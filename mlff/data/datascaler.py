@@ -1,0 +1,2 @@
+class EnergyScaler(object):
+    pass
