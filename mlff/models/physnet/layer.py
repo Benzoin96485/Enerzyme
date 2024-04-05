@@ -80,13 +80,13 @@ class DenseLayer(NeuronLayer):
         super().__init__(n_in, n_out, activation_fn)
         if W_init is None:
             W_init = semi_orthogonal_glorot_weights(n_in, n_out) 
-            self._W  = torch.from_numpy(W_init).requires_grad_()
+            self._W  = torch.tensor(W_init, requires_grad=True)
         else:
             self._W = W_init
 
         #define l2 loss term for regularization
         if regularization:
-            self._l2loss = F_.mse_loss(self.W, torch.zeros_like(self.W), reduction="sum")
+            self._l2loss = F_.mse_loss(self.W, torch.zeros_like(self.W), reduction="sum") / 2
         else:
             self._l2loss = 0.0
 

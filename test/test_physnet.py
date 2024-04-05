@@ -103,11 +103,14 @@ def test_DenseLayer():
     
     dense_layer_torch = DenseLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init))
     dense_layer_tf = Denselayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=tf.float64)
-    y_dense_torch = dense_layer_torch(torch.from_numpy(x)).numpy()
+    y_dense_torch = dense_layer_torch(torch.from_numpy(x)).detach().numpy()
+    l2loss_torch = dense_layer_torch.l2loss.detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         y_dense_tf = dense_layer_tf(x).eval()
+        l2loss_tf = dense_layer_tf.l2loss.eval()
     assert_allclose(y_dense_torch, y_dense_tf)
+    assert_allclose(l2loss_torch, l2loss_tf)
 
 
 def test_ResidualLayer():
