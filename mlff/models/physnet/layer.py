@@ -164,7 +164,7 @@ class InteractionLayer(NeuronLayer):
         super().__init__(K, F, activation_fn)
         self._drop_out = nn.Dropout(drop_out)
         #transforms radial basis functions to feature space
-        self._k2f = DenseLayer(K, F, W_init=torch.zeros([K, F], requires_grad=True), use_bias=False)
+        self._k2f = DenseLayer(K, F, W_init=torch.zeros([K, F], requires_grad=True, dtype=torch.double), use_bias=False)
         #rearrange feature vectors for computing the "message"
         self._dense_i = DenseLayer(F, F, activation_fn) # central atoms
         self._dense_j = DenseLayer(F, F, activation_fn) # neighbouring atoms

@@ -9,13 +9,36 @@ from numpy.random import get_state, set_state
 import torch
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
-sys.path.extend(["/home/gridsan/wlluo/src/MLFF/Enerzyme/", "/home/gridsan/wlluo/src/MLFF/PhysNet/neural_network"])
+sys.path.extend(["..", "."])
 from mlff.models.physnet import PhysNet
 from neural_network.NeuralNetwork import NeuralNetwork
-
+from mlff.models.physnet.init import semi_orthogonal_glorot_weights
 
 F = 128
 K = 60
+N = 50
+M = 20
+R = np.random.randn(N, 3) / 10
+idx_i = np.empty((N, N-1), dtype=int)
+idx_j = np.empty((N, N-1), dtype=int)
+for i in range(N):
+    for j in range(N - 1):
+        idx_i[i, j] = i
+for i in range(N):
+    c = 0
+    for j in range(N):
+        if j != i:
+            idx_j[i,c] = j
+            c += 1
+idx_i = idx_i.reshape(-1)
+idx_j = idx_j.reshape(-1)
+
+offsets = np.random.random((*idx_i.shape, 3))
+x = np.random.randn(N, F)
+W_init = semi_orthogonal_glorot_weights(F, F)
+b_init = np.random.randn(F)
+
+rbf = np.random.randn(*idx_i.shape, K)
 
 
 def initialize():
@@ -42,10 +65,7 @@ def test_grimme_d3_coefficient():
 
 def test_calculate_interatomic_distances():
     physnet_torch, physnet_tf = initialize()
-    R = np.random.randn(K, 3) / 10
-    idx_i = np.random.randint(0, K, 20)
-    idx_j = np.random.randint(0, K, 20)
-    offsets = np.random.random((20, 3))
+    
     D1 = physnet_torch.calculate_interatomic_distances(
         torch.from_numpy(R), 
         torch.from_numpy(idx_i), 
@@ -62,33 +82,25 @@ def test_calculate_interatomic_distances():
     assert_allclose(D1, D2)
 
 
-def test_RBFlayer():
+def test_RBFLayer():
     physnet_torch, physnet_tf = initialize()
-    R = np.random.randn(K, 3)
-    idx_i = np.random.randint(0, K, 20)
-    idx_j = np.random.randint(0, K, 20)
-    offsets = np.random.random((20, 3))
     D1 = physnet_torch.calculate_interatomic_distances(
         torch.from_numpy(R), 
         torch.from_numpy(idx_i), 
         torch.from_numpy(idx_j), 
         torch.from_numpy(offsets)
     ).numpy()
-    D = D1
-    rbf1 = physnet_torch.rbf_layer(torch.from_numpy(D)).detach().numpy()
+    rbf1 = physnet_torch.rbf_layer(torch.tensor(D1)).detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        rbf2 = physnet_tf.rbf_layer(D).eval()
+        rbf2 = physnet_tf.rbf_layer(D1).eval()
     assert_allclose(rbf1, rbf2, atol=1e-7, rtol=1e-7)
 
 
 def test_DenseLayer():
     from mlff.models.physnet.layer import DenseLayer as DenseLayer_torch
-    from mlff.models.physnet.init import semi_orthogonal_glorot_weights
     from neural_network.layers.DenseLayer import DenseLayer as Denselayer_tf
-    W_init = semi_orthogonal_glorot_weights(F, F)
-    b_init = np.random.randn(F)
-    x = np.random.randn(K, F)
+    
     dense_layer_torch = DenseLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init))
     dense_layer_tf = Denselayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=tf.float64)
     y_dense_torch = dense_layer_torch(torch.from_numpy(x)).numpy()
@@ -102,9 +114,6 @@ def test_ResidualLayer():
     from mlff.models.physnet.layer import ResidualLayer as ResidualLayer_torch
     from mlff.models.physnet.init import semi_orthogonal_glorot_weights
     from neural_network.layers.ResidualLayer import ResidualLayer as ResidualLayer_tf
-    W_init = semi_orthogonal_glorot_weights(F, F)
-    b_init = np.random.randn(F)
-    x = np.random.randn(K, F)
     residual_layer_torch = ResidualLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init))
     residual_layer_tf = ResidualLayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=tf.float64)
     y_residual_torch = residual_layer_torch(torch.from_numpy(x.copy())).numpy()
@@ -116,11 +125,53 @@ def test_ResidualLayer():
 
 def test_InteractionLayer():
     from mlff.models.physnet.layer import InteractionLayer as InteractionLayer_torch
-    from neural_network.layers.ResidualLayer import InteractionLayer as InteractionLayer_tf
+    from neural_network.layers.InteractionLayer import InteractionLayer as InteractionLayer_tf
     state = get_state()
+    interaction_layer_torch = InteractionLayer_torch(K, F, 3)
     set_state(state)
-    pass
+    interaction_layer_tf = InteractionLayer_tf(K, F, 3, scope="test", dtype=tf.float64)
+    y_interaction_torch = interaction_layer_torch(
+        torch.from_numpy(x.copy()), 
+        torch.from_numpy(rbf.copy()), 
+        torch.from_numpy(idx_i), 
+        torch.from_numpy(idx_j)
+    ).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        y_interaction_tf = interaction_layer_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
+    assert_allclose(y_interaction_torch, y_interaction_tf)
 
 
 def test_InteractionBlock():
-    pass
+    from mlff.models.physnet.block import InteractionBlock as InteractionBlock_torch
+    from neural_network.layers.InteractionBlock import InteractionBlock as InteractionBlock_tf
+    state = get_state()
+    interaction_block_torch = InteractionBlock_torch(K, F, 3, 3)
+    set_state(state)
+    interaction_block_tf = InteractionBlock_tf(K, F, 3, 3, scope="test", dtype=tf.float64)
+    y_interaction_torch = interaction_block_torch(
+        torch.from_numpy(x.copy()), 
+        torch.from_numpy(rbf.copy()), 
+        torch.from_numpy(idx_i), 
+        torch.from_numpy(idx_j)
+    ).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        y_interaction_tf = interaction_block_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
+    assert_allclose(y_interaction_torch, y_interaction_tf)
+
+
+def test_OutputBlock():
+    from mlff.models.physnet.block import OutputBlock as OutputBlock_torch
+    from neural_network.layers.OutputBlock import OutputBlock as OutputBlock_tf
+    state = get_state()
+    output_block_torch = OutputBlock_torch(F, 3)
+    set_state(state)
+    output_block_tf = OutputBlock_tf(F, 3, scope="test", dtype=tf.float64)
+    y_output_torch = output_block_torch(
+        torch.from_numpy(x.copy())
+    ).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        y_output_tf = output_block_tf(x.copy()).eval()
+    assert_allclose(y_output_torch, y_output_tf)
