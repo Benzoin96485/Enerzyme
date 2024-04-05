@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F_
-from .util import softplus_inverse, segment_sum
+from .func import softplus_inverse, segment_sum
 from .init import semi_orthogonal_glorot_weights
 
 
@@ -11,6 +11,7 @@ class NeuronLayer(nn.Module):
         return "[ " + str(self.n_in) + " -> " + str(self.n_out) + " ]"
 
     def __init__(self, n_in, n_out, activation_fn=None):
+        super().__init__()
         self._n_in  = n_in  # number of inputs
         self._n_out = n_out # number of outpus
         self._activation_fn = activation_fn # activation function
@@ -36,7 +37,7 @@ class RBFLayer(NeuronLayer):
         super().__init__(1, K, None)
         self._K = K
         self._cutoff = cutoff
-        centers = softplus_inverse(np.linspace(1.0,np.exp(-cutoff),K))
+        centers = softplus_inverse(np.linspace(1.0, np.exp(-cutoff), K))
         self._centers = F_.softplus(torch.tensor(np.asarray(centers), requires_grad=True))
         widths = [softplus_inverse((0.5 / ((1.0 - np.exp(-cutoff)) / K)) ** 2)] * K
         self._widths = F_.softplus(torch.tensor(np.asarray(widths), requires_grad=True))
@@ -79,7 +80,9 @@ class DenseLayer(NeuronLayer):
         super().__init__(n_in, n_out, activation_fn)
         if W_init is None:
             W_init = semi_orthogonal_glorot_weights(n_in, n_out) 
-        self._W  = torch.tensor(W_init, requires_grad=True)
+            self._W  = torch.from_numpy(W_init).requires_grad_()
+        else:
+            self._W = W_init
 
         #define l2 loss term for regularization
         if regularization:
@@ -91,8 +94,8 @@ class DenseLayer(NeuronLayer):
         self._use_bias = use_bias
         if self.use_bias:
             if b_init is None:
-                b_init = torch.zeros([self.n_out])
-            self._b = torch.zeros([self.n_out], requires_grad=True)
+                b_init = torch.zeros([self.n_out], requires_grad=True)
+            self._b = b_init
 
     @property
     def W(self):
@@ -121,7 +124,7 @@ class DenseLayer(NeuronLayer):
 
 class ResidualLayer(NeuronLayer):
     def __str__(self):
-        return "residual_layer"+super().__str__()
+        return "Residual layer: " + super().__str__()
 
     def __init__(self, n_in, n_out, activation_fn=None, W_init=None, b_init=None, use_bias=True, drop_out=0.0):
         super().__init__(n_in, n_out, activation_fn)
@@ -155,27 +158,27 @@ class ResidualLayer(NeuronLayer):
 
 class InteractionLayer(NeuronLayer):
     def __str__(self):
-        return "interaction_layer"+super().__str__()
+        return "Interaction layer: " + super().__str__()
 
-    def __init__(self, K, F, num_residual, activation_fn=None, dropout=0.0):
+    def __init__(self, K, F, num_residual, activation_fn=None, drop_out=0.0):
         super().__init__(K, F, activation_fn)
-        self._dropout = nn.Dropout(dropout)
+        self._drop_out = nn.Dropout(drop_out)
         #transforms radial basis functions to feature space
         self._k2f = DenseLayer(K, F, W_init=torch.zeros([K, F], requires_grad=True), use_bias=False)
         #rearrange feature vectors for computing the "message"
         self._dense_i = DenseLayer(F, F, activation_fn) # central atoms
         self._dense_j = DenseLayer(F, F, activation_fn) # neighbouring atoms
         #for performing residual transformation on the "message"
-        self._residual_layer = nn.Sequential([
-            ResidualLayer(F, F, activation_fn, drop_out=dropout) for i in range(num_residual)
+        self._residual_layer = nn.Sequential(*[
+            ResidualLayer(F, F, activation_fn, drop_out=drop_out) for i in range(num_residual)
         ])
         #for performing the final update to the feature vectors
         self._dense = DenseLayer(F, F)
         self._u = torch.ones([F], requires_grad=True)
 
     @property
-    def dropout(self):
-        return self._dropout
+    def drop_out(self):
+        return self._drop_out
 
     @property
     def k2f(self):
@@ -204,9 +207,9 @@ class InteractionLayer(NeuronLayer):
     def forward(self, x, rbf, idx_i, idx_j):
         #pre-activation
         if self.activation_fn is not None: 
-            xa = self.dropout(self.activation_fn(x))
+            xa = self.drop_out(self.activation_fn(x))
         else:
-            xa = self.dropout(x)
+            xa = self.drop_out(x)
         #calculate feature mask from radial basis functions
         g = self.k2f(rbf)
         #calculate contribution of neighbors and central atom

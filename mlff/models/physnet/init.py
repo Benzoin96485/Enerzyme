@@ -22,9 +22,9 @@ def square_orthogonal_matrix(dim=3):
 #generates a random (semi-)orthogonal matrix of size NxM
 def semi_orthogonal_matrix(N, M, seed=None):
     if N > M: #number of rows is larger than number of columns
-        square_matrix = square_orthogonal_matrix(dim=N, seed=seed)
+        square_matrix = square_orthogonal_matrix(dim=N)
     else: #number of columns is larger than number of rows
-        square_matrix = square_orthogonal_matrix(dim=M, seed=seed)
+        square_matrix = square_orthogonal_matrix(dim=M)
     return square_matrix[:N,:M]
 
 #generates a weight matrix with variance according to Glorot initialization

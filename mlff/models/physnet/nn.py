@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F_
-from .util import softplus_inverse, segment_sum
+from .func import softplus_inverse, segment_sum
 from .d3 import d3_s6, d3_s8, d3_a1, d3_a2, d3_autoang, d3_autoev, edisp
 from .layer import RBFLayer
 from .block import InteractionBlock, OutputBlock
@@ -24,9 +24,10 @@ class PhysNet(nn.Module):
         use_electrostatic=True,             # adds electrostatic contributions to atomic energy
         use_dispersion=True,                # adds dispersion contributions to atomic energy
         activation_fn="shifted_softplus",   # activation function
-        dropout=0.0,
+        drop_out=0.0,
         **params
     ):
+        super().__init__()
         self._num_blocks = num_blocks
         self._F = F
         self._K = K
@@ -36,22 +37,22 @@ class PhysNet(nn.Module):
         self._use_dispersion = use_dispersion
         self._activation_fn = activation_fn
         self._embeddings = nn.Embedding(95, self.F)
-        self._dropout = dropout
+        self._drop_out = drop_out
         self._rbf_layer = RBFLayer(K, sr_cut)
         self._s6 = F_.softplus(torch.tensor(softplus_inverse(d3_s6), requires_grad=True))
         self._s8 = F_.softplus(torch.tensor(softplus_inverse(d3_s8), requires_grad=True))
         self._a1 = F_.softplus(torch.tensor(softplus_inverse(d3_a1), requires_grad=True))
         self._a2 = F_.softplus(torch.tensor(softplus_inverse(d3_a2), requires_grad=True))
 
-        self._interaction_block = [
+        self._interaction_block = nn.Sequential(*[
             InteractionBlock(
-                K, F, num_residual_atomic, num_residual_interaction, activation_fn=activation_fn, dropout=dropout
+                K, F, num_residual_atomic, num_residual_interaction, activation_fn=activation_fn, drop_out=drop_out
             ) for i in range(num_blocks)
-        ]
-        self._output_block = [
-            OutputBlock(F, num_residual_output, activation_fn=activation_fn, dropout=dropout
+        ])
+        self._output_block = nn.Sequential(*[
+            OutputBlock(F, num_residual_output, activation_fn=activation_fn, drop_out=drop_out
             ) for i in range(num_blocks)
-        ]
+        ])
 
     def calculate_interatomic_distances(self, R, idx_i, idx_j, offsets=None):
         #calculate interatomic distances
@@ -197,8 +198,8 @@ class PhysNet(nn.Module):
 
 
     @property
-    def keep_prob(self):
-        return self._dropout
+    def drop_out(self):
+        return self._drop_out
     
     @property
     def num_blocks(self):

@@ -6,7 +6,7 @@ The Journal of chemical physics 132.15 (2010).
 import os
 import numpy as np
 import torch
-from .util import segment_sum, gather_nd
+from .func import segment_sum, gather_nd
 
 
 package_directory = os.path.dirname(os.path.abspath(__file__))
