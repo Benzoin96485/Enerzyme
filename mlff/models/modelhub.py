@@ -35,6 +35,6 @@ class ModelHub:
                 self.models['FF'][model_str] = self._init_ff(self.data, self.features[feature_name], trainer, model_str, loss_key, **model_params)
     
     def _init_ff(self, data, feature, trainer, model_str, loss_key=None, **params):
-        logger.info("init {} NN model".format(model_str))
+        logger.info("init {} Force Field".format(model_str))
         model = FF(data, feature, trainer, model_str, loss_key, **params)
         return model

@@ -72,17 +72,35 @@ def _getc6(ZiZj, nci, ncj, c6ab=d3_c6ab, k3=d3_k3):
             cn1 = c6ab_[:,i,j,1]
             cn2 = c6ab_[:,i,j,2]
             r = (cn1-nci)**2 + (cn2-ncj)**2
-            r_save = tf.where(r < r_save, r, r_save)
             c6mem  = tf.where(r < r_save, cn0, c6mem)
+            r_save = tf.where(r < r_save, r, r_save)
             tmp1 = tf.exp(k3*r)
             rsum += tf.where(cn0 > 0.0, tmp1,     tf.zeros_like(tmp1))
             csum += tf.where(cn0 > 0.0, tmp1*cn0, tf.zeros_like(tmp1))
     c6 = tf.where(rsum > 0.0, csum/rsum, c6mem)
     return c6
 
+
+def _getc6_v2(ZiZj, nci, ncj, c6ab=d3_c6ab, k3=d3_k3):
+    '''
+    interpolate c6
+    '''
+    #gather the relevant entries from the table
+    c6ab_ = tf.cast(tf.gather_nd(c6ab, ZiZj),nci.dtype)
+    #calculate c6 coefficients
+    d3_maxc2 = d3_maxc * d3_maxc
+    c6ab_ = tf.reshape(c6ab_, (-1, d3_maxc2, 3))
+    nci_ = tf.tile(tf.expand_dims(nci, -1), multiples=(1, d3_maxc2))
+    ncj_ = tf.tile(tf.expand_dims(ncj, -1), multiples=(1, d3_maxc2))
+    r = (c6ab_[:, :, 1] - nci_) ** 2 + (c6ab_[:, :, 2] - ncj_) ** 2
+    weight = tf.nn.softmax(k3 * r, axis=1)
+    c6 = tf.reduce_sum(weight * c6ab_[:, :, 0], axis=1)
+    return c6
+
+
 def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None, 
     r6=None, r8=None, s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k1=d3_k1, k2=d3_k2, 
-    k3=d3_k3, c6ab=d3_c6ab, r0ab=d3_r0ab, rcov=d3_rcov, r2r4=d3_r2r4):
+    k3=d3_k3, c6ab=d3_c6ab, r0ab=d3_r0ab, rcov=d3_rcov, r2r4=d3_r2r4, eps=1e-10):
     '''
     compute d3 dispersion energy in Hartree
     r: distance in bohr!
@@ -107,7 +125,7 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
 
     #Becke-Johnson damping, zero-damping introduces spurious repulsion
     #and is therefore not supported/implemented
-    tmp = a1*tf.sqrt(c8/c6) + a2
+    tmp = a1*tf.sqrt(c8/(c6+eps)+eps) + a2
     tmp2 = tmp**2
     tmp6 = tmp2**3
     tmp8 = tmp6*tmp2

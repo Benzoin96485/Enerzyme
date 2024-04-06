@@ -3,6 +3,9 @@ import torch
 import torch.nn.functional as F_
 
 
+LOG2 = np.log(2.0)
+
+
 def softplus_inverse(x):
     '''numerically stable inverse of softplus transform'''
     return x + np.log(-np.expm1(-x))
@@ -10,7 +13,7 @@ def softplus_inverse(x):
 
 def shifted_softplus(x):
     #return softplus(x) - np.log(2.0)
-    return F_.softplus(x) - torch.log(2.0)
+    return F_.softplus(x) - LOG2
 
 
 def segment_sum(x, indices, dim=0):

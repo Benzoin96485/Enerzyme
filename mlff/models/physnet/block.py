@@ -7,14 +7,14 @@ class InteractionBlock(NeuronLayer):
     def __str__(self):
         return "Interaction block: " + super().__str__()
 
-    def __init__(self, K, F, num_residual_atomic, num_residual_interaction, activation_fn=None, drop_out=0.0):
+    def __init__(self, K, F, num_residual_atomic, num_residual_interaction, activation_fn=None, drop_out=0.0, dtype=torch.double):
         super().__init__(K, F, activation_fn)
         #interaction layer
-        self._interaction = InteractionLayer(K, F, num_residual_interaction, activation_fn=activation_fn, drop_out=drop_out)
+        self._interaction = InteractionLayer(K, F, num_residual_interaction, activation_fn=activation_fn, drop_out=drop_out, dtype=dtype)
 
         #residual layers
         self._residual_layer = nn.Sequential(*[
-            ResidualLayer(F, F, activation_fn, drop_out=drop_out) for i in range(num_residual_atomic)
+            ResidualLayer(F, F, activation_fn, drop_out=drop_out, dtype=dtype) for i in range(num_residual_atomic)
         ])
 
     @property
@@ -33,12 +33,12 @@ class OutputBlock(NeuronLayer):
     def __str__(self):
         return "output"+super().__str__()
 
-    def __init__(self, F, num_residual, activation_fn=None, drop_out=0.0):
+    def __init__(self, F, num_residual, activation_fn=None, drop_out=0.0, dtype=torch.double):
         super().__init__(F, 2, activation_fn)
         self._residual_layer = nn.Sequential(*[
-            ResidualLayer(F, F, activation_fn, drop_out=drop_out) for i in range(num_residual)
+            ResidualLayer(F, F, activation_fn, drop_out=drop_out, dtype=dtype) for i in range(num_residual)
         ])
-        self._dense = DenseLayer(F, 2, W_init=torch.zeros([F, 2], dtype=torch.double), use_bias=False)
+        self._dense = DenseLayer(F, 2, W_init=torch.zeros([F, 2], dtype=dtype), use_bias=False)
     
     @property
     def residual_layer(self):

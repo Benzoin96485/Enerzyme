@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F_
-from .func import softplus_inverse, segment_sum
+from .func import softplus_inverse, segment_sum, shifted_softplus
 from .d3 import d3_s6, d3_s8, d3_a1, d3_a2, d3_autoang, d3_autoev, edisp
 from .layer import RBFLayer
 from .block import InteractionBlock, OutputBlock
@@ -23,34 +23,50 @@ class PhysNet(nn.Module):
         num_residual_output=1,              # number of residual layers for the output blocks
         use_electrostatic=True,             # adds electrostatic contributions to atomic energy
         use_dispersion=True,                # adds dispersion contributions to atomic energy
+        Eshift=0.0,                     #initial value for output energy shift (makes convergence faster)
+        Escale=1.0,                     #initial value for output energy scale (makes convergence faster)
+        Qshift=0.0,                     #initial value for output charge shift 
+        Qscale=1.0,                     #initial value for output charge scale 
+        kehalf=7.199822675975274,       #half (else double counting) of the Coulomb constant (default is in units e=1, eV=1, A=1)
         activation_fn="shifted_softplus",   # activation function
         drop_out=0.0,
+        dtype=torch.double,
         **params
     ):
         super().__init__()
         self._num_blocks = num_blocks
         self._F = F
         self._K = K
+        self._dtype = dtype
+        self._kehalf = kehalf
         self._sr_cut = sr_cut
         self._lr_cut = lr_cut
         self._use_electrostatic = use_electrostatic
         self._use_dispersion = use_dispersion
-        self._activation_fn = activation_fn
-        self._embeddings = nn.Embedding(95, self.F)
+        if callable(activation_fn):
+            self._activation_fn = activation_fn
+        else:
+            self._activation_fn = {"shifted_softplus": shifted_softplus}.get(activation_fn, shifted_softplus)
+        self._embeddings = nn.Embedding(95, self.F, dtype=dtype)
         self._drop_out = drop_out
-        self._rbf_layer = RBFLayer(K, sr_cut)
-        self._s6 = F_.softplus(torch.tensor(softplus_inverse(d3_s6), requires_grad=True))
-        self._s8 = F_.softplus(torch.tensor(softplus_inverse(d3_s8), requires_grad=True))
-        self._a1 = F_.softplus(torch.tensor(softplus_inverse(d3_a1), requires_grad=True))
-        self._a2 = F_.softplus(torch.tensor(softplus_inverse(d3_a2), requires_grad=True))
+        self._rbf_layer = RBFLayer(K, sr_cut, dtype=dtype)
+        self._s6 = F_.softplus(torch.tensor(softplus_inverse(d3_s6), dtype=dtype, requires_grad=True))
+        self._s8 = F_.softplus(torch.tensor(softplus_inverse(d3_s8), dtype=dtype, requires_grad=True))
+        self._a1 = F_.softplus(torch.tensor(softplus_inverse(d3_a1), dtype=dtype, requires_grad=True))
+        self._a2 = F_.softplus(torch.tensor(softplus_inverse(d3_a2), dtype=dtype, requires_grad=True))
+        self._Eshift = Eshift * torch.ones(95, dtype=dtype, requires_grad=True)
+        self._Escale = Escale * torch.ones(95, dtype=dtype, requires_grad=True)
+        self._Qshift = Qshift * torch.ones(95, dtype=dtype, requires_grad=True)
+        self._Qscale = Qscale * torch.ones(95, dtype=dtype, requires_grad=True)
 
         self._interaction_block = nn.Sequential(*[
             InteractionBlock(
-                K, F, num_residual_atomic, num_residual_interaction, activation_fn=activation_fn, drop_out=drop_out
+                K, F, num_residual_atomic, num_residual_interaction, activation_fn=self.activation_fn, drop_out=drop_out,
+                dtype=dtype
             ) for i in range(num_blocks)
         ])
         self._output_block = nn.Sequential(*[
-            OutputBlock(F, num_residual_output, activation_fn=activation_fn, drop_out=drop_out
+            OutputBlock(F, num_residual_output, activation_fn=self.activation_fn, drop_out=drop_out, dtype=dtype
             ) for i in range(num_blocks)
         ])
 
@@ -78,7 +94,7 @@ class PhysNet(nn.Module):
         rbf = self.rbf_layer(Dij_sr)
 
         #initialize feature vectors according to embeddings for nuclear charges
-        x = self.embeddings[Z]
+        x = self.embeddings(Z)
 
         #apply blocks
         Ea = 0 #atomic energy 
@@ -122,7 +138,6 @@ class PhysNet(nn.Module):
         forces = -torch.autograd.grad(torch.sum(energy), R)[0]
         return energy, forces
     
-
     def energy_from_atomic_properties(self, Ea, Qa, Dij, Z, idx_i, idx_j, Q_tot=None, batch_seg=None):
         if batch_seg is None:
             batch_seg = torch.zeros_like(Z)
@@ -214,6 +229,22 @@ class PhysNet(nn.Module):
         return self._embeddings
 
     @property
+    def Eshift(self):
+        return self._Eshift
+
+    @property
+    def Escale(self):
+        return self._Escale
+  
+    @property
+    def Qshift(self):
+        return self._Qshift
+
+    @property
+    def Qscale(self):
+        return self._Qscale
+
+    @property
     def s6(self):
         return self._s6
 
@@ -236,6 +267,14 @@ class PhysNet(nn.Module):
     @property
     def use_dispersion(self):
         return self._use_dispersion
+    
+    @property
+    def kehalf(self):
+        return self._kehalf
+    
+    @property
+    def dtype(self):
+        return self._dtype
 
     @property
     def F(self):

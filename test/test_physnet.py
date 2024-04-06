@@ -18,7 +18,7 @@ F = 128
 K = 60
 N = 50
 M = 20
-R = np.random.randn(N, 3) / 10
+R = np.random.rand(N, 3) * 100
 idx_i = np.empty((N, N-1), dtype=int)
 idx_j = np.empty((N, N-1), dtype=int)
 for i in range(N):
@@ -32,20 +32,33 @@ for i in range(N):
             c += 1
 idx_i = idx_i.reshape(-1)
 idx_j = idx_j.reshape(-1)
-
 offsets = np.random.random((*idx_i.shape, 3))
 x = np.random.randn(N, F)
 W_init = semi_orthogonal_glorot_weights(F, F)
 b_init = np.random.randn(F)
-
+D = np.random.random(*idx_i.shape) * 30 + 3
 rbf = np.random.randn(*idx_i.shape, K)
+Z = np.random.randint(0, 94, N)
+Qa = np.random.randn(N)
+Ea = np.random.randn(N)
+Q_tot = np.random.randn()
 
 
-def initialize():
+def initialize(dtype="float64", use_dispersion=True):
+    global R, offsets
+    if dtype == "float64":
+        dtype_torch = torch.float64
+        dtype_tf = tf.float64
+    elif dtype == "float32":
+        dtype_torch = torch.float32
+        dtype_tf = tf.float32
+        R = R.astype(np.float32)
+        offsets = offsets.astype(np.float32)
     state = get_state()
-    physnet_torch = PhysNet(F, K, 5.0)
+    physnet_torch = PhysNet(F, K, 5.0, dtype=dtype_torch, use_dispersion=use_dispersion)
     set_state(state)
-    physnet_tf = NeuralNetwork(F, K, 5.0, scope="test", dtype=tf.float64)
+    physnet_tf = NeuralNetwork(F, K, 5.0, scope="test", dtype=dtype_tf, use_dispersion=use_dispersion)
+    physnet_tf._embeddings = tf.Variable(physnet_torch.embeddings.weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
     return physnet_torch, physnet_tf
 
 
@@ -178,3 +191,146 @@ def test_OutputBlock():
         sess.run(tf.global_variables_initializer())
         y_output_tf = output_block_tf(x.copy()).eval()
     assert_allclose(y_output_torch, y_output_tf)
+
+
+def test_atomic_properties():
+    physnet_torch, physnet_tf = initialize("float32")
+    Ea_torch, Qa_torch, Dij_lr_torch, nhloss_torch = physnet_torch.atomic_properties(
+        torch.from_numpy(Z.copy()), 
+        torch.tensor(R, dtype=torch.float32), 
+        torch.from_numpy(idx_i.copy()), 
+        torch.from_numpy(idx_j.copy()), 
+        torch.tensor(offsets, dtype=torch.float32)
+    )
+    Ea_torch = Ea_torch.detach().numpy()
+    Qa_torch = Qa_torch.detach().numpy()
+    Dij_lr_torch = Dij_lr_torch.detach().numpy()
+    nhloss_torch = nhloss_torch.detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        Ea_tf, Qa_tf, Dij_lr_tf, nhloss_tf = physnet_tf.atomic_properties(
+            Z, R, idx_i, idx_j, offsets
+        )
+        Ea_tf = Ea_tf.eval()
+        Qa_tf = Qa_tf.eval()
+        Dij_lr_tf = Dij_lr_tf.eval()
+        nhloss_tf = nhloss_tf.eval()
+    assert_allclose(Ea_torch, Ea_tf)
+    assert_allclose(Qa_torch, Qa_tf)
+    assert_allclose(Dij_lr_torch, Dij_lr_tf, rtol=1e-6, atol=1e-6)
+    assert_allclose(nhloss_torch, nhloss_tf)
+
+
+def test_edisp():
+    from mlff.models.physnet.d3 import edisp as edisp_torch
+    from neural_network.grimme_d3.grimme_d3 import edisp as edisp_tf
+    e_torch = edisp_torch(torch.from_numpy(Z.copy()), torch.from_numpy(D.copy()), torch.from_numpy(idx_i), torch.from_numpy(idx_j)).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        e_tf = edisp_tf(Z, D, idx_i, idx_j).eval()
+    assert_allclose(e_torch, e_tf)
+
+
+def test_electrostatic_energy_per_atom():
+    physnet_torch, physnet_tf = initialize("float32")
+    e_torch = physnet_torch.electrostatic_energy_per_atom(
+        torch.from_numpy(D.copy()), 
+        torch.from_numpy(Qa.copy()), 
+        torch.from_numpy(idx_i), 
+        torch.from_numpy(idx_j)
+    ).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        e_tf = physnet_tf.electrostatic_energy_per_atom(D, Qa, idx_i, idx_j).eval()
+    assert_allclose(e_torch, e_tf)
+
+
+def test_energy_from_scaled_atomic_properties():
+    physnet_torch, physnet_tf = initialize()
+    e_torch = physnet_torch.energy_from_scaled_atomic_properties(
+        torch.from_numpy(Ea.copy()), 
+        torch.from_numpy(Qa.copy()), 
+        torch.from_numpy(D.copy()),
+        torch.from_numpy(Z.copy()),
+        torch.from_numpy(idx_i), 
+        torch.from_numpy(idx_j)
+    )
+    e_torch = e_torch.detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        e_tf = physnet_tf.energy_from_scaled_atomic_properties(Ea, Qa, D, Z, idx_i, idx_j).eval()
+    assert_allclose(e_torch, e_tf)
+
+
+def test_scaled_charges():
+    physnet_torch, physnet_tf = initialize()
+    q_torch = physnet_torch.scaled_charges(
+        torch.from_numpy(Z.copy()),
+        torch.from_numpy(Qa.copy()), 
+        torch.tensor(Q_tot)
+    ).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        q_tf = physnet_tf.scaled_charges(Z, Qa, Q_tot).eval()
+    assert_allclose(q_torch, q_tf, rtol=1e-7, atol=1e-7)
+
+def test_energy_from_atomic_properties():
+    physnet_torch, physnet_tf = initialize()
+    e_torch = physnet_torch.energy_from_atomic_properties(
+        torch.from_numpy(Ea.copy()), 
+        torch.from_numpy(Qa.copy()), 
+        torch.from_numpy(D.copy()),
+        torch.from_numpy(Z.copy()),
+        torch.from_numpy(idx_i), 
+        torch.from_numpy(idx_j),
+        torch.tensor(Q_tot)
+    )
+    e_torch = e_torch.detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        e_tf = physnet_tf.energy_from_atomic_properties(Ea, Qa, D, Z, idx_i, idx_j, Q_tot).eval()
+    assert_allclose(e_torch, e_tf)
+    pass
+
+
+def test_energy_from_atomic_properties():
+    physnet_torch, physnet_tf = initialize()
+    e_torch = physnet_torch.energy_from_atomic_properties(
+        torch.from_numpy(Ea.copy()), 
+        torch.from_numpy(Qa.copy()), 
+        torch.from_numpy(D.copy()),
+        torch.from_numpy(Z.copy()),
+        torch.from_numpy(idx_i), 
+        torch.from_numpy(idx_j),
+        torch.tensor(Q_tot)
+    )
+    e_torch = e_torch.detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        e_tf = physnet_tf.energy_from_atomic_properties(Ea, Qa, D, Z, idx_i, idx_j, Q_tot).eval()
+    assert_allclose(e_torch, e_tf)
+    pass
+
+
+def test_energy_and_forces():
+    torch.autograd.set_detect_anomaly(True)
+    physnet_torch, physnet_tf = initialize("float32")
+    e_torch, f_torch = physnet_torch.energy_and_forces(
+        torch.from_numpy(Z.copy()),
+        torch.tensor(R, requires_grad=True),
+        torch.from_numpy(idx_i),
+        torch.from_numpy(idx_j),
+        torch.tensor(Q_tot, dtype=torch.float32),
+        offsets=torch.from_numpy(offsets)
+    )
+    e_torch = e_torch.detach().numpy()
+    f_torch = f_torch.detach().numpy()
+    # print(e_torch, f_torch)
+    with tf.Session() as sess:
+        R_tf = tf.Variable(R)
+        sess.run(tf.global_variables_initializer())
+        e_tf, f_tf = physnet_tf.energy_and_forces(Z, R_tf, idx_i, idx_j, Q_tot, offsets=offsets)
+        e_tf = e_tf.eval()
+        f_tf = f_tf.eval()
+    assert_allclose(e_torch, e_tf, rtol=1e-7, atol=1e-7)
+    assert_allclose(f_torch, f_tf, rtol=1e-7, atol=1e-7)

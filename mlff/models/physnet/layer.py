@@ -33,14 +33,15 @@ class RBFLayer(NeuronLayer):
     def __str__(self):
         return "Radial basis function layer: " + super().__str__()
 
-    def __init__(self, K, cutoff):
+    def __init__(self, K, cutoff, dtype=torch.double):
         super().__init__(1, K, None)
         self._K = K
         self._cutoff = cutoff
+        self._dtype = dtype
         centers = softplus_inverse(np.linspace(1.0, np.exp(-cutoff), K))
-        self._centers = F_.softplus(torch.tensor(np.asarray(centers), requires_grad=True))
+        self._centers = F_.softplus(torch.tensor(np.asarray(centers), dtype=dtype, requires_grad=True))
         widths = [softplus_inverse((0.5 / ((1.0 - np.exp(-cutoff)) / K)) ** 2)] * K
-        self._widths = F_.softplus(torch.tensor(np.asarray(widths), requires_grad=True))
+        self._widths = F_.softplus(torch.tensor(np.asarray(widths), dtype=dtype, requires_grad=True))
 
     @property
     def K(self):
@@ -64,7 +65,7 @@ class RBFLayer(NeuronLayer):
         x3 = x ** 3
         x4 = x3 * x
         x5 = x4 * x
-        return torch.where(x < 1, 1 - 6 * x5 + 15 * x4 - 10 * x3, torch.zeros_like(x))
+        return torch.where(x < 1, 1 - 6 * x5 + 15 * x4 - 10 * x3, torch.zeros_like(x, dtype=self._dtype))
     
     def forward(self, D):
         D = torch.unsqueeze(D, -1) # necessary for proper broadcasting behaviour
@@ -76,17 +77,20 @@ class DenseLayer(NeuronLayer):
     def __str__(self):
         return "Dense layer: " + super().__str__()
 
-    def __init__(self, n_in, n_out, activation_fn=None, W_init=None, b_init=None, use_bias=True, regularization=True):
+    def __init__(
+        self, n_in, n_out, activation_fn=None, 
+        W_init=None, b_init=None, use_bias=True, regularization=True, dtype=torch.double
+    ):
         super().__init__(n_in, n_out, activation_fn)
         if W_init is None:
             W_init = semi_orthogonal_glorot_weights(n_in, n_out) 
-            self._W  = torch.tensor(W_init, requires_grad=True)
+            self._W  = torch.tensor(W_init, dtype=dtype, requires_grad=True)
         else:
             self._W = W_init
 
         #define l2 loss term for regularization
         if regularization:
-            self._l2loss = F_.mse_loss(self.W, torch.zeros_like(self.W), reduction="sum") / 2
+            self._l2loss = F_.mse_loss(self.W, torch.zeros_like(self.W, dtype=dtype), reduction="sum") / 2
         else:
             self._l2loss = 0.0
 
@@ -94,7 +98,7 @@ class DenseLayer(NeuronLayer):
         self._use_bias = use_bias
         if self.use_bias:
             if b_init is None:
-                b_init = torch.zeros([self.n_out], requires_grad=True)
+                b_init = torch.zeros([self.n_out], dtype=dtype, requires_grad=True)
             self._b = b_init
 
     @property
@@ -126,13 +130,16 @@ class ResidualLayer(NeuronLayer):
     def __str__(self):
         return "Residual layer: " + super().__str__()
 
-    def __init__(self, n_in, n_out, activation_fn=None, W_init=None, b_init=None, use_bias=True, drop_out=0.0):
+    def __init__(
+        self, n_in, n_out, activation_fn=None, 
+        W_init=None, b_init=None, use_bias=True, drop_out=0.0, dtype=torch.double
+    ):
         super().__init__(n_in, n_out, activation_fn)
         self._drop_out = nn.Dropout(drop_out)
         self._dense = DenseLayer(n_in, n_out, activation_fn=activation_fn, 
-            W_init=W_init, b_init=b_init, use_bias=use_bias)
+            W_init=W_init, b_init=b_init, use_bias=use_bias, dtype=dtype)
         self._residual = DenseLayer(n_out, n_out, activation_fn=None, 
-            W_init=W_init, b_init=b_init, use_bias=use_bias)
+            W_init=W_init, b_init=b_init, use_bias=use_bias, dtype=dtype)
       
     @property
     def drop_out(self):
@@ -152,29 +159,29 @@ class ResidualLayer(NeuronLayer):
             y = self.drop_out(self.activation_fn(x))
         else:
             y = self.drop_out(x)
-        x += self.residual(self.dense(y))
-        return x
+        z = self.residual(self.dense(y)) + x
+        return z
 
 
 class InteractionLayer(NeuronLayer):
     def __str__(self):
         return "Interaction layer: " + super().__str__()
 
-    def __init__(self, K, F, num_residual, activation_fn=None, drop_out=0.0):
+    def __init__(self, K, F, num_residual, activation_fn=None, drop_out=0.0, dtype=torch.double):
         super().__init__(K, F, activation_fn)
         self._drop_out = nn.Dropout(drop_out)
         #transforms radial basis functions to feature space
-        self._k2f = DenseLayer(K, F, W_init=torch.zeros([K, F], requires_grad=True, dtype=torch.double), use_bias=False)
+        self._k2f = DenseLayer(K, F, W_init=torch.zeros([K, F], requires_grad=True, dtype=dtype), use_bias=False, dtype=dtype)
         #rearrange feature vectors for computing the "message"
-        self._dense_i = DenseLayer(F, F, activation_fn) # central atoms
-        self._dense_j = DenseLayer(F, F, activation_fn) # neighbouring atoms
+        self._dense_i = DenseLayer(F, F, activation_fn, dtype=dtype) # central atoms
+        self._dense_j = DenseLayer(F, F, activation_fn, dtype=dtype) # neighbouring atoms
         #for performing residual transformation on the "message"
         self._residual_layer = nn.Sequential(*[
-            ResidualLayer(F, F, activation_fn, drop_out=drop_out) for i in range(num_residual)
+            ResidualLayer(F, F, activation_fn, drop_out=drop_out, dtype=dtype) for i in range(num_residual)
         ])
         #for performing the final update to the feature vectors
-        self._dense = DenseLayer(F, F)
-        self._u = torch.ones([F], requires_grad=True)
+        self._dense = DenseLayer(F, F, dtype=dtype)
+        self._u = torch.ones([F], requires_grad=True, dtype=dtype)
 
     @property
     def drop_out(self):

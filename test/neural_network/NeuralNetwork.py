@@ -185,7 +185,8 @@ class NeuralNetwork:
     def energy_and_forces_from_atomic_properties(self, Ea, Qa, Dij, Z, R, idx_i, idx_j, Q_tot=None, batch_seg=None):
         with tf.name_scope("energy_and_forces_from_atomic_properties"):
             energy = self.energy_from_atomic_properties(Ea, Qa, Dij, Z, idx_i, idx_j, Q_tot, batch_seg)
-            forces = -tf.convert_to_tensor(tf.gradients(tf.reduce_sum(energy), R)[0])
+            grad = tf.gradients(tf.reduce_sum(energy), R)[0]
+            forces = -tf.convert_to_tensor(grad)
         return energy, forces
 
     #calculates the total energy (including electrostatic interactions)
