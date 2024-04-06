@@ -274,6 +274,7 @@ def test_scaled_charges():
         q_tf = physnet_tf.scaled_charges(Z, Qa, Q_tot).eval()
     assert_allclose(q_torch, q_tf, rtol=1e-7, atol=1e-7)
 
+
 def test_energy_from_atomic_properties():
     physnet_torch, physnet_tf = initialize()
     e_torch = physnet_torch.energy_from_atomic_properties(

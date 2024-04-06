@@ -112,7 +112,8 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     nc = _ncoord(Zi, Zj, r, idx_i, cutoff=cutoff, rcov=rcov) #coordination numbers
     nci = tf.gather(nc, idx_i)
     ncj = tf.gather(nc, idx_j)
-    c6 = _getc6(ZiZj, nci, ncj, c6ab=c6ab, k3=k3) #c6 coefficients
+    c6 = _getc6_v2(ZiZj, nci, ncj, c6ab=c6ab, k3=k3) #c6 coefficients
+    
     c8 = 3*c6*tf.cast(tf.gather(r2r4, Zi),c6.dtype)*tf.cast(tf.gather(r2r4, Zj),c6.dtype) #c8 coefficient
     
     #compute all necessary powers of the distance
@@ -132,6 +133,7 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     if cutoff is None:
         e6 = 1/(r6+tmp6)
         e8 = 1/(r8+tmp8)
+        print(c6.eval(), c8.eval())
     else: #apply cutoff
         cut2 = cutoff**2
         cut6 = cut2**3

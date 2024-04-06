@@ -117,6 +117,7 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     nci = nc[idx_i]
     ncj = nc[idx_j]
     c6 = _getc6_v2(ZiZj, nci, ncj, c6ab=c6ab, k3=k3) #c6 coefficients
+    
     c8 = 3 * c6 * r2r4[Zi].type_as(c6) * r2r4[Zj].type_as(c6) #c8 coefficient
     
     #compute all necessary powers of the distance
@@ -133,8 +134,9 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     tmp2 = tmp ** 2
     tmp6 = tmp2 ** 3
     tmp8 = tmp6 * tmp2
-    e6 = 1 / r6 + tmp6
-    e8 = 1 / r8 + tmp8
+    e6 = 1 / (r6 + tmp6)
+    e8 = 1 / (r8 + tmp8)
+    print(c6, c8)
     if cutoff is not None:
         cut2 = cutoff ** 2
         cut6 = cut2 ** 3
