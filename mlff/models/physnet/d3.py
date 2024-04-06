@@ -104,7 +104,7 @@ def _getc6_v2(ZiZj, nci, ncj, c6ab=d3_c6ab, k3=d3_k3):
 
 def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None, 
     r6=None, r8=None, s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k1=d3_k1, k2=d3_k2, 
-    k3=d3_k3, c6ab=d3_c6ab, r0ab=d3_r0ab, rcov=d3_rcov, r2r4=d3_r2r4, eps=1e-10):
+    k3=d3_k3, c6ab=d3_c6ab, r0ab=d3_r0ab, rcov=d3_rcov, r2r4=d3_r2r4, eps=1e-10, c6_version=2):
     '''
     compute d3 dispersion energy in Hartree
     r: distance in bohr!
@@ -116,7 +116,10 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     nc = _ncoord(Zi, Zj, r, idx_i, cutoff=cutoff, rcov=rcov) #coordination numbers
     nci = nc[idx_i]
     ncj = nc[idx_j]
-    c6 = _getc6_v2(ZiZj, nci, ncj, c6ab=c6ab, k3=k3) #c6 coefficients
+    if c6_version == 2:
+        c6 = _getc6_v2(ZiZj, nci, ncj, c6ab=c6ab, k3=k3) #c6 coefficients
+    else:
+        c6 = _getc6(ZiZj, nci, ncj, c6ab=c6ab, k3=k3)
     
     c8 = 3 * c6 * r2r4[Zi].type_as(c6) * r2r4[Zj].type_as(c6) #c8 coefficient
     
@@ -136,7 +139,6 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     tmp8 = tmp6 * tmp2
     e6 = 1 / (r6 + tmp6)
     e8 = 1 / (r8 + tmp8)
-    print(c6, c8)
     if cutoff is not None:
         cut2 = cutoff ** 2
         cut6 = cut2 ** 3

@@ -10,7 +10,7 @@ from .block import InteractionBlock, OutputBlock
 
 class PhysNet(nn.Module):
     def __str__(self):
-        return "Implementation of PhysNet (J. Chem. Theory Comput. 2019, 15, 3678−3693)"
+        return "Pytorch Implementation of PhysNet (J. Chem. Theory Comput. 2019, 15, 3678−3693)"
     
     def __init__(self,
         F,                                  # dimensionality of feature vector

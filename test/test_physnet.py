@@ -335,3 +335,33 @@ def test_energy_and_forces():
         f_tf = f_tf.eval()
     assert_allclose(e_torch, e_tf, rtol=1e-7, atol=1e-7)
     assert_allclose(f_torch, f_tf, rtol=1e-7, atol=1e-7)
+
+
+if __name__ == "__main__":
+    import time
+    from mlff.models.physnet.d3 import edisp
+    
+    N = 300
+    idx_i = np.empty((N, N-1), dtype=int)
+    idx_j = np.empty((N, N-1), dtype=int)
+    for i in range(N):
+        for j in range(N - 1):
+            idx_i[i, j] = i
+    for i in range(N):
+        c = 0
+        for j in range(N):
+            if j != i:
+                idx_j[i,c] = j
+                c += 1
+    idx_i = torch.tensor(idx_i.reshape(-1))
+    idx_j = torch.tensor(idx_j.reshape(-1))
+    D = torch.tensor(np.random.random(*idx_i.shape) * 30 + 3)
+    Z = torch.tensor(np.random.randint(0, 94, N)) 
+    start_time = time.time()
+    e = edisp(Z, D, idx_i, idx_j, c6_version=1)
+    end_time = time.time()
+    print(f"v1 c6: {end_time - start_time} s")
+    start_time = time.time()
+    edisp(Z, D, idx_i, idx_j, c6_version=2)
+    end_time = time.time()
+    print(f"v2 c6: {end_time - start_time} s")

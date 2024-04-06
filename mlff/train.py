@@ -66,7 +66,7 @@ def get_parser(desc, default_task='train'):
     parser.add_argument('--train', action='store_true', help='training phase')
     parser.add_argument('--task', type=str, metavar='N', default='q', help='task type')
     parser.add_argument('--single_model_param', type=str, metavar='N', default='', 
-        help='traing single model param'
+        help='training single model param'
     )
     parser.add_argument('--config_path', type=str, metavar='N', default='', 
         help='training config'
@@ -79,7 +79,7 @@ def get_parser(desc, default_task='train'):
 
 
 if __name__ == '__main__':
-    args = get_parser("qsar training")
+    args = get_parser("training")
 
     moltrain = FFTrain(
         data_path=args.data_path,

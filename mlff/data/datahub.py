@@ -10,6 +10,8 @@ def load_from_pickle(self, data_path=None, task=None, **params):
         dd = {key: [datapoint[key] for datapoint in data] for key in ("atom_type", "coord", "chrg")}
     elif task == "e":
         dd = {key: [datapoint[key] for datapoint in data] for key in ("atom_type", "coord", "energy", "grad")}
+    elif task == "qe":
+        dd = {key: [datapoint[key] for datapoint in data] for key in ("atom_type", "coord", "chrg", "energy", "grad")}
     return dd
 
 
