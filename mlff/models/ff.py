@@ -2,6 +2,7 @@ import os
 import joblib
 from .physnet import PhysNet
 from ..utils import logger
+import torch
 
 
 SEP = "-"
@@ -9,42 +10,28 @@ FF_REGISTER = {
     "PhysNet": PhysNet
 }
 LOSS_REGISTER = {
-    "q": ...,
+    "q": torch.nn.MSELoss,
     "e": ...,
     "qe": ...
-}
-ACTIVATION_FN = {
-    "q": lambda x: x
-}
-OUTPUT_DIM = {
-    "q": 1,
-    "e": 1
 }
 
 
 class FF:
     def __init__(self, data, features, trainer, model_str, loss_key, **params):
         self.data = data
-        self.num_classes = self.data['num_classes']
-        self.target_scaler = self.data['target_scaler']
+        self.energy_scaler = self.data['energy_scaler']
         self.features = features
         self.trainer = trainer
         self.splitter = self.trainer.splitter
         self.model_str = model_str
         self.model_id, self.model_name, self.feature_name, self.task = self.model_str.split(SEP)[:4]
         self.model_params = params
-        self.model_params['output_dim'] = OUTPUT_DIM[self.task] if self.task in OUTPUT_DIM else self.num_classes
         self.model_params['device'] = self.trainer.device
-        self.cv_pretrain_path = self.model_params.get('cv_pretrain', None)
-        if self.cv_pretrain_path:
-            self.model_params["pretrain"] = f"{self.cv_pretrain_path}_0.pth"
-        self.cv = dict()
         self.metrics = self.trainer.metrics
         if loss_key is not None:
             self.loss_func = LOSS_REGISTER[self.task][loss_key]
         else:
             self.loss_func = LOSS_REGISTER[self.task]
-        self.activation_fn = ACTIVATION_FN[self.task]
         self.out_dir = self.trainer.out_dir
         self.dump_dir = os.path.join(self.out_dir, self.model_str)
         self.trainer.set_seed(self.trainer.seed)
@@ -54,6 +41,7 @@ class FF:
     def _init_model(self, model_name, **params):
         if model_name in FF_REGISTER:
             model = FF_REGISTER[model_name](**params)
+            print(model.__str__())
         else:
             raise ValueError('Unknown model: {}'.format(self.model_name))
         return model

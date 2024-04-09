@@ -2,25 +2,14 @@ import pickle
 import os
 from collections import defaultdict
 import pandas as pd
-
-
-def total_charge(data):
-    if "chrg" in data:
-        return int(sum(data["chrg"][0]) + 0.5)
-    else:
-        return 0
-
-
-FEATURE_REGISTER = {
-    'total_charge': total_charge
-}
+from .feature import FEATURE_REGISTER
 
 
 def basic_key_from_task(task):
     keys = ["atom_type", "coord"]
-    if "e" in task:
+    if 'e' in task:
         keys += ["energy", "grad"]
-    if "q" in task:
+    if 'q' in task:
         keys += ["chrg"]
     return keys
 
@@ -32,13 +21,20 @@ def load_from_pickle(data_path=None, task=None):
     return dd
 
 
+def load_energy_bias(energy_bias_path):
+    if os.path.exists(energy_bias_path):
+        return pd.read_csv(energy_bias_path, index_col="atom_type")
+    else:
+        return None
+
+
 class EnergyScaler(object):
     def __init__(self, energy_bias_path, load_dir=None):
         default_path = os.path.join(load_dir, 'energy_bias.csv')
-        if load_dir and default_path:
-            self.bias = pd.read_csv(default_path)
+        if load_dir is not None:
+            self.bias = load_energy_bias(default_path)
         else:
-            self.bias = None
+            self.bias = load_energy_bias(energy_bias_path)
     
     def transform(self, energy, atom_type):
         if self.bias is None:
@@ -65,7 +61,7 @@ class DataHub(object):
         self.energy_bias_path = energy_bias_path
         self._init_data()
         self._init_features(**params.Feature)
-        
+
         
     def _init_data(self):
         self.data = defaultdict(dict)
@@ -84,5 +80,8 @@ class DataHub(object):
         self.features = defaultdict(dict)
         for feature_name, feature_dict in feature_names.items():
             if feature_dict.get("active", False):
-                self.features[feature_name] = FEATURE_REGISTER[feature_name](self.data)
+                if feature_name in FEATURE_REGISTER:
+                    self.features[feature_name] = FEATURE_REGISTER[feature_name](self.data)
+                else:
+                    raise ValueError('Unknown feature name: {}'.format(feature_name))
         

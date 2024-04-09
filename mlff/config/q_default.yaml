@@ -5,15 +5,28 @@ Datahub:
   data_path:
   energy_bias_path:
   Feature:
-    total_charge:
+    Ra:
+      active: True
+    Za:
+      active: True
+    Q:
       active: True
 Modelhub:
   FF:
-    PhysNet:
+    FF01:
       active: True
       model: "PhysNet"
+      feature: ["Ra", "Za", "Q"]
       params:
-        pretrain:
+        sr_cut: 10.0
+        num_blocks: 3
+        num_residual_atomic: 2
+        num_residual_interaction: 2
+        num_residual_output: 1
+        use_electrostatic: true
+        use_dispersion: true
+        activation_fn: shifted_softplus
+        drop_out: 0.0
 Trainer:
   Common:
     split_method: [0.8, 0.1, 0.1]

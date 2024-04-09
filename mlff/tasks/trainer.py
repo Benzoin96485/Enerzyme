@@ -12,7 +12,7 @@ from ..utils import logger
 
 
 class Trainer(object):
-    def __init__(self, task=None, metrics_str=None, out_dir=None, **params):
+    def __init__(self, task=None, out_dir=None, **params):
         self.task = task
         self.out_dir = out_dir
         self._init_trainer(**params)
