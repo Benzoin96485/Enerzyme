@@ -1,0 +1,32 @@
+Base:
+  seed: 114514
+  task: "q"
+Datahub:
+  data_path:
+  energy_bias_path:
+  Feature:
+    total_charge:
+      active: True
+Modelhub:
+  FF:
+    PhysNet:
+      active: True
+      model: "PhysNet"
+      params:
+        pretrain:
+Trainer:
+  Common:
+    split_method: [0.8, 0.1, 0.1]
+    split_seed: 114514
+    seed: 114514
+    logger_level: 1
+    report: True
+  FFtrainer:
+    patience: 50
+    max_epochs: 300
+    learning_rate: 1e-3
+    warmup_ratio: 0.03
+    batch_size: 8
+    max_norm: 5.0
+    cuda: True
+    amp: True
