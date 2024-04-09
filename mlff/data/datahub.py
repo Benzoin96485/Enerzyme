@@ -1,7 +1,7 @@
 import pickle
 import os
 from collections import defaultdict
-import pandas as pd
+from .datascaler import EnergyScaler, ForceScaler, ChargeScaler
 from .feature import FEATURE_REGISTER
 
 
@@ -19,37 +19,6 @@ def load_from_pickle(data_path=None, task=None):
         data = pickle.load(f)
     dd = {key: [datapoint[key] for datapoint in data] for key in basic_key_from_task(task)}
     return dd
-
-
-def load_energy_bias(energy_bias_path):
-    if os.path.exists(energy_bias_path):
-        return pd.read_csv(energy_bias_path, index_col="atom_type")
-    else:
-        return None
-
-
-class EnergyScaler(object):
-    def __init__(self, energy_bias_path, load_dir=None):
-        default_path = os.path.join(load_dir, 'energy_bias.csv')
-        if load_dir is not None:
-            self.bias = load_energy_bias(default_path)
-        else:
-            self.bias = load_energy_bias(energy_bias_path)
-    
-    def transform(self, energy, atom_type):
-        if self.bias is None:
-            return energy
-        else:
-            e0 = self.bias.loc[atom_type]["atom_energy"].sum()
-            return [e - e0 for e in energy]
-
-
-    def inverse_transform(self, energy, atom_type):
-        if self.bias is None:
-            return energy
-        else:
-            e0 = self.bias.loc[atom_type]["atom_energy"].sum()
-            return [e + e0 for e in energy]
 
 
 class DataHub(object):
@@ -72,7 +41,11 @@ class DataHub(object):
         
         if "e" in self.task:
             self.data["energy_scaler"] = EnergyScaler(self.energy_bias_path,self.dump_dir)
-            self.data["energy"] = self.data["energy_scaler"].transform(self.data["energy"], self.data["atom_type"][0])
+            self.data["target"]["E"] = self.data["energy_scaler"].transform(self.data["energy"], self.data["atom_type"])
+            self.data["target"]["F"] = ForceScaler.transform(self.data["grad"])
+
+        if "q" in self.task:
+            self.data["target"]["Qa"] = ChargeScaler.transform(self.data["chrg"])
         
         # ss_method = params.get('binding_energy', 'none')
 
@@ -84,4 +57,3 @@ class DataHub(object):
                     self.features[feature_name] = FEATURE_REGISTER[feature_name](self.data)
                 else:
                     raise ValueError('Unknown feature name: {}'.format(feature_name))
-        

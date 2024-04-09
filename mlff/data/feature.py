@@ -1,3 +1,6 @@
+import numpy as np
+
+
 PERIODIC_TABLE = {
     "H": 1,
     "C": 6,
@@ -10,17 +13,17 @@ PERIODIC_TABLE = {
 
 def total_charge(data):
     if "chrg" in data:
-        return [int(sum(data["chrg"][i]) + 0.5) for i in len(data)]
+        return (np.array(data["chrg"]).sum(axis=1) + 0.5).astype(int)
     else:
-        return [0] * len(data)
+        return None
 
 
 def atom_type_to_Z(data):
-    return [PERIODIC_TABLE[atom_type] for atom_type in data["atom_type"]]
+    return np.array([PERIODIC_TABLE[atom_type] for atom_type in data["atom_type"]], dtype=int)
 
 
 FEATURE_REGISTER = {
     "Q": total_charge,
-    "Ra": lambda data: data["coord"],
+    "Ra": lambda data: np.array(data["coord"]),
     "Za": atom_type_to_Z
 }

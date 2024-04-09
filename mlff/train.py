@@ -50,9 +50,9 @@ class FFTrain(object):
         return config
         
     def train_single(self, model_str):
-        NNModels = self.modelhub.models.get('NNModel', None)
-        if NNModels is not None and model_str in NNModels.keys():
-            NNModels[model_str].run()
+        FFs = self.modelhub.models.get('FF', None)
+        if FFs is not None and model_str in FFs.keys():
+            FFs[model_str].run()
         
 
 def get_parser():
@@ -61,7 +61,9 @@ def get_parser():
         help='training config'
     )
     parser.add_argument('--output_dir', type=str, default='../results',
-                    help='the output directory for saving artifact')          
+                    help='the output directory for saving artifact') 
+    parser.add_argument('--model_name', type=str,
+                        help='training single model name')      
     args = parser.parse_args()
     return args
 
@@ -74,6 +76,6 @@ if __name__ == '__main__':
         config_path=args.config_path
     )
 
-    moltrain.train_single()
+    moltrain.train_single(args.model_name)
 
     logger.info("train complete")
