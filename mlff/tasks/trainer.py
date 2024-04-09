@@ -20,26 +20,37 @@ class Trainer(object):
     def _init_trainer(self, **params):
         print(params)
         ### init common params ###
-        self.split_method = params.get('Common').get('split_method',[8, 1, 1])
-        self.split_seed = params.get('Common').get('split_seed', 42)
-        self.seed = params.get('Common').get('seed', 42)
+        self.split_method = params.get('Split').get('method', "fold_random")
+        self.split_params = params.get('Split').get('params')
+        self.seed = params.get('Common').get('seed', 114514)
         self.set_seed(self.seed)
-        self.splitter = Splitter(self.split_method, self.split_seed)
+        self.splitter = Splitter(self.split_method, **self.split_params)
         self.logger_level = int(params.get('Common').get('logger_level'))
         ### init NN trainer params ###
-        self.learning_rate = float(params.get('NNtrainer').get('learning_rate', 1e-4))
-        self.batch_size = params.get('NNtrainer').get('batch_size', 32)
-        self.max_epochs = params.get('NNtrainer').get('max_epochs', 50)
-        self.warmup_ratio = params.get('NNtrainer').get('warmup_ratio', 0.1)
-        self.patience = params.get('NNtrainer').get('patience', 10)
-        self.max_norm = params.get('NNtrainer').get('max_norm', 1.0)
-        self.cuda = params.get('NNtrainer').get('cuda', False)
-        self.amp = params.get('NNtrainer').get('amp', False)
+        self.learning_rate = float(params.get('FFtrainer').get('learning_rate', 1e-4))
+        self.batch_size = params.get('FFtrainer').get('batch_size', 32)
+        self.max_epochs = params.get('FFtrainer').get('max_epochs', 50)
+        self.warmup_ratio = params.get('FFtrainer').get('warmup_ratio', 0.1)
+        self.patience = params.get('FFtrainer').get('patience', 10)
+        self.max_norm = params.get('FFtrainer').get('max_norm', 1.0)
+        self.cuda = params.get('FFtrainer').get('cuda', False)
+        self.amp = params.get('FFtrainer').get('amp', False)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
         self.scaler = torch.cuda.amp.GradScaler() if self.device.type == 'cuda' and self.amp == True else None
     
-    def decorate_batch(self, batch, feature_name):
-        pass
+    def decorate_batch(self, batch, feature_names):
+        net_input = dict()
+        for feature_name in feature_names:
+            if feature_name == "Ra":
+                net_input[feature_name] = torch.tensor(batch[feature_name]).reshape(-1, 3).to(self.device)
+            elif feature_name == "Za":
+                net_input[feature_name] = torch.tensor(batch[feature_name], dtype=torch.long).reshape(-1, 3).to(self.device)
+            elif feature_name == "Q":
+                net_input[feature_name] = torch.tensor(batch[feature_name], dtype=torch.double).reshape(-1).to(self.device)
+        net_input["batch_seg"] = torch.tensor([
+            [i] * len(Za) for i, Za in enumerate(batch["Za"])
+        ])
+        return net_input
 
     def set_seed(self, seed):
         """function used to set a random seed

@@ -3,6 +3,7 @@ import joblib
 import torch
 import pandas as pd
 import numpy as np
+from torch.utils.data import Dataset
 from .physnet import PhysNet
 from ..utils import logger
 
@@ -28,6 +29,10 @@ class FF:
         self.model_id, self.model_name, self.feature_name, self.task = self.model_str.split(SEP)[:4]
         self.model_params = params
         self.model_params['device'] = self.trainer.device
+        self.cv_pretrain_path = self.model_params.get('cv_pretrain', None)
+        if self.cv_pretrain_path:
+            self.model_params["pretrain"] = f"{self.cv_pretrain_path}_0.pth"
+        self.cv = dict()
         self.metrics = self.trainer.metrics
         if loss_key is not None:
             self.loss_func = LOSS_REGISTER[self.task][loss_key]
@@ -55,8 +60,8 @@ class FF:
         for fold, (tr_idx, te_idx) in enumerate(self.splitter.split(X.iloc, y.iloc)):
             X_train, y_train = X.iloc[tr_idx], y.iloc[tr_idx]
             X_valid, y_valid = X.iloc[te_idx], y.iloc[te_idx]
-            traindataset = NNDataset(X_train, y_train, self.feature_name, self.task)
-            validdataset = NNDataset(X_valid, y_valid, self.feature_name, self.task)
+            traindataset = FFDataset(X_train, y_train, self.feature_name, self.task)
+            validdataset = FFDataset(X_valid, y_valid, self.feature_name, self.task)
             if fold > 0:
                 ### need to initalize model for next fold training
                 if self.cv_pretrain_path:
@@ -95,3 +100,15 @@ class FF:
         
     def count_parameters(self, model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
+
+class FFDataset(Dataset):
+    def __init__(self, feature, label):
+        self.feature = feature
+        self.label = label
+
+    def __getitem__(self, idx):
+        return self.feature.iloc[idx], self.label.iloc[idx]
+
+    def __len__(self):
+        return len(self.data)

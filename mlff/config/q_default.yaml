@@ -28,9 +28,12 @@ Modelhub:
         activation_fn: shifted_softplus
         drop_out: 0.0
 Trainer:
+  Split:
+    method: "fold_random"
+    params:
+      seed: 114514
+      n_splits: 5
   Common:
-    split_method: [0.8, 0.1, 0.1]
-    split_seed: 114514
     seed: 114514
     logger_level: 1
     report: True

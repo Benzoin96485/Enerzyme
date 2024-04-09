@@ -135,7 +135,7 @@ class PhysNet(nn.Module):
 
     def energy_and_forces_from_scaled_atomic_properties(self, Ea, Qa, Dij, Z, R, idx_i, idx_j, batch_seg=None):
         energy = self.energy_from_scaled_atomic_properties(Ea, Qa, Dij, Z, idx_i, idx_j, batch_seg)
-        forces = -torch.autograd.grad(torch.sum(energy), R)[0]
+        forces = -torch.autograd.grad(torch.sum(energy), R, create_graph=True)[0]
         return energy, forces
     
     def energy_from_atomic_properties(self, Ea, Qa, Dij, Z, idx_i, idx_j, Q_tot=None, batch_seg=None):
@@ -155,7 +155,7 @@ class PhysNet(nn.Module):
     def energy(self, Z, R, idx_i, idx_j, Q_tot=None, batch_seg=None, offsets=None, sr_idx_i=None, sr_idx_j=None, sr_offsets=None):
         Ea, Qa, Dij, _ = self.atomic_properties(Z, R, idx_i, idx_j, offsets, sr_idx_i, sr_idx_j, sr_offsets)
         energy = self.energy_from_atomic_properties(Ea, Qa, Dij, Z, idx_i, idx_j, Q_tot, batch_seg)
-        return energy 
+        return energy
 
     #calculates the total energy and forces (including electrostatic interactions)
     def energy_and_forces(self, Z, R, idx_i, idx_j, Q_tot=None, batch_seg=None, offsets=None, sr_idx_i=None, sr_idx_j=None, sr_offsets=None):
@@ -164,15 +164,15 @@ class PhysNet(nn.Module):
         return energy, forces
 
     #returns scaled charges such that the sum of the partial atomic charges equals Q_tot (defaults to 0)
-    def scaled_charges(self, Z, Qa, Q_tot=None, batch_seg=None):
+    def scaled_charges(self, Za, Qa, Q=None, batch_seg=None):
         if batch_seg is None:
-            batch_seg = torch.zeros_like(Z)
+            batch_seg = torch.zeros_like(Za)
         #number of atoms per batch (needed for charge scaling)
         Na_per_batch = segment_sum(torch.ones_like(batch_seg, dtype=self.dtype), batch_seg)
-        if Q_tot is None: #assume desired total charge zero if not given
-            Q_tot = torch.zeros_like(Na_per_batch, dtype=self.dtype)
+        if Q is None: #assume desired total charge zero if not given
+            Q = torch.zeros_like(Na_per_batch, dtype=self.dtype)
         #return scaled charges (such that they have the desired total charge)
-        return Qa + ((Q_tot - segment_sum(Qa, batch_seg)) / Na_per_batch)[batch_seg]
+        return Qa + ((Q - segment_sum(Qa, batch_seg)) / Na_per_batch)[batch_seg]
 
     #switch function for electrostatic interaction (switches between shielded and unshielded electrostatic interaction)
     def _switch(self, Dij):
@@ -211,6 +211,11 @@ class PhysNet(nn.Module):
             Eele = torch.where(Dij <= cut, Eele, torch.zeros_like(Eele))
         return segment_sum(Eele, idx_i)
 
+    def forward(self, task, **net_input):
+        if task == "q":
+            return {
+                "Qa": self.scaled_charges(**net_input)
+            }
 
     @property
     def drop_out(self):

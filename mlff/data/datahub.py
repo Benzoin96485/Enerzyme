@@ -1,7 +1,7 @@
 import pickle
 import os
 from collections import defaultdict
-from .datascaler import EnergyScaler, ForceScaler, ChargeScaler
+from .datascaler import TargetScaler
 from .feature import FEATURE_REGISTER
 
 
@@ -39,15 +39,9 @@ class DataHub(object):
         else:
             raise ValueError('No data path provided.')
         
-        if "e" in self.task:
-            self.data["energy_scaler"] = EnergyScaler(self.energy_bias_path,self.dump_dir)
-            self.data["target"]["E"] = self.data["energy_scaler"].transform(self.data["energy"], self.data["atom_type"])
-            self.data["target"]["F"] = ForceScaler.transform(self.data["grad"])
-
-        if "q" in self.task:
-            self.data["target"]["Qa"] = ChargeScaler.transform(self.data["chrg"])
-        
-        # ss_method = params.get('binding_energy', 'none')
+        self.data["target_scaler"] = TargetScaler(self.task, self.energy_bias_path, self.dump_dir)
+        for k, v in self.data["target_scaler"].transform(self.data).items():
+            self.data["target"][k] = v
 
     def _init_features(self, **feature_names):
         self.features = defaultdict(dict)
@@ -57,3 +51,4 @@ class DataHub(object):
                     self.features[feature_name] = FEATURE_REGISTER[feature_name](self.data)
                 else:
                     raise ValueError('Unknown feature name: {}'.format(feature_name))
+        self.features["N"] = 
