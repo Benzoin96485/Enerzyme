@@ -27,18 +27,19 @@ class TargetScaler:
             else:
                 e0 = np.array([self.bias.loc[frame]["atom_energy"].sum() for frame in data["atom_type"]])
                 targets["E"] = np.array(data["energy"]) - e0
-            targets["F"] = -np.array(data["grad"])
+            targets["F"] = [-grad for grad in data["grad"]]
         if "q" in self.task:
-            targets["Q"] = np.array(data["chrg"])
+            targets["Qa"] = data["chrg"]
+        targets["atom_type"] = data["atom_type"]
         return targets
 
-    def inverse_transform(self, pred, atom_type):
+    def inverse_transform(self, pred):
         targets = dict()
         if "e" in self.task:
             if self.bias is None:
                 targets["E"] = pred["E"]
             else:
-                e0 = np.array([self.bias.loc[frame]["atom_energy"].sum() for frame in atom_type])
+                e0 = np.array([self.bias.loc[frame]["atom_energy"].sum() for frame in pred["atom_type"]])
                 targets["E"] = pred["E"] + e0
                 targets["F"] = pred["F"]
         if "q" in self.task:

@@ -7,6 +7,7 @@ from torch.optim import Adam
 from torch.nn.utils import clip_grad_norm_
 from transformers.optimization import get_linear_schedule_with_warmup
 import numpy as np
+import pandas as pd
 from .split import Splitter
 from ..utils import logger
 
@@ -38,18 +39,22 @@ class Trainer(object):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
         self.scaler = torch.cuda.amp.GradScaler() if self.device.type == 'cuda' and self.amp == True else None
     
-    def decorate_batch(self, batch, feature_names):
-        net_input = dict()
-        net_input["Ra"] = torch.tensor(np.concatenate(batch["Ra"])).to(self.device)
-        net_input["Za"] = torch.tensor(np.concatenate(batch["Za"]), dtype=torch.long)
-        for feature_name in feature_names:
-            if feature_name == "Q":
-                net_input[feature_name] = torch.tensor(batch[feature_name], dtype=torch.double).reshape(-1).to(self.device)
+    def decorate_batch(self, batch):
+        batch_input, batch_target = batch
+        net_input, net_target = dict(), dict()
+        for k, v in batch_input.items():
+            if k == "Q":
+                net_input[k] = torch.tensor(v, dtype=torch.double).reshape(-1).to(self.device)
+            if k == "Za":
+                net_input[k] = torch.tensor(np.concatenate(v), dtype=torch.long).to(self.device)
+            if k == "Ra":
+                net_input[k] = torch.tensor(np.concatenate(v)).to(self.device)
         batch_seg = []
         idx_i = []
         idx_j = []
+        split_sections = []
         count = 0
-        for i, Za in enumerate(batch["Za"]):
+        for i, Za in enumerate(batch_input["Za"]):
             N = len(Za)
             batch_seg.append(np.ones(N, dtype=int) * i)
             indices = np.indices((N, N-1))
@@ -58,11 +63,26 @@ class Trainer(object):
                 (indices[1] + np.triu(np.ones((N, N-1)))).reshape(-1) + count
             )
             count += N
+            split_sections.append(count)
         net_input["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
         net_input["idx_i"] = torch.tensor(np.concatenate(idx_i), dtype=torch.long)
         net_input["idx_j"] = torch.tensor(np.concatenate(idx_j), dtype=torch.long)
-        return net_input
-
+        for k, v in batch_target.items():
+            net_target[k] = torch.tensor(np.concatenate(v)).to(self.device)
+        net_target["split_sections"] = split_sections
+        net_target["atom_type"] = batch_target["atom_type"]
+        return net_input, net_target
+    
+    def decorate_batch_output(self, target, output):
+        y_pred = dict()
+        y_truth = dict()
+        split_sections = target["split_sections"]
+        for k in output:
+            y_pred[k] = np.split(output.cpu().numpy(), split_sections)
+            y_truth[k] = np.split(target.detach().cpu().numpy(), split_sections)
+        y_pred["atom_type"] = target["atom_type"]
+        return pd.Dataframe(y_pred), pd.DataFrame(y_truth)
+    
     def set_seed(self, seed):
         """function used to set a random seed
         Arguments:
@@ -73,7 +93,7 @@ class Trainer(object):
         torch.cuda.manual_seed_all(seed)
         np.random.seed(seed)
 
-    def fit_predict(self, model, train_dataset, valid_dataset, loss_func, dump_dir, target_scaler, feature_name):
+    def fit_predict(self, model, train_dataset, valid_dataset, loss_func, dump_dir, fold, target_scaler, feature_name):
         model = model.to(self.device)
         collate_fn = model.batch_collate_fn
         train_dataloader = DataLoader(
@@ -89,15 +109,22 @@ class Trainer(object):
         num_training_steps = len(train_dataloader) * self.max_epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
         optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6)
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_training_steps)
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer, 
+            num_warmup_steps=num_warmup_steps, 
+            num_training_steps=num_training_steps
+        )
 
         for epoch in range(self.max_epochs):
             model = model.train()
             start_time = time.time()
-            batch_bar = tqdm(total=len(train_dataloader), dynamic_ncols=True, leave=False, position=0, desc='Train', ncols=5) 
+            batch_bar = tqdm(
+                total=len(train_dataloader), dynamic_ncols=True, leave=False, position=0, 
+                desc='Train', ncols=5
+            ) 
             trn_loss = []
             for i, batch in enumerate(train_dataloader):
-                net_input, net_target = self.decorate_batch(batch, feature_name)
+                net_input, net_target = self.decorate_batch(batch)
                 if self.scaler and self.device.type == 'cuda':
                     with torch.cuda.amp.autocast():
                         outputs = model(**net_input)
@@ -111,7 +138,8 @@ class Trainer(object):
                 batch_bar.set_postfix(
                     Epoch="Epoch {}/{}".format(epoch+1, self.max_epochs),
                     loss="{:.04f}".format(float(sum(trn_loss) / (i + 1))),
-                    lr="{:.04f}".format(float(optimizer.param_groups[0]['lr'])))
+                    lr="{:.04f}".format(float(optimizer.param_groups[0]['lr']))
+                )
                 if self.scaler and self.device.type == 'cuda':
                     self.scaler.scale(loss).backward() # This is a replacement for loss.backward()
                     self.scaler.unscale_(optimizer) # unscale the gradients of optimizer's assigned params in-place
@@ -127,21 +155,38 @@ class Trainer(object):
 
             batch_bar.close()
             total_trn_loss = np.mean(trn_loss)
-            y_preds, val_loss, metric_score = self.predict(model, valid_dataset, loss_func, dump_dir, target_scaler, epoch, load_model=False, feature_name=feature_name)
+            y_preds, val_loss, metric_score = self.predict(
+                model=model, 
+                dataset=valid_dataset, 
+                loss_func=loss_func, 
+                dump_dir=dump_dir, 
+                target_scaler=target_scaler, 
+                epoch=epoch, 
+                load_model=False, 
+                feature_name=feature_name
+            )
             end_time = time.time()
             total_val_loss = np.mean(val_loss)
             _score = list(metric_score.values())[0]
             _metric = list(metric_score.keys())[0]
             message = 'Epoch [{}/{}] train_loss: {:.4f}, val_loss: {:.4f}, val_{}: {:.4f}, lr: {:.6f}, ' \
-                '{:.1f}s'.format(epoch+1, self.max_epochs,
-                                total_trn_loss, total_val_loss, 
-                                _metric, _score,
-                                optimizer.param_groups[0]['lr'],
-                                (end_time - start_time))
+                '{:.1f}s'.format(
+                    epoch+1, 
+                    self.max_epochs,
+                    total_trn_loss, 
+                    total_val_loss, 
+                    _metric, 
+                    _score,
+                    optimizer.param_groups[0]['lr'],
+                    (end_time - start_time)
+                )
             logger.info(message)
             is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, total_val_loss, min_val_loss, metric_score, max_score, model, dump_dir, self.patience, epoch)
             if is_early_stop:
                 break
+        
+        y_preds, _, _ = self.predict(model, valid_dataset, loss_func, activation_fn, dump_dir, fold, target_scaler, epoch, load_model=True, feature_name=feature_name)
+        return y_preds
     
     def _early_stop_choice(self, wait, loss, min_loss, metric_score, max_score, model, dump_dir, fold, patience, epoch):
         if not isinstance(self.metrics_str, str) or self.metrics_str in ['loss', 'none', '']:
@@ -165,7 +210,7 @@ class Trainer(object):
                 is_early_stop = True
         return is_early_stop, min_loss, wait
     
-    def predict(self, model, dataset, loss_func, activation_fn, dump_dir, fold, target_scaler=None, epoch=1, load_model=False, feature_name=None):
+    def predict(self, model, dataset, loss_func, dump_dir, fold, target_scaler=None, epoch=1, load_model=False, feature_name=None):
         model = model.to(self.device)
         collate_fn = model.batch_collate_fn
         if load_model == True:
@@ -192,16 +237,17 @@ class Trainer(object):
                 if not load_model:
                     loss = loss_func(outputs, net_target)
                     val_loss.append(float(loss.data))
-            y_preds.append(activation_fn(outputs).cpu().numpy())
-            y_truths.append(net_target.detach().cpu().numpy())
+            y_pred, y_truth = self.decorate_batch_output(net_target, outputs)
+            y_preds.append(y_pred)
+            y_truths.append(y_truth)
             if not load_model:
                 batch_bar.set_postfix(
                     Epoch="Epoch {}/{}".format(epoch+1, self.max_epochs),
-                    loss="{:.04f}".format(float(np.sum(val_loss) / (i + 1))))
-
+                    loss="{:.04f}".format(float(np.sum(val_loss) / (i + 1)))
+                )
             batch_bar.update()
-        y_preds = np.concatenate(y_preds)
-        y_truths = np.concatenate(y_truths)
+        y_preds = pd.concat(y_preds)
+        y_truths = pd.concat(y_truths)
         if target_scaler is not None:
             inverse_y_preds = target_scaler.inverse_transform(y_preds)
             inverse_y_truths = target_scaler.inverse_transform(y_truths)

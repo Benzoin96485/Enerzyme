@@ -53,24 +53,33 @@ class FF:
         return model
     
     def run(self):
-        logger.info("start training NNModel:{}".format(self.model_name))
+        logger.info("start training FF:{}".format(self.model_name))
         X = pd.Dataframe(self.features)
         y = pd.Dataframe(self.data['target'])
         y_pred = pd.DataFrame({k: np.empty_like(v) for k, v in self.data['target']})
         for fold, (tr_idx, te_idx) in enumerate(self.splitter.split(X.iloc, y.iloc)):
             X_train, y_train = X.iloc[tr_idx], y.iloc[tr_idx]
             X_valid, y_valid = X.iloc[te_idx], y.iloc[te_idx]
-            traindataset = FFDataset(X_train, y_train, self.feature_name, self.task)
-            validdataset = FFDataset(X_valid, y_valid, self.feature_name, self.task)
+            train_dataset = FFDataset(X_train, y_train, self.feature_name, self.task)
+            valid_dataset = FFDataset(X_valid, y_valid, self.feature_name, self.task)
             if fold > 0:
                 ### need to initalize model for next fold training
                 if self.cv_pretrain_path:
                     self.model_params["pretrain"] = f"{self.cv_pretrain_path}_{fold}.pth"
                 self.model = self._init_model(self.model_name, **self.model_params)
             try:
-                _y_pred = self.trainer.fit_predict(self.model, traindataset, validdataset, self.loss_func, self.activation_fn, self.dump_dir, fold, self.target_scaler, self.feature_name, pKa_mode=self.pKa_mode)
+                _y_pred = self.trainer.fit_predict(
+                    model=self.model, 
+                    train_dataset=train_dataset, 
+                    valid_dataset=valid_dataset, 
+                    loss_func=self.loss_func, 
+                    dump_dir=self.dump_dir, 
+                    fold=fold,
+                    target_scaler=self.target_scaler, 
+                    feature_name=self.feature_name
+                )
             except:
-                logger.info("NNModel {0} failed...".format(self.model_name))
+                logger.info("FF {0} failed...".format(self.model_name))
                 self.is_success = False
                 return
 
@@ -87,8 +96,8 @@ class FF:
         self.cv['metric'] = self.metrics.cal_metric(self.data['target_scaler'].inverse_transform(y), self.data['target_scaler'].inverse_transform(self.cv['pred']))
         self.dump(self.cv['pred'], self.dump_dir, 'cv.data')
         self.dump(self.cv['metric'], self.dump_dir, 'metric.result')
-        logger.info("{} NN model metrics score: \n{}".format(self.model_str, self.cv['metric']))
-        logger.info("{} NN model done!".format(self.model_str))
+        logger.info("{} FF metrics score: \n{}".format(self.model_str, self.cv['metric']))
+        logger.info("{} FF done!".format(self.model_str))
         logger.info("Metric result saved!")
         logger.info("{} Model saved!".format(self.model_str))
 

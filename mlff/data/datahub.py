@@ -1,5 +1,4 @@
 import pickle
-import os
 from collections import defaultdict
 from .datascaler import TargetScaler
 from .feature import FEATURE_REGISTER
