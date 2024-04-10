@@ -51,4 +51,3 @@ class DataHub(object):
                     self.features[feature_name] = FEATURE_REGISTER[feature_name](self.data)
                 else:
                     raise ValueError('Unknown feature name: {}'.format(feature_name))
-        self.features["N"] = 

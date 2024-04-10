@@ -40,16 +40,27 @@ class Trainer(object):
     
     def decorate_batch(self, batch, feature_names):
         net_input = dict()
+        net_input["Ra"] = torch.tensor(np.concatenate(batch["Ra"])).to(self.device)
+        net_input["Za"] = torch.tensor(np.concatenate(batch["Za"]), dtype=torch.long)
         for feature_name in feature_names:
-            if feature_name == "Ra":
-                net_input[feature_name] = torch.tensor(batch[feature_name]).reshape(-1, 3).to(self.device)
-            elif feature_name == "Za":
-                net_input[feature_name] = torch.tensor(batch[feature_name], dtype=torch.long).reshape(-1, 3).to(self.device)
-            elif feature_name == "Q":
+            if feature_name == "Q":
                 net_input[feature_name] = torch.tensor(batch[feature_name], dtype=torch.double).reshape(-1).to(self.device)
-        net_input["batch_seg"] = torch.tensor([
-            [i] * len(Za) for i, Za in enumerate(batch["Za"])
-        ])
+        batch_seg = []
+        idx_i = []
+        idx_j = []
+        count = 0
+        for i, Za in enumerate(batch["Za"]):
+            N = len(Za)
+            batch_seg.append(np.ones(N, dtype=int) * i)
+            indices = np.indices((N, N-1))
+            idx_i.append(indices[0].reshape(-1) + count)
+            idx_j.append(
+                (indices[1] + np.triu(np.ones((N, N-1)))).reshape(-1) + count
+            )
+            count += N
+        net_input["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
+        net_input["idx_i"] = torch.tensor(np.concatenate(idx_i), dtype=torch.long)
+        net_input["idx_j"] = torch.tensor(np.concatenate(idx_j), dtype=torch.long)
         return net_input
 
     def set_seed(self, seed):

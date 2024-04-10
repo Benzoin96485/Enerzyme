@@ -25,6 +25,5 @@ def atom_type_to_Z(data):
 FEATURE_REGISTER = {
     "Q": total_charge,
     "Ra": lambda data: np.array(data["coord"]),
-    "Za": atom_type_to_Z,
-    "N": count_atom
+    "Za": atom_type_to_Z
 }
