@@ -15,3 +15,11 @@ The dataset in `data_path` should be a python pickle file containing a list of e
     "coord": [] # np.ndarray of shape (N,3): coordinates
     "atom_type": [] # list of length N: atom types (element symbols in upper case)
 }
+```
+
+# Test
+The `test_physnet.py` tests if the behavior of our torch implementation of PhysNet is the same as the [official tensorflow repo](https://github.com/MMunibas/PhysNet?tab=readme-ov-file) and the [paper](https://pubs.acs.org/doi/full/10.1021/acs.jctc.9b00181). 
+```
+cd test
+pytest -v
+```
