@@ -30,9 +30,9 @@ Modelhub:
         F: 128
         K: 64
         sr_cut: 10.0
-        num_blocks: 3
+        num_blocks: 5
         num_residual_atomic: 2
-        num_residual_interaction: 2
+        num_residual_interaction: 3
         num_residual_output: 1
         use_electrostatic: true
         use_dispersion: true
