@@ -5,9 +5,12 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from .base_logger import logger
 
 
+def rmse(y_true, y_pred):
+    return np.sqrt(mean_squared_error(np.concatenate(y_true.to_list()), np.concatenate(y_pred.to_list())))
+
+
 METRICS_REGISTER = {
-    "rmse": lambda y_true, y_pred: np.sqrt(mean_squared_error(y_true, y_pred)),
-    "mae": mean_absolute_error
+    "rmse": rmse
 }
 
 

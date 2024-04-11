@@ -55,7 +55,7 @@ def initialize(dtype="float64", use_dispersion=True):
         R = R.astype(np.float32)
         offsets = offsets.astype(np.float32)
     state = get_state()
-    physnet_torch = PhysNet(F, K, 5.0, dtype=dtype_torch, use_dispersion=use_dispersion)
+    physnet_torch = PhysNet(F, K, 5.0, dtype=dtype, use_dispersion=use_dispersion)
     set_state(state)
     physnet_tf = NeuralNetwork(F, K, 5.0, scope="test", dtype=dtype_tf, use_dispersion=use_dispersion)
     physnet_tf._embeddings = tf.Variable(physnet_torch.embeddings.weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
@@ -132,7 +132,7 @@ def test_ResidualLayer():
     from neural_network.layers.ResidualLayer import ResidualLayer as ResidualLayer_tf
     residual_layer_torch = ResidualLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init))
     residual_layer_tf = ResidualLayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=tf.float64)
-    y_residual_torch = residual_layer_torch(torch.from_numpy(x.copy())).numpy()
+    y_residual_torch = residual_layer_torch(torch.from_numpy(x.copy())).detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         y_residual_tf = residual_layer_tf(x.copy()).eval()
@@ -326,7 +326,6 @@ def test_energy_and_forces():
     )
     e_torch = e_torch.detach().numpy()
     f_torch = f_torch.detach().numpy()
-    # print(e_torch, f_torch)
     with tf.Session() as sess:
         R_tf = tf.Variable(R)
         sess.run(tf.global_variables_initializer())

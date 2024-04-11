@@ -43,5 +43,5 @@ class TargetScaler:
                 targets["E"] = pred["E"] + e0
                 targets["F"] = pred["F"]
         if "q" in self.task:
-            targets["Q"] = pred["chrg"]
+            targets["Qa"] = pred["Qa"]
         return targets

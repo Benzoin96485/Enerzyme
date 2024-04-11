@@ -16,7 +16,7 @@ def basic_key_from_task(task):
 def load_from_pickle(data_path=None, task=None):
     with open(data_path, "rb") as f:
         data = pickle.load(f)
-    dd = {key: [datapoint[key] for datapoint in data] for key in basic_key_from_task(task)}
+    dd = {key: [datapoint[key] for datapoint in data][:200] for key in basic_key_from_task(task)}
     return dd
 
 
@@ -30,7 +30,6 @@ class DataHub(object):
         self._init_data()
         self._init_features(**params["Feature"])
 
-        
     def _init_data(self):
         self.data = defaultdict(dict)
         if self.data_path is not None:

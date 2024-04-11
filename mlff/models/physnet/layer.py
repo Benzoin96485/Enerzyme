@@ -39,9 +39,9 @@ class RBFLayer(NeuronLayer):
         self._cutoff = cutoff
         self._dtype = dtype
         centers = softplus_inverse(np.linspace(1.0, np.exp(-cutoff), K))
-        self._centers = F_.softplus(torch.tensor(np.asarray(centers), dtype=dtype, requires_grad=True))
+        self._centers = nn.Parameter(F_.softplus(torch.tensor(np.asarray(centers), dtype=dtype)))
         widths = [softplus_inverse((0.5 / ((1.0 - np.exp(-cutoff)) / K)) ** 2)] * K
-        self._widths = F_.softplus(torch.tensor(np.asarray(widths), dtype=dtype, requires_grad=True))
+        self._widths = nn.Parameter(F_.softplus(torch.tensor(np.asarray(widths), dtype=dtype, requires_grad=True)))
 
     @property
     def K(self):
@@ -84,9 +84,9 @@ class DenseLayer(NeuronLayer):
         super().__init__(n_in, n_out, activation_fn)
         if W_init is None:
             W_init = semi_orthogonal_glorot_weights(n_in, n_out) 
-            self._W  = torch.tensor(W_init, dtype=dtype, requires_grad=True)
+            self._W = nn.Parameter(torch.tensor(W_init, dtype=dtype))
         else:
-            self._W = W_init
+            self._W = nn.Parameter(W_init.type(dtype))
 
         #define l2 loss term for regularization
         if regularization:
@@ -98,8 +98,8 @@ class DenseLayer(NeuronLayer):
         self._use_bias = use_bias
         if self.use_bias:
             if b_init is None:
-                b_init = torch.zeros([self.n_out], dtype=dtype, requires_grad=True)
-            self._b = b_init
+                b_init = nn.Parameter(torch.zeros([self.n_out], dtype=dtype))
+            self._b = nn.Parameter(b_init.type(dtype))
 
     @property
     def W(self):
@@ -181,7 +181,7 @@ class InteractionLayer(NeuronLayer):
         ])
         #for performing the final update to the feature vectors
         self._dense = DenseLayer(F, F, dtype=dtype)
-        self._u = torch.ones([F], requires_grad=True, dtype=dtype)
+        self._u = nn.Parameter(torch.ones([F], dtype=dtype))
 
     @property
     def drop_out(self):

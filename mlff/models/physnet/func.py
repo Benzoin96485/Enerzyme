@@ -20,7 +20,7 @@ def segment_sum(x, indices, dim=0):
     """
     http://t.csdnimg.cn/kUA0u
     """
-    x_sum = torch.zeros_like(x, requires_grad=True)[:max(indices) + 1]
+    x_sum = torch.zeros_like(x)[:indices[-1] + 1]
     return x_sum.index_add(dim, indices, x)
 
 

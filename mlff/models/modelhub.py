@@ -29,7 +29,7 @@ class ModelHub:
             else:
                 logger.info("init {} custom train parameters".format(model_str))
                 trainer = Trainer(self.task, self.out_dir, **trainer_params)
-            loss_key = single_params.get('loss', None)
+            loss_param = single_params.get('loss', None)
             if single_params['active']:
                 self.models['FF'][model_str] = self._init_ff(
                     self.data, 
@@ -37,7 +37,7 @@ class ModelHub:
                         feature_name: self.features[feature_name] for feature_name in feature_names
                     }, 
                     trainer, model_str, 
-                    loss_key, **model_params
+                    loss_param, **model_params
                 )
     
     def _init_ff(self, data, feature, trainer, model_str, loss_key=None, **params):

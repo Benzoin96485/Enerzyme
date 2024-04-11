@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
-from .physnet import PhysNet
+from .physnet import PhysNet, MSE_nh_Loss
 from ..utils import logger
 
 
@@ -13,14 +13,12 @@ FF_REGISTER = {
     "PhysNet": PhysNet
 }
 LOSS_REGISTER = {
-    "q": torch.nn.MSELoss,
-    "e": ...,
-    "qe": ...
+    "mse_nh": MSE_nh_Loss
 }
 
 
 class FF:
-    def __init__(self, data, features, trainer, model_str, loss_key, **params):
+    def __init__(self, data, features, trainer, model_str, loss_param, **params):
         self.data = data
         self.target_scaler = self.data['target_scaler']
         self.features = features
@@ -35,10 +33,7 @@ class FF:
             self.model_params["pretrain"] = f"{self.cv_pretrain_path}_0.pth"
         self.cv = dict()
         self.metrics = self.trainer.metrics
-        if loss_key is not None:
-            self.loss_func = LOSS_REGISTER[self.task][loss_key]
-        else:
-            self.loss_func = LOSS_REGISTER[self.task]
+        self.loss_func = LOSS_REGISTER[loss_param["key"]](**loss_param["params"])
         self.out_dir = self.trainer.out_dir
         self.dump_dir = os.path.join(self.out_dir, self.model_str)
         self.trainer.set_seed(self.trainer.seed)
@@ -79,9 +74,10 @@ class FF:
                     target_scaler=self.target_scaler, 
                     feature_name=self.feature_name
                 )
-            except RuntimeError:
+            except RuntimeError as e:
                 logger.info("FF {0} failed...".format(self.model_name))
                 self.is_success = False
+                raise e
                 return
 
             y_pred.iloc[te_idx] = _y_pred

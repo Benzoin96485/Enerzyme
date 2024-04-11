@@ -12,7 +12,7 @@ PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="atom_type")
 
 def total_charge(data):
     if "chrg" in data:
-        return [(sum(chrgs) + 0.5).astype(int) for chrgs in data["chrg"]]
+        return [round(sum(chrgs)) for chrgs in data["chrg"]]
     else:
         return None
 

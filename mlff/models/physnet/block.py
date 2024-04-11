@@ -38,7 +38,7 @@ class OutputBlock(NeuronLayer):
         self._residual_layer = nn.Sequential(*[
             ResidualLayer(F, F, activation_fn, drop_out=drop_out, dtype=dtype) for i in range(num_residual)
         ])
-        self._dense = DenseLayer(F, 2, W_init=torch.zeros([F, 2], dtype=dtype), use_bias=False)
+        self._dense = DenseLayer(F, 2, W_init=torch.zeros([F, 2], dtype=dtype), use_bias=False, dtype=dtype)
     
     @property
     def residual_layer(self):

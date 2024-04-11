@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn
 import torch.nn.functional as F_
@@ -41,7 +42,7 @@ class PhysNet(nn.Module):
         self._num_blocks = num_blocks
         self._F = F
         self._K = K
-        self._dtype = dtype
+        self._dtype = torch.float32 if dtype == "float32" else torch.float64
         self._kehalf = kehalf
         self._sr_cut = sr_cut
         self._lr_cut = lr_cut
@@ -51,26 +52,26 @@ class PhysNet(nn.Module):
             self._activation_fn = activation_fn
         else:
             self._activation_fn = {"shifted_softplus": shifted_softplus}.get(activation_fn, shifted_softplus)
-        self._embeddings = nn.Embedding(95, self.F, dtype=dtype)
+        self._embeddings = nn.Embedding(95, self.F, dtype=self._dtype)
         self._drop_out = drop_out
-        self._rbf_layer = RBFLayer(K, sr_cut, dtype=dtype)
-        self._s6 = F_.softplus(torch.tensor(softplus_inverse(d3_s6), dtype=dtype, requires_grad=True))
-        self._s8 = F_.softplus(torch.tensor(softplus_inverse(d3_s8), dtype=dtype, requires_grad=True))
-        self._a1 = F_.softplus(torch.tensor(softplus_inverse(d3_a1), dtype=dtype, requires_grad=True))
-        self._a2 = F_.softplus(torch.tensor(softplus_inverse(d3_a2), dtype=dtype, requires_grad=True))
-        self._Eshift = Eshift * torch.ones(95, dtype=dtype, requires_grad=True)
-        self._Escale = Escale * torch.ones(95, dtype=dtype, requires_grad=True)
-        self._Qshift = Qshift * torch.ones(95, dtype=dtype, requires_grad=True)
-        self._Qscale = Qscale * torch.ones(95, dtype=dtype, requires_grad=True)
+        self._rbf_layer = RBFLayer(K, sr_cut, dtype=self._dtype)
+        self._s6 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_s6), dtype=self._dtype)))
+        self._s8 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_s8), dtype=self._dtype)))
+        self._a1 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_a1), dtype=self._dtype)))
+        self._a2 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_a2), dtype=self._dtype)))
+        self._Eshift = nn.Parameter(Eshift * torch.ones(95, dtype=self._dtype))
+        self._Escale = nn.Parameter(Escale * torch.ones(95, dtype=self._dtype))
+        self._Qshift = nn.Parameter(Qshift * torch.ones(95, dtype=self._dtype))
+        self._Qscale = nn.Parameter(Qscale * torch.ones(95, dtype=self._dtype))
 
         self._interaction_block = nn.Sequential(*[
             InteractionBlock(
                 K, F, num_residual_atomic, num_residual_interaction, activation_fn=self.activation_fn, drop_out=drop_out,
-                dtype=dtype
+                dtype=self._dtype
             ) for i in range(num_blocks)
         ])
         self._output_block = nn.Sequential(*[
-            OutputBlock(F, num_residual_output, activation_fn=self.activation_fn, drop_out=drop_out, dtype=dtype
+            OutputBlock(F, num_residual_output, activation_fn=self.activation_fn, drop_out=drop_out, dtype=self._dtype
             ) for i in range(num_blocks)
         ])
 
@@ -83,12 +84,12 @@ class PhysNet(nn.Module):
         Dij = torch.sqrt(torch.relu(torch.sum((Ri-Rj)**2, -1))) #relu prevents negative numbers in sqrt
         return Dij
     
-    def atomic_properties(self, Z, R, idx_i, idx_j, offsets=None, sr_idx_i=None, sr_idx_j=None, sr_offsets=None):
+    def atomic_properties(self, Za, Ra, idx_i, idx_j, offsets=None, sr_idx_i=None, sr_idx_j=None, sr_offsets=None, **kwargs):
         #calculate distances (for long range interaction)
-        Dij_lr = self.calculate_interatomic_distances(R, idx_i, idx_j, offsets=offsets)
+        Dij_lr = self.calculate_interatomic_distances(Ra, idx_i, idx_j, offsets=offsets)
         #optionally, it is possible to calculate separate distances for short range interactions (computational efficiency)
         if sr_idx_i is not None and sr_idx_j is not None:
-            Dij_sr = self.calculate_interatomic_distances(R, sr_idx_i, sr_idx_j, offsets=sr_offsets)
+            Dij_sr = self.calculate_interatomic_distances(Ra, sr_idx_i, sr_idx_j, offsets=sr_offsets)
         else:
             sr_idx_i = idx_i
             sr_idx_j = idx_j
@@ -98,7 +99,7 @@ class PhysNet(nn.Module):
         rbf = self.rbf_layer(Dij_sr)
 
         #initialize feature vectors according to embeddings for nuclear charges
-        x = self.embeddings(Z)
+        x = self.embeddings(Za)
 
         #apply blocks
         Ea = 0 #atomic energy 
@@ -116,8 +117,8 @@ class PhysNet(nn.Module):
             lastout2 = out2
 
         #apply scaling/shifting
-        Ea = self.Escale[Z] * Ea + self.Eshift[Z] + 0 * torch.sum(R, -1) #last term necessary to guarantee no "None" in force evaluation
-        Qa = self.Qscale[Z] * Qa + self.Qshift[Z]
+        Ea = self.Escale[Za] * Ea + self.Eshift[Za] + 0 * torch.sum(Ra, -1) #last term necessary to guarantee no "None" in force evaluation
+        Qa = self.Qscale[Za] * Qa + self.Qshift[Za]
         return Ea, Qa, Dij_lr, nhloss
     
     def energy_from_scaled_atomic_properties(self, Ea, Qa, Dij, Z, idx_i, idx_j, batch_seg=None):
@@ -168,7 +169,7 @@ class PhysNet(nn.Module):
         return energy, forces
 
     #returns scaled charges such that the sum of the partial atomic charges equals Q_tot (defaults to 0)
-    def scaled_charges(self, Za, Qa, Q=None, batch_seg=None):
+    def scaled_charges(self, Za, Qa, Q=None, batch_seg=None, **kwargs):
         if batch_seg is None:
             batch_seg = torch.zeros_like(Za)
         #number of atoms per batch (needed for charge scaling)
@@ -215,20 +216,20 @@ class PhysNet(nn.Module):
             Eele = torch.where(Dij <= cut, Eele, torch.zeros_like(Eele))
         return segment_sum(Eele, idx_i)
 
-
     def batch_collate_fn(self, sample):
-        print(sample)
-        feature, label = sample
+        feature, label = zip(*sample)
+        feature, label = pd.concat(feature, axis=1).T, pd.concat(label, axis=1).T
         batch_input, batch_target = dict(), dict()
         for k, v in feature.items():
             if k == "Q":
-                batch_input[k] = torch.tensor(v, dtype=torch.double).reshape(-1)
+                batch_input[k] = torch.tensor(v.to_list(), dtype=self.dtype).reshape(-1)
             if k == "Za":
-                batch_input[k] = torch.tensor(np.concatenate(v), dtype=torch.long)
+                batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=torch.long)
             if k == "Ra":
-                batch_input[k] = torch.tensor(np.concatenate(v))
+                batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=self.dtype)
         for k, v in label.items():
-            batch_target[k] = torch.tensor(np.concatenate(v))
+            if k != "atom_type":
+                batch_target[k] = torch.tensor(np.concatenate(v.to_list()))
         batch_seg = []
         idx_i = []
         idx_j = []
@@ -243,21 +244,34 @@ class PhysNet(nn.Module):
                 (indices[1] + np.triu(np.ones((N, N-1)))).reshape(-1) + count
             )
             count += N
-            split_sections.append(count)
+            split_sections.append(N)
         batch_input["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
         batch_input["idx_i"] = torch.tensor(np.concatenate(idx_i), dtype=torch.long)
         batch_input["idx_j"] = torch.tensor(np.concatenate(idx_j), dtype=torch.long)
         batch_target["split_sections"] = split_sections
-        batch_target["atom_type"] = batch_target["atom_type"]
+        batch_target["atom_type"] = label["atom_type"]
         return batch_input, batch_target
-
+    
+    def batch_output_collate_fn(self, output, target):
+        net_output, net_target = dict(), dict()
+        for k, v in target.items():
+            if k in ["Qa"]:
+                net_output[k] = torch.split(output[k], target["split_sections"])
+                net_target[k] = torch.split(v, target["split_sections"])
+            elif k == "atom_type":
+                net_output[k] = v
+                net_target[k] = v
+        return net_output, net_target
 
     def forward(self, task, **net_input):
+        Ea, Qa, Dij, nh_loss = self.atomic_properties(**net_input)
+        Qa = self.scaled_charges(Qa=Qa, **net_input)
         if task == "q":
             return {
-                "Qa": self.scaled_charges(**net_input)
+                "Qa": Qa,
+                "nh_loss": nh_loss
             }
-
+   
     @property
     def drop_out(self):
         return self._drop_out

@@ -1,12 +1,12 @@
 Base:
   seed: 114514
   task: "q"
-  metric:
-    metrics_str: ["q_rmse"]
+  Metric:
+    metrics_str: ["Qa_rmse"]
     metrics_weight: [1.0]
 Datahub:
-  data_path:
-  energy_bias_path:
+  data_path: ""
+  energy_bias_path: ""
   Feature:
     Ra:
       active: True
@@ -20,7 +20,15 @@ Modelhub:
       active: True
       model: "PhysNet"
       feature: ["Ra", "Za", "Q"]
+      loss:
+        key: "mse_nh"
+        params:
+          weights:
+            nh_loss: 1
+            Qa: 1
       params:
+        F: 128
+        K: 64
         sr_cut: 10.0
         num_blocks: 3
         num_residual_atomic: 2
@@ -30,6 +38,7 @@ Modelhub:
         use_dispersion: true
         activation_fn: shifted_softplus
         drop_out: 0.0
+        dtype: "float32"
 Trainer:
   Split:
     method: "fold_random"
@@ -42,10 +51,10 @@ Trainer:
     report: True
   FFtrainer:
     patience: 50
-    max_epochs: 300
+    max_epochs: 1
     learning_rate: 1e-3
     warmup_ratio: 0.03
-    batch_size: 8
+    batch_size: 32
     max_norm: 5.0
     cuda: True
-    amp: True
+    amp: False

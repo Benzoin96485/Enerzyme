@@ -26,7 +26,6 @@ class Trainer(object):
         self._init_trainer(**params)
 
     def _init_trainer(self, **params):
-        print(params)
         ### init common params ###
         self.split_method = params.get('Split').get('method', "fold_random")
         self.split_params = params.get('Split').get('params')
@@ -49,18 +48,20 @@ class Trainer(object):
     def decorate_batch(self, batch):
         batch_input, batch_target = batch
         for k, v in batch_input.items():
-            batch_input[k] = v.to(self.device)
+            if isinstance(v, torch.Tensor):
+                batch_input[k] = v.to(self.device)
         for k, v in batch_target.items():
-            batch_target[k] = v.to(self.device)
+            if isinstance(v, torch.Tensor):
+                batch_target[k] = v.to(self.device)
         return batch_input, batch_target
     
-    def decorate_batch_output(self, target, output):
+    def decorate_batch_output(self, output, target):
         y_pred = dict()
         y_truth = dict()
-        split_sections = target["split_sections"]
         for k in output:
-            y_pred[k] = np.split(output.cpu().numpy(), split_sections)
-            y_truth[k] = np.split(target.detach().cpu().numpy(), split_sections)
+            if k in ["Qa"]:
+                y_pred[k] = list(map(lambda x: x.cpu().numpy(), output[k]))
+                y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), target[k]))
         y_pred["atom_type"] = target["atom_type"]
         return pd.DataFrame(y_pred), pd.DataFrame(y_truth)
     
@@ -108,11 +109,11 @@ class Trainer(object):
                 net_input, net_target = self.decorate_batch(batch)
                 if self.scaler and self.device.type == 'cuda':
                     with torch.cuda.amp.autocast():
-                        outputs = model(**net_input)
+                        outputs = model(task=self.task, **net_input)
                         loss = loss_func(outputs, net_target)
                 else:
                     with torch.set_grad_enabled(True):
-                        outputs = model(**net_input)
+                        outputs = model(task=self.task, **net_input)
                         loss = loss_func(outputs, net_target)
                 trn_loss.append(float(loss.data))
                 # tqdm lets you add some details so you can monitor training as you train.
@@ -144,7 +145,8 @@ class Trainer(object):
                 target_scaler=target_scaler, 
                 epoch=epoch, 
                 load_model=False, 
-                feature_name=feature_name
+                feature_name=feature_name,
+                fold=fold
             )
             end_time = time.time()
             total_val_loss = np.mean(val_loss)
@@ -162,7 +164,7 @@ class Trainer(object):
                     (end_time - start_time)
                 )
             logger.info(message)
-            is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, total_val_loss, min_val_loss, metric_score, max_score, model, dump_dir, self.patience, epoch)
+            is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, total_val_loss, min_val_loss, metric_score, max_score, model, dump_dir, fold, self.patience, epoch)
             if is_early_stop:
                 break
         
@@ -180,11 +182,7 @@ class Trainer(object):
         return y_preds
     
     def _early_stop_choice(self, wait, loss, min_loss, metric_score, max_score, model, dump_dir, fold, patience, epoch):
-        if not isinstance(self.metrics_str, str) or self.metrics_str in ['loss', 'none', '']:
-            is_early_stop, min_val_loss, wait = self._judge_early_stop_loss(wait, loss, min_loss, model, dump_dir, fold, patience, epoch)
-        else:
-            is_early_stop, min_val_loss, wait, max_score = self.metrics._early_stop_choice(wait, min_loss, metric_score, max_score, model, dump_dir, fold, patience, epoch)
-        return is_early_stop,min_val_loss,wait, max_score
+        return self.metrics._early_stop_choice(wait, min_loss, metric_score, max_score, model, dump_dir, fold, patience, epoch)
     
     def _judge_early_stop_loss(self, wait, loss, min_loss, model, dump_dir, fold, patience, epoch):
         is_early_stop = False
@@ -221,14 +219,15 @@ class Trainer(object):
         y_preds = []
         y_truths = []
         for i, batch in enumerate(dataloader):
-            net_input, net_target = self.decorate_batch(batch, feature_name)
+            net_input, net_target = self.decorate_batch(batch)
             # Get model outputs
             with torch.no_grad():
-                outputs = model(**net_input)
+                outputs = model(task=self.task, **net_input)
                 if not load_model:
                     loss = loss_func(outputs, net_target)
                     val_loss.append(float(loss.data))
-            y_pred, y_truth = self.decorate_batch_output(net_target, outputs)
+            outputs, net_target = model.batch_output_collate_fn(outputs, net_target)
+            y_pred, y_truth = self.decorate_batch_output(outputs, net_target)
             y_preds.append(y_pred)
             y_truths.append(y_truth)
             if not load_model:
