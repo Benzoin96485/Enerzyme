@@ -28,7 +28,7 @@ class DataHub(object):
         self.dump_dir = dump_dir
         self.energy_bias_path = energy_bias_path
         self._init_data()
-        self._init_features(**params.Feature)
+        self._init_features(**params["Feature"])
 
         
     def _init_data(self):
@@ -39,6 +39,7 @@ class DataHub(object):
             raise ValueError('No data path provided.')
         
         self.data["target_scaler"] = TargetScaler(self.task, self.energy_bias_path, self.dump_dir)
+        self.data["target"] = dict()
         for k, v in self.data["target_scaler"].transform(self.data).items():
             self.data["target"][k] = v
 

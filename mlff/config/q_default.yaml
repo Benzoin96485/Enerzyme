@@ -2,8 +2,8 @@ Base:
   seed: 114514
   task: "q"
   metric:
-    metric_str: ["Qa_rmse"]
-    metric_weight: [1.0]
+    metrics_str: ["q_rmse"]
+    metrics_weight: [1.0]
 Datahub:
   data_path:
   energy_bias_path:

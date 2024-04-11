@@ -1,21 +1,28 @@
 import time
-import os
-import tqdm
+import os, logging, sys
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.nn.utils import clip_grad_norm_
+try:
+    logging.getLogger('tensorflow').disabled = True
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+except:
+    pass
 from transformers.optimization import get_linear_schedule_with_warmup
 import numpy as np
 import pandas as pd
 from .split import Splitter
 from ..utils import logger
+from ..utils.metrics import Metrics
 
 
 class Trainer(object):
-    def __init__(self, task=None, out_dir=None, **params):
+    def __init__(self, task=None, metrics_str=None, metrics_weight=None, out_dir=None, **params):
         self.task = task
         self.out_dir = out_dir
+        self.metrics = Metrics(metrics_str, metrics_weight)
         self._init_trainer(**params)
 
     def _init_trainer(self, **params):
@@ -41,37 +48,11 @@ class Trainer(object):
     
     def decorate_batch(self, batch):
         batch_input, batch_target = batch
-        net_input, net_target = dict(), dict()
         for k, v in batch_input.items():
-            if k == "Q":
-                net_input[k] = torch.tensor(v, dtype=torch.double).reshape(-1).to(self.device)
-            if k == "Za":
-                net_input[k] = torch.tensor(np.concatenate(v), dtype=torch.long).to(self.device)
-            if k == "Ra":
-                net_input[k] = torch.tensor(np.concatenate(v)).to(self.device)
-        batch_seg = []
-        idx_i = []
-        idx_j = []
-        split_sections = []
-        count = 0
-        for i, Za in enumerate(batch_input["Za"]):
-            N = len(Za)
-            batch_seg.append(np.ones(N, dtype=int) * i)
-            indices = np.indices((N, N-1))
-            idx_i.append(indices[0].reshape(-1) + count)
-            idx_j.append(
-                (indices[1] + np.triu(np.ones((N, N-1)))).reshape(-1) + count
-            )
-            count += N
-            split_sections.append(count)
-        net_input["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
-        net_input["idx_i"] = torch.tensor(np.concatenate(idx_i), dtype=torch.long)
-        net_input["idx_j"] = torch.tensor(np.concatenate(idx_j), dtype=torch.long)
+            batch_input[k] = v.to(self.device)
         for k, v in batch_target.items():
-            net_target[k] = torch.tensor(np.concatenate(v)).to(self.device)
-        net_target["split_sections"] = split_sections
-        net_target["atom_type"] = batch_target["atom_type"]
-        return net_input, net_target
+            batch_target[k] = v.to(self.device)
+        return batch_input, batch_target
     
     def decorate_batch_output(self, target, output):
         y_pred = dict()
@@ -81,7 +62,7 @@ class Trainer(object):
             y_pred[k] = np.split(output.cpu().numpy(), split_sections)
             y_truth[k] = np.split(target.detach().cpu().numpy(), split_sections)
         y_pred["atom_type"] = target["atom_type"]
-        return pd.Dataframe(y_pred), pd.DataFrame(y_truth)
+        return pd.DataFrame(y_pred), pd.DataFrame(y_truth)
     
     def set_seed(self, seed):
         """function used to set a random seed
@@ -101,7 +82,7 @@ class Trainer(object):
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=collate_fn,
-            drop_last=True
+            drop_last=True    
         )
         min_val_loss = float("inf")
         max_score = float("-inf")
@@ -185,7 +166,17 @@ class Trainer(object):
             if is_early_stop:
                 break
         
-        y_preds, _, _ = self.predict(model, valid_dataset, loss_func, activation_fn, dump_dir, fold, target_scaler, epoch, load_model=True, feature_name=feature_name)
+        y_preds, _, _ = self.predict(
+            model=model, 
+            dataset=valid_dataset, 
+            loss_func=loss_func, 
+            dump_dir=dump_dir, 
+            fold=fold, 
+            target_scaler=target_scaler, 
+            epoch=epoch, 
+            load_model=True, 
+            feature_name=feature_name
+        )
         return y_preds
     
     def _early_stop_choice(self, wait, loss, min_loss, metric_score, max_score, model, dump_dir, fold, patience, epoch):

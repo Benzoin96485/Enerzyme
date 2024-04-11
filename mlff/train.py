@@ -16,8 +16,7 @@ class FFTrain(object):
         self._init_datahub(**config.Datahub)
         self.config = self.update_config(config, **params)
         logger.info('Config: {}'.format(self.config))
-
-        self._init_trainer(**config.Trainer)
+        self._init_trainer(**config.Trainer, **self.config.Base.Metric)
         self._init_modelhub(**config.Modelhub)
 
         if self.out_dir is not None:
@@ -38,7 +37,11 @@ class FFTrain(object):
         self.datahub = DataHub(task=self.task, is_train=True, dump_dir=self.out_dir, **params)
 
     def _init_trainer(self, **params):
-        self.trainer = Trainer(self.task, self.out_dir, **params)
+        self.trainer = Trainer(
+            task=self.task,
+            out_dir=self.out_dir,
+            **params
+        )
 
     def _init_modelhub(self, **params):
         self.modelhub = ModelHub(self.datahub, self.trainer, self.task, **params)
@@ -49,33 +52,20 @@ class FFTrain(object):
                 config[key] = value
         return config
         
-    def train_single(self, model_str):
+    def train_all(self):
         FFs = self.modelhub.models.get('FF', None)
-        if FFs is not None and model_str in FFs.keys():
-            FFs[model_str].run()
+        for ff in FFs.values():
+            ff.run()
         
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config_path', type=str, default='', 
+    parser.add_argument('-c', '--config_path', type=str, default='', 
         help='training config'
     )
-    parser.add_argument('--output_dir', type=str, default='../results',
+    parser.add_argument('-o', '--output_dir', type=str, default='../results',
                     help='the output directory for saving artifact') 
-    parser.add_argument('--model_name', type=str,
+    parser.add_argument('-m', '--model_name', type=str,
                         help='training single model name')      
     args = parser.parse_args()
     return args
-
-
-if __name__ == '__main__':
-    args = get_parser("training")
-
-    moltrain = FFTrain(
-        out_dir=args.output_dir,
-        config_path=args.config_path
-    )
-
-    moltrain.train_single(args.model_name)
-
-    logger.info("train complete")

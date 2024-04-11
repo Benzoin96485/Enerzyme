@@ -17,6 +17,4 @@ class Splitter(object):
         return splitter
 
     def split(self, data):
-        if self.split_method in ['5fold_random']:
-            self.skf = self.splitter.split(data)
-        return self.skf
+        return self.splitter.split(data)

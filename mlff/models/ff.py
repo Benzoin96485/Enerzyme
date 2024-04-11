@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 from .physnet import PhysNet
 from ..utils import logger
 
+
 SEP = "-"
 FF_REGISTER = {
     "PhysNet": PhysNet
@@ -21,7 +22,7 @@ LOSS_REGISTER = {
 class FF:
     def __init__(self, data, features, trainer, model_str, loss_key, **params):
         self.data = data
-        self.energy_scaler = self.data['energy_scaler']
+        self.target_scaler = self.data['target_scaler']
         self.features = features
         self.trainer = trainer
         self.splitter = self.trainer.splitter
@@ -54,14 +55,14 @@ class FF:
     
     def run(self):
         logger.info("start training FF:{}".format(self.model_name))
-        X = pd.Dataframe(self.features)
-        y = pd.Dataframe(self.data['target'])
-        y_pred = pd.DataFrame({k: np.empty_like(v) for k, v in self.data['target']})
-        for fold, (tr_idx, te_idx) in enumerate(self.splitter.split(X.iloc, y.iloc)):
+        X = pd.DataFrame(self.features)
+        y = pd.DataFrame(self.data['target'])
+        y_pred = pd.DataFrame(columns=y.columns, index=y.index)
+        for fold, (tr_idx, te_idx) in enumerate(self.splitter.split(X)):
             X_train, y_train = X.iloc[tr_idx], y.iloc[tr_idx]
             X_valid, y_valid = X.iloc[te_idx], y.iloc[te_idx]
-            train_dataset = FFDataset(X_train, y_train, self.feature_name, self.task)
-            valid_dataset = FFDataset(X_valid, y_valid, self.feature_name, self.task)
+            train_dataset = FFDataset(X_train, y_train)
+            valid_dataset = FFDataset(X_valid, y_valid)
             if fold > 0:
                 ### need to initalize model for next fold training
                 if self.cv_pretrain_path:
@@ -78,7 +79,7 @@ class FF:
                     target_scaler=self.target_scaler, 
                     feature_name=self.feature_name
                 )
-            except:
+            except RuntimeError:
                 logger.info("FF {0} failed...".format(self.model_name))
                 self.is_success = False
                 return
@@ -120,4 +121,4 @@ class FFDataset(Dataset):
         return self.feature.iloc[idx], self.label.iloc[idx]
 
     def __len__(self):
-        return len(self.data)
+        return len(self.feature)

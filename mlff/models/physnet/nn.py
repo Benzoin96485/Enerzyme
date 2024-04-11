@@ -10,7 +10,11 @@ from .block import InteractionBlock, OutputBlock
 
 class PhysNet(nn.Module):
     def __str__(self):
-        return "Pytorch Implementation of PhysNet (J. Chem. Theory Comput. 2019, 15, 3678−3693)"
+        return """
+###################################################################################
+# Pytorch Implementation of PhysNet (J. Chem. Theory Comput. 2019, 15, 3678−3693) #
+###################################################################################
+"""
     
     def __init__(self,
         F,                                  # dimensionality of feature vector
@@ -210,6 +214,43 @@ class PhysNet(nn.Module):
             Eele = self.kehalf * Qi * Qj * (cswitch * Eele_shielded + switch * Eele_ordinary)
             Eele = torch.where(Dij <= cut, Eele, torch.zeros_like(Eele))
         return segment_sum(Eele, idx_i)
+
+
+    def batch_collate_fn(self, sample):
+        print(sample)
+        feature, label = sample
+        batch_input, batch_target = dict(), dict()
+        for k, v in feature.items():
+            if k == "Q":
+                batch_input[k] = torch.tensor(v, dtype=torch.double).reshape(-1)
+            if k == "Za":
+                batch_input[k] = torch.tensor(np.concatenate(v), dtype=torch.long)
+            if k == "Ra":
+                batch_input[k] = torch.tensor(np.concatenate(v))
+        for k, v in label.items():
+            batch_target[k] = torch.tensor(np.concatenate(v))
+        batch_seg = []
+        idx_i = []
+        idx_j = []
+        split_sections = []
+        count = 0
+        for i, Za in enumerate(feature["Za"]):
+            N = len(Za)
+            batch_seg.append(np.ones(N, dtype=int) * i)
+            indices = np.indices((N, N-1))
+            idx_i.append(indices[0].reshape(-1) + count)
+            idx_j.append(
+                (indices[1] + np.triu(np.ones((N, N-1)))).reshape(-1) + count
+            )
+            count += N
+            split_sections.append(count)
+        batch_input["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
+        batch_input["idx_i"] = torch.tensor(np.concatenate(idx_i), dtype=torch.long)
+        batch_input["idx_j"] = torch.tensor(np.concatenate(idx_j), dtype=torch.long)
+        batch_target["split_sections"] = split_sections
+        batch_target["atom_type"] = batch_target["atom_type"]
+        return batch_input, batch_target
+
 
     def forward(self, task, **net_input):
         if task == "q":

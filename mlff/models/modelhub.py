@@ -34,7 +34,7 @@ class ModelHub:
                 self.models['FF'][model_str] = self._init_ff(
                     self.data, 
                     {
-                        self.features[feature_name] for feature_name in feature_names
+                        feature_name: self.features[feature_name] for feature_name in feature_names
                     }, 
                     trainer, model_str, 
                     loss_key, **model_params

@@ -18,7 +18,7 @@ class YamlHandler:
             yaml file path of config
         """
         if not os.path.exists(file_path):
-            return FileExistsError(OSError)
+            raise FileNotFoundError(file_path)
             
         self.file_path = file_path
         logger.info('yaml handler load path: {}'.format(self.file_path))
