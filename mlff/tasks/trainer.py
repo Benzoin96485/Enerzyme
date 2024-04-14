@@ -107,6 +107,7 @@ class Trainer(object):
             trn_loss = []
             for i, batch in enumerate(train_dataloader):
                 net_input, net_target = self.decorate_batch(batch)
+                optimizer.zero_grad() # Zero gradients
                 if self.scaler and self.device.type == 'cuda':
                     with torch.cuda.amp.autocast():
                         outputs = model(task=self.task, **net_input)
@@ -152,19 +153,12 @@ class Trainer(object):
             total_val_loss = np.mean(val_loss)
             _score = list(metric_score.values())[0]
             _metric = list(metric_score.keys())[0]
-            message = 'Epoch [{}/{}] train_loss: {:.4f}, val_loss: {:.4f}, val_{}: {:.4f}, lr: {:.6f}, ' \
-                '{:.1f}s'.format(
-                    epoch+1, 
-                    self.max_epochs,
-                    total_trn_loss, 
-                    total_val_loss, 
-                    _metric, 
-                    _score,
-                    optimizer.param_groups[0]['lr'],
-                    (end_time - start_time)
-                )
-            logger.info(message)
             is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, total_val_loss, min_val_loss, metric_score, max_score, model, dump_dir, fold, self.patience, epoch)
+            message = f'Epoch [{epoch+1}/{self.max_epochs}] train_loss: {total_trn_loss:.4f}, ' + \
+                f'val_loss: {total_val_loss:.4f}, val_{_metric}: {_score:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}, ' + \
+                f'{(end_time - start_time):.1f}s' + \
+                (f'Patience [{wait}/{self.patience}], max_val_{_metric}: {min_val_loss:.4f}' if wait else '')
+            logger.info(message)
             if is_early_stop:
                 break
         
