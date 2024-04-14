@@ -75,7 +75,7 @@ class Trainer(object):
         torch.cuda.manual_seed_all(seed)
         np.random.seed(seed)
 
-    def fit_predict(self, model, train_dataset, valid_dataset, loss_func, dump_dir, fold, target_scaler, feature_name):
+    def fit_predict(self, model, train_dataset, valid_dataset, loss_func, dump_dir, fold, target_scaler, feature_name, test_dataset=None, cv=True):
         model = model.to(self.device)
         collate_fn = model.batch_collate_fn
         train_dataloader = DataLoader(
@@ -162,17 +162,30 @@ class Trainer(object):
             if is_early_stop:
                 break
         
-        y_preds, _, _ = self.predict(
-            model=model, 
-            dataset=valid_dataset, 
-            loss_func=loss_func, 
-            dump_dir=dump_dir, 
-            fold=fold, 
-            target_scaler=target_scaler, 
-            epoch=epoch, 
-            load_model=True, 
-            feature_name=feature_name
-        )
+        if cv:
+            y_preds, _, _ = self.predict(
+                model=model, 
+                dataset=valid_dataset, 
+                loss_func=loss_func, 
+                dump_dir=dump_dir, 
+                fold=fold, 
+                target_scaler=target_scaler, 
+                epoch=epoch, 
+                load_model=True, 
+                feature_name=feature_name
+            )
+        else:
+            y_preds, _, _ = self.predict(
+                model=model, 
+                dataset=test_dataset, 
+                loss_func=loss_func, 
+                dump_dir=dump_dir, 
+                fold=fold, 
+                target_scaler=target_scaler, 
+                epoch=epoch, 
+                load_model=True, 
+                feature_name=feature_name
+            )
         return y_preds
     
     def _early_stop_choice(self, wait, loss, min_loss, metric_score, max_score, model, dump_dir, fold, patience, epoch):

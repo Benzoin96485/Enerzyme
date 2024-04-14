@@ -53,11 +53,20 @@ class FF:
         X = pd.DataFrame(self.features)
         y = pd.DataFrame(self.data['target'])
         y_pred = pd.DataFrame(columns=y.columns, index=y.index)
-        for fold, (tr_idx, te_idx) in enumerate(self.splitter.split(X)):
+        for fold, idx in enumerate(self.splitter.split(X)):
+            if self.splitter.cv:
+                tr_idx, vl_idx = idx
+            else:
+                tr_idx, vl_idx, te_idx = idx
             X_train, y_train = X.iloc[tr_idx], y.iloc[tr_idx]
-            X_valid, y_valid = X.iloc[te_idx], y.iloc[te_idx]
+            X_valid, y_valid = X.iloc[vl_idx], y.iloc[vl_idx]
             train_dataset = FFDataset(X_train, y_train)
             valid_dataset = FFDataset(X_valid, y_valid)
+            if self.splitter.cv:
+                test_dataset = None
+            else:
+                X_test, y_test = X.iloc[te_idx], y.iloc[te_idx]
+                test_dataset = FFDataset(X_test, y_test)
             if fold > 0:
                 ### need to initalize model for next fold training
                 if self.cv_pretrain_path:
@@ -68,11 +77,13 @@ class FF:
                     model=self.model, 
                     train_dataset=train_dataset, 
                     valid_dataset=valid_dataset, 
+                    test_dataset=test_dataset,
                     loss_func=self.loss_func, 
                     dump_dir=self.dump_dir, 
                     fold=fold,
                     target_scaler=self.target_scaler, 
-                    feature_name=self.feature_name
+                    feature_name=self.feature_name,
+                    cv=self.splitter.cv
                 )
             except RuntimeError as e:
                 logger.info("FF {0} failed...".format(self.model_name))
@@ -80,18 +91,26 @@ class FF:
                 raise e
                 return
 
-            y_pred.iloc[te_idx] = _y_pred
-            logger.info ("fold {0}, result {1}".format(
+            if self.splitter.cv:
+                y_pred.iloc[vl_idx] = _y_pred
+                logger.info ("fold {0}, result {1}".format(
                     fold,
                     self.metrics.cal_metric(
                         self.data['target_scaler'].inverse_transform(y_valid), self.data['target_scaler'].inverse_transform(_y_pred)
+                        )
                     )
                 )
-            )
-
-        self.cv['pred'] = y_pred
-        self.cv['metric'] = self.metrics.cal_metric(self.data['target_scaler'].inverse_transform(y), self.data['target_scaler'].inverse_transform(self.cv['pred']))
-        self.dump(self.cv['pred'], self.dump_dir, 'cv.data')
+            else:
+                y_pred.iloc[te_idx] = _y_pred
+        
+        if self.splitter.cv:
+            self.cv['pred'] = y_pred
+            self.dump(self.cv['pred'], self.dump_dir, 'cv.data')
+            self.cv['metric'] = self.metrics.cal_metric(self.data['target_scaler'].inverse_transform(y), self.data['target_scaler'].inverse_transform(self.cv['pred']))
+        else:
+            self.cv['pred'] = y_pred.iloc[te_idx]
+            self.dump(self.cv['pred'], self.dump_dir, 'test.data')
+            self.cv['metric'] = self.metrics.cal_metric(self.data['target_scaler'].inverse_transform(y.iloc[te_idx]), self.data['target_scaler'].inverse_transform(self.cv['pred']))
         self.dump(self.cv['metric'], self.dump_dir, 'metric.result')
         logger.info("{} FF metrics score: \n{}".format(self.model_str, self.cv['metric']))
         logger.info("{} FF done!".format(self.model_str))
