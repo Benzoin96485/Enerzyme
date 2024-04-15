@@ -59,10 +59,14 @@ class Trainer(object):
         y_pred = dict()
         y_truth = dict()
         for k in output:
-            if k in ["Qa"]:
-                y_pred[k] = list(map(lambda x: x.cpu().numpy(), output[k]))
+            if k in ["Qa", "F"]:
+                y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), output[k]))
                 y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), target[k]))
+            elif k in ["E"]:
+                y_pred[k] = output[k].detach().cpu().numpy()
+                y_truth[k] = output[k].detach().cpu().numpy()
         y_pred["atom_type"] = target["atom_type"]
+        y_truth["atom_type"] = target["atom_type"]
         return pd.DataFrame(y_pred), pd.DataFrame(y_truth)
     
     def set_seed(self, seed):
@@ -227,9 +231,9 @@ class Trainer(object):
         y_truths = []
         for i, batch in enumerate(dataloader):
             net_input, net_target = self.decorate_batch(batch)
+            outputs = model(task=self.task, **net_input)
             # Get model outputs
             with torch.no_grad():
-                outputs = model(task=self.task, **net_input)
                 if not load_model:
                     loss = loss_func(outputs, net_target)
                     val_loss.append(float(loss.data))

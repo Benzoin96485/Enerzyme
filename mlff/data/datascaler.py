@@ -13,7 +13,7 @@ def load_energy_bias(energy_bias_path):
 class TargetScaler:
     def __init__(self, task, energy_bias_path, load_dir=None):
         if load_dir is not None:
-            path = os.path.join(load_dir, 'energy_bias.csv')
+            path = os.path.join(load_dir, energy_bias_path)
         else:
             path = energy_bias_path
         self.bias = load_energy_bias(path)
@@ -38,6 +38,7 @@ class TargetScaler:
         if "e" in self.task:
             if self.bias is None:
                 targets["E"] = pred["E"]
+                targets["F"] = pred["F"]
             else:
                 e0 = np.array([self.bias.loc[frame]["atom_energy"].sum() for frame in pred["atom_type"]])
                 targets["E"] = pred["E"] + e0

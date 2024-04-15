@@ -29,8 +29,8 @@ class FF:
         self.model_params = params
         self.model_params['device'] = self.trainer.device
         self.cv_pretrain_path = self.model_params.get('cv_pretrain', None)
-        if self.cv_pretrain_path:
-            self.model_params["pretrain"] = f"{self.cv_pretrain_path}_0.pth"
+        if self.cv_pretrain_path is not None:
+            self.model_params["pretrain"] = f"{self.cv_pretrain_path}/model_0.pth"
         self.cv = dict()
         self.metrics = self.trainer.metrics
         self.loss_func = LOSS_REGISTER[loss_param["key"]](**loss_param["params"])
@@ -43,6 +43,10 @@ class FF:
     def _init_model(self, model_name, **params):
         if model_name in FF_REGISTER:
             model = FF_REGISTER[model_name](**params)
+            if self.cv_pretrain_path is not None:
+                model_dict = torch.load(self.model_params["pretrain"], map_location=self.trainer.device)["model_state_dict"]
+                model.load_state_dict(model_dict, strict=False)
+                logger.info(f"load model success from {self.model_params['pretrain']}!")
             print(model.__str__())
         else:
             raise ValueError('Unknown model: {}'.format(self.model_name))
@@ -70,7 +74,7 @@ class FF:
             if fold > 0:
                 ### need to initalize model for next fold training
                 if self.cv_pretrain_path:
-                    self.model_params["pretrain"] = f"{self.cv_pretrain_path}_{fold}.pth"
+                    self.model_params["pretrain"] = f"{self.cv_pretrain_path}/model_{fold}.pth"
                 self.model = self._init_model(self.model_name, **self.model_params)
             try:
                 _y_pred = self.trainer.fit_predict(

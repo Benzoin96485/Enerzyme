@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F_
 from .func import softplus_inverse, segment_sum, shifted_softplus
-from .d3 import d3_s6, d3_s8, d3_a1, d3_a2, d3_autoang, d3_autoev, edisp
+from .d3 import d3_s6, d3_s8, d3_a1, d3_a2, d3_autoang, d3_autoev, DispLayer
 from .layer import RBFLayer
 from .block import InteractionBlock, OutputBlock
 
@@ -33,6 +33,7 @@ class PhysNet(nn.Module):
         Qshift=0.0,                     #initial value for output charge shift 
         Qscale=1.0,                     #initial value for output charge scale 
         kehalf=7.199822675975274,       #half (else double counting) of the Coulomb constant (default is in units e=1, eV=1, A=1)
+        d3_autoev=d3_autoev,
         activation_fn="shifted_softplus",   # activation function
         drop_out=0.0,
         dtype=torch.double,
@@ -52,28 +53,30 @@ class PhysNet(nn.Module):
             self._activation_fn = activation_fn
         else:
             self._activation_fn = {"shifted_softplus": shifted_softplus}.get(activation_fn, shifted_softplus)
-        self._embeddings = nn.Embedding(95, self.F, dtype=self._dtype)
+        self._embeddings = nn.Embedding(95, self.F, dtype=self.dtype)
         self._drop_out = drop_out
-        self._rbf_layer = RBFLayer(K, sr_cut, dtype=self._dtype)
-        self._s6 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_s6), dtype=self._dtype)))
-        self._s8 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_s8), dtype=self._dtype)))
-        self._a1 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_a1), dtype=self._dtype)))
-        self._a2 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_a2), dtype=self._dtype)))
-        self._Eshift = nn.Parameter(Eshift * torch.ones(95, dtype=self._dtype))
-        self._Escale = nn.Parameter(Escale * torch.ones(95, dtype=self._dtype))
-        self._Qshift = nn.Parameter(Qshift * torch.ones(95, dtype=self._dtype))
-        self._Qscale = nn.Parameter(Qscale * torch.ones(95, dtype=self._dtype))
+        self._rbf_layer = RBFLayer(K, sr_cut, dtype=self.dtype)
+        self._s6 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_s6), dtype=self.dtype)))
+        self._s8 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_s8), dtype=self.dtype)))
+        self._a1 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_a1), dtype=self.dtype)))
+        self._a2 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_a2), dtype=self.dtype)))
+        self._Eshift = nn.Parameter(Eshift * torch.ones(95, dtype=self.dtype))
+        self._Escale = nn.Parameter(Escale * torch.ones(95, dtype=self.dtype))
+        self._Qshift = nn.Parameter(Qshift * torch.ones(95, dtype=self.dtype))
+        self._Qscale = nn.Parameter(Qscale * torch.ones(95, dtype=self.dtype))
+        self._d3_autoev = d3_autoev
 
         self._interaction_block = nn.Sequential(*[
             InteractionBlock(
                 K, F, num_residual_atomic, num_residual_interaction, activation_fn=self.activation_fn, drop_out=drop_out,
-                dtype=self._dtype
+                dtype=self.dtype
             ) for i in range(num_blocks)
         ])
         self._output_block = nn.Sequential(*[
-            OutputBlock(F, num_residual_output, activation_fn=self.activation_fn, drop_out=drop_out, dtype=self._dtype
+            OutputBlock(F, num_residual_output, activation_fn=self.activation_fn, drop_out=drop_out, dtype=self.dtype
             ) for i in range(num_blocks)
         ])
+        self._disp_layer = DispLayer(dtype=self.dtype)
 
     def calculate_interatomic_distances(self, R, idx_i, idx_j, offsets=None):
         #calculate interatomic distances
@@ -129,18 +132,18 @@ class PhysNet(nn.Module):
             Ea += self.electrostatic_energy_per_atom(Dij, Qa, idx_i, idx_j)
         if self.use_dispersion:
             if self.lr_cut is not None:   
-                Ea += d3_autoev * edisp(
+                Ea += self.d3_autoev * self.disp_layer(
                     Z, Dij / d3_autoang, idx_i, idx_j, s6=self.s6, s8=self.s8, a1=self.a1, a2=self.a2, cutoff=self.lr_cut/d3_autoang
                 )
             else:
-                Ea += d3_autoev * edisp(
+                Ea += self.d3_autoev * self.disp_layer(
                     Z, Dij / d3_autoang, idx_i, idx_j, s6=self.s6, s8=self.s8, a1=self.a1, a2=self.a2
                 )
         return torch.squeeze(segment_sum(Ea, batch_seg))
 
-    def energy_and_forces_from_scaled_atomic_properties(self, Ea, Qa, Dij, Z, R, idx_i, idx_j, batch_seg=None):
-        energy = self.energy_from_scaled_atomic_properties(Ea, Qa, Dij, Z, idx_i, idx_j, batch_seg)
-        forces = -torch.autograd.grad(torch.sum(energy), R, create_graph=True)[0]
+    def energy_and_forces_from_scaled_atomic_properties(self, Ea, Qa, Dij, Za, Ra, idx_i, idx_j, batch_seg=None, **params):
+        energy = self.energy_from_scaled_atomic_properties(Ea, Qa, Dij, Za, idx_i, idx_j, batch_seg)
+        forces = -torch.autograd.grad(torch.sum(energy), Ra, create_graph=True)[0]
         return energy, forces
     
     def energy_from_atomic_properties(self, Ea, Qa, Dij, Z, idx_i, idx_j, Q_tot=None, batch_seg=None):
@@ -153,7 +156,7 @@ class PhysNet(nn.Module):
     #calculates the energy and force given the atomic properties (in order to prevent recomputation if atomic properties are calculated)
     def energy_and_forces_from_atomic_properties(self, Ea, Qa, Dij, Z, R, idx_i, idx_j, Q_tot=None, batch_seg=None):
         energy = self.energy_from_atomic_properties(Ea, Qa, Dij, Z, idx_i, idx_j, Q_tot, batch_seg)
-        forces = -torch.autograd.grad(torch.sum(energy), R)[0]
+        forces = -torch.autograd.grad(torch.sum(energy), R, create_graph=True)[0]
         return energy, forces
 
     #calculates the total energy (including electrostatic interactions)
@@ -226,10 +229,12 @@ class PhysNet(nn.Module):
             if k == "Za":
                 batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=torch.long)
             if k == "Ra":
-                batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=self.dtype)
+                batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=self.dtype, requires_grad=True)
         for k, v in label.items():
-            if k != "atom_type":
+            if k in ["Qa", "F"]:
                 batch_target[k] = torch.tensor(np.concatenate(v.to_list()))
+            elif k in ["E"]:
+                batch_target[k] = torch.tensor(v.to_list())
         batch_seg = []
         idx_i = []
         idx_j = []
@@ -255,22 +260,28 @@ class PhysNet(nn.Module):
     def batch_output_collate_fn(self, output, target):
         net_output, net_target = dict(), dict()
         for k, v in target.items():
-            if k in ["Qa"]:
+            if k in ["Qa", "F"]:
                 net_output[k] = torch.split(output[k], target["split_sections"])
                 net_target[k] = torch.split(v, target["split_sections"])
-            elif k == "atom_type":
+            elif k in ["atom_type"]:
                 net_output[k] = v
+                net_target[k] = v
+            elif k in ["E"]:
+                net_output[k] = output[k]
                 net_target[k] = v
         return net_output, net_target
 
     def forward(self, task, **net_input):
         Ea, Qa, Dij, nh_loss = self.atomic_properties(**net_input)
         Qa = self.scaled_charges(Qa=Qa, **net_input)
-        if task == "q":
-            return {
-                "Qa": Qa,
-                "nh_loss": nh_loss
-            }
+        output = {"nh_loss": nh_loss}
+        if "q" in task:
+            output["Qa"] = Qa
+        if "e" in task:
+            energy, forces = self.energy_and_forces_from_scaled_atomic_properties(Ea, Qa, Dij, **net_input)
+            output["E"] = energy
+            output["F"] = forces
+        return output
    
     @property
     def drop_out(self):
@@ -333,6 +344,10 @@ class PhysNet(nn.Module):
         return self._kehalf
     
     @property
+    def d3_autoev(self):
+        return self._d3_autoev
+    
+    @property
     def dtype(self):
         return self._dtype
 
@@ -367,3 +382,7 @@ class PhysNet(nn.Module):
     @property
     def output_block(self):
         return self._output_block
+    
+    @property
+    def disp_layer(self):
+        return self._disp_layer

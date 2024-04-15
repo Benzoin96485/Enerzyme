@@ -22,10 +22,10 @@ d3_k1 = 16.000
 d3_k2 = 4/3
 d3_k3 = -4.000
 
-d3_c6ab = torch.from_numpy(np.load(os.path.join(package_directory,"tables","c6ab.npy")))
-d3_r0ab = torch.from_numpy(np.load(os.path.join(package_directory,"tables","r0ab.npy")))
-d3_rcov = torch.from_numpy(np.load(os.path.join(package_directory,"tables","rcov.npy")))
-d3_r2r4 = torch.from_numpy(np.load(os.path.join(package_directory,"tables","r2r4.npy")))
+d3_c6ab = torch.tensor(np.load(os.path.join(package_directory,"tables","c6ab.npy")))
+d3_r0ab = torch.tensor(np.load(os.path.join(package_directory,"tables","r0ab.npy")))
+d3_rcov = torch.tensor(np.load(os.path.join(package_directory,"tables","rcov.npy")))
+d3_r2r4 = torch.tensor(np.load(os.path.join(package_directory,"tables","r2r4.npy")))
 d3_maxc = 5 #maximum number of coordination complexes
 
 
@@ -152,3 +152,19 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     e6 = -0.5 * s6 * c6 * e6
     e8 = -0.5 * s8 * c8 * e8
     return segment_sum(e6 + e8, idx_i)
+
+
+class DispLayer(torch.nn.Module):
+    def __init__(self, dtype):
+        super().__init__()
+        self.d3_c6ab = torch.nn.Parameter(d3_c6ab.type(dtype), requires_grad=False)
+        self.d3_r0ab = torch.nn.Parameter(d3_r0ab.type(dtype), requires_grad=False)
+        self.d3_rcov = torch.nn.Parameter(d3_rcov.type(dtype), requires_grad=False)
+        self.d3_r2r4 = torch.nn.Parameter(d3_r2r4.type(dtype), requires_grad=False)
+        
+    def forward(self, Z, r, idx_i, idx_j, cutoff=None, r2=None, 
+    r6=None, r8=None, s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k1=d3_k1, k2=d3_k2, 
+    k3=d3_k3, eps=1e-10, c6_version=2):
+        return edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None, 
+    r6=None, r8=None, s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k1=d3_k1, k2=d3_k2, 
+    k3=d3_k3, c6ab=self.d3_c6ab, r0ab=self.d3_r0ab, rcov=self.d3_rcov, r2r4=self.d3_r2r4, eps=1e-10, c6_version=2)

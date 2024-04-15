@@ -5,8 +5,12 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from .base_logger import logger
 
 
-def rmse(y_true, y_pred):
-    return np.sqrt(mean_squared_error(np.concatenate(y_true.to_list()), np.concatenate(y_pred.to_list())))
+def rmse(y_true, y_pred, target_name=None):
+    if target_name in ["Qa", "F"]:
+        score = mean_squared_error(np.concatenate(y_true.to_list()), np.concatenate(y_pred.to_list()), squared=False)
+    elif target_name in ["E"]:
+        score = mean_squared_error(y_true.to_numpy(), y_pred.to_numpy(), squared=False)
+    return score
 
 
 METRICS_REGISTER = {
@@ -32,7 +36,7 @@ class Metrics(object):
         return " + ".join(pre_list)
        
     def cal_single_metric(self, label, predict, target_name, metric_str):
-        return METRICS_REGISTER[metric_str](label[target_name], predict[target_name])
+        return METRICS_REGISTER[metric_str](label[target_name], predict[target_name], target_name)
     
     def cal_judge_score(self, raw_metric_score):
         judge_score = 0
