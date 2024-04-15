@@ -151,13 +151,13 @@ class Trainer(object):
             )
             end_time = time.time()
             total_val_loss = np.mean(val_loss)
-            _score = list(metric_score.values())[0]
-            _metric = list(metric_score.keys())[0]
+            _score = metric_score["_judge_score"]
+            _metric = str(self.metrics)
             is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, total_val_loss, min_val_loss, metric_score, max_score, model, dump_dir, fold, self.patience, epoch)
             message = f'Epoch [{epoch+1}/{self.max_epochs}] train_loss: {total_trn_loss:.4f}, ' + \
-                f'val_loss: {total_val_loss:.4f}, val_{_metric}: {_score:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}, ' + \
+                f'val_loss: {total_val_loss:.4f}, val_judge_score ({_metric}): {_score:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}, ' + \
                 f'{(end_time - start_time):.1f}s' + \
-                (f'Patience [{wait}/{self.patience}], max_val_{_metric}: {min_val_loss:.4f}' if wait else '')
+                (f', Patience [{wait}/{self.patience}], min_val_judge_score: {min_val_loss:.4f}' if wait else '')
             logger.info(message)
             if is_early_stop:
                 break
