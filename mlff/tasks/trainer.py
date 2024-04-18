@@ -139,7 +139,7 @@ class Trainer(object):
                     optimizer.step()
                 scheduler.step()
                 batch_bar.update()
-
+            torch.cuda.empty_cache()
             batch_bar.close()
             total_trn_loss = np.mean(trn_loss)
             y_preds, val_loss, metric_score = self.predict(
@@ -165,7 +165,7 @@ class Trainer(object):
             logger.info(message)
             if is_early_stop:
                 break
-        
+        torch.cuda.empty_cache()   
         if cv:
             y_preds, _, _ = self.predict(
                 model=model, 
