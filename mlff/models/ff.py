@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
-from .physnet import PhysNet, MSE_nh_Loss
+from .physnet import PhysNet, MSE_nh_Loss, MAE_nh_Loss
 from ..utils import logger
 
 
@@ -13,7 +13,8 @@ FF_REGISTER = {
     "PhysNet": PhysNet
 }
 LOSS_REGISTER = {
-    "mse_nh": MSE_nh_Loss
+    "mse_nh": MSE_nh_Loss,
+    "mae_nh": MAE_nh_Loss
 }
 
 

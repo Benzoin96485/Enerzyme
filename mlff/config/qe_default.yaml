@@ -21,13 +21,11 @@ Modelhub:
       model: "PhysNet"
       feature: ["Ra", "Za", "Q"]
       loss:
-        key: "mse_nh"
+        key: "mae_nh"
         params:
           weights:
-            nh_loss: 1
-            Qa: 1
-            E: 1
-            F: 100
+            nh_loss: 0.272
+            Qa: 1.36 # 27.2 / 20
       params:
         F: 128
         K: 64
@@ -40,7 +38,7 @@ Modelhub:
         use_dispersion: true
         activation_fn: shifted_softplus
         drop_out: 0.0
-        kehalf: 0.5 # atomic unit system
+        kehalf: 0.26458863 # atomic unit system 0.5 * 0.529
         d3_autoev: 1 # atomic unit system
         dtype: "float32"
         cv_pretrain:
@@ -54,11 +52,12 @@ Trainer:
     logger_level: 1
     report: True
   FFtrainer:
-    patience: 2
+    patience: 50
     max_epochs: 1000
     learning_rate: 1e-3
     warmup_ratio: 0.03
-    batch_size: 16
+    batch_size: 8
     max_norm: 5.0
+    weight_decay: 0.999
     cuda: True
     amp: False
