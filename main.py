@@ -29,9 +29,11 @@ def get_parser():
     )
     parser_predict.add_argument('--data_path', type=str, help='test data path')
     parser_predict.add_argument('--model_dir', type=str,
-                    help='the output directory for saving artifact')
+                    help='the directory of models')
     parser_predict.add_argument('--save_dir', type=str,
                 help='the output directory for saving artifact')    
+    parser_predict.add_argument('--metric_str', nargs="+", type=str,
+                help='the metric names separated by commas')  
 
     args = parser.parse_args()
     return args
@@ -49,7 +51,8 @@ def predict(args):
     molpredict = FFPredict(
         model_dir=args.model_dir,
         data_path=args.data_path,
-        save_dir=args.save_dir
+        save_dir=args.save_dir,
+        metric_str=args.metric_str
     )
     molpredict.predict()
 

@@ -210,7 +210,7 @@ class Trainer(object):
                 is_early_stop = True
         return is_early_stop, min_loss, wait
     
-    def predict(self, model, dataset, loss_func, dump_dir, fold, target_scaler=None, epoch=1, load_model=False, feature_name=None):
+    def predict(self, model, dataset, loss_func, dump_dir, fold, target_scaler=None, epoch=1, load_model=False):
         model = model.to(self.device)
         collate_fn = model.batch_collate_fn
         if load_model == True:

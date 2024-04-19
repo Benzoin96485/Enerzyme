@@ -27,7 +27,8 @@ class TargetScaler:
             else:
                 e0 = np.array([self.bias.loc[frame]["atom_energy"].sum() for frame in data["atom_type"]])
                 targets["E"] = np.array(data["energy"]) - e0
-            targets["F"] = [-grad for grad in data["grad"]]
+            if "grad" in data:
+                targets["F"] = [-grad for grad in data["grad"]]
         if "q" in self.task:
             targets["Qa"] = data["chrg"]
         targets["atom_type"] = data["atom_type"]
@@ -38,11 +39,13 @@ class TargetScaler:
         if "e" in self.task:
             if self.bias is None:
                 targets["E"] = pred["E"]
-                targets["F"] = pred["F"]
+                if "F" in pred:
+                    targets["F"] = pred["F"] 
             else:
                 e0 = np.array([self.bias.loc[frame]["atom_energy"].sum() for frame in pred["atom_type"]])
                 targets["E"] = pred["E"] + e0
-                targets["F"] = pred["F"]
+                if "F" in pred:
+                    targets["F"] = pred["F"]
         if "q" in self.task:
             targets["Qa"] = pred["Qa"]
         return targets

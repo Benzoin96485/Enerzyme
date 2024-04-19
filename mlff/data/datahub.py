@@ -16,7 +16,8 @@ def basic_key_from_task(task):
 def load_from_pickle(data_path=None, task=None):
     with open(data_path, "rb") as f:
         data = pickle.load(f)
-    dd = {key: [datapoint[key] for datapoint in data] for key in basic_key_from_task(task)}
+    keys = data[0].keys()
+    dd = {key: [datapoint[key] for datapoint in data] for key in keys}
     return dd
 
 

@@ -121,6 +121,28 @@ class FF:
         logger.info("Metric result saved!")
         logger.info("{} Model saved!".format(self.model_str))
 
+    def evaluate(self, checkpoints_path=None):
+        logger.info("start predict FF:{}".format(self.model_name))
+        X = pd.DataFrame(self.features)
+        y = pd.DataFrame(self.data['target'])
+        test_dataset = FFDataset(X, y)
+        if not self.splitter.cv:
+            # model_path = os.path.join(checkpoints_path, f'model_0.pth')
+            # self.model.load_state_dict(torch.load(model_path, map_location=self.trainer.device)['model_state_dict'])
+            _y_pred, _, metric_score = self.trainer.predict(
+                model=self.model, 
+                dataset=test_dataset, 
+                loss_func=self.loss_func, 
+                dump_dir=self.dump_dir, 
+                fold=0, 
+                target_scaler=self.target_scaler, 
+                epoch=1, 
+                load_model=True
+            )
+        self.cv['test_pred'] = _y_pred
+        self.cv['test_metrics'] = metric_score
+        print(metric_score)
+
     def dump(self, data, dir, name):
         path = os.path.join(dir, name)
         if not os.path.exists(dir):
