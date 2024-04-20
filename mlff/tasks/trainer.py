@@ -42,7 +42,7 @@ class Trainer(object):
         self.max_norm = params.get('FFtrainer').get('max_norm', 1.0)
         self.cuda = params.get('FFtrainer').get('cuda', False)
         self.amp = params.get('FFtrainer').get('amp', False)
-        self.weight_decay = params.get('FFtrainer').get('weight_decay', 0.999)
+        self.weight_decay = params.get('FFtrainer').get('weight_decay', 1e-4)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
         self.scaler = torch.cuda.amp.GradScaler() if self.device.type == 'cuda' and self.amp == True else None
     
@@ -65,7 +65,7 @@ class Trainer(object):
                 y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), target[k]))
             elif k in ["E"]:
                 y_pred[k] = output[k].detach().cpu().numpy()
-                y_truth[k] = output[k].detach().cpu().numpy()
+                y_truth[k] = target[k].detach().cpu().numpy()
         y_pred["atom_type"] = target["atom_type"]
         y_truth["atom_type"] = target["atom_type"]
         return pd.DataFrame(y_pred), pd.DataFrame(y_truth)
@@ -159,7 +159,9 @@ class Trainer(object):
             _metric = str(self.metrics)
             is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, total_val_loss, min_val_loss, metric_score, max_score, model, dump_dir, fold, self.patience, epoch)
             message = f'Epoch [{epoch+1}/{self.max_epochs}] train_loss: {total_trn_loss:.4f}, ' + \
-                f'val_loss: {total_val_loss:.4f}, val_judge_score ({_metric}): {_score:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}, ' + \
+                f'val_loss: {total_val_loss:.4f}, ' + \
+                ", ".join([f'val_{k}: {v:.4f}' for k, v in metric_score.items() if k != "_judge_score"]) + \
+                f', val_judge_score ({_metric}): {_score:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}, ' + \
                 f'{(end_time - start_time):.1f}s' + \
                 (f', Patience [{wait}/{self.patience}], min_val_judge_score: {min_val_loss:.4f}' if wait else '')
             logger.info(message)
@@ -175,8 +177,7 @@ class Trainer(object):
                 fold=fold, 
                 target_scaler=target_scaler, 
                 epoch=epoch, 
-                load_model=True, 
-                feature_name=feature_name
+                load_model=True
             )
         else:
             y_preds, _, _ = self.predict(
@@ -187,8 +188,7 @@ class Trainer(object):
                 fold=fold, 
                 target_scaler=target_scaler, 
                 epoch=epoch, 
-                load_model=True, 
-                feature_name=feature_name
+                load_model=True
             )
         return y_preds
     

@@ -58,6 +58,6 @@ Trainer:
     warmup_ratio: 0.03
     batch_size: 8
     max_norm: 5.0
-    weight_decay: 0.999
+    weight_decay: 0.001
     cuda: True
     amp: False
