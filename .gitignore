@@ -3,3 +3,6 @@ __pycache__
 .pytest_cache
 data/**
 logs
+slurm-*.out
+train*.sh
+profile.txt
