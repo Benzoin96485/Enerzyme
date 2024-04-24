@@ -37,6 +37,7 @@ class PhysNet(nn.Module):
         activation_fn="shifted_softplus",   # activation function
         drop_out=0.0,
         dtype=torch.double,
+        fix_scale=False,
         **params
     ):
         super().__init__()
@@ -60,10 +61,10 @@ class PhysNet(nn.Module):
         self._s8 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_s8), dtype=self.dtype)))
         self._a1 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_a1), dtype=self.dtype)))
         self._a2 = nn.Parameter(F_.softplus(torch.tensor(softplus_inverse(d3_a2), dtype=self.dtype)))
-        self._Eshift = nn.Parameter(Eshift * torch.ones(95, dtype=self.dtype))
-        self._Escale = nn.Parameter(Escale * torch.ones(95, dtype=self.dtype))
-        self._Qshift = nn.Parameter(Qshift * torch.ones(95, dtype=self.dtype))
-        self._Qscale = nn.Parameter(Qscale * torch.ones(95, dtype=self.dtype))
+        self._Eshift = nn.Parameter(Eshift * torch.ones(95, dtype=self.dtype), requires_grad=not fix_scale)
+        self._Escale = nn.Parameter(Escale * torch.ones(95, dtype=self.dtype), requires_grad=not fix_scale)
+        self._Qshift = nn.Parameter(Qshift * torch.ones(95, dtype=self.dtype), requires_grad=not fix_scale)
+        self._Qscale = nn.Parameter(Qscale * torch.ones(95, dtype=self.dtype), requires_grad=not fix_scale)
         self._d3_autoev = d3_autoev
 
         self._interaction_block = nn.Sequential(*[
