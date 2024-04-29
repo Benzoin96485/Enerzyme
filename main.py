@@ -33,7 +33,7 @@ def get_parser():
     parser_predict.add_argument('--save_dir', type=str,
                 help='the output directory for saving artifact')    
     parser_predict.add_argument('--metric_str', nargs="+", type=str,
-                help='the metric names separated by commas')  
+                help='the metric names separated by spaces')  
 
     args = parser.parse_args()
     return args
