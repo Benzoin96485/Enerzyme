@@ -2,6 +2,7 @@ from pickle import dump
 from tqdm import tqdm
 import numpy as np
 from glob import glob
+import pandas as pd
 
 
 def parse_xyz(xyz_file):
@@ -38,8 +39,18 @@ def parse_chrg(chrg_file):
     return np.loadtxt(chrg_file, usecols=4)
 
 
-def picklizer(file_lists, output, flavor="terachem", use_chrg=True):
+def parse_dipole(dipole_file):
+    df = pd.read_csv(dipole_file, sep="\s+", header=None)
+    df[0] = df[0].apply(lambda x: x.strip(":"))
+    df = df.set_index(0).loc[:,4:]
+    df.columns = ["x", "y", "z"]
+    return df
+
+
+def picklizer(file_lists, output, flavor="terachem", use_chrg=True, use_dipole=True):
     data = []
+    dipole_file = None
+    dipole_df = None
     for file_group in tqdm(file_lists):
         if flavor == "terachem":
             atom_type, coord = parse_xyz(file_group["coord"])
@@ -48,6 +59,10 @@ def picklizer(file_lists, output, flavor="terachem", use_chrg=True):
             else:
                 energy, grad = parse_terachem_energy(file_group["energy"])
             chrg = parse_chrg(file_group["chrg"]) if use_chrg else None
+            if file_group["dipole"] != dipole_file:
+                dipole_file = file_group["dipole"]
+                dipole_df = parse_dipole(dipole_file)
+            dipole = dipole_df.loc[file_group["coord"].split("/")[-1], ["x", "y", "z"]].to_numpy() if use_dipole else None
         elif flavor == "xtb":
             pass
         datapoint = {
@@ -55,7 +70,8 @@ def picklizer(file_lists, output, flavor="terachem", use_chrg=True):
             "coord": coord,
             "energy": energy,
             "grad": grad,
-            "chrg": chrg
+            "chrg": chrg,
+            "dipole": dipole
         }
         datapoint.update({
             k: v for k, v in file_group.items() if k not in datapoint.keys()
