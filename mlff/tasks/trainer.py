@@ -43,6 +43,7 @@ class Trainer(object):
         self.cuda = params.get('FFtrainer').get('cuda', False)
         self.amp = params.get('FFtrainer').get('amp', False)
         self.weight_decay = params.get('FFtrainer').get('weight_decay', 1e-4)
+        self.amsgrad = params.get('FFtrainer').get('amsgrad', False)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
         self.scaler = torch.cuda.amp.GradScaler() if self.device.type == 'cuda' and self.amp == True else None
     
@@ -95,7 +96,7 @@ class Trainer(object):
         wait = 0
         num_training_steps = len(train_dataloader) * self.max_epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
-        optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay)
+        optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay, amsgrad=self.amsgrad)
         scheduler = get_linear_schedule_with_warmup(
             optimizer, 
             num_warmup_steps=num_warmup_steps, 
