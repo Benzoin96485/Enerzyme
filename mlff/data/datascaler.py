@@ -31,6 +31,8 @@ class TargetScaler:
                 targets["F"] = [-grad for grad in data["grad"]]
         if "q" in self.task:
             targets["Qa"] = data["chrg"]
+        if "p" in self.task:
+            targets["P"] = data["dipole"]
         targets["atom_type"] = data["atom_type"]
         return targets
 
@@ -48,4 +50,6 @@ class TargetScaler:
                     targets["F"] = pred["F"]
         if "q" in self.task:
             targets["Qa"] = pred["Qa"]
+        if "p" in self.task:
+            targets["P"] = pred["P"]
         return targets

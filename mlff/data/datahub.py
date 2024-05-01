@@ -10,6 +10,8 @@ def basic_key_from_task(task):
         keys += ["energy", "grad"]
     if 'q' in task:
         keys += ["chrg"]
+    if 'p' in task:
+        keys += ["dipole"]
     return keys
 
 

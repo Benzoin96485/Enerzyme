@@ -6,7 +6,7 @@ from .base_logger import logger
 
 
 def rmse(y_true, y_pred, target_name=None):
-    if target_name in ["Qa", "F"]:
+    if target_name in ["Qa", "F", "P"]:
         score = mean_squared_error(np.concatenate(y_true.to_list()), np.concatenate(y_pred.to_list()), squared=False)
     elif target_name in ["E"]:
         score = mean_squared_error(y_true.to_numpy(), y_pred.to_numpy(), squared=False)
@@ -62,7 +62,7 @@ class Metrics(object):
 
     def _judge_early_stop_decrease(self, wait, score, min_score, model, dump_dir, fold, patience, epoch):
         is_early_stop = False
-        if score <= min_score :
+        if score <= min_score:
             min_score = score
             wait = 0
             info = {'model_state_dict': model.state_dict()}

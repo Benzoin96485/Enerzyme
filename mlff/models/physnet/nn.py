@@ -234,8 +234,8 @@ class PhysNet(nn.Module):
         for k, v in label.items():
             if k in ["Qa", "F"]:
                 batch_target[k] = torch.tensor(np.concatenate(v.to_list()))
-            elif k in ["E"]:
-                batch_target[k] = torch.tensor(v.to_list())
+            elif k in ["E", "P"]:
+                batch_target[k] = torch.tensor(np.array(v.to_list()))
         batch_seg = []
         idx_i = []
         idx_j = []
@@ -267,7 +267,7 @@ class PhysNet(nn.Module):
             elif k in ["atom_type"]:
                 net_output[k] = v
                 net_target[k] = v
-            elif k in ["E"]:
+            elif k in ["E", "P"]:
                 net_output[k] = output[k]
                 net_target[k] = v
         return net_output, net_target
@@ -282,6 +282,8 @@ class PhysNet(nn.Module):
             energy, forces = self.energy_and_forces_from_scaled_atomic_properties(Ea, Qa, Dij, **net_input)
             output["E"] = energy
             output["F"] = forces
+        if "p" in task:
+            output["P"] = segment_sum(Qa.unsqueeze(1) * net_input["Ra"], net_input["batch_seg"]) / (self.kehalf * 2)
         return output
    
     @property

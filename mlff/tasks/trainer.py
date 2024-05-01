@@ -60,7 +60,7 @@ class Trainer(object):
         y_pred = dict()
         y_truth = dict()
         for k in output:
-            if k in ["Qa", "F"]:
+            if k in ["Qa", "F", "P"]:
                 y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), output[k]))
                 y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), target[k]))
             elif k in ["E"]:
