@@ -63,7 +63,7 @@ class Trainer(object):
             if k in ["Qa", "F", "P"]:
                 y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), output[k]))
                 y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), target[k]))
-            elif k in ["E"]:
+            elif k in ["E", "Q"]:
                 y_pred[k] = output[k].detach().cpu().numpy()
                 y_truth[k] = target[k].detach().cpu().numpy()
         y_pred["atom_type"] = target["atom_type"]

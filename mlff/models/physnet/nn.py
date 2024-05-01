@@ -227,15 +227,16 @@ class PhysNet(nn.Module):
         for k, v in feature.items():
             if k == "Q":
                 batch_input[k] = torch.tensor(v.to_list(), dtype=self.dtype).reshape(-1)
-            if k == "Za":
+            elif k == "Za":
                 batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=torch.long)
-            if k == "Ra":
+            elif k == "Ra":
                 batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=self.dtype, requires_grad=True)
         for k, v in label.items():
             if k in ["Qa", "F"]:
                 batch_target[k] = torch.tensor(np.concatenate(v.to_list()))
             elif k in ["E", "P"]:
                 batch_target[k] = torch.tensor(np.array(v.to_list()))
+        batch_target["Q"] = batch_input["Q"]
         batch_seg = []
         idx_i = []
         idx_j = []
@@ -267,14 +268,14 @@ class PhysNet(nn.Module):
             elif k in ["atom_type"]:
                 net_output[k] = v
                 net_target[k] = v
-            elif k in ["E", "P"]:
+            elif k in ["E", "P", "Q"]:
                 net_output[k] = output[k]
                 net_target[k] = v
         return net_output, net_target
 
     def forward(self, task, **net_input):
-        Ea, Qa, Dij, nh_loss = self.atomic_properties(**net_input)
-        Qa = self.scaled_charges(Qa=Qa, **net_input)
+        Ea, raw_Qa, Dij, nh_loss = self.atomic_properties(**net_input)
+        Qa = self.scaled_charges(Qa=raw_Qa, **net_input)
         output = {"nh_loss": nh_loss}
         if "q" in task:
             output["Qa"] = Qa
@@ -284,6 +285,7 @@ class PhysNet(nn.Module):
             output["F"] = forces
         if "p" in task:
             output["P"] = segment_sum(Qa.unsqueeze(1) * net_input["Ra"], net_input["batch_seg"]) / (self.kehalf * 2)
+            output["Q"] = segment_sum(raw_Qa, net_input["batch_seg"]) / (self.kehalf * 2)
         return output
    
     @property
