@@ -29,10 +29,12 @@ class TargetScaler:
                 targets["E"] = np.array(data["energy"]) - e0
             if "grad" in data:
                 targets["F"] = [-grad for grad in data["grad"]]
-        if "q" in self.task:
-            targets["Qa"] = data["chrg"]
+        if "q" in self.task or "p" in self.task:
+            if "chrg" in data:
+                targets["Qa"] = data["chrg"]
         if "p" in self.task:
-            targets["P"] = data["dipole"]
+            if "dipole" in data:
+                targets["P"] = data["dipole"]
         targets["atom_type"] = data["atom_type"]
         return targets
 
@@ -48,8 +50,10 @@ class TargetScaler:
                 targets["E"] = pred["E"] + e0
                 if "F" in pred:
                     targets["F"] = pred["F"]
-        if "q" in self.task:
-            targets["Qa"] = pred["Qa"]
+        if "q" in self.task or "p" in self.task:
+            if "Qa" in pred:
+                targets["Qa"] = pred["Qa"]
         if "p" in self.task:
-            targets["P"] = pred["P"]
+            if "P" in pred:
+                targets["P"] = pred["P"]
         return targets
