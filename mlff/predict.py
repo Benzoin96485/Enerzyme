@@ -85,7 +85,7 @@ class FFPredict(object):
             for k, v in self.metrics.cal_metric(pd.DataFrame(target), pred).items():
                 metrics[k].append(v)
         metrics_df = pd.DataFrame(metrics, index=FFs.keys())
-        metrics_df.to_csv(os.path.join(self.save_dir, f'metric.csv'))
+        metrics_df.to_csv(os.path.join(self.save_dir, f'{ff_name}-metric.csv'))
         logger.info(f"final predict metrics score: \n{metrics_df.T}")
         logger.info("pipeline finish!")
 

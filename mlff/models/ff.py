@@ -59,7 +59,7 @@ class FF:
         logger.info("start training FF:{}".format(self.model_name))
         X = pd.DataFrame(self.features)
         y = pd.DataFrame(self.data['target'])
-        y_pred = pd.DataFrame(columns=y.columns, index=y.index)
+        y_pred = pd.DataFrame(index=y.index)
         for fold, idx in enumerate(self.splitter.split(X)):
             if self.splitter.cv:
                 tr_idx, vl_idx = idx
@@ -108,7 +108,8 @@ class FF:
                     )
                 )
             else:
-                y_pred.iloc[te_idx] = _y_pred
+                for column in _y_pred.columns:
+                    y_pred.loc[te_idx, column] = _y_pred[column]
         
         if self.splitter.cv:
             self.cv['pred'] = y_pred
