@@ -110,6 +110,12 @@ class SpookyNet(nn.Module):
             can only handle elements up to Rn (Z=86).
         zero_init (bool): Initialize parameters with zero whenever possible?
     """
+    def __str__(self):
+        return """
+###############################################
+# SpookyNet (Nat. Commun., 2021, 12(1): 7273) #
+###############################################
+"""
 
     def __init__(
         self,
@@ -1144,7 +1150,39 @@ class SpookyNet(nn.Module):
                     hessian[idx] = tmp.view(-1)
         return energy, forces, hessian, f, ea, qa, ea_rep, ea_ele, ea_vdw, pa, c6
 
-    def forward(
+    def forward(self, task, **net_input):
+        Z = net_input["Za"]
+        if net_input.get("batch_seg", None) is None:
+            batch_seg = Z.new_zeros(Z.size(0))
+        Q = net_input["Q"]
+        S = Q.new_zeros(Q.size)
+        R = net_input["Ra"]
+        idx_i = net_input["idx_i"]
+        idx_j = net_input["idx_j"]
+        num_batch = batch_seg[-1] + 1
+        (
+            energy, forces, f,
+            ea, qa, ea_rep, ea_ele, ea_vdw,
+            pa, c6
+        ) = self.energy_and_forces(
+            Z=Z, Q=Q, S=S, R=R,
+            idx_i=idx_i, idx_j=idx_j,
+            cell=None, cell_offsets=None,
+            num_batch=num_batch, batch_seg=batch_seg,
+            create_graph=True,
+        )
+        dipole = qa.new_zeros((num_batch, 3)).index_add_(
+            0, batch_seg, qa.view(-1, 1) * R
+        )
+        output = dict()
+        output["E"] = energy
+        output["F"] = forces
+        output["P"] = dipole
+        output["Qa"] = qa
+
+        return output
+
+    def forward_(
         self,
         Z: torch.Tensor,
         Q: torch.Tensor,

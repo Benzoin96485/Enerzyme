@@ -20,7 +20,7 @@ Modelhub:
   FF:
     FF01:
       active: True
-      model: "PhysNet"
+      model: "SpookyNet"
       feature: ["Ra", "Za", "Q"]
       loss:
         key: "mae_nh"
