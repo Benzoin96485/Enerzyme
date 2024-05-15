@@ -1172,7 +1172,7 @@ class SpookyNet(nn.Module):
                 batch_target[k] = torch.tensor(np.concatenate(v.to_list()))
             elif k in ["E", "P"]:
                 batch_target[k] = torch.tensor(np.array(v.to_list()))
-        batch_target["Q"] = batch_input["Q"]
+        # batch_target["Q"] = batch_input["Q"]
         batch_seg = []
         split_sections = []
         idx_is = []
