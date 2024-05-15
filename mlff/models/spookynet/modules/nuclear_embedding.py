@@ -30,7 +30,7 @@ class NuclearEmbedding(nn.Module):
         """ Initializes the NuclearEmbedding class. """
         super(NuclearEmbedding, self).__init__()
         self.num_features = num_features
-        self.register_buffer("electron_config", torch.tensor(electron_config))
+        self.register_buffer("electron_config", torch.tensor(electron_config, dtype=torch.float32))
         self.register_parameter(
             "element_embedding", nn.Parameter(torch.Tensor(Zmax, self.num_features))
         )

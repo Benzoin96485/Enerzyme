@@ -4,6 +4,9 @@ import torch.nn as nn
 from .functional import cutoff_function
 from .modules import *
 from typing import Tuple, Optional
+from sklearn.neighbors import BallTree
+import numpy as np
+import pandas as pd
 
 # backwards compatibility with old versions of pytorch
 try:
@@ -149,6 +152,7 @@ class SpookyNet(nn.Module):
         load_from=None,
         Zmax=87,
         zero_init=True,
+        **params
     ) -> None:
         """ Initializes the SpookyNet class. """
         super(SpookyNet, self).__init__()
@@ -392,12 +396,14 @@ class SpookyNet(nn.Module):
         super(SpookyNet, self).train(mode=mode)
         for name, param in self.named_parameters():
             param.requires_grad = self.requires_grad_dict[name]
+        return self
 
     def eval(self) -> None:
         """ Turn on evaluation mode (smaller memory footprint)."""
         super(SpookyNet, self).eval()
         for name, param in self.named_parameters():
             param.requires_grad = False
+        return self
 
     def build_requires_grad_dict(self) -> None:
         """
@@ -714,7 +720,7 @@ class SpookyNet(nn.Module):
             batch_seg = Z.new_zeros(Z.size(0))
 
         # compute radial functions
-        rbf = self.radial_basis_functions(sr_rij, cutoff_values)
+        rbf = self.radial_basis_functions(sr_rij, cutoff_values).type_as(sr_rij)
 
         # initialize feature vectors
         z = self.nuclear_embedding(Z)
@@ -1150,12 +1156,71 @@ class SpookyNet(nn.Module):
                     hessian[idx] = tmp.view(-1)
         return energy, forces, hessian, f, ea, qa, ea_rep, ea_ele, ea_vdw, pa, c6
 
+    def batch_collate_fn(self, sample):
+        feature, label = zip(*sample)
+        feature, label = pd.concat(feature, axis=1).T, pd.concat(label, axis=1).T
+        batch_input, batch_target = dict(), dict()
+        for k, v in feature.items():
+            if k == "Q":
+                batch_input[k] = torch.tensor(v.to_list(), dtype=self.dtype).reshape(-1)
+            elif k == "Za":
+                batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=torch.long)
+            elif k == "Ra":
+                batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=self.dtype, requires_grad=True)
+        for k, v in label.items():
+            if k in ["Qa", "F"]:
+                batch_target[k] = torch.tensor(np.concatenate(v.to_list()))
+            elif k in ["E", "P"]:
+                batch_target[k] = torch.tensor(np.array(v.to_list()))
+        batch_target["Q"] = batch_input["Q"]
+        batch_seg = []
+        split_sections = []
+        idx_is = []
+        idx_js = []
+        for i, Za in enumerate(feature["Za"]):
+            N = len(Za)
+            batch_seg.append(np.ones(N, dtype=int) * i)
+            split_sections.append(N)
+            positions = feature["Ra"].iloc[i]
+            tree = BallTree(positions)
+            idx_i = []
+            idx_j = tree.query_radius(positions, r=self.cutoff)
+            for i in range(len(idx_j)):
+                idx = idx_j[i]  # all neighbors with self-interaction
+                idx = idx[idx != i]  # filter out self-interaction
+                idx_i.append(np.full(idx.shape, i, idx.dtype))
+                idx_j[i] = idx
+            idx_is.append(np.concatenate(idx_i))
+            idx_js.append(np.concatenate(idx_j))
+        batch_input["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
+        batch_input["idx_i"] = torch.tensor(np.concatenate(idx_is), dtype=torch.long)
+        batch_input["idx_j"] = torch.tensor(np.concatenate(idx_js), dtype=torch.long)
+        batch_target["split_sections"] = split_sections
+        batch_target["atom_type"] = label["atom_type"]
+        return batch_input, batch_target
+
+    def batch_output_collate_fn(self, output, target):
+        net_output, net_target = dict(), dict()
+        for k, v in target.items():
+            if k in ["Qa", "F"]:
+                net_output[k] = torch.split(output[k], target["split_sections"])
+                net_target[k] = torch.split(v, target["split_sections"])
+            elif k in ["atom_type"]:
+                net_output[k] = v
+                net_target[k] = v
+            elif k in ["E", "P", "Q"]:
+                net_output[k] = output[k]
+                net_target[k] = v
+        return net_output, net_target
+
     def forward(self, task, **net_input):
         Z = net_input["Za"]
         if net_input.get("batch_seg", None) is None:
             batch_seg = Z.new_zeros(Z.size(0))
+        else:
+            batch_seg = net_input["batch_seg"]
         Q = net_input["Q"]
-        S = Q.new_zeros(Q.size)
+        S = Q.new_zeros(Q.shape)
         R = net_input["Ra"]
         idx_i = net_input["idx_i"]
         idx_j = net_input["idx_j"]
@@ -1179,7 +1244,6 @@ class SpookyNet(nn.Module):
         output["F"] = forces
         output["P"] = dipole
         output["Qa"] = qa
-
         return output
 
     def forward_(

@@ -234,7 +234,7 @@ class D4DispersionEnergy(nn.Module):
         if self.cutoff is not None:
             tmp = tmp * switch_function(rij, self.cuton, self.cutoff)
 
-        covcn = rij.new_zeros(N).index_add_(0, idx_i, tmp)
+        covcn = rij.new_zeros(N).index_add_(0, idx_i, tmp.type_as(rij))
 
         # calculate gaussian weights
         gweights = torch.sum(
@@ -312,7 +312,7 @@ class D4DispersionEnergy(nn.Module):
         s6 = F.softplus(self._s6)
         s8 = F.softplus(self._s8)
         pairwise = -c6ij * (s6 * oor6 + s8 * sqrt_r4r2ij ** 2 * oor8) * self.convert2eV
-        edisp = rij.new_zeros(N).index_add_(0, idx_i, pairwise)
+        edisp = rij.new_zeros(N).index_add_(0, idx_i, pairwise.type_as(rij))
         if compute_atomic_quantities:
             alpha = self.alpha[Z, :, 0]
             polarizabilities = torch.sum(zeta * alpha, -1) * self.convert2Angstrom3

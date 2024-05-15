@@ -66,7 +66,7 @@ class Attention(nn.Module):
         """ Normalize X and project into random feature space. """
         d = X.shape[-1]
         m = self.omega.shape[-1]
-        U = torch.matmul(X / d ** 0.25, self.omega)
+        U = torch.matmul(X / d ** 0.25, self.omega.type_as(X))
         h = torch.sum(X ** 2, dim=-1, keepdim=True) / (2 * d ** 0.5)  # OLD
         # determine maximum (is subtracted to prevent numerical overflow)
         if is_query:
