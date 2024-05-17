@@ -16,7 +16,7 @@ The dataset in `data_path` should be a python pickle file containing a list of e
     "grad": [...] # np.ndarray of shape (N,3): energy gradient in Ha/Angstrom
     "coord": [] # np.ndarray of shape (N,3): coordinates
     "atom_type": [] # list of length N: atom types (element symbols in upper case)
-    "dipole": [] # np.ndarray of shape (3,): dipole in a.u.
+    "dipole": [] # np.ndarray of shape (3,): dipole in e·Angstrom
 }
 ```
 

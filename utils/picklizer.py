@@ -23,7 +23,7 @@ def parse_terachem_grad(grad_file):
         _ = f.readline()
         title = f.readline()
     energy = float(title.split()[6])
-    grads = np.loadtxt(grad_file, skiprows=2, usecols=(1,2,3))
+    grads = np.loadtxt(grad_file, skiprows=2, usecols=(1,2,3)) / 0.5291772108 # Ha/Bohr to Ha/Ang !!!
     return energy, grads
 
 

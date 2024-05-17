@@ -279,13 +279,13 @@ class PhysNet(nn.Module):
         output = {"nh_loss": nh_loss}
         if "q" in task or "p" in task:
             output["Qa"] = Qa
-            output["Q"] = segment_sum(raw_Qa, net_input["batch_seg"]) / (self.kehalf * 2)
+            output["Q"] = segment_sum(raw_Qa, net_input["batch_seg"])
         if "e" in task:
             energy, forces = self.energy_and_forces_from_scaled_atomic_properties(Ea, Qa, Dij, **net_input)
             output["E"] = energy
             output["F"] = forces
         if "p" in task:
-            output["P"] = segment_sum(Qa.unsqueeze(1) * net_input["Ra"], net_input["batch_seg"]) / (self.kehalf * 2)
+            output["P"] = segment_sum(Qa.unsqueeze(1) * net_input["Ra"], net_input["batch_seg"])
         return output
    
     @property
