@@ -27,12 +27,12 @@ def get_parser():
         help="predict Enerzyme command",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_predict.add_argument('--data_path', type=str, help='test data path')
-    parser_predict.add_argument('--model_dir', type=str,
+    parser_predict.add_argument('-d', '--data_path', type=str, help='test data path')
+    parser_predict.add_argument('-o', '--model_dir', type=str,
                     help='the directory of models')
-    parser_predict.add_argument('--save_dir', type=str,
+    parser_predict.add_argument('-s', '--save_dir', type=str,
                 help='the output directory for saving artifact')    
-    parser_predict.add_argument('--metric_str', nargs="+", type=str,
+    parser_predict.add_argument('-m', '--metric_str', nargs="+", type=str,
                 help='the metric names separated by spaces')  
 
     args = parser.parse_args()

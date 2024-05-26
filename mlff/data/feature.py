@@ -11,7 +11,9 @@ PERIODIC_TABLE_PATH = os.path.join(
 PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="atom_type")
 
 def total_charge(data):
-    if "chrg" in data:
+    if "total_chrg" in data:
+        return data["total_chrg"]
+    elif "chrg" in data:
         return [round(sum(chrgs)) for chrgs in data["chrg"]]
     else:
         return None
