@@ -220,9 +220,12 @@ class PhysNet(nn.Module):
             Eele = torch.where(Dij <= cut, Eele, torch.zeros_like(Eele))
         return segment_sum(Eele, idx_i)
 
-    def batch_collate_fn(self, sample):
-        feature, label = zip(*sample)
-        feature, label = pd.concat(feature, axis=1).T, pd.concat(label, axis=1).T
+    def batch_collate_fn(self, sample, has_label=True):
+        if has_label:
+            feature, label = zip(*sample)
+            feature, label = pd.concat(feature, axis=1).T, pd.concat(label, axis=1).T 
+        else:
+            feature = sample
         batch_input, batch_target = dict(), dict()
         for k, v in feature.items():
             if k == "Q":
@@ -231,12 +234,13 @@ class PhysNet(nn.Module):
                 batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=torch.long)
             elif k == "Ra":
                 batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=self.dtype, requires_grad=True)
-        for k, v in label.items():
-            if k in ["Qa", "F"]:
-                batch_target[k] = torch.tensor(np.concatenate(v.to_list()))
-            elif k in ["E", "P"]:
-                batch_target[k] = torch.tensor(np.array(v.to_list()))
-        batch_target["Q"] = batch_input["Q"]
+        if has_label:
+            for k, v in label.items():
+                if k in ["Qa", "F"]:
+                    batch_target[k] = torch.tensor(np.concatenate(v.to_list()))
+                elif k in ["E", "P"]:
+                    batch_target[k] = torch.tensor(np.array(v.to_list()))
+            batch_target["Q"] = batch_input["Q"]
         batch_seg = []
         idx_i = []
         idx_j = []
@@ -256,21 +260,29 @@ class PhysNet(nn.Module):
         batch_input["idx_i"] = torch.tensor(np.concatenate(idx_i), dtype=torch.long)
         batch_input["idx_j"] = torch.tensor(np.concatenate(idx_j), dtype=torch.long)
         batch_target["split_sections"] = split_sections
-        batch_target["atom_type"] = label["atom_type"]
+        if has_label:
+            batch_target["atom_type"] = label["atom_type"]
         return batch_input, batch_target
     
-    def batch_output_collate_fn(self, output, target):
+    def batch_output_collate_fn(self, output, target, has_label=True):
         net_output, net_target = dict(), dict()
-        for k, v in target.items():
-            if k in ["Qa", "F"]:
-                net_output[k] = torch.split(output[k], target["split_sections"])
-                net_target[k] = torch.split(v, target["split_sections"])
-            elif k in ["atom_type"]:
-                net_output[k] = v
-                net_target[k] = v
-            elif k in ["E", "P", "Q"]:
-                net_output[k] = output[k]
-                net_target[k] = v
+        if has_label:
+            for k, v in target.items():
+                if k in ["Qa", "F"]:
+                    net_output[k] = torch.split(output[k], target["split_sections"])
+                    net_target[k] = torch.split(v, target["split_sections"])
+                elif k in ["atom_type"]:
+                    net_output[k] = v
+                    net_target[k] = v
+                elif k in ["E", "P", "Q"]:
+                    net_output[k] = output[k]
+                    net_target[k] = v
+        else:
+            for k, v in output.items():
+                if k in ["Qa", "F"]:
+                    net_output[k] = torch.split(v, target["split_sections"])
+                elif k in ["E", "P", "Q"]:
+                    net_output[k] = v
         return net_output, net_target
 
     def forward(self, task, **net_input):

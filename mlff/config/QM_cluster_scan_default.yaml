@@ -1,0 +1,23 @@
+Simulation:
+  environment: "ase"
+  cuda: True
+  model_str: "FF01-PhysNet-Q_Ra_Za-pe"
+  task: "scan"
+  idx_start_from: 1
+  constraint:
+    fix_atom:
+      indices: []
+  optimize:
+    optimizer: "LBFGS"
+  sampling:
+    cv: "distance"
+    params:
+      i0: 0
+      i1: 1       
+      x0: 5
+      x1: 10
+      num: 1
+System:
+  structure_file: ""
+  charge: -1
+  multiplicity: 1
