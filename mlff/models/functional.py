@@ -1,4 +1,5 @@
 import math
+from typing import Literal
 import numpy as np
 import torch
 import torch.nn.functional as F_
@@ -12,7 +13,9 @@ def shifted_softplus(x: torch.Tensor) -> torch.Tensor:
 def softplus_inverse(x: torch.Tensor) -> torch.Tensor:
     """
     Inverse of the softplus function. This is useful for initialization of
-    parameters that are constrained to be positive (via softplus).
+    parameters that are constrained to be positive (via softplus). 
+    
+    The indirect implementation is for numerical stability.
     """
     if not isinstance(x, torch.Tensor):
         x = torch.tensor(x)
@@ -51,14 +54,26 @@ def gather_nd(params, indices):
     return output.reshape(out_shape).contiguous()
 
 
-def cutoff_function(x: torch.Tensor, cutoff: float, flavor: str="bump") -> torch.Tensor:
+def smooth_cutoff_function(x: torch.Tensor, cutoff: float, flavor: Literal["bump", "poly"]="bump") -> torch.Tensor:
     """
     Cutoff function that smoothly goes from f(x) = 1 to f(x) = 0 in the interval
     from x = 0 to x = cutoff. 
     For x >= cutoff, f(x) = 0. 
-    "bump" flavor has infinitely many smooth derivatives. 
-    "poly" flavor has sufficiently many smooth derivatives. 
-    Only positive x should be used as input.
+
+    Params:
+    -----
+
+    x: Only positive x should be used as input.
+
+    cutoff: A positive cutoff radius.
+
+    flavor:
+        - "bump" flavor has infinitely many smooth derivatives. 
+        - "poly" flavor has sufficiently many smooth derivatives [1]. 
+    
+    References:
+    -----
+    [1] Texturing & Modeling: A Procedural Approach; Morgan Kaufmann: 2003.
     """
     zeros = torch.zeros_like(x)
     x_ = torch.where(x < cutoff, x, zeros)  # prevent nan in backprop

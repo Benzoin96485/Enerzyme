@@ -152,6 +152,7 @@ class SpookyNet(nn.Module):
         load_from=None,
         Zmax=87,
         zero_init=True,
+        dtype="float64",
         **params
     ) -> None:
         """ Initializes the SpookyNet class. """
@@ -226,6 +227,7 @@ class SpookyNet(nn.Module):
         self.compute_d4_atomic = compute_d4_atomic
         self.module_keep_prob = module_keep_prob
         self.Zmax = Zmax
+        self._dtype={"float64": torch.float64, "float32": torch.float32}[dtype]
 
         # for performing module dropout
         if self.module_keep_prob < 0.0 or self.module_keep_prob > 1.0:
@@ -250,49 +252,49 @@ class SpookyNet(nn.Module):
         # embeddings
         self.nuclear_embedding = NuclearEmbedding(
             self.num_features, self.Zmax, zero_init=zero_init
-        )
+        ).to(dtype=self.dtype)
         if self.use_nonlinear_embedding:
             self.charge_embedding = NonlinearElectronicEmbedding(
                 self.num_features, self.num_residual_electron, activation
-            )
+            ).to(dtype=self.dtype)
             self.magmom_embedding = NonlinearElectronicEmbedding(
                 self.num_features, self.num_residual_electron, activation
-            )
+            ).to(dtype=self.dtype)
         else:
             self.charge_embedding = ElectronicEmbedding(
                 self.num_features,
                 self.num_residual_electron,
                 activation,
-                is_charge=True,
-            )
+                is_charge=True
+            ).to(dtype=self.dtype)
             self.magmom_embedding = ElectronicEmbedding(
                 self.num_features,
                 self.num_residual_electron,
                 activation,
-                is_charge=False,
-            )
+                is_charge=False
+            ).to(dtype=self.dtype)
 
         # radial basis functions
         if self.basis_functions == "exp-gaussian":
             self.radial_basis_functions = ExponentialGaussianFunctions(
                 self.num_basis_functions, exp_weighting=self.exp_weighting
-            )
+            ).to(dtype=self.dtype)
         elif self.basis_functions == "exp-bernstein":
             self.radial_basis_functions = ExponentialBernsteinPolynomials(
                 self.num_basis_functions, exp_weighting=self.exp_weighting
-            )
+            ).to(dtype=self.dtype)
         elif self.basis_functions == "gaussian":
             self.radial_basis_functions = GaussianFunctions(
                 self.num_basis_functions, self.cutoff
-            )
+            ).to(dtype=self.dtype)
         elif self.basis_functions == "bernstein":
             self.radial_basis_functions = BernsteinPolynomials(
                 self.num_basis_functions, self.cutoff
-            )
+            ).to(dtype=self.dtype)
         elif self.basis_functions == "sinc":
             self.radial_basis_functions = SincFunctions(
                 self.num_basis_functions, self.cutoff
-            )
+            ).to(dtype=self.dtype)
         else:
             raise ValueError(
                 "Argument 'basis_functions' may only take the "
@@ -318,17 +320,17 @@ class SpookyNet(nn.Module):
                     num_residual_post=self.num_residual_post,
                     num_residual_output=self.num_residual_output,
                     activation=self.activation,
-                )
+                ).to(dtype=self.dtype)
                 for i in range(self.num_modules)
             ]
         )
 
         # output layer (2 outputs for atomic energy and partial charge)
-        self.output = nn.Linear(self.num_features, 2, bias=False)
+        self.output = nn.Linear(self.num_features, 2, bias=False).to(dtype=self.dtype)
 
         # ZBL inspired short-range repulsion
         if use_zbl_repulsion:
-            self.zbl_repulsion_energy = ZBLRepulsionEnergy()
+            self.zbl_repulsion_energy = ZBLRepulsionEnergy().to(dtype=self.dtype)
 
         # point-charge electrostatics
         if use_electrostatics:
@@ -336,11 +338,11 @@ class SpookyNet(nn.Module):
                 cuton=0.25 * self.cutoff,
                 cutoff=0.75 * self.cutoff,
                 lr_cutoff=self.lr_cutoff,
-            )
+            ).to(dtype=self.dtype)
 
         # Grimme's D4 dispersion
         if use_d4_dispersion:
-            self.d4_dispersion_energy = D4DispersionEnergy(cutoff=self.lr_cutoff)
+            self.d4_dispersion_energy = D4DispersionEnergy(cutoff=self.lr_cutoff).to(dtype=self.dtype)
 
         # constants used for calculating angular functions
         self._sqrt2 = math.sqrt(2.0)
@@ -383,8 +385,9 @@ class SpookyNet(nn.Module):
 
     @property
     def dtype(self) -> torch.dtype:
-        """ Return torch.dtype of parameters (input tensors must match). """
-        return self.nuclear_embedding.element_embedding.dtype
+        return self._dtype
+        # """ Return torch.dtype of parameters (input tensors must match). """
+        # return self.nuclear_embedding.element_embedding.dtype
 
     @property
     def device(self) -> torch.device:
@@ -1177,11 +1180,12 @@ class SpookyNet(nn.Module):
         split_sections = []
         idx_is = []
         idx_js = []
-        for i, Za in enumerate(feature["Za"]):
+        count = 0
+        for ii, Za in enumerate(feature["Za"]):
             N = len(Za)
-            batch_seg.append(np.ones(N, dtype=int) * i)
+            batch_seg.append(np.ones(N, dtype=int) * ii)
             split_sections.append(N)
-            positions = feature["Ra"].iloc[i]
+            positions = feature["Ra"].iloc[ii].copy()
             tree = BallTree(positions)
             idx_i = []
             idx_j = tree.query_radius(positions, r=self.cutoff)
@@ -1190,8 +1194,9 @@ class SpookyNet(nn.Module):
                 idx = idx[idx != i]  # filter out self-interaction
                 idx_i.append(np.full(idx.shape, i, idx.dtype))
                 idx_j[i] = idx
-            idx_is.append(np.concatenate(idx_i))
-            idx_js.append(np.concatenate(idx_j))
+            idx_is.append(np.concatenate(idx_i) + count)
+            idx_js.append(np.concatenate(idx_j) + count)
+            count += N
         batch_input["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
         batch_input["idx_i"] = torch.tensor(np.concatenate(idx_is), dtype=torch.long)
         batch_input["idx_j"] = torch.tensor(np.concatenate(idx_js), dtype=torch.long)
