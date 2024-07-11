@@ -1,0 +1,1 @@
+from .spookynet import SpookyNet

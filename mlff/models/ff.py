@@ -5,12 +5,14 @@ import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
 from .physnet import PhysNet, MSE_nh_Loss, MAE_nh_Loss
+from .spookynet import SpookyNet
 from ..utils import logger
 
 
 SEP = "-"
 FF_REGISTER = {
-    "PhysNet": PhysNet
+    "PhysNet": PhysNet,
+    "SpookyNet": SpookyNet
 }
 LOSS_REGISTER = {
     "mse_nh": MSE_nh_Loss,

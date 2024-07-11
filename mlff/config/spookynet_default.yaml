@@ -1,0 +1,80 @@
+Base:
+  seed: 114514
+  task: "pe"
+  Metric:
+    metrics_str: ["E_rmse", "F_rmse", "P_rmse"]
+    metrics_weight: [27.2, 1440, 27.2]
+Datahub:
+  data_path: "/home/gridsan/wlluo/src/MLFF/Enerzyme/data/PfPMT-large-20240430.pkl"
+  energy_bias_path: "/home/gridsan/wlluo/src/MLFF/Enerzyme/data/B3LYP-6_31Gs-PCM10-noH.csv"
+  Feature:
+    Ra:
+      active: True
+    Za:
+      active: True
+    Q:
+      active: True
+    S:
+      active: True
+Modelhub:
+  FF:
+    FF01:
+      active: True
+      model: "SpookyNet"
+      feature: ["Ra", "Za", "Q"]
+      loss:
+        key: "mae_nh"
+        params:
+          weights:
+            nh_loss: 0.272
+            E: 27.2 # 1 * 27.2
+            F: 1440 # 100 * 0.529 * 27.2
+            P: 27.2
+            Q: 27.2
+      params:
+        activation: "swish"
+        num_features: 128
+        num_basis_functions: 16
+        num_modules: 6
+        num_residual_electron: 1
+        num_residual_pre: 1
+        num_residual_local_x: 1
+        num_residual_local_s: 1
+        num_residual_local_p: 1
+        num_residual_local_d: 1
+        num_residual_local: 1
+        num_residual_nonlocal_q: 1
+        num_residual_nonlocal_k: 1
+        num_residual_nonlocal_v: 1
+        num_residual_post: 1
+        num_residual_output: 1
+        basis_functions: "exp-bernstein"
+        exp_weighting: True
+        cutoff: 5.291772105638412
+        use_zbl_repulsion: True
+        use_electrostatics: True
+        use_d4_dispersion: True
+        use_irreps: True
+        use_nonlinear_embedding: False
+        compute_d4_atomic: False
+        module_keep_prob: 0.9
+        Zmax: 87 
+Trainer:
+  Split:
+    method: "train_val_withheld_test_random"
+    params:
+      ratio: [0.07, 0.01, 0.72, 0.2]
+  Common:
+    seed: 114514
+    logger_level: 1
+    report: True
+  FFtrainer:
+    patience: 50
+    max_epochs: 1000
+    learning_rate: 1e-3
+    warmup_ratio: 0.03
+    batch_size: 8
+    max_norm: 5.0
+    weight_decay: 0.001
+    cuda: True
+    amp: False

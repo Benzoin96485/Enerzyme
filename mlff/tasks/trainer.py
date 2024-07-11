@@ -168,7 +168,6 @@ class Trainer(object):
             logger.info(message)
             if is_early_stop:
                 break
-        torch.cuda.empty_cache()   
         if cv:
             y_preds, _, _ = self.predict(
                 model=model, 

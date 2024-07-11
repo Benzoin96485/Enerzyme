@@ -1,6 +1,7 @@
 import argparse
 from mlff.train import FFTrain
 from mlff.predict import FFPredict
+from mlff.simulate import FFSimulate
 from mlff.utils.base_logger import logger
 
 
@@ -27,13 +28,24 @@ def get_parser():
         help="predict Enerzyme command",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_predict.add_argument('--data_path', type=str, help='test data path')
-    parser_predict.add_argument('--model_dir', type=str,
+    parser_predict.add_argument('-d', '--data_path', type=str, help='test data path')
+    parser_predict.add_argument('-o', '--model_dir', type=str,
                     help='the directory of models')
-    parser_predict.add_argument('--save_dir', type=str,
+    parser_predict.add_argument('-s', '--save_dir', type=str,
                 help='the output directory for saving artifact')    
-    parser_predict.add_argument('--metric_str', nargs="+", type=str,
+    parser_predict.add_argument('-m', '--metric_str', nargs="+", type=str,
                 help='the metric names separated by spaces')  
+
+    parser_simulate = subparsers.add_parser(
+        "simulate",
+        help="simulate Enerzyme command",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser_simulate.add_argument('-c', '--config_path', type=str, default='', 
+        help='simulation config'
+    )
+    parser_simulate.add_argument('-o', '--model_dir', type=str,
+                    help='the directory of models')
 
     args = parser.parse_args()
     return args
@@ -57,11 +69,20 @@ def predict(args):
     molpredict.predict()
 
 
+def simulate(args):
+    molcalculate = FFSimulate(
+        model_dir=args.model_dir,
+        config_path=args.config_path
+    )
+    molcalculate.run()
+
+
 if __name__ == '__main__':
     args = get_parser()
     if args.command == 'train':
         train(args)
     elif args.command == 'predict':
-        predict(args)
-    
+        predict(args)   
+    elif args.command == 'simulate':
+        simulate(args)
     logger.info("job complete")

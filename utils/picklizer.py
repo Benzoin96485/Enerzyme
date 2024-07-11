@@ -23,7 +23,7 @@ def parse_terachem_grad(grad_file):
         _ = f.readline()
         title = f.readline()
     energy = float(title.split()[6])
-    grads = np.loadtxt(grad_file, skiprows=2, usecols=(1,2,3))
+    grads = np.loadtxt(grad_file, skiprows=2, usecols=(1,2,3)) / 0.5291772108 # Ha/Bohr to Ha/Ang !!!
     return energy, grads
 
 
@@ -47,7 +47,13 @@ def parse_dipole(dipole_file):
     return df
 
 
-def picklizer(file_lists, output, flavor="terachem", use_chrg=True, use_dipole=True):
+def parse_dipole_new(dipole_file):
+    with open(dipole_file) as f:
+        lines = f.readlines()
+    x, y, z = lines[5].split()
+    return np.array([float(x), float(y), float(z)]) * 0.2081943
+
+def picklizer(file_lists, output, flavor="terachem", use_chrg=True, use_dipole=True, new_dipole=True, provide_Q=None):
     data = []
     dipole_file = None
     dipole_df = None
@@ -59,10 +65,14 @@ def picklizer(file_lists, output, flavor="terachem", use_chrg=True, use_dipole=T
             else:
                 energy, grad = parse_terachem_energy(file_group["energy"])
             chrg = parse_chrg(file_group["chrg"]) if use_chrg else None
-            if file_group["dipole"] != dipole_file:
-                dipole_file = file_group["dipole"]
-                dipole_df = parse_dipole(dipole_file)
-            dipole = dipole_df.loc[file_group["coord"].split("/")[-1], ["x", "y", "z"]].to_numpy() if use_dipole else None
+            total_chrg = provide_Q
+            if new_dipole:
+                dipole = parse_dipole_new(file_group["dipole"])
+            else:
+                if file_group["dipole"] != dipole_file:
+                    dipole_file = file_group["dipole"]
+                    dipole_df = parse_dipole(dipole_file)
+                dipole = dipole_df.loc[file_group["coord"].split("/")[-1], ["x", "y", "z"]].to_numpy() if use_dipole else None
         elif flavor == "xtb":
             pass
         datapoint = {
@@ -71,7 +81,8 @@ def picklizer(file_lists, output, flavor="terachem", use_chrg=True, use_dipole=T
             "energy": energy,
             "grad": grad,
             "chrg": chrg,
-            "dipole": dipole
+            "dipole": dipole,
+            "total_chrg": total_chrg
         }
         datapoint.update({
             k: v for k, v in file_group.items() if k not in datapoint.keys()
