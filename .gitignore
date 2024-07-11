@@ -6,3 +6,6 @@ logs
 slurm-*.out
 train*.sh
 profile.txt
+*.egg-info
+build/**
+scan.sh
