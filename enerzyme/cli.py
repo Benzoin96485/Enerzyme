@@ -1,8 +1,8 @@
 import argparse
-from enerzyme.train import FFTrain
-from enerzyme.predict import FFPredict
-from enerzyme.simulate import FFSimulate
-from enerzyme.utils.base_logger import logger
+from .train import FFTrain
+from .predict import FFPredict
+from .simulate import FFSimulate
+from .utils.base_logger import logger
 
 
 def get_parser():
@@ -77,7 +77,7 @@ def simulate(args):
     molcalculate.run()
 
 
-if __name__ == '__main__':
+def main():
     args = get_parser()
     if args.command == 'train':
         train(args)
@@ -85,4 +85,10 @@ if __name__ == '__main__':
         predict(args)   
     elif args.command == 'simulate':
         simulate(args)
+    else:
+        raise NotImplementedError(f"Command {args.command} is not supported now.")
     logger.info("job complete")
+
+
+if __name__ == '__main__':
+    main()
