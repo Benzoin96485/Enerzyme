@@ -2,6 +2,11 @@
 Next generation machine learning force field on enzymatic catalysis
 
 # Usage
+## Installation
+```bash
+pip install -e .
+```
+
 ## Training
 ```bash
 python main.py -c config.yaml -o output_dir
