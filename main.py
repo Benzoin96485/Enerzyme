@@ -1,8 +1,8 @@
 import argparse
-from mlff.train import FFTrain
-from mlff.predict import FFPredict
-from mlff.simulate import FFSimulate
-from mlff.utils.base_logger import logger
+from enerzyme.train import FFTrain
+from enerzyme.predict import FFPredict
+from enerzyme.simulate import FFSimulate
+from enerzyme.utils.base_logger import logger
 
 
 def get_parser():
