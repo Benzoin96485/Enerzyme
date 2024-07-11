@@ -1181,22 +1181,32 @@ class SpookyNet(nn.Module):
         idx_is = []
         idx_js = []
         count = 0
-        for ii, Za in enumerate(feature["Za"]):
+        # for ii, Za in enumerate(feature["Za"]):
+        #     N = len(Za)
+        #     batch_seg.append(np.ones(N, dtype=int) * ii)
+        #     split_sections.append(N)
+        #     positions = feature["Ra"].iloc[ii].copy()
+        #     tree = BallTree(positions)
+        #     idx_i = []
+        #     idx_j = tree.query_radius(positions, r=self.cutoff)
+        #     for i in range(len(idx_j)):
+        #         idx = idx_j[i]  # all neighbors with self-interaction
+        #         idx = idx[idx != i]  # filter out self-interaction
+        #         idx_i.append(np.full(idx.shape, i, idx.dtype))
+        #         idx_j[i] = idx
+        #     idx_is.append(np.concatenate(idx_i) + count)
+        #     idx_js.append(np.concatenate(idx_j) + count)
+        #     count += N
+        for i, Za in enumerate(feature["Za"]):
             N = len(Za)
-            batch_seg.append(np.ones(N, dtype=int) * ii)
-            split_sections.append(N)
-            positions = feature["Ra"].iloc[ii].copy()
-            tree = BallTree(positions)
-            idx_i = []
-            idx_j = tree.query_radius(positions, r=self.cutoff)
-            for i in range(len(idx_j)):
-                idx = idx_j[i]  # all neighbors with self-interaction
-                idx = idx[idx != i]  # filter out self-interaction
-                idx_i.append(np.full(idx.shape, i, idx.dtype))
-                idx_j[i] = idx
-            idx_is.append(np.concatenate(idx_i) + count)
-            idx_js.append(np.concatenate(idx_j) + count)
+            batch_seg.append(np.ones(N, dtype=int) * i)
+            indices = np.indices((N, N-1))
+            idx_is.append(indices[0].reshape(-1) + count)
+            idx_js.append(
+                (indices[1] + np.triu(np.ones((N, N-1)))).reshape(-1) + count
+            )
             count += N
+            split_sections.append(N)
         batch_input["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
         batch_input["idx_i"] = torch.tensor(np.concatenate(idx_is), dtype=torch.long)
         batch_input["idx_j"] = torch.tensor(np.concatenate(idx_js), dtype=torch.long)
