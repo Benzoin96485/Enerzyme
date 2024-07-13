@@ -1,17 +1,26 @@
 Datahub:
-  data_path:
-  data_format:
+  data_path: "/my/dataset.pkl" # path to dataset: pickle, npz or hdf5
+  data_format: pickle # pickle, npz or hdf5
   features:
-    Ra:
-    Za:
+    Ra: coord
+    Za: atom_type
     Q:
-    Na: 
+    N: 
   targets:
-    E:
-    Fa:
-    Qa:
+    E: energy
+    Fa: grad
+    Qa: chrg
     Q:
-    M2:
+    M2: dipole
+  preload: false
   neighbor_list: full
-  transform_args:
-    atomic_energy: # path to store atomic_energy
+  transforms:
+    atomic_energy: "/my/atomic/energy.csv" # path to store atomic_energy
+Trainer:
+  Splitter:
+    method: random
+    parts: ["training", "validation", "test"]
+    ratios: [0.7, 0.1, 0.2]
+    preload: false
+    save: true
+    seed: 114514

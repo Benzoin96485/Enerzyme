@@ -13,7 +13,7 @@ except:
 from transformers.optimization import get_linear_schedule_with_warmup
 import numpy as np
 import pandas as pd
-from .split import Splitter
+from .splitter import Splitter
 from ..utils import logger
 from ..utils.metrics import Metrics
 

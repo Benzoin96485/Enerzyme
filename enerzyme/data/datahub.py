@@ -62,6 +62,7 @@ class DataHub:
         self.transforms = transforms
         datahub_str = neighbor_list + str(sorted(transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
+        self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
         if not self.preload or not self.preload_data():
             self._init_data()
             self._init_neighbor_list()
@@ -82,12 +83,11 @@ class DataHub:
                 self._load_molecular_data(k, loaded_data, preload=True)
         loaded_file.close()
 
-    def preload_data(self):
-        preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
-        hdf5_path = os.path.join(preload_path, "pre_transformed.hdf5")
-        config_path = os.path.join(preload_path, "datahub.yaml")
+    def preload_data(self): 
+        hdf5_path = os.path.join(self.preload_path, "pre_transformed.hdf5")
+        config_path = os.path.join(self.preload_path, "datahub.yaml")
         if (
-            os.path.isdir(preload_path) and
+            os.path.isdir(self.preload_path) and
             os.path.isfile(hdf5_path) and
             os.path.isfile(config_path)
         ):
@@ -97,7 +97,7 @@ class DataHub:
             if preload_data_types <= set(self.data_types.keys()):
                 # all kinds of features and targets are contained in the processed dataset
                 self._preload_data(hdf5_path)
-                logger.info(f"Data matched and preloaded from {preload_path}")
+                logger.info(f"Data matched and preloaded from {self.preload_path}")
                 return True
         return False
 
@@ -123,7 +123,6 @@ class DataHub:
                     self.data[k] = [round(sum(v)) for v in self.data[k + "a"]]
                 else:
                     self.data[k] = [sum(v) for v in self.data[k + "a"]]
-
 
     def _load_atomic_data(self, k, raw_data, preload=False):
         if k in self.data:
@@ -187,7 +186,7 @@ class DataHub:
 
     def _init_neighbor_list(self):
         if self.neighbor_list_type == "full":
-            from .neighbor import full_neighbor_list
+            from .neighbor_list import full_neighbor_list
             idx_i, idx_j = full_neighbor_list(self.data["N"])
         else:
             raise NotImplementedError
@@ -199,12 +198,11 @@ class DataHub:
         self.data = self.transform.transform(self.data)
 
     def _save(self):
-        preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
-        if os.path.exists(preload_path):
-            logger.warning(f"Preload path {preload_path} exists and will be covered")
+        if os.path.exists(self.preload_path):
+            logger.warning(f"Preload path {self.preload_path} exists and will be covered")
         else:
-            os.makedirs(preload_path, exist_ok=True)
-        loaded_file = h5py.File(os.path.join(preload_path, "pre_transformed.hdf5"), mode="w")
+            os.makedirs(self.preload_path, exist_ok=True)
+        loaded_file = h5py.File(os.path.join(self.preload_path, "pre_transformed.hdf5"), mode="w")
         loaded_data = loaded_file.create_group("data")
         max_N = max(self.data["N"])
         for k, v in self.data.items():
@@ -213,7 +211,7 @@ class DataHub:
             else:
                 loaded_data.create_dataset(k, data=np.array(v))
         loaded_file.close()
-        handler = YamlHandler(os.path.join(preload_path, "datahub.yaml"))
+        handler = YamlHandler(os.path.join(self.preload_path, "datahub.yaml"))
         datahub_config = Dict({
             "feature": self.feature_types,
             "target": self.target_types,
@@ -221,7 +219,7 @@ class DataHub:
             "neighbor_list": self.neighbor_list_type
         })
         handler.write_yaml(datahub_config)
-        logger.info(f"Save preloaded dataset at {preload_path}")
+        logger.info(f"Save preloaded dataset at {self.preload_path}")
 
     @property
     def features(self):
