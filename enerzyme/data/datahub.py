@@ -44,7 +44,7 @@ class DataHub:
         save=True,
         features=None,
         targets=None,
-        transform_args=None,
+        transforms=None,
         neighbor_list=None,
         hash_length=16,
         **params
@@ -59,8 +59,8 @@ class DataHub:
         self.data_types = self.feature_types | self.target_types
         self.data = dict()
         self.neighbor_list_type = neighbor_list
-        self.transform_args = transform_args
-        datahub_str = neighbor_list + str(sorted(transform_args.items()))
+        self.transforms = transforms
+        datahub_str = neighbor_list + str(sorted(transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         if not self.preload or not self.preload_data():
             self._init_data()
@@ -195,7 +195,7 @@ class DataHub:
         self.data["idx_j"] = idx_j
 
     def _init_transform(self):
-        self.transform = Transform(self.data, self.transform_args)
+        self.transform = Transform(self.data, self.transforms)
         self.data = self.transform.transform(self.data)
 
     def _save(self):
@@ -217,7 +217,7 @@ class DataHub:
         datahub_config = Dict({
             "feature": self.feature_types,
             "target": self.target_types,
-            "transform_args": self.transform_args,
+            "transform_args": self.transforms,
             "neighbor_list": self.neighbor_list_type
         })
         handler.write_yaml(datahub_config)
