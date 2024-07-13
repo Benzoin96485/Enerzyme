@@ -2,6 +2,7 @@ import argparse
 from .train import FFTrain
 from .predict import FFPredict
 from .simulate import FFSimulate
+from .data_process import FFDataProcess
 from .utils.base_logger import logger
 
 
@@ -47,6 +48,17 @@ def get_parser():
     parser_simulate.add_argument('-o', '--model_dir', type=str,
                     help='the directory of models')
 
+    parser_data_process = subparsers.add_parser(
+        "data_process",
+        help="Process and save preloaded data",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser_data_process.add_argument('-c', '--config_path', type=str, default='', 
+        help='data process config'
+    )
+    parser_data_process.add_argument('-o', '--output_dir', type=str, default='../results',
+        help='the output directory for saving artifact')
+
     args = parser.parse_args()
     return args
 
@@ -77,6 +89,13 @@ def simulate(args):
     molcalculate.run()
 
 
+def data_process(args):
+    FFDataProcess(
+        out_dir=args.output_dir,
+        config_path=args.config_path
+    )
+
+
 def main():
     args = get_parser()
     if args.command == 'train':
@@ -85,6 +104,8 @@ def main():
         predict(args)   
     elif args.command == 'simulate':
         simulate(args)
+    elif args.command == 'data_process':
+        data_process(args)
     else:
         raise NotImplementedError(f"Command {args.command} is not supported now.")
     logger.info("job complete")
