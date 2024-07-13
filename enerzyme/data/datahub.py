@@ -72,7 +72,7 @@ class DataHub:
     def _preload_data(self, hdf5_path):
         loaded_file = h5py.File(hdf5_path, mode="r")
         loaded_data = loaded_file["data"]
-        self.data["N"] = list(["N"])
+        self.data["N"] = list(loaded_data["N"])
         for k in self.data_types:
             if k == "N":
                 continue
@@ -130,7 +130,7 @@ class DataHub:
             return
         values = raw_data[k if preload else self.data_types[k]]
         if preload or len(values) == self.n_datapoint:
-            self.data[k] = [values[i][:self.data["N"][i]] for i in range(self.n_datapoint)]
+            self.data[k] = [values[i][:self.data["N"][i]] for i in range(len(values))]
         else:
             raise IndexError(f"Length of {k} ({self.data_types[k]}) should be n_datapoint")
 

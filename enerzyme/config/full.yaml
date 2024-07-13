@@ -1,0 +1,17 @@
+Datahub:
+  data_path:
+  data_format:
+  features:
+    Ra:
+    Za:
+    Q:
+    Na: 
+  targets:
+    E:
+    Fa:
+    Qa:
+    Q:
+    M2:
+  neighbor_list: full
+  transform_args:
+    atomic_energy: # path to store atomic_energy
