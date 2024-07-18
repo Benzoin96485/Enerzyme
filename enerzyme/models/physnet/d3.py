@@ -155,12 +155,12 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
 
 
 class DispLayer(torch.nn.Module):
-    def __init__(self, dtype):
+    def __init__(self):
         super().__init__()
-        self.d3_c6ab = torch.nn.Parameter(d3_c6ab.type(dtype), requires_grad=False)
-        self.d3_r0ab = torch.nn.Parameter(d3_r0ab.type(dtype), requires_grad=False)
-        self.d3_rcov = torch.nn.Parameter(d3_rcov.type(dtype), requires_grad=False)
-        self.d3_r2r4 = torch.nn.Parameter(d3_r2r4.type(dtype), requires_grad=False)
+        self.d3_c6ab = torch.nn.Parameter(d3_c6ab, requires_grad=False)
+        self.d3_r0ab = torch.nn.Parameter(d3_r0ab, requires_grad=False)
+        self.d3_rcov = torch.nn.Parameter(d3_rcov, requires_grad=False)
+        self.d3_r2r4 = torch.nn.Parameter(d3_r2r4, requires_grad=False)
         
     def forward(self, Z, r, idx_i, idx_j, cutoff=None, r2=None, 
     r6=None, r8=None, s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k1=d3_k1, k2=d3_k2, 

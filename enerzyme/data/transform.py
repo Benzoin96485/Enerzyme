@@ -2,7 +2,9 @@ import os
 import pathlib
 import pandas as pd
 import numpy as np
-
+from threading import Thread
+from tqdm import tqdm
+from ..utils import logger
 
 PERIODIC_TABLE_PATH = os.path.join(
     pathlib.Path(__file__).parent.resolve(),
@@ -17,7 +19,11 @@ def parse_Za(atom_types):
     elif isinstance(atom_types[0], str):
         return PERIODIC_TABLE.loc[atom_types]["Za"].to_numpy()
     else:
-        return [parse_Za(atom_types_) for atom_types_ in atom_types]
+        logger.info("Parsing atom type")
+        Zas = []
+        for atom_types_ in tqdm(atom_types):
+            Zas.append(parse_Za(atom_types_))
+        return Zas
 
 
 def load_atomic_energy(atomic_energy_path):
@@ -57,7 +63,7 @@ class NegativeGradientTransform:
 
 
 class Transform:
-    def __init__(self, raw_input, transform_args):
+    def __init__(self, transform_args):
         self.backup_keys = set()
         self.shifts = []
         self.scales = []
@@ -69,25 +75,16 @@ class Transform:
                 self.scales.append(NegativeGradientTransform())
                 self.backup_keys.add("Fa")
 
-    def backup(self, new_input):
-        for backup_key in self.backup_keys:
-            new_input[backup_key + "_old"] = new_input[backup_key].copy()
-
     def transform(self, raw_input):
-        new_input = {k: v.copy() for k, v in raw_input.items()}
-        self.backup(new_input)
         for shift in self.shifts:
-            shift.transform(new_input)
+            shift.transform(raw_input)
         for scale in self.scales:
-            scale.transform(new_input)
-        return new_input
+            scale.transform(raw_input)
 
     def inverse_transform(self, raw_output):
-        new_output = {k: v.copy() for k, v in raw_output.items()}
         for scale in self.scales:
-            scale.inverse_transform(new_output)
+            scale.inverse_transform(raw_output)
         for shift in self.shifts:
-            shift.inverse_transform(new_output)
-        return new_output
+            shift.inverse_transform(raw_output)
 
 

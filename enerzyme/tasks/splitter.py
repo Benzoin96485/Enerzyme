@@ -61,7 +61,6 @@ class Splitter:
         self.method = method
         self.seed = seed
         self.params = params
-        self._set_seed()
         self.splitter = self._init_split(method, **params)
         self.preload = preload
         self.save = save
@@ -78,7 +77,7 @@ class Splitter:
             raise NotImplementedError
 
     def preload_split(self, preload_path):
-        if os.path.isdir(preload_path):
+        if preload_path is not None and os.path.isdir(preload_path):
             split_path = os.path.join(preload_path, "split_" + self.splitter.hash)
             split_file = os.path.join(split_path, "split.npz")
             if os.path.isfile(split_file):
@@ -107,6 +106,7 @@ class Splitter:
             raise FileNotFoundError(f"Preload path {preload_path} not found")
 
     def split(self, data, preload_path=None): 
+        self._set_seed()
         if self.preload and self.preload_split(preload_path):
             return self.split
         else:

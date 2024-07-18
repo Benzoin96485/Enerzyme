@@ -13,11 +13,10 @@ class FFTrain(object):
         self.config_path = config_path
         self.out_dir = out_dir
         self.task = config.Base.task
-        self._init_datahub(**config.Datahub)
-        self.config = self.update_config(config, **params)
-        logger.info('Config: {}'.format(self.config))
-        self._init_trainer(**config.Trainer, **self.config.Base.Metric)
-        self._init_modelhub(**config.Modelhub)
+        self.datahub = DataHub(dump_dir=self.out_dir, **config.Datahub)
+        logger.info('Config: {}'.format(config))
+        self.trainer = Trainer(out_dir=self.out_dir, metric_config=config.Metric, **config.Trainer)
+        self.modelhub = ModelHub(self.datahub, self.trainer, **config.Modelhub)
 
         if self.out_dir is not None:
             if not os.path.exists(self.out_dir):
@@ -25,32 +24,15 @@ class FFTrain(object):
                 os.makedirs(self.out_dir)
             else:
                 logger.info('Output directory already exists: {}'.format(self.out_dir))
-                logger.info('Warning: Overwrite output directory: {}'.format(self.out_dir))
+                logger.warning('Overwrite output directory: {}'.format(self.out_dir))
             out_path = os.path.join(self.out_dir, 'config.yaml')
-            self.yamlhandler.write_yaml(data = self.config, out_file_path = out_path)
+            self.yamlhandler.write_yaml(data = config, out_file_path = out_path)
 
-    def _init_baseconfig(self, **params):
-        for key, value in params.items():
-            setattr(self, key, value)
-
-    def _init_datahub(self, **params):
-        self.datahub = DataHub(task=self.task, is_train=True, dump_dir=self.out_dir, **params)
-
-    def _init_trainer(self, **params):
-        self.trainer = Trainer(
-            task=self.task,
-            out_dir=self.out_dir,
-            **params
-        )
-
-    def _init_modelhub(self, **params):
-        self.modelhub = ModelHub(self.datahub, self.trainer, self.task, **params)
-
-    def update_config(self, config, **params):
-        for key, value in params.items():
-            if value is not None:
-                config[key] = value
-        return config
+    # def update_config(self, config, **params):
+    #     for key, value in params.items():
+    #         if value is not None:
+    #             config[key] = value
+    #     return config
         
     def train_all(self):
         FFs = self.modelhub.models.get('FF', None)

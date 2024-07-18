@@ -1,11 +1,15 @@
+from collections import defaultdict
 import os
+from enerzyme import data
+from enerzyme.models.physnet.loss import NHLoss
 import joblib
 import torch
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
-from .physnet import PhysNet, MSE_nh_Loss, MAE_nh_Loss
+from .physnet import PhysNet, NHLoss
 from .spookynet import SpookyNet
+from .loss import MAELoss, MSELoss
 from ..utils import logger
 
 
@@ -15,136 +19,111 @@ FF_REGISTER = {
     "SpookyNet": SpookyNet
 }
 LOSS_REGISTER = {
-    "mse_nh": MSE_nh_Loss,
-    "mae_nh": MAE_nh_Loss
+    "nh_penalty": NHLoss,
+    "mae": MAELoss,
+    "mse": MSELoss
 }
 
 
 class FF:
-    def __init__(self, data, features, trainer, model_str, loss_param, **params):
-        self.data = data
-        self.target_scaler = self.data['target_scaler']
-        self.features = features
+    def __init__(self, 
+        datahub, trainer, model_str, loss, architecture, build_params,
+        pretrain_path=None, **params
+    ):
+        self.datahub = datahub
         self.trainer = trainer
         self.splitter = self.trainer.splitter
         self.model_str = model_str
-        self.model_id, self.model_name, self.feature_name, self.task = self.model_str.split(SEP)[:4]
-        self.model_params = params
-        self.model_params['device'] = self.trainer.device
-        self.cv_pretrain_path = self.model_params.get('cv_pretrain', None)
-        if self.cv_pretrain_path is not None:
-            self.model_params["pretrain"] = f"{self.cv_pretrain_path}/model_0.pth"
-        self.cv = dict()
+        self.architecture = architecture
+        self.build_params = build_params
+        if pretrain_path is not None:
+            if os.path.isdir(pretrain_path):
+                self.pretrain_path = f"{pretrain_path}/model_best.pth"
+            elif os.path.isfile(pretrain_path):
+                self.pretrain_path = pretrain_path
+            else:
+                raise FileNotFoundError(f"Pretrained model not found at {self.pretrain_path}")
+        else:
+            self.pretrain_path = None
         self.metrics = self.trainer.metrics
-        self.loss_func = LOSS_REGISTER[loss_param["key"]](**loss_param["params"])
+        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
         self.out_dir = self.trainer.out_dir
         self.dump_dir = os.path.join(self.out_dir, self.model_str)
-        self.trainer.set_seed(self.trainer.seed)
-        self.model = self._init_model(self.model_name, **self.model_params)
+        self.trainer._set_seed(self.trainer.seed)
+        self.model = self._init_model(self.build_params)
         self.is_success = True
     
-    def _init_model(self, model_name, **params):
-        if model_name in FF_REGISTER:
-            model = FF_REGISTER[model_name](**params)
-            if self.cv_pretrain_path is not None:
-                model_dict = torch.load(self.model_params["pretrain"], map_location=self.trainer.device)["model_state_dict"]
+    def _init_model(self, build_params):
+        if self.architecture in FF_REGISTER:
+            model = FF_REGISTER[self.architecture](**build_params)
+            if self.pretrain_path is not None:
+                model_dict = torch.load(self.pretrain_path, map_location=self.trainer.device)["model_state_dict"]
                 model.load_state_dict(model_dict, strict=False)
-                logger.info(f"load model success from {self.model_params['pretrain']}!")
+                logger.info(f"load model success from {self.pretrain_path}!")
             print(model.__str__())
         else:
-            raise ValueError('Unknown model: {}'.format(self.model_name))
+            raise KeyError('Unknown model: {}'.format(self.architecture))
         return model
     
     def run(self):
-        logger.info("start training FF:{}".format(self.model_name))
-        X = pd.DataFrame(self.features)
-        y = pd.DataFrame(self.data['target'])
-        y_pred = pd.DataFrame(index=y.index)
-        for fold, idx in enumerate(self.splitter.split(X)):
-            if self.splitter.cv:
-                tr_idx, vl_idx = idx
-            else:
-                tr_idx, vl_idx, te_idx = idx
-            X_train, y_train = X.iloc[tr_idx], y.iloc[tr_idx]
-            X_valid, y_valid = X.iloc[vl_idx], y.iloc[vl_idx]
-            train_dataset = FFDataset(X_train, y_train)
-            valid_dataset = FFDataset(X_valid, y_valid)
-            if self.splitter.cv:
-                test_dataset = None
-            else:
-                X_test, y_test = X.iloc[te_idx], y.iloc[te_idx]
-                test_dataset = FFDataset(X_test, y_test)
-            if fold > 0:
-                ### need to initalize model for next fold training
-                if self.cv_pretrain_path:
-                    self.model_params["pretrain"] = f"{self.cv_pretrain_path}/model_{fold}.pth"
-                self.model = self._init_model(self.model_name, **self.model_params)
-            try:
-                _y_pred = self.trainer.fit_predict(
-                    model=self.model, 
-                    train_dataset=train_dataset, 
-                    valid_dataset=valid_dataset, 
-                    test_dataset=test_dataset,
-                    loss_func=self.loss_func, 
-                    dump_dir=self.dump_dir, 
-                    fold=fold,
-                    target_scaler=self.target_scaler, 
-                    feature_name=self.feature_name,
-                    cv=self.splitter.cv
-                )
-            except RuntimeError as e:
-                logger.info("FF {0} failed...".format(self.model_name))
-                self.is_success = False
-                raise e
-                return
-
-            if self.splitter.cv:
-                y_pred.iloc[vl_idx] = _y_pred
-                logger.info ("fold {0}, result {1}".format(
-                    fold,
-                    self.metrics.cal_metric(
-                        self.data['target_scaler'].inverse_transform(y_valid), self.data['target_scaler'].inverse_transform(_y_pred)
-                        )
-                    )
-                )
-            else:
-                for column in _y_pred.columns:
-                    y_pred.loc[te_idx, column] = _y_pred[column]
-        
-        if self.splitter.cv:
-            self.cv['pred'] = y_pred
-            self.dump(self.cv['pred'], self.dump_dir, 'cv.data')
-            self.cv['metric'] = self.metrics.cal_metric(self.data['target_scaler'].inverse_transform(y), self.data['target_scaler'].inverse_transform(self.cv['pred']))
-        else:
-            self.cv['pred'] = y_pred.iloc[te_idx]
-            self.dump(self.cv['pred'], self.dump_dir, 'test.data')
-            self.cv['metric'] = self.metrics.cal_metric(self.data['target_scaler'].inverse_transform(y.iloc[te_idx]), self.data['target_scaler'].inverse_transform(self.cv['pred']))
-        self.dump(self.cv['metric'], self.dump_dir, 'metric.result')
-        logger.info("{} FF metrics score: \n{}".format(self.model_str, self.cv['metric']))
+        logger.info("start training FF:{}".format(self.model_str))
+        X = self.datahub.features
+        y = self.datahub.targets
+        split = self.splitter.split(X, preload_path=self.datahub.preload_path)
+        tr_idx = split["training"]
+        vl_idx = split["validation"]
+        te_idx = split["test"]
+        train_dataset = FFDataset(X, y, tr_idx, self.trainer.data_in_memory)
+        valid_dataset = FFDataset(X, y, vl_idx, True)
+        if len(te_idx) > 0:
+            test_dataset = FFDataset(X, y, te_idx, True)
+            y_test = test_dataset.targets
+            y_test["Za"] = test_dataset.features["Za"]
+        try:
+            y_pred = self.trainer.fit_predict(
+                model=self.model, 
+                train_dataset=train_dataset, 
+                valid_dataset=valid_dataset, 
+                test_dataset=test_dataset,
+                loss_terms=self.loss_terms, 
+                transform=self.datahub.transform,
+                dump_dir=self.dump_dir
+            )
+        except RuntimeError as e:
+            logger.info("FF {0} failed...".format(self.model_str))
+            self.is_success = False
+            raise e
+        self.datahub.transform.inverse_transform(y_test)
+        self.dump(y_pred, self.dump_dir, 'test.data')
+        metric_score = self.metrics.cal_metric(y_test, y_pred)
+        self.dump(metric_score, self.dump_dir, 'metric.result')
+        logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
         logger.info("{} FF done!".format(self.model_str))
         logger.info("Metric result saved!")
         logger.info("{} Model saved!".format(self.model_str))
 
-    def evaluate(self, checkpoints_path=None):
-        logger.info("start predict FF:{}".format(self.model_name))
-        X = pd.DataFrame(self.features)
-        y = pd.DataFrame(self.data['target'])
+    def evaluate(self):
+        logger.info("start predict FF:{}".format(self.model_str))
+        X = self.datahub.features
+        y = self.datahub.targets
         test_dataset = FFDataset(X, y)
         if not self.splitter.cv:
             # model_path = os.path.join(checkpoints_path, f'model_0.pth')
             # self.model.load_state_dict(torch.load(model_path, map_location=self.trainer.device)['model_state_dict'])
-            _y_pred, _, metric_score = self.trainer.predict(
+            y_pred, _, metric_score = self.trainer.predict(
                 model=self.model, 
                 dataset=test_dataset, 
-                loss_func=self.loss_func, 
+                loss_terms=self.loss_terms, 
                 dump_dir=self.dump_dir, 
-                fold=0, 
-                target_scaler=self.target_scaler, 
+                transform=self.datahub.transform, 
                 epoch=1, 
                 load_model=True
             )
-        self.cv['test_pred'] = _y_pred
-        self.cv['test_metrics'] = metric_score
+        self.dump(y_pred, self.dump_dir, 'test.data')
+        self.dump(metric_score, self.dump_dir, 'metric.result')
+        logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
+        logger.info("{} FF done!".format(self.model_str))
+        logger.info("Metric result saved!")
         print(metric_score)
 
     def dump(self, data, dir, name):
@@ -158,12 +137,20 @@ class FF:
     
 
 class FFDataset(Dataset):
-    def __init__(self, feature, label):
-        self.feature = feature
-        self.label = label
-
-    def __getitem__(self, idx):
-        return self.feature.iloc[idx], self.label.iloc[idx]
+    def __init__(self, features, targets, indices=None, data_in_memory=True):
+        self.data_in_memory = data_in_memory
+        self.indices = indices if indices is not None else np.arange(0, len(features["Za"]))
+        if data_in_memory:
+            self.features = {k: np.array([v[idx] for idx in indices]) for k, v in features.items()}
+            self.targets = {k: np.array([v[idx] for idx in indices]) for k, v in targets.items()}
+            self._getitem = lambda idx: ({k: v[idx] for k, v in self.features.items()}, {k: v[idx] for k, v in self.targets.items()})
+        else:
+            self.features = features
+            self.targets = targets
+            self._getitem = lambda idx: ({k: v[self.indices[idx]] for k, v in self.features.items()}, {k: v[self.indices[idx]] for k, v in self.targets.items()})
 
     def __len__(self):
-        return len(self.feature)
+        return len(self.indices)
+    
+    def __getitem__(self, idx):
+        return self._getitem(idx)
