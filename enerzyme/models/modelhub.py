@@ -4,6 +4,10 @@ from ..tasks import Trainer
 from .ff import FF
 
 
+def get_model_str(model_id, model_params):
+    return f"{model_id}-{model_params.architecture}" + (f"-{model_params.suffix}" if model_params.suffix else "")
+
+
 class ModelHub:
     def __init__(self, datahub, trainer, **params):
         self.datahub = datahub
@@ -18,7 +22,7 @@ class ModelHub:
         for model_id, model_params in internal_FFs.items():
             # WARNING: please carefully update the model_str function due to
             # need to call each model one by one.
-            model_str = f"{model_id}-{model_params.architecture}" + (f"-{model_params.suffix}" if model_params.suffix else "")
+            model_str = get_model_str(model_id, model_params)
             trainer_params = model_params.get('Trainer', None)
             if trainer_params is None:
                 trainer = self.default_trainer

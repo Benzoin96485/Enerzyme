@@ -2,7 +2,7 @@ import os
 import joblib
 import argparse
 import pandas as pd
-from .utils import YamlHandler, logger, addict2dict
+from .utils import YamlHandler, logger
 from .data import DataHub
 from .tasks import Trainer
 from .models import ModelHub

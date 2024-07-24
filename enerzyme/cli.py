@@ -1,8 +1,4 @@
 import argparse
-from .train import FFTrain
-from .predict import FFPredict
-from .simulate import FFSimulate
-from .data_process import FFDataProcess
 from .utils.base_logger import logger
 
 
@@ -47,6 +43,8 @@ def get_parser():
     )
     parser_simulate.add_argument('-m', '--model_dir', type=str,
                     help='the directory of models')
+    parser_simulate.add_argument('-o', '--output_dir', type=str, default='../results',
+        help='the output directory for saving artifact')
 
     parser_data_process = subparsers.add_parser(
         "data_process",
@@ -64,6 +62,7 @@ def get_parser():
 
 
 def train(args):
+    from .train import FFTrain
     moltrain = FFTrain(
         out_dir=args.output_dir,
         config_path=args.config_path
@@ -72,6 +71,7 @@ def train(args):
 
 
 def predict(args):
+    from .predict import FFPredict
     molpredict = FFPredict(
         model_dir=args.model_dir,
         output_dir=args.output_dir,
@@ -81,14 +81,17 @@ def predict(args):
 
 
 def simulate(args):
-    molcalculate = FFSimulate(
+    from .simulate import FFSimulate
+    molsimulate = FFSimulate(
         model_dir=args.model_dir,
-        config_path=args.config_path
+        config_path=args.config_path,
+        out_dir=args.output_dir
     )
-    molcalculate.run()
+    molsimulate.run()
 
 
 def data_process(args):
+    from .data_process import FFDataProcess
     FFDataProcess(
         out_dir=args.output_dir,
         config_path=args.config_path
