@@ -1,7 +1,4 @@
 import argparse
-from .train import FFTrain
-from .predict import FFPredict
-from .simulate import FFSimulate
 from .utils.base_logger import logger
 
 
@@ -17,7 +14,7 @@ def get_parser():
         help="train Enerzyme command",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_train.add_argument('-c', '--config_path', type=str, default='', 
+    parser_train.add_argument('-c', '--config_path', type=str, 
         help='training config'
     )
     parser_train.add_argument('-o', '--output_dir', type=str, default='../results',
@@ -28,13 +25,13 @@ def get_parser():
         help="predict Enerzyme command",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_predict.add_argument('-d', '--data_path', type=str, help='test data path')
-    parser_predict.add_argument('-o', '--model_dir', type=str,
+    parser_predict.add_argument('-m', '--model_dir', type=str,
                     help='the directory of models')
-    parser_predict.add_argument('-s', '--save_dir', type=str,
+    parser_predict.add_argument('-o', '--output_dir', type=str, default='../results',
                 help='the output directory for saving artifact')    
-    parser_predict.add_argument('-m', '--metric_str', nargs="+", type=str,
-                help='the metric names separated by spaces')  
+    parser_predict.add_argument('-c', '--config_path', type=str, 
+        help='prediction config'
+    )
 
     parser_simulate = subparsers.add_parser(
         "simulate",
@@ -44,14 +41,28 @@ def get_parser():
     parser_simulate.add_argument('-c', '--config_path', type=str, default='', 
         help='simulation config'
     )
-    parser_simulate.add_argument('-o', '--model_dir', type=str,
+    parser_simulate.add_argument('-m', '--model_dir', type=str,
                     help='the directory of models')
+    parser_simulate.add_argument('-o', '--output_dir', type=str, default='../results',
+        help='the output directory for saving artifact')
+
+    parser_data_process = subparsers.add_parser(
+        "data_process",
+        help="Process and save preloaded data",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser_data_process.add_argument('-c', '--config_path', type=str, default='', 
+        help='data process config'
+    )
+    parser_data_process.add_argument('-o', '--output_dir', type=str, default='../results',
+        help='the output directory for saving artifact')
 
     args = parser.parse_args()
     return args
 
 
 def train(args):
+    from .train import FFTrain
     moltrain = FFTrain(
         out_dir=args.output_dir,
         config_path=args.config_path
@@ -60,21 +71,31 @@ def train(args):
 
 
 def predict(args):
+    from .predict import FFPredict
     molpredict = FFPredict(
         model_dir=args.model_dir,
-        data_path=args.data_path,
-        save_dir=args.save_dir,
-        metric_str=args.metric_str
+        output_dir=args.output_dir,
+        config_path=args.config_path
     )
     molpredict.predict()
 
 
 def simulate(args):
-    molcalculate = FFSimulate(
+    from .simulate import FFSimulate
+    molsimulate = FFSimulate(
         model_dir=args.model_dir,
+        config_path=args.config_path,
+        out_dir=args.output_dir
+    )
+    molsimulate.run()
+
+
+def data_process(args):
+    from .data_process import FFDataProcess
+    FFDataProcess(
+        out_dir=args.output_dir,
         config_path=args.config_path
     )
-    molcalculate.run()
 
 
 def main():
@@ -85,6 +106,8 @@ def main():
         predict(args)   
     elif args.command == 'simulate':
         simulate(args)
+    elif args.command == 'data_process':
+        data_process(args)
     else:
         raise NotImplementedError(f"Command {args.command} is not supported now.")
     logger.info("job complete")

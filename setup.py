@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='enerzyme',
     version='0.0.1',
-    install_requires=['ase', 'joblib', 'addict'],
+    install_requires=['ase', 'joblib', 'addict', 'python>=3.10'],
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
     packages=find_packages(include=["enerzyme", "enerzyme.*"]),
     package_data={"enerzyme": [

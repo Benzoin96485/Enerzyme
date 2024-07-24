@@ -40,7 +40,7 @@ class Logger(object):
         self.console_output_level = 'INFO'
         self.file_output_level = 'INFO'
         self.DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-        self.formatter = logging.Formatter("%(asctime)s | %(relativepath)s | %(lineno)s | %(levelname)s | %(name)s | %(message)s", self.DATE_FORMAT)
+        self.formatter = logging.Formatter("%(asctime)s | %(relativepath)s:%(lineno)s | %(levelname)s | %(name)s | %(message)s", self.DATE_FORMAT)
 
     def get_logger(self):
         if not self.logger.handlers:
