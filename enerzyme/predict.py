@@ -2,40 +2,34 @@ import os
 import joblib
 import argparse
 import pandas as pd
-from .utils import YamlHandler, logger
+from .utils import YamlHandler, logger, addict2dict
 from .data import DataHub
 from .tasks import Trainer
 from .models import ModelHub
 
 
 class FFPredict(object):
-    def __init__(self, model_dir=None, data_path=None, output_dir=None, config_path=None):
+    def __init__(self, model_dir=None, output_dir=None, config_path=None):
         if model_dir is None:
             raise ValueError("model_dir is None")
-        if data_path is None:
-            raise ValueError("data_path is None")
         self.model_dir = model_dir
-        self.data_path = data_path
         self.output_dir = model_dir if output_dir is None else model_dir
 
         model_config_path = os.path.join(model_dir, 'config.yaml')
         config = YamlHandler(model_config_path).read_yaml()
         new_config = YamlHandler(config_path).read_yaml()
         if config_path is not None:
-            print(config)
-            config.update(new_config)
-            print(config)
+            config["Datahub"] = new_config["Datahub"]
+            config["Metric"] = new_config["Metric"]
 
-        # logger.info('Config: {}'.format(config))
+        logger.info('Config: {}'.format(config))
         
         ### load from ckp will initialize the datahub and the modelhub
         self.load_from_ckp(**config)
 
     def load_from_ckp(self, **params):
-        params['Datahub'].pop("data_path")
         ## load test data
         self.datahub = DataHub(
-            data_path=self.data_path, 
             dump_dir=self.output_dir, 
             **params['Datahub']
         )

@@ -123,7 +123,7 @@ class FF:
         logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
         logger.info("{} FF done!".format(self.model_str))
         logger.info("Metric result saved!")
-        return y_pred, pd.DataFrame(metric_score)
+        return y_pred, pd.DataFrame(metric_score, index=[self.model_str])
 
     def dump(self, data, dir, name):
         path = os.path.join(dir, name)

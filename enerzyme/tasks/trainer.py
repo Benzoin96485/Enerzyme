@@ -292,6 +292,8 @@ class Trainer(object):
         if transform is not None:
             transform.inverse_transform(y_preds)
             transform.inverse_transform(y_truths)
-        metric_score = self.metrics.cal_metric(y_truths, y_preds) if not load_model else None
+        metric_score = self.metrics.cal_metric(y_truths, y_preds)
+        if load_model and "_judge_score" in metric_score:
+            metric_score.pop("_judge_score")
         batch_bar.close()
         return y_preds, val_loss, metric_score

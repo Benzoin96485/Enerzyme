@@ -137,7 +137,7 @@ class PhysNet(nn.Module):
                 Ea += self.d3_autoev * self.disp_layer(
                     Z, Dij / d3_autoang, idx_i, idx_j, s6=self.s6, s8=self.s8, a1=self.a1, a2=self.a2
                 )
-        return torch.squeeze(segment_sum(Ea, batch_seg))
+        return segment_sum(Ea, batch_seg)
 
     def energy_and_forces_from_scaled_atomic_properties(self, Ea, Qa, Dij, Za, Ra, idx_i, idx_j, batch_seg=None, **params):
         energy = self.energy_from_scaled_atomic_properties(Ea, Qa, Dij, Za, idx_i, idx_j, batch_seg)

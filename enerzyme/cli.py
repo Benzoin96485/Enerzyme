@@ -29,7 +29,6 @@ def get_parser():
         help="predict Enerzyme command",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_predict.add_argument('-d', '--data_path', type=str, help='test data path')
     parser_predict.add_argument('-m', '--model_dir', type=str,
                     help='the directory of models')
     parser_predict.add_argument('-o', '--output_dir', type=str, default='../results',
@@ -75,7 +74,6 @@ def train(args):
 def predict(args):
     molpredict = FFPredict(
         model_dir=args.model_dir,
-        data_path=args.data_path,
         output_dir=args.output_dir,
         config_path=args.config_path
     )
