@@ -1,6 +1,5 @@
 from collections import defaultdict
-from ..utils import hash_model_name, model_name_generation, logger
-from ..tasks import Trainer
+from ..utils import logger
 from .ff import FF
 
 
@@ -27,6 +26,7 @@ class ModelHub:
             if trainer_params is None:
                 trainer = self.default_trainer
             else:
+                from ..tasks import Trainer
                 logger.info("init {} custom train parameters".format(model_str))
                 trainer = Trainer(self.task, self.out_dir, **trainer_params)
             if model_params['active']:
