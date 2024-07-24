@@ -18,7 +18,7 @@ def get_parser():
         help="train Enerzyme command",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_train.add_argument('-c', '--config_path', type=str, default='', 
+    parser_train.add_argument('-c', '--config_path', type=str, 
         help='training config'
     )
     parser_train.add_argument('-o', '--output_dir', type=str, default='../results',
@@ -30,12 +30,13 @@ def get_parser():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser_predict.add_argument('-d', '--data_path', type=str, help='test data path')
-    parser_predict.add_argument('-o', '--model_dir', type=str,
+    parser_predict.add_argument('-m', '--model_dir', type=str,
                     help='the directory of models')
-    parser_predict.add_argument('-s', '--save_dir', type=str,
+    parser_predict.add_argument('-o', '--output_dir', type=str, default='../results',
                 help='the output directory for saving artifact')    
-    parser_predict.add_argument('-m', '--metric_str', nargs="+", type=str,
-                help='the metric names separated by spaces')  
+    parser_predict.add_argument('-c', '--config_path', type=str, 
+        help='prediction config'
+    )
 
     parser_simulate = subparsers.add_parser(
         "simulate",
@@ -45,7 +46,7 @@ def get_parser():
     parser_simulate.add_argument('-c', '--config_path', type=str, default='', 
         help='simulation config'
     )
-    parser_simulate.add_argument('-o', '--model_dir', type=str,
+    parser_simulate.add_argument('-m', '--model_dir', type=str,
                     help='the directory of models')
 
     parser_data_process = subparsers.add_parser(
@@ -75,8 +76,8 @@ def predict(args):
     molpredict = FFPredict(
         model_dir=args.model_dir,
         data_path=args.data_path,
-        save_dir=args.save_dir,
-        metric_str=args.metric_str
+        output_dir=args.output_dir,
+        config_path=args.config_path
     )
     molpredict.predict()
 

@@ -106,25 +106,24 @@ class FF:
         logger.info("start predict FF:{}".format(self.model_str))
         X = self.datahub.features
         y = self.datahub.targets
-        test_dataset = FFDataset(X, y)
-        if not self.splitter.cv:
+        test_dataset = FFDataset(X, y, data_in_memory=True)
             # model_path = os.path.join(checkpoints_path, f'model_0.pth')
             # self.model.load_state_dict(torch.load(model_path, map_location=self.trainer.device)['model_state_dict'])
-            y_pred, _, metric_score = self.trainer.predict(
-                model=self.model, 
-                dataset=test_dataset, 
-                loss_terms=self.loss_terms, 
-                dump_dir=self.dump_dir, 
-                transform=self.datahub.transform, 
-                epoch=1, 
-                load_model=True
-            )
-        self.dump(y_pred, self.dump_dir, 'test.data')
-        self.dump(metric_score, self.dump_dir, 'metric.result')
+        y_pred, _, metric_score = self.trainer.predict(
+            model=self.model, 
+            dataset=test_dataset, 
+            loss_terms=self.loss_terms, 
+            dump_dir=self.dump_dir, 
+            transform=self.datahub.transform, 
+            epoch=1, 
+            load_model=True
+        )
+        # self.dump(y_pred, self.dump_dir, 'test.data')
+        # self.dump(metric_score, self.dump_dir, 'metric.result')
         logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
         logger.info("{} FF done!".format(self.model_str))
         logger.info("Metric result saved!")
-        print(metric_score)
+        return y_pred, pd.DataFrame(metric_score)
 
     def dump(self, data, dir, name):
         path = os.path.join(dir, name)
@@ -141,8 +140,8 @@ class FFDataset(Dataset):
         self.data_in_memory = data_in_memory
         self.indices = indices if indices is not None else np.arange(0, len(features["Za"]))
         if data_in_memory:
-            self.features = {k: np.array([v[idx] for idx in indices]) for k, v in features.items()}
-            self.targets = {k: np.array([v[idx] for idx in indices]) for k, v in targets.items()}
+            self.features = {k: np.array([v[idx] for idx in self.indices]) for k, v in features.items()}
+            self.targets = {k: np.array([v[idx] for idx in self.indices]) for k, v in targets.items()}
             self._getitem = lambda idx: ({k: v[idx] for k, v in self.features.items()}, {k: v[idx] for k, v in self.targets.items()})
         else:
             self.features = features

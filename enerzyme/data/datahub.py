@@ -51,7 +51,7 @@ class DataHub:
         hash_length=16,
         **params
     ):
-        self.data_path = data_path
+        self.data_path = os.path.abspath(data_path)
         self.dump_dir = dump_dir
         self.data_format = data_format
         self.preload = preload
