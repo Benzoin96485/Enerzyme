@@ -39,24 +39,25 @@ class ASECalculator(Calculator):
     def calculate(self, atoms=None, properties=["energy"], system_changes=all_changes):
         Calculator.calculate(self, atoms, properties, system_changes)
         features = {
-            "Q": [self.parameters.charge],
-            "Ra": [atoms.positions],
-            "Za": [atoms.numbers],
-            "N": [len(atoms)]
+            "Q": self.parameters.charge,
+            "Ra": atoms.positions,
+            "Za": atoms.numbers,
+            "N": len(atoms)
         }
         if self.neighbor_list_type == "full":
             idx_i, idx_j = full_neighbor_list(features["N"])
             features["idx_i"] = idx_i
             features["idx_j"] = idx_j
+            features["N_pair"] = len(idx_i)
         net_input, _ = _decorate_batch_input(
-            batch=(features, None),
+            batch=[(features, None)],
             device=self.device,
             dtype=self.dtype
         )
         net_output = self.model(**net_input)
         output, _ = _decorate_batch_output(
             output=net_output,
-            features=features,
+            features=net_input,
             targets=None
         )
         self.transform.inverse_transform(output)
@@ -78,7 +79,6 @@ class Simulation:
         self.constraint_config = config.Simulation.get("constraint", None)
         self.sampling_config = config.Simulation.get("sampling", None)
         self.neighbor_list_type = config.Simulation.get("neighbor_list", "full")
-        self.simulation_config = config.Simulation
         self.cuda = config.Simulation.get('cuda', False)
         self.dtype = DTYPE_MAPPING[config.Simulation.get("dtype", "float64")]
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
@@ -86,6 +86,7 @@ class Simulation:
         self.model = model.to(self.device).type(self.dtype)
         self.model.eval()
         self.out_dir = out_dir
+        self.simulation_config = {k: v for k, v in config.Simulation.items() if not hasattr(self, k)}
         # initialize
         getattr(self, f"_init_{self.environment}_env")()
 
@@ -121,7 +122,7 @@ class Simulation:
             for i, x in enumerate(x_scan):
                 # reset constraint
                 del self.system.constraints
-                logger.log("Setting distance to:", self.system.get_distance(i0, i1))
+                logger.info(f"Setting distance to: {self.system.get_distance(i0, i1)}")
                 self.system.set_distance(i0, i1, x)
                 c = FixBondLengths([(i0, i1)], bondlengths=[x], tolerance=1e-6)
                 self.system.set_constraint(self.constraints + [c])
@@ -131,8 +132,8 @@ class Simulation:
                 optimizer.attach(write_xyz, interval=1, atoms=self.system) 
                 optimizer.run(fmax=4.5e-4)
                 ase.io.write(osp.join(f"scan_optim.xyz", f"traj-{i}.xyz"), self.system, append=True)
-                logger.log(f"Final energy: {self.system.get_potential_energy()}")
-                logger.log("Final distance:", self.system.get_distance(i0, i1))
+                logger.info(f"Final energy: {self.system.get_potential_energy()}")
+                logger.info(f"Final distance: {self.system.get_distance(i0, i1)}")
 
     def run(self):
         getattr(self, f"_run_{self.task}")()

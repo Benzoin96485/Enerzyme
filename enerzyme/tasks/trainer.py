@@ -30,7 +30,7 @@ DTYPE_MAPPING = {
 }
 
 
-def _decorate_batch_input(self, batch, dtype, device):
+def _decorate_batch_input(batch, dtype, device):
     features, targets = zip(*batch)
     batch_features = dict()
     batch_targets = dict()
@@ -62,7 +62,7 @@ def _decorate_batch_input(self, batch, dtype, device):
     batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long).to(device)
     batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long).to(device)
 
-    if targets is not None:
+    if targets[0] is not None:
         for k in targets[0]:
             if is_atomic(k): 
                 batch_targets[k] = torch.tensor(
