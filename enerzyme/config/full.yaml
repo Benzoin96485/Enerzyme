@@ -55,7 +55,22 @@ Modelhub:
             num_residual_output: 1
             activation_fn: shifted_softplus
             drop_out: 0.0
-        - AtomicAffine
+        - name: AtomicAffine
+          params: 
+            Ea:
+              shift: 
+                values: 0
+                learnable: true
+              scale:
+                values: 1
+                learnable: true
+            Qa:
+              shift: 
+                values: 0
+                learnable: true
+              scale:
+                values: 1
+                learnable: true
         - ChargeConservation
         - AtomicCharge2Dipole
         - ElectrostaticEnergy

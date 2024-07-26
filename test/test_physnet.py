@@ -13,7 +13,7 @@ sys.path.extend(["..", "."])
 from enerzyme.models.ff import build_model
 # from enerzyme.models.physnet import PhysNetCore
 from neural_network.NeuralNetwork import NeuralNetwork
-# from enerzyme.models.physnet.init import semi_orthogonal_glorot_weights
+from enerzyme.models.physnet.init import semi_orthogonal_glorot_weights
 
 F = 128
 K = 5
@@ -36,7 +36,7 @@ idx_i = idx_i.reshape(-1)
 idx_j = idx_j.reshape(-1)
 offsets = np.random.random((*idx_i.shape, 3))
 x = np.random.randn(N, F)
-# W_init = semi_orthogonal_glorot_weights(F, F)
+W_init = semi_orthogonal_glorot_weights(F, F)
 b_init = np.random.randn(F)
 D = np.random.random(*idx_i.shape) * 30 + 3
 rbf = np.random.randn(*idx_i.shape, K)
@@ -44,18 +44,26 @@ Z = np.random.randint(0, 94, N)
 Qa = np.random.randn(N)
 Ea = np.random.randn(N)
 Q_tot = np.random.randn()
+# def set_dtype(dtype):
+dtype = "float64"
+if dtype == "float64":
+    dtype_torch = torch.float64
+    dtype_tf = tf.float64
+    R = R.astype(np.float64)
+    offsets = offsets.astype(np.float64)
+    W_init = W_init.astype(np.float64)
+    b_init = b_init.astype(np.float64)
+elif dtype == "float32":
+    dtype_torch = torch.float32
+    dtype_tf = tf.float32
+    R = R.astype(np.float32)
+    offsets = offsets.astype(np.float32)
+    W_init = W_init.astype(np.float32)
+    b_init = b_init.astype(np.float32)
 
+# set_dtype("float64")
 
-def initialize(dtype="float64", use_dispersion=True):
-    global R, offsets
-    if dtype == "float64":
-        dtype_torch = torch.float64
-        dtype_tf = tf.float64
-    elif dtype == "float32":
-        dtype_torch = torch.float32
-        dtype_tf = tf.float32
-        R = R.astype(np.float32)
-        offsets = offsets.astype(np.float32)
+def initialize():
     state = get_state()
     physnet_torch = build_model(
         architecture="PhysNet",
@@ -81,11 +89,11 @@ def initialize(dtype="float64", use_dispersion=True):
             {"name": "RandomAtomEmbedding"},
             {"name": "Core"}
         ]
-    )
+    ).type(dtype_torch)
     # physnet_torch = None
     # physnet_torch = PhysNetCore(F, K, 5.0, dtype=dtype, use_dispersion=use_dispersion)
     set_state(state)
-    physnet_tf = NeuralNetwork(F, K, cutoff, scope="test", dtype=dtype_tf, use_dispersion=use_dispersion)
+    physnet_tf = NeuralNetwork(F, K, cutoff, scope="test", dtype=dtype_tf)
     # physnet_tf._embeddings = tf.Variable(physnet_torch.embeddings.weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
     return physnet_torch, physnet_tf
     
@@ -143,7 +151,7 @@ def test_RBFLayer():
         cutoff_sr=cutoff,
         cutoff_fn="polynomial",
         init_width_flavor="PhysNet"
-    )
+    ).type(dtype_torch)
     rbf1 = rbf_layer.get_rbf(torch.from_numpy(D1)).detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -153,119 +161,119 @@ def test_RBFLayer():
 
 def test_embedding():
     from enerzyme.models.layers.embedding import RandomAtomEmbedding
-    embedding = RandomAtomEmbedding(95, F)
+    embedding = RandomAtomEmbedding(95, F).type(dtype_torch)
     embedding.get_embedding(torch.from_numpy(Z))
 
 
-# def test_DenseLayer():
-#     from enerzyme.models.physnet.layer import DenseLayer as DenseLayer_torch
-#     from neural_network.layers.DenseLayer import DenseLayer as Denselayer_tf
+def test_DenseLayer():
+    from enerzyme.models.physnet.layer import DenseLayer as DenseLayer_torch
+    from neural_network.layers.DenseLayer import DenseLayer as Denselayer_tf
     
-#     dense_layer_torch = DenseLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init))
-#     dense_layer_tf = Denselayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=tf.float64)
-#     y_dense_torch = dense_layer_torch(torch.from_numpy(x)).detach().numpy()
-#     l2loss_torch = dense_layer_torch.l2loss.detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         y_dense_tf = dense_layer_tf(x).eval()
-#         l2loss_tf = dense_layer_tf.l2loss.eval()
-#     assert_allclose(y_dense_torch, y_dense_tf)
-#     assert_allclose(l2loss_torch, l2loss_tf)
+    dense_layer_torch = DenseLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init)).type(dtype_torch)
+    dense_layer_tf = Denselayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=dtype_tf)
+    y_dense_torch = dense_layer_torch(torch.from_numpy(x)).detach().numpy()
+    l2loss_torch = dense_layer_torch.l2loss.detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        y_dense_tf = dense_layer_tf(x).eval()
+        l2loss_tf = dense_layer_tf.l2loss.eval()
+    assert_allclose(y_dense_torch, y_dense_tf)
+    assert_allclose(l2loss_torch, l2loss_tf)
 
 
-# def test_ResidualLayer():
-#     from enerzyme.models.physnet.layer import ResidualLayer as ResidualLayer_torch
-#     from enerzyme.models.physnet.init import semi_orthogonal_glorot_weights
-#     from neural_network.layers.ResidualLayer import ResidualLayer as ResidualLayer_tf
-#     residual_layer_torch = ResidualLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init))
-#     residual_layer_tf = ResidualLayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=tf.float64)
-#     y_residual_torch = residual_layer_torch(torch.from_numpy(x.copy())).detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         y_residual_tf = residual_layer_tf(x.copy()).eval()
-#     assert_allclose(y_residual_torch, y_residual_tf)
+def test_ResidualLayer():
+    from enerzyme.models.physnet.layer import ResidualLayer as ResidualLayer_torch
+    from enerzyme.models.physnet.init import semi_orthogonal_glorot_weights
+    from neural_network.layers.ResidualLayer import ResidualLayer as ResidualLayer_tf
+    residual_layer_torch = ResidualLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init)).type(dtype_torch)
+    residual_layer_tf = ResidualLayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=dtype_tf)
+    y_residual_torch = residual_layer_torch(torch.from_numpy(x.copy())).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        y_residual_tf = residual_layer_tf(x.copy()).eval()
+    assert_allclose(y_residual_torch, y_residual_tf)
 
 
-# def test_InteractionLayer():
-#     from enerzyme.models.physnet.layer import InteractionLayer as InteractionLayer_torch
-#     from neural_network.layers.InteractionLayer import InteractionLayer as InteractionLayer_tf
-#     state = get_state()
-#     interaction_layer_torch = InteractionLayer_torch(K, F, 3)
-#     set_state(state)
-#     interaction_layer_tf = InteractionLayer_tf(K, F, 3, scope="test", dtype=tf.float64)
-#     y_interaction_torch = interaction_layer_torch(
-#         torch.from_numpy(x.copy()), 
-#         torch.from_numpy(rbf.copy()), 
-#         torch.from_numpy(idx_i), 
-#         torch.from_numpy(idx_j)
-#     ).detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         y_interaction_tf = interaction_layer_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
-#     assert_allclose(y_interaction_torch, y_interaction_tf)
+def test_InteractionLayer():
+    from enerzyme.models.physnet.layer import InteractionLayer as InteractionLayer_torch
+    from neural_network.layers.InteractionLayer import InteractionLayer as InteractionLayer_tf
+    state = get_state()
+    interaction_layer_torch = InteractionLayer_torch(K, F, 3).type(dtype_torch)
+    set_state(state)
+    interaction_layer_tf = InteractionLayer_tf(K, F, 3, scope="test", dtype=dtype_tf)
+    y_interaction_torch = interaction_layer_torch(
+        torch.from_numpy(x.copy()), 
+        torch.from_numpy(rbf.copy()), 
+        torch.from_numpy(idx_i), 
+        torch.from_numpy(idx_j)
+    ).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        y_interaction_tf = interaction_layer_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
+    assert_allclose(y_interaction_torch, y_interaction_tf)
 
 
-# def test_InteractionBlock():
-#     from enerzyme.models.physnet.block import InteractionBlock as InteractionBlock_torch
-#     from neural_network.layers.InteractionBlock import InteractionBlock as InteractionBlock_tf
-#     state = get_state()
-#     interaction_block_torch = InteractionBlock_torch(K, F, 3, 3)
-#     set_state(state)
-#     interaction_block_tf = InteractionBlock_tf(K, F, 3, 3, scope="test", dtype=tf.float64)
-#     y_interaction_torch = interaction_block_torch(
-#         torch.from_numpy(x.copy()), 
-#         torch.from_numpy(rbf.copy()), 
-#         torch.from_numpy(idx_i), 
-#         torch.from_numpy(idx_j)
-#     ).detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         y_interaction_tf = interaction_block_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
-#     assert_allclose(y_interaction_torch, y_interaction_tf)
+def test_InteractionBlock():
+    from enerzyme.models.physnet.block import InteractionBlock as InteractionBlock_torch
+    from neural_network.layers.InteractionBlock import InteractionBlock as InteractionBlock_tf
+    state = get_state()
+    interaction_block_torch = InteractionBlock_torch(K, F, 3, 3).type(dtype_torch)
+    set_state(state)
+    interaction_block_tf = InteractionBlock_tf(K, F, 3, 3, scope="test", dtype=dtype_tf)
+    y_interaction_torch = interaction_block_torch(
+        torch.from_numpy(x.copy()), 
+        torch.from_numpy(rbf.copy()), 
+        torch.from_numpy(idx_i), 
+        torch.from_numpy(idx_j)
+    ).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        y_interaction_tf = interaction_block_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
+    assert_allclose(y_interaction_torch, y_interaction_tf)
 
 
-# def test_OutputBlock():
-#     from enerzyme.models.physnet.block import OutputBlock as OutputBlock_torch
-#     from neural_network.layers.OutputBlock import OutputBlock as OutputBlock_tf
-#     state = get_state()
-#     output_block_torch = OutputBlock_torch(F, 3)
-#     set_state(state)
-#     output_block_tf = OutputBlock_tf(F, 3, scope="test", dtype=tf.float64)
-#     y_output_torch = output_block_torch(
-#         torch.from_numpy(x.copy())
-#     ).detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         y_output_tf = output_block_tf(x.copy()).eval()
-#     assert_allclose(y_output_torch, y_output_tf)
+def test_OutputBlock():
+    from enerzyme.models.physnet.block import OutputBlock as OutputBlock_torch
+    from neural_network.layers.OutputBlock import OutputBlock as OutputBlock_tf
+    state = get_state()
+    output_block_torch = OutputBlock_torch(F, 3).type(dtype_torch)
+    set_state(state)
+    output_block_tf = OutputBlock_tf(F, 3, scope="test", dtype=dtype_tf)
+    y_output_torch = output_block_torch(
+        torch.from_numpy(x.copy())
+    ).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        y_output_tf = output_block_tf(x.copy()).eval()
+    assert_allclose(y_output_torch, y_output_tf)
 
 
-# def test_atomic_properties():
-#     physnet_torch, physnet_tf = initialize("float32")
-#     Ea_torch, Qa_torch, Dij_lr_torch, nhloss_torch = physnet_torch.atomic_properties(
-#         torch.from_numpy(Z.copy()), 
-#         torch.tensor(R, dtype=torch.float32), 
-#         torch.from_numpy(idx_i.copy()), 
-#         torch.from_numpy(idx_j.copy()), 
-#         torch.tensor(offsets, dtype=torch.float32)
-#     )
-#     Ea_torch = Ea_torch.detach().numpy()
-#     Qa_torch = Qa_torch.detach().numpy()
-#     Dij_lr_torch = Dij_lr_torch.detach().numpy()
-#     nhloss_torch = nhloss_torch.detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         Ea_tf, Qa_tf, Dij_lr_tf, nhloss_tf = physnet_tf.atomic_properties(
-#             Z, R, idx_i, idx_j, offsets
-#         )
-#         Ea_tf = Ea_tf.eval()
-#         Qa_tf = Qa_tf.eval()
-#         Dij_lr_tf = Dij_lr_tf.eval()
-#         nhloss_tf = nhloss_tf.eval()
-#     assert_allclose(Ea_torch, Ea_tf)
-#     assert_allclose(Qa_torch, Qa_tf)
-#     assert_allclose(Dij_lr_torch, Dij_lr_tf, rtol=1e-6, atol=1e-6)
-#     assert_allclose(nhloss_torch, nhloss_tf)
+def test_atomic_properties():
+    physnet_torch, physnet_tf = initialize()
+    output = physnet_torch({
+        "Za": torch.from_numpy(Z.copy()), 
+        "Ra": torch.from_numpy(R), 
+        "idx_i": torch.from_numpy(idx_i.copy()), 
+        "idx_j": torch.from_numpy(idx_j.copy()), 
+        "offsets": torch.from_numpy(offsets)
+    })
+    Ea_torch = output["Ea"].detach().numpy()
+    Qa_torch = output["Qa"].detach().numpy()
+    Dij_lr_torch = output["Dij_lr"].detach().numpy()
+    nhloss_torch = output["nh_loss"].detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        Ea_tf, Qa_tf, Dij_lr_tf, nhloss_tf = physnet_tf.atomic_properties(
+            Z, R, idx_i, idx_j, offsets
+        )
+        Ea_tf = Ea_tf.eval()
+        Qa_tf = Qa_tf.eval()
+        Dij_lr_tf = Dij_lr_tf.eval()
+        nhloss_tf = nhloss_tf.eval()
+    assert_allclose(Ea_torch, Ea_tf)
+    assert_allclose(Qa_torch, Qa_tf)
+    assert_allclose(Dij_lr_torch, Dij_lr_tf, rtol=1e-6, atol=1e-6)
+    assert_allclose(nhloss_torch, nhloss_tf)
 
 
 # def test_edisp():

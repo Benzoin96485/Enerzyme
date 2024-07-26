@@ -46,8 +46,8 @@ class CoreWrapper(nn.Module):
     def __str__(self):
         return self.core.__str__()
     
-    def forward(self):
-        return self.post_sequence.forward()
+    def forward(self, net_input):
+        return self.post_sequence.forward(net_input)
     
     def append(self, layer):
         self.post_sequence.append(layer)

@@ -19,7 +19,7 @@ class BaseRBF(nn.Module):
     def get_rbf(self, Dij: Tensor, cutoff_values: Tensor, **kwargs) -> Tensor:
         ...
 
-    def forward(self, cutoff_values: Tensor, Dij_name: str="Dij", **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def forward(self, cutoff_values: Tensor=None, Dij_name: str="Dij", **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         output["rbf"] = self.get_rbf(
             Dij=net_input[Dij_name],
@@ -90,7 +90,7 @@ class ExponentialRBF(BaseRBF):
         ...
 
 
-    def get_rbf(self, r: Tensor, cutoff_values: Tensor=None) -> Tensor:
+    def get_rbf(self, Dij: Tensor, cutoff_values: Tensor=None) -> Tensor:
         '''
         Evaluate the RBF values
 
@@ -105,10 +105,10 @@ class ExponentialRBF(BaseRBF):
         -----
         rbf: Float tensor of RBFs, shape [M, `num_basis_functions`]
         '''
-        alphar = -F.softplus(self._alpha) * r.view(-1, 1)
+        alphar = -F.softplus(self._alpha) * Dij.view(-1, 1)
         expalphar = torch.exp(alphar)
         if cutoff_values is None:
-            cutoff_values = self.cutoff_fn(r, cutoff=self.cutoff)
+            cutoff_values = self.cutoff_fn(Dij, cutoff=self.cutoff)
         return cutoff_values.view(-1, 1) * torch.exp(self.inner_fn(alphar, expalphar)) * (expalphar if self.exp_weighting else 1)
 
 
@@ -210,12 +210,10 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
         elif init_width_flavor == "PhysNet":
             self.register_parameter(
                 "_widths", nn.Parameter(
-                    torch.tensor(
-                        softplus_inverse(
-                            [(0.5 / ((-math.expm1(-self.cutoff)) / self.num_basis_functions)) ** 2] * \
-                            self.num_basis_functions
-                        )
-                    ), 
+                    softplus_inverse(
+                        [(0.5 / ((-math.expm1(-self.cutoff)) / self.num_basis_functions)) ** 2] * \
+                        self.num_basis_functions
+                    ),
                     requires_grad=self.learnable_shape
                 )
             )
