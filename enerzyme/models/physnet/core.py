@@ -73,7 +73,7 @@ class PhysNetCore(nn.Module):
     @classmethod
     def build(cls, built_layers: Dict[str, nn.Module], **build_params: Dict[str, Any]) -> nn.Module:
         instance = cls(**build_params)
-        for layer_name, layer in built_layers:
+        for layer_name, layer in built_layers.items():
             if layer_name.endswith("Distance"):
                 instance.distance_layer = layer
             elif layer_name.endswith("RBF"):

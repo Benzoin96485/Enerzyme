@@ -56,43 +56,43 @@ def initialize(dtype="float64", use_dispersion=True):
         dtype_tf = tf.float32
         R = R.astype(np.float32)
         offsets = offsets.astype(np.float32)
-    # state = get_state()
-    # physnet_torch = build_model(
-    #     architecture="PhysNet",
-    #     build_params={
-    #         "dim_embedding": F,
-    #         "num_rbf": K,
-    #         "max_Za": 95,
-    #         "cutoff_sr": cutoff
-    #     },
-    #     layer_params=[
-    #         {"name": "Distance"},
-    #         {
-    #             "name": "ExponentialGaussianRBF", 
-    #             "params": {
-    #                 "no_basis_at_infinity": False,
-    #                 "init_alpha": 1,
-    #                 "exp_weighting": False,
-    #                 "learnable_shape": True,
-    #                 "cutoff_fn": "polynomial",
-    #                 "init_width_flavor": "PhysNet"
-    #             }
-    #         },
-    #         {"name": "RandomAtomEmbedding"},
-    #         {"name": "Core"}
-    #     ]
-    # )
-    physnet_torch = None
+    state = get_state()
+    physnet_torch = build_model(
+        architecture="PhysNet",
+        build_params={
+            "dim_embedding": F,
+            "num_rbf": K,
+            "max_Za": 95,
+            "cutoff_sr": cutoff
+        },
+        layer_params=[
+            {"name": "Distance"},
+            {
+                "name": "ExponentialGaussianRBF", 
+                "params": {
+                    "no_basis_at_infinity": False,
+                    "init_alpha": 1,
+                    "exp_weighting": False,
+                    "learnable_shape": True,
+                    "cutoff_fn": "polynomial",
+                    "init_width_flavor": "PhysNet"
+                }
+            },
+            {"name": "RandomAtomEmbedding"},
+            {"name": "Core"}
+        ]
+    )
+    # physnet_torch = None
     # physnet_torch = PhysNetCore(F, K, 5.0, dtype=dtype, use_dispersion=use_dispersion)
-    # set_state(state)
+    set_state(state)
     physnet_tf = NeuralNetwork(F, K, cutoff, scope="test", dtype=dtype_tf, use_dispersion=use_dispersion)
     # physnet_tf._embeddings = tf.Variable(physnet_torch.embeddings.weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
     return physnet_torch, physnet_tf
     
 
 
-# def test_initialize():
-#     initialize()
+def test_initialize():
+    initialize()
 
 
 # def test_grimme_d3_coefficient():
@@ -155,21 +155,6 @@ def test_embedding():
     from enerzyme.models.layers.embedding import RandomAtomEmbedding
     embedding = RandomAtomEmbedding(95, F)
     embedding.get_embedding(torch.from_numpy(Z))
-
-
-# def test_RBFLayer():
-#     physnet_torch, physnet_tf = initialize()
-#     D1 = physnet_torch.calculate_interatomic_distances(
-#         torch.from_numpy(R), 
-#         torch.from_numpy(idx_i), 
-#         torch.from_numpy(idx_j), 
-#         torch.from_numpy(offsets)
-#     ).numpy()
-#     rbf1 = physnet_torch.rbf_layer(torch.tensor(D1)).detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         rbf2 = physnet_tf.rbf_layer(D1).eval()
-#     assert_allclose(rbf1, rbf2, atol=1e-7, rtol=1e-7)
 
 
 # def test_DenseLayer():

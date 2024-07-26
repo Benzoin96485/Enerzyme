@@ -1,3 +1,3 @@
 from .geometry import DistanceLayer
-from .rbf import BaseRBF
-from .embedding import BaseAtomEmbedding
+from .rbf import BaseRBF, ExponentialGaussianRBFLayer
+from .embedding import BaseAtomEmbedding, RandomAtomEmbedding

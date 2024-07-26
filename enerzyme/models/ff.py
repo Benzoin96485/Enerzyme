@@ -29,7 +29,7 @@ LOSS_REGISTER = {
 
 def get_ff_core(architecture: str) -> Tuple[nn.Module, List]:
     global LOSS_REGISTER
-    if architecture.lower == "physnet":
+    if architecture.lower() == "physnet":
         from .physnet import PhysNetCore as Core
         from .physnet import LAYERS
         from .physnet import LOSS_REGISTER as special_loss
@@ -39,8 +39,9 @@ def get_ff_core(architecture: str) -> Tuple[nn.Module, List]:
 
 class CoreWrapper(nn.Module):
     def __init__(self, core):
+        super().__init__()
         self.core = core
-        self.post_sequence = nn.Sequential([core])
+        self.post_sequence = nn.Sequential(core)
     
     def __str__(self):
         return self.core.__str__()
@@ -82,8 +83,9 @@ def build_model(
     for layer_param in layer_params:
         layer_name = layer_param["name"]
         params = layer_param.get("params", dict())
-
-        if hasattr(Layers, layer_name + "Layer"):
+        if layer_name == "Core":
+            Layer = Core
+        elif hasattr(Layers, layer_name + "Layer"):
             Layer = getattr(Layers, layer_name + "Layer")
         elif hasattr(Layers, layer_name):
             Layer = getattr(Layers, layer_name)
