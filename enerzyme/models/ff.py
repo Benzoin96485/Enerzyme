@@ -6,7 +6,7 @@ from inspect import signature
 import torch
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, List, Any, Callable, Union
+from typing import Dict, Tuple, List, Any, Callable, Union, Literal
 from torch import nn
 from torch.utils.data import Dataset
 from ..data import DataHub
@@ -73,7 +73,7 @@ def build_layer(layer: Callable, params: Dict[str, Any], build_params: Dict[str,
 
 def build_model(
     architecture: str, 
-    layer_params: List[Dict[str, Union[str, Dict]]], 
+    layer_params: List[Dict[Literal["name", "params"], Any]], 
     build_params: Dict
 ) -> nn.Module:
     Core, default_layer_names = get_ff_core(architecture)

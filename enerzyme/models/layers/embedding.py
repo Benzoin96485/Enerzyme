@@ -123,6 +123,10 @@ class RandomAtomEmbedding(BaseAtomEmbedding):
 
     def get_embedding(self, Za: Tensor) -> Tensor:
         return self.embedding(Za)
+    
+    @property
+    def weight(self) -> Tensor:
+        return self.embedding.weight
 
 
 class NuclearEmbedding(nn.Module):

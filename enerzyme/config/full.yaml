@@ -56,19 +56,19 @@ Modelhub:
             activation_fn: shifted_softplus
             drop_out: 0.0
         - name: AtomicAffine
-          params: 
-            Ea:
-              shift: 
+          params: # max_Za in build_params
+            shifts:
+              - name: Ea
                 values: 0
                 learnable: true
-              scale:
+              - name: Qa
+                values: 0
+                learnable: true
+            scales:
+              - name: Ea
                 values: 1
                 learnable: true
-            Qa:
-              shift: 
-                values: 0
-                learnable: true
-              scale:
+              - name: Qa
                 values: 1
                 learnable: true
         - ChargeConservation

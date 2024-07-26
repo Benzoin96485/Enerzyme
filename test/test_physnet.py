@@ -94,7 +94,7 @@ def initialize():
     # physnet_torch = PhysNetCore(F, K, 5.0, dtype=dtype, use_dispersion=use_dispersion)
     set_state(state)
     physnet_tf = NeuralNetwork(F, K, cutoff, scope="test", dtype=dtype_tf)
-    # physnet_tf._embeddings = tf.Variable(physnet_torch.embeddings.weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
+    physnet_tf._embeddings = tf.Variable(physnet_torch.core.embeddings.weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
     return physnet_torch, physnet_tf
     
 
@@ -286,18 +286,24 @@ def test_atomic_properties():
 #     assert_allclose(e_torch, e_tf)
 
 
-# def test_electrostatic_energy_per_atom():
-#     physnet_torch, physnet_tf = initialize("float32")
-#     e_torch = physnet_torch.electrostatic_energy_per_atom(
-#         torch.from_numpy(D.copy()), 
-#         torch.from_numpy(Qa.copy()), 
-#         torch.from_numpy(idx_i), 
-#         torch.from_numpy(idx_j)
-#     ).detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         e_tf = physnet_tf.electrostatic_energy_per_atom(D, Qa, idx_i, idx_j).eval()
-#     assert_allclose(e_torch, e_tf)
+def test_electrostatic_energy_per_atom():
+    _, physnet_tf = initialize()
+    from enerzyme.models.layers.electrostatics import ElectrostaticEnergyLayer
+    ele_layer = ElectrostaticEnergyLayer(
+        kehalf=physnet_tf.kehalf,
+        cutoff_sr=cutoff,
+        cutoff_lr=None
+    )
+    e_torch = ele_layer.get_E_ele_a(
+        Dij=torch.from_numpy(D.copy()), 
+        Qa=torch.from_numpy(Qa.copy()), 
+        idx_i=torch.from_numpy(idx_i), 
+        idx_j=torch.from_numpy(idx_j)
+    ).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        e_tf = physnet_tf.electrostatic_energy_per_atom(D, Qa, idx_i, idx_j).eval()
+    assert_allclose(e_torch, e_tf)
 
 
 # def test_energy_from_scaled_atomic_properties():

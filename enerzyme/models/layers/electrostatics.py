@@ -1,20 +1,21 @@
 from typing import Dict
 import torch
 from torch import nn
-from ..functional import smooth_cutoff_function, segment_sum
+from ..functional import segment_sum
+from ..cutoff import polynomial_cutoff
 
 
 class ChargeConservationLayer(nn.Module):
-    """
-    Correct the atomic charges to make their summation equal to the total charge by [1]
-
-    q^{corrected}_i = q_i - 1 / N (\sum_{j=1}^N q_j - Q)
-
-    References:
-    -----
-    [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
-    """
     def __init__(self) -> None:
+        """
+        Correct the atomic charges to make their summation equal to the total charge by [1]
+
+        q^{corrected}_i = q_i - 1 / N (\sum_{j=1}^N q_j - Q)
+
+        References:
+        -----
+        [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
+        """
         super().__init__()
 
     def get_corrected_Qa(
@@ -61,33 +62,33 @@ class ChargeConservationLayer(nn.Module):
 
 
 class ElectrostaticEnergyLayer(nn.Module):
-    """
-    Calculate the electrostatic energy from distributed multipoles and atomic positions
+    def __init__(self, kehalf: float, cutoff_sr: float, cutoff_lr: float) -> None:
+        """
+        Calculate the electrostatic energy from distributed multipoles and atomic positions
 
-    Params:
-    -----
-    kehalf: a half of the electrostatic force constant k (1/(4\pi\epsilon_0)) 
-    multiplied by the element charge e at the current unit system.
+        Params:
+        -----
+        kehalf: a half of the electrostatic force constant k (1/(4\pi\epsilon_0)) 
+        multiplied by the element charge e at the current unit system.
 
-    short_range_cutoff: the cutoff of short range interaction, the Coulomb's law at long-range
-    and a damped term at short-range to avoid the singularity at r = 0 are smoothly interpolated by
-    \phi [1]:
+        short_range_cutoff: the cutoff of short range interaction, the Coulomb's law at long-range
+        and a damped term at short-range to avoid the singularity at r = 0 are smoothly interpolated by
+        \phi [1]:
 
-    \chi(r) = \phi(2r) + 1 / \sqrt{r^2 + 1} + (1 - \phi(2r)) / r
+        \chi(r) = \phi(2r) + 1 / \sqrt{r^2 + 1} + (1 - \phi(2r)) / r
 
-    long_range_cutoff: the cutoff of long range interaction, outside which the electrostatics are ignored
+        long_range_cutoff: the cutoff of long range interaction, outside which the electrostatics are ignored
 
-    References:
-    -----
-    [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
-    """
-    def __init__(self, kehalf: float, short_range_cutoff: float, long_range_cutoff: float) -> None:
+        References:
+        -----
+        [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
+        """
         super().__init__()
         self.kehalf = kehalf
-        self.sr_cutoff = short_range_cutoff
-        self.lr_cutoff = long_range_cutoff
-        if long_range_cutoff is not None and long_range_cutoff > 0:
-            self.lr_cutoff2 = self.lr_cutoff * self.lr_cutoff
+        self.cutoff_sr = cutoff_sr
+        self.cutoff_lr = cutoff_lr
+        if cutoff_lr is not None and cutoff_lr > 0:
+            self.lr_cutoff2 = self.cutoff_lr * self.cutoff_lr
 
     def get_E_ele_a(self, Dij: torch.Tensor, Qa: torch.Tensor, idx_i: torch.Tensor, idx_j: torch.Tensor, **kwargs) -> torch.Tensor:
         '''
@@ -110,18 +111,18 @@ class ElectrostaticEnergyLayer(nn.Module):
         Qi = Qa.gather(0, idx_i)
         Qj = Qa.gather(0, idx_j)
         Dij_shielded = torch.sqrt(Dij * Dij + 1.0)
-        switch = smooth_cutoff_function(Dij, self.sr_cutoff / 2, "poly")
+        switch = polynomial_cutoff(Dij, self.cutoff_sr / 2)
         cswitch = 1 - switch
-        if self.lr_cutoff is None or self.lr_cutoff <= 0:
+        if self.cutoff_lr is None or self.cutoff_lr <= 0:
             Eele_ordinary = 1.0 / Dij
             Eele_shielded = 1.0 / Dij_shielded
             Eele = self.kehalf * Qi * Qj * (switch * Eele_shielded + cswitch * Eele_ordinary)
         else:
-            Eele_ordinary = 1.0 / Dij + Dij / self.lr_cutoff2 - 2.0 / self.lr_cutoff
-            Eele_shielded = 1.0 / Dij_shielded + Dij_shielded / self.lr_cutoff2 - 2.0 / self.lr_cutoff
+            Eele_ordinary = 1.0 / Dij + Dij / self.lr_cutoff2 - 2.0 / self.cutoff_lr
+            Eele_shielded = 1.0 / Dij_shielded + Dij_shielded / self.lr_cutoff2 - 2.0 / self.cutoff_lr
             #combine shielded and ordinary interactions and apply prefactors 
             Eele = self.kehalf * Qi * Qj * (switch * Eele_shielded + cswitch * Eele_ordinary)
-            Eele = torch.where(Dij <= self.lr_cutoff, Eele, torch.zeros_like(Eele))
+            Eele = torch.where(Dij <= self.cutoff_lr, Eele, torch.zeros_like(Eele))
         return segment_sum(Eele, idx_i)
     
     def forward(self, **net_input: dict) -> dict:
