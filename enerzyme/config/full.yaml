@@ -29,19 +29,39 @@ Modelhub:
           E: 1
         nh_penalty: 0.01
       build_params:
-        F: 128
-        K: 64
-        sr_cut: 10.0
-        num_blocks: 5
-        num_residual_atomic: 2
-        num_residual_interaction: 3
-        num_residual_output: 1
-        use_electrostatic: true
-        use_dispersion: true
-        activation_fn: shifted_softplus
+        dim_embedding: 128
+        num_rbf: 64
+        max_Za: 95
+        cutoff_sr: 10.0
         drop_out: 0.0
         kehalf: 0.26458863 # atomic unit system 0.5 * 0.529
         d3_autoev: 1 # atomic unit system
+      layers:
+        - name: Distance
+        - name: ExponentialGaussianRBF
+          params: # num_rbf, cutoff_sr in build_params
+            no_basis_at_infinity: false
+            init_alpha: 1
+            exp_weighting: false
+            learnable_shape: true
+            cutoff_fn: polynomial
+            init_width_flavor: PhysNet
+        - name: RandomAtomEmbedding # dim_embedding, max_Za in build_params
+        - name: Core
+          params: # dim_embedding, num_rbf, cutoff_sr in build_params; cutoff_lr as default
+            num_blocks: 5
+            num_residual_atomic: 2
+            num_residual_interaction: 3
+            num_residual_output: 1
+            activation_fn: shifted_softplus
+            drop_out: 0.0
+        - AtomicAffine
+        - ChargeConservation
+        - AtomicCharge2Dipole
+        - ElectrostaticEnergy
+        - DispersionEnergy
+        - EnergyReduce
+        - Force
     FF02:
       architecture: SpookyNet
       active: True
