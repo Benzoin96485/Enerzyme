@@ -276,14 +276,15 @@ def test_atomic_properties():
     assert_allclose(nhloss_torch, nhloss_tf)
 
 
-# def test_edisp():
-#     from enerzyme.models.physnet.d3 import edisp as edisp_torch
-#     from neural_network.grimme_d3.grimme_d3 import edisp as edisp_tf
-#     e_torch = edisp_torch(torch.from_numpy(Z.copy()), torch.from_numpy(D.copy()), torch.from_numpy(idx_i), torch.from_numpy(idx_j)).detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         e_tf = edisp_tf(Z, D, idx_i, idx_j).eval()
-#     assert_allclose(e_torch, e_tf)
+def test_edisp():
+    from enerzyme.models.layers.dispersion.grimme_d3 import GrimmeD3EnergyLayer
+    from neural_network.grimme_d3.grimme_d3 import edisp as edisp_tf
+    edisp_torch_layer = GrimmeD3EnergyLayer()
+    e_torch = edisp_torch_layer.get_e_disp(torch.from_numpy(Z.copy()), torch.from_numpy(D.copy()), torch.from_numpy(idx_i), torch.from_numpy(idx_j)).detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        e_tf = edisp_tf(Z, D, idx_i, idx_j).eval()
+    assert_allclose(e_torch, e_tf)
 
 
 def test_electrostatic_energy_per_atom():

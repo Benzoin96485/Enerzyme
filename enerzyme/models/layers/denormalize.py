@@ -3,7 +3,8 @@ import torch
 from torch import nn, Tensor
 from ...data import PERIODIC_TABLE
 
-class AtomicAffine(nn.Module):
+
+class AtomicAffineLayer(nn.Module):
     def __init__(
         self, 
         max_Za: int, 

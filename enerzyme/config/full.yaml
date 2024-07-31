@@ -71,12 +71,14 @@ Modelhub:
               - name: Qa
                 values: 1
                 learnable: true
-        - ChargeConservation
-        - AtomicCharge2Dipole
-        - ElectrostaticEnergy
-        - DispersionEnergy
-        - EnergyReduce
-        - Force
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        - name: ElectrostaticEnergy
+        - name: GrimmeD3Energy
+          params:
+            learnable: true
+        - name: EnergyReduce
+        - name: Force
     FF02:
       architecture: SpookyNet
       active: True

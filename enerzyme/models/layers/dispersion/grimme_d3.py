@@ -4,28 +4,26 @@ Grimme, Stefan, et al.
 The Journal of chemical physics 132.15 (2010).
 '''
 import os
+from typing import Dict
 import numpy as np
 import torch
-from .func import segment_sum, gather_nd
+from torch import nn, Tensor
+from ...functional import segment_sum, gather_nd
 
 
 package_directory = os.path.dirname(os.path.abspath(__file__))
 
-KE_HALF = 7.199822675975274       # half (else double counting) of the Coulomb constant (default is in units e=1, eV=1, A=1)
 d3_s6 = 1.0000 
 d3_s8 = 0.9171 
 d3_a1 = 0.3385 
 d3_a2 = 2.8830
-d3_autoang = 0.52917726            # for converting distance from bohr to angstrom
-d3_autoev  = 27.21138505           # for converting a.u. to eV
 d3_k1 = 16.000
 d3_k2 = 4/3
 d3_k3 = -4.000
 
-d3_c6ab = torch.tensor(np.load(os.path.join(package_directory,"tables","c6ab.npy")))
-d3_r0ab = torch.tensor(np.load(os.path.join(package_directory,"tables","r0ab.npy")))
-d3_rcov = torch.tensor(np.load(os.path.join(package_directory,"tables","rcov.npy")))
-d3_r2r4 = torch.tensor(np.load(os.path.join(package_directory,"tables","r2r4.npy")))
+d3_c6ab = torch.tensor(np.load(os.path.join(package_directory, "grimme_d3_tables", "c6ab.npy")))
+d3_rcov = torch.tensor(np.load(os.path.join(package_directory, "grimme_d3_tables", "rcov.npy")))
+d3_r2r4 = torch.tensor(np.load(os.path.join(package_directory, "grimme_d3_tables", "r2r4.npy")))
 d3_maxc = 5 #maximum number of coordination complexes
 
 
@@ -59,32 +57,6 @@ def _ncoord(Zi, Zj, r, idx_i, cutoff=None, k1=d3_k1, rcov=d3_rcov):
     return segment_sum(damp, idx_i)
 
 
-def _getc6(ZiZj, nci, ncj, c6ab=d3_c6ab, k3=d3_k3):
-    '''
-    interpolate c6
-    '''
-    #gather the relevant entries from the table
-    c6ab_ = gather_nd(c6ab, ZiZj).type_as(nci)
-    #calculate c6 coefficients
-    c6mem  = -1.0e99 * torch.ones_like(nci)
-    r_save = 1.0e99 * torch.ones_like(nci)
-    rsum = torch.zeros_like(nci)
-    csum = torch.zeros_like(nci)
-    for i in range(d3_maxc):
-        for j in range(d3_maxc):
-            cn0 = c6ab_[:,i,j,0]
-            cn1 = c6ab_[:,i,j,1]
-            cn2 = c6ab_[:,i,j,2]
-            r = (cn1 - nci) ** 2 + (cn2 - ncj) ** 2
-            c6mem  = torch.where(r < r_save, cn0, c6mem)
-            r_save = torch.where(r < r_save, r, r_save)
-            tmp1 = torch.exp(k3 * r)
-            rsum += torch.where(cn0 > 0.0, tmp1, torch.zeros_like(tmp1))
-            csum += torch.where(cn0 > 0.0, tmp1 * cn0, torch.zeros_like(tmp1))
-    c6 = torch.where(rsum > 0.0, csum / rsum, c6mem)
-    return c6
-
-
 def _getc6_v2(ZiZj, nci, ncj, c6ab=d3_c6ab, k3=d3_k3):
     '''
     interpolate c6
@@ -103,8 +75,8 @@ def _getc6_v2(ZiZj, nci, ncj, c6ab=d3_c6ab, k3=d3_k3):
 
 
 def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None, 
-    r6=None, r8=None, s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k1=d3_k1, k2=d3_k2, 
-    k3=d3_k3, c6ab=d3_c6ab, r0ab=d3_r0ab, rcov=d3_rcov, r2r4=d3_r2r4, eps=1e-10, c6_version=2):
+    r6=None, r8=None, s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, 
+    k3=d3_k3, c6ab=d3_c6ab, rcov=d3_rcov, r2r4=d3_r2r4, eps=1e-10):
     '''
     compute d3 dispersion energy in Hartree
     r: distance in bohr!
@@ -116,10 +88,7 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     nc = _ncoord(Zi, Zj, r, idx_i, cutoff=cutoff, rcov=rcov) #coordination numbers
     nci = nc[idx_i]
     ncj = nc[idx_j]
-    if c6_version == 2:
-        c6 = _getc6_v2(ZiZj, nci, ncj, c6ab=c6ab, k3=k3) #c6 coefficients
-    else:
-        c6 = _getc6(ZiZj, nci, ncj, c6ab=c6ab, k3=k3)
+    c6 = _getc6_v2(ZiZj, nci, ncj, c6ab=c6ab, k3=k3) #c6 coefficients
     
     c8 = 3 * c6 * r2r4[Zi].type_as(c6) * r2r4[Zj].type_as(c6) #c8 coefficient
     
@@ -154,17 +123,23 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     return segment_sum(e6 + e8, idx_i)
 
 
-class DispLayer(torch.nn.Module):
-    def __init__(self, dtype):
+class GrimmeD3EnergyLayer(torch.nn.Module):
+    def __init__(self, learnable: bool=True) -> None:
         super().__init__()
-        self.d3_c6ab = torch.nn.Parameter(d3_c6ab.type(dtype), requires_grad=False)
-        self.d3_r0ab = torch.nn.Parameter(d3_r0ab.type(dtype), requires_grad=False)
-        self.d3_rcov = torch.nn.Parameter(d3_rcov.type(dtype), requires_grad=False)
-        self.d3_r2r4 = torch.nn.Parameter(d3_r2r4.type(dtype), requires_grad=False)
-        
-    def forward(self, Z, r, idx_i, idx_j, cutoff=None, r2=None, 
-    r6=None, r8=None, s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k1=d3_k1, k2=d3_k2, 
-    k3=d3_k3, eps=1e-10, c6_version=2):
-        return edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None, 
-    r6=None, r8=None, s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k1=d3_k1, k2=d3_k2, 
-    k3=d3_k3, c6ab=self.d3_c6ab, r0ab=self.d3_r0ab, rcov=self.d3_rcov, r2r4=self.d3_r2r4, eps=1e-10, c6_version=2)
+        self.d3_c6ab = nn.Parameter(d3_c6ab, requires_grad=learnable)
+        self.d3_rcov = nn.Parameter(d3_rcov, requires_grad=learnable)
+        self.d3_r2r4 = nn.Parameter(d3_r2r4, requires_grad=learnable)
+
+    def get_e_disp(self, Za: Tensor, Ra: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: float=None, **kwargs) -> Tensor:
+        return edisp(
+            Za, Ra, idx_i, idx_j, cutoff, 
+            r2=None, r6=None, r8=None, 
+            s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k3=d3_k3, 
+            c6ab=self.d3_c6ab, rcov=self.d3_rcov, r2r4=self.d3_r2r4, 
+            eps=1e-10
+        )
+
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        output = net_input.copy()
+        output["E_disp_a"] = self.get_e_disp(**net_input)
+        return output

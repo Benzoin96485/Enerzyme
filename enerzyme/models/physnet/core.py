@@ -16,7 +16,7 @@ LAYERS = [
     "ChargeConservation",
     "AtomicCharge2Dipole",
     "ElectrostaticEnergy",
-    "DispersionEnergy",
+    "GrimmeD3Energy",
     "EnergyReduce",
     "Force"
 ]

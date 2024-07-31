@@ -1,6 +1,6 @@
 from typing import Dict
 import torch
-from torch import nn
+from torch import nn, Tensor
 from ..functional import segment_sum
 from ..cutoff import polynomial_cutoff
 
@@ -55,7 +55,7 @@ class ChargeConservationLayer(nn.Module):
             "Q": raw_Q
         }
     
-    def forward(self, **net_input: dict) -> dict:
+    def forward(self, **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         output.update(self.get_corrected_Qa(**net_input))
         return output
@@ -90,7 +90,7 @@ class ElectrostaticEnergyLayer(nn.Module):
         if cutoff_lr is not None and cutoff_lr > 0:
             self.lr_cutoff2 = self.cutoff_lr * self.cutoff_lr
 
-    def get_E_ele_a(self, Dij: torch.Tensor, Qa: torch.Tensor, idx_i: torch.Tensor, idx_j: torch.Tensor, **kwargs) -> torch.Tensor:
+    def get_E_ele_a(self, Dij: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor, **kwargs) -> Tensor:
         '''
         Compute the atomic electrostatic energy
 
@@ -125,11 +125,20 @@ class ElectrostaticEnergyLayer(nn.Module):
             Eele = torch.where(Dij <= self.cutoff_lr, Eele, torch.zeros_like(Eele))
         return segment_sum(Eele, idx_i)
     
-    def forward(self, **net_input: dict) -> dict:
+    def forward(self, **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         output["E_ele_a"] = self.get_E_ele_a(**net_input)
         return output
 
 
 class AtomicCharge2DipoleLayer(nn.Module):
-    pass
+    def __init__(self) -> None:
+        super().__init__()
+
+    def get_dipole(self, Qa: Tensor, Ra: Tensor, N: Tensor, **kwargs) -> Tensor:
+        return segment_sum(Qa.unsqueeze(1) * Ra, N)
+
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        output = net_input.copy()
+        output["M2"] = self.get_dipole(**net_input)
+        return output
