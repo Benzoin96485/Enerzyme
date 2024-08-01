@@ -120,7 +120,7 @@ class FF:
         self.model_str = model_str
         self.architecture = architecture
         self.build_params = build_params
-        self.layer_names = layers
+        self.layer_params = layers
         if pretrain_path is not None:
             if os.path.isdir(pretrain_path):
                 self.pretrain_path = f"{pretrain_path}/model_best.pth"
@@ -142,7 +142,7 @@ class FF:
         if self.architecture in FF_REGISTER:
             model = FF_REGISTER[self.architecture](**build_params)
         else:
-            model = build_model(self.architecture, self.layer_names, self.build_params)
+            model = build_model(self.architecture, self.layer_params, self.build_params)
         print(model.__str__())
         if self.pretrain_path is not None:
             model_dict = torch.load(self.pretrain_path, map_location=self.trainer.device)["model_state_dict"]
