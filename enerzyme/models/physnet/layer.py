@@ -2,8 +2,8 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F_
-from .func import softplus_inverse, segment_sum
 from .init import semi_orthogonal_glorot_weights
+from ..functional import softplus_inverse, segment_sum
 
 
 class NeuronLayer(nn.Module):

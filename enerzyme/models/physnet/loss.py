@@ -4,4 +4,7 @@ class NHLoss:
 
     def __call__(self, output, target):
         return output.get("nh_loss", 0) * self.weight
-        
+
+LOSS_REGISTER = {
+    "nh_penalty": NHLoss,
+}

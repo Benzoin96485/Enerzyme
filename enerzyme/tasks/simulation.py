@@ -54,7 +54,7 @@ class ASECalculator(Calculator):
             device=self.device,
             dtype=self.dtype
         )
-        net_output = self.model(**net_input)
+        net_output = self.model(net_input)
         output, _ = _decorate_batch_output(
             output=net_output,
             features=net_input,

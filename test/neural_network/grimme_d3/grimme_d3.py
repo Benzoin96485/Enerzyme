@@ -133,7 +133,6 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     if cutoff is None:
         e6 = 1/(r6+tmp6)
         e8 = 1/(r8+tmp8)
-        print(c6.eval(), c8.eval())
     else: #apply cutoff
         cut2 = cutoff**2
         cut6 = cut2**3

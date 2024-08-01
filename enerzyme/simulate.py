@@ -1,6 +1,6 @@
 import os
 import torch
-from .models import SEP, FF_REGISTER, get_model_str
+from .models import SEP, FF_REGISTER, get_model_str, build_model
 from .tasks import Simulation
 from .utils import YamlHandler, logger
 from .data import Transform
@@ -28,7 +28,10 @@ class FFSimulate:
     
     def _init_model(self, FF_key, FF_params):
         model_str = get_model_str(FF_key, FF_params)
-        model = FF_REGISTER[FF_params.architecture](**FF_params.build_params)
+        if FF_params.architecture in FF_REGISTER:
+            model = FF_REGISTER[FF_params.architecture](**FF_params.build_params)
+        else:
+            model = build_model(FF_params.architecture, FF_params.layers, FF_params.build_params)
         model_path = os.path.join(self.model_dir, model_str, f'model_best.pth')
         model_dict = torch.load(model_path)["model_state_dict"]
         model.load_state_dict(model_dict)

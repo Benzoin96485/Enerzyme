@@ -1,33 +1,117 @@
-from collections import defaultdict
+from distutils.command import build
 import os
-from enerzyme import data
-from enerzyme.models.physnet.loss import NHLoss
 import joblib
+import inspect
+from inspect import signature
 import torch
 import pandas as pd
 import numpy as np
+from typing import Dict, Tuple, List, Any, Callable, Union, Literal
+from torch import nn
 from torch.utils.data import Dataset
-from .physnet import PhysNet, NHLoss
+from ..data import DataHub
+from ..tasks import Trainer
 from .spookynet import SpookyNet
 from .loss import MAELoss, MSELoss
 from ..utils import logger
+from . import layers as Layers
 
 
 SEP = "-"
 FF_REGISTER = {
-    "PhysNet": PhysNet,
     "SpookyNet": SpookyNet
 }
 LOSS_REGISTER = {
-    "nh_penalty": NHLoss,
     "mae": MAELoss,
     "mse": MSELoss
 }
 
 
+def get_ff_core(architecture: str) -> Tuple[nn.Module, List]:
+    global LOSS_REGISTER
+    if architecture.lower() == "physnet":
+        from .physnet import PhysNetCore as Core
+        from .physnet import LAYERS
+        from .physnet import LOSS_REGISTER as special_loss
+    LOSS_REGISTER.update(special_loss)
+    return Core, LAYERS
+
+
+class CoreWrapper(nn.Module):
+    def __init__(self, core):
+        super().__init__()
+        self.core = core
+        self.post_sequence = nn.Sequential(core)
+    
+    def __str__(self):
+        return self.core.__str__()
+    
+    def forward(self, net_input):
+        return self.post_sequence.forward(net_input)
+    
+    def append(self, layer):
+        self.post_sequence.append(layer)
+
+
+def build_layer(layer: Callable, params: Dict[str, Any], build_params: Dict[str, Any], built_layers: Dict[str, nn.Module]) -> nn.Module:
+    final_params = dict()
+    if hasattr(layer, "build") and callable(layer.build):
+        constructor = layer.build
+        final_params["built_layers"] = built_layers
+    else:
+        constructor = layer
+    param_constructor = layer
+    for name, attr in signature(param_constructor).parameters.items():
+        if name in params:
+            final_params[name] = params[name]
+        elif name in build_params:
+            final_params[name] = build_params[name]
+        elif attr.default is attr.empty:
+            raise TypeError(f"{name} value should be provided")
+    return constructor(**final_params)
+
+
+def build_model(
+    architecture: str, 
+    layer_params: List[Dict[Literal["name", "params"], Any]], 
+    build_params: Dict
+) -> nn.Module:
+    Core, default_layer_names = get_ff_core(architecture)
+    if layer_params is None:
+        layer_params = [{"name": layer_name} for layer_name in default_layer_names]
+    built_layers = dict()
+    for layer_param in layer_params:
+        layer_name = layer_param["name"]
+        params = layer_param.get("params", dict())
+        if layer_name == "Core":
+            Layer = Core
+        elif hasattr(Layers, layer_name + "Layer"):
+            Layer = getattr(Layers, layer_name + "Layer")
+        elif hasattr(Layers, layer_name):
+            Layer = getattr(Layers, layer_name)
+        else:
+            raise NotImplementedError(f"Layer {layer_name} not implemented")
+        
+        layer = build_layer(Layer, params, build_params, built_layers)
+        if layer_name == "Core":
+            built_layers["Core"] = CoreWrapper(layer)
+        else:
+            if "Core" in built_layers:
+                built_layers["Core"].append(layer)
+            else:
+                built_layers[layer_name] = layer
+        logger.info(f"built {layer_name}")
+    return built_layers["Core"]
+
+
 class FF:
     def __init__(self, 
-        datahub, trainer, model_str, loss, architecture, build_params,
+        datahub: DataHub, 
+        trainer: Trainer, 
+        model_str: str, 
+        loss: Dict, 
+        architecture: str, 
+        build_params, layers=None,
         pretrain_path=None, **params
     ):
         self.datahub = datahub
@@ -36,6 +120,7 @@ class FF:
         self.model_str = model_str
         self.architecture = architecture
         self.build_params = build_params
+        self.layer_params = layers
         if pretrain_path is not None:
             if os.path.isdir(pretrain_path):
                 self.pretrain_path = f"{pretrain_path}/model_best.pth"
@@ -46,26 +131,26 @@ class FF:
         else:
             self.pretrain_path = None
         self.metrics = self.trainer.metrics
-        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
         self.out_dir = self.trainer.out_dir
         self.dump_dir = os.path.join(self.out_dir, self.model_str)
         self.trainer._set_seed(self.trainer.seed)
         self.model = self._init_model(self.build_params)
+        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
         self.is_success = True
     
     def _init_model(self, build_params):
         if self.architecture in FF_REGISTER:
             model = FF_REGISTER[self.architecture](**build_params)
-            if self.pretrain_path is not None:
-                model_dict = torch.load(self.pretrain_path, map_location=self.trainer.device)["model_state_dict"]
-                model.load_state_dict(model_dict, strict=False)
-                logger.info(f"load model success from {self.pretrain_path}!")
-            print(model.__str__())
         else:
-            raise KeyError('Unknown model: {}'.format(self.architecture))
+            model = build_model(self.architecture, self.layer_params, self.build_params)
+        print(model.__str__())
+        if self.pretrain_path is not None:
+            model_dict = torch.load(self.pretrain_path, map_location=self.trainer.device)["model_state_dict"]
+            model.load_state_dict(model_dict, strict=False)
+            logger.info(f"load model success from {self.pretrain_path}!")
         return model
     
-    def run(self):
+    def train(self):
         logger.info("start training FF:{}".format(self.model_str))
         X = self.datahub.features
         y = self.datahub.targets
@@ -103,7 +188,7 @@ class FF:
         logger.info("{} Model saved!".format(self.model_str))
 
     def evaluate(self):
-        logger.info("start predict FF:{}".format(self.model_str))
+        logger.info("start evaluate FF:{}".format(self.model_str))
         X = self.datahub.features
         y = self.datahub.targets
         test_dataset = FFDataset(X, y, data_in_memory=True)

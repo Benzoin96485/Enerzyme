@@ -37,7 +37,7 @@ class FFTrain(object):
     def train_all(self):
         FFs = self.modelhub.models.get('FF', None)
         for ff in FFs.values():
-            ff.run()
+            ff.train()
         
 
 def get_parser():

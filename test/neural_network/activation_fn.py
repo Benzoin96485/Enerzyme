@@ -19,7 +19,7 @@ def softplus(x):
 
 def shifted_softplus(x):
     #return softplus(x) - np.log(2.0)
-    return tf.nn.softplus(x) - tf.log(2.0)
+    return tf.nn.softplus(x) - np.log(2.0)
 
 #this ensures that the function is close to linear near the origin!
 def scaled_shifted_softplus(x):

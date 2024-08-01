@@ -1,2 +1,2 @@
-from .nn import PhysNet
-from .loss import NHLoss
+from .core import PhysNetCore, LAYERS
+from .loss import LOSS_REGISTER
