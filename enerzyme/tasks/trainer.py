@@ -16,7 +16,7 @@ from transformers.optimization import get_linear_schedule_with_warmup
 import numpy as np
 import pandas as pd
 from .splitter import Splitter
-from ..data import is_atomic, is_int, is_pair_idx, get_tensor_rank, requires_grad
+from ..data import is_atomic, is_int, is_idx, get_tensor_rank, requires_grad
 from ..utils import logger
 from .metrics import Metrics
 
@@ -42,7 +42,7 @@ def _decorate_batch_input(batch, dtype, device):
                 dtype=torch.long if is_int(k) else dtype,
                 requires_grad=requires_grad(k)
             ).to(device)
-        elif not is_pair_idx(k):
+        elif not is_idx(k):
             batch_features[k] = torch.tensor(
                 np.array([feature[k] for feature in features]), 
                 dtype=torch.long if is_int(k) else dtype,
@@ -177,7 +177,7 @@ class Trainer(object):
                 # else:
                 loss = 0
                 with torch.set_grad_enabled(True):
-                    output = model(**net_input)
+                    output = model(net_input)
                     for loss_term in loss_terms.values():
                         loss += loss_term(output, net_target)
                 trn_loss.append(float(loss.data))
@@ -276,7 +276,7 @@ class Trainer(object):
         y_truths = defaultdict(list)
         for i, batch in enumerate(dataloader):
             net_input, net_target = batch
-            output = model(**net_input)
+            output = model(net_input)
             # Get model outputs
             loss = 0
             with torch.no_grad():

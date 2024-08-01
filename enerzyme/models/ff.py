@@ -131,11 +131,11 @@ class FF:
         else:
             self.pretrain_path = None
         self.metrics = self.trainer.metrics
-        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
         self.out_dir = self.trainer.out_dir
         self.dump_dir = os.path.join(self.out_dir, self.model_str)
         self.trainer._set_seed(self.trainer.seed)
         self.model = self._init_model(self.build_params)
+        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
         self.is_success = True
     
     def _init_model(self, build_params):
@@ -148,8 +148,6 @@ class FF:
             model_dict = torch.load(self.pretrain_path, map_location=self.trainer.device)["model_state_dict"]
             model.load_state_dict(model_dict, strict=False)
             logger.info(f"load model success from {self.pretrain_path}!")
-        else:
-            raise KeyError('Unknown model: {}'.format(self.architecture))
         return model
     
     def train(self):
