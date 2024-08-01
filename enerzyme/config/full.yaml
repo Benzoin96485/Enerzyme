@@ -34,8 +34,8 @@ Modelhub:
         max_Za: 95
         cutoff_sr: 10.0
         drop_out: 0.0
-        kehalf: 0.26458863 # atomic unit system 0.5 * 0.529
-        d3_autoev: 1 # atomic unit system
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
       layers:
         - name: Distance
         - name: ExponentialGaussianRBF

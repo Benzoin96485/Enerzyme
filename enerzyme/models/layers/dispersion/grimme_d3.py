@@ -124,15 +124,17 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
 
 
 class GrimmeD3EnergyLayer(torch.nn.Module):
-    def __init__(self, learnable: bool=True) -> None:
+    def __init__(self, learnable: bool=True, Hartree_in_E: float=1, Bohr_in_R: float=0.5291772108) -> None:
         super().__init__()
         self.d3_c6ab = nn.Parameter(d3_c6ab, requires_grad=learnable)
         self.d3_rcov = nn.Parameter(d3_rcov, requires_grad=learnable)
         self.d3_r2r4 = nn.Parameter(d3_r2r4, requires_grad=learnable)
+        self.Hartree_in_E = Hartree_in_E
+        self.Bohr_in_R = Bohr_in_R
 
-    def get_e_disp(self, Za: Tensor, Ra: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: float=None, **kwargs) -> Tensor:
-        return edisp(
-            Za, Ra, idx_i, idx_j, cutoff, 
+    def get_e_disp(self, Za: Tensor, Dij: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: float=None, **kwargs) -> Tensor:
+        return self.Hartree_in_E * edisp(
+            Za, Dij / self.Bohr_in_R, idx_i, idx_j, cutoff, 
             r2=None, r6=None, r8=None, 
             s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k3=d3_k3, 
             c6ab=self.d3_c6ab, rcov=self.d3_rcov, r2r4=self.d3_r2r4, 

@@ -1,4 +1,5 @@
 from typing import Dict
+import torch
 from torch import nn, Tensor
 from ..functional import segment_sum
 
@@ -11,5 +12,9 @@ class EnergyReduceLayer(nn.Module):
         for k, v in net_input.items():
             if k[0] == "E" and k[-1] == "a" and len(k) > 2:
                 output["Ea"] += v
-        output["E"] = segment_sum(net_input["Ea"], net_input["N"])
+        if "batch_seg" in net_input:
+            batch_seg = net_input["batch_seg"]
+        else:
+            batch_seg = torch.zeros_like(net_input["Za"])
+        output["E"] = segment_sum(net_input["Ea"], batch_seg)
         return output

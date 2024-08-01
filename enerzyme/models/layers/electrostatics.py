@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Literal
 import torch
 from torch import nn, Tensor
 from ..functional import segment_sum
@@ -14,7 +14,7 @@ class ChargeConservationLayer(nn.Module):
 
         References:
         -----
-        [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
+        [1] J. Chem. Theory Comput. 2019, 15, 3678-3693.
         """
         super().__init__()
 
@@ -22,7 +22,7 @@ class ChargeConservationLayer(nn.Module):
         self, 
         Za: torch.Tensor, Qa: torch.Tensor, 
         Q: torch.Tensor=None, batch_seg: torch.Tensor=None, **kwargs
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Dict[Literal["Qa", "Q"], torch.Tensor]:
         '''
         Correct the atomic charge
 
@@ -62,14 +62,15 @@ class ChargeConservationLayer(nn.Module):
 
 
 class ElectrostaticEnergyLayer(nn.Module):
-    def __init__(self, kehalf: float, cutoff_sr: float, cutoff_lr: float) -> None:
+    def __init__(self, cutoff_sr: float, cutoff_lr: float, Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1) -> None:
         """
         Calculate the electrostatic energy from distributed multipoles and atomic positions
 
         Params:
         -----
-        kehalf: a half of the electrostatic force constant k (1/(4\pi\epsilon_0)) 
-        multiplied by the element charge e at the current unit system.
+        bohr_in_Ra: the numerical value of one Bohr in the unit of atom positions.
+
+        Hartree_in_Ea: the numerical value of one Hartree in the unit of energy.
 
         short_range_cutoff: the cutoff of short range interaction, the Coulomb's law at long-range
         and a damped term at short-range to avoid the singularity at r = 0 are smoothly interpolated by
@@ -81,10 +82,10 @@ class ElectrostaticEnergyLayer(nn.Module):
 
         References:
         -----
-        [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
+        [1] J. Chem. Theory Comput. 2019, 15, 3678-3693.
         """
         super().__init__()
-        self.kehalf = kehalf
+        self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
         self.cutoff_sr = cutoff_sr
         self.cutoff_lr = cutoff_lr
         if cutoff_lr is not None and cutoff_lr > 0:
@@ -125,7 +126,7 @@ class ElectrostaticEnergyLayer(nn.Module):
             Eele = torch.where(Dij <= self.cutoff_lr, Eele, torch.zeros_like(Eele))
         return segment_sum(Eele, idx_i)
     
-    def forward(self, **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         output["E_ele_a"] = self.get_E_ele_a(**net_input)
         return output
@@ -135,8 +136,8 @@ class AtomicCharge2DipoleLayer(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-    def get_dipole(self, Qa: Tensor, Ra: Tensor, N: Tensor, **kwargs) -> Tensor:
-        return segment_sum(Qa.unsqueeze(1) * Ra, N)
+    def get_dipole(self, Qa: Tensor, Ra: Tensor, batch_seg: Tensor, **kwargs) -> Tensor:
+        return segment_sum(Qa.unsqueeze(1) * Ra, batch_seg)
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()

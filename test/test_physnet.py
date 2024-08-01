@@ -13,6 +13,7 @@ sys.path.extend(["..", "."])
 from enerzyme.models.ff import build_model
 # from enerzyme.models.physnet import PhysNetCore
 from neural_network.NeuralNetwork import NeuralNetwork
+from neural_network.grimme_d3.grimme_d3 import d3_autoang, d3_autoev
 from enerzyme.models.physnet.init import semi_orthogonal_glorot_weights
 
 F = 128
@@ -63,7 +64,24 @@ elif dtype == "float32":
 
 # set_dtype("float64")
 
-def initialize():
+default_layer_params = [
+    {"name": "Distance"},
+    {
+        "name": "ExponentialGaussianRBF", 
+        "params": {
+            "no_basis_at_infinity": False,
+            "init_alpha": 1,
+            "exp_weighting": False,
+            "learnable_shape": True,
+            "cutoff_fn": "polynomial",
+            "init_width_flavor": "PhysNet"
+        }
+    },
+    {"name": "RandomAtomEmbedding"},
+    {"name": "Core"}
+]
+
+def initialize(layer_params=default_layer_params):
     state = get_state()
     physnet_torch = build_model(
         architecture="PhysNet",
@@ -73,22 +91,7 @@ def initialize():
             "max_Za": 95,
             "cutoff_sr": cutoff
         },
-        layer_params=[
-            {"name": "Distance"},
-            {
-                "name": "ExponentialGaussianRBF", 
-                "params": {
-                    "no_basis_at_infinity": False,
-                    "init_alpha": 1,
-                    "exp_weighting": False,
-                    "learnable_shape": True,
-                    "cutoff_fn": "polynomial",
-                    "init_width_flavor": "PhysNet"
-                }
-            },
-            {"name": "RandomAtomEmbedding"},
-            {"name": "Core"}
-        ]
+        layer_params=layer_params
     ).type(dtype_torch)
     # physnet_torch = None
     # physnet_torch = PhysNetCore(F, K, 5.0, dtype=dtype, use_dispersion=use_dispersion)
@@ -279,8 +282,8 @@ def test_atomic_properties():
 def test_edisp():
     from enerzyme.models.layers.dispersion.grimme_d3 import GrimmeD3EnergyLayer
     from neural_network.grimme_d3.grimme_d3 import edisp as edisp_tf
-    edisp_torch_layer = GrimmeD3EnergyLayer()
-    e_torch = edisp_torch_layer.get_e_disp(torch.from_numpy(Z.copy()), torch.from_numpy(D.copy()), torch.from_numpy(idx_i), torch.from_numpy(idx_j)).detach().numpy()
+    disp_layer = GrimmeD3EnergyLayer()
+    e_torch = disp_layer.get_e_disp(torch.from_numpy(Z.copy()), torch.from_numpy(D.copy()), torch.from_numpy(idx_i), torch.from_numpy(idx_j)).detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         e_tf = edisp_tf(Z, D, idx_i, idx_j).eval()
@@ -291,10 +294,10 @@ def test_electrostatic_energy_per_atom():
     _, physnet_tf = initialize()
     from enerzyme.models.layers.electrostatics import ElectrostaticEnergyLayer
     ele_layer = ElectrostaticEnergyLayer(
-        kehalf=physnet_tf.kehalf,
         cutoff_sr=cutoff,
         cutoff_lr=None
     )
+    ele_layer.kehalf = physnet_tf.kehalf
     e_torch = ele_layer.get_E_ele_a(
         Dij=torch.from_numpy(D.copy()), 
         Qa=torch.from_numpy(Qa.copy()), 
@@ -307,53 +310,46 @@ def test_electrostatic_energy_per_atom():
     assert_allclose(e_torch, e_tf)
 
 
-# def test_energy_from_scaled_atomic_properties():
-#     physnet_torch, physnet_tf = initialize()
-#     e_torch = physnet_torch.energy_from_scaled_atomic_properties(
-#         torch.from_numpy(Ea.copy()), 
-#         torch.from_numpy(Qa.copy()), 
-#         torch.from_numpy(D.copy()),
-#         torch.from_numpy(Z.copy()),
-#         torch.from_numpy(idx_i), 
-#         torch.from_numpy(idx_j)
-#     )
-#     e_torch = e_torch.detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         e_tf = physnet_tf.energy_from_scaled_atomic_properties(Ea, Qa, D, Z, idx_i, idx_j).eval()
-#     assert_allclose(e_torch, e_tf)
+def test_energy_from_scaled_atomic_properties():
+    _, physnet_tf = initialize()
+    from enerzyme.models.layers.dispersion.grimme_d3 import GrimmeD3EnergyLayer
+    from enerzyme.models.layers.electrostatics import ElectrostaticEnergyLayer
+    from enerzyme.models.layers.reduce import EnergyReduceLayer
+    ele_layer = ElectrostaticEnergyLayer(
+        cutoff_sr=cutoff,
+        cutoff_lr=None
+    )
+    ele_layer.kehalf = physnet_tf.kehalf
+    disp_layer = GrimmeD3EnergyLayer(Bohr_in_R=d3_autoang, Hartree_in_E=d3_autoev)
+    reduce_layer = EnergyReduceLayer()
+    e_torch = reduce_layer(disp_layer(ele_layer({
+        "Ea": torch.from_numpy(Ea.copy()), 
+        "Qa": torch.from_numpy(Qa.copy()), 
+        "Dij": torch.from_numpy(D.copy()),
+        "Za": torch.from_numpy(Z.copy()),
+        "idx_i": torch.from_numpy(idx_i), 
+        "idx_j": torch.from_numpy(idx_j)
+    })))["E"]
+    e_torch = e_torch.detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        e_tf = physnet_tf.energy_from_scaled_atomic_properties(Ea, Qa, D, Z, idx_i, idx_j).eval()
+    assert_allclose(e_torch, e_tf)
 
 
-# def test_scaled_charges():
-#     physnet_torch, physnet_tf = initialize()
-#     q_torch = physnet_torch.scaled_charges(
-#         torch.from_numpy(Z.copy()),
-#         torch.from_numpy(Qa.copy()), 
-#         torch.tensor(Q_tot)
-#     ).detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         q_tf = physnet_tf.scaled_charges(Z, Qa, Q_tot).eval()
-#     assert_allclose(q_torch, q_tf, rtol=1e-7, atol=1e-7)
-
-
-# def test_energy_from_atomic_properties():
-#     physnet_torch, physnet_tf = initialize()
-#     e_torch = physnet_torch.energy_from_atomic_properties(
-#         torch.from_numpy(Ea.copy()), 
-#         torch.from_numpy(Qa.copy()), 
-#         torch.from_numpy(D.copy()),
-#         torch.from_numpy(Z.copy()),
-#         torch.from_numpy(idx_i), 
-#         torch.from_numpy(idx_j),
-#         torch.tensor(Q_tot)
-#     )
-#     e_torch = e_torch.detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         e_tf = physnet_tf.energy_from_atomic_properties(Ea, Qa, D, Z, idx_i, idx_j, Q_tot).eval()
-#     assert_allclose(e_torch, e_tf)
-#     pass
+def test_scaled_charges():
+    _, physnet_tf = initialize()
+    from enerzyme.models.layers.electrostatics import ChargeConservationLayer
+    Q_layer = ChargeConservationLayer()
+    q_torch = Q_layer.get_corrected_Qa(
+        torch.from_numpy(Z.copy()),
+        torch.from_numpy(Qa.copy()), 
+        torch.tensor(Q_tot)
+    )["Qa"].detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        q_tf = physnet_tf.scaled_charges(Z, Qa, Q_tot).eval()
+    assert_allclose(q_torch, q_tf, rtol=1e-7, atol=1e-7)
 
 
 # def test_energy_from_atomic_properties():
