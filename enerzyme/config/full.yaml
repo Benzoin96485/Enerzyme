@@ -21,7 +21,7 @@ Modelhub:
     FF01:
       suffix:
       architecture: PhysNet
-      active: true
+      active: false
       loss:
         mae:
           Qa: 1
@@ -34,7 +34,6 @@ Modelhub:
         num_rbf: 64
         max_Za: 95
         cutoff_sr: 10.0
-        drop_out: 0.0
         Hartree_in_E: 1
         Bohr_in_R: 0.5291772108
       layers:
@@ -81,8 +80,19 @@ Modelhub:
         - name: EnergyReduce
         - name: Force
     FF02:
+      suffix:
       architecture: SpookyNet
-      active: True
+      active: true
+      build_params:
+        dim_embedding: 64
+        max_Za: 87
+      layers:
+        - name: NuclearEmbedding
+          params:
+            zero_init: true
+            use_electron_config: true
+        - name: Core
+
 Trainer:
   Splitter:
     method: random

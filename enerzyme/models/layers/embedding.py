@@ -5,6 +5,37 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 
+
+class BaseAtomEmbedding(nn.Module):
+    def __init__(self, max_Za, dim_embedding):
+        super().__init__()
+        self.max_Za = max_Za
+        self.dim_embedding = dim_embedding
+
+    def get_embedding(self, Za: Tensor) -> Tensor:
+        ...
+
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        output = net_input.copy()
+        output["atom_embedding"] = self.get_embedding(
+            Za = net_input["Za"]
+        )
+        return output
+
+
+class RandomAtomEmbedding(BaseAtomEmbedding):
+    def __init__(self, max_Za, dim_embedding):
+        super().__init__(max_Za, dim_embedding)
+        self.embedding = nn.Embedding(max_Za, dim_embedding)
+
+    def get_embedding(self, Za: Tensor) -> Tensor:
+        return self.embedding(Za)
+    
+    @property
+    def weight(self) -> Tensor:
+        return self.embedding.weight
+
+
 ELECTRON_CONFIG = np.array([
   #  Z 1s 2s 2p 3s 3p 4s  3d 4p 5s  4d 5p 6s  4f  5d 6p vs vp  vd  vf
   [  0, 0, 0, 0, 0, 0, 0,  0, 0, 0,  0, 0, 0,  0,  0, 0, 0, 0,  0,  0], # n
@@ -99,77 +130,19 @@ ELECTRON_CONFIG = np.array([
 ELECTRON_CONFIG = ELECTRON_CONFIG / np.max(ELECTRON_CONFIG, axis=0)
 
 
-class BaseAtomEmbedding(nn.Module):
-    def __init__(self, max_Za, dim_embedding):
-        super().__init__()
-        self.max_Za = max_Za
-        self.dim_embedding = dim_embedding
-
-    def get_embedding(self, Za: Tensor) -> Tensor:
-        ...
-
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output["atom_embedding"] = self.get_embedding(
-            Za = net_input["Za"]
-        )
-        return output
-
-
-class RandomAtomEmbedding(BaseAtomEmbedding):
-    def __init__(self, max_Za, dim_embedding):
+class NuclearEmbedding(BaseAtomEmbedding):
+    def __init__(self, max_Za: int, dim_embedding: int, zero_init: bool=True, use_electron_config: bool=True) -> None:
         super().__init__(max_Za, dim_embedding)
-        self.embedding = nn.Embedding(max_Za, dim_embedding)
-
-    def get_embedding(self, Za: Tensor) -> Tensor:
-        return self.embedding(Za)
-    
-    @property
-    def weight(self) -> Tensor:
-        return self.embedding.weight
-
-
-class NuclearEmbedding(nn.Module):
-    """
-    Embedding which maps scalar nuclear charges Z to vectors in a
-    (num_features)-dimensional feature space. The embedding consists of a freely
-    learnable parameter matrix [Zmax, num_features] and a learned linear mapping
-    from the electron configuration to a (num_features)-dimensional vector. The
-    latter part encourages alchemically meaningful representations without
-    restricting the expressivity of learned embeddings.
-
-    Params:
-    -----
-    num_features: Dimensions of feature space.
-    
-    Zmax: Maximum nuclear charge +1 of atoms. The default is 87, so all
-        elements up to Rn (Z=86) are supported. Can be kept at the default
-        value (has minimal memory impact).
-
-    zero_init: If true, the parameters will be initialized as zero tensors.
-
-    dtype: Data type of floating number parameters.
-
-    use_electron_config: If true, electron configurations will be used in the embedding.
-    """
-
-    def __init__(
-        self, num_features: int, Zmax: int=87, zero_init: bool=True, dtype: torch.dtype=torch.float64, use_electron_config: bool=True
-    ) -> None:
-        super.__init__()
-        self.num_features = num_features
-        self.use_electron_config = use_electron_config
         self.register_parameter(
-            "element_embedding", nn.Parameter(torch.Tensor(Zmax, self.num_features, dtype=dtype))
+            "element_embedding", nn.Parameter(Tensor(max_Za + 1, dim_embedding))
         )
         self.register_buffer(
-            "embedding", torch.Tensor(Zmax, self.num_features, dtype=dtype), persistent=False
+            "embedding", Tensor(max_Za + 1, dim_embedding), persistent=False
         )
         if use_electron_config:
-            self.register_buffer("electron_config", torch.tensor(ELECTRON_CONFIG, dtype=dtype))
+            self.register_buffer("electron_config", torch.tensor(ELECTRON_CONFIG))
             self.config_linear = nn.Linear(
-                self.electron_config.size(1), self.num_features, bias=False, dtype=dtype
-            )
+                self.electron_config.size(1), self.num_features, bias=False)
         self.reset_parameters(zero_init)
 
     def reset_parameters(self, zero_init: bool = True) -> None:
@@ -185,7 +158,7 @@ class NuclearEmbedding(nn.Module):
 
     def train(self, mode: bool = True) -> None:
         """ Switch between training and evaluation mode. """
-        super(NuclearEmbedding, self).train(mode=mode)
+        super().train(mode=mode)
         if not self.training:
             with torch.no_grad():
                 if self.use_electron_config:
@@ -195,14 +168,14 @@ class NuclearEmbedding(nn.Module):
                 else:
                     self.embedding = self.element_embedding
 
-    def forward(self, Z: torch.Tensor) -> torch.Tensor:
+    def get_embedding(self, Za: Tensor) -> Tensor:
         """
         Assign corresponding embeddings to nuclear charges.
         N: Number of atoms.
         num_features: Dimensions of feature space.
 
         Arguments:
-            Z (LongTensor [N]):
+            Za (LongTensor [N]):
                 Nuclear charges (atomic numbers) of atoms.
 
         Returns:
@@ -217,8 +190,8 @@ class NuclearEmbedding(nn.Module):
             else:
                 self.embedding = self.element_embedding
         if self.embedding.device.type == "cpu":  # indexing is faster on CPUs
-            return self.embedding[Z]
+            return self.embedding[Za]
         else:  # gathering is faster on GPUs
             return torch.gather(
-                self.embedding, 0, Z.view(-1, 1).expand(-1, self.num_features)
+                self.embedding, 0, Za.view(-1, 1).expand(-1, self.dim_embedding)
             )

@@ -12,8 +12,8 @@ tf.disable_v2_behavior()
 sys.path.extend(["..", "."])
 from enerzyme.models.ff import build_model
 # from enerzyme.models.physnet import PhysNetCore
-from neural_network.NeuralNetwork import NeuralNetwork
-from neural_network.grimme_d3.grimme_d3 import d3_autoang, d3_autoev
+from physnet.NeuralNetwork import NeuralNetwork
+from physnet.grimme_d3.grimme_d3 import d3_autoang, d3_autoev
 from enerzyme.models.physnet.init import semi_orthogonal_glorot_weights
 
 F = 128
@@ -173,7 +173,7 @@ def test_embedding():
 
 def test_DenseLayer():
     from enerzyme.models.physnet.layer import DenseLayer as DenseLayer_torch
-    from neural_network.layers.DenseLayer import DenseLayer as Denselayer_tf
+    from physnet.layers.DenseLayer import DenseLayer as Denselayer_tf
     
     dense_layer_torch = DenseLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init)).type(dtype_torch)
     dense_layer_tf = Denselayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=dtype_tf)
@@ -190,7 +190,7 @@ def test_DenseLayer():
 def test_ResidualLayer():
     from enerzyme.models.physnet.layer import ResidualLayer as ResidualLayer_torch
     from enerzyme.models.physnet.init import semi_orthogonal_glorot_weights
-    from neural_network.layers.ResidualLayer import ResidualLayer as ResidualLayer_tf
+    from physnet.layers.ResidualLayer import ResidualLayer as ResidualLayer_tf
     residual_layer_torch = ResidualLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init)).type(dtype_torch)
     residual_layer_tf = ResidualLayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=dtype_tf)
     y_residual_torch = residual_layer_torch(torch.from_numpy(x.copy())).detach().numpy()
@@ -202,7 +202,7 @@ def test_ResidualLayer():
 
 def test_InteractionLayer():
     from enerzyme.models.physnet.layer import InteractionLayer as InteractionLayer_torch
-    from neural_network.layers.InteractionLayer import InteractionLayer as InteractionLayer_tf
+    from physnet.layers.InteractionLayer import InteractionLayer as InteractionLayer_tf
     state = get_state()
     interaction_layer_torch = InteractionLayer_torch(K, F, 3).type(dtype_torch)
     set_state(state)
@@ -221,7 +221,7 @@ def test_InteractionLayer():
 
 def test_InteractionBlock():
     from enerzyme.models.physnet.block import InteractionBlock as InteractionBlock_torch
-    from neural_network.layers.InteractionBlock import InteractionBlock as InteractionBlock_tf
+    from physnet.layers.InteractionBlock import InteractionBlock as InteractionBlock_tf
     state = get_state()
     interaction_block_torch = InteractionBlock_torch(K, F, 3, 3).type(dtype_torch)
     set_state(state)
@@ -240,7 +240,7 @@ def test_InteractionBlock():
 
 def test_OutputBlock():
     from enerzyme.models.physnet.block import OutputBlock as OutputBlock_torch
-    from neural_network.layers.OutputBlock import OutputBlock as OutputBlock_tf
+    from physnet.layers.OutputBlock import OutputBlock as OutputBlock_tf
     state = get_state()
     output_block_torch = OutputBlock_torch(F, 3).type(dtype_torch)
     set_state(state)
@@ -284,7 +284,7 @@ def test_atomic_properties():
 
 def test_edisp():
     from enerzyme.models.layers.dispersion.grimme_d3 import GrimmeD3EnergyLayer
-    from neural_network.grimme_d3.grimme_d3 import edisp as edisp_tf
+    from physnet.grimme_d3.grimme_d3 import edisp as edisp_tf
     disp_layer = GrimmeD3EnergyLayer(Hartree_in_E=1, Bohr_in_R=1)
     e_torch = disp_layer.get_e_disp(torch.from_numpy(Z.copy()), torch.from_numpy(D.copy()), torch.from_numpy(idx_i), torch.from_numpy(idx_j)).detach().numpy()
     with tf.Session() as sess:

@@ -40,12 +40,6 @@ class PhysNetCore(nn.Module):
         num_residual_atomic: int=2,              # number of residual layers for atomic refinements of feature vector
         num_residual_interaction: int=2,         # number of residual layers for refinement of message vector
         num_residual_output: int=1,              # number of residual layers for the output blocks
-        # Eshift=0.0,                     #initial value for output energy shift (makes convergence faster)
-        # Escale=1.0,                     #initial value for output energy scale (makes convergence faster)
-        # Qshift=0.0,                     #initial value for output charge shift 
-        # Qscale=1.0,                     #initial value for output charge scale 
-        # kehalf=7.199822675975274,       #half (else double counting) of the Coulomb constant (default is in units e=1, eV=1, A=1)
-        # d3_autoev=d3_autoev,
         activation_fn: Literal["shifted_softplus"]="shifted_softplus",   # activation function
         drop_out: float=0.0
     ):
