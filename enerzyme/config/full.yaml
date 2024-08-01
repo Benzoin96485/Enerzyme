@@ -73,9 +73,9 @@ Modelhub:
                 learnable: true
         - name: ChargeConservation
         - name: AtomicCharge2Dipole
-        - name: ElectrostaticEnergy
+        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params
         - name: GrimmeD3Energy
-          params:
+          params: # Hartree_in_E, Bohr_in_R in build_params
             learnable: true
         - name: EnergyReduce
         - name: Force

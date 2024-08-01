@@ -7,7 +7,7 @@ from ..cutoff import polynomial_cutoff
 
 class ChargeConservationLayer(nn.Module):
     def __init__(self) -> None:
-        """
+        r"""
         Correct the atomic charges to make their summation equal to the total charge by [1]
 
         q^{corrected}_i = q_i - 1 / N (\sum_{j=1}^N q_j - Q)
@@ -55,7 +55,7 @@ class ChargeConservationLayer(nn.Module):
             "Q": raw_Q
         }
     
-    def forward(self, **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         output.update(self.get_corrected_Qa(**net_input))
         return output
@@ -63,7 +63,7 @@ class ChargeConservationLayer(nn.Module):
 
 class ElectrostaticEnergyLayer(nn.Module):
     def __init__(self, cutoff_sr: float, cutoff_lr: float, Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1) -> None:
-        """
+        r"""
         Calculate the electrostatic energy from distributed multipoles and atomic positions
 
         Params:
@@ -136,7 +136,9 @@ class AtomicCharge2DipoleLayer(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-    def get_dipole(self, Qa: Tensor, Ra: Tensor, batch_seg: Tensor, **kwargs) -> Tensor:
+    def get_dipole(self, Qa: Tensor, Ra: Tensor, batch_seg: Tensor=None, **kwargs) -> Tensor:
+        if batch_seg is None:
+            batch_seg = torch.zeros_like(Qa)
         return segment_sum(Qa.unsqueeze(1) * Ra, batch_seg)
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:

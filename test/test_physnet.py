@@ -352,23 +352,34 @@ def test_scaled_charges():
     assert_allclose(q_torch, q_tf, rtol=1e-7, atol=1e-7)
 
 
-# def test_energy_from_atomic_properties():
-#     physnet_torch, physnet_tf = initialize()
-#     e_torch = physnet_torch.energy_from_atomic_properties(
-#         torch.from_numpy(Ea.copy()), 
-#         torch.from_numpy(Qa.copy()), 
-#         torch.from_numpy(D.copy()),
-#         torch.from_numpy(Z.copy()),
-#         torch.from_numpy(idx_i), 
-#         torch.from_numpy(idx_j),
-#         torch.tensor(Q_tot)
-#     )
-#     e_torch = e_torch.detach().numpy()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         e_tf = physnet_tf.energy_from_atomic_properties(Ea, Qa, D, Z, idx_i, idx_j, Q_tot).eval()
-#     assert_allclose(e_torch, e_tf)
-#     pass
+def test_energy_from_atomic_properties():
+    _, physnet_tf = initialize()
+    from enerzyme.models.layers.dispersion.grimme_d3 import GrimmeD3EnergyLayer
+    from enerzyme.models.layers.electrostatics import ElectrostaticEnergyLayer, ChargeConservationLayer
+    from enerzyme.models.layers.reduce import EnergyReduceLayer
+    Q_layer = ChargeConservationLayer()
+    ele_layer = ElectrostaticEnergyLayer(
+        cutoff_sr=cutoff,
+        cutoff_lr=None
+    )
+    ele_layer.kehalf = physnet_tf.kehalf
+    disp_layer = GrimmeD3EnergyLayer(Bohr_in_R=d3_autoang, Hartree_in_E=d3_autoev)
+    reduce_layer = EnergyReduceLayer()
+    e_torch = reduce_layer(disp_layer(ele_layer(Q_layer({
+        "Ea": torch.from_numpy(Ea.copy()), 
+        "Qa": torch.from_numpy(Qa.copy()), 
+        "Dij": torch.from_numpy(D.copy()),
+        "Za": torch.from_numpy(Z.copy()),
+        "idx_i": torch.from_numpy(idx_i), 
+        "idx_j": torch.from_numpy(idx_j),
+        "Q": torch.tensor(Q_tot)
+    }))))["E"]
+    e_torch = e_torch.detach().numpy()
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        e_tf = physnet_tf.energy_from_atomic_properties(Ea, Qa, D, Z, idx_i, idx_j, Q_tot).eval()
+    assert_allclose(e_torch, e_tf)
+    pass
 
 
 # def test_energy_and_forces():
