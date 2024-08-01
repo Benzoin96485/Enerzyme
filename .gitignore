@@ -9,4 +9,3 @@ profile.txt
 *.egg-info
 build/**
 scan.sh
-.vscode

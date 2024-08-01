@@ -1,214 +1,151 @@
-from distutils.command import build
 import os
 import joblib
-import inspect
-from inspect import signature
 import torch
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, List, Any, Callable, Union, Literal
-from torch import nn
 from torch.utils.data import Dataset
-from ..data import DataHub
-from ..tasks import Trainer
+from .physnet import PhysNet, MSE_nh_Loss, MAE_nh_Loss
 from .spookynet import SpookyNet
-from .loss import MAELoss, MSELoss
 from ..utils import logger
-from . import layers as Layers
 
 
 SEP = "-"
 FF_REGISTER = {
+    "PhysNet": PhysNet,
     "SpookyNet": SpookyNet
 }
 LOSS_REGISTER = {
-    "mae": MAELoss,
-    "mse": MSELoss
+    "mse_nh": MSE_nh_Loss,
+    "mae_nh": MAE_nh_Loss
 }
 
 
-def get_ff_core(architecture: str) -> Tuple[nn.Module, List]:
-    global LOSS_REGISTER
-    if architecture.lower() == "physnet":
-        from .physnet import PhysNetCore as Core
-        from .physnet import LAYERS
-        from .physnet import LOSS_REGISTER as special_loss
-    LOSS_REGISTER.update(special_loss)
-    return Core, LAYERS
-
-
-class CoreWrapper(nn.Module):
-    def __init__(self, core):
-        super().__init__()
-        self.core = core
-        self.post_sequence = nn.Sequential(core)
-    
-    def __str__(self):
-        return self.core.__str__()
-    
-    def forward(self, net_input):
-        return self.post_sequence.forward(net_input)
-    
-    def append(self, layer):
-        self.post_sequence.append(layer)
-
-
-def build_layer(layer: Callable, params: Dict[str, Any], build_params: Dict[str, Any], built_layers: Dict[str, nn.Module]) -> nn.Module:
-    final_params = dict()
-    if hasattr(layer, "build") and callable(layer.build):
-        constructor = layer.build
-        final_params["built_layers"] = built_layers
-    else:
-        constructor = layer
-    param_constructor = layer
-    for name, attr in signature(param_constructor).parameters.items():
-        if name in params:
-            final_params[name] = params[name]
-        elif name in build_params:
-            final_params[name] = build_params[name]
-        elif attr.default is attr.empty:
-            raise TypeError(f"{name} value should be provided")
-    return constructor(**final_params)
-
-
-def build_model(
-    architecture: str, 
-    layer_params: List[Dict[Literal["name", "params"], Any]], 
-    build_params: Dict
-) -> nn.Module:
-    Core, default_layer_names = get_ff_core(architecture)
-    if layer_params is None:
-        layer_params = [{"name": layer_name} for layer_name in default_layer_names]
-    built_layers = dict()
-    for layer_param in layer_params:
-        layer_name = layer_param["name"]
-        params = layer_param.get("params", dict())
-        if layer_name == "Core":
-            Layer = Core
-        elif hasattr(Layers, layer_name + "Layer"):
-            Layer = getattr(Layers, layer_name + "Layer")
-        elif hasattr(Layers, layer_name):
-            Layer = getattr(Layers, layer_name)
-        else:
-            raise NotImplementedError(f"Layer {layer_name} not implemented")
-        
-        layer = build_layer(Layer, params, build_params, built_layers)
-        if layer_name == "Core":
-            built_layers["Core"] = CoreWrapper(layer)
-        else:
-            if "Core" in built_layers:
-                built_layers["Core"].append(layer)
-            else:
-                built_layers[layer_name] = layer
-        logger.info(f"built {layer_name}")
-    return built_layers["Core"]
-
-
 class FF:
-    def __init__(self, 
-        datahub: DataHub, 
-        trainer: Trainer, 
-        model_str: str, 
-        loss: Dict, 
-        architecture: str, 
-        build_params, layers=None,
-        pretrain_path=None, **params
-    ):
-        self.datahub = datahub
+    def __init__(self, data, features, trainer, model_str, loss_param, **params):
+        self.data = data
+        self.target_scaler = self.data['target_scaler']
+        self.features = features
         self.trainer = trainer
         self.splitter = self.trainer.splitter
         self.model_str = model_str
-        self.architecture = architecture
-        self.build_params = build_params
-        self.layer_params = layers
-        if pretrain_path is not None:
-            if os.path.isdir(pretrain_path):
-                self.pretrain_path = f"{pretrain_path}/model_best.pth"
-            elif os.path.isfile(pretrain_path):
-                self.pretrain_path = pretrain_path
-            else:
-                raise FileNotFoundError(f"Pretrained model not found at {self.pretrain_path}")
-        else:
-            self.pretrain_path = None
+        self.model_id, self.model_name, self.feature_name, self.task = self.model_str.split(SEP)[:4]
+        self.model_params = params
+        self.model_params['device'] = self.trainer.device
+        self.cv_pretrain_path = self.model_params.get('cv_pretrain', None)
+        if self.cv_pretrain_path is not None:
+            self.model_params["pretrain"] = f"{self.cv_pretrain_path}/model_0.pth"
+        self.cv = dict()
         self.metrics = self.trainer.metrics
+        self.loss_func = LOSS_REGISTER[loss_param["key"]](**loss_param["params"])
         self.out_dir = self.trainer.out_dir
         self.dump_dir = os.path.join(self.out_dir, self.model_str)
-        self.trainer._set_seed(self.trainer.seed)
-        self.model = self._init_model(self.build_params)
-        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
+        self.trainer.set_seed(self.trainer.seed)
+        self.model = self._init_model(self.model_name, **self.model_params)
         self.is_success = True
     
-    def _init_model(self, build_params):
-        if self.architecture in FF_REGISTER:
-            model = FF_REGISTER[self.architecture](**build_params)
+    def _init_model(self, model_name, **params):
+        if model_name in FF_REGISTER:
+            model = FF_REGISTER[model_name](**params)
+            if self.cv_pretrain_path is not None:
+                model_dict = torch.load(self.model_params["pretrain"], map_location=self.trainer.device)["model_state_dict"]
+                model.load_state_dict(model_dict, strict=False)
+                logger.info(f"load model success from {self.model_params['pretrain']}!")
+            print(model.__str__())
         else:
-            model = build_model(self.architecture, self.layer_params, self.build_params)
-        print(model.__str__())
-        if self.pretrain_path is not None:
-            model_dict = torch.load(self.pretrain_path, map_location=self.trainer.device)["model_state_dict"]
-            model.load_state_dict(model_dict, strict=False)
-            logger.info(f"load model success from {self.pretrain_path}!")
+            raise ValueError('Unknown model: {}'.format(self.model_name))
         return model
     
-    def train(self):
-        logger.info("start training FF:{}".format(self.model_str))
-        X = self.datahub.features
-        y = self.datahub.targets
-        split = self.splitter.split(X, preload_path=self.datahub.preload_path)
-        tr_idx = split["training"]
-        vl_idx = split["validation"]
-        te_idx = split["test"]
-        train_dataset = FFDataset(X, y, tr_idx, self.trainer.data_in_memory)
-        valid_dataset = FFDataset(X, y, vl_idx, True)
-        if len(te_idx) > 0:
-            test_dataset = FFDataset(X, y, te_idx, True)
-            y_test = test_dataset.targets
-            y_test["Za"] = test_dataset.features["Za"]
-        try:
-            y_pred = self.trainer.fit_predict(
-                model=self.model, 
-                train_dataset=train_dataset, 
-                valid_dataset=valid_dataset, 
-                test_dataset=test_dataset,
-                loss_terms=self.loss_terms, 
-                transform=self.datahub.transform,
-                dump_dir=self.dump_dir
-            )
-        except RuntimeError as e:
-            logger.info("FF {0} failed...".format(self.model_str))
-            self.is_success = False
-            raise e
-        self.datahub.transform.inverse_transform(y_test)
-        self.dump(y_pred, self.dump_dir, 'test.data')
-        metric_score = self.metrics.cal_metric(y_test, y_pred)
-        self.dump(metric_score, self.dump_dir, 'metric.result')
-        logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
+    def run(self):
+        logger.info("start training FF:{}".format(self.model_name))
+        X = pd.DataFrame(self.features)
+        y = pd.DataFrame(self.data['target'])
+        y_pred = pd.DataFrame(index=y.index)
+        for fold, idx in enumerate(self.splitter.split(X)):
+            if self.splitter.cv:
+                tr_idx, vl_idx = idx
+            else:
+                tr_idx, vl_idx, te_idx = idx
+            X_train, y_train = X.iloc[tr_idx], y.iloc[tr_idx]
+            X_valid, y_valid = X.iloc[vl_idx], y.iloc[vl_idx]
+            train_dataset = FFDataset(X_train, y_train)
+            valid_dataset = FFDataset(X_valid, y_valid)
+            if self.splitter.cv:
+                test_dataset = None
+            else:
+                X_test, y_test = X.iloc[te_idx], y.iloc[te_idx]
+                test_dataset = FFDataset(X_test, y_test)
+            if fold > 0:
+                ### need to initalize model for next fold training
+                if self.cv_pretrain_path:
+                    self.model_params["pretrain"] = f"{self.cv_pretrain_path}/model_{fold}.pth"
+                self.model = self._init_model(self.model_name, **self.model_params)
+            try:
+                _y_pred = self.trainer.fit_predict(
+                    model=self.model, 
+                    train_dataset=train_dataset, 
+                    valid_dataset=valid_dataset, 
+                    test_dataset=test_dataset,
+                    loss_func=self.loss_func, 
+                    dump_dir=self.dump_dir, 
+                    fold=fold,
+                    target_scaler=self.target_scaler, 
+                    feature_name=self.feature_name,
+                    cv=self.splitter.cv
+                )
+            except RuntimeError as e:
+                logger.info("FF {0} failed...".format(self.model_name))
+                self.is_success = False
+                raise e
+                return
+
+            if self.splitter.cv:
+                y_pred.iloc[vl_idx] = _y_pred
+                logger.info ("fold {0}, result {1}".format(
+                    fold,
+                    self.metrics.cal_metric(
+                        self.data['target_scaler'].inverse_transform(y_valid), self.data['target_scaler'].inverse_transform(_y_pred)
+                        )
+                    )
+                )
+            else:
+                for column in _y_pred.columns:
+                    y_pred.loc[te_idx, column] = _y_pred[column]
+        
+        if self.splitter.cv:
+            self.cv['pred'] = y_pred
+            self.dump(self.cv['pred'], self.dump_dir, 'cv.data')
+            self.cv['metric'] = self.metrics.cal_metric(self.data['target_scaler'].inverse_transform(y), self.data['target_scaler'].inverse_transform(self.cv['pred']))
+        else:
+            self.cv['pred'] = y_pred.iloc[te_idx]
+            self.dump(self.cv['pred'], self.dump_dir, 'test.data')
+            self.cv['metric'] = self.metrics.cal_metric(self.data['target_scaler'].inverse_transform(y.iloc[te_idx]), self.data['target_scaler'].inverse_transform(self.cv['pred']))
+        self.dump(self.cv['metric'], self.dump_dir, 'metric.result')
+        logger.info("{} FF metrics score: \n{}".format(self.model_str, self.cv['metric']))
         logger.info("{} FF done!".format(self.model_str))
         logger.info("Metric result saved!")
         logger.info("{} Model saved!".format(self.model_str))
 
-    def evaluate(self):
-        logger.info("start evaluate FF:{}".format(self.model_str))
-        X = self.datahub.features
-        y = self.datahub.targets
-        test_dataset = FFDataset(X, y, data_in_memory=True)
+    def evaluate(self, checkpoints_path=None):
+        logger.info("start predict FF:{}".format(self.model_name))
+        X = pd.DataFrame(self.features)
+        y = pd.DataFrame(self.data['target'])
+        test_dataset = FFDataset(X, y)
+        if not self.splitter.cv:
             # model_path = os.path.join(checkpoints_path, f'model_0.pth')
             # self.model.load_state_dict(torch.load(model_path, map_location=self.trainer.device)['model_state_dict'])
-        y_pred, _, metric_score = self.trainer.predict(
-            model=self.model, 
-            dataset=test_dataset, 
-            loss_terms=self.loss_terms, 
-            dump_dir=self.dump_dir, 
-            transform=self.datahub.transform, 
-            epoch=1, 
-            load_model=True
-        )
-        # self.dump(y_pred, self.dump_dir, 'test.data')
-        # self.dump(metric_score, self.dump_dir, 'metric.result')
-        logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
-        logger.info("{} FF done!".format(self.model_str))
-        logger.info("Metric result saved!")
-        return y_pred, pd.DataFrame(metric_score, index=[self.model_str])
+            _y_pred, _, metric_score = self.trainer.predict(
+                model=self.model, 
+                dataset=test_dataset, 
+                loss_func=self.loss_func, 
+                dump_dir=self.dump_dir, 
+                fold=0, 
+                target_scaler=self.target_scaler, 
+                epoch=1, 
+                load_model=True
+            )
+        self.cv['test_pred'] = _y_pred
+        self.cv['test_metrics'] = metric_score
+        print(metric_score)
 
     def dump(self, data, dir, name):
         path = os.path.join(dir, name)
@@ -221,20 +158,12 @@ class FF:
     
 
 class FFDataset(Dataset):
-    def __init__(self, features, targets, indices=None, data_in_memory=True):
-        self.data_in_memory = data_in_memory
-        self.indices = indices if indices is not None else np.arange(0, len(features["Za"]))
-        if data_in_memory:
-            self.features = {k: np.array([v[idx] for idx in self.indices]) for k, v in features.items()}
-            self.targets = {k: np.array([v[idx] for idx in self.indices]) for k, v in targets.items()}
-            self._getitem = lambda idx: ({k: v[idx] for k, v in self.features.items()}, {k: v[idx] for k, v in self.targets.items()})
-        else:
-            self.features = features
-            self.targets = targets
-            self._getitem = lambda idx: ({k: v[self.indices[idx]] for k, v in self.features.items()}, {k: v[self.indices[idx]] for k, v in self.targets.items()})
+    def __init__(self, feature, label):
+        self.feature = feature
+        self.label = label
+
+    def __getitem__(self, idx):
+        return self.feature.iloc[idx], self.label.iloc[idx]
 
     def __len__(self):
-        return len(self.indices)
-    
-    def __getitem__(self, idx):
-        return self._getitem(idx)
+        return len(self.feature)

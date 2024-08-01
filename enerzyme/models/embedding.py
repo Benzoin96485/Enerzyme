@@ -1,8 +1,7 @@
 import math
-from typing import Dict
 import numpy as np
 import torch
-from torch import nn, Tensor
+import torch.nn as nn
 import torch.nn.functional as F
 
 ELECTRON_CONFIG = np.array([
@@ -97,37 +96,6 @@ ELECTRON_CONFIG = np.array([
 ], dtype=np.float64)
 # normalize entries (between 0.0 and 1.0)
 ELECTRON_CONFIG = ELECTRON_CONFIG / np.max(ELECTRON_CONFIG, axis=0)
-
-
-class BaseAtomEmbedding(nn.Module):
-    def __init__(self, max_Za, dim_embedding):
-        super().__init__()
-        self.max_Za = max_Za
-        self.dim_embedding = dim_embedding
-
-    def get_embedding(self, Za: Tensor) -> Tensor:
-        ...
-
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output["atom_embedding"] = self.get_embedding(
-            Za = net_input["Za"]
-        )
-        return output
-
-
-class RandomAtomEmbedding(BaseAtomEmbedding):
-    def __init__(self, max_Za, dim_embedding):
-        super().__init__(max_Za, dim_embedding)
-        self.embedding = nn.Embedding(max_Za, dim_embedding)
-
-    def get_embedding(self, Za: Tensor) -> Tensor:
-        return self.embedding(Za)
-    
-    @property
-    def weight(self) -> Tensor:
-        return self.embedding.weight
-
 
 class NuclearEmbedding(nn.Module):
     """

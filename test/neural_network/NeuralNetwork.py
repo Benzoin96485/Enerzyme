@@ -53,7 +53,7 @@ class NeuralNetwork:
 
         with tf.variable_scope(self.scope):
             #keep probability for dropout regularization
-            self._keep_prob = tf.placeholder_with_default(tf.Variable(1.0, dtype=dtype), shape=[], name="keep_prob")
+            self._keep_prob = tf.placeholder_with_default(1.0, shape=[], name="keep_prob")
 
             #atom embeddings (we go up to Pu(94), 95 because indices start with 0)
             self._embeddings = tf.Variable(tf.random_uniform([95, self.F], minval=-np.sqrt(3), maxval=np.sqrt(3), seed=seed, dtype=dtype), name="embeddings", dtype=dtype)
