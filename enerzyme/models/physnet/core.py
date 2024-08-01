@@ -23,7 +23,7 @@ LAYERS = [
 
 
 class PhysNetCore(nn.Module):
-    def __str__(self):
+    def __str__(self) -> str:
         return """
 ###################################################################################
 # Pytorch Implementation of PhysNet (J. Chem. Theory Comput. 2019, 15, 3678−3693) #
@@ -91,33 +91,34 @@ class PhysNetCore(nn.Module):
         '''
         # long-short range separation
         net_output = self.distance_layer(
-            Dij_name = "Dij_lr",
-            **net_input
+            net_input,
+            Dij_name = "Dij",
         )
         if "sr_idx_i" in net_input and "sr_idx_j" in net_input:
             net_output = self.distance_layer(
+                net_output,
                 idx_i_name = "sr_idx_i",
                 idx_j_name = "sr_idx_j",
-                Dij_name = "Dij_sr",
-                **net_output
+                Dij_name = "Dij_sr"
             )
+            sr_idx_i = net_output["sr_idx_i"]
+            sr_idx_j = net_output["sr_idx_j"]
         else:
-            net_output["sr_idx_i"] = net_output["idx_i"]
-            net_output["sr_idx_j"] = net_output["idx_j"]
-            net_output["Dij_sr"] = net_output["Dij_lr"]
+            sr_idx_i = net_output["idx_i"]
+            sr_idx_j = net_output["idx_j"]
+            net_output["Dij_sr"] = net_output["Dij"]
         
         # rbf based on short range interations
         net_output = self.rbf_layer(
-            Dij_name = "Dij_sr",
-            **net_output
+            net_output,
+            Dij_name = "Dij_sr"
         )
-
-        net_output = self.embeddings(**net_output)
+        net_output.pop("Dij_sr")
+        net_output = self.embeddings(net_output)
 
         rbf = net_output["rbf"]
         x = net_output["atom_embedding"]
-        sr_idx_i = net_output["sr_idx_i"]
-        sr_idx_j = net_output["sr_idx_j"]
+
         Ea = 0 #atomic energy 
         Qa = 0 #atomic charge
         nhloss = 0 #non-hierarchicality loss
@@ -136,78 +137,6 @@ class PhysNetCore(nn.Module):
         net_output["nh_loss"] = nhloss
         return net_output
 
-        #apply scaling/shifting
-        # Ea = self.Escale[Za] * Ea + self.Eshift[Za] + 0 * torch.sum(Ra, -1) #last term necessary to guarantee no "None" in force evaluation
-        # Qa = self.Qscale[Za] * Qa + self.Qshift[Za]
-    
-    def energy_from_scaled_atomic_properties(self, Ea, Qa, Dij, Z, idx_i, idx_j, batch_seg=None):
-        if batch_seg is None:
-            batch_seg = torch.zeros_like(Z)
-        #add electrostatic and dispersion contribution to atomic energy
-        if self.use_electrostatic:
-            Ea += self.electrostatic_energy_per_atom(Dij, Qa, idx_i, idx_j)
-        if self.use_dispersion:
-            if self.lr_cut is not None:   
-                Ea += self.d3_autoev * self.disp_layer(
-                    Z, Dij / d3_autoang, idx_i, idx_j, s6=self.s6, s8=self.s8, a1=self.a1, a2=self.a2, cutoff=self.lr_cut/d3_autoang
-                )
-            else:
-                Ea += self.d3_autoev * self.disp_layer(
-                    Z, Dij / d3_autoang, idx_i, idx_j, s6=self.s6, s8=self.s8, a1=self.a1, a2=self.a2
-                )
-        return segment_sum(Ea, batch_seg)
-
-    def energy_and_forces_from_scaled_atomic_properties(self, Ea, Qa, Dij, Za, Ra, idx_i, idx_j, batch_seg=None, **params):
-        energy = self.energy_from_scaled_atomic_properties(Ea, Qa, Dij, Za, idx_i, idx_j, batch_seg)
-        forces = -torch.autograd.grad(torch.sum(energy), Ra, create_graph=True, retain_graph=True)[0]
-        return energy, forces
-    
-    def energy_from_atomic_properties(self, Ea, Qa, Dij, Z, idx_i, idx_j, Q_tot=None, batch_seg=None):
-        if batch_seg is None:
-            batch_seg = torch.zeros_like(Z)
-        #scale charges such that they have the desired total charge
-        Qa = self.scaled_charges(Z, Qa, Q_tot, batch_seg)
-        return self.energy_from_scaled_atomic_properties(Ea, Qa, Dij, Z, idx_i, idx_j, batch_seg)
-
-    #calculates the energy and force given the atomic properties (in order to prevent recomputation if atomic properties are calculated)
-    def energy_and_forces_from_atomic_properties(self, Ea, Qa, Dij, Z, R, idx_i, idx_j, Q_tot=None, batch_seg=None):
-        energy = self.energy_from_atomic_properties(Ea, Qa, Dij, Z, idx_i, idx_j, Q_tot, batch_seg)
-        forces = -torch.autograd.grad(torch.sum(energy), R, create_graph=True)[0]
-        return energy, forces
-
-    #calculates the total energy (including electrostatic interactions)
-    def energy(self, Z, R, idx_i, idx_j, Q_tot=None, batch_seg=None, offsets=None, sr_idx_i=None, sr_idx_j=None, sr_offsets=None):
-        Ea, Qa, Dij, _ = self.atomic_properties(Z, R, idx_i, idx_j, offsets, sr_idx_i, sr_idx_j, sr_offsets)
-        energy = self.energy_from_atomic_properties(Ea, Qa, Dij, Z, idx_i, idx_j, Q_tot, batch_seg)
-        return energy
-
-    #calculates the total energy and forces (including electrostatic interactions)
-    def energy_and_forces(self, Z, R, idx_i, idx_j, Q_tot=None, batch_seg=None, offsets=None, sr_idx_i=None, sr_idx_j=None, sr_offsets=None):
-        Ea, Qa, Dij, _ = self.atomic_properties(Z, R, idx_i, idx_j, offsets, sr_idx_i, sr_idx_j, sr_offsets)
-        energy, forces = self.energy_and_forces_from_atomic_properties(Ea, Qa, Dij, Z, R, idx_i, idx_j, Q_tot, batch_seg)
-        return energy, forces
-
-    #returns scaled charges such that the sum of the partial atomic charges equals Q_tot (defaults to 0)
-    def scaled_charges(self, Za, Qa, Q=None, batch_seg=None, **kwargs):
-        return self._charge_conservation_layer.get_corrected_Qa(Za, Qa, Q, batch_seg)["Qa"]
-
-    #calculates the electrostatic energy per atom 
-    #for very small distances, the 1/r law is shielded to avoid singularities
-    def electrostatic_energy_per_atom(self, Dij, Qa, idx_i, idx_j):
-        return self._electrostatic_layer.get_E_ele_a(Dij, Qa, idx_i, idx_j)
-
-    # def forward(self, **net_input):
-    #     Ea, raw_Qa, Dij, nh_loss = self.atomic_properties(**net_input)
-    #     Qa = self.scaled_charges(Qa=raw_Qa, **net_input)
-    #     output = {"nh_loss": nh_loss}
-    #     output["Qa"] = Qa
-    #     output["Q"] = segment_sum(raw_Qa, net_input["batch_seg"])
-    #     energy, forces = self.energy_and_forces_from_scaled_atomic_properties(Ea, Qa, Dij, **net_input)
-    #     output["E"] = energy
-    #     output["Fa"] = forces
-    #     output["M2"] = segment_sum(Qa.unsqueeze(1) * net_input["Ra"], net_input["batch_seg"])
-    #     return output
-
     @property
     def interaction_block(self):
         return self._interaction_block
@@ -215,3 +144,4 @@ class PhysNetCore(nn.Module):
     @property
     def output_block(self):
         return self._output_block
+    

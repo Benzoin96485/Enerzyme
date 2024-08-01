@@ -141,10 +141,9 @@ class FF:
     def _init_model(self, build_params):
         if self.architecture in FF_REGISTER:
             model = FF_REGISTER[self.architecture](**build_params)
-            print(model.__str__())
         else:
             model = build_model(self.architecture, self.layer_names, self.build_params)
-            print(model[0].__str__())
+        print(model.__str__())
         if self.pretrain_path is not None:
             model_dict = torch.load(self.pretrain_path, map_location=self.trainer.device)["model_state_dict"]
             model.load_state_dict(model_dict, strict=False)

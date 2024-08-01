@@ -19,7 +19,7 @@ class BaseRBF(nn.Module):
     def get_rbf(self, Dij: Tensor, cutoff_values: Tensor, **kwargs) -> Tensor:
         ...
 
-    def forward(self, cutoff_values: Tensor=None, Dij_name: str="Dij", **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def forward(self, net_input: Dict[str, Tensor], cutoff_values: Tensor=None, Dij_name: str="Dij") -> Dict[str, Tensor]:
         output = net_input.copy()
         output["rbf"] = self.get_rbf(
             Dij=net_input[Dij_name],

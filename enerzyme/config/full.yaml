@@ -58,17 +58,17 @@ Modelhub:
         - name: AtomicAffine
           params: # max_Za in build_params
             shifts:
-              - name: Ea
+              Ea:
                 values: 0
                 learnable: true
-              - name: Qa
+              Qa:
                 values: 0
                 learnable: true
             scales:
-              - name: Ea
+              Ea:
                 values: 1
                 learnable: true
-              - name: Qa
+              Qa:
                 values: 1
                 learnable: true
         - name: ChargeConservation

@@ -14,7 +14,7 @@ class ChargeConservationLayer(nn.Module):
 
         References:
         -----
-        [1] J. Chem. Theory Comput. 2019, 15, 3678-3693.
+        [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         """
         super().__init__()
 
@@ -43,7 +43,7 @@ class ChargeConservationLayer(nn.Module):
         raw_Q: Float tensor of total atomic charge before correction, shape [batch_size]
         '''
         if batch_seg is None:
-            batch_seg = torch.zeros_like(Za)
+            batch_seg = torch.zeros_like(Za, dtype=torch.long)
         #number of atoms per batch (needed for charge scaling)
         N_per_batch = segment_sum(torch.ones_like(batch_seg), batch_seg)
         raw_Q = segment_sum(Qa, batch_seg)
@@ -62,7 +62,7 @@ class ChargeConservationLayer(nn.Module):
 
 
 class ElectrostaticEnergyLayer(nn.Module):
-    def __init__(self, cutoff_sr: float, cutoff_lr: float, Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1) -> None:
+    def __init__(self, cutoff_sr: float, cutoff_lr: float=None, Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1) -> None:
         r"""
         Calculate the electrostatic energy from distributed multipoles and atomic positions
 
@@ -82,7 +82,7 @@ class ElectrostaticEnergyLayer(nn.Module):
 
         References:
         -----
-        [1] J. Chem. Theory Comput. 2019, 15, 3678-3693.
+        [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         """
         super().__init__()
         self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
@@ -138,8 +138,9 @@ class AtomicCharge2DipoleLayer(nn.Module):
 
     def get_dipole(self, Qa: Tensor, Ra: Tensor, batch_seg: Tensor=None, **kwargs) -> Tensor:
         if batch_seg is None:
-            batch_seg = torch.zeros_like(Qa)
-        return segment_sum(Qa.unsqueeze(1) * Ra, batch_seg)
+            batch_seg = torch.zeros_like(Qa, dtype=torch.long)
+        Pa = Qa.unsqueeze(1) * Ra
+        return segment_sum(Pa, batch_seg)
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()

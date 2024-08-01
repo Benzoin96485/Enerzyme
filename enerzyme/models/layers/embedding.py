@@ -108,7 +108,7 @@ class BaseAtomEmbedding(nn.Module):
     def get_embedding(self, Za: Tensor) -> Tensor:
         ...
 
-    def forward(self, **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         output["atom_embedding"] = self.get_embedding(
             Za = net_input["Za"]

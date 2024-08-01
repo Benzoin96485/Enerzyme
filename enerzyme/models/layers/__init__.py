@@ -5,3 +5,4 @@ from .electrostatics import ElectrostaticEnergyLayer, ChargeConservationLayer, A
 from .gradient import ForceLayer
 from .reduce import EnergyReduceLayer
 from .denormalize import AtomicAffineLayer
+from .dispersion.grimme_d3 import GrimmeD3EnergyLayer

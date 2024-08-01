@@ -89,7 +89,10 @@ def initialize(layer_params=default_layer_params):
             "dim_embedding": F,
             "num_rbf": K,
             "max_Za": 95,
-            "cutoff_sr": cutoff
+            "cutoff_sr": cutoff,
+            "drop_out": 0.0,
+            "Hartree_in_E": d3_autoev,
+            "Bohr_in_R": d3_autoang
         },
         layer_params=layer_params
     ).type(dtype_torch)
@@ -262,7 +265,7 @@ def test_atomic_properties():
     })
     Ea_torch = output["Ea"].detach().numpy()
     Qa_torch = output["Qa"].detach().numpy()
-    Dij_lr_torch = output["Dij_lr"].detach().numpy()
+    Dij_lr_torch = output["Dij"].detach().numpy()
     nhloss_torch = output["nh_loss"].detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -282,7 +285,7 @@ def test_atomic_properties():
 def test_edisp():
     from enerzyme.models.layers.dispersion.grimme_d3 import GrimmeD3EnergyLayer
     from neural_network.grimme_d3.grimme_d3 import edisp as edisp_tf
-    disp_layer = GrimmeD3EnergyLayer()
+    disp_layer = GrimmeD3EnergyLayer(Hartree_in_E=1, Bohr_in_R=1)
     e_torch = disp_layer.get_e_disp(torch.from_numpy(Z.copy()), torch.from_numpy(D.copy()), torch.from_numpy(idx_i), torch.from_numpy(idx_j)).detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -382,27 +385,44 @@ def test_energy_from_atomic_properties():
     pass
 
 
-# def test_energy_and_forces():
-#     torch.autograd.set_detect_anomaly(True)
-#     physnet_torch, physnet_tf = initialize("float32")
-#     e_torch, f_torch = physnet_torch.energy_and_forces(
-#         torch.from_numpy(Z.copy()),
-#         torch.tensor(R, requires_grad=True),
-#         torch.from_numpy(idx_i),
-#         torch.from_numpy(idx_j),
-#         torch.tensor(Q_tot, dtype=torch.float32),
-#         offsets=torch.from_numpy(offsets)
-#     )
-#     e_torch = e_torch.detach().numpy()
-#     f_torch = f_torch.detach().numpy()
-#     with tf.Session() as sess:
-#         R_tf = tf.Variable(R)
-#         sess.run(tf.global_variables_initializer())
-#         e_tf, f_tf = physnet_tf.energy_and_forces(Z, R_tf, idx_i, idx_j, Q_tot, offsets=offsets)
-#         e_tf = e_tf.eval()
-#         f_tf = f_tf.eval()
-#     assert_allclose(e_torch, e_tf, rtol=1e-7, atol=1e-7)
-#     assert_allclose(f_torch, f_tf, rtol=1e-7, atol=1e-7)
+def test_energy_and_forces():
+    torch.autograd.set_detect_anomaly(True)
+    physnet_torch, physnet_tf = initialize(default_layer_params + [
+        {"name": "AtomicAffine", "params": {
+            "shifts": {
+                "Ea": {"values": 0, "learnable": True},
+                "Qa": {"values": 0, "learnable": True}
+            },
+            "scales": {
+                "Ea": {"values": 1, "learnable": True},
+                "Qa": {"values": 1, "learnable": True}
+            }
+        }},
+        {"name": "ChargeConservation"},
+        {"name": "AtomicCharge2Dipole"},
+        {"name": "ElectrostaticEnergy"},
+        {"name": "GrimmeD3Energy", "params": {"learnable": True}},
+        {"name": "EnergyReduce"},
+        {"name": "Force"}
+    ])
+    output = physnet_torch({
+        "Za": torch.from_numpy(Z.copy()),
+        "Ra": torch.tensor(R, requires_grad=True),
+        "idx_i": torch.from_numpy(idx_i),
+        "idx_j": torch.from_numpy(idx_j),
+        "Q": torch.tensor(Q_tot),
+        "offsets": torch.from_numpy(offsets)
+    })
+    e_torch = output["E"].detach().numpy()
+    f_torch = output["Fa"].detach().numpy()
+    with tf.Session() as sess:
+        R_tf = tf.Variable(R)
+        sess.run(tf.global_variables_initializer())
+        e_tf, f_tf = physnet_tf.energy_and_forces(Z, R_tf, idx_i, idx_j, Q_tot, offsets=offsets)
+        e_tf = e_tf.eval()
+        f_tf = f_tf.eval()
+    assert_allclose(e_torch, e_tf, rtol=1e-7, atol=1e-7)
+    assert_allclose(f_torch, f_tf, rtol=1e-7, atol=1e-7)
 
 
 if __name__ == "__main__":

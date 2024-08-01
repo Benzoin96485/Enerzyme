@@ -17,7 +17,6 @@ class RandomSplit:
     def split(self, data):
         rest = None
         l = len(data["Ra"])
-        print(l)
         partition = dict()
         allocated_count = 0
         if len(self.ratios) != len(self.parts):

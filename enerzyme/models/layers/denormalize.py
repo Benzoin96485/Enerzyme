@@ -8,35 +8,35 @@ class AtomicAffineLayer(nn.Module):
     def __init__(
         self, 
         max_Za: int, 
-        shifts: List[Dict[Literal["name", "values", "learnable"], Union[Dict[str, float], float, bool, Literal["Ea", "Qa"]]]],
-        scales: List[Dict[Literal["name", "values", "learnable"], Union[Dict[str, float], float, bool, Literal["Ea", "Qa"]]]]
+        shifts: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]],
+        scales: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]
     ) -> None:
+        super().__init__()
         self.max_Za = max_Za
         self.shifts = self.build_affine(shifts, 0)
         self.scales = self.build_affine(scales, 1)
 
     def build_affine(
         self, 
-        params: List[Dict[Literal["name", "values", "learnable"], Union[Dict[Union[str, int], float], float, bool, Literal["Ea", "Qa"]]]],
+        params: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]],
         default_value: float
     ) -> nn.ParameterDict:
         affine_dict = dict()
-        for param in params:
-            name = param["name"]
+        for name, param in params.items():
             values = param["values"]
             if isinstance(values, dict):
-                affine_param = torch.full(self.max_Za + 1, float(default_value))
+                affine_param = torch.full((self.max_Za + 1,), float(default_value))
                 for idx, value in values.items():
                     if isinstance(idx, str):
                         affine_param[PERIODIC_TABLE.loc[idx]["Za"]] = value
                     else:
                         affine_param[idx] = value
             else:
-                affine_param = torch.full(self.max_Za + 1, float(values))
+                affine_param = torch.full((self.max_Za + 1,), float(values))
             affine_dict[name] = nn.Parameter(affine_param, requires_grad=param["learnable"])
         return nn.ParameterDict(affine_dict)
 
-    def forward(self, **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         for name, shift in self.shifts.items():
             output[name] += shift.gather(0, output["Za"])

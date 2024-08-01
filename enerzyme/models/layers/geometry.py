@@ -36,7 +36,7 @@ class DistanceLayer(nn.Module):
         Dij = torch.sqrt(torch.relu(torch.sum((Ri - Rj) ** 2, -1))) #relu prevents negative numbers in sqrt
         return Dij
 
-    def forward(self, idx_i_name: str="idx_i", idx_j_name: str="idx_j", Dij_name: str="Dij", offsets_name: str="offsets", **net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def forward(self, net_input: Dict[str, Tensor], idx_i_name: str="idx_i", idx_j_name: str="idx_j", Dij_name: str="Dij", offsets_name: str="offsets") -> Dict[str, Tensor]:
         output = net_input.copy()
         output[Dij_name] = self.get_distance(
             Ra=net_input["Ra"],
