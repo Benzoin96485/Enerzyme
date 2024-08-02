@@ -48,7 +48,7 @@ Modelhub:
             init_width_flavor: PhysNet
         - name: RandomAtomEmbedding # dim_embedding, max_Za in build_params
         - name: Core
-          params: # dim_embedding, num_rbf, cutoff_sr in build_params; cutoff_lr as default
+          params: # dim_embedding, num_rbf in build_params
             num_blocks: 5
             num_residual_atomic: 2
             num_residual_interaction: 3
@@ -59,7 +59,7 @@ Modelhub:
               initial_alpha: 1
               initial_beta: 1
               learnable: false
-            drop_out: 0.0
+            dropout_rate: 0.0
         - name: AtomicAffine
           params: # max_Za in build_params
             shifts:
@@ -78,7 +78,7 @@ Modelhub:
                 learnable: true
         - name: ChargeConservation
         - name: AtomicCharge2Dipole
-        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params
+        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
         - name: GrimmeD3Energy
           params: # Hartree_in_E, Bohr_in_R in build_params
             learnable: true

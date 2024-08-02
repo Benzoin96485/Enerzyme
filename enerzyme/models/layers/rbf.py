@@ -1,4 +1,5 @@
 import math
+from abc import ABC, abstractmethod
 from typing import Literal, Dict
 import torch
 from torch import nn, Tensor
@@ -7,7 +8,7 @@ from ..cutoff import CUTOFF_REGISTER
 from ..functional import softplus_inverse
 
 
-class BaseRBF(nn.Module):
+class BaseRBF(ABC, nn.Module):
     def __init__(
         self,
         num_basis_functions: int
@@ -15,6 +16,7 @@ class BaseRBF(nn.Module):
         super().__init__()
         self.num_basis_functions = num_basis_functions
 
+    @abstractmethod
     def get_rbf(self, Dij: Tensor, cutoff_values: Tensor, **kwargs) -> Tensor:
         ...
 
@@ -84,7 +86,7 @@ class ExponentialRBF(BaseRBF):
         self.cutoff = cutoff
         self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
     
-
+    @abstractmethod
     def inner_fn(self, alphar: Tensor, expalphar: Tensor) -> Tensor:
         ...
 
@@ -191,7 +193,6 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
                 )
             )
         self._init_width(init_width_flavor)
-        self.inner_fn = self.gaussian
 
     def _init_width(self, init_width_flavor: Literal["PhysNet", "SpookyNet"]="PhysNet") -> None:
         '''
@@ -217,7 +218,7 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
                 )
             )
 
-    def gaussian(self, alphar, expalphar) -> torch.Tensor:
+    def inner_fn(self, alphar, expalphar) -> torch.Tensor:
         return -F.softplus(self._widths) * (expalphar - F.softplus(self._centers)) ** 2
 
 

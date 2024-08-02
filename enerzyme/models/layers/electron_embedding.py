@@ -1,11 +1,12 @@
 from typing import Dict, Optional, Literal
+from abc import ABC, abstractmethod
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from ..functional import segment_sum
 
 
-class BaseElectronEmbedding(nn.Module):
+class BaseElectronEmbedding(ABC):
     def __init__(self, dim_embedding: int, num_residual: int, activation: str, attribute: Literal["charge", "spin"]="charge"):
         super().__init__()
         self.dim_embedding = dim_embedding
@@ -13,6 +14,7 @@ class BaseElectronEmbedding(nn.Module):
         self.activation = activation
         self.attribute = attribute
 
+    @abstractmethod
     def get_embedding(self, atom_embedding, Q, batch_seg, eps, **kwargs) -> Tensor:
         ...
 

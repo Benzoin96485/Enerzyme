@@ -1,10 +1,9 @@
 import torch
 from torch import nn, Tensor
-from typing import Dict, Any, Literal, Optional
+from typing import Dict, Any, Optional
 from .block import InteractionBlock, OutputBlock
-from ..functional import segment_sum
 from ..layers import DistanceLayer, BaseRBF, BaseAtomEmbedding
-from ..activation import get_activation_fn
+from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 
 
 LAYERS = [
@@ -34,30 +33,28 @@ class PhysNetCore(nn.Module):
         self,
         dim_embedding: int,
         num_rbf: int,
-        cutoff_sr: float,                             # cutoff distance for short range interactions
-        cutoff_lr: Optional[float]=None,                        # cutoff distance for long range interactions (default: no cutoff)
         num_blocks: int=3,                       # number of building blocks to be stacked
         num_residual_atomic: int=2,              # number of residual layers for atomic refinements of feature vector
         num_residual_interaction: int=2,         # number of residual layers for refinement of message vector
         num_residual_output: int=1,              # number of residual layers for the output blocks
-        activation_fn: Literal["shifted_softplus"]="shifted_softplus",   # activation function
-        activation_params: Optional[Dict]=dict(),
-        drop_out: float=0.0
-    ):
+        activation_fn: ACTIVATION_KEY_TYPE="shifted_softplus",   # activation function
+        activation_params: ACTIVATION_PARAM_TYPE=dict(),
+        dropout_rate: float=0.0
+    ) -> None:
         super().__init__()
         self.num_blocks = num_blocks
-        self.sr_cut = cutoff_sr
-        self.lr_cut = cutoff_lr
-        self.activation_fn = get_activation_fn(activation_fn, activation_params)
-        self.drop_out = drop_out
+        self.drop_out = dropout_rate
 
-        self._interaction_block = nn.Sequential(*[
+        self.interaction_block = nn.Sequential(*[
             InteractionBlock(
-                num_rbf, dim_embedding, num_residual_atomic, num_residual_interaction, activation_fn=self.activation_fn, drop_out=drop_out
+                num_rbf, dim_embedding, num_residual_atomic, num_residual_interaction, 
+                activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate
             ) for i in range(num_blocks)
         ])
-        self._output_block = nn.Sequential(*[
-            OutputBlock(dim_embedding, num_residual_output, activation_fn=self.activation_fn, drop_out=drop_out
+        self.output_block = nn.Sequential(*[
+            OutputBlock(
+                dim_embedding, num_residual_output, 
+                activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate
             ) for i in range(num_blocks)
         ])
         
@@ -131,12 +128,3 @@ class PhysNetCore(nn.Module):
         net_output["Qa"] = Qa
         net_output["nh_loss"] = nhloss
         return net_output
-
-    @property
-    def interaction_block(self):
-        return self._interaction_block
-
-    @property
-    def output_block(self):
-        return self._output_block
-    

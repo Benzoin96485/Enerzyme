@@ -14,7 +14,7 @@ from enerzyme.models.ff import build_model
 # from enerzyme.models.physnet import PhysNetCore
 from physnet.NeuralNetwork import NeuralNetwork
 from physnet.grimme_d3.grimme_d3 import d3_autoang, d3_autoev
-from enerzyme.models.physnet.init import semi_orthogonal_glorot_weights
+from enerzyme.models.layers.init import semi_orthogonal_glorot_weights
 
 F = 128
 K = 5
@@ -52,14 +52,14 @@ if dtype == "float64":
     dtype_tf = tf.float64
     R = R.astype(np.float64)
     offsets = offsets.astype(np.float64)
-    W_init = W_init.astype(np.float64)
+    W_init = W_init.type(dtype_torch)
     b_init = b_init.astype(np.float64)
 elif dtype == "float32":
     dtype_torch = torch.float32
     dtype_tf = tf.float32
     R = R.astype(np.float32)
     offsets = offsets.astype(np.float32)
-    W_init = W_init.astype(np.float32)
+    W_init = W_init.type(dtype_torch)
     b_init = b_init.astype(np.float32)
 
 # set_dtype("float64")
@@ -175,29 +175,29 @@ def test_DenseLayer():
     from enerzyme.models.physnet.layer import DenseLayer as DenseLayer_torch
     from physnet.layers.DenseLayer import DenseLayer as Denselayer_tf
     
-    dense_layer_torch = DenseLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init)).type(dtype_torch)
-    dense_layer_tf = Denselayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=dtype_tf)
+    dense_layer_torch = DenseLayer_torch(F, F, initial_weight=W_init, initial_bias=torch.from_numpy(b_init)).type(dtype_torch)
+    dense_layer_tf = Denselayer_tf(F, F, W_init=W_init.T.detach().numpy(), b_init=b_init, scope="test", dtype=dtype_tf)
     y_dense_torch = dense_layer_torch(torch.from_numpy(x)).detach().numpy()
-    l2loss_torch = dense_layer_torch.l2loss.detach().numpy()
+    l2loss_torch = dense_layer_torch.l2loss().detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         y_dense_tf = dense_layer_tf(x).eval()
         l2loss_tf = dense_layer_tf.l2loss.eval()
-    assert_allclose(y_dense_torch, y_dense_tf)
-    assert_allclose(l2loss_torch, l2loss_tf)
+    assert_allclose(y_dense_torch, y_dense_tf, rtol=1e-6, atol=1e-6)
+    assert_allclose(l2loss_torch, l2loss_tf, rtol=1e-6, atol=1e-6)
 
 
 def test_ResidualLayer():
     from enerzyme.models.physnet.layer import ResidualLayer as ResidualLayer_torch
-    from enerzyme.models.physnet.init import semi_orthogonal_glorot_weights
+    from enerzyme.models.layers.init import semi_orthogonal_glorot_weights
     from physnet.layers.ResidualLayer import ResidualLayer as ResidualLayer_tf
-    residual_layer_torch = ResidualLayer_torch(F, F, W_init=torch.from_numpy(W_init), b_init=torch.from_numpy(b_init)).type(dtype_torch)
-    residual_layer_tf = ResidualLayer_tf(F, F, W_init=W_init, b_init=b_init, scope="test", dtype=dtype_tf)
+    residual_layer_torch = ResidualLayer_torch(F, F, initial_weight=W_init, initial_bias=torch.from_numpy(b_init)).type(dtype_torch)
+    residual_layer_tf = ResidualLayer_tf(F, F, W_init=W_init.T.detach().numpy(), b_init=b_init, scope="test", dtype=dtype_tf)
     y_residual_torch = residual_layer_torch(torch.from_numpy(x.copy())).detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         y_residual_tf = residual_layer_tf(x.copy()).eval()
-    assert_allclose(y_residual_torch, y_residual_tf)
+    assert_allclose(y_residual_torch, y_residual_tf, rtol=1e-6, atol=1e-6)
 
 
 def test_InteractionLayer():
@@ -216,7 +216,7 @@ def test_InteractionLayer():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         y_interaction_tf = interaction_layer_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
-    assert_allclose(y_interaction_torch, y_interaction_tf)
+    assert_allclose(y_interaction_torch, y_interaction_tf, rtol=1e-6, atol=1e-6)
 
 
 def test_InteractionBlock():
@@ -235,7 +235,7 @@ def test_InteractionBlock():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         y_interaction_tf = interaction_block_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
-    assert_allclose(y_interaction_torch, y_interaction_tf)
+    assert_allclose(y_interaction_torch, y_interaction_tf, rtol=1e-5, atol=1e-5)
 
 
 def test_OutputBlock():

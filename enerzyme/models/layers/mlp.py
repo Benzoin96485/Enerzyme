@@ -1,0 +1,119 @@
+from typing import Optional, Union, Literal
+from numpy import ndarray
+from torch import nn, Tensor
+from torch.nn import Module, init
+import torch.nn.functional as F
+import torch
+from ..activation import get_activation_fn, ACTIVATION_PARAM_TYPE, ACTIVATION_KEY_TYPE
+from .init import semi_orthogonal_glorot_weights
+
+
+INITIAL_WEIGHT_TYPE = Union[Tensor, ndarray, Literal["semi_orthogonal_glorot", "orthogonal", "zero"]]
+INITIAL_BIAS_TYPE = Union[Tensor, ndarray, Literal["zero"]]
+
+
+class NeuronLayer(Module):
+    def __str__(self):
+        return "[ " + str(self.dim_feature_in) + " -> " + str(self.dim_feature_out) + " ]"
+
+    def __init__(
+        self, dim_feature_in, dim_feature_out, 
+        activation_fn: Optional[ACTIVATION_KEY_TYPE]=None,
+        activation_params: ACTIVATION_PARAM_TYPE=dict(),
+    ):
+        super().__init__()
+        self.dim_feature_in = dim_feature_in
+        self.dim_feature_out = dim_feature_out
+        if activation_fn is not None:
+            self.activation_fn = get_activation_fn(activation_fn, activation_params)
+        else:
+            self.activation_fn = None
+
+
+class DenseLayer(NeuronLayer):
+    def __str__(self):
+         return "Dense layer: " + super().__str__()
+
+    def __init__(
+        self, dim_feature_in: int, dim_feature_out: int, 
+        activation_fn: Optional[ACTIVATION_KEY_TYPE]=None, activation_params: ACTIVATION_PARAM_TYPE=dict(), 
+        initial_weight: INITIAL_WEIGHT_TYPE="orthogonal", 
+        initial_bias: INITIAL_BIAS_TYPE="zero",
+        use_bias: bool=True
+    ):
+        super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
+
+        self.linear = nn.Linear(dim_feature_in, dim_feature_out, use_bias)
+        if initial_weight == "semi_orthogonal_glorot":
+            with torch.no_grad():
+                self.linear.weight.data.copy_(semi_orthogonal_glorot_weights(dim_feature_in, dim_feature_out))
+        elif initial_weight == "orthogonal":
+            init.orthogonal_(self.linear.weight.data)
+        elif initial_weight == "zero":
+            init.zeros_(self.linear.weight.data)
+        else:
+            with torch.no_grad():
+                self.linear.weight.data.copy_(torch.tensor(initial_weight))
+        if use_bias:
+            if initial_bias == "zero":
+                nn.init.zeros_(self.linear.bias)
+            else:
+                self.linear.bias.data.copy_(torch.tensor(initial_bias))     
+        
+        if activation_fn is None:
+            self.op = self.linear
+        else:
+            self.op = nn.Sequential(self.linear, self.activation_fn)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.op(x)
+    
+    @property
+    def W(self) -> Tensor:
+        return self.linear.weight.data
+
+    def l2loss(self) -> Tensor:
+        return F.mse_loss(self.W, torch.zeros_like(self.W), reduction="sum") / 2
+    
+
+class ResidualLayer(NeuronLayer):
+    def __str__(self):
+         return "Residual layer: " + super().__str__()
+
+    def __init__(
+        self, dim_feature_in: int, dim_feature_out: int, 
+        activation_fn: Optional[ACTIVATION_KEY_TYPE]=None, activation_params: ACTIVATION_PARAM_TYPE=dict(), 
+        initial_weight1: INITIAL_WEIGHT_TYPE="orthogonal", 
+        initial_weight2: INITIAL_WEIGHT_TYPE="zero", 
+        initial_bias: INITIAL_BIAS_TYPE="zero",
+        dropout_rate: float=0,
+        use_bias: bool=True
+    ) -> None:
+        super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
+        
+        dropout = nn.Dropout(dropout_rate)
+        dense1 = DenseLayer(
+            dim_feature_in=dim_feature_in, 
+            dim_feature_out=dim_feature_out, 
+            activation_fn=activation_fn, 
+            activation_params=activation_params, 
+            initial_weight=initial_weight1, 
+            initial_bias=initial_bias, 
+            use_bias=use_bias
+        )
+        dense2 = DenseLayer(
+            dim_feature_in=dim_feature_in, 
+            dim_feature_out=dim_feature_out, 
+            activation_fn=None,
+            initial_weight=initial_weight2, 
+            initial_bias=initial_bias, 
+            use_bias=use_bias
+        )
+        if activation_fn is not None:
+            self.residual = nn.Sequential(self.activation_fn, dropout, dense1, dense2)
+        else:
+            self.residual = nn.Sequential(dropout, dense1, dense2)
+        
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x + self.residual(x)

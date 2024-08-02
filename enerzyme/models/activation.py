@@ -1,5 +1,5 @@
 import math
-from typing import Literal, Dict
+from typing import Literal, Dict, Union, Optional
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
@@ -110,7 +110,12 @@ ACTIVATION_REGISTER = {
     "shifted_softplus": ShiftedSoftplus,
     "swish": Swish,
 }
+ACTIVATION_KEY_TYPE = Literal["shifted_softplus", "swish"]
+ACTIVATION_PARAM_TYPE = Dict[Literal["dim_feature", "initial_alpha", "initial_beta", "learnable"], Union[int, float, bool]]
 
 
-def get_activation_fn(key: Literal["shifted_softplus", "swish"], activation_params: Dict=dict()) -> nn.Module:
+def get_activation_fn(
+    key: ACTIVATION_KEY_TYPE, 
+    activation_params: ACTIVATION_PARAM_TYPE=dict()
+) -> BaseScaledTemperedActivation:
     return ACTIVATION_REGISTER[key](**activation_params)

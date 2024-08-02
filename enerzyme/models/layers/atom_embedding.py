@@ -1,4 +1,5 @@
 import math
+from abc import ABC, abstractmethod
 from typing import Dict
 import numpy as np
 import torch
@@ -6,12 +7,13 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 
 
-class BaseAtomEmbedding(nn.Module):
+class BaseAtomEmbedding(ABC, nn.Module):
     def __init__(self, max_Za, dim_embedding):
         super().__init__()
         self.max_Za = max_Za
         self.dim_embedding = dim_embedding
 
+    @abstractmethod
     def get_embedding(self, Za: Tensor) -> Tensor:
         ...
 
