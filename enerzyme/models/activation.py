@@ -9,7 +9,7 @@ def shifted_softplus(x: Tensor) -> Tensor:
     return 
 
 
-class ShiftedSoftPlus(nn.Module):
+class ShiftedSoftplus(nn.Module):
     def __init__(self, dim_feature: int=1, initial_alpha: float=1.0, initial_beta: float=1.0, learnable: bool=False) -> None:
         """
         Shifted softplus activation function with learnable feature-wise parameters:
@@ -52,7 +52,7 @@ class ShiftedSoftPlus(nn.Module):
 
 
 ACTIVATION_REGISTER = {
-    "shifted_softplus": ShiftedSoftPlus,
+    "shifted_softplus": ShiftedSoftplus,
     "swish": ...,
 }
 
