@@ -6,21 +6,18 @@ from inspect import signature
 import torch
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, List, Any, Callable, Union, Literal
+from typing import Dict, Tuple, List, Any, Callable, Literal
 from torch import nn
 from torch.utils.data import Dataset
 from ..data import DataHub
 from ..tasks import Trainer
-from .spookynet import SpookyNet
 from .loss import MAELoss, MSELoss
 from ..utils import logger
 from . import layers as Layers
 
 
 SEP = "-"
-FF_REGISTER = {
-    "SpookyNet": SpookyNet
-}
+FF_REGISTER = {}
 LOSS_REGISTER = {
     "mae": MAELoss,
     "mse": MSELoss
@@ -33,6 +30,8 @@ def get_ff_core(architecture: str) -> Tuple[nn.Module, List]:
         from .physnet import PhysNetCore as Core
         from .physnet import LAYERS
         from .physnet import LOSS_REGISTER as special_loss
+    elif architecture.lower() == "spookynet":
+        from .spookynet import SpookyNetCore as Core
     LOSS_REGISTER.update(special_loss)
     return Core, LAYERS
 

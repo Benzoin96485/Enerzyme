@@ -2,7 +2,7 @@ from typing import Dict, Any
 from ..layers import DistanceLayer, BaseRBF, BaseAtomEmbedding
 from torch import nn
 
-class SpookyNet(nn.Module):
+class SpookyNetCore(nn.Module):
     """
     Neural network for PES construction augmented with optional explicit terms
     for short-range repulsion, electrostatics and dispersion and explicit nonlocal

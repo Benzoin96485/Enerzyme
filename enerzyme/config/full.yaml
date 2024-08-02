@@ -56,7 +56,9 @@ Modelhub:
             activation_fn: shifted_softplus
             activation_params:
               dim_feature: 1
-              
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
             drop_out: 0.0
         - name: AtomicAffine
           params: # max_Za in build_params

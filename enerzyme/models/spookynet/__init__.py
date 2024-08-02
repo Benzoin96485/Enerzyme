@@ -1,1 +1,1 @@
-from .spookynet import SpookyNet
+from .core import SpookyNetCore
