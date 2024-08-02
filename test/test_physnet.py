@@ -166,7 +166,7 @@ def test_RBFLayer():
 
 
 def test_embedding():
-    from enerzyme.models.layers.embedding import RandomAtomEmbedding
+    from enerzyme.models.layers.atom_embedding import RandomAtomEmbedding
     embedding = RandomAtomEmbedding(95, F).type(dtype_torch)
     embedding.get_embedding(torch.from_numpy(Z))
 

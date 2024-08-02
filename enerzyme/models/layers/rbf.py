@@ -1,6 +1,5 @@
 import math
-from typing import Callable, Literal, Dict, Any
-import numpy as np
+from typing import Literal, Dict
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
@@ -124,7 +123,7 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
         cutoff_fn: Literal["polynomial", "bump"]="polynomial",
         init_width_flavor: Literal["PhysNet", "SpookyNet"]="PhysNet"
     ) -> None:
-        '''
+        r'''
         Radial basis functions based on exponential Gaussian functions given by:
 
         g_i(x) = exp(-width_i*(exp(-alpha*x)-center_i)**2)

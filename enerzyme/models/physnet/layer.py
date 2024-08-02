@@ -3,7 +3,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F_
 from .init import semi_orthogonal_glorot_weights
-from ..functional import softplus_inverse, segment_sum
+from ..functional import segment_sum
 
 
 class NeuronLayer(nn.Module):
@@ -28,49 +28,6 @@ class NeuronLayer(nn.Module):
     def activation_fn(self):
         return self._activation_fn
     
-
-class RBFLayer(NeuronLayer):
-    def __str__(self):
-        return "Radial basis function layer: " + super().__str__()
-
-    def __init__(self, K, cutoff):
-        super().__init__(1, K, None)
-        self._K = K
-        self._cutoff = cutoff
-        centers = softplus_inverse(np.linspace(1.0, np.exp(-cutoff), K))
-        self._centers = nn.Parameter(F_.softplus(torch.tensor(np.asarray(centers))))
-        widths = [softplus_inverse((0.5 / ((1.0 - np.exp(-cutoff)) / K)) ** 2)] * K
-        self._widths = nn.Parameter(F_.softplus(torch.tensor(np.asarray(widths), requires_grad=True)))
-
-    @property
-    def K(self):
-        return self._K
-
-    @property
-    def cutoff(self):
-        return self._cutoff
-    
-    @property
-    def centers(self):
-        return self._centers   
-
-    @property
-    def widths(self):
-        return self._widths  
-
-    # cutoff function that ensures a smooth cutoff
-    def cutoff_fn(self, D):
-        x = D / self.cutoff
-        x3 = x ** 3
-        x4 = x3 * x
-        x5 = x4 * x
-        return torch.where(x < 1, 1 - 6 * x5 + 15 * x4 - 10 * x3, torch.zeros_like(x))
-    
-    def forward(self, D):
-        D = torch.unsqueeze(D, -1) # necessary for proper broadcasting behaviour
-        rbf = self.cutoff_fn(D) * torch.exp(-self.widths * (torch.exp(-D) - self.centers) ** 2)
-        return rbf
-
 
 class DenseLayer(NeuronLayer):
     def __str__(self):

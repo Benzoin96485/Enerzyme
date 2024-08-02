@@ -1,10 +1,10 @@
 import torch
 from torch import nn, Tensor
-from typing import Dict, Any, Literal
+from typing import Dict, Any, Literal, Optional
 from .block import InteractionBlock, OutputBlock
 from ..functional import segment_sum
 from ..layers import DistanceLayer, BaseRBF, BaseAtomEmbedding
-from ..activation import ACTIVATION_REGISTER
+from ..activation import get_activation_fn
 
 
 LAYERS = [
@@ -35,19 +35,20 @@ class PhysNetCore(nn.Module):
         dim_embedding: int,
         num_rbf: int,
         cutoff_sr: float,                             # cutoff distance for short range interactions
-        cutoff_lr: float=None,                        # cutoff distance for long range interactions (default: no cutoff)
+        cutoff_lr: Optional[float]=None,                        # cutoff distance for long range interactions (default: no cutoff)
         num_blocks: int=3,                       # number of building blocks to be stacked
         num_residual_atomic: int=2,              # number of residual layers for atomic refinements of feature vector
         num_residual_interaction: int=2,         # number of residual layers for refinement of message vector
         num_residual_output: int=1,              # number of residual layers for the output blocks
         activation_fn: Literal["shifted_softplus"]="shifted_softplus",   # activation function
+        activation_params: Optional[Dict]=dict(),
         drop_out: float=0.0
     ):
         super().__init__()
         self.num_blocks = num_blocks
         self.sr_cut = cutoff_sr
         self.lr_cut = cutoff_lr
-        self.activation_fn = ACTIVATION_REGISTER[activation_fn]
+        self.activation_fn = get_activation_fn(activation_fn, activation_params)
         self.drop_out = drop_out
 
         self._interaction_block = nn.Sequential(*[
