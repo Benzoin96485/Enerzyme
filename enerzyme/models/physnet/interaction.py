@@ -6,7 +6,7 @@ from ..functional import segment_sum
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 from ..layers.mlp import DenseLayer as _DenseLayer
 from ..layers.mlp import ResidualStack as _ResidualStack
-from ..layers.mlp import INITIAL_WEIGHT_TYPE, INITIAL_BIAS_TYPE, NeuronLayer
+from ..layers.mlp import INITIAL_WEIGHT_TYPE, INITIAL_BIAS_TYPE, NeuronLayer, ResidualMLP
 
 
 DEFAULT_TYPE = Optional[Union[Tensor, np.ndarray, str]]
@@ -105,3 +105,36 @@ class InteractionLayer(NeuronLayer):
             m = self.activation_fn(m)
         x = self.u * x + self.dense(m)
         return x
+
+
+class InteractionBlock(NeuronLayer):
+    def __str__(self) -> str:
+        return "Interaction Block: " + super().__str__()
+
+    def __init__(
+        self, num_rbf: int, dim_embedding: int, num_residual_atomic: int, num_residual_interaction: int, 
+        activation_fn: ACTIVATION_KEY_TYPE=None, activation_params: ACTIVATION_PARAM_TYPE=dict(), dropout_rate: float=0.0
+    ) -> None:
+        super().__init__(num_rbf, dim_embedding)
+        #interaction layer
+        self.interaction = InteractionLayer(num_rbf, dim_embedding, num_residual_interaction, activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate)
+
+        #residual layers
+        self.residual_stack = ResidualStack(dim_embedding, num_residual_atomic, activation_fn, activation_params, dropout_rate=dropout_rate)
+
+    def forward(self, x: Tensor, rbf: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:
+        return self.residual_stack(self.interaction(x, rbf, idx_i, idx_j))
+    
+
+def OutputBlock(
+    dim_embedding: int, num_residual: int, 
+    activation_fn: ACTIVATION_KEY_TYPE=None, activation_params: ACTIVATION_PARAM_TYPE=dict(),
+    dropout_rate: float=0.0
+) -> ResidualMLP:
+    default_initial_weight = weight_default()
+    return ResidualMLP(
+        dim_feature_in=dim_embedding, dim_feature_out=2, num_residual=num_residual,
+        activation_fn=activation_fn, activation_params=activation_params,
+        initial_weight1=default_initial_weight, initial_weight2=default_initial_weight, initial_weight_out="zero",
+        initial_bias_residual=bias_default(), use_bias_out=False, dropout_rate=dropout_rate
+    )

@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
-from typing import Dict, Any, Optional
-from .block import InteractionBlock, OutputBlock
+from typing import Dict, Any
+from .interaction import InteractionBlock, OutputBlock
 from ..layers import DistanceLayer, BaseRBF, BaseAtomEmbedding
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 

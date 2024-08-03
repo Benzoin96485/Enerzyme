@@ -172,7 +172,7 @@ def test_embedding():
 
 
 def test_DenseLayer():
-    from enerzyme.models.physnet.layer import DenseLayer as DenseLayer_torch
+    from enerzyme.models.physnet.interaction import DenseLayer as DenseLayer_torch
     from physnet.layers.DenseLayer import DenseLayer as Denselayer_tf
     
     dense_layer_torch = DenseLayer_torch(F, F, initial_weight=W_init, initial_bias=torch.from_numpy(b_init)).type(dtype_torch)
@@ -200,7 +200,7 @@ def test_ResidualLayer():
 
 
 def test_InteractionLayer():
-    from enerzyme.models.physnet.layer import InteractionLayer as InteractionLayer_torch
+    from enerzyme.models.physnet.interaction import InteractionLayer as InteractionLayer_torch
     from physnet.layers.InteractionLayer import InteractionLayer as InteractionLayer_tf
     state = get_state()
     interaction_layer_torch = InteractionLayer_torch(K, F, 3).type(dtype_torch)
@@ -219,7 +219,7 @@ def test_InteractionLayer():
 
 
 def test_InteractionBlock():
-    from enerzyme.models.physnet.block import InteractionBlock as InteractionBlock_torch
+    from enerzyme.models.physnet.interaction import InteractionBlock as InteractionBlock_torch
     from physnet.layers.InteractionBlock import InteractionBlock as InteractionBlock_tf
     state = get_state()
     interaction_block_torch = InteractionBlock_torch(K, F, 3, 3).type(dtype_torch)
@@ -238,7 +238,7 @@ def test_InteractionBlock():
 
 
 def test_OutputBlock():
-    from enerzyme.models.physnet.block import OutputBlock as OutputBlock_torch
+    from enerzyme.models.physnet.interaction import OutputBlock as OutputBlock_torch
     from physnet.layers.OutputBlock import OutputBlock as OutputBlock_tf
     state = get_state()
     output_block_torch = OutputBlock_torch(F, 3).type(dtype_torch)
