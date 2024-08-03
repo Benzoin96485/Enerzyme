@@ -1,6 +1,6 @@
 import torch
 from torch import nn, Tensor
-from .layer import NeuronLayer, InteractionLayer, ResidualLayer, DenseLayer
+from .layer import NeuronLayer, InteractionLayer, ResidualStack, DenseLayer
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 from enerzyme.models import activation
 
@@ -18,12 +18,10 @@ class InteractionBlock(NeuronLayer):
         self.interaction = InteractionLayer(num_rbf, dim_embedding, num_residual_interaction, activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate)
 
         #residual layers
-        self.residual_layer = nn.Sequential(*[
-            ResidualLayer(dim_embedding, dim_embedding, activation_fn, activation_params, dropout_rate=dropout_rate) for i in range(num_residual_atomic)
-        ])
+        self.residual_stack = ResidualStack(dim_embedding, num_residual_atomic, activation_fn, activation_params, dropout_rate=dropout_rate)
 
     def forward(self, x: Tensor, rbf: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:
-        return self.residual_layer(self.interaction(x, rbf, idx_i, idx_j))
+        return self.residual_stack(self.interaction(x, rbf, idx_i, idx_j))
     
 
 class OutputBlock(NeuronLayer):
@@ -34,13 +32,11 @@ class OutputBlock(NeuronLayer):
         activation_fn: ACTIVATION_KEY_TYPE=None, activation_params: ACTIVATION_PARAM_TYPE=dict(), dropout_rate: float=0.0
     ):
         super().__init__(dim_embedding, 2, activation_fn, activation_params)
-        self.residual_layer = nn.Sequential(*[
-            ResidualLayer(dim_embedding, dim_embedding, activation_fn, activation_params, dropout_rate=dropout_rate) for i in range(num_residual)
-        ])
+        self.residual_stack = ResidualStack(dim_embedding, num_residual, activation_fn, activation_params, dropout_rate=dropout_rate)
         self.dense = DenseLayer(dim_embedding, 2, initial_weight="zero", use_bias=False)
 
     def forward(self, x):
-        x = self.residual_layer(x)
+        x = self.residual_stack(x)
         if self.activation_fn is not None: 
             x = self.activation_fn(x)
         return self.dense(x)

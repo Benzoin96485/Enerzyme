@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
+from .mlp import ResidualMLP
 from ..functional import segment_sum
 
 

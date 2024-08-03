@@ -28,3 +28,33 @@ def test_swish():
     f1 = F1(dim_feature, initial_alpha, initial_beta)
     f2 = F2(dim_feature, initial_alpha, initial_beta)
     assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
+
+
+def test_residual_layer():
+    from enerzyme.models.layers.mlp import ResidualLayer as F1
+    from spookynet.modules.residual import Residual as F2
+    f1 = F1(
+        dim_feature_in=dim_feature, dim_feature_out=dim_feature, 
+        activation_fn="swish", activation_params={
+            "dim_feature": dim_feature,
+            "learnable": True
+        },
+        initial_bias="zero", initial_weight1="orthogonal", initial_weight2="zero"
+    )
+    f2 = F2(dim_feature)
+    assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
+
+
+def test_residual_stack():
+    from enerzyme.models.layers.mlp import ResidualStack as F1
+    from spookynet.modules.residual_stack import ResidualStack as F2
+    f1 = F1(
+        dim_feature=dim_feature, num_residual=3, 
+        activation_fn="swish", activation_params={
+            "dim_feature": dim_feature,
+            "learnable": True
+        },
+        initial_bias="zero", initial_weight1="orthogonal", initial_weight2="zero"
+    )
+    f2 = F2(dim_feature, 3)
+    assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())

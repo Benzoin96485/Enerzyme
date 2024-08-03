@@ -5,7 +5,7 @@ from torch import nn, Tensor
 from ..functional import segment_sum
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 from ..layers.mlp import DenseLayer as _DenseLayer
-from ..layers.mlp import ResidualLayer as _ResidualLayer
+from ..layers.mlp import ResidualStack as _ResidualStack
 from ..layers.mlp import INITIAL_WEIGHT_TYPE, INITIAL_BIAS_TYPE, NeuronLayer
 
 
@@ -40,20 +40,44 @@ def DenseLayer(
     )
 
 
-def ResidualLayer(
-    dim_feature_in: int,
-    dim_feature_out: int,
+# def ResidualLayer(
+#     dim_feature_in: int,
+#     dim_feature_out: int,
+#     activation_fn: Optional[ACTIVATION_KEY_TYPE]=None,
+#     activation_params: ACTIVATION_PARAM_TYPE=dict(),
+#     initial_weight: Optional[Union[Tensor, np.ndarray]]=None,
+#     initial_bias: Optional[Union[Tensor, np.ndarray]]=None,
+#     use_bias: bool=True,
+#     dropout_rate: float=0.0
+# ) -> _ResidualLayer:
+#     default_initial_weight = weight_default(initial_weight)
+#     return _ResidualLayer(
+#         dim_feature_in=dim_feature_in,
+#         dim_feature_out=dim_feature_out,
+#         activation_fn=activation_fn,
+#         activation_params=activation_params,
+#         initial_weight1=default_initial_weight,
+#         initial_weight2=default_initial_weight,
+#         initial_bias=bias_default(initial_bias),
+#         use_bias=use_bias,
+#         dropout_rate=dropout_rate
+#     )
+
+
+def ResidualStack(
+    dim_feature: int,
+    num_residual: int,
     activation_fn: Optional[ACTIVATION_KEY_TYPE]=None,
     activation_params: ACTIVATION_PARAM_TYPE=dict(),
     initial_weight: Optional[Union[Tensor, np.ndarray]]=None,
     initial_bias: Optional[Union[Tensor, np.ndarray]]=None,
     use_bias: bool=True,
     dropout_rate: float=0.0
-) -> _ResidualLayer:
+) -> _ResidualStack:
     default_initial_weight = weight_default(initial_weight)
-    return _ResidualLayer(
-        dim_feature_in=dim_feature_in,
-        dim_feature_out=dim_feature_out,
+    return _ResidualStack(
+        dim_feature=dim_feature,
+        num_residual=num_residual,
         activation_fn=activation_fn,
         activation_params=activation_params,
         initial_weight1=default_initial_weight,
@@ -62,42 +86,6 @@ def ResidualLayer(
         use_bias=use_bias,
         dropout_rate=dropout_rate
     )
-
-# class ResidualLayer(NeuronLayer):
-#     def __str__(self):
-#         return "Residual layer: " + super().__str__()
-
-#     def __init__(
-#         self, n_in, n_out, activation_fn=None, 
-#         W_init=None, b_init=None, use_bias=True, drop_out=0.0
-#     ):
-#         super().__init__(n_in, n_out, activation_fn)
-#         self._drop_out = nn.Dropout(drop_out)
-#         self._dense = DenseLayer(n_in, n_out, activation_fn=activation_fn, 
-#             W_init=W_init, b_init=b_init, use_bias=use_bias)
-#         self._residual = DenseLayer(n_out, n_out, activation_fn=None, 
-#             W_init=W_init, b_init=b_init, use_bias=use_bias)
-      
-#     @property
-#     def drop_out(self):
-#         return self._drop_out
-    
-#     @property
-#     def dense(self):
-#         return self._dense
-
-#     @property
-#     def residual(self):
-#         return self._residual
-
-#     def forward(self, x):
-#         #pre-activation
-#         if self.activation_fn is not None: 
-#             y = self.drop_out(self.activation_fn(x))
-#         else:
-#             y = self.drop_out(x)
-#         z = self.residual(self.dense(y)) + x
-#         return z
 
 
 class InteractionLayer(NeuronLayer):
@@ -117,9 +105,7 @@ class InteractionLayer(NeuronLayer):
         self.dense_i = DenseLayer(dim_embedding, dim_embedding, activation_fn, activation_params) # central atoms
         self.dense_j = DenseLayer(dim_embedding, dim_embedding, activation_fn, activation_params) # neighbouring atoms
         #for performing residual transformation on the "message"
-        self.residual_layer = nn.Sequential(*[
-            ResidualLayer(dim_embedding, dim_embedding, activation_fn, activation_params, dropout_rate=dropout_rate) for i in range(num_residual)
-        ])
+        self.residual_stack = ResidualStack(dim_embedding, num_residual, activation_fn, activation_params, dropout_rate=dropout_rate)
         #for performing the final update to the feature vectors
         self.dense = DenseLayer(dim_embedding, dim_embedding)
         self.u = nn.Parameter(torch.ones([dim_embedding]))
@@ -138,7 +124,7 @@ class InteractionLayer(NeuronLayer):
         xj = segment_sum(g * self.dense_j(xa)[idx_j], idx_i)
         #add contributions to get the "message" 
         m = xi + xj 
-        m = self.residual_layer(m)
+        m = self.residual_stack(m)
         if self.activation_fn is not None: 
             m = self.activation_fn(m)
         x = self.u * x + self.dense(m)

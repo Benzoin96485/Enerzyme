@@ -1,7 +1,7 @@
 from typing import Optional, Union, Literal
 from numpy import ndarray
-from torch import nn, Tensor
-from torch.nn import Module, init
+from torch import Tensor
+from torch.nn import Module, init, Sequential, Parameter, Dropout
 import torch.nn.functional as F
 import torch
 from ..activation import get_activation_fn, ACTIVATION_PARAM_TYPE, ACTIVATION_KEY_TYPE
@@ -44,21 +44,25 @@ class DenseLayer(NeuronLayer):
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
 
         if initial_weight == "semi_orthogonal_glorot":
-            self.weight = nn.Parameter(semi_orthogonal_glorot_weights(dim_feature_in, dim_feature_out))
+            self.weight = Parameter(semi_orthogonal_glorot_weights(dim_feature_in, dim_feature_out))
         elif initial_weight == "orthogonal":
-            self.weight = nn.Parameter(torch.empty(dim_feature_out, dim_feature_in))
+            self.weight = Parameter(torch.empty(dim_feature_out, dim_feature_in))
             init.orthogonal_(self.weight)
         elif initial_weight == "zero":
-            self.weight = nn.Parameter(torch.empty(dim_feature_out, dim_feature_in))
+            self.weight = Parameter(torch.empty(dim_feature_out, dim_feature_in))
             init.zeros_(self.weight)
+        elif isinstance(initial_weight, Tensor):
+            self.weight = Parameter(initial_weight)
         else:
-            self.weight = nn.Parameter(torch.tensor(initial_weight))
+            self.weight = Parameter(torch.tensor(initial_weight))
         if use_bias:
             if initial_bias == "zero":
-                self.bias = nn.Parameter(torch.empty(dim_feature_out))
+                self.bias = Parameter(torch.empty(dim_feature_out))
                 init.zeros_(self.bias)
+            elif isinstance(initial_bias, Tensor):
+                self.bias = Parameter(initial_bias)
             else:
-                self.bias = nn.Parameter(torch.tensor(initial_bias))
+                self.bias = Parameter(torch.tensor(initial_bias))
         else:
             self.bias = None 
 
@@ -88,7 +92,7 @@ class ResidualLayer(NeuronLayer):
     ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
         
-        dropout = nn.Dropout(dropout_rate)
+        dropout = Dropout(dropout_rate)
         dense1 = DenseLayer(
             dim_feature_in=dim_feature_in, 
             dim_feature_out=dim_feature_out, 
@@ -99,7 +103,7 @@ class ResidualLayer(NeuronLayer):
             use_bias=use_bias
         )
         dense2 = DenseLayer(
-            dim_feature_in=dim_feature_in, 
+            dim_feature_in=dim_feature_out, 
             dim_feature_out=dim_feature_out, 
             activation_fn=None,
             initial_weight=initial_weight2, 
@@ -107,10 +111,36 @@ class ResidualLayer(NeuronLayer):
             use_bias=use_bias
         )
         if activation_fn is not None:
-            self.residual = nn.Sequential(self.activation_fn, dropout, dense1, dense2)
+            self.residual = Sequential(self.activation_fn, dropout, dense1, dense2)
         else:
-            self.residual = nn.Sequential(dropout, dense1, dense2)
+            self.residual = Sequential(dropout, dense1, dense2)
         
 
     def forward(self, x: Tensor) -> Tensor:
         return x + self.residual(x)
+    
+
+class ResidualStack(NeuronLayer):
+    def __str__(self):
+         return f"Residual stack ({self.num_residual} layers): " + super().__str__()
+
+    def __init__(
+        self, dim_feature: int, num_residual: int, 
+        activation_fn: Optional[ACTIVATION_KEY_TYPE]=None, activation_params: ACTIVATION_PARAM_TYPE=dict(), 
+        initial_weight1: INITIAL_WEIGHT_TYPE="orthogonal", 
+        initial_weight2: INITIAL_WEIGHT_TYPE="zero", 
+        initial_bias: INITIAL_BIAS_TYPE="zero",
+        dropout_rate: float=0,
+        use_bias: bool=True
+    ) -> None:
+        super().__init__(dim_feature, dim_feature, activation_fn, activation_params)
+        self.num_residual = num_residual
+        self.stack = Sequential(*(ResidualLayer(
+            dim_feature, dim_feature,
+            activation_fn, activation_params,
+            initial_weight1, initial_weight2, initial_bias,
+            dropout_rate, use_bias
+        ) for _ in range(num_residual)))
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.stack(x)

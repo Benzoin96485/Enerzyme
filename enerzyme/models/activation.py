@@ -1,11 +1,12 @@
 import math
-from typing import Literal, Dict, Union, Optional
+from abc import ABC, abstractmethod
+from typing import Literal, Dict, Union
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
 
-class BaseScaledTemperedActivation(nn.Module):
+class BaseScaledTemperedActivation(ABC, nn.Module):
     def __init__(self, dim_feature: int=1, initial_alpha: float=1.0, initial_beta: float=1.0, learnable: bool=False) -> None:
         super().__init__()
         if float(initial_alpha) == 1.0 and float(initial_beta) == 1.0 and not learnable:
@@ -19,9 +20,11 @@ class BaseScaledTemperedActivation(nn.Module):
             self.register_parameter("beta", nn.Parameter(torch.full((dim_feature,), initial_beta), requires_grad=learnable))
             self._activation_fn = self.activation_fn
 
+    @abstractmethod
     def simple_activation_fn(self, x: Tensor) -> Tensor:
         ...
 
+    @abstractmethod
     def activation_fn(self, x: Tensor) -> Tensor:
         ...
 
@@ -82,7 +85,7 @@ class Swish(BaseScaledTemperedActivation):
     """
 
     def __init__(
-        self, dim_feature: int, initial_alpha: float=1.0, initial_beta: float=1.702, learnable: bool=True
+        self, dim_feature: int=1, initial_alpha: float=1.0, initial_beta: float=1.702, learnable: bool=True
     ) -> None:
         """ Initializes the Swish class. """
         super().__init__(dim_feature, initial_alpha, initial_beta, learnable)
