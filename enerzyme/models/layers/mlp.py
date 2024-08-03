@@ -144,3 +144,41 @@ class ResidualStack(NeuronLayer):
 
     def forward(self, x: Tensor) -> Tensor:
         return self.stack(x)
+
+
+class ResidualMLP(NeuronLayer):
+    def __str__(self):
+         return f"Residual MLP ({self.num_residual} residual layers): " + super().__str__()
+    
+    def __init__(
+        self, dim_feature_in: int, dim_feature_out:int, num_residual: int, 
+        activation_fn: Optional[ACTIVATION_KEY_TYPE]=None, activation_params: ACTIVATION_PARAM_TYPE=dict(), 
+        initial_weight1: INITIAL_WEIGHT_TYPE="orthogonal", 
+        initial_weight2: INITIAL_WEIGHT_TYPE="zero", 
+        initial_weight_out: INITIAL_WEIGHT_TYPE="zero",
+        initial_bias_residual: INITIAL_BIAS_TYPE="zero",
+        initial_bias_out: INITIAL_BIAS_TYPE="zero",
+        dropout_rate: float=0,
+        use_bias_residual: bool=True,
+        use_bias_out: bool=True
+    ) -> None:
+        super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
+        residual_stack = ResidualStack(
+            dim_feature_in, num_residual, 
+            activation_fn, activation_params,
+            initial_weight1, initial_weight2, initial_bias_residual,
+            dropout_rate, use_bias_residual
+        )
+        output = DenseLayer(
+            dim_feature_in, dim_feature_out,
+            initial_weight=initial_weight_out, initial_bias=initial_bias_out,
+            use_bias=use_bias_out
+        )
+        if self.activation_fn is None:
+            self.stack = Sequential(residual_stack, output)
+        else:
+            self.stack = Sequential(residual_stack, self.activation_fn, output)
+        self.output = output
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.stack(x)

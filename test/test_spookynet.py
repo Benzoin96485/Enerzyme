@@ -58,3 +58,19 @@ def test_residual_stack():
     )
     f2 = F2(dim_feature, 3)
     assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
+
+
+def test_residual_mlp():
+    from enerzyme.models.layers.mlp import ResidualMLP as F1
+    from spookynet.modules.residual_mlp import ResidualMLP as F2
+    f2 = F2(dim_feature, 3)
+    f1 = F1(
+        dim_feature_in=dim_feature, dim_feature_out=dim_feature, num_residual=3, 
+        activation_fn="swish", activation_params={
+            "dim_feature": dim_feature,
+            "learnable": True
+        },
+        initial_weight1="orthogonal", initial_weight2="zero", initial_weight_out=f2.linear.weight.data,
+        initial_bias_residual="zero", initial_bias_out=f2.linear.bias.data
+    )
+    assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())

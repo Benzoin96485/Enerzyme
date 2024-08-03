@@ -40,30 +40,6 @@ def DenseLayer(
     )
 
 
-# def ResidualLayer(
-#     dim_feature_in: int,
-#     dim_feature_out: int,
-#     activation_fn: Optional[ACTIVATION_KEY_TYPE]=None,
-#     activation_params: ACTIVATION_PARAM_TYPE=dict(),
-#     initial_weight: Optional[Union[Tensor, np.ndarray]]=None,
-#     initial_bias: Optional[Union[Tensor, np.ndarray]]=None,
-#     use_bias: bool=True,
-#     dropout_rate: float=0.0
-# ) -> _ResidualLayer:
-#     default_initial_weight = weight_default(initial_weight)
-#     return _ResidualLayer(
-#         dim_feature_in=dim_feature_in,
-#         dim_feature_out=dim_feature_out,
-#         activation_fn=activation_fn,
-#         activation_params=activation_params,
-#         initial_weight1=default_initial_weight,
-#         initial_weight2=default_initial_weight,
-#         initial_bias=bias_default(initial_bias),
-#         use_bias=use_bias,
-#         dropout_rate=dropout_rate
-#     )
-
-
 def ResidualStack(
     dim_feature: int,
     num_residual: int,
@@ -129,55 +105,3 @@ class InteractionLayer(NeuronLayer):
             m = self.activation_fn(m)
         x = self.u * x + self.dense(m)
         return x
-    
-# class DenseLayer(NeuronLayer):
-#     def __str__(self):
-#         return "Dense layer: " + super().__str__()
-
-#     def __init__(
-#         self, n_in, n_out, activation_fn=None, 
-#         W_init=None, b_init=None, use_bias=True, regularization=True
-#     ):
-#         super().__init__(n_in, n_out, activation_fn)
-#         if W_init is None:
-#             W_init = semi_orthogonal_glorot_weights(n_in, n_out) 
-#             self._W = nn.Parameter(torch.tensor(W_init))
-#         else:
-#             self._W = nn.Parameter(W_init)
-
-#         #define l2 loss term for regularization
-#         if regularization:
-#             self._l2loss = F_.mse_loss(self.W, torch.zeros_like(self.W), reduction="sum") / 2
-#         else:
-#             self._l2loss = 0.0
-
-#         #define bias
-#         self._use_bias = use_bias
-#         if self.use_bias:
-#             if b_init is None:
-#                 b_init = nn.Parameter(torch.zeros([self.n_out]))
-#             self._b = nn.Parameter(b_init)
-
-#     @property
-#     def W(self):
-#         return self._W
-
-#     @property
-#     def b(self):
-#         return self._b
-
-#     @property
-#     def l2loss(self):
-#         return self._l2loss
-    
-#     @property
-#     def use_bias(self):
-#         return self._use_bias
-
-#     def forward(self, x):
-#         y = torch.matmul(x, self.W)
-#         if self.use_bias:
-#             y += self.b
-#         if self.activation_fn is not None: 
-#             y = self.activation_fn(y)
-#         return y
