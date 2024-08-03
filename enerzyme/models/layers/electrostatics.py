@@ -1,4 +1,4 @@
-from typing import Dict, Literal
+from typing import Dict, Literal, Optional
 import torch
 from torch import nn, Tensor
 from ..functional import segment_sum
@@ -20,9 +20,9 @@ class ChargeConservationLayer(nn.Module):
 
     def get_corrected_Qa(
         self, 
-        Za: torch.Tensor, Qa: torch.Tensor, 
-        Q: torch.Tensor=None, batch_seg: torch.Tensor=None, **kwargs
-    ) -> Dict[Literal["Qa", "Q"], torch.Tensor]:
+        Za: Tensor, Qa: Tensor, 
+        Q: Optional[Tensor]=None, batch_seg: Optional[Tensor]=None, **kwargs
+    ) -> Dict[Literal["Qa", "Q"], Tensor]:
         '''
         Correct the atomic charge
 

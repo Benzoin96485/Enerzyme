@@ -43,37 +43,34 @@ class DenseLayer(NeuronLayer):
     ):
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
 
-        self.linear = nn.Linear(dim_feature_in, dim_feature_out, use_bias)
         if initial_weight == "semi_orthogonal_glorot":
-            with torch.no_grad():
-                self.linear.weight.data.copy_(semi_orthogonal_glorot_weights(dim_feature_in, dim_feature_out))
+            self.weight = nn.Parameter(semi_orthogonal_glorot_weights(dim_feature_in, dim_feature_out))
         elif initial_weight == "orthogonal":
-            init.orthogonal_(self.linear.weight.data)
+            self.weight = nn.Parameter(torch.empty(dim_feature_out, dim_feature_in))
+            init.orthogonal_(self.weight)
         elif initial_weight == "zero":
-            init.zeros_(self.linear.weight.data)
+            self.weight = nn.Parameter(torch.empty(dim_feature_out, dim_feature_in))
+            init.zeros_(self.weight)
         else:
-            with torch.no_grad():
-                self.linear.weight.data.copy_(torch.tensor(initial_weight))
+            self.weight = nn.Parameter(torch.tensor(initial_weight))
         if use_bias:
             if initial_bias == "zero":
-                nn.init.zeros_(self.linear.bias)
+                self.bias = nn.Parameter(torch.empty(dim_feature_out))
+                init.zeros_(self.bias)
             else:
-                self.linear.bias.data.copy_(torch.tensor(initial_bias))     
-        
-        if activation_fn is None:
-            self.op = self.linear
+                self.bias = nn.Parameter(torch.tensor(initial_bias))
         else:
-            self.op = nn.Sequential(self.linear, self.activation_fn)
+            self.bias = None 
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.op(x)
-    
-    @property
-    def W(self) -> Tensor:
-        return self.linear.weight.data
+        y = F.linear(x, self.weight, self.bias)
+        if self.activation_fn is None:
+            return y
+        else:
+            return self.activation_fn(y)
 
     def l2loss(self) -> Tensor:
-        return F.mse_loss(self.W, torch.zeros_like(self.W), reduction="sum") / 2
+        return F.mse_loss(self.weight, torch.zeros_like(self.weight), reduction="sum") / 2
     
 
 class ResidualLayer(NeuronLayer):

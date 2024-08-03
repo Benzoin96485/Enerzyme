@@ -37,7 +37,7 @@ idx_i = idx_i.reshape(-1)
 idx_j = idx_j.reshape(-1)
 offsets = np.random.random((*idx_i.shape, 3))
 x = np.random.randn(N, F)
-W_init = semi_orthogonal_glorot_weights(F, F)
+W_init = semi_orthogonal_glorot_weights(F, F) * 10000
 b_init = np.random.randn(F)
 D = np.random.random(*idx_i.shape) * 30 + 3
 rbf = np.random.randn(*idx_i.shape, K)
@@ -183,8 +183,8 @@ def test_DenseLayer():
         sess.run(tf.global_variables_initializer())
         y_dense_tf = dense_layer_tf(x).eval()
         l2loss_tf = dense_layer_tf.l2loss.eval()
-    assert_allclose(y_dense_torch, y_dense_tf, rtol=1e-6, atol=1e-6)
-    assert_allclose(l2loss_torch, l2loss_tf, rtol=1e-6, atol=1e-6)
+    assert_allclose(y_dense_torch, y_dense_tf)
+    assert_allclose(l2loss_torch, l2loss_tf)
 
 
 def test_ResidualLayer():
@@ -197,7 +197,7 @@ def test_ResidualLayer():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         y_residual_tf = residual_layer_tf(x.copy()).eval()
-    assert_allclose(y_residual_torch, y_residual_tf, rtol=1e-6, atol=1e-6)
+    assert_allclose(y_residual_torch, y_residual_tf)
 
 
 def test_InteractionLayer():
@@ -216,7 +216,7 @@ def test_InteractionLayer():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         y_interaction_tf = interaction_layer_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
-    assert_allclose(y_interaction_torch, y_interaction_tf, rtol=1e-6, atol=1e-6)
+    assert_allclose(y_interaction_torch, y_interaction_tf)
 
 
 def test_InteractionBlock():
@@ -235,7 +235,7 @@ def test_InteractionBlock():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         y_interaction_tf = interaction_block_tf(x.copy(), rbf.copy(), idx_i, idx_j).eval()
-    assert_allclose(y_interaction_torch, y_interaction_tf, rtol=1e-5, atol=1e-5)
+    assert_allclose(y_interaction_torch, y_interaction_tf)
 
 
 def test_OutputBlock():
@@ -278,7 +278,7 @@ def test_atomic_properties():
         nhloss_tf = nhloss_tf.eval()
     assert_allclose(Ea_torch, Ea_tf)
     assert_allclose(Qa_torch, Qa_tf)
-    assert_allclose(Dij_lr_torch, Dij_lr_tf, rtol=1e-6, atol=1e-6)
+    assert_allclose(Dij_lr_torch, Dij_lr_tf)
     assert_allclose(nhloss_torch, nhloss_tf)
 
 
