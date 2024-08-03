@@ -74,3 +74,79 @@ def test_residual_mlp():
         initial_bias_residual="zero", initial_bias_out=f2.linear.bias.data
     )
     assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
+
+
+def test_nuclear_embedding():
+    pass
+
+
+def test_electronic_embedding():
+    pass
+
+
+def test_nonlinear_electronic_embedding():
+    pass
+
+
+def test_exponential_gaussian_functions():
+    pass
+
+
+def test_exponential_bernstein_polynomials():
+    pass
+
+
+def test_gaussian_functions():
+    pass
+
+
+def test_bernstein_polynomials():
+    pass
+
+
+def test_sinc_functions():
+    pass
+
+
+def test_local_interaction():
+    pass
+
+
+def test_nonlocal_interaction():
+    pass
+
+
+def test_interaction_module():
+    pass
+
+
+def test_zbl_repulsion_energy():
+    pass
+
+
+def test_d4_dispersion_energy():
+    pass
+
+
+def test_calculate_distances():
+    pass
+
+
+def test_atomic_properties_static():
+    pass
+
+
+def test_atomic_properties_dynamic():
+    pass
+
+
+def test_atomic_properties():
+    pass
+
+
+def test_energy():
+    pass
+
+
+def test_energy_and_forces():
+    pass

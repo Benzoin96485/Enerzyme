@@ -2,13 +2,14 @@ from typing import Dict, Optional, Literal
 from abc import ABC, abstractmethod
 import torch
 from torch import nn, Tensor
+from torch.nn import Linear
 import torch.nn.functional as F
-from .mlp import ResidualMLP
+from .mlp import NeuronLayer, ResidualMLP
 from ..functional import segment_sum
 
 
-class BaseElectronEmbedding(ABC):
-    def __init__(self, dim_embedding: int, num_residual: int, activation: str, attribute: Literal["charge", "spin"]="charge"):
+class BaseElectronEmbedding(ABC, NeuronLayer):
+    def __init__(self, dim_embedding: int, num_residual: int, activation_fn: str, attribute: Literal["charge", "spin"]="charge"):
         super().__init__()
         self.dim_embedding = dim_embedding
         self.num_residual = num_residual
@@ -25,7 +26,7 @@ class BaseElectronEmbedding(ABC):
         return output
 
 
-class ElectronicEmbedding(nn.Module):
+class ElectronicEmbedding(BaseElectronEmbedding):
     """
     Block for updating atomic features through nonlocal interactions with the
     electrons.
@@ -53,22 +54,24 @@ class ElectronicEmbedding(nn.Module):
         self,
         dim_embedding: int,
         num_residual: int,
-        activation: str = "swish",
+        activation_fn: str="swish",
+        activation_params: str="swish",
         attribute: Literal["charge", "spin"]="charge"
     ) -> None:
         """ Initializes the ElectronicEmbedding class. """
         super().__init__(dim_embedding, num_residual, activation, attribute)
-        self.linear_q = nn.Linear(dim_embedding, dim_embedding)
+        self.linear_q = Linear(dim_embedding, dim_embedding)
         self.sqrt_dim_embedding = dim_embedding ** 0.5
         if attribute == "charge":  # charges are duplicated to use separate weights for +/-
-            self.linear_k = nn.Linear(2, dim_embedding, bias=False)
-            self.linear_v = nn.Linear(2, dim_embedding, bias=False)
+            self.linear_k = Linear(2, dim_embedding, bias=False)
+            self.linear_v = Linear(2, dim_embedding, bias=False)
         else:
-            self.linear_k = nn.Linear(1, dim_embedding, bias=False)
-            self.linear_v = nn.Linear(1, dim_embedding, bias=False)
+            self.linear_k = Linear(1, dim_embedding, bias=False)
+            self.linear_v = Linear(1, dim_embedding, bias=False)
         self.resblock = ResidualMLP(
-            dim_embedding,
-            num_residual,
+            dim_feature_in=dim_embedding,
+            dim_feature_out=dim_embedding,
+            num_residual=num_residual,
             activation=activation,
             zero_init=True,
             bias=False,

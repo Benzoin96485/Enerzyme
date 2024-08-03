@@ -3,11 +3,11 @@ from abc import ABC, abstractmethod
 from typing import Dict
 import numpy as np
 import torch
-from torch import nn, Tensor
-import torch.nn.functional as F
+from torch import Tensor
+from torch.nn import Module, Embedding, Parameter, Linear, init
 
 
-class BaseAtomEmbedding(ABC, nn.Module):
+class BaseAtomEmbedding(ABC, Module):
     def __init__(self, max_Za, dim_embedding):
         super().__init__()
         self.max_Za = max_Za
@@ -28,7 +28,7 @@ class BaseAtomEmbedding(ABC, nn.Module):
 class RandomAtomEmbedding(BaseAtomEmbedding):
     def __init__(self, max_Za, dim_embedding):
         super().__init__(max_Za, dim_embedding)
-        self.embedding = nn.Embedding(max_Za, dim_embedding)
+        self.embedding = Embedding(max_Za, dim_embedding)
 
     def get_embedding(self, Za: Tensor) -> Tensor:
         return self.embedding(Za)
@@ -136,27 +136,27 @@ class NuclearEmbedding(BaseAtomEmbedding):
     def __init__(self, max_Za: int, dim_embedding: int, zero_init: bool=True, use_electron_config: bool=True) -> None:
         super().__init__(max_Za, dim_embedding)
         self.register_parameter(
-            "element_embedding", nn.Parameter(Tensor(max_Za + 1, dim_embedding))
+            "element_embedding", Parameter(Tensor(max_Za + 1, dim_embedding))
         )
         self.register_buffer(
             "embedding", Tensor(max_Za + 1, dim_embedding), persistent=False
         )
         if use_electron_config:
             self.register_buffer("electron_config", torch.tensor(ELECTRON_CONFIG))
-            self.config_linear = nn.Linear(
+            self.config_linear = Linear(
                 self.electron_config.size(1), self.num_features, bias=False)
         self.reset_parameters(zero_init)
 
     def reset_parameters(self, zero_init: bool = True) -> None:
         """ Initialize parameters. """
         if zero_init:
-            nn.init.zeros_(self.element_embedding)
+            init.zeros_(self.element_embedding)
             if self.use_electron_config:
-                nn.init.zeros_(self.config_linear.weight)
+                init.zeros_(self.config_linear.weight)
         else:
-            nn.init.uniform_(self.element_embedding, -math.sqrt(3), math.sqrt(3))
+            init.uniform_(self.element_embedding, -math.sqrt(3), math.sqrt(3))
             if self.use_electron_config:
-                nn.init.orthogonal_(self.config_linear.weight)
+                init.orthogonal_(self.config_linear.weight)
 
     def train(self, mode: bool = True) -> None:
         """ Switch between training and evaluation mode. """
