@@ -45,6 +45,8 @@ Z = np.random.randint(0, 94, N)
 Qa = np.random.randn(N)
 Ea = np.random.randn(N)
 Q_tot = np.random.randn()
+nci = np.random.rand(*idx_i.shape) * 5
+ncj = np.random.rand(*idx_j.shape) * 5
 # def set_dtype(dtype):
 dtype = "float64"
 if dtype == "float64":
@@ -279,6 +281,40 @@ def test_atomic_properties():
     assert_allclose(Qa_torch, Qa_tf)
     assert_allclose(Dij_lr_torch, Dij_lr_tf)
     assert_allclose(nhloss_torch, nhloss_tf)
+
+
+def test_ncoord():
+    from enerzyme.models.layers.dispersion.grimme_d3 import _ncoord as f1
+    from physnet.grimme_d3.grimme_d3 import _ncoord as f2
+    cn_torch = f1(
+        Zi=torch.from_numpy(Z)[torch.from_numpy(idx_i)],
+        Zj=torch.from_numpy(Z)[torch.from_numpy(idx_j)], 
+        Dij=torch.from_numpy(D),
+        idx_i=torch.from_numpy(idx_i),
+        cutoff=2
+    )
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        cn_tf = f2(Z[idx_i], Z[idx_j], D, idx_i, 2).eval()
+    assert_allclose(cn_torch, cn_tf)
+
+
+def test_getc6():
+    from enerzyme.models.layers.dispersion.grimme_d3 import _getc6 as f1
+    from physnet.grimme_d3.grimme_d3 import _getc6 as f2
+    c6_torch = f1(
+        Zi=torch.from_numpy(Z)[torch.from_numpy(idx_i)],
+        Zj=torch.from_numpy(Z)[torch.from_numpy(idx_j)],
+        nci=torch.from_numpy(nci),
+        ncj=torch.from_numpy(ncj)
+    )
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        c6_tf = f2(
+            np.stack([Z[idx_i], Z[idx_j]], axis=1),
+            nci, ncj
+        ).eval()
+    assert_allclose(c6_torch, c6_tf)
 
 
 def test_edisp():

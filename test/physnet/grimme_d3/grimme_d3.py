@@ -112,7 +112,7 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
     nc = _ncoord(Zi, Zj, r, idx_i, cutoff=cutoff, rcov=rcov) #coordination numbers
     nci = tf.gather(nc, idx_i)
     ncj = tf.gather(nc, idx_j)
-    c6 = _getc6_v2(ZiZj, nci, ncj, c6ab=c6ab, k3=k3) #c6 coefficients
+    c6 = _getc6(ZiZj, nci, ncj, c6ab=c6ab, k3=k3) #c6 coefficients
     
     c8 = 3*c6*tf.cast(tf.gather(r2r4, Zi),c6.dtype)*tf.cast(tf.gather(r2r4, Zj),c6.dtype) #c8 coefficient
     
