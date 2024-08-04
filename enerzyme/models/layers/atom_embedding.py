@@ -141,10 +141,11 @@ class NuclearEmbedding(BaseAtomEmbedding):
         self.register_buffer(
             "embedding", Tensor(max_Za + 1, dim_embedding), persistent=False
         )
+        self.use_electron_config = use_electron_config
         if use_electron_config:
             self.register_buffer("electron_config", torch.tensor(ELECTRON_CONFIG))
             self.config_linear = Linear(
-                self.electron_config.size(1), self.num_features, bias=False)
+                self.electron_config.size(1), dim_embedding, bias=False)
         self.reset_parameters(zero_init)
 
     def reset_parameters(self, zero_init: bool = True) -> None:

@@ -12,21 +12,30 @@ dim_feature = 64
 initial_alpha = np.random.randn()
 initial_beta = np.random.randn()
 x = torch.randn(dim_feature)
+max_Za = 87
+Za = torch.randint(1, max_Za, (100,))
+dtype = "float64"
+if dtype == "float64":
+    dtype = torch.float64
+    x.type(dtype)
+elif dtype == "float32":
+    dtype = torch.float32
+    x.type(dtype)
 
 
 def test_shifted_softplus():
     from enerzyme.models.activation import ShiftedSoftplus as F1
     from spookynet.modules.shifted_softplus import ShiftedSoftplus as F2
-    f1 = F1(dim_feature, initial_alpha, initial_beta)
-    f2 = F2(dim_feature, initial_alpha, initial_beta)
+    f1 = F1(dim_feature, initial_alpha, initial_beta).type(dtype)
+    f2 = F2(dim_feature, initial_alpha, initial_beta).type(dtype)
     assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
 
 
 def test_swish():
     from enerzyme.models.activation import Swish as F1
     from spookynet.modules.swish import Swish as F2
-    f1 = F1(dim_feature, initial_alpha, initial_beta)
-    f2 = F2(dim_feature, initial_alpha, initial_beta)
+    f1 = F1(dim_feature, initial_alpha, initial_beta).type(dtype)
+    f2 = F2(dim_feature, initial_alpha, initial_beta).type(dtype)
     assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
 
 
@@ -40,8 +49,8 @@ def test_residual_layer():
             "learnable": True
         },
         initial_bias="zero", initial_weight1="orthogonal", initial_weight2="zero"
-    )
-    f2 = F2(dim_feature)
+    ).type(dtype)
+    f2 = F2(dim_feature).type(dtype)
     assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
 
 
@@ -55,15 +64,15 @@ def test_residual_stack():
             "learnable": True
         },
         initial_bias="zero", initial_weight1="orthogonal", initial_weight2="zero"
-    )
-    f2 = F2(dim_feature, 3)
+    ).type(dtype)
+    f2 = F2(dim_feature, 3).type(dtype)
     assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
 
 
 def test_residual_mlp():
     from enerzyme.models.layers.mlp import ResidualMLP as F1
     from spookynet.modules.residual_mlp import ResidualMLP as F2
-    f2 = F2(dim_feature, 3)
+    f2 = F2(dim_feature, 3).type(dtype)
     f1 = F1(
         dim_feature_in=dim_feature, dim_feature_out=dim_feature, num_residual=3, 
         activation_fn="swish", activation_params={
@@ -72,12 +81,16 @@ def test_residual_mlp():
         },
         initial_weight1="orthogonal", initial_weight2="zero", initial_weight_out=f2.linear.weight.data,
         initial_bias_residual="zero", initial_bias_out=f2.linear.bias.data
-    )
+    ).type(dtype)
     assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
 
 
 def test_nuclear_embedding():
-    pass
+    from enerzyme.models.layers.atom_embedding import NuclearEmbedding as F1
+    from spookynet.modules.nuclear_embedding import NuclearEmbedding as F2
+    f1 = F1(86, dim_feature).type(dtype)
+    f2 = F2(dim_feature).type(dtype)
+    assert_allclose(f1.get_embedding(Za).detach().numpy(), f2(Za).detach().numpy())
 
 
 def test_electronic_embedding():
