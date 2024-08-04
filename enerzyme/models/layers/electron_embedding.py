@@ -137,7 +137,7 @@ class ElectronicEmbedding(BaseElectronEmbedding):
         return self.resblock((a / (anorm + eps)).unsqueeze(-1) * v)
 
 
-class NonlinearElectronicEmbedding(nn.Module):
+class NonlinearElectronicEmbedding(BaseElectronEmbedding):
     """
     Block for updating atomic features through nonlocal interactions with the
     electrons.
@@ -162,22 +162,22 @@ class NonlinearElectronicEmbedding(nn.Module):
     """
 
     def __init__(
-        self, num_features: int, num_residual: int, activation: str = "swish"
+        self, dim_embedding: int, num_residual: int, activation_fn: str="swish", attribute: Literal["charge", "spin"]="charge"
     ) -> None:
         """ Initializes the NonlinearElectronicEmbedding class. """
-        super(NonlinearElectronicEmbedding, self).__init__()
-        self.linear_q = nn.Linear(num_features, num_features, bias=False)
-        self.featurize_k = nn.Linear(1, num_features)
+        super(NonlinearElectronicEmbedding, self).__init__(dim_embedding, num_residual, attribute)
+        self.linear_q = nn.Linear(dim_embedding, dim_embedding, bias=False)
+        self.featurize_k = nn.Linear(1, dim_embedding)
         self.resblock_k = ResidualMLP(
-            num_features, num_residual, activation=activation, zero_init=True
+            dim_embedding, num_residual, activation_fn=activation_fn, zero_init=True
         )
-        self.featurize_v = nn.Linear(1, num_features, bias=False)
+        self.featurize_v = nn.Linear(1, dim_embedding, bias=False)
         self.resblock_v = ResidualMLP(
-            num_features,
+            dim_embedding,
             num_residual,
-            activation=activation,
+            activation_fn=activation_fn,
             zero_init=True,
-            bias=False,
+            use_bias=False,
         )
         self.reset_parameters()
 
@@ -188,15 +188,15 @@ class NonlinearElectronicEmbedding(nn.Module):
         nn.init.zeros_(self.featurize_k.bias)
         nn.init.orthogonal_(self.featurize_v.weight)
 
-    def forward(
+    def get_embedding(
         self,
-        x: torch.Tensor,
-        E: torch.Tensor,
-        num_batch: int,
-        batch_seg: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
+        atom_embedding: Tensor,
+        Q: Optional[Tensor]=None,
+        S: Optional[Tensor]=None,
+        batch_seg: Optional[Tensor]=None,
+        mask: Optional[Tensor] = None,
         eps: float = 1e-8,
-    ) -> torch.Tensor:
+    ) -> Tensor:
         """
         Evaluate interaction block.
         N: Number of atoms.
@@ -204,18 +204,25 @@ class NonlinearElectronicEmbedding(nn.Module):
         x (FloatTensor [N, num_features]):
             Atomic feature vectors.
         """
+        if batch_seg is None:  # assume a single batch
+            batch_seg = torch.zeros(atom_embedding.size(0), dtype=torch.long, device=atom_embedding.device)
+        if self.attribute == "charge":
+            E = Q
+        else:
+            E = S
         e = E.unsqueeze(-1)
-        q = self.linear_q(x)  # queries
+        q = self.linear_q(atom_embedding)  # queries
         k = self.resblock_k(self.featurize_k(e))[batch_seg]  # keys
         v = self.resblock_v(self.featurize_v(e))[batch_seg]  # values
         # dot product
         dot = torch.sum(k * q, dim=-1)
         # determine maximum dot product (for numerics)
+        num_batch = batch_seg[-1] + 1
         if num_batch > 1:
             if mask is None:
                 mask = (
                     nn.functional.one_hot(batch_seg)
-                    .to(dtype=x.dtype, device=x.device)
+                    .to(dtype=atom_embedding.dtype, device=atom_embedding.device)
                     .transpose(-1, -2)
                 )
             tmp = dot.view(1, -1).expand(num_batch, -1)
@@ -230,7 +237,7 @@ class NonlinearElectronicEmbedding(nn.Module):
         d = k.shape[-1]
         a = torch.exp((dot - maximum) / d ** 0.5)
 
-        anorm = a.new_zeros(num_batch).index_add_(0, batch_seg, a)
+        anorm = segment_sum(a, batch_seg)
         if a.device.type == "cpu":  # indexing is faster on CPUs
             anorm = anorm[batch_seg]
         else:  # gathering is faster on GPUs

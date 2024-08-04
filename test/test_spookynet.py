@@ -110,6 +110,15 @@ def test_electronic_embedding():
 
 
 def test_nonlinear_electronic_embedding():
+    from enerzyme.models.layers.electron_embedding import NonlinearElectronicEmbedding as F1
+    from spookynet.modules.nonlinear_electronic_embedding import NonlinearElectronicEmbedding as F2
+    f1 = F1(dim_feature, 3, attribute="spin").type(dtype)
+    f2 = F2(dim_feature, 3).type(dtype)
+    S = torch.tensor([2], dtype=dtype)
+    assert_allclose(
+        f1.get_embedding(atom_embedding=atom_embedding, S=S).detach().numpy(), 
+        f2(atom_embedding, S, 1, torch.zeros(N, dtype=torch.long)).detach().numpy()
+    )
     pass
 
 
