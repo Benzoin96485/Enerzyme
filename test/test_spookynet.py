@@ -1,4 +1,6 @@
 import logging
+
+from enerzyme.models.layers import atom_embedding
 logging.getLogger('tensorflow').disabled = True
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
@@ -13,15 +15,16 @@ initial_alpha = np.random.randn()
 initial_beta = np.random.randn()
 x = torch.randn(dim_feature)
 max_Za = 87
-Za = torch.randint(1, max_Za, (100,))
+N = 100
+Za = torch.randint(1, max_Za, (N,))
+atom_embedding = torch.randn((N, dim_feature))
 dtype = "float64"
 if dtype == "float64":
     dtype = torch.float64
-    x.type(dtype)
 elif dtype == "float32":
     dtype = torch.float32
-    x.type(dtype)
-
+x = x.type(dtype)
+atom_embedding = atom_embedding.type(dtype)
 
 def test_shifted_softplus():
     from enerzyme.models.activation import ShiftedSoftplus as F1
@@ -94,6 +97,15 @@ def test_nuclear_embedding():
 
 
 def test_electronic_embedding():
+    from enerzyme.models.layers.electron_embedding import ElectronicEmbedding as F1
+    from spookynet.modules.electronic_embedding import ElectronicEmbedding as F2
+    f1 = F1(dim_feature, 3, attribute="spin").type(dtype)
+    f2 = F2(dim_feature, 3).type(dtype)
+    S = torch.tensor([2], dtype=dtype)
+    assert_allclose(
+        f1.get_embedding(atom_embedding=atom_embedding, S=S).detach().numpy(), 
+        f2(atom_embedding, S, 1, None).detach().numpy()
+    )
     pass
 
 

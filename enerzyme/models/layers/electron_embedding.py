@@ -2,18 +2,39 @@ from typing import Dict, Optional, Literal
 from abc import ABC, abstractmethod
 import torch
 from torch import nn, Tensor
-from torch.nn import Linear
+from torch.nn import Linear, Module
 import torch.nn.functional as F
-from .mlp import NeuronLayer, ResidualMLP
+from .mlp import ResidualMLP as _ResidualMLP
+from ..activation import ACTIVATION_KEY_TYPE
 from ..functional import segment_sum
 
 
-class BaseElectronEmbedding(ABC, NeuronLayer):
-    def __init__(self, dim_embedding: int, num_residual: int, activation_fn: str, attribute: Literal["charge", "spin"]="charge"):
+def ResidualMLP(
+    dim_embedding: int, num_residual: int, 
+    activation_fn: ACTIVATION_KEY_TYPE,
+    use_bias: bool=True, zero_init: bool=True
+) -> _ResidualMLP:
+    return _ResidualMLP(
+        dim_feature_in=dim_embedding,
+        dim_feature_out=dim_embedding,
+        num_residual=num_residual,
+        activation_fn=activation_fn,
+        activation_params = {
+            "dim_feature": dim_embedding,
+            "learnable": True
+        },
+        initial_weight1="orthogonal", initial_weight2="zero", initial_weight_out="zero" if zero_init else "orthogonal",
+        use_bias_residual=use_bias, use_bias_out=use_bias
+    )
+
+
+class BaseElectronEmbedding(ABC, Module):
+    def __init__(
+        self, dim_embedding: int, num_residual: int, attribute: Literal["charge", "spin"]="charge"
+    ) -> None:
         super().__init__()
         self.dim_embedding = dim_embedding
         self.num_residual = num_residual
-        self.activation = activation
         self.attribute = attribute
 
     @abstractmethod
@@ -54,12 +75,12 @@ class ElectronicEmbedding(BaseElectronEmbedding):
         self,
         dim_embedding: int,
         num_residual: int,
-        activation_fn: str="swish",
-        activation_params: str="swish",
+        activation_fn: ACTIVATION_KEY_TYPE="swish",
         attribute: Literal["charge", "spin"]="charge"
     ) -> None:
         """ Initializes the ElectronicEmbedding class. """
-        super().__init__(dim_embedding, num_residual, activation, attribute)
+        
+        super().__init__(dim_embedding, num_residual, attribute)
         self.linear_q = Linear(dim_embedding, dim_embedding)
         self.sqrt_dim_embedding = dim_embedding ** 0.5
         if attribute == "charge":  # charges are duplicated to use separate weights for +/-
@@ -69,12 +90,8 @@ class ElectronicEmbedding(BaseElectronEmbedding):
             self.linear_k = Linear(1, dim_embedding, bias=False)
             self.linear_v = Linear(1, dim_embedding, bias=False)
         self.resblock = ResidualMLP(
-            dim_feature_in=dim_embedding,
-            dim_feature_out=dim_embedding,
-            num_residual=num_residual,
-            activation=activation,
-            zero_init=True,
-            bias=False,
+            dim_embedding, num_residual, activation_fn,
+            use_bias=False, zero_init=True
         )
         self.reset_parameters()
 
@@ -91,7 +108,6 @@ class ElectronicEmbedding(BaseElectronEmbedding):
         Q: Optional[Tensor]=None,
         S: Optional[Tensor]=None,
         batch_seg: Optional[Tensor]=None,
-        mask: Optional[Tensor]=None,  # only for backwards compatibility
         eps: float = 1e-8,
     ) -> torch.Tensor:
         """
@@ -102,7 +118,7 @@ class ElectronicEmbedding(BaseElectronEmbedding):
             Atomic feature vectors.
         """
         if batch_seg is None:  # assume a single batch
-            batch_seg = torch.zeros(atom_embedding.size(0), dtype=torch.int64, device=x.device)
+            batch_seg = torch.zeros(atom_embedding.size(0), dtype=torch.long, device=atom_embedding.device)
         q = self.linear_q(atom_embedding)  # queries
         if self.attribute == "charge":
             e = F.relu(torch.stack([Q, -Q], dim=-1))
@@ -119,3 +135,104 @@ class ElectronicEmbedding(BaseElectronEmbedding):
         else:  # gathering is faster on GPUs
             anorm = torch.gather(anorm, 0, batch_seg)
         return self.resblock((a / (anorm + eps)).unsqueeze(-1) * v)
+
+
+class NonlinearElectronicEmbedding(nn.Module):
+    """
+    Block for updating atomic features through nonlocal interactions with the
+    electrons.
+
+    Arguments:
+        num_features (int):
+            Dimensions of feature space.
+        num_basis_functions (int):
+            Number of radial basis functions.
+        num_residual_pre_i (int):
+            Number of residual blocks applied to atomic features in i branch
+            (central atoms) before computing the interaction.
+        num_residual_pre_j (int):
+            Number of residual blocks applied to atomic features in j branch
+            (neighbouring atoms) before computing the interaction.
+        num_residual_post (int):
+            Number of residual blocks applied to interaction features.
+        activation (str):
+            Kind of activation function. Possible values:
+            'swish': Swish activation function.
+            'ssp': Shifted softplus activation function.
+    """
+
+    def __init__(
+        self, num_features: int, num_residual: int, activation: str = "swish"
+    ) -> None:
+        """ Initializes the NonlinearElectronicEmbedding class. """
+        super(NonlinearElectronicEmbedding, self).__init__()
+        self.linear_q = nn.Linear(num_features, num_features, bias=False)
+        self.featurize_k = nn.Linear(1, num_features)
+        self.resblock_k = ResidualMLP(
+            num_features, num_residual, activation=activation, zero_init=True
+        )
+        self.featurize_v = nn.Linear(1, num_features, bias=False)
+        self.resblock_v = ResidualMLP(
+            num_features,
+            num_residual,
+            activation=activation,
+            zero_init=True,
+            bias=False,
+        )
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        """ Initialize parameters. """
+        nn.init.orthogonal_(self.linear_q.weight)
+        nn.init.orthogonal_(self.featurize_k.weight)
+        nn.init.zeros_(self.featurize_k.bias)
+        nn.init.orthogonal_(self.featurize_v.weight)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        E: torch.Tensor,
+        num_batch: int,
+        batch_seg: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        eps: float = 1e-8,
+    ) -> torch.Tensor:
+        """
+        Evaluate interaction block.
+        N: Number of atoms.
+
+        x (FloatTensor [N, num_features]):
+            Atomic feature vectors.
+        """
+        e = E.unsqueeze(-1)
+        q = self.linear_q(x)  # queries
+        k = self.resblock_k(self.featurize_k(e))[batch_seg]  # keys
+        v = self.resblock_v(self.featurize_v(e))[batch_seg]  # values
+        # dot product
+        dot = torch.sum(k * q, dim=-1)
+        # determine maximum dot product (for numerics)
+        if num_batch > 1:
+            if mask is None:
+                mask = (
+                    nn.functional.one_hot(batch_seg)
+                    .to(dtype=x.dtype, device=x.device)
+                    .transpose(-1, -2)
+                )
+            tmp = dot.view(1, -1).expand(num_batch, -1)
+            tmp, _ = torch.max(mask * tmp, dim=-1)
+            if tmp.device.type == "cpu":  # indexing is faster on CPUs
+                maximum = tmp[batch_seg]
+            else:  # gathering is faster on GPUs
+                maximum = torch.gather(tmp, 0, batch_seg)
+        else:
+            maximum = torch.max(dot)
+        # attention
+        d = k.shape[-1]
+        a = torch.exp((dot - maximum) / d ** 0.5)
+
+        anorm = a.new_zeros(num_batch).index_add_(0, batch_seg, a)
+        if a.device.type == "cpu":  # indexing is faster on CPUs
+            anorm = anorm[batch_seg]
+        else:  # gathering is faster on GPUs
+            anorm = torch.gather(anorm, 0, batch_seg)
+        return (a / (anorm + eps)).unsqueeze(-1) * v
