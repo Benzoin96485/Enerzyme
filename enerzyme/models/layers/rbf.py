@@ -224,61 +224,54 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
         return -F.softplus(self._widths) * (expalphar - F.softplus(self._centers)) ** 2
 
 
-# class ExponentialBernsteinRBFLayer(ExponentialRBF):
-#     def __init__(
-#         self,
-#         num_basis_functions: int,
-#         dtype: torch.dtype,
-#         no_basis_function_at_infinity: bool=False,
-#         init_alpha: float=0.9448630629184640,
-#         exp_weighting: bool=False,
-#         learnable_shape: bool=True,
-#         cutoff: float=float("inf"),
-#         cutoff_fn: Callable=lambda x, cutoff: smooth_cutoff_function(x, cutoff=cutoff, flavor="poly")
-#     ) -> None:
-#         '''
-#         Radial basis functions based on exponential Bernstein polynomials given by:
-#         b_{v,n}(x) = (n over v) * exp(-alpha*x)**v * (1-exp(-alpha*x))**(n-v)
-#         (see https://en.wikipedia.org/wiki/Bernstein_polynomial)
+class ExponentialBernsteinRBFLayer(ExponentialRBF):
+    def __init__(
+        self,
+        num_rbf: int,
+        no_basis_at_infinity: bool=False,
+        init_alpha: float=0.9448630629184640,
+        exp_weighting: bool=False,
+        learnable_shape: bool=True,
+        cutoff: float=float("inf"),
+        cutoff_fn: Literal["polynomial", "bump"]="bump",
+    ) -> None:
+        '''
+        Radial basis functions based on exponential Bernstein polynomials given by:
+        b_{v,n}(x) = (n over v) * exp(-alpha*x)**v * (1-exp(-alpha*x))**(n-v)
+        (see https://en.wikipedia.org/wiki/Bernstein_polynomial)
 
-#         For n to infinity, linear combination of b_{v,n}s can approximate 
-#         any continuous function on the interval [0, 1] uniformly [1].
+        For n to infinity, linear combination of b_{v,n}s can approximate 
+        any continuous function on the interval [0, 1] uniformly [1].
 
-#         NOTE: There is a problem for x = 0, as log(-expm1(0)) will be log(0) = -inf.
-#         This itself is not an issue, but the buffer v contains an entry 0 and
-#         0*(-inf)=nan. The correct behaviour could be recovered by replacing the nan
-#         with 0.0, but should not be necessary because issues are only present when
-#         r = 0, which will not occur with chemically meaningful inputs.
+        NOTE: There is a problem for x = 0, as log(-expm1(0)) will be log(0) = -inf.
+        This itself is not an issue, but the buffer v contains an entry 0 and
+        0*(-inf)=nan. The correct behaviour could be recovered by replacing the nan
+        with 0.0, but should not be necessary because issues are only present when
+        r = 0, which will not occur with chemically meaningful inputs.
 
-#         References:
-#         -----
-#         [1] Commun. Kharkov Math. Soc. 1912, 13, 1.
-#         '''
-#         super().__init__(
-#             num_basis_functions=num_basis_functions,
-#             dtype=dtype,
-#             no_basis_function_at_infinity=no_basis_function_at_infinity,
-#             init_alpha=init_alpha,
-#             exp_weighting=exp_weighting,
-#             learnable_shape=learnable_shape,
-#             cutoff=cutoff,
-#             cutoff_fn=cutoff_fn
-#         )
-#         self.num_basis_functions += bool(self.no_basis_function_at_infinity)
-#         logfactorial = np.zeros((self.num_basis_functions))
-#         for i in range(2, num_basis_functions):
-#             logfactorial[i] = logfactorial[i - 1] + np.log(i)
-#         v = np.arange(0, num_basis_functions)
-#         n = (num_basis_functions - 1) - v
-#         logbinomial = logfactorial[-1] - logfactorial[v] - logfactorial[n]
-#         if self.no_basis_function_at_infinity:  # remove last basis function at infinity
-#             v = v[:-1]
-#             n = n[:-1]
-#             logbinomial = logbinomial[:-1]
-#         self.register_buffer("logc", torch.tensor(logbinomial, dtype=self.dtype))
-#         self.register_buffer("n", torch.tensor(n, dtype=self.dtype))
-#         self.register_buffer("v", torch.tensor(v, dtype=self.dtype))
-#         self.inner_fn = self.bernstein
+        References:
+        -----
+        [1] Commun. Kharkov Math. Soc. 1912, 13, 1.
+        '''
+        super().__init__(
+            num_rbf=num_rbf,
+            no_basis_at_infinity=no_basis_at_infinity,
+            init_alpha=init_alpha,
+            exp_weighting=exp_weighting,
+            learnable_shape=learnable_shape,
+            cutoff=cutoff,
+            cutoff_fn=cutoff_fn
+        )
+        from ..special import get_berstein_coefficient
+        self.num_basis_functions += int(no_basis_at_infinity)
+        v, n, logc = get_berstein_coefficient(self.num_basis_functions)
+        if no_basis_at_infinity:  # remove last basis function at infinity
+            v = v[:-1]
+            n = n[:-1]
+            logc = logc[:-1]
+        self.register_buffer("logc", torch.tensor(logc))
+        self.register_buffer("n", torch.tensor(n))
+        self.register_buffer("v", torch.tensor(v))
 
-#     def bernstein(self, alphar, expalphar) -> torch.Tensor:
-#         return self.logc + self.n * alphar + self.v * torch.log(-torch.expm1(alphar))
+    def inner_fn(self, alphar: Tensor, expalphar: Tensor) -> Tensor:
+        return self.logc + self.n * alphar + self.v * torch.log(-torch.expm1(alphar))

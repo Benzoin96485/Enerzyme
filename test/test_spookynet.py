@@ -152,7 +152,14 @@ def test_exponential_gaussian_functions():
 
 
 def test_exponential_bernstein_polynomials():
-    pass
+    from enerzyme.models.layers.rbf import ExponentialBernsteinRBFLayer as F1
+    from spookynet.modules.exponential_bernstein_polynomials import ExponentialBernsteinPolynomials as F2
+    f1 = F1(dim_feature)
+    f2 = F2(dim_feature)
+    assert_allclose(
+        f1.get_rbf(D, cutoff_values).detach().numpy(), 
+        f2(D, cutoff_values).detach().numpy(), rtol=1e-6, atol=1e-6
+    )
 
 
 def test_gaussian_functions():
