@@ -1,14 +1,15 @@
 import math
 from abc import ABC, abstractmethod
-from typing import Literal, Dict
+from typing import Literal, Dict, Optional
 import torch
-from torch import nn, Tensor
+from torch import Tensor
+from torch.nn import Module, Parameter
 import torch.nn.functional as F
 from ..cutoff import CUTOFF_REGISTER
 from ..functional import softplus_inverse
 
 
-class BaseRBF(ABC, nn.Module):
+class BaseRBF(ABC, Module):
     def __init__(
         self,
         num_basis_functions: int
@@ -17,10 +18,10 @@ class BaseRBF(ABC, nn.Module):
         self.num_basis_functions = num_basis_functions
 
     @abstractmethod
-    def get_rbf(self, Dij: Tensor, cutoff_values: Tensor, **kwargs) -> Tensor:
+    def get_rbf(self, Dij: Tensor, cutoff_values: Optional[Tensor]=None, **kwargs) -> Tensor:
         ...
 
-    def forward(self, net_input: Dict[str, Tensor], cutoff_values: Tensor=None, Dij_name: str="Dij") -> Dict[str, Tensor]:
+    def forward(self, net_input: Dict[str, Tensor], cutoff_values: Optional[Tensor]=None, Dij_name: str="Dij") -> Dict[str, Tensor]:
         output = net_input.copy()
         output["rbf"] = self.get_rbf(
             Dij=net_input[Dij_name],
@@ -80,7 +81,7 @@ class ExponentialRBF(BaseRBF):
         self.learnable_shape = learnable_shape
         self.no_basis_function_at_infinity = no_basis_at_infinity
         self.register_parameter(
-            "_alpha", nn.Parameter(softplus_inverse(init_alpha))
+            "_alpha", Parameter(softplus_inverse(init_alpha))
         )
 
         self.cutoff = cutoff
@@ -91,7 +92,7 @@ class ExponentialRBF(BaseRBF):
         ...
 
 
-    def get_rbf(self, Dij: Tensor, cutoff_values: Tensor=None) -> Tensor:
+    def get_rbf(self, Dij: Tensor, cutoff_values: Optional[Tensor]=None) -> Tensor:
         '''
         Evaluate the RBF values
 
@@ -176,7 +177,7 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
         )
         if cutoff_sr == float("inf") and no_basis_at_infinity:
             self.register_parameter(
-                "_centers", nn.Parameter(
+                "_centers", Parameter(
                     softplus_inverse(torch.linspace(
                         1, 0, num_rbf + 1
                     )[:-1]), 
@@ -185,7 +186,7 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
             )
         else:
             self.register_parameter(
-                "_centers", nn.Parameter(
+                "_centers", Parameter(
                     softplus_inverse(torch.linspace(
                         1, math.exp(-cutoff_sr), num_rbf
                     )), 
@@ -200,16 +201,17 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
         '''
         if init_width_flavor == "SpookyNet":
             self.register_parameter(
-                "_widths", nn.Parameter(
+                "_widths", Parameter(
                     softplus_inverse(
-                    1.0 * self.num_basis_functions + \
-                    int(self.no_basis_function_at_infinity))
-                ), 
-                requires_grad=self.learnable_shape
+                        1.0 * self.num_basis_functions + \
+                        int(self.no_basis_function_at_infinity)
+                    ),
+                    requires_grad=self.learnable_shape
+                )
             )
         elif init_width_flavor == "PhysNet":
             self.register_parameter(
-                "_widths", nn.Parameter(
+                "_widths", Parameter(
                     softplus_inverse(
                         [(0.5 / ((-math.expm1(-self.cutoff)) / self.num_basis_functions)) ** 2] * \
                         self.num_basis_functions

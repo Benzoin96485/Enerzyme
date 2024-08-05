@@ -16,7 +16,22 @@ initial_beta = np.random.randn()
 x = torch.randn(dim_feature)
 max_Za = 87
 N = 100
+idx_i = torch.empty((N, N-1), dtype=int)
+idx_j = torch.empty((N, N-1), dtype=int)
+for i in range(N):
+    for j in range(N - 1):
+        idx_i[i, j] = i
+for i in range(N):
+    c = 0
+    for j in range(N):
+        if j != i:
+            idx_j[i,c] = j
+            c += 1
+idx_i = idx_i.reshape(-1)
+idx_j = idx_j.reshape(-1)
+D = torch.rand(*idx_i.shape) * 30 + 3
 Za = torch.randint(1, max_Za, (N,))
+cutoff_values = torch.rand(*idx_i.shape)
 atom_embedding = torch.randn((N, dim_feature))
 dtype = "float64"
 if dtype == "float64":
@@ -25,6 +40,9 @@ elif dtype == "float32":
     dtype = torch.float32
 x = x.type(dtype)
 atom_embedding = atom_embedding.type(dtype)
+D = D.type(dtype)
+cutoff_values = cutoff_values.type(dtype)
+
 
 def test_shifted_softplus():
     from enerzyme.models.activation import ShiftedSoftplus as F1
@@ -123,7 +141,14 @@ def test_nonlinear_electronic_embedding():
 
 
 def test_exponential_gaussian_functions():
-    pass
+    from enerzyme.models.layers.rbf import ExponentialGaussianRBFLayer as F1
+    from spookynet.modules.exponential_gaussian_functions import ExponentialGaussianFunctions as F2
+    f1 = F1(dim_feature, init_width_flavor="SpookyNet")
+    f2 = F2(dim_feature)
+    assert_allclose(
+        f1.get_rbf(D, cutoff_values).detach().numpy(), 
+        f2(D, cutoff_values).detach().numpy(), rtol=1e-6, atol=1e-6
+    )
 
 
 def test_exponential_bernstein_polynomials():

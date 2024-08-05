@@ -1,8 +1,10 @@
 from typing import Dict, Any
-from ..layers import DistanceLayer, BaseRBF, BaseAtomEmbedding
+from ..layers import DistanceLayer, BaseRBF, BaseAtomEmbedding, BaseElectronEmbedding
+from .interaction import InteractionModule
 from torch import nn
+from torch.nn import Module, ModuleList
 
-class SpookyNetCore(nn.Module):
+class SpookyNetCore(Module):
     """
     Neural network for PES construction augmented with optional explicit terms
     for short-range repulsion, electrostatics and dispersion and explicit nonlocal
@@ -107,9 +109,33 @@ class SpookyNetCore(nn.Module):
 ###############################################
 """
 
-    def __init__(self, max_Za: int=87, dim_embedding: int=64):
-        self.embeddings: BaseAtomEmbedding = None
-        pass
+    def __init__(self):
+        self.nuclear_embeddings: BaseAtomEmbedding = None
+        self.charge_embeddings: BaseElectronEmbedding = None
+        self.spin_embeddings: BaseElectronEmbedding = None
+        self.radial_basis_functions: BaseRBF = None
+
+        self.module = ModuleList(
+            [
+                InteractionModule(
+                    num_features=self.num_features,
+                    num_basis_functions=self.num_basis_functions,
+                    num_residual_pre=self.num_residual_pre,
+                    num_residual_local_x=self.num_residual_local_x,
+                    num_residual_local_s=self.num_residual_local_s,
+                    num_residual_local_p=self.num_residual_local_p,
+                    num_residual_local_d=self.num_residual_local_d,
+                    num_residual_local=self.num_residual_local,
+                    num_residual_nonlocal_q=self.num_residual_nonlocal_q,
+                    num_residual_nonlocal_k=self.num_residual_nonlocal_k,
+                    num_residual_nonlocal_v=self.num_residual_nonlocal_v,
+                    num_residual_post=self.num_residual_post,
+                    num_residual_output=self.num_residual_output,
+                    activation=self.activation,
+                )   
+                for i in range(self.num_modules)
+            ]
+        )
 
     @classmethod
     def build(cls, built_layers: Dict[str, nn.Module], **build_params: Dict[str, Any]) -> nn.Module:

@@ -1,6 +1,7 @@
 from .geometry import DistanceLayer
 from .rbf import BaseRBF, ExponentialGaussianRBFLayer
 from .atom_embedding import BaseAtomEmbedding, RandomAtomEmbedding
+from .electron_embedding import BaseElectronEmbedding
 from .electrostatics import ElectrostaticEnergyLayer, ChargeConservationLayer, AtomicCharge2DipoleLayer
 from .gradient import ForceLayer
 from .reduce import EnergyReduceLayer

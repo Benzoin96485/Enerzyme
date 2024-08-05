@@ -5,7 +5,7 @@ from torch.nn import Module, init, Sequential, Parameter, Dropout
 import torch.nn.functional as F
 import torch
 from ..activation import get_activation_fn, ACTIVATION_PARAM_TYPE, ACTIVATION_KEY_TYPE
-from .init import semi_orthogonal_glorot_weights
+from ..init import semi_orthogonal_glorot_weights
 
 
 INITIAL_WEIGHT_TYPE = Union[Tensor, ndarray, Literal["semi_orthogonal_glorot", "orthogonal", "zero"]]
