@@ -1,10 +1,10 @@
 from typing import Dict
 import torch
 from torch import Tensor
-from torch import nn
+from torch.nn import Module
 
 
-class DistanceLayer(nn.Module):
+class DistanceLayer(Module):
     '''
     Compute the distance between atoms
     '''

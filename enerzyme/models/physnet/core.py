@@ -1,5 +1,6 @@
 import torch
-from torch import nn, Tensor
+from torch import Tensor
+from torch.nn import Module, Sequential
 from typing import Dict, Any
 from .interaction import InteractionBlock, OutputBlock
 from ..layers import DistanceLayer, BaseRBF, BaseAtomEmbedding
@@ -21,7 +22,7 @@ LAYERS = [
 ]
 
 
-class PhysNetCore(nn.Module):
+class PhysNetCore(Module):
     def __str__(self) -> str:
         return """
 ###################################################################################
@@ -45,13 +46,13 @@ class PhysNetCore(nn.Module):
         self.num_blocks = num_blocks
         self.drop_out = dropout_rate
 
-        self.interaction_block = nn.Sequential(*[
+        self.interaction_block = Sequential(*[
             InteractionBlock(
                 num_rbf, dim_embedding, num_residual_atomic, num_residual_interaction, 
                 activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate
             ) for i in range(num_blocks)
         ])
-        self.output_block = nn.Sequential(*[
+        self.output_block = Sequential(*[
             OutputBlock(
                 dim_embedding, num_residual_output, 
                 activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate
@@ -63,7 +64,7 @@ class PhysNetCore(nn.Module):
         self.embeddings: BaseAtomEmbedding = None
 
     @classmethod
-    def build(cls, built_layers: Dict[str, nn.Module], **build_params: Dict[str, Any]) -> nn.Module:
+    def build(cls, built_layers: Dict[str, Module], **build_params: Dict[str, Any]) -> Module:
         instance = cls(**build_params)
         for layer_name, layer in built_layers.items():
             if layer_name.endswith("Distance"):

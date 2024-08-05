@@ -8,7 +8,7 @@ from torch.nn import Module, Embedding, Parameter, Linear, init
 
 
 class BaseAtomEmbedding(ABC, Module):
-    def __init__(self, max_Za, dim_embedding):
+    def __init__(self, max_Za, dim_embedding) -> None:
         super().__init__()
         self.max_Za = max_Za
         self.dim_embedding = dim_embedding
@@ -26,7 +26,7 @@ class BaseAtomEmbedding(ABC, Module):
 
 
 class RandomAtomEmbedding(BaseAtomEmbedding):
-    def __init__(self, max_Za, dim_embedding):
+    def __init__(self, max_Za, dim_embedding) -> None:
         super().__init__(max_Za, dim_embedding)
         self.embedding = Embedding(max_Za, dim_embedding)
 
@@ -148,7 +148,7 @@ class NuclearEmbedding(BaseAtomEmbedding):
                 self.electron_config.size(1), dim_embedding, bias=False)
         self.reset_parameters(zero_init)
 
-    def reset_parameters(self, zero_init: bool = True) -> None:
+    def reset_parameters(self, zero_init: bool=True) -> None:
         """ Initialize parameters. """
         if zero_init:
             init.zeros_(self.element_embedding)
@@ -159,7 +159,7 @@ class NuclearEmbedding(BaseAtomEmbedding):
             if self.use_electron_config:
                 init.orthogonal_(self.config_linear.weight)
 
-    def train(self, mode: bool = True) -> None:
+    def train(self, mode: bool=True) -> None:
         """ Switch between training and evaluation mode. """
         super().train(mode=mode)
         if not self.training:

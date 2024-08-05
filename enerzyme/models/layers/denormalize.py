@@ -1,4 +1,4 @@
-from typing import Dict, List, Union, Literal
+from typing import Dict, Union, Literal
 import torch
 from torch import nn, Tensor
 from ...data import PERIODIC_TABLE

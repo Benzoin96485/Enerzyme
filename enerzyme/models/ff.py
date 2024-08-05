@@ -1,13 +1,11 @@
-from distutils.command import build
 import os
 import joblib
-import inspect
 from inspect import signature
 import torch
 import pandas as pd
 import numpy as np
 from typing import Dict, Tuple, List, Any, Callable, Literal
-from torch import nn
+from torch.nn import Module, Sequential
 from torch.utils.data import Dataset
 from ..data import DataHub
 from ..tasks import Trainer
@@ -24,7 +22,7 @@ LOSS_REGISTER = {
 }
 
 
-def get_ff_core(architecture: str) -> Tuple[nn.Module, List]:
+def get_ff_core(architecture: str) -> Tuple[Module, List]:
     global LOSS_REGISTER
     if architecture.lower() == "physnet":
         from .physnet import PhysNetCore as Core
@@ -36,11 +34,11 @@ def get_ff_core(architecture: str) -> Tuple[nn.Module, List]:
     return Core, LAYERS
 
 
-class CoreWrapper(nn.Module):
+class CoreWrapper(Module):
     def __init__(self, core):
         super().__init__()
         self.core = core
-        self.post_sequence = nn.Sequential(core)
+        self.post_sequence = Sequential(core)
     
     def __str__(self):
         return self.core.__str__()
@@ -52,7 +50,7 @@ class CoreWrapper(nn.Module):
         self.post_sequence.append(layer)
 
 
-def build_layer(layer: Callable, params: Dict[str, Any], build_params: Dict[str, Any], built_layers: Dict[str, nn.Module]) -> nn.Module:
+def build_layer(layer: Callable, params: Dict[str, Any], build_params: Dict[str, Any], built_layers: Dict[str, Module]) -> Module:
     final_params = dict()
     if hasattr(layer, "build") and callable(layer.build):
         constructor = layer.build
@@ -74,7 +72,7 @@ def build_model(
     architecture: str, 
     layer_params: List[Dict[Literal["name", "params"], Any]], 
     build_params: Dict
-) -> nn.Module:
+) -> Module:
     Core, default_layer_names = get_ff_core(architecture)
     if layer_params is None:
         layer_params = [{"name": layer_name} for layer_name in default_layer_names]
@@ -112,7 +110,7 @@ class FF:
         architecture: str, 
         build_params, layers=None,
         pretrain_path=None, **params
-    ):
+    ) -> None:
         self.datahub = datahub
         self.trainer = trainer
         self.splitter = self.trainer.splitter
@@ -137,7 +135,7 @@ class FF:
         self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
         self.is_success = True
     
-    def _init_model(self, build_params):
+    def _init_model(self, build_params) -> Module:
         if self.architecture in FF_REGISTER:
             model = FF_REGISTER[self.architecture](**build_params)
         else:
@@ -149,7 +147,7 @@ class FF:
             logger.info(f"load model success from {self.pretrain_path}!")
         return model
     
-    def train(self):
+    def train(self) -> None:
         logger.info("start training FF:{}".format(self.model_str))
         X = self.datahub.features
         y = self.datahub.targets
@@ -220,7 +218,7 @@ class FF:
     
 
 class FFDataset(Dataset):
-    def __init__(self, features, targets, indices=None, data_in_memory=True):
+    def __init__(self, features, targets, indices=None, data_in_memory=True) -> None:
         self.data_in_memory = data_in_memory
         self.indices = indices if indices is not None else np.arange(0, len(features["Za"]))
         if data_in_memory:
@@ -232,7 +230,7 @@ class FFDataset(Dataset):
             self.targets = targets
             self._getitem = lambda idx: ({k: v[self.indices[idx]] for k, v in self.features.items()}, {k: v[self.indices[idx]] for k, v in self.targets.items()})
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.indices)
     
     def __getitem__(self, idx):

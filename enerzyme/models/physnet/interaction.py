@@ -1,7 +1,8 @@
 from typing import Optional, Union
 import numpy as np
 import torch
-from torch import nn, Tensor
+from torch import Tensor
+from torch.nn import Dropout, Parameter
 from ..functional import segment_sum
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 from ..layers.mlp import DenseLayer as _DenseLayer
@@ -74,7 +75,7 @@ class InteractionLayer(NeuronLayer):
         activation_params: ACTIVATION_PARAM_TYPE=dict(),
         dropout_rate=0.0) -> None:
         super().__init__(num_rbf, dim_embedding, activation_fn, activation_params)
-        self.dropout = nn.Dropout(dropout_rate)
+        self.dropout = Dropout(dropout_rate)
         #transforms radial basis functions to feature space
         self.k2f = DenseLayer(num_rbf, dim_embedding, initial_weight="zero", use_bias=False)
         #rearrange feature vectors for computing the "message"
@@ -84,7 +85,7 @@ class InteractionLayer(NeuronLayer):
         self.residual_stack = ResidualStack(dim_embedding, num_residual, activation_fn, activation_params, dropout_rate=dropout_rate)
         #for performing the final update to the feature vectors
         self.dense = DenseLayer(dim_embedding, dim_embedding)
-        self.u = nn.Parameter(torch.ones([dim_embedding]))
+        self.u = Parameter(torch.ones([dim_embedding]))
 
     
     def forward(self, x: Tensor, rbf: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:

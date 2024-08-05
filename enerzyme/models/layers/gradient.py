@@ -1,9 +1,10 @@
 from typing import Dict
 import torch
-from torch import nn, Tensor
+from torch import Tensor
+from torch.nn import Module
 
 
-class ForceLayer(nn.Module):
+class ForceLayer(Module):
     def __init__(self) -> None:
         super().__init__()
 

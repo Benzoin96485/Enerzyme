@@ -3,10 +3,11 @@ from abc import ABC, abstractmethod
 from typing import Literal, Dict, Union
 import torch
 import torch.nn.functional as F
-from torch import Tensor, nn
+from torch import Tensor
+from torch.nn import Module, Parameter
 
 
-class BaseScaledTemperedActivation(ABC, nn.Module):
+class BaseScaledTemperedActivation(ABC, Module):
     def __init__(self, dim_feature: int=1, initial_alpha: float=1.0, initial_beta: float=1.0, learnable: bool=False) -> None:
         super().__init__()
         if float(initial_alpha) == 1.0 and float(initial_beta) == 1.0 and not learnable:
@@ -16,8 +17,8 @@ class BaseScaledTemperedActivation(ABC, nn.Module):
             self._activation_fn = self.simple_activation_fn
         else:
             self.simple = False
-            self.register_parameter("alpha", nn.Parameter(torch.full((dim_feature,), initial_alpha), requires_grad=learnable))
-            self.register_parameter("beta", nn.Parameter(torch.full((dim_feature,), initial_beta), requires_grad=learnable))
+            self.register_parameter("alpha", Parameter(torch.full((dim_feature,), initial_alpha), requires_grad=learnable))
+            self.register_parameter("beta", Parameter(torch.full((dim_feature,), initial_beta), requires_grad=learnable))
             self._activation_fn = self.activation_fn
 
     @abstractmethod

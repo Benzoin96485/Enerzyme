@@ -13,7 +13,7 @@ class BaseRBF(ABC, Module):
     def __init__(
         self,
         num_basis_functions: int
-    ):
+    ) -> None:
         super().__init__()
         self.num_basis_functions = num_basis_functions
 
@@ -90,7 +90,6 @@ class ExponentialRBF(BaseRBF):
     @abstractmethod
     def inner_fn(self, alphar: Tensor, expalphar: Tensor) -> Tensor:
         ...
-
 
     def get_rbf(self, Dij: Tensor, cutoff_values: Optional[Tensor]=None) -> Tensor:
         '''

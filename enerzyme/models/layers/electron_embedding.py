@@ -1,8 +1,8 @@
 from typing import Dict, Optional, Literal
 from abc import ABC, abstractmethod
 import torch
-from torch import nn, Tensor
-from torch.nn import Linear, Module
+from torch import Tensor
+from torch.nn import Linear, Module, init
 import torch.nn.functional as F
 from .mlp import ResidualMLP as _ResidualMLP
 from ..activation import ACTIVATION_KEY_TYPE
@@ -97,10 +97,10 @@ class ElectronicEmbedding(BaseElectronEmbedding):
 
     def reset_parameters(self) -> None:
         """ Initialize parameters. """
-        nn.init.orthogonal_(self.linear_k.weight)
-        nn.init.orthogonal_(self.linear_v.weight)
-        nn.init.orthogonal_(self.linear_q.weight)
-        nn.init.zeros_(self.linear_q.bias)
+        init.orthogonal_(self.linear_k.weight)
+        init.orthogonal_(self.linear_v.weight)
+        init.orthogonal_(self.linear_q.weight)
+        init.zeros_(self.linear_q.bias)
 
     def get_embedding(
         self,
@@ -128,7 +128,7 @@ class ElectronicEmbedding(BaseElectronEmbedding):
         k = self.linear_k(e / enorm)[batch_seg]  # keys
         v = self.linear_v(e)[batch_seg]  # values
         dot = torch.sum(k * q, dim=-1) / self.sqrt_dim_embedding  # scaled dot product
-        a = nn.functional.softplus(dot)  # unnormalized attention weights
+        a = F.softplus(dot)  # unnormalized attention weights
         anorm = segment_sum(a, batch_seg)
         if a.device.type == "cpu":  # indexing is faster on CPUs
             anorm = anorm[batch_seg]
@@ -166,12 +166,12 @@ class NonlinearElectronicEmbedding(BaseElectronEmbedding):
     ) -> None:
         """ Initializes the NonlinearElectronicEmbedding class. """
         super(NonlinearElectronicEmbedding, self).__init__(dim_embedding, num_residual, attribute)
-        self.linear_q = nn.Linear(dim_embedding, dim_embedding, bias=False)
-        self.featurize_k = nn.Linear(1, dim_embedding)
+        self.linear_q = Linear(dim_embedding, dim_embedding, bias=False)
+        self.featurize_k = Linear(1, dim_embedding)
         self.resblock_k = ResidualMLP(
             dim_embedding, num_residual, activation_fn=activation_fn, zero_init=True
         )
-        self.featurize_v = nn.Linear(1, dim_embedding, bias=False)
+        self.featurize_v = Linear(1, dim_embedding, bias=False)
         self.resblock_v = ResidualMLP(
             dim_embedding,
             num_residual,
@@ -183,10 +183,10 @@ class NonlinearElectronicEmbedding(BaseElectronEmbedding):
 
     def reset_parameters(self) -> None:
         """ Initialize parameters. """
-        nn.init.orthogonal_(self.linear_q.weight)
-        nn.init.orthogonal_(self.featurize_k.weight)
-        nn.init.zeros_(self.featurize_k.bias)
-        nn.init.orthogonal_(self.featurize_v.weight)
+        init.orthogonal_(self.linear_q.weight)
+        init.orthogonal_(self.featurize_k.weight)
+        init.zeros_(self.featurize_k.bias)
+        init.orthogonal_(self.featurize_v.weight)
 
     def get_embedding(
         self,
@@ -221,7 +221,7 @@ class NonlinearElectronicEmbedding(BaseElectronEmbedding):
         if num_batch > 1:
             if mask is None:
                 mask = (
-                    nn.functional.one_hot(batch_seg)
+                    F.one_hot(batch_seg)
                     .to(dtype=atom_embedding.dtype, device=atom_embedding.device)
                     .transpose(-1, -2)
                 )

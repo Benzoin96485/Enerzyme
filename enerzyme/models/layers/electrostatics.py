@@ -1,11 +1,12 @@
 from typing import Dict, Literal, Optional
 import torch
-from torch import nn, Tensor
+from torch import Tensor
+from torch.nn import Module
 from ..functional import segment_sum
 from ..cutoff import polynomial_cutoff
 
 
-class ChargeConservationLayer(nn.Module):
+class ChargeConservationLayer(Module):
     def __init__(self) -> None:
         r"""
         Correct the atomic charges to make their summation equal to the total charge by [1]
@@ -61,8 +62,8 @@ class ChargeConservationLayer(nn.Module):
         return output
 
 
-class ElectrostaticEnergyLayer(nn.Module):
-    def __init__(self, cutoff_sr: float, cutoff_lr: float=None, Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1) -> None:
+class ElectrostaticEnergyLayer(Module):
+    def __init__(self, cutoff_sr: float, cutoff_lr: Optional[float]=None, Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1) -> None:
         r"""
         Calculate the electrostatic energy from distributed multipoles and atomic positions
 
@@ -132,11 +133,11 @@ class ElectrostaticEnergyLayer(nn.Module):
         return output
 
 
-class AtomicCharge2DipoleLayer(nn.Module):
+class AtomicCharge2DipoleLayer(Module):
     def __init__(self) -> None:
         super().__init__()
 
-    def get_dipole(self, Qa: Tensor, Ra: Tensor, batch_seg: Tensor=None, **kwargs) -> Tensor:
+    def get_dipole(self, Qa: Tensor, Ra: Tensor, batch_seg: Optional[Tensor]=None, **kwargs) -> Tensor:
         if batch_seg is None:
             batch_seg = torch.zeros_like(Qa, dtype=torch.long)
         Pa = Qa.unsqueeze(1) * Ra

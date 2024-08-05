@@ -13,14 +13,14 @@ INITIAL_BIAS_TYPE = Union[Tensor, ndarray, Literal["zero"]]
 
 
 class NeuronLayer(Module):
-    def __str__(self):
+    def __str__(self) -> str:
         return "[ " + str(self.dim_feature_in) + " -> " + str(self.dim_feature_out) + " ]"
 
     def __init__(
         self, dim_feature_in, dim_feature_out, 
         activation_fn: Optional[ACTIVATION_KEY_TYPE]=None,
         activation_params: ACTIVATION_PARAM_TYPE=dict(),
-    ):
+    ) -> None:
         super().__init__()
         self.dim_feature_in = dim_feature_in
         self.dim_feature_out = dim_feature_out
@@ -31,7 +31,7 @@ class NeuronLayer(Module):
 
 
 class DenseLayer(NeuronLayer):
-    def __str__(self):
+    def __str__(self) -> str:
          return "Dense layer: " + super().__str__()
 
     def __init__(
@@ -40,7 +40,7 @@ class DenseLayer(NeuronLayer):
         initial_weight: INITIAL_WEIGHT_TYPE="orthogonal", 
         initial_bias: INITIAL_BIAS_TYPE="zero",
         use_bias: bool=True
-    ):
+    ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
 
         if initial_weight == "semi_orthogonal_glorot":
@@ -78,7 +78,7 @@ class DenseLayer(NeuronLayer):
     
 
 class ResidualLayer(NeuronLayer):
-    def __str__(self):
+    def __str__(self) -> str:
          return "Residual layer: " + super().__str__()
 
     def __init__(
@@ -121,7 +121,7 @@ class ResidualLayer(NeuronLayer):
     
 
 class ResidualStack(NeuronLayer):
-    def __str__(self):
+    def __str__(self) -> str:
          return f"Residual stack ({self.num_residual} layers): " + super().__str__()
 
     def __init__(
@@ -147,7 +147,7 @@ class ResidualStack(NeuronLayer):
 
 
 class ResidualMLP(NeuronLayer):
-    def __str__(self):
+    def __str__(self) -> str:
          return f"Residual MLP ({self.num_residual} residual layers): " + super().__str__()
     
     def __init__(
