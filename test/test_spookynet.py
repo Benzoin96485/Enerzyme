@@ -43,6 +43,7 @@ idx_j = idx_j.reshape(-1)
 vij = torch.rand(*idx_i.shape, 3) * 30
 D = torch.norm(vij, dim=-1, keepdim=True)
 pij = vij / D
+D = D.squeeze(-1)
 dij = torch.rand(*idx_i.shape, 5)
 Za = torch.randint(1, max_Za, (N,))
 rbf = torch.rand(*idx_i.shape, dim_feature)
@@ -286,6 +287,16 @@ def test_interaction_module():
 
 
 def test_zbl_repulsion_energy():
+    from enerzyme.models.layers.zbl import ZBLRepulsionEnergyLayer as F1
+    from spookynet.modules.zbl_repulsion_energy import ZBLRepulsionEnergy as F2
+    f1 = F1().type(dtype)
+    f2 = F2().type(dtype)
+    f1.kehalf = f2.kehalf
+    f1.a0 = f2.a0
+    assert_allclose(
+        f1.get_zbf_energy(Za, D, idx_i, idx_j, cutoff_values).detach().numpy(),
+        f2(len(Za), Za.type(dtype), D, cutoff_values, idx_i, idx_j).detach().numpy()
+    )
     pass
 
 

@@ -1,20 +1,22 @@
+from typing import Union
 import numpy as np
 import torch
+from torch import Tensor
 
 
-def softplus_inverse(x: torch.Tensor) -> torch.Tensor:
+def softplus_inverse(x: Union[Tensor, np.ndarray]) -> Tensor:
     """
     Inverse of the softplus function. This is useful for initialization of
     parameters that are constrained to be positive (via softplus). 
     
     The indirect implementation is for numerical stability.
     """
-    if not isinstance(x, torch.Tensor):
+    if not isinstance(x, Tensor):
         x = torch.tensor(x)
     return x + torch.log(-torch.expm1(-x))
 
 
-def segment_sum(x: torch.Tensor, indices: torch.Tensor, dim: int=0):
+def segment_sum(x: Tensor, indices: Tensor, dim: int=0) -> Tensor:
     """
     http://t.csdnimg.cn/kUA0u
     """
@@ -22,7 +24,7 @@ def segment_sum(x: torch.Tensor, indices: torch.Tensor, dim: int=0):
     return x_sum.index_add(dim, indices, x)
 
 
-def gather_nd(params, indices):
+def gather_nd(params: Tensor, indices: Tensor) -> Tensor:
     """ The same as tf.gather_nd but batched gather is not supported yet.
     indices is an k-dimensional integer tensor, best thought of as a (k-1)-dimensional tensor of indices into params, where each element defines a slice of params:
 
