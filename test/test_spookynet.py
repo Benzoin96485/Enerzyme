@@ -15,6 +15,11 @@ initial_beta = np.random.randn()
 x = torch.randn(dim_feature)
 max_Za = 87
 N = 100
+num_residual_local_x = 1
+num_residual_local_s = 1
+num_residual_local_p = 1
+num_residual_local_d = 1
+num_residual_local = 1
 idx_i = torch.empty((N, N-1), dtype=int)
 idx_j = torch.empty((N, N-1), dtype=int)
 for i in range(N):
@@ -28,18 +33,29 @@ for i in range(N):
             c += 1
 idx_i = idx_i.reshape(-1)
 idx_j = idx_j.reshape(-1)
-D = torch.rand(*idx_i.shape) * 30 + 3
+vij = torch.rand(*idx_i.shape, 3) * 30
+D = torch.norm(vij, dim=-1, keepdim=True)
+pij = vij / D
+dij = torch.rand(*idx_i.shape, 5)
 Za = torch.randint(1, max_Za, (N,))
+rbf = torch.rand(*idx_i.shape, dim_feature)
 cutoff_values = torch.rand(*idx_i.shape)
 atom_embedding = torch.randn((N, dim_feature))
+Q = torch.randn((N, dim_feature))
+K = torch.randn((N, dim_feature))
 dtype = "float64"
 if dtype == "float64":
     dtype = torch.float64
 elif dtype == "float32":
     dtype = torch.float32
 x = x.type(dtype)
+Q = Q.type(dtype)
+K = K.type(dtype)
 atom_embedding = atom_embedding.type(dtype)
 D = D.type(dtype)
+pij = pij.type(dtype)
+dij = dij.type(dtype)
+rbf = rbf.type(dtype)
 cutoff_values = cutoff_values.type(dtype)
 
 
@@ -148,8 +164,8 @@ def test_nonlinear_electronic_embedding():
 def test_exponential_gaussian_functions():
     from enerzyme.models.layers.rbf import ExponentialGaussianRBFLayer as F1
     from spookynet.modules.exponential_gaussian_functions import ExponentialGaussianFunctions as F2
-    f1 = F1(dim_feature, init_width_flavor="SpookyNet")
-    f2 = F2(dim_feature)
+    f1 = F1(dim_feature, init_width_flavor="SpookyNet").type(dtype)
+    f2 = F2(dim_feature).type(dtype)
     assert_allclose(
         f1.get_rbf(D, cutoff_values).detach().numpy(), 
         f2(D, cutoff_values).detach().numpy(), rtol=1e-6, atol=1e-6
@@ -159,8 +175,8 @@ def test_exponential_gaussian_functions():
 def test_exponential_bernstein_polynomials():
     from enerzyme.models.layers.rbf import ExponentialBernsteinRBFLayer as F1
     from spookynet.modules.exponential_bernstein_polynomials import ExponentialBernsteinPolynomials as F2
-    f1 = F1(dim_feature)
-    f2 = F2(dim_feature)
+    f1 = F1(dim_feature).type(dtype).type(dtype)
+    f2 = F2(dim_feature).type(dtype).type(dtype)
     assert_allclose(
         f1.get_rbf(D, cutoff_values).detach().numpy(), 
         f2(D, cutoff_values).detach().numpy(), rtol=1e-6, atol=1e-6
@@ -170,8 +186,8 @@ def test_exponential_bernstein_polynomials():
 def test_gaussian_functions():
     from enerzyme.models.layers.rbf import GaussianRBFLayer as F1
     from spookynet.modules.gaussian_functions import GaussianFunctions as F2
-    f1 = F1(dim_feature, 5.0)
-    f2 = F2(dim_feature, 5.0)
+    f1 = F1(dim_feature, 5.0).type(dtype)
+    f2 = F2(dim_feature, 5.0).type(dtype)
     assert_allclose(
         f1.get_rbf(D, cutoff_values).detach().numpy(), 
         f2(D, cutoff_values).detach().numpy()
@@ -181,8 +197,8 @@ def test_gaussian_functions():
 def test_bernstein_polynomials():
     from enerzyme.models.layers.rbf import BernsteinRBFLayer as F1
     from spookynet.modules.bernstein_polynomials import BernsteinPolynomials as F2
-    f1 = F1(dim_feature, 5.0)
-    f2 = F2(dim_feature, 5.0)
+    f1 = F1(dim_feature, 5.0).type(dtype)
+    f2 = F2(dim_feature, 5.0).type(dtype)
     assert_allclose(
         f1.get_rbf(D, cutoff_values).detach().numpy(), 
         f2(D, cutoff_values).detach().numpy()
@@ -192,8 +208,8 @@ def test_bernstein_polynomials():
 def test_sinc_functions():
     from enerzyme.models.layers.rbf import SincRBFLayer as F1
     from spookynet.modules.sinc_functions import SincFunctions as F2
-    f1 = F1(dim_feature, 5.0)
-    f2 = F2(dim_feature, 5.0)
+    f1 = F1(dim_feature, 5.0).type(dtype)
+    f2 = F2(dim_feature, 5.0).type(dtype)
     assert_allclose(
         f1.get_rbf(D, cutoff_values).detach().numpy(), 
         f2(D, cutoff_values).detach().numpy()
@@ -201,7 +217,31 @@ def test_sinc_functions():
 
 
 def test_local_interaction():
-    pass
+    from enerzyme.models.spookynet.interaction import LocalInteraction as F1
+    from spookynet.modules.local_interaction import LocalInteraction as F2
+    f1 = F1(
+        dim_feature, dim_feature, 
+        num_residual_local_x, num_residual_local_s, num_residual_local_p, num_residual_local_d, num_residual_local
+    ).type(dtype)
+    f2 = F2(dim_feature, dim_feature, 
+        num_residual_local_x, num_residual_local_s, num_residual_local_p, num_residual_local_d, num_residual_local
+    ).type(dtype)
+    assert_allclose(
+        f1(atom_embedding, rbf, pij, dij, idx_i, idx_j).detach().numpy(),
+        f2(atom_embedding, rbf, pij, dij, idx_i, idx_j).detach().numpy()
+    )
+
+
+def test_attention():
+    from enerzyme.models.layers.attention import Attention as F1
+    from spookynet.modules.attention import Attention as F2
+    f2 = F2(dim_feature, dim_feature, dim_feature)
+    f1 = F1(dim_feature, dim_feature)
+    f1.omega.copy_(f2.omega)
+    assert_allclose(
+        f1(Q, K, atom_embedding, 1, None).detach().numpy(),
+        f2(Q, K, atom_embedding, 1, None).detach().numpy()
+    )
 
 
 def test_nonlocal_interaction():
