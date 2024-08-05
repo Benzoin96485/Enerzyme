@@ -1,5 +1,5 @@
 from typing import Dict
-from torch.nn import Tensor
+from torch import Tensor
 
 
 class NHLoss:

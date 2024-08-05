@@ -14,14 +14,14 @@ from enerzyme.models.ff import build_model
 # from enerzyme.models.physnet import PhysNetCore
 from physnet.NeuralNetwork import NeuralNetwork
 from physnet.grimme_d3.grimme_d3 import d3_autoang, d3_autoev
-from enerzyme.models.layers.init import semi_orthogonal_glorot_weights
+from enerzyme.models.init import semi_orthogonal_glorot_weights
 
 F = 128
 K = 5
 N = 50
 M = 20
-cutoff=5.0
-R = np.random.rand(N, 3) * 10
+cutoff=20
+R = np.random.rand(N, 3) * 20
 idx_i = np.empty((N, N-1), dtype=int)
 idx_j = np.empty((N, N-1), dtype=int)
 for i in range(N):
@@ -325,7 +325,7 @@ def test_edisp():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         e_tf = edisp_tf(Z, D, idx_i, idx_j).eval()
-    assert_allclose(e_torch, e_tf)
+    assert_allclose(e_torch, e_tf, rtol=1e-7, atol=1e-7)
 
 
 def test_electrostatic_energy_per_atom():

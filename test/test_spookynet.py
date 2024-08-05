@@ -1,5 +1,4 @@
 import logging
-
 from enerzyme.models.layers import atom_embedding
 logging.getLogger('tensorflow').disabled = True
 import os
@@ -42,6 +41,12 @@ x = x.type(dtype)
 atom_embedding = atom_embedding.type(dtype)
 D = D.type(dtype)
 cutoff_values = cutoff_values.type(dtype)
+
+
+def test_cutoff_function():
+    from enerzyme.models.cutoff import bump_cutoff
+    from spookynet.functional import cutoff_function
+    assert_allclose(bump_cutoff(x, 5).detach().numpy(), cutoff_function(x, 5).detach().numpy())
 
 
 def test_shifted_softplus():
