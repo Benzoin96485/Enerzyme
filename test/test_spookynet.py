@@ -168,15 +168,36 @@ def test_exponential_bernstein_polynomials():
 
 
 def test_gaussian_functions():
-    pass
+    from enerzyme.models.layers.rbf import GaussianRBFLayer as F1
+    from spookynet.modules.gaussian_functions import GaussianFunctions as F2
+    f1 = F1(dim_feature, 5.0)
+    f2 = F2(dim_feature, 5.0)
+    assert_allclose(
+        f1.get_rbf(D, cutoff_values).detach().numpy(), 
+        f2(D, cutoff_values).detach().numpy()
+    )
 
 
 def test_bernstein_polynomials():
-    pass
+    from enerzyme.models.layers.rbf import BernsteinRBFLayer as F1
+    from spookynet.modules.bernstein_polynomials import BernsteinPolynomials as F2
+    f1 = F1(dim_feature, 5.0)
+    f2 = F2(dim_feature, 5.0)
+    assert_allclose(
+        f1.get_rbf(D, cutoff_values).detach().numpy(), 
+        f2(D, cutoff_values).detach().numpy()
+    )
 
 
 def test_sinc_functions():
-    pass
+    from enerzyme.models.layers.rbf import SincRBFLayer as F1
+    from spookynet.modules.sinc_functions import SincFunctions as F2
+    f1 = F1(dim_feature, 5.0)
+    f2 = F2(dim_feature, 5.0)
+    assert_allclose(
+        f1.get_rbf(D, cutoff_values).detach().numpy(), 
+        f2(D, cutoff_values).detach().numpy()
+    )
 
 
 def test_local_interaction():

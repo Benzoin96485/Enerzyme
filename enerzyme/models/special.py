@@ -1,9 +1,8 @@
 import numpy as np
+import math
+import torch
+from torch import Tensor
 from typing import Tuple
-
-
-def gaussian():
-    pass
 
 
 def get_berstein_coefficient(order: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -16,5 +15,6 @@ def get_berstein_coefficient(order: int) -> Tuple[np.ndarray, np.ndarray, np.nda
     return v, n, logbinomial
 
 
-def sinc():
-    pass
+def sinc(x: Tensor) -> Tensor:
+    x = x * math.pi
+    return torch.sin(x) / x
