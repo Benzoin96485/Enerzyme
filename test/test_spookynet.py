@@ -20,6 +20,9 @@ num_residual_local_s = 1
 num_residual_local_p = 1
 num_residual_local_d = 1
 num_residual_local = 1
+num_residual_nonlocal_q = 1
+num_residual_nonlocal_k = 1
+num_residual_nonlocal_v = 1
 idx_i = torch.empty((N, N-1), dtype=int)
 idx_j = torch.empty((N, N-1), dtype=int)
 for i in range(N):
@@ -235,8 +238,8 @@ def test_local_interaction():
 def test_attention():
     from enerzyme.models.layers.attention import Attention as F1
     from spookynet.modules.attention import Attention as F2
-    f2 = F2(dim_feature, dim_feature, dim_feature)
-    f1 = F1(dim_feature, dim_feature)
+    f2 = F2(dim_feature, dim_feature, dim_feature).type(dtype)
+    f1 = F1(dim_feature, dim_feature).type(dtype)
     f1.omega.copy_(f2.omega)
     assert_allclose(
         f1(Q, K, atom_embedding, 1, None).detach().numpy(),
@@ -245,7 +248,15 @@ def test_attention():
 
 
 def test_nonlocal_interaction():
-    pass
+    from enerzyme.models.spookynet.interaction import NonlocalInteraction as F1
+    from spookynet.modules.nonlocal_interaction import NonlocalInteraction as F2
+    f2 = F2(dim_feature, num_residual_nonlocal_q, num_residual_nonlocal_k, num_residual_nonlocal_v).type(dtype)
+    f1 = F1(dim_feature, num_residual_nonlocal_q, num_residual_nonlocal_k, num_residual_nonlocal_v).type(dtype)
+    f1.attention.omega.copy_(f2.attention.omega)
+    assert_allclose(
+        f1(atom_embedding, 1, None).detach().numpy(),
+        f2(atom_embedding, 1, None).detach().numpy()
+    )
 
 
 def test_interaction_module():
