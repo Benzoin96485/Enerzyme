@@ -23,6 +23,10 @@ num_residual_local = 1
 num_residual_nonlocal_q = 1
 num_residual_nonlocal_k = 1
 num_residual_nonlocal_v = 1
+num_residual_pre = 1
+num_residual_post = 1
+num_residual_output = 1
+
 idx_i = torch.empty((N, N-1), dtype=int)
 idx_j = torch.empty((N, N-1), dtype=int)
 for i in range(N):
@@ -260,7 +264,25 @@ def test_nonlocal_interaction():
 
 
 def test_interaction_module():
-    pass
+    from enerzyme.models.spookynet.interaction import InteractionModule as F1
+    from spookynet.modules.interaction_module import InteractionModule as F2
+    f2 = F2(
+        dim_feature, dim_feature, 
+        num_residual_pre, num_residual_local_x, num_residual_local_s, num_residual_local_p, num_residual_local_d, num_residual_local,
+        num_residual_nonlocal_q, num_residual_nonlocal_k, num_residual_nonlocal_v, num_residual_post, num_residual_output
+    ).type(dtype)
+    f1 = F1(
+        dim_feature, dim_feature, 
+        num_residual_pre, num_residual_local_x, num_residual_local_s, num_residual_local_p, num_residual_local_d, num_residual_local,
+        num_residual_nonlocal_q, num_residual_nonlocal_k, num_residual_nonlocal_v, num_residual_post, num_residual_output
+    ).type(dtype)
+    f1.nonlocal_interaction.attention.omega.copy_(f2.nonlocal_interaction.attention.omega)
+    with torch.no_grad():
+        f1.resblock.stack[-1].weight.copy_(f2.resblock.linear.weight)
+    x1, y1 = f1(atom_embedding, rbf, pij, dij, idx_i, idx_j, 1, None)
+    x2, y2 = f2(atom_embedding, rbf, pij, dij, idx_i, idx_j, 1, None)
+    assert_allclose(x1.detach().numpy(), x2.detach().numpy())
+    assert_allclose(y1.detach().numpy(), y2.detach().numpy())
 
 
 def test_zbl_repulsion_energy():

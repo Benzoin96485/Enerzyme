@@ -118,8 +118,8 @@ class SpookyNetCore(Module):
         self.module = ModuleList(
             [
                 InteractionModule(
-                    num_features=self.num_features,
-                    num_basis_functions=self.num_basis_functions,
+                    dim_embedding=self.num_features,
+                    num_rbf=self.num_basis_functions,
                     num_residual_pre=self.num_residual_pre,
                     num_residual_local_x=self.num_residual_local_x,
                     num_residual_local_s=self.num_residual_local_s,
@@ -131,7 +131,7 @@ class SpookyNetCore(Module):
                     num_residual_nonlocal_v=self.num_residual_nonlocal_v,
                     num_residual_post=self.num_residual_post,
                     num_residual_output=self.num_residual_output,
-                    activation=self.activation,
+                    activation_fn=self.activation,
                 )   
                 for i in range(self.num_modules)
             ]
