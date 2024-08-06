@@ -106,19 +106,8 @@ def initialize(layer_params=default_layer_params):
     return physnet_torch, physnet_tf
     
 
-
 def test_initialize():
     initialize()
-
-
-# def test_grimme_d3_coefficient():
-#     physnet_torch, physnet_tf = initialize()
-#     with tf.Session() as sess:
-#         sess.run(tf.global_variables_initializer())
-#         assert_allclose(physnet_torch.a1.detach().numpy(), physnet_tf.a1.eval())
-#         assert_allclose(physnet_torch.a2.detach().numpy(), physnet_tf.a2.eval())
-#         assert_allclose(physnet_torch.s6.detach().numpy(), physnet_tf.s6.eval())
-#         assert_allclose(physnet_torch.s8.detach().numpy(), physnet_tf.s8.eval())
 
 
 def test_calculate_interatomic_distances():

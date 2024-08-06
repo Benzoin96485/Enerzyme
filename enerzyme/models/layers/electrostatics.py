@@ -1,4 +1,5 @@
-from typing import Dict, Literal, Optional
+from typing import Dict, Literal, Optional, Tuple
+from numpy import zeros_like
 import torch
 from torch import Tensor
 from torch.nn import Module
@@ -66,7 +67,7 @@ class ElectrostaticEnergyLayer(Module):
     def __init__(
         self, cutoff_sr: float, cutoff_lr: Optional[float]=None, 
         Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1,
-        cutoff_fn: CUTOFF_KEY_TYPE="smooth"
+        cutoff_fn: CUTOFF_KEY_TYPE="smooth", lr_flavor: Literal["simple", "smooth"]="smooth", half_switch: bool=False
     ) -> None:
         r"""
         Calculate the electrostatic energy from distributed multipoles and atomic positions
@@ -91,11 +92,47 @@ class ElectrostaticEnergyLayer(Module):
         """
         super().__init__()
         self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
-        self.cutoff_sr = cutoff_sr
+        if half_switch:
+            self.cutoff_sr = cutoff_sr / 2
+        else:
+            self.cutoff_sr = cutoff_sr
         self.cutoff_lr = cutoff_lr
         self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
+        
         if cutoff_lr is not None and cutoff_lr > 0:
-            self.lr_cutoff2 = self.cutoff_lr * self.cutoff_lr
+            self.cutoff_lr2 = self.cutoff_lr * self.cutoff_lr
+            self.two_div_cut = 2.0 / self.cutoff_lr
+            if lr_flavor == "simple":
+                self.lr_shield = self._simple_lr_shield
+            elif lr_flavor == "smooth":
+                self.rcutconstant = self.cutoff_lr / (self.cutoff_lr ** 2 + 1.0) ** 1.5
+                self.cutconstant = (2 * self.cutoff_lr ** 2 + 1.0) / (self.cutoff_lr** 2 + 1.0) ** 1.5
+                self.lr_shield = self._smooth_lr_shield
+
+    def _lr_ordinary(self, Dij: Tensor) -> Tensor:
+        return 1.0 / Dij + Dij / self.lr_cutoff2 - self.two_div_cut
+
+    def _shield(self, Dij: Tensor) -> Tensor:
+        return torch.sqrt(Dij * Dij + 1.0)
+
+    def _simple_lr_shield(self, Dij: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        Dij_shield = self._shield(Dij)
+        zeros = torch.zeros_like(Dij)
+        condition = Dij < self.cutoff_lr
+        return (
+            torch.where(condition, self._lr_ordinary(Dij), zeros), 
+            torch.where(condition, self._lr_ordinary(Dij_shield), zeros), condition, zeros
+        )
+
+    def _smooth_lr_shield(self, Dij: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        Dij_shield = self._shield(Dij)
+        zeros = torch.zeros_like(Dij)
+        condition = Dij < self.cutoff_lr
+        return (
+            torch.where(condition, self._lr_ordinary(Dij), zeros), 
+            torch.where(condition, self._lr_ordinary(1.0 / Dij_shield + Dij * self.rcutconstant - self.cutconstant), zeros),
+            condition, zeros
+        )
 
     def get_E_ele_a(self, Dij: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor, **kwargs) -> Tensor:
         '''
@@ -115,21 +152,21 @@ class ElectrostaticEnergyLayer(Module):
         -----
         Ea: Float tensor of atomic electrostatic energy, shape [N * batch_size]
         '''
-        Qi = Qa.gather(0, idx_i)
-        Qj = Qa.gather(0, idx_j)
-        Dij_shielded = torch.sqrt(Dij * Dij + 1.0)
-        switch = self.cutoff_fn(Dij, self.cutoff_sr / 2)
+        if Qa.device.type == "cpu":
+            fac = self.kehalf * Qa[idx_i] * Qa[idx_j]
+        else:
+            fac = self.kehalf * Qa.gather(0, idx_i) * Qa.gather(0, idx_j)
+        switch = self.cutoff_fn(Dij, self.cutoff_sr)
         cswitch = 1 - switch
         if self.cutoff_lr is None or self.cutoff_lr <= 0:
             Eele_ordinary = 1.0 / Dij
-            Eele_shielded = 1.0 / Dij_shielded
-            Eele = self.kehalf * Qi * Qj * (switch * Eele_shielded + cswitch * Eele_ordinary)
+            Eele_shielded = 1.0 / self._shield(Dij)
+            Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary)
         else:
-            Eele_ordinary = 1.0 / Dij + Dij / self.lr_cutoff2 - 2.0 / self.cutoff_lr
-            Eele_shielded = 1.0 / Dij_shielded + Dij_shielded / self.lr_cutoff2 - 2.0 / self.cutoff_lr
-            #combine shielded and ordinary interactions and apply prefactors 
-            Eele = self.kehalf * Qi * Qj * (switch * Eele_shielded + cswitch * Eele_ordinary)
-            Eele = torch.where(Dij <= self.cutoff_lr, Eele, torch.zeros_like(Eele))
+            Eele_ordinary, Eele_shielded, condition, zeros = self.lr_shield(Dij)
+            # combine shielded and ordinary interactions and apply prefactors
+            Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary)
+            Eele = torch.where(condition, Eele, zeros)
         return segment_sum(Eele, idx_i)
     
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:

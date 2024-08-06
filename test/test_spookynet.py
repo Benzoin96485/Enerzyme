@@ -50,6 +50,7 @@ rbf = torch.rand(*idx_i.shape, dim_feature)
 cutoff_values = torch.rand(*idx_i.shape)
 atom_embedding = torch.randn((N, dim_feature))
 Q = torch.randn((N, dim_feature))
+Qa = torch.randn((N,))
 K = torch.randn((N, dim_feature))
 dtype = "float64"
 if dtype == "float64":
@@ -58,6 +59,7 @@ elif dtype == "float32":
     dtype = torch.float32
 x = x.type(dtype)
 Q = Q.type(dtype)
+Qa = Qa.type(dtype)
 K = K.type(dtype)
 atom_embedding = atom_embedding.type(dtype)
 D = D.type(dtype)
@@ -299,8 +301,25 @@ def test_zbl_repulsion_energy():
     )
 
 
+def test_switch_function():
+    from enerzyme.models.cutoff import smooth_transition
+    from spookynet.functional import switch_function
+    assert_allclose(
+        smooth_transition(D, 10, 1).detach().numpy(),
+        switch_function(D, 1, 10).detach().numpy()
+    )
+
+
 def test_electrostatic_energy():
-    pass
+    from enerzyme.models.layers.electrostatics import ElectrostaticEnergyLayer as F1
+    from spookynet.modules.electrostatic_energy import ElectrostaticEnergy as F2
+    f2 = F2(cutoff=5.0)
+    f1 = F1(cutoff_sr=5.0, lr_flavor="smooth")
+    f1.kehalf = f2.kehalf
+    assert_allclose(
+        f1.get_E_ele_a(D, Qa, idx_i, idx_j).detach().numpy(),
+        f2(len(Qa), Qa, D, idx_i, idx_j).detach().numpy()
+    )
 
 
 def test_d4_dispersion_energy():

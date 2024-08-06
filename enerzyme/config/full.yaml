@@ -79,6 +79,9 @@ Modelhub:
         - name: ChargeConservation
         - name: AtomicCharge2Dipole
         - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
+          params:
+            lr_flavor: simple
+            half_switch: true
         - name: GrimmeD3Energy
           params: # Hartree_in_E, Bohr_in_R in build_params
             learnable: true
