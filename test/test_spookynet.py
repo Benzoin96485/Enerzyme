@@ -68,9 +68,9 @@ cutoff_values = cutoff_values.type(dtype)
 
 
 def test_cutoff_function():
-    from enerzyme.models.cutoff import bump_cutoff
+    from enerzyme.models.cutoff import bump_transition
     from spookynet.functional import cutoff_function
-    assert_allclose(bump_cutoff(x, 5).detach().numpy(), cutoff_function(x, 5).detach().numpy())
+    assert_allclose(bump_transition(x, 5).detach().numpy(), cutoff_function(x, 5).detach().numpy())
 
 
 def test_shifted_softplus():
@@ -297,6 +297,9 @@ def test_zbl_repulsion_energy():
         f1.get_zbf_energy(Za, D, idx_i, idx_j, cutoff_values).detach().numpy(),
         f2(len(Za), Za.type(dtype), D, cutoff_values, idx_i, idx_j).detach().numpy()
     )
+
+
+def test_electrostatic_energy():
     pass
 
 

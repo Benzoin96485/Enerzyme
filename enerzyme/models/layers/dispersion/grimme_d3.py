@@ -5,7 +5,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module, Parameter
 from torch.nn.functional import softmax
-from ...cutoff import polynomial_cutoff
+from ...cutoff import polynomial_transition
 from ...functional import segment_sum, gather_nd
 
 # parameters
@@ -73,13 +73,7 @@ def _ncoord(Zi: Tensor, Zj: Tensor, Dij: Tensor, idx_i: Tensor, cutoff: float=No
     rr = rco / Dij
     damp = 1.0 / (1.0 + torch.exp(-k1 * (rr - 1.0)))
     if cutoff is not None:
-        cuton = cutoff - 1
-        Dij_ = Dij - cuton
-        damp *= torch.where(
-            Dij_ > 0,
-            polynomial_cutoff(Dij_, cutoff),
-            torch.ones_like(Dij)
-        )
+        damp *= polynomial_transition(Dij, cutoff, cutoff-1)
     return segment_sum(damp, idx_i)
 
 

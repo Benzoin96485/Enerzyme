@@ -32,19 +32,19 @@ Modelhub:
       build_params:
         dim_embedding: 128
         num_rbf: 64
-        max_Za: 95
+        max_Za: 94
         cutoff_sr: 10.0
         Hartree_in_E: 1
         Bohr_in_R: 0.5291772108
+        cutoff_fn: polynomial
       layers:
         - name: Distance
         - name: ExponentialGaussianRBF
-          params: # num_rbf, cutoff_sr in build_params
+          params: # num_rbf, cutoff_sr, cutoff_fn in build_params
             no_basis_at_infinity: false
             init_alpha: 1
             exp_weighting: false
             learnable_shape: true
-            cutoff_fn: polynomial
             init_width_flavor: PhysNet
         - name: RandomAtomEmbedding # dim_embedding, max_Za in build_params
         - name: Core

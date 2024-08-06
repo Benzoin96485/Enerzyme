@@ -28,7 +28,7 @@ class BaseAtomEmbedding(ABC, Module):
 class RandomAtomEmbedding(BaseAtomEmbedding):
     def __init__(self, max_Za, dim_embedding) -> None:
         super().__init__(max_Za, dim_embedding)
-        self.embedding = Embedding(max_Za, dim_embedding)
+        self.embedding = Embedding(max_Za + 1, dim_embedding)
 
     def get_embedding(self, Za: Tensor) -> Tensor:
         return self.embedding(Za)

@@ -90,7 +90,7 @@ def initialize(layer_params=default_layer_params):
         build_params={
             "dim_embedding": F,
             "num_rbf": K,
-            "max_Za": 95,
+            "max_Za": 94,
             "cutoff_sr": cutoff,
             "drop_out": 0.0,
             "Hartree_in_E": d3_autoev,
@@ -333,7 +333,8 @@ def test_electrostatic_energy_per_atom():
     from enerzyme.models.layers.electrostatics import ElectrostaticEnergyLayer
     ele_layer = ElectrostaticEnergyLayer(
         cutoff_sr=cutoff,
-        cutoff_lr=None
+        cutoff_lr=None,
+        cutoff_fn="polynomial"
     )
     ele_layer.kehalf = physnet_tf.kehalf
     e_torch = ele_layer.get_E_ele_a(
@@ -355,7 +356,8 @@ def test_energy_from_scaled_atomic_properties():
     from enerzyme.models.layers.reduce import EnergyReduceLayer
     ele_layer = ElectrostaticEnergyLayer(
         cutoff_sr=cutoff,
-        cutoff_lr=None
+        cutoff_lr=None,
+        cutoff_fn="polynomial"
     )
     ele_layer.kehalf = physnet_tf.kehalf
     disp_layer = GrimmeD3EnergyLayer(Bohr_in_R=d3_autoang, Hartree_in_E=d3_autoev)
@@ -398,7 +400,8 @@ def test_energy_from_atomic_properties():
     Q_layer = ChargeConservationLayer()
     ele_layer = ElectrostaticEnergyLayer(
         cutoff_sr=cutoff,
-        cutoff_lr=None
+        cutoff_lr=None,
+        cutoff_fn="polynomial"
     )
     ele_layer.kehalf = physnet_tf.kehalf
     disp_layer = GrimmeD3EnergyLayer(Bohr_in_R=d3_autoang, Hartree_in_E=d3_autoev)
@@ -435,7 +438,7 @@ def test_energy_and_forces():
         }},
         {"name": "ChargeConservation"},
         {"name": "AtomicCharge2Dipole"},
-        {"name": "ElectrostaticEnergy"},
+        {"name": "ElectrostaticEnergy", "params": {"cutoff_fn": "polynomial"}},
         {"name": "GrimmeD3Energy", "params": {"learnable": True}},
         {"name": "EnergyReduce"},
         {"name": "Force"}

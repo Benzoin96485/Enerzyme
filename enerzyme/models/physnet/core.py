@@ -50,13 +50,13 @@ class PhysNetCore(Module):
             InteractionBlock(
                 num_rbf, dim_embedding, num_residual_atomic, num_residual_interaction, 
                 activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate
-            ) for i in range(num_blocks)
+            ) for _ in range(num_blocks)
         ])
         self.output_block = Sequential(*[
             OutputBlock(
                 dim_embedding, num_residual_output, 
                 activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate
-            ) for i in range(num_blocks)
+            ) for _ in range(num_blocks)
         ])
         
         self.distance_layer: DistanceLayer = None

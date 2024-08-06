@@ -3,7 +3,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module
 from ..functional import segment_sum
-from ..cutoff import polynomial_cutoff
+from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
 class ChargeConservationLayer(Module):
@@ -63,7 +63,11 @@ class ChargeConservationLayer(Module):
 
 
 class ElectrostaticEnergyLayer(Module):
-    def __init__(self, cutoff_sr: float, cutoff_lr: Optional[float]=None, Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1) -> None:
+    def __init__(
+        self, cutoff_sr: float, cutoff_lr: Optional[float]=None, 
+        Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1,
+        cutoff_fn: CUTOFF_KEY_TYPE="smooth"
+    ) -> None:
         r"""
         Calculate the electrostatic energy from distributed multipoles and atomic positions
 
@@ -89,6 +93,7 @@ class ElectrostaticEnergyLayer(Module):
         self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
         self.cutoff_sr = cutoff_sr
         self.cutoff_lr = cutoff_lr
+        self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
         if cutoff_lr is not None and cutoff_lr > 0:
             self.lr_cutoff2 = self.cutoff_lr * self.cutoff_lr
 
@@ -113,7 +118,7 @@ class ElectrostaticEnergyLayer(Module):
         Qi = Qa.gather(0, idx_i)
         Qj = Qa.gather(0, idx_j)
         Dij_shielded = torch.sqrt(Dij * Dij + 1.0)
-        switch = polynomial_cutoff(Dij, self.cutoff_sr / 2)
+        switch = self.cutoff_fn(Dij, self.cutoff_sr / 2)
         cswitch = 1 - switch
         if self.cutoff_lr is None or self.cutoff_lr <= 0:
             Eele_ordinary = 1.0 / Dij
