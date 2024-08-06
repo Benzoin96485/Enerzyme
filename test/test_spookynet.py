@@ -323,8 +323,16 @@ def test_electrostatic_energy():
 
 
 def test_d4_dispersion_energy():
-    pass
-
+    from enerzyme.models.layers.dispersion.grimme_d4 import GrimmeD4EnergyLayer as F1
+    from spookynet.modules.d4_dispersion_energy import D4DispersionEnergy as F2
+    f2 = F2()
+    f1 = F1()
+    f1.Hartree_in_E = f2.convert2eV * 2
+    f1.Bohr_in_R = 1 / f2.convert2Bohr
+    assert_allclose(
+        f1.get_e_disp(Za, Qa, D, idx_i, idx_j).detach().numpy(),
+        f2(N, Za, Qa, D, idx_i, idx_j)[0].detach().numpy()
+    )
 
 def test_calculate_distances():
     pass
