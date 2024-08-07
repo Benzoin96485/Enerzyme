@@ -53,9 +53,16 @@ class DistanceLayer(BaseFFLayer):
 
 class RangeSeparationLayer(BaseFFLayer):
     def __init__(self, cutoff_sr) -> None:
-        super().__init__(input_fields={"Dij_lr", "idx_i_lr", "idx_j_lr"}, output_fields={"Dij_sr", "idx_i_sr", "idx_j_sr"})
+        super().__init__(input_fields={"Dij_lr", "idx_i_lr", "idx_j_lr", "vij_lr"}, output_fields={"Dij_sr", "idx_i_sr", "idx_j_sr", "vij)sr"})
         self.cutoff_sr = cutoff_sr
 
-    def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor) -> Dict[str, Tensor]:
-        relevant_output = dict()
-        pass
+    def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor, vij_lr: Optional[Tensor]=None) -> Dict[str, Tensor]:
+        cutmask = Dij_lr < self.cutoff_sr
+        relevant_output = {
+            "Dij_sr": Dij_lr[cutmask],
+            "idx_i_sr": idx_i_lr[cutmask],
+            "idx_j_sr": idx_j_lr[cutmask],
+        }
+        if vij_lr is not None:
+            relevant_output["vij_sr"] = vij_lr[cutmask]
+        return relevant_output

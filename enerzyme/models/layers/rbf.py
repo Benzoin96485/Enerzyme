@@ -31,14 +31,6 @@ class BaseRBF(BaseFFLayer):
     def _get_rbf(self, Dij: Tensor) -> Tensor:
         ...
 
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output["rbf"] = self.get_rbf(
-            Dij_sr=net_input[self.Dij_name],
-            cutoff_values=net_input.get(self.cutoff_sr_values_name, None)
-        )
-        return output
-
 
 class GaussianRBFLayer(BaseRBF):
     """

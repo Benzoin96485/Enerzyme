@@ -10,6 +10,9 @@ class BaseFFModule(ABC, Module):
         self._input_fields = input_fields
         self._output_fields = output_fields
         self._relevant_fields = input_fields | output_fields
+        self._name_mapping = dict()
+        for field_name in self._relevant_fields:
+            self._name_mapping[field_name] = field_name
 
     @abstractmethod
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
@@ -31,9 +34,6 @@ class BaseFFModule(ABC, Module):
 class BaseFFLayer(BaseFFModule):
     def __init__(self, input_fields: Set[str], output_fields: Set[str]) -> None:
         super().__init__(input_fields, output_fields)
-        self._name_mapping = dict()
-        for field_name in self._relevant_fields:
-            self._name_mapping[field_name] = field_name
 
     def reset_field_name(self, **mapping: Dict[str, str]) -> None:
         self._relevant_fields = self._input_fields | self._output_fields

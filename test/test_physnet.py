@@ -78,7 +78,7 @@ def initialize(build_params=DEFAULT_BUILD_PARAMS, layer_params=DEFAULT_LAYER_PAR
     ).type(dtype_torch)
     set_state(state)
     physnet_tf = NeuralNetwork(F, K, cutoff, scope="test", dtype=dtype_tf)
-    print(physnet_torch.pre_sequence)
+    print(physnet_torch)
     physnet_tf._embeddings = tf.Variable(physnet_torch.pre_sequence[3].weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
     return physnet_torch, physnet_tf
     
@@ -222,7 +222,7 @@ def test_OutputBlock():
 
 
 def test_atomic_properties():
-    physnet_torch, physnet_tf = initialize()
+    physnet_torch, physnet_tf = initialize(layer_params=DEFAULT_LAYER_PARAMS[:4])
     output = physnet_torch({
         "Za": torch.from_numpy(Z.copy()), 
         "Ra": torch.from_numpy(R), 
@@ -232,7 +232,7 @@ def test_atomic_properties():
     })
     Ea_torch = output["Ea"].detach().numpy()
     Qa_torch = output["Qa"].detach().numpy()
-    Dij_lr_torch = output["Dij"].detach().numpy()
+    Dij_lr_torch = output["Dij_lr"].detach().numpy()
     nhloss_torch = output["nh_loss"].detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -325,8 +325,10 @@ def test_energy_from_scaled_atomic_properties():
         cutoff_lr=None,
         cutoff_fn="polynomial"
     )
+    ele_layer.reset_field_name(Dij_lr="Dij")
     ele_layer.kehalf = physnet_tf.kehalf
     disp_layer = GrimmeD3EnergyLayer(Bohr_in_R=d3_autoang, Hartree_in_E=d3_autoev)
+    disp_layer.reset_field_name(Dij_lr="Dij")
     reduce_layer = EnergyReduceLayer()
     e_torch = reduce_layer(disp_layer(ele_layer({
         "Ea": torch.from_numpy(Ea.copy()), 

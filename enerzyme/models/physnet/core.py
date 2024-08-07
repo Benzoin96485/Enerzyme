@@ -1,7 +1,7 @@
 import torch
 from torch import Tensor
 from torch.nn import Module, Sequential
-from typing import Dict, Optional, List
+from typing import Dict, List
 from .interaction import InteractionBlock, OutputBlock
 from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
@@ -48,6 +48,7 @@ DEFAULT_LAYER_PARAMS = [
  {'name': 'GrimmeD3Energy', 'params': {'learnable': True}},
  {'name': 'EnergyReduce'},
  {'name': 'Force'}]
+
 
 class PhysNetCore(BaseFFCore):
     def __str__(self) -> str:
