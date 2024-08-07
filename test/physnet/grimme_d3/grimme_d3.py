@@ -126,7 +126,7 @@ def edisp(Z, r, idx_i, idx_j, cutoff=None, r2=None,
 
     #Becke-Johnson damping, zero-damping introduces spurious repulsion
     #and is therefore not supported/implemented
-    tmp = a1*tf.sqrt(c8/(c6+eps)+eps) + a2
+    tmp = a1*tf.sqrt(c8/(c6+1e-14)+eps) + a2
     tmp2 = tmp**2
     tmp6 = tmp2**3
     tmp8 = tmp6*tmp2

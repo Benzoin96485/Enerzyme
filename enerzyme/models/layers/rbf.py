@@ -224,7 +224,7 @@ class ExponentialRBF(BaseRBF):
         self.learnable_shape = learnable_shape
         self.no_basis_at_infinity = no_basis_at_infinity
         self.register_parameter(
-            "alpha", Parameter(softplus_inverse(init_alpha))
+            "alpha", Parameter(softplus_inverse(torch.tensor(init_alpha, dtype=torch.float64)))
         )
     
     @abstractmethod
@@ -316,7 +316,7 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
             self.register_parameter(
                 "centers", Parameter(
                     softplus_inverse(torch.linspace(
-                        1, 0, num_rbf + 1
+                        1, 0, num_rbf + 1, dtype=torch.float64
                     )[:-1]), 
                     requires_grad=self.learnable_shape
                 )
@@ -325,7 +325,7 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
             self.register_parameter(
                 "centers", Parameter(
                     softplus_inverse(torch.linspace(
-                        1, math.exp(-cutoff_sr), num_rbf
+                        1, math.exp(-cutoff_sr), num_rbf, dtype=torch.float64
                     )), 
                     requires_grad=self.learnable_shape
                 )
@@ -340,8 +340,10 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
             self.register_parameter(
                 "widths", Parameter(
                     softplus_inverse(
-                        1.0 * self.num_rbf + \
-                        int(self.no_basis_at_infinity)
+                        torch.tensor(
+                            1.0 * self.num_rbf + \
+                            int(self.no_basis_at_infinity), dtype=torch.float64
+                        )
                     ),
                     requires_grad=self.learnable_shape
                 )
@@ -350,8 +352,10 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
             self.register_parameter(
                 "widths", Parameter(
                     softplus_inverse(
-                        [(0.5 / ((-math.expm1(-self.cutoff_sr)) / self.num_rbf)) ** 2] * \
-                        self.num_rbf
+                        torch.tensor(
+                            [(0.5 / ((-math.expm1(-self.cutoff_sr)) / self.num_rbf)) ** 2] * \
+                            self.num_rbf, dtype=torch.float64
+                        )
                     ),
                     requires_grad=self.learnable_shape
                 )

@@ -17,11 +17,10 @@ from physnet.grimme_d3.grimme_d3 import d3_autoang, d3_autoev
 from enerzyme.models.physnet import DEFAULT_LAYER_PARAMS, DEFAULT_BUILD_PARAMS
 from enerzyme.models.init import semi_orthogonal_glorot_weights
 
-F = 128
-K = 5
+F = DEFAULT_BUILD_PARAMS['dim_embedding']
+K = DEFAULT_BUILD_PARAMS['num_rbf']
 N = 50
-M = 20
-cutoff=20
+cutoff=DEFAULT_BUILD_PARAMS['cutoff_sr']
 R = np.random.rand(N, 3) * 20
 idx_i = np.empty((N, N-1), dtype=int)
 idx_j = np.empty((N, N-1), dtype=int)
@@ -77,7 +76,11 @@ def initialize(build_params=DEFAULT_BUILD_PARAMS, layer_params=DEFAULT_LAYER_PAR
         layer_params=layer_params
     ).type(dtype_torch)
     set_state(state)
-    physnet_tf = NeuralNetwork(F, K, cutoff, scope="test", dtype=dtype_tf)
+    physnet_tf = NeuralNetwork(
+        build_params['dim_embedding'],
+        build_params['num_rbf'],
+        build_params['cutoff_sr'],
+        scope="test", dtype=dtype_tf)
     print(physnet_torch)
     physnet_tf._embeddings = tf.Variable(physnet_torch.pre_sequence[3].weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
     return physnet_torch, physnet_tf
@@ -300,7 +303,9 @@ def test_electrostatic_energy_per_atom():
     ele_layer = ElectrostaticEnergyLayer(
         cutoff_sr=cutoff,
         cutoff_lr=None,
-        cutoff_fn="polynomial"
+        cutoff_fn="polynomial",
+        half_switch=True,
+        lr_flavor="simple"
     )
     ele_layer.kehalf = physnet_tf.kehalf
     e_torch = ele_layer.get_E_ele_a(
@@ -323,7 +328,9 @@ def test_energy_from_scaled_atomic_properties():
     ele_layer = ElectrostaticEnergyLayer(
         cutoff_sr=cutoff,
         cutoff_lr=None,
-        cutoff_fn="polynomial"
+        cutoff_fn="polynomial",
+        half_switch=True,
+        lr_flavor="simple"
     )
     ele_layer.reset_field_name(Dij_lr="Dij")
     ele_layer.kehalf = physnet_tf.kehalf
@@ -357,7 +364,7 @@ def test_scaled_charges():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         q_tf = physnet_tf.scaled_charges(Z, Qa, Q_tot).eval()
-    assert_allclose(q_torch, q_tf, rtol=1e-7, atol=1e-7)
+    assert_allclose(q_torch, q_tf)
 
 
 def test_energy_from_atomic_properties():
@@ -369,10 +376,14 @@ def test_energy_from_atomic_properties():
     ele_layer = ElectrostaticEnergyLayer(
         cutoff_sr=cutoff,
         cutoff_lr=None,
-        cutoff_fn="polynomial"
+        cutoff_fn="polynomial",
+        half_switch=True,
+        lr_flavor="simple"
     )
     ele_layer.kehalf = physnet_tf.kehalf
     disp_layer = GrimmeD3EnergyLayer(Bohr_in_R=d3_autoang, Hartree_in_E=d3_autoev)
+    ele_layer.reset_field_name(Dij_lr="Dij")
+    disp_layer.reset_field_name(Dij_lr="Dij")
     reduce_layer = EnergyReduceLayer()
     e_torch = reduce_layer(disp_layer(ele_layer(Q_layer({
         "Ea": torch.from_numpy(Ea.copy()), 
@@ -393,24 +404,7 @@ def test_energy_from_atomic_properties():
 
 def test_energy_and_forces():
     torch.autograd.set_detect_anomaly(True)
-    physnet_torch, physnet_tf = initialize(default_layer_params + [
-        {"name": "AtomicAffine", "params": {
-            "shifts": {
-                "Ea": {"values": 0, "learnable": True},
-                "Qa": {"values": 0, "learnable": True}
-            },
-            "scales": {
-                "Ea": {"values": 1, "learnable": True},
-                "Qa": {"values": 1, "learnable": True}
-            }
-        }},
-        {"name": "ChargeConservation"},
-        {"name": "AtomicCharge2Dipole"},
-        {"name": "ElectrostaticEnergy", "params": {"cutoff_fn": "polynomial"}},
-        {"name": "GrimmeD3Energy", "params": {"learnable": True}},
-        {"name": "EnergyReduce"},
-        {"name": "Force"}
-    ])
+    physnet_torch, physnet_tf = initialize()
     output = physnet_torch({
         "Za": torch.from_numpy(Z.copy()),
         "Ra": torch.tensor(R, requires_grad=True),

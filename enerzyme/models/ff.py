@@ -45,6 +45,7 @@ def build_layer(layer: Callable, layer_params: Dict[str, Any], build_params: Dic
             final_params[name] = built_layers
         elif attr.default is attr.empty:
             raise TypeError(f"{name} value should be provided")
+    print(layer, final_params)
     return layer(**final_params)
 
 
