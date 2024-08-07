@@ -14,6 +14,7 @@ from enerzyme.models.ff import build_model
 # from enerzyme.models.physnet import PhysNetCore
 from physnet.NeuralNetwork import NeuralNetwork
 from physnet.grimme_d3.grimme_d3 import d3_autoang, d3_autoev
+from enerzyme.models.physnet import DEFAULT_LAYER_PARAMS, DEFAULT_BUILD_PARAMS
 from enerzyme.models.init import semi_orthogonal_glorot_weights
 
 F = 128
@@ -66,43 +67,19 @@ elif dtype == "float32":
 
 # set_dtype("float64")
 
-default_layer_params = [
-    {"name": "Distance"},
-    {
-        "name": "ExponentialGaussianRBF", 
-        "params": {
-            "no_basis_at_infinity": False,
-            "init_alpha": 1,
-            "exp_weighting": False,
-            "learnable_shape": True,
-            "cutoff_fn": "polynomial",
-            "init_width_flavor": "PhysNet"
-        }
-    },
-    {"name": "RandomAtomEmbedding"},
-    {"name": "Core"}
-]
-
-def initialize(layer_params=default_layer_params):
+def initialize(build_params=DEFAULT_BUILD_PARAMS, layer_params=DEFAULT_LAYER_PARAMS):
     state = get_state()
+    build_params.update({"Hartree_in_E": d3_autoev,
+            "Bohr_in_R": d3_autoang})
     physnet_torch = build_model(
         architecture="PhysNet",
-        build_params={
-            "dim_embedding": F,
-            "num_rbf": K,
-            "max_Za": 94,
-            "cutoff_sr": cutoff,
-            "drop_out": 0.0,
-            "Hartree_in_E": d3_autoev,
-            "Bohr_in_R": d3_autoang
-        },
+        build_params=build_params,
         layer_params=layer_params
     ).type(dtype_torch)
-    # physnet_torch = None
-    # physnet_torch = PhysNetCore(F, K, 5.0, dtype=dtype, use_dispersion=use_dispersion)
     set_state(state)
     physnet_tf = NeuralNetwork(F, K, cutoff, scope="test", dtype=dtype_tf)
-    physnet_tf._embeddings = tf.Variable(physnet_torch.core.embeddings.weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
+    print(physnet_torch.pre_sequence)
+    physnet_tf._embeddings = tf.Variable(physnet_torch.pre_sequence[3].weight.detach().numpy(), name="embeddings", dtype=dtype_tf)
     return physnet_torch, physnet_tf
     
 
@@ -133,12 +110,12 @@ def test_RBFLayer():
     _, physnet_tf = initialize()
     from enerzyme.models.layers.rbf import ExponentialGaussianRBFLayer
     from enerzyme.models.layers.geometry import DistanceLayer
-    D1 = DistanceLayer().get_Dij(
+    D1 = DistanceLayer().get_output(
         Ra=torch.from_numpy(R), 
         idx_i=torch.from_numpy(idx_i), 
         idx_j=torch.from_numpy(idx_j), 
         offsets=torch.from_numpy(offsets)
-    ).numpy()
+    )["Dij"].detach().numpy()
     rbf_layer = ExponentialGaussianRBFLayer(
         num_rbf=K,
         no_basis_at_infinity=False,
@@ -310,7 +287,7 @@ def test_edisp():
     from enerzyme.models.layers.dispersion.grimme_d3 import GrimmeD3EnergyLayer
     from physnet.grimme_d3.grimme_d3 import edisp as edisp_tf
     disp_layer = GrimmeD3EnergyLayer(Hartree_in_E=1, Bohr_in_R=1)
-    e_torch = disp_layer.get_e_disp(torch.from_numpy(Z.copy()), torch.from_numpy(D.copy()), torch.from_numpy(idx_i), torch.from_numpy(idx_j)).detach().numpy()
+    e_torch = disp_layer.get_E_disp_a(torch.from_numpy(Z.copy()), torch.from_numpy(D.copy()), torch.from_numpy(idx_i), torch.from_numpy(idx_j)).detach().numpy()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         e_tf = edisp_tf(Z, D, idx_i, idx_j).eval()
@@ -327,7 +304,7 @@ def test_electrostatic_energy_per_atom():
     )
     ele_layer.kehalf = physnet_tf.kehalf
     e_torch = ele_layer.get_E_ele_a(
-        Dij=torch.from_numpy(D.copy()), 
+        Dij_lr=torch.from_numpy(D.copy()), 
         Qa=torch.from_numpy(Qa.copy()), 
         idx_i=torch.from_numpy(idx_i), 
         idx_j=torch.from_numpy(idx_j)

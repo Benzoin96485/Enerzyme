@@ -1,14 +1,36 @@
-from typing import Dict, Set
+from typing import Dict, Set, List
+from abc import ABC, abstractmethod
 from torch import Tensor
-from torch.nn import Module
+from torch.nn import Module, Sequential
 
 
-class BaseLayer(Module):
+class BaseFFModule(ABC, Module):
     def __init__(self, input_fields: Set[str], output_fields: Set[str]) -> None:
         super().__init__()
         self._input_fields = input_fields
         self._output_fields = output_fields
         self._relevant_fields = input_fields | output_fields
+
+    @abstractmethod
+    def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        ...
+
+    def _forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        net_output = net_input.copy()
+        relevant_input = dict()
+        for k in self._input_fields:
+            new_k = self._name_mapping[k]
+            relevant_input[k] = net_input.get(new_k, None)
+        relevant_output = self.get_output(**relevant_input)
+        for k in self._output_fields:
+            new_k = self._name_mapping[k]
+            if k in relevant_output:
+                net_output[new_k] = relevant_output[k]
+        return net_output
+
+class BaseFFLayer(BaseFFModule):
+    def __init__(self, input_fields: Set[str], output_fields: Set[str]) -> None:
+        super().__init__(input_fields, output_fields)
         self._name_mapping = dict()
         for field_name in self._relevant_fields:
             self._name_mapping[field_name] = field_name
@@ -28,14 +50,18 @@ class BaseLayer(Module):
         return relevant_output
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        net_output = net_input.copy()
-        relevant_input = dict()
-        for k in self._input_fields:
-            new_k = self._name_mapping[k]
-            relevant_input[k] = net_input.get(new_k, None)
-        relevant_output = self.get_output(**relevant_input)
-        for k in self._output_fields:
-            new_k = self._name_mapping[k]
-            if k in relevant_output:
-                net_output[new_k] = relevant_output[k]
-        return net_output
+        return self._forward(net_input)
+
+
+class BaseFFCore(BaseFFModule):
+    def __init__(self, input_fields, output_fields):
+        super().__init__(input_fields, output_fields)
+        self.pre_sequence = Sequential()
+        self.post_sequence = Sequential()
+
+    def forward(self, net_input):
+        return self.post_sequence(self._forward(self.pre_sequence(net_input)))
+    
+    @abstractmethod
+    def build(self, built_layers: List[Module]) -> None:
+        ...

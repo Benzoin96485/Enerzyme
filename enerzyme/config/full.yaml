@@ -38,7 +38,7 @@ Modelhub:
         Bohr_in_R: 0.5291772108
         cutoff_fn: polynomial
       layers:
-        - name: Distance
+        - name: RangeSeparation # cutoff_sr in build_params
         - name: ExponentialGaussianRBF
           params: # num_rbf, cutoff_sr, cutoff_fn in build_params
             no_basis_at_infinity: false
@@ -80,6 +80,7 @@ Modelhub:
         - name: AtomicCharge2Dipole
         - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
           params:
+            cutoff_lr: null
             lr_flavor: simple
             half_switch: true
         - name: GrimmeD3Energy

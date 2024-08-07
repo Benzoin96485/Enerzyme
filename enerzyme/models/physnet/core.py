@@ -1,28 +1,55 @@
 import torch
 from torch import Tensor
 from torch.nn import Module, Sequential
-from typing import Dict, Any
+from typing import Dict, Optional, List
 from .interaction import InteractionBlock, OutputBlock
-from ..layers import DistanceLayer, BaseRBF, BaseAtomEmbedding
+from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 
 
-LAYERS = [
-    "Distance",
-    "RandomEmbedding",
-    "ExponentialGaussianRBFLayer",
-    "Core",
-    "AtomicAffine",
-    "ChargeConservation",
-    "AtomicCharge2Dipole",
-    "ElectrostaticEnergy",
-    "GrimmeD3Energy",
-    "EnergyReduce",
-    "Force"
-]
+DEFAULT_BUILD_PARAMS = {
+    'dim_embedding': 128,
+    'num_rbf': 64,
+    'max_Za': 94,
+    'cutoff_sr': 10.0,
+    'Hartree_in_E': 1,
+    'Bohr_in_R': 0.5291772108,
+    'cutoff_fn': 'polynomial'
+}
+DEFAULT_LAYER_PARAMS = [
+ {'name': 'RangeSeparation'},
+ {'name': 'ExponentialGaussianRBF',
+  'params': {'no_basis_at_infinity': False,
+   'init_alpha': 1,
+   'exp_weighting': False,
+   'learnable_shape': True,
+   'init_width_flavor': 'PhysNet'}},
+ {'name': 'RandomAtomEmbedding'},
+ {'name': 'Core',
+  'params': {'num_blocks': 5,
+   'num_residual_atomic': 2,
+   'num_residual_interaction': 3,
+   'num_residual_output': 1,
+   'activation_fn': 'shifted_softplus',
+   'activation_params': {'dim_feature': 1,
+    'initial_alpha': 1,
+    'initial_beta': 1,
+    'learnable': False},
+   'dropout_rate': 0.0}},
+ {'name': 'AtomicAffine',
+  'params': {'shifts': {'Ea': {'values': 0, 'learnable': True},
+    'Qa': {'values': 0, 'learnable': True}},
+   'scales': {'Ea': {'values': 1, 'learnable': True},
+    'Qa': {'values': 1, 'learnable': True}}}},
+ {'name': 'ChargeConservation'},
+ {'name': 'AtomicCharge2Dipole'},
+ {'name': 'ElectrostaticEnergy',
+  'params': {'lr_flavor': 'simple', 'half_switch': True, 'cutoff_lr': None}},
+ {'name': 'GrimmeD3Energy', 'params': {'learnable': True}},
+ {'name': 'EnergyReduce'},
+ {'name': 'Force'}]
 
-
-class PhysNetCore(Module):
+class PhysNetCore(BaseFFCore):
     def __str__(self) -> str:
         return """
 ###################################################################################
@@ -40,12 +67,11 @@ class PhysNetCore(Module):
         num_residual_output: int=1,              # number of residual layers for the output blocks
         activation_fn: ACTIVATION_KEY_TYPE="shifted_softplus",   # activation function
         activation_params: ACTIVATION_PARAM_TYPE=dict(),
-        dropout_rate: float=0.0
+        dropout_rate: float=0.0,
     ) -> None:
-        super().__init__()
+        super().__init__(input_fields={"rbf", "atom_embedding", "idx_i_sr", "idx_j_sr"}, output_fields={"Ea", "Qa", "nh_loss"})
         self.num_blocks = num_blocks
         self.drop_out = dropout_rate
-
         self.interaction_block = Sequential(*[
             InteractionBlock(
                 num_rbf, dim_embedding, num_residual_atomic, num_residual_interaction, 
@@ -58,74 +84,38 @@ class PhysNetCore(Module):
                 activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate
             ) for _ in range(num_blocks)
         ])
-        
-        self.distance_layer: DistanceLayer = None
-        self.rbf_layer: BaseRBF = None
-        self.embeddings: BaseAtomEmbedding = None
 
-    @classmethod
-    def build(cls, built_layers: Dict[str, Module], **build_params: Dict[str, Any]) -> Module:
-        instance = cls(**build_params)
-
-        # build necessary flexiable pre-core layers
-        for layer_name, layer in built_layers.items():
-            if isinstance(layer, BaseRBF):
-                instance.rbf_layer = layer
-            elif isinstance(layer, BaseAtomEmbedding):
-                instance.embeddings = layer
-
-        # check if necessary flexible pre-core layers has been built
-        for layer_name in ["rbf_layer", "embeddings"]:
-            if getattr(instance, layer_name) is None:
-                raise AttributeError(f"{layer_name} is not built")
-            
+    def build(self, built_layers: List[Module]) -> None:
         # build necessary fixed pre-core layers
-        instance.distance_layer = DistanceLayer()
+        calculate_distance = DistanceLayer()
+        calculate_distance.reset_field_name(Dij="Dij_lr")
+        self.pre_sequence.append(calculate_distance)
 
-        # reset pre-core layers
-        
-        return instance
+        pre_core = True
+        for layer in built_layers:
+            if layer is self:
+                pre_core = False
+                continue
+            if pre_core:
+                # reset pre-core layers
+                if isinstance(layer, RangeSeparationLayer):
+                    layer.reset_field_name(idx_i_lr="idx_i", idx_j_lr="idx_j")
+                # build pre-core sequence
+                self.pre_sequence.append(layer)
+            else: 
+                # build post-core sequence
+                self.post_sequence.append(layer)
 
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def get_output(self, rbf: Tensor, atom_embedding: Tensor, idx_i_sr: Tensor, idx_j_sr: Tensor) -> Dict[str, Tensor]:
         '''
         Compute raw atomic properties
         '''
-        # long-short range separation
-        net_output = self.distance_layer(
-            net_input,
-            Dij_name = "Dij",
-        )
-        if "sr_idx_i" in net_input and "sr_idx_j" in net_input:
-            net_output = self.distance_layer(
-                net_output,
-                idx_i_name = "sr_idx_i",
-                idx_j_name = "sr_idx_j",
-                Dij_name = "Dij_sr"
-            )
-            sr_idx_i = net_output["sr_idx_i"]
-            sr_idx_j = net_output["sr_idx_j"]
-        else:
-            sr_idx_i = net_output["idx_i"]
-            sr_idx_j = net_output["idx_j"]
-            net_output["Dij_sr"] = net_output["Dij"]
-        
-        # rbf based on short range interations
-        net_output = self.rbf_layer(
-            net_output,
-            Dij_name = "Dij_sr"
-        )
-        net_output.pop("Dij_sr")
-        net_output = self.embeddings(net_output)
-
-        rbf = net_output["rbf"]
-        x = net_output["atom_embedding"]
-
         Ea = 0 #atomic energy 
         Qa = 0 #atomic charge
         nhloss = 0 #non-hierarchicality loss
         for i in range(self.num_blocks):
-            x = self.interaction_block[i](x, rbf, sr_idx_i, sr_idx_j)
-            out = self.output_block[i](x)
+            atom_embedding = self.interaction_block[i](atom_embedding, rbf, idx_i_sr, idx_j_sr)
+            out = self.output_block[i](atom_embedding)
             Ea += out[:,0]
             Qa += out[:,1]
             # compute non-hierarchicality loss
@@ -133,7 +123,4 @@ class PhysNetCore(Module):
             if i > 0:
                 nhloss += torch.mean(out2 / (out2 + lastout2 + 1e-7))
             lastout2 = out2
-        net_output["Ea"] = Ea
-        net_output["Qa"] = Qa
-        net_output["nh_loss"] = nhloss
-        return net_output
+        return {"Ea": Ea, "Qa": Qa, "nh_loss": nhloss}

@@ -3,29 +3,29 @@ from abc import ABC, abstractmethod
 from typing import Literal, Dict, Optional
 import torch
 from torch import Tensor
-from torch.nn import Module, Parameter
+from torch.nn import Parameter
 import torch.nn.functional as F
-from . import BaseLayer
+from . import BaseFFLayer
 from ..cutoff import CUTOFF_REGISTER
 from ..functional import softplus_inverse
 
 
-class BaseRBF(ABC, BaseLayer):
+class BaseRBF(BaseFFLayer):
     def __init__(
         self,
         num_rbf: int,
         cutoff_sr: float,
         cutoff_fn: Literal["polynomial", "bump"]
     ) -> None:
-        super().__init__(input_fields={"Dij", "cutoff_sr_values"}, output_fields={"rbf"})
+        super().__init__(input_fields={"Dij_sr", "cutoff_sr_values"}, output_fields={"rbf"})
         self.num_rbf = num_rbf
         self.cutoff_sr = cutoff_sr
         self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
 
-    def get_rbf(self, Dij: Tensor, cutoff_values: Optional[Tensor]=None, **kwargs) -> Tensor:
+    def get_rbf(self, Dij_sr: Tensor, cutoff_values: Optional[Tensor]=None, **kwargs) -> Tensor:
         if cutoff_values is None:
-            cutoff_values = self.cutoff_fn(Dij, cutoff=self.cutoff_sr)
-        return cutoff_values.view(-1, 1) * self._get_rbf(Dij)
+            cutoff_values = self.cutoff_fn(Dij_sr, cutoff=self.cutoff_sr)
+        return cutoff_values.view(-1, 1) * self._get_rbf(Dij_sr)
 
     @abstractmethod
     def _get_rbf(self, Dij: Tensor) -> Tensor:
@@ -34,7 +34,7 @@ class BaseRBF(ABC, BaseLayer):
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         output["rbf"] = self.get_rbf(
-            Dij=net_input[self.Dij_name],
+            Dij_sr=net_input[self.Dij_name],
             cutoff_values=net_input.get(self.cutoff_sr_values_name, None)
         )
         return output

@@ -1,10 +1,10 @@
 from typing import Optional, Dict
 from torch import Tensor
 import torch.nn.functional as F
-from . import BaseLayer
+from . import BaseFFLayer
 
 
-class DistanceLayer(BaseLayer):
+class DistanceLayer(BaseFFLayer):
     '''
     Compute the distance between atoms
     '''
@@ -49,3 +49,13 @@ class DistanceLayer(BaseLayer):
         if self._with_vector:
             relevant_output["vij"] = Rj_ - Ri
         return relevant_output
+
+
+class RangeSeparationLayer(BaseFFLayer):
+    def __init__(self, cutoff_sr) -> None:
+        super().__init__(input_fields={"Dij_lr", "idx_i_lr", "idx_j_lr"}, output_fields={"Dij_sr", "idx_i_sr", "idx_j_sr"})
+        self.cutoff_sr = cutoff_sr
+
+    def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor) -> Dict[str, Tensor]:
+        relevant_output = dict()
+        pass

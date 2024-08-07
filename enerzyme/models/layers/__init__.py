@@ -1,5 +1,5 @@
-from ._base_layer import BaseLayer
-from .geometry import DistanceLayer
+from ._base_layer import BaseFFLayer, BaseFFCore
+from .geometry import DistanceLayer, RangeSeparationLayer
 from .rbf import BaseRBF, ExponentialGaussianRBFLayer
 from .atom_embedding import BaseAtomEmbedding, RandomAtomEmbedding
 from .electron_embedding import BaseElectronEmbedding

@@ -1,8 +1,8 @@
 from typing import Dict, Literal, Optional, Tuple
-from numpy import zeros_like
 import torch
 from torch import Tensor
 from torch.nn import Module
+from . import BaseFFLayer
 from ..functional import segment_sum
 from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
@@ -63,7 +63,7 @@ class ChargeConservationLayer(Module):
         return output
 
 
-class ElectrostaticEnergyLayer(Module):
+class ElectrostaticEnergyLayer(BaseFFLayer):
     def __init__(
         self, cutoff_sr: float, cutoff_lr: Optional[float]=None, 
         Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1,
@@ -90,7 +90,7 @@ class ElectrostaticEnergyLayer(Module):
         -----
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         """
-        super().__init__()
+        super().__init__(input_fields={"Dij_lr", "Qa", "idx_i", "idx_j"}, output_fields={"E_ele_a"})
         self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
         if half_switch:
             self.cutoff_sr = cutoff_sr / 2
@@ -134,7 +134,7 @@ class ElectrostaticEnergyLayer(Module):
             condition, zeros
         )
 
-    def get_E_ele_a(self, Dij: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor, **kwargs) -> Tensor:
+    def get_E_ele_a(self, Dij_lr: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:
         '''
         Compute the atomic electrostatic energy
 
@@ -156,23 +156,18 @@ class ElectrostaticEnergyLayer(Module):
             fac = self.kehalf * Qa[idx_i] * Qa[idx_j]
         else:
             fac = self.kehalf * Qa.gather(0, idx_i) * Qa.gather(0, idx_j)
-        switch = self.cutoff_fn(Dij, self.cutoff_sr)
+        switch = self.cutoff_fn(Dij_lr, self.cutoff_sr)
         cswitch = 1 - switch
         if self.cutoff_lr is None or self.cutoff_lr <= 0:
-            Eele_ordinary = 1.0 / Dij
-            Eele_shielded = 1.0 / self._shield(Dij)
+            Eele_ordinary = 1.0 / Dij_lr
+            Eele_shielded = 1.0 / self._shield(Dij_lr)
             Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary)
         else:
-            Eele_ordinary, Eele_shielded, condition, zeros = self.lr_shield(Dij)
+            Eele_ordinary, Eele_shielded, condition, zeros = self.lr_shield(Dij_lr)
             # combine shielded and ordinary interactions and apply prefactors
             Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary)
             Eele = torch.where(condition, Eele, zeros)
         return segment_sum(Eele, idx_i)
-    
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output["E_ele_a"] = self.get_E_ele_a(**net_input)
-        return output
 
 
 class AtomicCharge2DipoleLayer(Module):

@@ -5,6 +5,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module, Parameter
 from torch.nn.functional import softmax
+from .. import BaseFFLayer
 from ...cutoff import polynomial_transition
 from ...functional import segment_sum, gather_nd
 
@@ -243,8 +244,11 @@ def edisp(Za: Tensor, Dij: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: Optiona
     return segment_sum(e6 + e8, idx_i)
 
 
-class GrimmeD3EnergyLayer(Module):
-    def __init__(self, learnable: bool=True, Hartree_in_E: float=1, Bohr_in_R: float=0.5291772108) -> None:
+class GrimmeD3EnergyLayer(BaseFFLayer):
+    def __init__(
+        self, learnable: bool=True, Hartree_in_E: float=1, Bohr_in_R: float=0.5291772108, 
+        cutoff_lr: Optional[float]=None
+    ) -> None:
         '''
         DFT-D3 dispersion correction [1] with Becke-Johnson damping [2].
 
@@ -262,14 +266,15 @@ class GrimmeD3EnergyLayer(Module):
 
         [2]: J. Comput. Chem. 2011, 32(7), 1456−1465
         '''
-        super().__init__()
+        super().__init__(input_fields={"Za", "Dij_lr", "idx_i", "idx_j"}, output_fields={"E_disp_a"})
         self.d3_c6ab = Parameter(d3_c6ab, requires_grad=learnable)
         self.d3_rcov = Parameter(d3_rcov, requires_grad=learnable)
         self.d3_r2r4 = Parameter(d3_r2r4, requires_grad=learnable)
+        self.cutoff_lr = cutoff_lr
         self.Hartree_in_E = Hartree_in_E
         self.Bohr_in_R = Bohr_in_R
 
-    def get_e_disp(self, Za: Tensor, Dij: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: Optional[float]=None, **kwargs) -> Tensor:
+    def get_E_disp_a(self, Za: Tensor, Dij_lr: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:
         r'''
         Compute DFT-D3(BJ) energy with a cutoff with the model's parameters.
 
@@ -290,30 +295,8 @@ class GrimmeD3EnergyLayer(Module):
         edisp: Float tensor of atomic dispersion energy, shape [N * batch_size]
         '''
         return self.Hartree_in_E * edisp(
-            Za, Dij / self.Bohr_in_R, idx_i, idx_j, 
-            cutoff = cutoff / self.Bohr_in_R if cutoff is not None else cutoff, 
+            Za, Dij_lr / self.Bohr_in_R, idx_i, idx_j, 
+            cutoff = self.cutoff_lr / self.Bohr_in_R if self.cutoff_lr is not None else self.cutoff_lr, 
             s6=d3_s6, s8=d3_s8, a1=d3_a1, a2=d3_a2, k3=d3_k3, 
             c6ab=self.d3_c6ab, rcov=self.d3_rcov, r2r4=self.d3_r2r4
         )
-
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        r'''
-        Input fields:
-        -----
-        Za: Long tensor of the first atomic number in the pair, shape [N * batch_size]
-
-        Dij: Float tensor of distances, shape [N_pair * batch_size]
-
-        idx_i: Long tensor of the first pair indices, shape [N_pair * batch_size]
-
-        idx_j: Long tensor of the second pair indices, shape [N_pair * batch_size]
-
-        cutoff: Cutoff for the damping function
-
-        Output fields:
-        -----
-        E_disp_a: Float tensor of atomic DFT-D3(BJ) energy
-        '''
-        output = net_input.copy()
-        output["E_disp_a"] = self.get_e_disp(**net_input)
-        return output

@@ -1,11 +1,11 @@
 import os
 import joblib
 from inspect import signature
+from typing import Dict, Tuple, List, Any, Callable, Literal, Optional
 import torch
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, List, Any, Callable, Literal, Optional
-from torch.nn import Module, Sequential
+from torch.nn import Module
 from torch.utils.data import Dataset
 from ..data import DataHub
 from ..tasks import Trainer
@@ -22,61 +22,44 @@ LOSS_REGISTER = {
 }
 
 
-def get_ff_core(architecture: str) -> Tuple[Module, List]:
+def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, List]:
     global LOSS_REGISTER
     if architecture.lower() == "physnet":
         from .physnet import PhysNetCore as Core
-        from .physnet import LAYERS
+        from .physnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         from .physnet import LOSS_REGISTER as special_loss
     elif architecture.lower() == "spookynet":
         from .spookynet import SpookyNetCore as Core
     LOSS_REGISTER.update(special_loss)
-    return Core, LAYERS
+    return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
 
-class CoreWrapper(Module):
-    def __init__(self, core):
-        super().__init__()
-        self.core = core
-        self.post_sequence = Sequential(core)
-    
-    def __str__(self):
-        return self.core.__str__()
-    
-    def forward(self, net_input):
-        return self.post_sequence.forward(net_input)
-    
-    def append(self, layer):
-        self.post_sequence.append(layer)
-
-
-def build_layer(layer: Callable, params: Dict[str, Any], build_params: Dict[str, Any], built_layers: Dict[str, Module]) -> Module:
+def build_layer(layer: Callable, layer_params: Dict[str, Any], build_params: Dict[str, Any], built_layers: Optional[Dict[str, Module]]=None) -> Module:
     final_params = dict()
-    if hasattr(layer, "build") and callable(layer.build):
-        constructor = layer.build
-        final_params["built_layers"] = built_layers
-    else:
-        constructor = layer
-    param_constructor = layer
-    for name, attr in signature(param_constructor).parameters.items():
-        if name in params:
-            final_params[name] = params[name]
+    for name, attr in signature(layer).parameters.items():
+        if name in layer_params:
+            final_params[name] = layer_params[name]
         elif name in build_params:
             final_params[name] = build_params[name]
+        elif name == "built_layers" and built_layers is not None:
+            final_params[name] = built_layers
         elif attr.default is attr.empty:
             raise TypeError(f"{name} value should be provided")
-    return constructor(**final_params)
+    return layer(**final_params)
 
 
 def build_model(
     architecture: str, 
-    layer_params: Optional[List[Dict[Literal["name", "params"], Any]]], 
-    build_params: Dict
+    layer_params: Optional[List[Dict[Literal["name", "params"], Any]]]=None, 
+    build_params: Optional[Dict]=None
 ) -> Module:
-    Core, default_layer_names = get_ff_core(architecture)
+    Core, default_build_params, default_layer_params = get_ff_core(architecture)
     if layer_params is None:
-        layer_params = [{"name": layer_name} for layer_name in default_layer_names]
-    built_layers = dict()
+        layer_params = default_layer_params
+    if build_params is None:
+        build_params = default_build_params
+    built_layers = []
+    core = None
     for layer_param in layer_params:
         layer_name = layer_param["name"]
         params = layer_param.get("params", dict())
@@ -91,14 +74,12 @@ def build_model(
         
         layer = build_layer(Layer, params, build_params, built_layers)
         if layer_name == "Core":
-            built_layers["Core"] = CoreWrapper(layer)
-        else:
-            if "Core" in built_layers:
-                built_layers["Core"].append(layer)
-            else:
-                built_layers[layer_name] = layer
+            core = layer
         logger.info(f"built {layer_name}")
-    return built_layers["Core"]
+        built_layers.append(layer)
+    
+    core.build(built_layers)
+    return core
 
 
 class FF:
