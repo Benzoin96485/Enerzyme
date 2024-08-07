@@ -14,8 +14,8 @@ class BaseLayer(Module):
             self._name_mapping[field_name] = field_name
 
     def reset_field_name(self, **mapping: Dict[str, str]) -> None:
-        self._relevant_fields = self.input_fields | self.output_fields
-        for k, v in mapping:
+        self._relevant_fields = self._input_fields | self._output_fields
+        for k, v in mapping.items():
             if k in self._relevant_fields:
                 self._name_mapping[k] = v
             else:

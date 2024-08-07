@@ -14,7 +14,7 @@ class DistanceLayer(BaseLayer):
 
     def with_vector_on(self, vij_name: str="vij") -> None:
         self._with_vector = True
-        self.reset_field_name("vij", vij_name)
+        self.reset_field_name(vij=vij_name)
 
     def get_output(self, Ra: Tensor, idx_i: Tensor, idx_j: Tensor, offsets: Optional[Tensor]=None) -> Dict[str, Tensor]:
         '''
@@ -47,5 +47,5 @@ class DistanceLayer(BaseLayer):
             Rj_ = Rj
         relevant_output["Dij"] = F.pairwise_distance(Ri, Rj_, eps=1e-15)
         if self._with_vector:
-            relevant_output["vij"] = Rj - Ri + offsets
+            relevant_output["vij"] = Rj_ - Ri
         return relevant_output
