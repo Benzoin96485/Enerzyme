@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 from torch import Tensor
 from torch.nn import Module
 import torch.nn.functional as F
@@ -11,7 +11,7 @@ class DistanceLayer(Module):
     def __init__(self) -> None:
         super().__init__()
 
-    def get_distance(self, Ra: Tensor, idx_i: Tensor, idx_j: Tensor, offsets: Tensor=None, **kwargs) -> Tensor:
+    def get_distance(self, Ra: Tensor, idx_i: Tensor, idx_j: Tensor, offsets: Optional[Tensor]=None, with_vector: bool=False, **kwargs) -> Tensor:
         '''
         Compute the distance with atom pair indices
 
@@ -35,7 +35,14 @@ class DistanceLayer(Module):
         else:
             Ri = Ra.gather(0, idx_i.view(-1, 1).expand(-1, 3))
             Rj = Ra.gather(0, idx_j.view(-1, 1).expand(-1, 3))
-        return F.pairwise_distance(Ri, Rj + offsets, eps=1e-15)
+        if offsets is not None:
+            Rj_ = Rj + offsets
+        else:
+            Rj_ = Rj
+        if with_vector:
+            return F.pairwise_distance(Ri, Rj_, eps=1e-15), Rj - Ri
+        else:
+            return F.pairwise_distance(Ri, Rj_, eps=1e-15)
 
     def forward(self, net_input: Dict[str, Tensor], idx_i_name: str="idx_i", idx_j_name: str="idx_j", Dij_name: str="Dij", offsets_name: str="offsets") -> Dict[str, Tensor]:
         output = net_input.copy()

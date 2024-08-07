@@ -67,11 +67,11 @@ class PhysNetCore(Module):
     def build(cls, built_layers: Dict[str, Module], **build_params: Dict[str, Any]) -> Module:
         instance = cls(**build_params)
         for layer_name, layer in built_layers.items():
-            if layer_name.endswith("Distance"):
+            if isinstance(layer, DistanceLayer):
                 instance.distance_layer = layer
-            elif layer_name.endswith("RBF"):
+            elif isinstance(layer, BaseRBF):
                 instance.rbf_layer = layer
-            elif layer_name.endswith("AtomEmbedding"):
+            elif isinstance(layer, BaseAtomEmbedding):
                 instance.embeddings = layer
         for layer_name in ["distance_layer", "rbf_layer", "embeddings"]:
             if getattr(instance, layer_name) is None:
