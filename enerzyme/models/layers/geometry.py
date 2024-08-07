@@ -1,7 +1,7 @@
 from typing import Dict
-import torch
 from torch import Tensor
 from torch.nn import Module
+import torch.nn.functional as F
 
 
 class DistanceLayer(Module):
@@ -29,12 +29,13 @@ class DistanceLayer(Module):
         -----
         Dij: Float tensor of distances, shape [N_pair * batch_size]
         '''
-        Ri = Ra.gather(0, idx_i.view(-1, 1).expand(-1, 3))
-        Rj = Ra.gather(0, idx_j.view(-1, 1).expand(-1, 3))
-        if offsets is not None:
-            Rj += offsets
-        Dij = torch.sqrt(torch.relu(torch.sum((Ri - Rj) ** 2, -1))) #relu prevents negative numbers in sqrt
-        return Dij
+        if Ra.device.type == "cpu":  # indexing is faster on CPUs
+            Ri = Ra[idx_i]
+            Rj = Ra[idx_j]
+        else:
+            Ri = Ra.gather(0, idx_i.view(-1, 1).expand(-1, 3))
+            Rj = Ra.gather(0, idx_j.view(-1, 1).expand(-1, 3))
+        return F.pairwise_distance(Ri, Rj + offsets, eps=1e-15)
 
     def forward(self, net_input: Dict[str, Tensor], idx_i_name: str="idx_i", idx_j_name: str="idx_j", Dij_name: str="Dij", offsets_name: str="offsets") -> Dict[str, Tensor]:
         output = net_input.copy()

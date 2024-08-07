@@ -53,7 +53,8 @@ def bump_transition(x_: Tensor) -> Tensor:
     -----
     [1] Nat. Commun., 2021, 12, 7273.
     """
-    return torch.exp(-(x_ ** 2) / ((1 - x_) * (1 + x_)))
+    x2 = x_ ** 2
+    return torch.exp(-x2 / (1 - x2))
 
 
 @scale

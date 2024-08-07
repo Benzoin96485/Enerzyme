@@ -41,6 +41,7 @@ for i in range(N):
 idx_i = idx_i.reshape(-1)
 idx_j = idx_j.reshape(-1)
 vij = torch.rand(*idx_i.shape, 3) * 30
+R = np.random.rand(N, 3) * 20
 D = torch.norm(vij, dim=-1, keepdim=True)
 pij = vij / D
 D = D.squeeze(-1)
@@ -63,6 +64,7 @@ Qa = Qa.type(dtype)
 K = K.type(dtype)
 atom_embedding = atom_embedding.type(dtype)
 D = D.type(dtype)
+R = R.type(dtype)
 pij = pij.type(dtype)
 dij = dij.type(dtype)
 rbf = rbf.type(dtype)
@@ -72,7 +74,7 @@ cutoff_values = cutoff_values.type(dtype)
 def test_cutoff_function():
     from enerzyme.models.cutoff import bump_transition
     from spookynet.functional import cutoff_function
-    assert_allclose(bump_transition(x, 5).detach().numpy(), cutoff_function(x, 5).detach().numpy())
+    assert_allclose(bump_transition(D, 5).detach().numpy(), cutoff_function(D, 5).detach().numpy())
 
 
 def test_shifted_softplus():
@@ -335,7 +337,14 @@ def test_d4_dispersion_energy():
     )
 
 def test_calculate_distances():
-    pass
+    from enerzyme.models.layers.geometry import DistanceLayer as F1
+    from spookynet.spookynet import SpookyNet as F2
+    f1 = F1()
+    f2 = F2()
+    assert_allclose(
+        f1.get_distance(R, idx_i, idx_j).detach().numpy(),
+        f2.calculate_distances(R, idx_i, idx_j).detach().numpy()
+    )
 
 
 def test_atomic_properties_static():
