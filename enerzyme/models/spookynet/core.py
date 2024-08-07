@@ -1,6 +1,7 @@
 from typing import Dict, Any
 from ..layers import DistanceLayer, BaseRBF, BaseAtomEmbedding, BaseElectronEmbedding
 from .interaction import InteractionModule
+from torch import Tensor
 from torch.nn import Module, ModuleList, Linear
 
 class SpookyNetCore(Module):
@@ -47,10 +48,10 @@ class SpookyNetCore(Module):
     @classmethod
     def build(cls, built_layers: Dict[str, Module], **build_params: Dict[str, Any]) -> Module:
         instance = cls(**build_params)
+
+        # build necessary flexiable pre-core layers
         for layer_name, layer in built_layers.items():
-            if isinstance(layer, DistanceLayer):
-                instance.distance_layer = layer
-            elif isinstance(layer, BaseRBF):
+            if isinstance(layer, BaseRBF):
                 instance.rbf_layer = layer
             elif isinstance(layer, BaseAtomEmbedding):
                 instance.nuclear_embeddings = layer
@@ -59,7 +60,12 @@ class SpookyNetCore(Module):
                     instance.spin_embeddings = layer
                 elif layer.attribute == "charge":
                     instance.charge_embeddings = layer
-        for layer_name in ["distance_layer", "rbf_layer", "nuclear_embeddings", "spin_embeddings", "charge_embeddings"]:
+        
+        # check if necessary flexible pre-core layers has been built
+        for layer_name in ["rbf_layer", "nuclear_embeddings", "spin_embeddings", "charge_embeddings"]:
             if getattr(instance, layer_name) is None:
                 raise AttributeError(f"{layer_name} is not built")
         return instance
+
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        ...

@@ -113,12 +113,12 @@ def test_initialize():
 def test_calculate_interatomic_distances():
     _, physnet_tf = initialize()
     from enerzyme.models.layers.geometry import DistanceLayer
-    D1 = DistanceLayer().get_distance(
+    D1 = DistanceLayer().get_output(
         Ra=torch.from_numpy(R), 
         idx_i=torch.from_numpy(idx_i), 
         idx_j=torch.from_numpy(idx_j), 
         offsets=torch.from_numpy(offsets)
-    ).numpy()
+    )["Dij"].detach().numpy()
     with tf.Session() as sess:
         D2 = physnet_tf.calculate_interatomic_distances(
             R,
@@ -133,7 +133,7 @@ def test_RBFLayer():
     _, physnet_tf = initialize()
     from enerzyme.models.layers.rbf import ExponentialGaussianRBFLayer
     from enerzyme.models.layers.geometry import DistanceLayer
-    D1 = DistanceLayer().get_distance(
+    D1 = DistanceLayer().get_Dij(
         Ra=torch.from_numpy(R), 
         idx_i=torch.from_numpy(idx_i), 
         idx_j=torch.from_numpy(idx_j), 

@@ -4,7 +4,7 @@ from inspect import signature
 import torch
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, List, Any, Callable, Literal
+from typing import Dict, Tuple, List, Any, Callable, Literal, Optional
 from torch.nn import Module, Sequential
 from torch.utils.data import Dataset
 from ..data import DataHub
@@ -70,7 +70,7 @@ def build_layer(layer: Callable, params: Dict[str, Any], build_params: Dict[str,
 
 def build_model(
     architecture: str, 
-    layer_params: List[Dict[Literal["name", "params"], Any]], 
+    layer_params: Optional[List[Dict[Literal["name", "params"], Any]]], 
     build_params: Dict
 ) -> Module:
     Core, default_layer_names = get_ff_core(architecture)

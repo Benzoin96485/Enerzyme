@@ -66,16 +66,24 @@ class PhysNetCore(Module):
     @classmethod
     def build(cls, built_layers: Dict[str, Module], **build_params: Dict[str, Any]) -> Module:
         instance = cls(**build_params)
+
+        # build necessary flexiable pre-core layers
         for layer_name, layer in built_layers.items():
-            if isinstance(layer, DistanceLayer):
-                instance.distance_layer = layer
-            elif isinstance(layer, BaseRBF):
+            if isinstance(layer, BaseRBF):
                 instance.rbf_layer = layer
             elif isinstance(layer, BaseAtomEmbedding):
                 instance.embeddings = layer
-        for layer_name in ["distance_layer", "rbf_layer", "embeddings"]:
+
+        # check if necessary flexible pre-core layers has been built
+        for layer_name in ["rbf_layer", "embeddings"]:
             if getattr(instance, layer_name) is None:
                 raise AttributeError(f"{layer_name} is not built")
+            
+        # build necessary fixed pre-core layers
+        instance.distance_layer = DistanceLayer()
+
+        # reset pre-core layers
+        
         return instance
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:

@@ -342,7 +342,7 @@ def test_calculate_distances():
     from spookynet.spookynet import SpookyNet as F2
     f1 = F1()
     f2 = F2()
-    Dij1, vij1 = f1.get_distance(R, idx_i, idx_j, with_vector=True)
+    Dij1, vij1 = f1.get_Dij(R, idx_i, idx_j, with_vector=True)
     Dij2, vij2 = f2.calculate_distances(R, idx_i, idx_j)
     assert_allclose(Dij1.detach().numpy(), Dij2.detach().numpy())
     assert_allclose(vij1.detach().numpy(), vij2.detach().numpy())

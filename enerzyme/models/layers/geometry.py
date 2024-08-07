@@ -1,17 +1,22 @@
-from typing import Dict, Optional
+from typing import Optional, Dict
 from torch import Tensor
-from torch.nn import Module
 import torch.nn.functional as F
+from . import BaseLayer
 
 
-class DistanceLayer(Module):
+class DistanceLayer(BaseLayer):
     '''
     Compute the distance between atoms
     '''
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(input_fields={"Ra", "idx_i", "idx_j", "offsets"}, output_fields={"Dij", "vij"})
+        self._with_vector = False
 
-    def get_distance(self, Ra: Tensor, idx_i: Tensor, idx_j: Tensor, offsets: Optional[Tensor]=None, with_vector: bool=False, **kwargs) -> Tensor:
+    def with_vector_on(self, vij_name: str="vij") -> None:
+        self._with_vector = True
+        self.reset_field_name("vij", vij_name)
+
+    def get_output(self, Ra: Tensor, idx_i: Tensor, idx_j: Tensor, offsets: Optional[Tensor]=None) -> Dict[str, Tensor]:
         '''
         Compute the distance with atom pair indices
 
@@ -29,6 +34,7 @@ class DistanceLayer(Module):
         -----
         Dij: Float tensor of distances, shape [N_pair * batch_size]
         '''
+        relevant_output = dict()
         if Ra.device.type == "cpu":  # indexing is faster on CPUs
             Ri = Ra[idx_i]
             Rj = Ra[idx_j]
@@ -39,17 +45,7 @@ class DistanceLayer(Module):
             Rj_ = Rj + offsets
         else:
             Rj_ = Rj
-        if with_vector:
-            return F.pairwise_distance(Ri, Rj_, eps=1e-15), Rj - Ri
-        else:
-            return F.pairwise_distance(Ri, Rj_, eps=1e-15)
-
-    def forward(self, net_input: Dict[str, Tensor], idx_i_name: str="idx_i", idx_j_name: str="idx_j", Dij_name: str="Dij", offsets_name: str="offsets") -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output[Dij_name] = self.get_distance(
-            Ra=net_input["Ra"],
-            idx_i=net_input[idx_i_name],
-            idx_j=net_input[idx_j_name],
-            offsets=net_input.get(offsets_name, None)
-        )
-        return output
+        relevant_output["Dij"] = F.pairwise_distance(Ri, Rj_, eps=1e-15)
+        if self._with_vector:
+            relevant_output["vij"] = Rj - Ri + offsets
+        return relevant_output

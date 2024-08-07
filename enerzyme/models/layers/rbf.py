@@ -5,18 +5,19 @@ import torch
 from torch import Tensor
 from torch.nn import Module, Parameter
 import torch.nn.functional as F
+from . import BaseLayer
 from ..cutoff import CUTOFF_REGISTER
 from ..functional import softplus_inverse
 
 
-class BaseRBF(ABC, Module):
+class BaseRBF(ABC, BaseLayer):
     def __init__(
         self,
         num_rbf: int,
         cutoff_sr: float,
         cutoff_fn: Literal["polynomial", "bump"]
     ) -> None:
-        super().__init__()
+        super().__init__(input_fields={"Dij", "cutoff_sr_values"}, output_fields={"rbf"})
         self.num_rbf = num_rbf
         self.cutoff_sr = cutoff_sr
         self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
@@ -30,11 +31,11 @@ class BaseRBF(ABC, Module):
     def _get_rbf(self, Dij: Tensor) -> Tensor:
         ...
 
-    def forward(self, net_input: Dict[str, Tensor], cutoff_values: Optional[Tensor]=None, Dij_name: str="Dij") -> Dict[str, Tensor]:
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         output["rbf"] = self.get_rbf(
-            Dij=net_input[Dij_name],
-            cutoff_values=cutoff_values
+            Dij=net_input[self.Dij_name],
+            cutoff_values=net_input.get(self.cutoff_sr_values_name, None)
         )
         return output
 
@@ -160,7 +161,7 @@ class SincRBFLayer(BaseRBF):
             from ..special import sinc
         self.sinc = sinc
 
-    def _get_rbf(self, r: Tensor) -> Tensor:
+    def _get_rbf(self, Dij: Tensor) -> Tensor:
         """
         Evaluates radial basis functions given distances and the corresponding
         values of a cutoff function (must be consistent with cutoff value
@@ -176,7 +177,7 @@ class SincRBFLayer(BaseRBF):
             rbf (FloatTensor [N, num_basis_functions]):
                 Values of the radial basis functions for the distances r.
         """
-        x = self.factor * r.view(-1, 1)
+        x = self.factor * Dij.view(-1, 1)
         return self.sinc(x)
 
 
