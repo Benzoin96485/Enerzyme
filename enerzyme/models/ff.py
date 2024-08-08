@@ -30,6 +30,8 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, List]:
         from .physnet import LOSS_REGISTER as special_loss
     elif architecture.lower() == "spookynet":
         from .spookynet import SpookyNetCore as Core
+        from .spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     LOSS_REGISTER.update(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 

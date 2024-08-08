@@ -59,7 +59,7 @@ class LocalInteraction(Module):
         num_residual_p: int,
         num_residual_d: int,
         num_residual: int,
-        activation_fn: str = "swish",
+        activation_fn: ACTIVATION_KEY_TYPE="swish",
     ) -> None:
         """ Initializes the LocalInteraction class. """
         super().__init__()
@@ -167,7 +167,7 @@ class NonlocalInteraction(Module):
         num_residual_q: int,
         num_residual_k: int,
         num_residual_v: int,
-        activation_fn: str = "swish",
+        activation_fn: ACTIVATION_KEY_TYPE="swish",
     ) -> None:
         """ Initializes the NonlocalInteraction class. """
         super().__init__()
@@ -249,7 +249,7 @@ class InteractionModule(Module):
         num_residual_nonlocal_v: int,
         num_residual_post: int,
         num_residual_output: int,
-        activation_fn: str = "swish",
+        activation_fn: ACTIVATION_KEY_TYPE="swish",
     ) -> None:
         """ Initializes the InteractionModule class. """
         super().__init__()

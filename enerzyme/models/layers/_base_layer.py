@@ -1,15 +1,22 @@
-from typing import Dict, Set, List
+from typing import Dict, Set, List, Optional
+from inspect import signature
 from abc import ABC, abstractmethod
 from torch import Tensor
 from torch.nn import Module, Sequential
 
 
 class BaseFFModule(ABC, Module):
-    def __init__(self, input_fields: Set[str], output_fields: Set[str]) -> None:
+    def __init__(self, input_fields: Optional[Set[str]]=None, output_fields: Optional[Set[str]]=None) -> None:
         super().__init__()
-        self._input_fields = input_fields
-        self._output_fields = output_fields
-        self._relevant_fields = input_fields | output_fields
+        self._input_fields = (
+            input_fields if input_fields is not None
+            else signature(self.get_output).parameters.keys() - {"self"}
+        )
+        self._output_fields = (
+            output_fields if output_fields is not None
+            else set(signature(self.get_output).return_annotation.__args__[0].__args__)
+        )
+        self._relevant_fields = self._input_fields | self._output_fields
         self._name_mapping = dict()
         for field_name in self._relevant_fields:
             self._name_mapping[field_name] = field_name
@@ -31,8 +38,9 @@ class BaseFFModule(ABC, Module):
                 net_output[new_k] = relevant_output[k]
         return net_output
 
+
 class BaseFFLayer(BaseFFModule):
-    def __init__(self, input_fields: Set[str], output_fields: Set[str]) -> None:
+    def __init__(self, input_fields: Optional[Set[str]]=None, output_fields: Optional[Set[str]]=None) -> None:
         super().__init__(input_fields, output_fields)
 
     def reset_field_name(self, **mapping: Dict[str, str]) -> None:
@@ -54,7 +62,7 @@ class BaseFFLayer(BaseFFModule):
 
 
 class BaseFFCore(BaseFFModule):
-    def __init__(self, input_fields, output_fields):
+    def __init__(self, input_fields: Optional[Set[str]]=None, output_fields: Optional[Set[str]]=None):
         super().__init__(input_fields, output_fields)
         self.pre_sequence = Sequential()
         self.post_sequence = Sequential()

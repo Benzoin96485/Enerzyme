@@ -31,7 +31,6 @@ class D4DispersionEnergy(nn.Module):
         Zmax: int = 87,
         Bohr: float = 0.5291772105638411,  # conversion to Bohr
         Hartree: float = 27.211386024367243,  # conversion to Hartree
-        dtype: torch.dtype = torch.float32,
     ) -> None:
         """ Initializes the D4DispersionEnergy class. """
         super(D4DispersionEnergy, self).__init__()

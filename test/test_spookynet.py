@@ -8,12 +8,14 @@ sys.path.extend(["..", "."])
 import numpy as np
 from numpy.testing import assert_allclose
 import torch
+from enerzyme.models.spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
-dim_feature = 64
+
+dim_feature = DEFAULT_BUILD_PARAMS["dim_embedding"]
 initial_alpha = np.random.randn()
 initial_beta = np.random.randn()
 x = torch.randn(dim_feature)
-max_Za = 87
+max_Za = DEFAULT_BUILD_PARAMS["max_Za"]
 N = 100
 num_residual_local_x = 1
 num_residual_local_s = 1
@@ -69,6 +71,30 @@ pij = pij.type(dtype)
 dij = dij.type(dtype)
 rbf = rbf.type(dtype)
 cutoff_values = cutoff_values.type(dtype)
+
+
+def initialize():
+    global DEFAULT_BUILD_PARAMS
+    from spookynet.modules.d4_dispersion_energy import D4DispersionEnergy
+    d4 = D4DispersionEnergy()
+    DEFAULT_BUILD_PARAMS.update({
+        "Bohr_in_R": d4.convert2eV * 2,
+        "Hartree_in_E": 1 / d4.convert2Bohr
+    })
+    from enerzyme.models.ff import build_model
+    from enerzyme.models.spookynet import SpookyNetCore as F1
+    from spookynet.spookynet import SpookyNet as F2
+    f1 = build_model(
+        "SpookyNet", 
+        DEFAULT_LAYER_PARAMS, 
+        DEFAULT_BUILD_PARAMS
+    )
+    f2 = F2()
+    return f1, f2
+
+
+def test_initialize():
+    initialize()
 
 
 def test_cutoff_function():
@@ -352,6 +378,7 @@ def test_calculate_distances():
 
 
 def test_atomic_properties_static():
+    f1, f2 = initialize()
     pass
 
 
