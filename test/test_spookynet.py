@@ -8,6 +8,7 @@ sys.path.extend(["..", "."])
 import numpy as np
 from numpy.testing import assert_allclose
 import torch
+from enerzyme.models.spookynet import SpookyNetCore
 from enerzyme.models.spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
 
@@ -73,6 +74,10 @@ rbf = rbf.type(dtype)
 cutoff_values = cutoff_values.type(dtype)
 
 
+def assert_tensor_allclose(t1, t2, **kwargs):
+    assert_allclose(t1, t2, **kwargs)
+
+
 def initialize():
     global DEFAULT_BUILD_PARAMS
     from spookynet.modules.d4_dispersion_energy import D4DispersionEnergy
@@ -84,7 +89,7 @@ def initialize():
     from enerzyme.models.ff import build_model
     from enerzyme.models.spookynet import SpookyNetCore as F1
     from spookynet.spookynet import SpookyNet as F2
-    f1 = build_model(
+    f1: SpookyNetCore = build_model(
         "SpookyNet", 
         DEFAULT_LAYER_PARAMS, 
         DEFAULT_BUILD_PARAMS
@@ -100,7 +105,7 @@ def test_initialize():
 def test_cutoff_function():
     from enerzyme.models.cutoff import bump_transition
     from spookynet.functional import cutoff_function
-    assert_allclose(bump_transition(D, 5).detach().numpy(), cutoff_function(D, 5).detach().numpy())
+    assert_tensor_allclose(bump_transition(D, 5), cutoff_function(D, 5))
 
 
 def test_shifted_softplus():
@@ -108,7 +113,7 @@ def test_shifted_softplus():
     from spookynet.modules.shifted_softplus import ShiftedSoftplus as F2
     f1 = F1(dim_feature, initial_alpha, initial_beta).type(dtype)
     f2 = F2(dim_feature, initial_alpha, initial_beta).type(dtype)
-    assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
+    assert_tensor_allclose(f1(x), f2(x))
 
 
 def test_swish():
@@ -116,7 +121,7 @@ def test_swish():
     from spookynet.modules.swish import Swish as F2
     f1 = F1(dim_feature, initial_alpha, initial_beta).type(dtype)
     f2 = F2(dim_feature, initial_alpha, initial_beta).type(dtype)
-    assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
+    assert_tensor_allclose(f1(x), f2(x))
 
 
 def test_residual_layer():
@@ -131,7 +136,7 @@ def test_residual_layer():
         initial_bias="zero", initial_weight1="orthogonal", initial_weight2="zero"
     ).type(dtype)
     f2 = F2(dim_feature).type(dtype)
-    assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
+    assert_tensor_allclose(f1(x), f2(x))
 
 
 def test_residual_stack():
@@ -146,7 +151,7 @@ def test_residual_stack():
         initial_bias="zero", initial_weight1="orthogonal", initial_weight2="zero"
     ).type(dtype)
     f2 = F2(dim_feature, 3).type(dtype)
-    assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
+    assert_tensor_allclose(f1(x), f2(x))
 
 
 def test_residual_mlp():
@@ -162,7 +167,7 @@ def test_residual_mlp():
         initial_weight1="orthogonal", initial_weight2="zero", initial_weight_out=f2.linear.weight.data,
         initial_bias_residual="zero", initial_bias_out=f2.linear.bias.data
     ).type(dtype)
-    assert_allclose(f1(x).detach().numpy(), f2(x).detach().numpy())
+    assert_tensor_allclose(f1(x), f2(x))
 
 
 def test_nuclear_embedding():
@@ -170,7 +175,7 @@ def test_nuclear_embedding():
     from spookynet.modules.nuclear_embedding import NuclearEmbedding as F2
     f1 = F1(86, dim_feature).type(dtype)
     f2 = F2(dim_feature).type(dtype)
-    assert_allclose(f1.get_embedding(Za).detach().numpy(), f2(Za).detach().numpy())
+    assert_tensor_allclose(f1.get_embedding(Za), f2(Za))
 
 
 def test_electronic_embedding():
@@ -179,9 +184,9 @@ def test_electronic_embedding():
     f1 = F1(dim_feature, 3, attribute="spin").type(dtype)
     f2 = F2(dim_feature, 3).type(dtype)
     S = torch.tensor([2], dtype=dtype)
-    assert_allclose(
-        f1.get_embedding(atom_embedding=atom_embedding, S=S).detach().numpy(), 
-        f2(atom_embedding, S, 1, None).detach().numpy()
+    assert_tensor_allclose(
+        f1.get_embedding(atom_embedding=atom_embedding, S=S), 
+        f2(atom_embedding, S, 1, None)
     )
     pass
 
@@ -192,9 +197,9 @@ def test_nonlinear_electronic_embedding():
     f1 = F1(dim_feature, 3, attribute="spin").type(dtype)
     f2 = F2(dim_feature, 3).type(dtype)
     S = torch.tensor([2], dtype=dtype)
-    assert_allclose(
-        f1.get_embedding(atom_embedding=atom_embedding, S=S).detach().numpy(), 
-        f2(atom_embedding, S, 1, torch.zeros(N, dtype=torch.long)).detach().numpy()
+    assert_tensor_allclose(
+        f1.get_embedding(atom_embedding=atom_embedding, S=S), 
+        f2(atom_embedding, S, 1, torch.zeros(N, dtype=torch.long))
     )
     pass
 
@@ -204,9 +209,9 @@ def test_exponential_gaussian_functions():
     from spookynet.modules.exponential_gaussian_functions import ExponentialGaussianFunctions as F2
     f1 = F1(dim_feature, init_width_flavor="SpookyNet").type(dtype)
     f2 = F2(dim_feature).type(dtype)
-    assert_allclose(
-        f1.get_rbf(D, cutoff_values).detach().numpy(), 
-        f2(D, cutoff_values).detach().numpy(), rtol=1e-6, atol=1e-6
+    assert_tensor_allclose(
+        f1.get_rbf(D, cutoff_values), 
+        f2(D, cutoff_values), rtol=1e-6, atol=1e-6
     )
 
 
@@ -215,9 +220,9 @@ def test_exponential_bernstein_polynomials():
     from spookynet.modules.exponential_bernstein_polynomials import ExponentialBernsteinPolynomials as F2
     f1 = F1(dim_feature).type(dtype).type(dtype)
     f2 = F2(dim_feature).type(dtype).type(dtype)
-    assert_allclose(
-        f1.get_rbf(D, cutoff_values).detach().numpy(), 
-        f2(D, cutoff_values).detach().numpy(), rtol=1e-6, atol=1e-6
+    assert_tensor_allclose(
+        f1.get_rbf(D, cutoff_values), 
+        f2(D, cutoff_values), rtol=1e-6, atol=1e-6
     )
 
 
@@ -226,9 +231,9 @@ def test_gaussian_functions():
     from spookynet.modules.gaussian_functions import GaussianFunctions as F2
     f1 = F1(dim_feature, 5.0).type(dtype)
     f2 = F2(dim_feature, 5.0).type(dtype)
-    assert_allclose(
-        f1.get_rbf(D, cutoff_values).detach().numpy(), 
-        f2(D, cutoff_values).detach().numpy()
+    assert_tensor_allclose(
+        f1.get_rbf(D, cutoff_values), 
+        f2(D, cutoff_values)
     )
 
 
@@ -237,9 +242,9 @@ def test_bernstein_polynomials():
     from spookynet.modules.bernstein_polynomials import BernsteinPolynomials as F2
     f1 = F1(dim_feature, 5.0).type(dtype)
     f2 = F2(dim_feature, 5.0).type(dtype)
-    assert_allclose(
-        f1.get_rbf(D, cutoff_values).detach().numpy(), 
-        f2(D, cutoff_values).detach().numpy()
+    assert_tensor_allclose(
+        f1.get_rbf(D, cutoff_values), 
+        f2(D, cutoff_values)
     )
 
 
@@ -248,9 +253,9 @@ def test_sinc_functions():
     from spookynet.modules.sinc_functions import SincFunctions as F2
     f1 = F1(dim_feature, 5.0).type(dtype)
     f2 = F2(dim_feature, 5.0).type(dtype)
-    assert_allclose(
-        f1.get_rbf(D, cutoff_values).detach().numpy(), 
-        f2(D, cutoff_values).detach().numpy()
+    assert_tensor_allclose(
+        f1.get_rbf(D, cutoff_values), 
+        f2(D, cutoff_values)
     )
 
 
@@ -264,9 +269,9 @@ def test_local_interaction():
     f2 = F2(dim_feature, dim_feature, 
         num_residual_local_x, num_residual_local_s, num_residual_local_p, num_residual_local_d, num_residual_local
     ).type(dtype)
-    assert_allclose(
-        f1(atom_embedding, rbf, pij, dij, idx_i, idx_j).detach().numpy(),
-        f2(atom_embedding, rbf, pij, dij, idx_i, idx_j).detach().numpy()
+    assert_tensor_allclose(
+        f1(atom_embedding, rbf, pij, dij, idx_i, idx_j),
+        f2(atom_embedding, rbf, pij, dij, idx_i, idx_j)
     )
 
 
@@ -276,9 +281,9 @@ def test_attention():
     f2 = F2(dim_feature, dim_feature, dim_feature).type(dtype)
     f1 = F1(dim_feature, dim_feature).type(dtype)
     f1.omega.copy_(f2.omega)
-    assert_allclose(
-        f1(Q, K, atom_embedding, 1, None).detach().numpy(),
-        f2(Q, K, atom_embedding, 1, None).detach().numpy()
+    assert_tensor_allclose(
+        f1(Q, K, atom_embedding, 1, None),
+        f2(Q, K, atom_embedding, 1, None)
     )
 
 
@@ -288,9 +293,9 @@ def test_nonlocal_interaction():
     f2 = F2(dim_feature, num_residual_nonlocal_q, num_residual_nonlocal_k, num_residual_nonlocal_v).type(dtype)
     f1 = F1(dim_feature, num_residual_nonlocal_q, num_residual_nonlocal_k, num_residual_nonlocal_v).type(dtype)
     f1.attention.omega.copy_(f2.attention.omega)
-    assert_allclose(
-        f1(atom_embedding, 1, None).detach().numpy(),
-        f2(atom_embedding, 1, None).detach().numpy()
+    assert_tensor_allclose(
+        f1(atom_embedding, 1, None),
+        f2(atom_embedding, 1, None)
     )
 
 
@@ -312,8 +317,8 @@ def test_interaction_module():
         f1.resblock.stack[-1].weight.copy_(f2.resblock.linear.weight)
     x1, y1 = f1(atom_embedding, rbf, pij, dij, idx_i, idx_j, 1, None)
     x2, y2 = f2(atom_embedding, rbf, pij, dij, idx_i, idx_j, 1, None)
-    assert_allclose(x1.detach().numpy(), x2.detach().numpy())
-    assert_allclose(y1.detach().numpy(), y2.detach().numpy())
+    assert_tensor_allclose(x1, x2)
+    assert_tensor_allclose(y1, y2)
 
 
 def test_zbl_repulsion_energy():
@@ -323,18 +328,18 @@ def test_zbl_repulsion_energy():
     f2 = F2().type(dtype)
     f1.kehalf = f2.kehalf
     f1.a0 = f2.a0
-    assert_allclose(
-        f1.get_zbf_energy(Za, D, idx_i, idx_j, cutoff_values).detach().numpy(),
-        f2(len(Za), Za.type(dtype), D, cutoff_values, idx_i, idx_j).detach().numpy()
+    assert_tensor_allclose(
+        f1.get_zbf_energy(Za, D, idx_i, idx_j, cutoff_values),
+        f2(len(Za), Za.type(dtype), D, cutoff_values, idx_i, idx_j)
     )
 
 
 def test_switch_function():
     from enerzyme.models.cutoff import smooth_transition
     from spookynet.functional import switch_function
-    assert_allclose(
-        smooth_transition(D, 10, 1).detach().numpy(),
-        switch_function(D, 1, 10).detach().numpy()
+    assert_tensor_allclose(
+        smooth_transition(D, 10, 1),
+        switch_function(D, 1, 10)
     )
 
 
@@ -344,9 +349,9 @@ def test_electrostatic_energy():
     f2 = F2(cutoff=5.0)
     f1 = F1(cutoff_sr=5.0, lr_flavor="smooth")
     f1.kehalf = f2.kehalf
-    assert_allclose(
-        f1.get_E_ele_a(D, Qa, idx_i, idx_j).detach().numpy(),
-        f2(len(Qa), Qa, D, idx_i, idx_j).detach().numpy()
+    assert_tensor_allclose(
+        f1.get_E_ele_a(D, Qa, idx_i, idx_j),
+        f2(len(Qa), Qa, D, idx_i, idx_j)
     )
 
 
@@ -357,9 +362,9 @@ def test_d4_dispersion_energy():
     f1 = F1()
     f1.Hartree_in_E = f2.convert2eV * 2
     f1.Bohr_in_R = 1 / f2.convert2Bohr
-    assert_allclose(
-        f1.get_e_disp(Za, Qa, D, idx_i, idx_j).detach().numpy(),
-        f2(N, Za, Qa, D, idx_i, idx_j)[0].detach().numpy()
+    assert_tensor_allclose(
+        f1.get_e_disp(Za, Qa, D, idx_i, idx_j),
+        f2(N, Za, Qa, D, idx_i, idx_j)[0]
     )
 
 
@@ -373,14 +378,20 @@ def test_calculate_distances():
     Dij1 = output1["Dij"]
     vij1 = output1["vij"]
     Dij2, vij2 = f2.calculate_distances(R, idx_i, idx_j)
-    assert_allclose(Dij1.detach().numpy(), Dij2.detach().numpy())
-    assert_allclose(vij1.detach().numpy(), vij2.detach().numpy())
+    assert_tensor_allclose(Dij1, Dij2)
+    assert_tensor_allclose(vij1, vij2)
 
 
 def test_atomic_properties_static():
     f1, f2 = initialize()
-    pass
-
+    net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j}
+    output = f1.range_separation(f1.calculate_distance(net_input))
+    print(output.keys())
+    pij1, dij1, _, _ = f1._atomic_properties_static(output["Dij_sr"], output["vij_sr"])
+    _, _, _, _, pij2, dij2, _, _, _ = f2._atomic_properties_static(Za, R, idx_i, idx_j)
+    assert_tensor_allclose(pij1, pij2)
+    assert_tensor_allclose(dij1, dij2)
+    
 
 def test_atomic_properties_dynamic():
     pass

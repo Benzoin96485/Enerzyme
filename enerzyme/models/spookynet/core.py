@@ -102,13 +102,15 @@ class SpookyNetCore(BaseFFCore):
         self._sqrt3 = math.sqrt(3.0)
         self._sqrt3half = 0.5 * self._sqrt3
         self.module_keep_prob = 1 - dropout_rate
+        self.calculate_distance: DistanceLayer = None
+        self.range_separation: RangeSeparationLayer = None
 
     def build(self, built_layers: List[Module]) -> None:
         # build necessary fixed pre-core layers
-        calculate_distance = DistanceLayer()
-        calculate_distance.with_vector_on("vij_lr")
-        calculate_distance.reset_field_name(Dij="Dij_lr")
-        self.pre_sequence.append(calculate_distance)
+        self.calculate_distance = DistanceLayer()
+        self.calculate_distance.with_vector_on("vij_lr")
+        self.calculate_distance.reset_field_name(Dij="Dij_lr")
+        self.pre_sequence.append(self.calculate_distance)
 
         pre_core = True
         for layer in built_layers:
@@ -118,7 +120,8 @@ class SpookyNetCore(BaseFFCore):
             if pre_core:
                 # reset pre-core layers
                 if isinstance(layer, RangeSeparationLayer):
-                    layer.reset_field_name(idx_i_lr="idx_i", idx_j_lr="idx_j")
+                    self.range_separation = layer
+                    self.range_separation.reset_field_name(idx_i_lr="idx_i", idx_j_lr="idx_j")
                 # build pre-core sequence
                 self.pre_sequence.append(layer)
             else: 

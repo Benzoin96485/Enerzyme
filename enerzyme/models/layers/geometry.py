@@ -1,4 +1,4 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, Literal
 from torch import Tensor
 import torch.nn.functional as F
 from . import BaseFFLayer
@@ -53,10 +53,12 @@ class DistanceLayer(BaseFFLayer):
 
 class RangeSeparationLayer(BaseFFLayer):
     def __init__(self, cutoff_sr) -> None:
-        super().__init__(input_fields={"Dij_lr", "idx_i_lr", "idx_j_lr", "vij_lr"}, output_fields={"Dij_sr", "idx_i_sr", "idx_j_sr", "vij)sr"})
+        super().__init__()
         self.cutoff_sr = cutoff_sr
 
-    def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor, vij_lr: Optional[Tensor]=None) -> Dict[str, Tensor]:
+    def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor, vij_lr: Optional[Tensor]=None) -> Dict[
+        Literal["Dij_sr", "idx_i_sr", "idx_j_sr", "vij_sr"], Tensor
+    ]:
         cutmask = Dij_lr < self.cutoff_sr
         relevant_output = {
             "Dij_sr": Dij_lr[cutmask],
