@@ -5,13 +5,13 @@ from torch import Tensor
 from torch.nn import Module, ModuleList, Linear
 import torch.nn.functional as F
 from .interaction import InteractionModule
-from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore
+from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore, BaseAtomEmbedding, BaseElectronEmbedding, BaseRBF, ChargeConservationLayer
 from ..activation import ACTIVATION_KEY_TYPE
 
 
 DEFAULT_BUILD_PARAMS = {'dim_embedding': 64,
  'num_rbf': 16,
- 'max_Za': 87,
+ 'max_Za': 86,
  'cutoff_sr': 5.291772105638412,
  'Hartree_in_E': 1,
  'Bohr_in_R': 0.5291772108,
@@ -122,10 +122,21 @@ class SpookyNetCore(BaseFFCore):
                 if isinstance(layer, RangeSeparationLayer):
                     self.range_separation = layer
                     self.range_separation.reset_field_name(idx_i_lr="idx_i", idx_j_lr="idx_j")
+                elif isinstance(layer, BaseAtomEmbedding):
+                    self.atom_embedding = layer
+                elif isinstance(layer, BaseElectronEmbedding):
+                    if layer.attribute == "charge":
+                        self.charge_embedding = layer
+                    elif layer.attribute == "spin":
+                        self.spin_embedding = layer
+                elif isinstance(layer, BaseRBF):
+                    self.radial_basis_function = layer
                 # build pre-core sequence
                 self.pre_sequence.append(layer)
             else: 
                 # build post-core sequence
+                if isinstance(layer, ChargeConservationLayer):
+                    self.charge_conservation = layer
                 self.post_sequence.append(layer)
 
     def _atomic_properties_static(self, Dij_sr: Tensor, vij_sr: Tensor, batch_seg: Optional[Tensor]=None) -> Tuple[Tensor, Tensor, Tensor, int]:
@@ -178,7 +189,7 @@ class SpookyNetCore(BaseFFCore):
         x = atom_embedding + charge_embedding + spin_embedding
         dropout_mask = torch.ones((num_batch, 1), dtype=x.dtype, device=x.device)
         f = x.new_zeros(x.size())
-        for module in self.module:
+        for module in self.interaction:
             x, y = module(
                 x, rbf, pij, dij, idx_i_sr, idx_j_sr, num_batch, batch_seg, mask
             )

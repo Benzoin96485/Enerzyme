@@ -5,17 +5,36 @@ from torch import Tensor
 from torch.nn import Module, Sequential
 
 
+def get_output_fields(func):
+    key_type = signature(func).return_annotation.__args__[0]
+    # if key_type is str:
+    #     return set()
+    # else:
+    return set(key_type.__args__)
+
+
 class BaseFFModule(ABC, Module):
     def __init__(self, input_fields: Optional[Set[str]]=None, output_fields: Optional[Set[str]]=None) -> None:
         super().__init__()
-        self._input_fields = (
-            input_fields if input_fields is not None
-            else signature(self.get_output).parameters.keys() - {"self"}
-        )
-        self._output_fields = (
-            output_fields if output_fields is not None
-            else set(signature(self.get_output).return_annotation.__args__[0].__args__)
-        )
+        
+        # gather input fields
+        if input_fields is None:
+            keys = signature(self.get_output).parameters.keys()
+            if "relevant_input" in keys:
+                raise KeyError("Input fields not specified!")
+            else:
+                input_fields = signature(self.get_output).parameters.keys() - {"self"}
+        self._input_fields = input_fields
+        
+        # gather output fields
+        if output_fields is None:
+            key_type = signature(self.get_output).return_annotation.__args__[0]
+            if key_type is str:
+                raise KeyError("Output fields not specified!")
+            else:
+                output_fields = set(key_type.__args__)
+        self._output_fields = output_fields
+
         self._relevant_fields = self._input_fields | self._output_fields
         self._name_mapping = dict()
         for field_name in self._relevant_fields:

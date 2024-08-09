@@ -1,10 +1,11 @@
 from typing import Dict, Optional, Literal
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 import torch
 from torch import Tensor
-from torch.nn import Linear, Module, init
+from torch.nn import Linear, init
 import torch.nn.functional as F
 from .mlp import ResidualMLP as _ResidualMLP
+from . import BaseFFLayer
 from ..activation import ACTIVATION_KEY_TYPE
 from ..functional import segment_sum
 
@@ -28,23 +29,24 @@ def ResidualMLP(
     )
 
 
-class BaseElectronEmbedding(ABC, Module):
+class BaseElectronEmbedding(BaseFFLayer):
     def __init__(
         self, dim_embedding: int, num_residual: int, attribute: Literal["charge", "spin"]="charge"
     ) -> None:
-        super().__init__()
+        input_fields = {"atom_embedding", "batch_seg"}
+        if attribute == "charge":
+            input_fields.add("Q")
+        elif attribute == "spin":
+            input_fields.add("S")
+        super().__init__(input_fields=input_fields, output_fields={"electron_embedding"})
         self.dim_embedding = dim_embedding
         self.num_residual = num_residual
         self.attribute = attribute
+        self.reset_field_name(electron_embedding=f"{attribute}_embedding")
 
     @abstractmethod
-    def get_embedding(self, atom_embedding, Q, batch_seg, eps, **kwargs) -> Tensor:
+    def get_electron_embedding(self, atom_embedding, Q, batch_seg) -> Dict[Literal["electron_embedding"], Tensor]:
         ...
-
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output["electron_embedding"] = self.get_embedding(**net_input)
-        return output
 
 
 class ElectronicEmbedding(BaseElectronEmbedding):
@@ -101,14 +103,14 @@ class ElectronicEmbedding(BaseElectronEmbedding):
         init.orthogonal_(self.linear_v.weight)
         init.orthogonal_(self.linear_q.weight)
         init.zeros_(self.linear_q.bias)
+        self.eps = 1e-8
 
-    def get_embedding(
+    def get_electron_embedding(
         self,
         atom_embedding: Tensor,
         Q: Optional[Tensor]=None,
         S: Optional[Tensor]=None,
-        batch_seg: Optional[Tensor]=None,
-        eps: float = 1e-8,
+        batch_seg: Optional[Tensor]=None
     ) -> torch.Tensor:
         """
         Evaluate interaction block.
@@ -134,7 +136,7 @@ class ElectronicEmbedding(BaseElectronEmbedding):
             anorm = anorm[batch_seg]
         else:  # gathering is faster on GPUs
             anorm = torch.gather(anorm, 0, batch_seg)
-        return self.resblock((a / (anorm + eps)).unsqueeze(-1) * v)
+        return self.resblock((a / (anorm + self.eps)).unsqueeze(-1) * v)
 
 
 class NonlinearElectronicEmbedding(BaseElectronEmbedding):
@@ -188,7 +190,7 @@ class NonlinearElectronicEmbedding(BaseElectronEmbedding):
         init.zeros_(self.featurize_k.bias)
         init.orthogonal_(self.featurize_v.weight)
 
-    def get_embedding(
+    def get_electron_embedding(
         self,
         atom_embedding: Tensor,
         Q: Optional[Tensor]=None,

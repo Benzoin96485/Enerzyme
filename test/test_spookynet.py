@@ -8,6 +8,7 @@ sys.path.extend(["..", "."])
 import numpy as np
 from numpy.testing import assert_allclose
 import torch
+from torch.nn import Sequential
 from enerzyme.models.spookynet import SpookyNetCore
 from enerzyme.models.spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
@@ -53,7 +54,7 @@ Za = torch.randint(1, max_Za, (N,))
 rbf = torch.rand(*idx_i.shape, dim_feature)
 cutoff_values = torch.rand(*idx_i.shape)
 atom_embedding = torch.randn((N, dim_feature))
-Q = torch.randn((N, dim_feature))
+q = torch.randn((N, dim_feature))
 Qa = torch.randn((N,))
 K = torch.randn((N, dim_feature))
 dtype = "float64"
@@ -62,7 +63,7 @@ if dtype == "float64":
 elif dtype == "float32":
     dtype = torch.float32
 x = x.type(dtype)
-Q = Q.type(dtype)
+q = q.type(dtype)
 Qa = Qa.type(dtype)
 K = K.type(dtype)
 atom_embedding = atom_embedding.type(dtype)
@@ -72,10 +73,11 @@ pij = pij.type(dtype)
 dij = dij.type(dtype)
 rbf = rbf.type(dtype)
 cutoff_values = cutoff_values.type(dtype)
-
+Q = torch.tensor([-1], dtype=dtype)
+S = torch.tensor([1], dtype=dtype)
 
 def assert_tensor_allclose(t1, t2, **kwargs):
-    assert_allclose(t1, t2, **kwargs)
+    assert_allclose(t1.detach().numpy(), t2.detach().numpy(), **kwargs)
 
 
 def initialize():
@@ -93,8 +95,8 @@ def initialize():
         "SpookyNet", 
         DEFAULT_LAYER_PARAMS, 
         DEFAULT_BUILD_PARAMS
-    )
-    f2 = F2()
+    ).type(dtype)
+    f2 = F2().type(dtype)
     return f1, f2
 
 
@@ -282,8 +284,8 @@ def test_attention():
     f1 = F1(dim_feature, dim_feature).type(dtype)
     f1.omega.copy_(f2.omega)
     assert_tensor_allclose(
-        f1(Q, K, atom_embedding, 1, None),
-        f2(Q, K, atom_embedding, 1, None)
+        f1(q, K, atom_embedding, 1, None),
+        f2(q, K, atom_embedding, 1, None)
     )
 
 
@@ -394,6 +396,27 @@ def test_atomic_properties_static():
     
 
 def test_atomic_properties_dynamic():
+    f1, f2 = initialize()
+    N_, cutoff_values_, Dij_lr, Dij_sr, pij, dij, idx_i_sr, idx_j_sr, _ = f2._atomic_properties_static(Za, R, idx_i, idx_j)
+    _, ea2, qa2, _, _, _, _, _ = f2._atomic_properties_dynamic(
+        N_, Q, S, Za, R, cutoff_values_, Dij_lr, idx_i, idx_j, Dij_sr, pij, dij, idx_i_sr, idx_j_sr
+    )
+    net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S}
+    pre_layers = Sequential(
+        f1.calculate_distance, f1.range_separation, f1.atom_embedding, f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function
+    )
+    output = pre_layers(net_input)
+    ea1, qa1 = f1._atomic_properties_dynamic(
+        output["atom_embedding"],
+        output["charge_embedding"],
+        output["spin_embedding"],
+        1,
+        output["rbf"],
+        pij, dij, output["idx_i_sr"], output["idx_j_sr"], None
+    )
+    qa1 = f1.charge_conservation.get_corrected_Qa(Za, qa1, Q)["Qa"]
+    assert_tensor_allclose(ea1, ea2)
+    assert_tensor_allclose(qa1, qa2)
     pass
 
 

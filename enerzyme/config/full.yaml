@@ -98,7 +98,7 @@ Modelhub:
       build_params:
         dim_embedding: 64
         num_rbf: 16
-        max_Za: 87
+        max_Za: 86
         cutoff_sr: 5.291772105638412
         Hartree_in_E: 1
         Bohr_in_R: 0.5291772108
