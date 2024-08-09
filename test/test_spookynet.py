@@ -187,7 +187,7 @@ def test_electronic_embedding():
     f2 = F2(dim_feature, 3).type(dtype)
     S = torch.tensor([2], dtype=dtype)
     assert_tensor_allclose(
-        f1.get_embedding(atom_embedding=atom_embedding, S=S), 
+        f1.get_electron_embedding(atom_embedding=atom_embedding, S=S), 
         f2(atom_embedding, S, 1, None)
     )
     pass
@@ -200,7 +200,7 @@ def test_nonlinear_electronic_embedding():
     f2 = F2(dim_feature, 3).type(dtype)
     S = torch.tensor([2], dtype=dtype)
     assert_tensor_allclose(
-        f1.get_embedding(atom_embedding=atom_embedding, S=S), 
+        f1.get_electron_embedding(atom_embedding=atom_embedding, S=S), 
         f2(atom_embedding, S, 1, torch.zeros(N, dtype=torch.long))
     )
     pass
@@ -421,7 +421,28 @@ def test_atomic_properties_dynamic():
 
 
 def test_atomic_properties():
-    pass
+    f1, f2 = initialize()
+    _, ea2, qa2, _, _, _, _, _ = f2.atomic_properties(Za, Q, S, R, idx_i, idx_j)
+    net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S}
+    pre_layers = Sequential(
+        f1.calculate_distance, f1.range_separation, f1.atom_embedding, f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function
+    )
+    output = pre_layers(net_input)
+    pij1, dij1, _, _ = f1._atomic_properties_static(
+        output["Dij_sr"],
+        output["vij_sr"],
+    )
+    ea1, qa1 = f1._atomic_properties_dynamic(
+        output["atom_embedding"],
+        output["charge_embedding"],
+        output["spin_embedding"],
+        1,
+        output["rbf"],
+        pij1, dij1, output["idx_i_sr"], output["idx_j_sr"], None
+    )
+    qa1 = f1.charge_conservation.get_corrected_Qa(Za, qa1, Q)["Qa"]
+    assert_tensor_allclose(ea1, ea2)
+    assert_tensor_allclose(qa1, qa2)
 
 
 def test_energy():
