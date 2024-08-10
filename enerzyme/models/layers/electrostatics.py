@@ -7,7 +7,7 @@ from ..functional import segment_sum
 from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
-class ChargeConservationLayer(Module):
+class ChargeConservationLayer(BaseFFLayer):
     def __init__(self) -> None:
         r"""
         Correct the atomic charges to make their summation equal to the total charge by [1]
@@ -20,10 +20,9 @@ class ChargeConservationLayer(Module):
         """
         super().__init__()
 
-    def get_corrected_Qa(
-        self, 
-        Za: Tensor, Qa: Tensor, 
-        Q: Optional[Tensor]=None, batch_seg: Optional[Tensor]=None, **kwargs
+    def get_output(
+        self, Za: Tensor, Qa: Tensor, 
+        Q: Optional[Tensor]=None, batch_seg: Optional[Tensor]=None
     ) -> Dict[Literal["Qa", "Q"], Tensor]:
         '''
         Correct the atomic charge
@@ -56,18 +55,13 @@ class ChargeConservationLayer(Module):
             "Qa": Qa + ((Q - raw_Q) / N_per_batch).gather(0, batch_seg), 
             "Q": raw_Q
         }
-    
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output.update(self.get_corrected_Qa(**net_input))
-        return output
 
 
 class ElectrostaticEnergyLayer(BaseFFLayer):
     def __init__(
         self, cutoff_sr: float, cutoff_lr: Optional[float]=None, 
         Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1,
-        cutoff_fn: CUTOFF_KEY_TYPE="smooth", lr_flavor: Literal["simple", "smooth"]="smooth", half_switch: bool=False
+        cutoff_fn: CUTOFF_KEY_TYPE="smooth", flavor: Literal["PhysNet", "SpookyNet"]="SpookyNet"
     ) -> None:
         r"""
         Calculate the electrostatic energy from distributed multipoles and atomic positions
@@ -92,19 +86,21 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         """
         super().__init__(input_fields={"Dij_lr", "Qa", "idx_i", "idx_j"}, output_fields={"E_ele_a"})
         self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
-        if half_switch:
-            self.cutoff_sr = cutoff_sr / 2
-        else:
-            self.cutoff_sr = cutoff_sr
+        if flavor == "PhysNet":
+            self.cutoff = cutoff_sr / 2
+            self.cuton = 0
+        elif flavor == "SpookyNet":
+            self.cutoff = cutoff_sr * 0.75
+            self.cuton = cutoff_sr * 0.25
         self.cutoff_lr = cutoff_lr
         self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
         
         if cutoff_lr is not None and cutoff_lr > 0:
             self.cutoff_lr2 = self.cutoff_lr * self.cutoff_lr
             self.two_div_cut = 2.0 / self.cutoff_lr
-            if lr_flavor == "simple":
+            if flavor == "PhysNet":
                 self.lr_shield = self._simple_lr_shield
-            elif lr_flavor == "smooth":
+            elif flavor == "SpookyNet":
                 self.rcutconstant = self.cutoff_lr / (self.cutoff_lr ** 2 + 1.0) ** 1.5
                 self.cutconstant = (2 * self.cutoff_lr ** 2 + 1.0) / (self.cutoff_lr** 2 + 1.0) ** 1.5
                 self.lr_shield = self._smooth_lr_shield
@@ -156,7 +152,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             fac = self.kehalf * Qa[idx_i] * Qa[idx_j]
         else:
             fac = self.kehalf * Qa.gather(0, idx_i) * Qa.gather(0, idx_j)
-        switch = self.cutoff_fn(Dij_lr, self.cutoff_sr)
+        switch = self.cutoff_fn(Dij_lr, self.cutoff, self.cuton)
         cswitch = 1 - switch
         if self.cutoff_lr is None or self.cutoff_lr <= 0:
             Eele_ordinary = 1.0 / Dij_lr

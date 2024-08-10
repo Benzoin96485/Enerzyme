@@ -356,7 +356,7 @@ def test_scaled_charges():
     _, physnet_tf = initialize()
     from enerzyme.models.layers.electrostatics import ChargeConservationLayer
     Q_layer = ChargeConservationLayer()
-    q_torch = Q_layer.get_corrected_Qa(
+    q_torch = Q_layer.get_output(
         torch.from_numpy(Z.copy()),
         torch.from_numpy(Qa.copy()), 
         torch.tensor(Q_tot)

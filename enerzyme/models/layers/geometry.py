@@ -2,6 +2,7 @@ from typing import Optional, Dict, Literal
 from torch import Tensor
 import torch.nn.functional as F
 from . import BaseFFLayer
+from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
 class DistanceLayer(BaseFFLayer):
@@ -52,12 +53,16 @@ class DistanceLayer(BaseFFLayer):
 
 
 class RangeSeparationLayer(BaseFFLayer):
-    def __init__(self, cutoff_sr) -> None:
+    def __init__(self, cutoff_sr, cutoff_fn: Optional[CUTOFF_KEY_TYPE]=None) -> None:
         super().__init__()
         self.cutoff_sr = cutoff_sr
+        if cutoff_fn is not None:
+            self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
+        else:
+            self.cutoff_fn = None
 
     def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor, vij_lr: Optional[Tensor]=None) -> Dict[
-        Literal["Dij_sr", "idx_i_sr", "idx_j_sr", "vij_sr"], Tensor
+        Literal["Dij_sr", "idx_i_sr", "idx_j_sr", "vij_sr", "cutoff_values_sr"], Tensor
     ]:
         cutmask = Dij_lr < self.cutoff_sr
         relevant_output = {
@@ -65,6 +70,8 @@ class RangeSeparationLayer(BaseFFLayer):
             "idx_i_sr": idx_i_lr[cutmask],
             "idx_j_sr": idx_j_lr[cutmask],
         }
+        if self.cutoff_fn is not None:
+            relevant_output["cutoff_values_sr"] = self.cutoff_fn(relevant_output["Dij_sr"], self.cutoff_sr)
         if vij_lr is not None:
             relevant_output["vij_sr"] = vij_lr[cutmask]
         return relevant_output

@@ -16,13 +16,12 @@ DEFAULT_BUILD_PARAMS = {'dim_embedding': 64,
  'Hartree_in_E': 1,
  'Bohr_in_R': 0.5291772108,
  'activation_fn': 'swish'}
-DEFAULT_LAYER_PARAMS = [{'name': 'RangeSeparation'},
+DEFAULT_LAYER_PARAMS = [{'name': 'RangeSeparation', 'params': {'cutoff_fn': 'bump'}},
  {'name': 'ExponentialBernsteinRBF',
   'params': {'no_basis_at_infinity': False,
    'init_alpha': 0.944863062918464,
    'exp_weighting': False,
-   'learnable_shape': True,
-   'cutoff_fn': 'bump'}},
+   'learnable_shape': True}},
  {'name': 'NuclearEmbedding',
   'params': {'zero_init': True, 'use_electron_config': True}},
  {'name': 'ElectronicEmbedding',
@@ -52,8 +51,7 @@ DEFAULT_LAYER_PARAMS = [{'name': 'RangeSeparation'},
  {'name': 'ChargeConservation'},
  {'name': 'AtomicCharge2Dipole'},
  {'name': 'ZBLRepulsionEnergy'},
- {'name': 'ElectrostaticEnergy',
-  'params': {'lr_flavor': 'smooth', 'half_switch': False}},
+ {'name': 'ElectrostaticEnergy', 'params': {'flavor': 'SpookyNet'}},
  {'name': 'GrimmeD4Energy', 'params': {'learnable': True}},
  {'name': 'EnergyReduce'},
  {'name': 'Force'}]
@@ -196,15 +194,8 @@ class SpookyNetCore(BaseFFCore):
             # apply dropout mask
             if self.training and self.module_keep_prob < 1.0:
                 y = y * dropout_mask[batch_seg]
-                dropout_mask = dropout_mask * torch.bernoulli(
-                    self.keep_prob
-                    * torch.ones(
-                        dropout_mask.shape,
-                        dtype=dropout_mask.dtype,
-                        device=dropout_mask.device,
-                    )
-                )
-            f += y
+                dropout_mask = dropout_mask * torch.bernoulli(self.keep_prob * torch.ones_like(dropout_mask))
+            f = f + y
         out = self.output(f)
         ea = out.narrow(-1, 0, 1).squeeze(-1)  # atomic energy
         qa = out.narrow(-1, 1, 1).squeeze(-1)  # partial charge
@@ -216,6 +207,6 @@ class SpookyNetCore(BaseFFCore):
     ) -> Dict[Literal["Ea", "Qa"], Tensor]:
         pij, dij, mask, num_batch = self._atomic_properties_static(Dij_sr, vij_sr, batch_seg)
         ea, qa = self._atomic_properties_dynamic(
-            atom_embedding, charge_embedding, spin_embedding, num_batch, rbf, pij, dij. idx_i_sr, idx_j_sr, mask, batch_seg
+            atom_embedding, charge_embedding, spin_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg
         )
         return {"Ea": ea, "Qa": qa}

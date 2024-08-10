@@ -17,15 +17,15 @@ class BaseRBF(BaseFFLayer):
         cutoff_sr: float,
         cutoff_fn: Literal["polynomial", "bump"]
     ) -> None:
-        super().__init__(input_fields={"Dij_sr", "cutoff_sr_values"}, output_fields={"rbf"})
+        super().__init__(input_fields={"Dij_sr", "cutoff_values_sr"}, output_fields={"rbf"})
         self.num_rbf = num_rbf
         self.cutoff_sr = cutoff_sr
         self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
 
-    def get_rbf(self, Dij_sr: Tensor, cutoff_values: Optional[Tensor]=None, **kwargs) -> Tensor:
-        if cutoff_values is None:
-            cutoff_values = self.cutoff_fn(Dij_sr, cutoff=self.cutoff_sr)
-        return cutoff_values.view(-1, 1) * self._get_rbf(Dij_sr)
+    def get_rbf(self, Dij_sr: Tensor, cutoff_values_sr: Optional[Tensor]=None, **kwargs) -> Tensor:
+        if cutoff_values_sr is None:
+            cutoff_values_sr = self.cutoff_fn(Dij_sr, cutoff=self.cutoff_sr)
+        return cutoff_values_sr.view(-1, 1) * self._get_rbf(Dij_sr)
 
     @abstractmethod
     def _get_rbf(self, Dij: Tensor) -> Tensor:

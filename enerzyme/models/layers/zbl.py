@@ -3,11 +3,12 @@ import torch
 from torch import Tensor
 from torch.nn import Module, Parameter, init
 import torch.nn.functional as F
+from . import BaseFFLayer
 from ..functional import softplus_inverse, segment_sum
-from ..cutoff import CUTOFF_REGISTER
+from ..cutoff import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
 
 
-class ZBLRepulsionEnergyLayer(Module):
+class ZBLRepulsionEnergyLayer(BaseFFLayer):
     """
     Short-range repulsive potential with learnable parameters inspired by the
     Ziegler-Biersack-Littmark (ZBL) potential described in Ziegler, J.F.,
@@ -24,10 +25,10 @@ class ZBLRepulsionEnergyLayer(Module):
     """
     def __init__(
         self, Bohr_in_R: float=0.5291772105638411, Hartree_in_E: float=1, cutoff_sr: Optional[float]=None,
-        cutoff_fn: Optional[Literal["polynomial", "bump"]]=None
+        cutoff_fn: CUTOFF_KEY_TYPE=None
     ) -> None:
         """ Initializes the ZBLRepulsionEnergy class. """
-        super().__init__()
+        super().__init__(output_fields={"E_zbl_a"})
         self.a0 = Bohr_in_R
         self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
         if cutoff_fn is not None:
@@ -58,13 +59,13 @@ class ZBLRepulsionEnergyLayer(Module):
         init.constant_(self._a3, softplus_inverse(0.40280))
         init.constant_(self._a4, softplus_inverse(0.20160))
 
-    def get_zbf_energy(
+    def get_E_zbl_a(
         self,
         Za: Tensor,
-        Dij: Tensor,
-        idx_i: Tensor,
-        idx_j: Tensor,
-        cutoff_values: Optional[Tensor]=None,
+        Dij_sr: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+        cutoff_values_sr: Optional[Tensor]=None,
     ) -> Tensor:
         """
         Evaluate the short-range repulsive potential.
@@ -89,12 +90,12 @@ class ZBLRepulsionEnergyLayer(Module):
             e (FloatTensor [N]):
                 Atomic contributions to the total repulsive energy.
         """
-        if cutoff_values is None:
-            cutoff_values = self.cutoff_fn(Dij, cutoff=self.cutoff_sr)
+        if cutoff_values_sr is None:
+            cutoff_values_sr = self.cutoff_fn(Dij_sr, cutoff=self.cutoff_sr)
         # calculate ZBL parameters
         Zf = Za.type_as(self._a1)
         z = Zf ** F.softplus(self._apow)
-        a = (z[idx_i] + z[idx_j]) * F.softplus(self._adiv)
+        a = (z[idx_i_sr] + z[idx_j_sr]) * F.softplus(self._adiv)
         a1 = F.softplus(self._a1) * a
         a2 = F.softplus(self._a2) * a
         a3 = F.softplus(self._a3) * a
@@ -111,11 +112,11 @@ class ZBLRepulsionEnergyLayer(Module):
         c3 = c3 / csum
         c4 = c4 / csum
         # compute interactions
-        zizj = Zf[idx_i] * Zf[idx_j]
+        zizj = Zf[idx_i_sr] * Zf[idx_j_sr]
         f = (
-            c1 * torch.exp(-a1 * Dij)
-            + c2 * torch.exp(-a2 * Dij)
-            + c3 * torch.exp(-a3 * Dij)
-            + c4 * torch.exp(-a4 * Dij)
-        ) * cutoff_values
-        return segment_sum(self.kehalf * f * zizj / Dij, idx_i)
+            c1 * torch.exp(-a1 * Dij_sr)
+            + c2 * torch.exp(-a2 * Dij_sr)
+            + c3 * torch.exp(-a3 * Dij_sr)
+            + c4 * torch.exp(-a4 * Dij_sr)
+        ) * cutoff_values_sr
+        return segment_sum(self.kehalf * f * zizj / Dij_sr, idx_i_sr)

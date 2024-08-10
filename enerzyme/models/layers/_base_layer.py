@@ -19,12 +19,19 @@ class BaseFFModule(ABC, Module):
         
         # gather input fields
         if input_fields is None:
+            input_fields = set()
+            if output_fields is not None:
+                for output_field in output_fields:
+                    get_function = getattr(self, f"get_{output_field}", None)
+                    if callable(get_function):
+                        input_fields |= signature(get_function).parameters.keys() - {"self"}
             keys = signature(self.get_output).parameters.keys()
             if "relevant_input" in keys:
-                raise KeyError("Input fields not specified!")
+                if not input_fields:
+                    raise KeyError("Input fields not specified!")
             else:
-                input_fields = signature(self.get_output).parameters.keys() - {"self"}
-        self._input_fields = input_fields
+                input_fields |= keys - {"self"}
+        self._input_fields = set(input_fields)
         
         # gather output fields
         if output_fields is None:
@@ -33,7 +40,7 @@ class BaseFFModule(ABC, Module):
                 raise KeyError("Output fields not specified!")
             else:
                 output_fields = set(key_type.__args__)
-        self._output_fields = output_fields
+        self._output_fields = set(output_fields)
 
         self._relevant_fields = self._input_fields | self._output_fields
         self._name_mapping = dict()

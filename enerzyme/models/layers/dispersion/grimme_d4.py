@@ -4,9 +4,10 @@ import torch
 from torch import Tensor
 from torch.nn import Module, Parameter
 import torch.nn.functional as F
+from .. import BaseFFLayer
 from ...functional import softplus_inverse, segment_sum
 from ...cutoff import smooth_transition
-from typing import Tuple, Optional
+from typing import Dict, Literal, Optional
 
 """
 computes D4 dispersion energy
@@ -14,7 +15,7 @@ HF      s6=1.00000000, s8=1.61679827, a1=0.44959224, a2=3.35743605
 """
 
 
-class GrimmeD4EnergyLayer(Module):
+class GrimmeD4EnergyLayer(BaseFFLayer):
     def __init__(
         self,
         cutoff: Optional[float] = None,
@@ -34,7 +35,7 @@ class GrimmeD4EnergyLayer(Module):
         Hartree_in_E: float=1, Bohr_in_R: float=0.5291772108
     ) -> None:
         """ Initializes the D4DispersionEnergy class. """
-        super().__init__()
+        super().__init__(output_fields={"E_disp_a"})
         # Grimme's D4 dispersion is only parametrized up to Rn (Z=86)
         assert max_Za <= 87
         # trainable parameters
@@ -205,16 +206,9 @@ class GrimmeD4EnergyLayer(Module):
                 persistent=False,
             )
 
-    def get_e_disp(
-        self,
-        Za: torch.Tensor,
-        Qa: torch.Tensor,
-        Dij: torch.Tensor,
-        idx_i: torch.Tensor,
-        idx_j: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def get_E_disp_a(self, Za: Tensor, Qa: Tensor, Dij_lr: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:
         # initialization of Zi/Zj and unit conversion
-        Dij = Dij / self.Bohr_in_R  # convert distances to Bohr
+        Dij_lr = Dij_lr / self.Bohr_in_R  # convert distances to Bohr
         Zi = Za[idx_i]
         Zj = Za[idx_j]
 
@@ -223,9 +217,9 @@ class GrimmeD4EnergyLayer(Module):
         den = self.k4 * torch.exp(
             -((torch.abs(self.en[Zi] - self.en[Zj]) + self.k5) ** 2) / self.k6
         )
-        tmp = den * 0.5 * (1.0 + torch.erf(-self.kn * (Dij - rco) / rco))
+        tmp = den * 0.5 * (1.0 + torch.erf(-self.kn * (Dij_lr - rco) / rco))
         if self.cutoff is not None:
-            tmp = tmp * smooth_transition(Dij, self.cutoff, self.cuton)
+            tmp = tmp * smooth_transition(Dij_lr, self.cutoff, self.cuton)
 
         covcn = segment_sum(tmp, idx_i)
 
@@ -283,8 +277,8 @@ class GrimmeD4EnergyLayer(Module):
         a2 = F.softplus(self._a2)
         r0 = a1 * sqrt_r4r2ij + a2
         if self.cutoff is None:
-            oor6 = 1 / (Dij ** 6 + r0 ** 6)
-            oor8 = 1 / (Dij ** 8 + r0 ** 8)
+            oor6 = 1 / (Dij_lr ** 6 + r0 ** 6)
+            oor8 = 1 / (Dij_lr ** 8 + r0 ** 8)
         else:
             cut2 = self.cutoff ** 2
             cut6 = cut2 ** 3
@@ -293,15 +287,15 @@ class GrimmeD4EnergyLayer(Module):
             tmp8 = r0 ** 8
             cut6tmp6 = cut6 + tmp6
             cut8tmp8 = cut8 + tmp8
-            tmpc = Dij / self.cutoff - 1
+            tmpc = Dij_lr / self.cutoff - 1
             oor6 = (
-                1 / (Dij ** 6 + tmp6) - 1 / cut6tmp6 + 6 * cut6 / cut6tmp6 ** 2 * tmpc
+                1 / (Dij_lr ** 6 + tmp6) - 1 / cut6tmp6 + 6 * cut6 / cut6tmp6 ** 2 * tmpc
             )
             oor8 = (
-                1 / (Dij ** 8 + tmp8) - 1 / cut8tmp8 + 8 * cut8 / cut8tmp8 ** 2 * tmpc
+                1 / (Dij_lr ** 8 + tmp8) - 1 / cut8tmp8 + 8 * cut8 / cut8tmp8 ** 2 * tmpc
             )
-            oor6 = torch.where(Dij < self.cutoff, oor6, torch.zeros_like(oor6))
-            oor8 = torch.where(Dij < self.cutoff, oor8, torch.zeros_like(oor8))
+            oor6 = torch.where(Dij_lr < self.cutoff, oor6, torch.zeros_like(oor6))
+            oor8 = torch.where(Dij_lr < self.cutoff, oor8, torch.zeros_like(oor8))
         s6 = F.softplus(self._s6)
         s8 = F.softplus(self._s8)
         pairwise = -c6ij * (s6 * oor6 + s8 * sqrt_r4r2ij ** 2 * oor8) * self.Hartree_in_E / 2

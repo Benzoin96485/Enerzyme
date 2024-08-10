@@ -16,8 +16,7 @@ DEFAULT_BUILD_PARAMS = {
     'Bohr_in_R': 0.5291772108,
     'cutoff_fn': 'polynomial'
 }
-DEFAULT_LAYER_PARAMS = [
- {'name': 'RangeSeparation'},
+DEFAULT_LAYER_PARAMS = [{'name': 'RangeSeparation'},
  {'name': 'ExponentialGaussianRBF',
   'params': {'no_basis_at_infinity': False,
    'init_alpha': 1,
@@ -44,7 +43,7 @@ DEFAULT_LAYER_PARAMS = [
  {'name': 'ChargeConservation'},
  {'name': 'AtomicCharge2Dipole'},
  {'name': 'ElectrostaticEnergy',
-  'params': {'lr_flavor': 'simple', 'half_switch': True, 'cutoff_lr': None}},
+  'params': {'cutoff_lr': None, 'flavor': 'PhysNet'}},
  {'name': 'GrimmeD3Energy', 'params': {'learnable': True}},
  {'name': 'EnergyReduce'},
  {'name': 'Force'}]

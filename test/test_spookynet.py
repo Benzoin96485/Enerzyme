@@ -85,18 +85,17 @@ def initialize():
     from spookynet.modules.d4_dispersion_energy import D4DispersionEnergy
     d4 = D4DispersionEnergy()
     DEFAULT_BUILD_PARAMS.update({
-        "Bohr_in_R": d4.convert2eV * 2,
-        "Hartree_in_E": 1 / d4.convert2Bohr
+        "Bohr_in_R": 1 / d4.convert2Bohr,
+        "Hartree_in_E": d4.convert2eV * 2,
     })
     from enerzyme.models.ff import build_model
-    from enerzyme.models.spookynet import SpookyNetCore as F1
     from spookynet.spookynet import SpookyNet as F2
     f1: SpookyNetCore = build_model(
         "SpookyNet", 
         DEFAULT_LAYER_PARAMS, 
         DEFAULT_BUILD_PARAMS
     ).type(dtype)
-    f2 = F2().type(dtype)
+    f2 = F2(use_zbl_repulsion=True, use_electrostatics=True, use_d4_dispersion=True).type(dtype)
     return f1, f2
 
 
@@ -331,7 +330,7 @@ def test_zbl_repulsion_energy():
     f1.kehalf = f2.kehalf
     f1.a0 = f2.a0
     assert_tensor_allclose(
-        f1.get_zbf_energy(Za, D, idx_i, idx_j, cutoff_values),
+        f1.get_E_zbl_a(Za, D, idx_i, idx_j, cutoff_values),
         f2(len(Za), Za.type(dtype), D, cutoff_values, idx_i, idx_j)
     )
 
@@ -348,8 +347,8 @@ def test_switch_function():
 def test_electrostatic_energy():
     from enerzyme.models.layers.electrostatics import ElectrostaticEnergyLayer as F1
     from spookynet.modules.electrostatic_energy import ElectrostaticEnergy as F2
-    f2 = F2(cutoff=5.0)
-    f1 = F1(cutoff_sr=5.0, lr_flavor="smooth")
+    f2 = F2(cutoff=5.0 * 0.75, cuton=5.0 * 0.25)
+    f1 = F1(cutoff_sr=5.0)
     f1.kehalf = f2.kehalf
     assert_tensor_allclose(
         f1.get_E_ele_a(D, Qa, idx_i, idx_j),
@@ -365,7 +364,7 @@ def test_d4_dispersion_energy():
     f1.Hartree_in_E = f2.convert2eV * 2
     f1.Bohr_in_R = 1 / f2.convert2Bohr
     assert_tensor_allclose(
-        f1.get_e_disp(Za, Qa, D, idx_i, idx_j),
+        f1.get_E_disp_a(Za, Qa, D, idx_i, idx_j),
         f2(N, Za, Qa, D, idx_i, idx_j)[0]
     )
 
@@ -388,7 +387,6 @@ def test_atomic_properties_static():
     f1, f2 = initialize()
     net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j}
     output = f1.range_separation(f1.calculate_distance(net_input))
-    print(output.keys())
     pij1, dij1, _, _ = f1._atomic_properties_static(output["Dij_sr"], output["vij_sr"])
     _, _, _, _, pij2, dij2, _, _, _ = f2._atomic_properties_static(Za, R, idx_i, idx_j)
     assert_tensor_allclose(pij1, pij2)
@@ -414,7 +412,7 @@ def test_atomic_properties_dynamic():
         output["rbf"],
         pij, dij, output["idx_i_sr"], output["idx_j_sr"], None
     )
-    qa1 = f1.charge_conservation.get_corrected_Qa(Za, qa1, Q)["Qa"]
+    qa1 = f1.charge_conservation.get_output(Za, qa1, Q)["Qa"]
     assert_tensor_allclose(ea1, ea2)
     assert_tensor_allclose(qa1, qa2)
     pass
@@ -440,14 +438,23 @@ def test_atomic_properties():
         output["rbf"],
         pij1, dij1, output["idx_i_sr"], output["idx_j_sr"], None
     )
-    qa1 = f1.charge_conservation.get_corrected_Qa(Za, qa1, Q)["Qa"]
+    qa1 = f1.charge_conservation.get_output(Za, qa1, Q)["Qa"]
     assert_tensor_allclose(ea1, ea2)
     assert_tensor_allclose(qa1, qa2)
 
 
-def test_energy():
-    pass
+def test_forward():
+    torch.autograd.set_detect_anomaly(True)
+    f1, f2 = initialize()
+    E2, Fa2, M22, _, ea, qa, ea_rep, ea_ele, ea_vdw, *_ = f2.forward(Za, Q, S, R.requires_grad_(), idx_i, idx_j)
+    net_input = {"Ra": R.requires_grad_(), "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S}
+    output = f1(net_input)
+    E1 = output["E"]
+    Fa1 = output["Fa"]
+    M21 = output["M2"]
+    assert_tensor_allclose(E1, E2)
+    assert_tensor_allclose(Fa1, Fa2)
+    assert_tensor_allclose(M21, M22)
 
-
-def test_energy_and_forces():
-    pass
+if __name__ == "__main__":
+    test_forward()

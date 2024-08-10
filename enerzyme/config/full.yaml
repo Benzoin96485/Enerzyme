@@ -41,7 +41,7 @@ Modelhub:
         Bohr_in_R: 0.5291772108
         cutoff_fn: polynomial
       layers:
-        - name: RangeSeparation # cutoff_sr in build_params
+        - name: RangeSeparation # cutoff_sr, cutoff_fn in build_params
         - name: ExponentialGaussianRBF
           params: # num_rbf, cutoff_sr, cutoff_fn in build_params
             no_basis_at_infinity: false
@@ -84,8 +84,7 @@ Modelhub:
         - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
           params:
             cutoff_lr: null
-            lr_flavor: simple
-            half_switch: true
+            flavor: PhysNet
         - name: GrimmeD3Energy
           params: # Hartree_in_E, Bohr_in_R in build_params
             learnable: true
@@ -104,14 +103,15 @@ Modelhub:
         Bohr_in_R: 0.5291772108
         activation_fn: swish
       layers:
-        - name: RangeSeparation
+        - name: RangeSeparation # cutoff_sr in build_params
+          params:
+            cutoff_fn: bump
         - name: ExponentialBernsteinRBF
-          params: # num_rbf, cutoff_sr in build_params
+          params: # num_rbf, cutoff_sr, cutoff_fn in build_params
             no_basis_at_infinity: false
             init_alpha: 0.9448630629184640
             exp_weighting: false
             learnable_shape: true
-            cutoff_fn: bump
         - name: NuclearEmbedding
           params: # max_Za, dim_embedding in build_params
             zero_init: true
@@ -161,8 +161,7 @@ Modelhub:
         - name: ZBLRepulsionEnergy # Hartree_in_E, Bohr_in_R in build_params
         - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
           params:
-            lr_flavor: smooth
-            half_switch: false
+            flavor: SpookyNet
         - name: GrimmeD4Energy
           params: # Hartree_in_E, Bohr_in_R, max_Za in build_params
             learnable: true
