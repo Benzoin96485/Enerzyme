@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+from torch import Tensor
 
 #generates a random square orthogonal matrix of dimension dim
 def square_orthogonal_matrix(dim=3):
@@ -33,7 +35,7 @@ def semi_orthogonal_matrix(N, M, seed=None):
 #(stated by eg. "Reducing overfitting in deep networks by decorrelating representations",
 #"Dropout: a simple way to prevent neural networks from overfitting",
 #"Exact solutions to the nonlinear dynamics of learning in deep linear neural networks")
-def semi_orthogonal_glorot_weights(n_in, n_out, scale=2.0):
+def semi_orthogonal_glorot_weights(n_in: int, n_out: int, scale: float=2.0) -> Tensor:
     W = semi_orthogonal_matrix(n_in, n_out)
     W *= np.sqrt(scale / ((n_in + n_out) * W.var())) 
-    return W
+    return torch.tensor(W.T, requires_grad=True)

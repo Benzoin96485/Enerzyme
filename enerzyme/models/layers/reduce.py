@@ -1,10 +1,11 @@
 from typing import Dict
 import torch
-from torch import nn, Tensor
+from torch import Tensor
+from torch.nn import Module
 from ..functional import segment_sum
 
-class EnergyReduceLayer(nn.Module):
-    def __init__(self):
+class EnergyReduceLayer(Module):
+    def __init__(self) -> None:
         super().__init__()
     
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:

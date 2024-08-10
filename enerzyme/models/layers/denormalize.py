@@ -1,4 +1,4 @@
-from typing import Dict, List, Union, Literal
+from typing import Dict, Union, Literal
 import torch
 from torch import nn, Tensor
 from ...data import PERIODIC_TABLE
@@ -39,8 +39,8 @@ class AtomicAffineLayer(nn.Module):
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         for name, shift in self.shifts.items():
-            output[name] += shift.gather(0, output["Za"])
+            output[name] = output[name] + shift.gather(0, output["Za"])
         for name, scale in self.scales.items():
-            output[name] *= scale.gather(0, output["Za"])
+            output[name] = output[name] * scale.gather(0, output["Za"])
         return output
         

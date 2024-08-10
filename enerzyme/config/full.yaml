@@ -16,12 +16,15 @@ Datahub:
   neighbor_list: full
   transforms:
     atomic_energy: "/my/atomic/energy.csv" # path to store atomic_energy
+    global_normalize:
+      shift: null
+      scale: null
 Modelhub:
   internal_FFs:
     FF01:
       suffix:
       architecture: PhysNet
-      active: true
+      active: false
       loss:
         mae:
           Qa: 1
@@ -32,30 +35,34 @@ Modelhub:
       build_params:
         dim_embedding: 128
         num_rbf: 64
-        max_Za: 95
+        max_Za: 94
         cutoff_sr: 10.0
-        drop_out: 0.0
         Hartree_in_E: 1
         Bohr_in_R: 0.5291772108
+        cutoff_fn: polynomial
       layers:
-        - name: Distance
+        - name: RangeSeparation # cutoff_sr, cutoff_fn in build_params
         - name: ExponentialGaussianRBF
-          params: # num_rbf, cutoff_sr in build_params
+          params: # num_rbf, cutoff_sr, cutoff_fn in build_params
             no_basis_at_infinity: false
             init_alpha: 1
             exp_weighting: false
             learnable_shape: true
-            cutoff_fn: polynomial
             init_width_flavor: PhysNet
         - name: RandomAtomEmbedding # dim_embedding, max_Za in build_params
         - name: Core
-          params: # dim_embedding, num_rbf, cutoff_sr in build_params; cutoff_lr as default
+          params: # dim_embedding, num_rbf in build_params
             num_blocks: 5
             num_residual_atomic: 2
             num_residual_interaction: 3
             num_residual_output: 1
             activation_fn: shifted_softplus
-            drop_out: 0.0
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            dropout_rate: 0.0
         - name: AtomicAffine
           params: # max_Za in build_params
             shifts:
@@ -74,15 +81,106 @@ Modelhub:
                 learnable: true
         - name: ChargeConservation
         - name: AtomicCharge2Dipole
-        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params
+        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
+          params:
+            cutoff_lr: null
+            flavor: PhysNet
         - name: GrimmeD3Energy
           params: # Hartree_in_E, Bohr_in_R in build_params
             learnable: true
         - name: EnergyReduce
         - name: Force
     FF02:
+      suffix:
       architecture: SpookyNet
-      active: True
+      active: true
+      loss:
+        mae:
+          Qa: 1
+          Fa: 1
+          E: 1
+      build_params:
+        dim_embedding: 64
+        num_rbf: 16
+        max_Za: 86
+        cutoff_sr: 5.291772105638412
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+        activation_fn: swish
+      layers:
+        - name: RangeSeparation # cutoff_sr in build_params
+          params:
+            cutoff_fn: bump
+        - name: ExponentialBernsteinRBF
+          params: # num_rbf, cutoff_sr, cutoff_fn in build_params
+            no_basis_at_infinity: false
+            init_alpha: 0.9448630629184640
+            exp_weighting: false
+            learnable_shape: true
+        - name: NuclearEmbedding
+          params: # max_Za, dim_embedding in build_params
+            zero_init: true
+            use_electron_config: true
+        - name: ElectronicEmbedding
+          params: # dim_embedding, activation_fn in build_params
+            num_residual: 1
+            attribute: charge
+        - name: ElectronicEmbedding
+          params:
+            num_residual: 1
+            attribute: spin
+        - name: Core
+          params: # dim_embedding, num_rbf, activation_fn in build_params
+            num_modules: 3
+            num_residual_pre: 1
+            num_residual_local_x: 1
+            num_residual_local_s: 1
+            num_residual_local_p: 1
+            num_residual_local_d: 1
+            num_residual_local: 1
+            num_residual_nonlocal_q: 1
+            num_residual_nonlocal_k: 1
+            num_residual_nonlocal_v: 1
+            num_residual_post: 1
+            num_residual_output: 1
+            use_irreps: true
+            dropout_rate: 0.0
+        - name: AtomicAffine
+          params: # max_Za in build_params
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        - name: ZBLRepulsionEnergy # Hartree_in_E, Bohr_in_R in build_params
+        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
+          params:
+            flavor: SpookyNet
+        - name: GrimmeD4Energy
+          params: # Hartree_in_E, Bohr_in_R, max_Za in build_params
+            learnable: true
+        - name: EnergyReduce
+        - name: Force
+    # FF03:
+    #   suffix:
+    #   architecture: NequiP
+    # FF04:
+    #   suffix:
+    #   architecture: TensorNet
+    # FF05:
+    #   suffix:
+    #   architecture: Allegro
 Trainer:
   Splitter:
     method: random

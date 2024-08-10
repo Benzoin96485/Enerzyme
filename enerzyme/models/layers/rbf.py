@@ -1,31 +1,176 @@
 import math
-from typing import Callable, Literal, Dict, Any
-import numpy as np
+from abc import ABC, abstractmethod
+from typing import Literal, Dict, Optional
 import torch
-from torch import nn, Tensor
+from torch import Tensor
+from torch.nn import Parameter
 import torch.nn.functional as F
+from . import BaseFFLayer
 from ..cutoff import CUTOFF_REGISTER
 from ..functional import softplus_inverse
 
 
-class BaseRBF(nn.Module):
+class BaseRBF(BaseFFLayer):
     def __init__(
         self,
-        num_basis_functions: int
-    ):
-        super().__init__()
-        self.num_basis_functions = num_basis_functions
+        num_rbf: int,
+        cutoff_sr: float,
+        cutoff_fn: Literal["polynomial", "bump"]
+    ) -> None:
+        super().__init__(input_fields={"Dij_sr", "cutoff_values_sr"}, output_fields={"rbf"})
+        self.num_rbf = num_rbf
+        self.cutoff_sr = cutoff_sr
+        self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
 
-    def get_rbf(self, Dij: Tensor, cutoff_values: Tensor, **kwargs) -> Tensor:
+    def get_rbf(self, Dij_sr: Tensor, cutoff_values_sr: Optional[Tensor]=None, **kwargs) -> Tensor:
+        if cutoff_values_sr is None:
+            cutoff_values_sr = self.cutoff_fn(Dij_sr, cutoff=self.cutoff_sr)
+        return cutoff_values_sr.view(-1, 1) * self._get_rbf(Dij_sr)
+
+    @abstractmethod
+    def _get_rbf(self, Dij: Tensor) -> Tensor:
         ...
 
-    def forward(self, net_input: Dict[str, Tensor], cutoff_values: Tensor=None, Dij_name: str="Dij") -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output["rbf"] = self.get_rbf(
-            Dij=net_input[Dij_name],
-            cutoff_values=cutoff_values
+
+class GaussianRBFLayer(BaseRBF):
+    """
+    Radial basis functions based on Gaussian functions given by:
+    g_i(x) = exp(-width*(x-center_i)**2)
+    Here, i takes values from 0 to num_basis_functions-1. The centers are chosen
+    to optimally cover the range x = 0...cutoff and the width parameter is
+    selected to give optimal overlap between adjacent Gaussian functions.
+
+    Arguments:
+        num_basis_functions (int):
+            Number of radial basis functions.
+        cutoff (float):
+            Cutoff radius.
+    """
+
+    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: Literal["polynomial", "bump"]="bump") -> None:
+        """ Initializes the GaussianFunctions class. """
+        super().__init__(num_rbf, cutoff_sr, cutoff_fn)
+        self.register_buffer(
+            "center",
+            torch.linspace(0, cutoff_sr, num_rbf, dtype=torch.float64),
         )
-        return output
+        self.register_buffer(
+            "width", torch.tensor(num_rbf / cutoff_sr, dtype=torch.float64)
+        )
+
+    def _get_rbf(self, Dij: Tensor) -> Tensor:
+        """
+        Evaluates radial basis functions given distances and the corresponding
+        values of a cutoff function (must be consistent with cutoff value
+        passed at initialization).
+        N: Number of input values.
+        num_basis_functions: Number of radial basis functions.
+
+        Arguments:
+            Dij (FloatTensor [N]):
+                Input distances.
+
+        Returns:
+            rbf (FloatTensor [N, num_basis_functions]):
+                Values of the radial basis functions for the distances r.
+        """
+        return torch.exp(
+            -self.width * (Dij.view(-1, 1) - self.center) ** 2
+        )
+
+
+class BernsteinRBFLayer(BaseRBF):
+    """
+    Radial basis functions based on Bernstein polynomials given by:
+    b_{v,n}(x) = (n over v) * (x/cutoff)**v * (1-(x/cutoff))**(n-v)
+    (see https://en.wikipedia.org/wiki/Bernstein_polynomial)
+    Here, n = num_basis_functions-1 and v takes values from 0 to n. The basis
+    functions are placed to optimally cover the range x = 0...cutoff.
+
+    Arguments:
+        num_basis_functions (int):
+            Number of radial basis functions.
+        cutoff (float):
+            Cutoff radius.
+    """
+
+    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: Literal["polynomial", "bump"]="bump") -> None:
+        """ Initializes the BernsteinPolynomials class. """
+        super().__init__(num_rbf, cutoff_sr, cutoff_fn)
+        # compute values to initialize buffers
+        from ..special import get_berstein_coefficient
+        v, n, logc = get_berstein_coefficient(self.num_rbf)
+        # register buffers and parameters
+        self.register_buffer("logc", torch.tensor(logc, dtype=torch.float64))
+        self.register_buffer("n", torch.tensor(n, dtype=torch.float64))
+        self.register_buffer("v", torch.tensor(v, dtype=torch.float64))
+
+    def _get_rbf(self, r: Tensor) -> Tensor:
+        """
+        Evaluates radial basis functions given distances and the corresponding
+        values of a cutoff function (must be consistent with cutoff value
+        passed at initialization).
+        N: Number of input values.
+        num_basis_functions: Number of radial basis functions.
+
+        Arguments:
+            Dij (FloatTensor [N]):
+                Input distances.
+
+        Returns:
+            rbf (FloatTensor [N, num_basis_functions]):
+                Values of the radial basis functions for the distances r.
+        """
+        x = r.view(-1, 1) / self.cutoff_sr
+        x = torch.where(x < 1.0, x, 0.5 * torch.ones_like(x))  # prevent nans
+        x = torch.log(x)
+        x = self.logc + self.n * x + self.v * torch.log(-torch.expm1(x))
+        return torch.exp(x)
+
+
+class SincRBFLayer(BaseRBF):
+    """
+    Radial basis functions based on sinc functions given by:
+    g_i(x) = sinc((i+1)*x/cutoff)
+    Here, i takes values from 0 to num_basis_functions-1.
+
+    Arguments:
+        num_basis_functions (int):
+            Number of radial basis functions.
+        cutoff (float):
+            Cutoff radius.
+    """
+
+    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: Literal["polynomial", "bump"]="bump") -> None:
+        """ Initializes the SincFunctions class. """
+        super().__init__(num_rbf, cutoff_sr, cutoff_fn)
+        self.register_buffer(
+            "factor", torch.linspace(1, num_rbf, num_rbf, dtype=torch.float64) / cutoff_sr,
+        )
+        try:
+            from torch import sinc
+        except ImportError:
+            from ..special import sinc
+        self.sinc = sinc
+
+    def _get_rbf(self, Dij: Tensor) -> Tensor:
+        """
+        Evaluates radial basis functions given distances and the corresponding
+        values of a cutoff function (must be consistent with cutoff value
+        passed at initialization).
+        N: Number of input values.
+        num_basis_functions: Number of radial basis functions.
+
+        Arguments:
+            Dij (FloatTensor [N]):
+                Input distances.
+
+        Returns:
+            rbf (FloatTensor [N, num_basis_functions]):
+                Values of the radial basis functions for the distances r.
+        """
+        x = self.factor * Dij.view(-1, 1)
+        return self.sinc(x)
 
 
 class ExponentialRBF(BaseRBF):
@@ -36,7 +181,7 @@ class ExponentialRBF(BaseRBF):
         init_alpha: float=0.9448630629184640,
         exp_weighting: bool=False,
         learnable_shape: bool=True,
-        cutoff: float=float("inf"),
+        cutoff_sr: float=float("inf"),
         cutoff_fn: Literal["polynomial", "bump"]="bump"
     ) -> None:
         '''
@@ -74,23 +219,19 @@ class ExponentialRBF(BaseRBF):
         [3] Nat. Chem. 2020, 12, 891–897.
 
         '''
-        super().__init__(num_rbf)
+        super().__init__(num_rbf, cutoff_sr, cutoff_fn)
         self.exp_weighting = exp_weighting
         self.learnable_shape = learnable_shape
-        self.no_basis_function_at_infinity = no_basis_at_infinity
+        self.no_basis_at_infinity = no_basis_at_infinity
         self.register_parameter(
-            "_alpha", nn.Parameter(softplus_inverse(init_alpha))
+            "alpha", Parameter(softplus_inverse(torch.tensor(init_alpha, dtype=torch.float64)))
         )
-
-        self.cutoff = cutoff
-        self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
     
-
-    def inner_fn(self, alphar: Tensor, expalphar: Tensor) -> Tensor:
+    @abstractmethod
+    def inner_fn(self, alphar: Optional[Tensor]=None, expalphar: Optional[Tensor]=None) -> Tensor:
         ...
 
-
-    def get_rbf(self, Dij: Tensor, cutoff_values: Tensor=None) -> Tensor:
+    def _get_rbf(self, Dij: Tensor) -> Tensor:
         '''
         Evaluate the RBF values
 
@@ -105,11 +246,9 @@ class ExponentialRBF(BaseRBF):
         -----
         rbf: Float tensor of RBFs, shape [M, `num_basis_functions`]
         '''
-        alphar = -F.softplus(self._alpha) * Dij.view(-1, 1)
+        alphar = -F.softplus(self.alpha) * Dij.view(-1, 1)
         expalphar = torch.exp(alphar)
-        if cutoff_values is None:
-            cutoff_values = self.cutoff_fn(Dij, cutoff=self.cutoff)
-        return cutoff_values.view(-1, 1) * torch.exp(self.inner_fn(alphar, expalphar)) * (expalphar if self.exp_weighting else 1)
+        return torch.exp(self.inner_fn(alphar, expalphar)) * (expalphar if self.exp_weighting else 1)
 
 
 class ExponentialGaussianRBFLayer(ExponentialRBF):
@@ -124,7 +263,7 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
         cutoff_fn: Literal["polynomial", "bump"]="polynomial",
         init_width_flavor: Literal["PhysNet", "SpookyNet"]="PhysNet"
     ) -> None:
-        '''
+        r'''
         Radial basis functions based on exponential Gaussian functions given by:
 
         g_i(x) = exp(-width_i*(exp(-alpha*x)-center_i)**2)
@@ -170,29 +309,28 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
             init_alpha=init_alpha,
             exp_weighting=exp_weighting,
             learnable_shape=learnable_shape,
-            cutoff=cutoff_sr,
+            cutoff_sr=cutoff_sr,
             cutoff_fn=cutoff_fn
         )
         if cutoff_sr == float("inf") and no_basis_at_infinity:
             self.register_parameter(
-                "_centers", nn.Parameter(
+                "centers", Parameter(
                     softplus_inverse(torch.linspace(
-                        1, 0, num_rbf + 1
+                        1, 0, num_rbf + 1, dtype=torch.float64
                     )[:-1]), 
                     requires_grad=self.learnable_shape
                 )
             )
         else:
             self.register_parameter(
-                "_centers", nn.Parameter(
+                "centers", Parameter(
                     softplus_inverse(torch.linspace(
-                        1, math.exp(-cutoff_sr), num_rbf
+                        1, math.exp(-cutoff_sr), num_rbf, dtype=torch.float64
                     )), 
                     requires_grad=self.learnable_shape
                 )
             )
         self._init_width(init_width_flavor)
-        self.inner_fn = self.gaussian
 
     def _init_width(self, init_width_flavor: Literal["PhysNet", "SpookyNet"]="PhysNet") -> None:
         '''
@@ -200,83 +338,81 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
         '''
         if init_width_flavor == "SpookyNet":
             self.register_parameter(
-                "_widths", nn.Parameter(
+                "widths", Parameter(
                     softplus_inverse(
-                    1.0 * self.num_basis_functions + \
-                    int(self.no_basis_function_at_infinity))
-                ), 
-                requires_grad=self.learnable_shape
+                        torch.tensor(
+                            1.0 * self.num_rbf + \
+                            int(self.no_basis_at_infinity), dtype=torch.float64
+                        )
+                    ),
+                    requires_grad=self.learnable_shape
+                )
             )
         elif init_width_flavor == "PhysNet":
             self.register_parameter(
-                "_widths", nn.Parameter(
+                "widths", Parameter(
                     softplus_inverse(
-                        [(0.5 / ((-math.expm1(-self.cutoff)) / self.num_basis_functions)) ** 2] * \
-                        self.num_basis_functions
+                        torch.tensor(
+                            [(0.5 / ((-math.expm1(-self.cutoff_sr)) / self.num_rbf)) ** 2] * \
+                            self.num_rbf, dtype=torch.float64
+                        )
                     ),
                     requires_grad=self.learnable_shape
                 )
             )
 
-    def gaussian(self, alphar, expalphar) -> torch.Tensor:
-        return -F.softplus(self._widths) * (expalphar - F.softplus(self._centers)) ** 2
+    def inner_fn(self, alphar: Tensor, expalphar: Tensor) -> torch.Tensor:
+        return -F.softplus(self.widths) * (expalphar - F.softplus(self.centers)) ** 2
 
 
-# class ExponentialBernsteinRBFLayer(ExponentialRBF):
-#     def __init__(
-#         self,
-#         num_basis_functions: int,
-#         dtype: torch.dtype,
-#         no_basis_function_at_infinity: bool=False,
-#         init_alpha: float=0.9448630629184640,
-#         exp_weighting: bool=False,
-#         learnable_shape: bool=True,
-#         cutoff: float=float("inf"),
-#         cutoff_fn: Callable=lambda x, cutoff: smooth_cutoff_function(x, cutoff=cutoff, flavor="poly")
-#     ) -> None:
-#         '''
-#         Radial basis functions based on exponential Bernstein polynomials given by:
-#         b_{v,n}(x) = (n over v) * exp(-alpha*x)**v * (1-exp(-alpha*x))**(n-v)
-#         (see https://en.wikipedia.org/wiki/Bernstein_polynomial)
+class ExponentialBernsteinRBFLayer(ExponentialRBF):
+    def __init__(
+        self,
+        num_rbf: int,
+        no_basis_at_infinity: bool=False,
+        init_alpha: float=0.9448630629184640,
+        exp_weighting: bool=False,
+        learnable_shape: bool=True,
+        cutoff_sr: float=float("inf"),
+        cutoff_fn: Literal["polynomial", "bump"]="bump",
+    ) -> None:
+        '''
+        Radial basis functions based on exponential Bernstein polynomials given by:
+        b_{v,n}(x) = (n over v) * exp(-alpha*x)**v * (1-exp(-alpha*x))**(n-v)
+        (see https://en.wikipedia.org/wiki/Bernstein_polynomial)
 
-#         For n to infinity, linear combination of b_{v,n}s can approximate 
-#         any continuous function on the interval [0, 1] uniformly [1].
+        For n to infinity, linear combination of b_{v,n}s can approximate 
+        any continuous function on the interval [0, 1] uniformly [1].
 
-#         NOTE: There is a problem for x = 0, as log(-expm1(0)) will be log(0) = -inf.
-#         This itself is not an issue, but the buffer v contains an entry 0 and
-#         0*(-inf)=nan. The correct behaviour could be recovered by replacing the nan
-#         with 0.0, but should not be necessary because issues are only present when
-#         r = 0, which will not occur with chemically meaningful inputs.
+        NOTE: There is a problem for x = 0, as log(-expm1(0)) will be log(0) = -inf.
+        This itself is not an issue, but the buffer v contains an entry 0 and
+        0*(-inf)=nan. The correct behaviour could be recovered by replacing the nan
+        with 0.0, but should not be necessary because issues are only present when
+        r = 0, which will not occur with chemically meaningful inputs.
 
-#         References:
-#         -----
-#         [1] Commun. Kharkov Math. Soc. 1912, 13, 1.
-#         '''
-#         super().__init__(
-#             num_basis_functions=num_basis_functions,
-#             dtype=dtype,
-#             no_basis_function_at_infinity=no_basis_function_at_infinity,
-#             init_alpha=init_alpha,
-#             exp_weighting=exp_weighting,
-#             learnable_shape=learnable_shape,
-#             cutoff=cutoff,
-#             cutoff_fn=cutoff_fn
-#         )
-#         self.num_basis_functions += bool(self.no_basis_function_at_infinity)
-#         logfactorial = np.zeros((self.num_basis_functions))
-#         for i in range(2, num_basis_functions):
-#             logfactorial[i] = logfactorial[i - 1] + np.log(i)
-#         v = np.arange(0, num_basis_functions)
-#         n = (num_basis_functions - 1) - v
-#         logbinomial = logfactorial[-1] - logfactorial[v] - logfactorial[n]
-#         if self.no_basis_function_at_infinity:  # remove last basis function at infinity
-#             v = v[:-1]
-#             n = n[:-1]
-#             logbinomial = logbinomial[:-1]
-#         self.register_buffer("logc", torch.tensor(logbinomial, dtype=self.dtype))
-#         self.register_buffer("n", torch.tensor(n, dtype=self.dtype))
-#         self.register_buffer("v", torch.tensor(v, dtype=self.dtype))
-#         self.inner_fn = self.bernstein
+        References:
+        -----
+        [1] Commun. Kharkov Math. Soc. 1912, 13, 1.
+        '''
+        super().__init__(
+            num_rbf=num_rbf,
+            no_basis_at_infinity=no_basis_at_infinity,
+            init_alpha=init_alpha,
+            exp_weighting=exp_weighting,
+            learnable_shape=learnable_shape,
+            cutoff_sr=cutoff_sr,
+            cutoff_fn=cutoff_fn
+        )
+        from ..special import get_berstein_coefficient
+        self.num_rbf += int(no_basis_at_infinity)
+        v, n, logc = get_berstein_coefficient(self.num_rbf)
+        if no_basis_at_infinity:  # remove last basis function at infinity
+            v = v[:-1]
+            n = n[:-1]
+            logc = logc[:-1]
+        self.register_buffer("logc", torch.tensor(logc))
+        self.register_buffer("n", torch.tensor(n))
+        self.register_buffer("v", torch.tensor(v))
 
-#     def bernstein(self, alphar, expalphar) -> torch.Tensor:
-#         return self.logc + self.n * alphar + self.v * torch.log(-torch.expm1(alphar))
+    def inner_fn(self, alphar: Tensor, expalphar: Tensor) -> Tensor:
+        return self.logc + self.n * alphar + self.v * torch.log(-torch.expm1(alphar))

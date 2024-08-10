@@ -1,17 +1,23 @@
-from typing import Dict
-import torch
+from typing import Optional, Dict, Literal
 from torch import Tensor
-from torch import nn
+import torch.nn.functional as F
+from . import BaseFFLayer
+from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
-class DistanceLayer(nn.Module):
+class DistanceLayer(BaseFFLayer):
     '''
     Compute the distance between atoms
     '''
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(input_fields={"Ra", "idx_i", "idx_j", "offsets"}, output_fields={"Dij", "vij"})
+        self._with_vector = False
 
-    def get_distance(self, Ra: Tensor, idx_i: Tensor, idx_j: Tensor, offsets: Tensor=None, **kwargs) -> Tensor:
+    def with_vector_on(self, vij_name: str="vij") -> None:
+        self._with_vector = True
+        self.reset_field_name(vij=vij_name)
+
+    def get_output(self, Ra: Tensor, idx_i: Tensor, idx_j: Tensor, offsets: Optional[Tensor]=None) -> Dict[str, Tensor]:
         '''
         Compute the distance with atom pair indices
 
@@ -29,19 +35,43 @@ class DistanceLayer(nn.Module):
         -----
         Dij: Float tensor of distances, shape [N_pair * batch_size]
         '''
-        Ri = Ra.gather(0, idx_i.view(-1, 1).expand(-1, 3))
-        Rj = Ra.gather(0, idx_j.view(-1, 1).expand(-1, 3))
+        relevant_output = dict()
+        if Ra.device.type == "cpu":  # indexing is faster on CPUs
+            Ri = Ra[idx_i]
+            Rj = Ra[idx_j]
+        else:
+            Ri = Ra.gather(0, idx_i.view(-1, 1).expand(-1, 3))
+            Rj = Ra.gather(0, idx_j.view(-1, 1).expand(-1, 3))
         if offsets is not None:
-            Rj += offsets
-        Dij = torch.sqrt(torch.relu(torch.sum((Ri - Rj) ** 2, -1))) #relu prevents negative numbers in sqrt
-        return Dij
+            Rj_ = Rj + offsets
+        else:
+            Rj_ = Rj
+        relevant_output["Dij"] = F.pairwise_distance(Ri, Rj_, eps=1e-15)
+        if self._with_vector:
+            relevant_output["vij"] = Rj_ - Ri
+        return relevant_output
 
-    def forward(self, net_input: Dict[str, Tensor], idx_i_name: str="idx_i", idx_j_name: str="idx_j", Dij_name: str="Dij", offsets_name: str="offsets") -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output[Dij_name] = self.get_distance(
-            Ra=net_input["Ra"],
-            idx_i=net_input[idx_i_name],
-            idx_j=net_input[idx_j_name],
-            offsets=net_input.get(offsets_name, None)
-        )
-        return output
+
+class RangeSeparationLayer(BaseFFLayer):
+    def __init__(self, cutoff_sr, cutoff_fn: Optional[CUTOFF_KEY_TYPE]=None) -> None:
+        super().__init__()
+        self.cutoff_sr = cutoff_sr
+        if cutoff_fn is not None:
+            self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
+        else:
+            self.cutoff_fn = None
+
+    def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor, vij_lr: Optional[Tensor]=None) -> Dict[
+        Literal["Dij_sr", "idx_i_sr", "idx_j_sr", "vij_sr", "cutoff_values_sr"], Tensor
+    ]:
+        cutmask = Dij_lr < self.cutoff_sr
+        relevant_output = {
+            "Dij_sr": Dij_lr[cutmask],
+            "idx_i_sr": idx_i_lr[cutmask],
+            "idx_j_sr": idx_j_lr[cutmask],
+        }
+        if self.cutoff_fn is not None:
+            relevant_output["cutoff_values_sr"] = self.cutoff_fn(relevant_output["Dij_sr"], self.cutoff_sr)
+        if vij_lr is not None:
+            relevant_output["vij_sr"] = vij_lr[cutmask]
+        return relevant_output

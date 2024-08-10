@@ -4,9 +4,6 @@ import torch.nn as nn
 from .functional import cutoff_function
 from .modules import *
 from typing import Tuple, Optional
-from sklearn.neighbors import BallTree
-import numpy as np
-import pandas as pd
 
 # backwards compatibility with old versions of pytorch
 try:
@@ -113,12 +110,6 @@ class SpookyNet(nn.Module):
             can only handle elements up to Rn (Z=86).
         zero_init (bool): Initialize parameters with zero whenever possible?
     """
-    def __str__(self):
-        return """
-###############################################
-# SpookyNet (Nat. Commun., 2021, 12(1): 7273) #
-###############################################
-"""
 
     def __init__(
         self,
@@ -152,8 +143,6 @@ class SpookyNet(nn.Module):
         load_from=None,
         Zmax=87,
         zero_init=True,
-        dtype="float64",
-        **params
     ) -> None:
         """ Initializes the SpookyNet class. """
         super(SpookyNet, self).__init__()
@@ -227,7 +216,6 @@ class SpookyNet(nn.Module):
         self.compute_d4_atomic = compute_d4_atomic
         self.module_keep_prob = module_keep_prob
         self.Zmax = Zmax
-        self._dtype={"float64": torch.float64, "float32": torch.float32}[dtype]
 
         # for performing module dropout
         if self.module_keep_prob < 0.0 or self.module_keep_prob > 1.0:
@@ -252,49 +240,49 @@ class SpookyNet(nn.Module):
         # embeddings
         self.nuclear_embedding = NuclearEmbedding(
             self.num_features, self.Zmax, zero_init=zero_init
-        ).to(dtype=self.dtype)
+        )
         if self.use_nonlinear_embedding:
             self.charge_embedding = NonlinearElectronicEmbedding(
                 self.num_features, self.num_residual_electron, activation
-            ).to(dtype=self.dtype)
+            )
             self.magmom_embedding = NonlinearElectronicEmbedding(
                 self.num_features, self.num_residual_electron, activation
-            ).to(dtype=self.dtype)
+            )
         else:
             self.charge_embedding = ElectronicEmbedding(
                 self.num_features,
                 self.num_residual_electron,
                 activation,
-                is_charge=True
-            ).to(dtype=self.dtype)
+                is_charge=True,
+            )
             self.magmom_embedding = ElectronicEmbedding(
                 self.num_features,
                 self.num_residual_electron,
                 activation,
-                is_charge=False
-            ).to(dtype=self.dtype)
+                is_charge=False,
+            )
 
         # radial basis functions
         if self.basis_functions == "exp-gaussian":
             self.radial_basis_functions = ExponentialGaussianFunctions(
                 self.num_basis_functions, exp_weighting=self.exp_weighting
-            ).to(dtype=self.dtype)
+            )
         elif self.basis_functions == "exp-bernstein":
             self.radial_basis_functions = ExponentialBernsteinPolynomials(
                 self.num_basis_functions, exp_weighting=self.exp_weighting
-            ).to(dtype=self.dtype)
+            )
         elif self.basis_functions == "gaussian":
             self.radial_basis_functions = GaussianFunctions(
                 self.num_basis_functions, self.cutoff
-            ).to(dtype=self.dtype)
+            )
         elif self.basis_functions == "bernstein":
             self.radial_basis_functions = BernsteinPolynomials(
                 self.num_basis_functions, self.cutoff
-            ).to(dtype=self.dtype)
+            )
         elif self.basis_functions == "sinc":
             self.radial_basis_functions = SincFunctions(
                 self.num_basis_functions, self.cutoff
-            ).to(dtype=self.dtype)
+            )
         else:
             raise ValueError(
                 "Argument 'basis_functions' may only take the "
@@ -320,17 +308,17 @@ class SpookyNet(nn.Module):
                     num_residual_post=self.num_residual_post,
                     num_residual_output=self.num_residual_output,
                     activation=self.activation,
-                ).to(dtype=self.dtype)
+                )
                 for i in range(self.num_modules)
             ]
         )
 
         # output layer (2 outputs for atomic energy and partial charge)
-        self.output = nn.Linear(self.num_features, 2, bias=False).to(dtype=self.dtype)
+        self.output = nn.Linear(self.num_features, 2, bias=False)
 
         # ZBL inspired short-range repulsion
         if use_zbl_repulsion:
-            self.zbl_repulsion_energy = ZBLRepulsionEnergy().to(dtype=self.dtype)
+            self.zbl_repulsion_energy = ZBLRepulsionEnergy()
 
         # point-charge electrostatics
         if use_electrostatics:
@@ -338,11 +326,11 @@ class SpookyNet(nn.Module):
                 cuton=0.25 * self.cutoff,
                 cutoff=0.75 * self.cutoff,
                 lr_cutoff=self.lr_cutoff,
-            ).to(dtype=self.dtype)
+            )
 
         # Grimme's D4 dispersion
         if use_d4_dispersion:
-            self.d4_dispersion_energy = D4DispersionEnergy(cutoff=self.lr_cutoff).to(dtype=self.dtype)
+            self.d4_dispersion_energy = D4DispersionEnergy(cutoff=self.lr_cutoff)
 
         # constants used for calculating angular functions
         self._sqrt2 = math.sqrt(2.0)
@@ -385,9 +373,8 @@ class SpookyNet(nn.Module):
 
     @property
     def dtype(self) -> torch.dtype:
-        return self._dtype
-        # """ Return torch.dtype of parameters (input tensors must match). """
-        # return self.nuclear_embedding.element_embedding.dtype
+        """ Return torch.dtype of parameters (input tensors must match). """
+        return self.nuclear_embedding.element_embedding.dtype
 
     @property
     def device(self) -> torch.device:
@@ -399,14 +386,12 @@ class SpookyNet(nn.Module):
         super(SpookyNet, self).train(mode=mode)
         for name, param in self.named_parameters():
             param.requires_grad = self.requires_grad_dict[name]
-        return self
 
     def eval(self) -> None:
         """ Turn on evaluation mode (smaller memory footprint)."""
         super(SpookyNet, self).eval()
         for name, param in self.named_parameters():
             param.requires_grad = False
-        return self
 
     def build_requires_grad_dict(self) -> None:
         """
@@ -723,7 +708,7 @@ class SpookyNet(nn.Module):
             batch_seg = Z.new_zeros(Z.size(0))
 
         # compute radial functions
-        rbf = self.radial_basis_functions(sr_rij, cutoff_values).type_as(sr_rij)
+        rbf = self.radial_basis_functions(sr_rij, cutoff_values)
 
         # initialize feature vectors
         z = self.nuclear_embedding(Z)
@@ -1159,109 +1144,7 @@ class SpookyNet(nn.Module):
                     hessian[idx] = tmp.view(-1)
         return energy, forces, hessian, f, ea, qa, ea_rep, ea_ele, ea_vdw, pa, c6
 
-    def batch_collate_fn(self, sample):
-        feature, label = zip(*sample)
-        feature, label = pd.concat(feature, axis=1).T, pd.concat(label, axis=1).T
-        batch_input, batch_target = dict(), dict()
-        for k, v in feature.items():
-            if k == "Q":
-                batch_input[k] = torch.tensor(v.to_list(), dtype=self.dtype).reshape(-1)
-            elif k == "Za":
-                batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=torch.long)
-            elif k == "Ra":
-                batch_input[k] = torch.tensor(np.concatenate(v.to_list()), dtype=self.dtype, requires_grad=True)
-        for k, v in label.items():
-            if k in ["Qa", "F"]:
-                batch_target[k] = torch.tensor(np.concatenate(v.to_list()))
-            elif k in ["E", "P"]:
-                batch_target[k] = torch.tensor(np.array(v.to_list()))
-        # batch_target["Q"] = batch_input["Q"]
-        batch_seg = []
-        split_sections = []
-        idx_is = []
-        idx_js = []
-        count = 0
-        # for ii, Za in enumerate(feature["Za"]):
-        #     N = len(Za)
-        #     batch_seg.append(np.ones(N, dtype=int) * ii)
-        #     split_sections.append(N)
-        #     positions = feature["Ra"].iloc[ii].copy()
-        #     tree = BallTree(positions)
-        #     idx_i = []
-        #     idx_j = tree.query_radius(positions, r=self.cutoff)
-        #     for i in range(len(idx_j)):
-        #         idx = idx_j[i]  # all neighbors with self-interaction
-        #         idx = idx[idx != i]  # filter out self-interaction
-        #         idx_i.append(np.full(idx.shape, i, idx.dtype))
-        #         idx_j[i] = idx
-        #     idx_is.append(np.concatenate(idx_i) + count)
-        #     idx_js.append(np.concatenate(idx_j) + count)
-        #     count += N
-        for i, Za in enumerate(feature["Za"]):
-            N = len(Za)
-            batch_seg.append(np.ones(N, dtype=int) * i)
-            indices = np.indices((N, N-1))
-            idx_is.append(indices[0].reshape(-1) + count)
-            idx_js.append(
-                (indices[1] + np.triu(np.ones((N, N-1)))).reshape(-1) + count
-            )
-            count += N
-            split_sections.append(N)
-        batch_input["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
-        batch_input["idx_i"] = torch.tensor(np.concatenate(idx_is), dtype=torch.long)
-        batch_input["idx_j"] = torch.tensor(np.concatenate(idx_js), dtype=torch.long)
-        batch_target["split_sections"] = split_sections
-        batch_target["atom_type"] = label["atom_type"]
-        return batch_input, batch_target
-
-    def batch_output_collate_fn(self, output, target):
-        net_output, net_target = dict(), dict()
-        for k, v in target.items():
-            if k in ["Qa", "F"]:
-                net_output[k] = torch.split(output[k], target["split_sections"])
-                net_target[k] = torch.split(v, target["split_sections"])
-            elif k in ["atom_type"]:
-                net_output[k] = v
-                net_target[k] = v
-            elif k in ["E", "P", "Q"]:
-                net_output[k] = output[k]
-                net_target[k] = v
-        return net_output, net_target
-
-    def forward(self, task, **net_input):
-        Z = net_input["Za"]
-        if net_input.get("batch_seg", None) is None:
-            batch_seg = Z.new_zeros(Z.size(0))
-        else:
-            batch_seg = net_input["batch_seg"]
-        Q = net_input["Q"]
-        S = Q.new_zeros(Q.shape)
-        R = net_input["Ra"]
-        idx_i = net_input["idx_i"]
-        idx_j = net_input["idx_j"]
-        num_batch = batch_seg[-1] + 1
-        (
-            energy, forces, f,
-            ea, qa, ea_rep, ea_ele, ea_vdw,
-            pa, c6
-        ) = self.energy_and_forces(
-            Z=Z, Q=Q, S=S, R=R,
-            idx_i=idx_i, idx_j=idx_j,
-            cell=None, cell_offsets=None,
-            num_batch=num_batch, batch_seg=batch_seg,
-            create_graph=True,
-        )
-        dipole = qa.new_zeros((num_batch, 3)).index_add_(
-            0, batch_seg, qa.view(-1, 1) * R
-        )
-        output = dict()
-        output["E"] = energy
-        output["F"] = forces
-        output["P"] = dipole
-        output["Qa"] = qa
-        return output
-
-    def forward_(
+    def forward(
         self,
         Z: torch.Tensor,
         Q: torch.Tensor,
