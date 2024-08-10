@@ -171,7 +171,7 @@ class SpookyNetCore(BaseFFCore):
         if batch_seg is None:
             num_batch = 1
         else:
-            num_batch = batch_seg[-1]
+            num_batch = batch_seg[-1] + 1
         if num_batch > 1:
             one_hot = F.one_hot(batch_seg).to(
                 dtype=Dij_sr.dtype, device=Dij_sr.device

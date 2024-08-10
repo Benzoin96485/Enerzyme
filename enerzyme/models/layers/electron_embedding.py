@@ -123,8 +123,12 @@ class ElectronicEmbedding(BaseElectronEmbedding):
             batch_seg = torch.zeros(atom_embedding.size(0), dtype=torch.long, device=atom_embedding.device)
         q = self.linear_q(atom_embedding)  # queries
         if self.attribute == "charge":
+            if Q is None:
+                Q = torch.zeros(batch_seg[-1] + 1, dtype=atom_embedding.dtype, device=atom_embedding.device)
             e = F.relu(torch.stack([Q, -Q], dim=-1))
         else:
+            if S is None:
+                S = torch.zeros(batch_seg[-1] + 1, dtype=atom_embedding.dtype, device=atom_embedding.device)
             e = torch.abs(S).unsqueeze(-1)  # +/- spin is the same => abs
         enorm = torch.maximum(e, torch.ones_like(e))
         k = self.linear_k(e / enorm)[batch_seg]  # keys

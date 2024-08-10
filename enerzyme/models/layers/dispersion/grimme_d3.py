@@ -133,7 +133,7 @@ def _getc6(Zi: Tensor, Zj: Tensor, nci: Tensor, ncj: Tensor, c6ab: Tensor=d3_c6a
     ncj_ = ncj.unsqueeze(-1).repeat(1, d3_maxc2)
     c6ab_ = c6ab_.reshape(-1, d3_maxc2, 3)
     r = (c6ab_[:, :, 1] - nci_) ** 2 + (c6ab_[:, :, 2] - ncj_) ** 2
-    weight = softmax(torch.where(c6ab_[:, :, 0] > 0, k3 * r, torch.full_like(c6ab_[:, :, 0], -1e99)), dim=1)
+    weight = softmax(torch.where(c6ab_[:, :, 0] > 0, k3 * r, torch.full_like(c6ab_[:, :, 0], -1e15)), dim=1)
     c6 = torch.sum(weight * c6ab_[:, :, 0], dim=1)
     return c6
 
