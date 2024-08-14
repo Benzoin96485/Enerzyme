@@ -23,7 +23,7 @@ Datahub:
     atomic_energy: "/my/atomic/energy.csv" # path to store atomic_energy. 
     # The summation of atomic reference energies in each frame will be deducted from the total energy
     negative_gradient: true # Flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
-    global_normalize: false # Normalize the total energy globally by substract the mean and divide the standard deviation
+    total_energy_normalization: false # Normalize the total energy globally by substract the mean and divide the standard deviation
 Modelhub:
   internal_FFs: # Force fields built in enerzyme
     FF01: # arbitrary prefix
