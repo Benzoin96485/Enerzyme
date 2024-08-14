@@ -19,8 +19,10 @@ class FFPredict(object):
         config = YamlHandler(model_config_path).read_yaml()
         new_config = YamlHandler(config_path).read_yaml()
         if config_path is not None:
-            config["Datahub"] = new_config["Datahub"]
-            config["Metric"] = new_config["Metric"]
+            for k, v in new_config.Datahub.items():
+                if k not in ["transforms", "neighbor_list"]:
+                    config.Datahub.k = v
+            config.Metric = new_config.Metric
 
         logger.info('Config: {}'.format(config))
         

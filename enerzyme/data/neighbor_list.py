@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def full_neighbor_list(N):
     idx = np.indices((N, N))
     idx_i = np.concatenate(idx[0][:, :N-1])

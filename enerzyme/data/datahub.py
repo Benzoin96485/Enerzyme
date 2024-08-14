@@ -43,7 +43,6 @@ class DataHub:
         data_format=None,
         data_path=None, 
         preload=True,
-        save=True,
         features=None,
         targets=None,
         transforms=None,
@@ -63,7 +62,7 @@ class DataHub:
         datahub_str = data_path + neighbor_list + str(sorted(transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
-        self.transform = Transform(self.transforms)
+        self.transform = Transform(self.transforms, self.preload_path)
         if not self.preload or not self.preload_data():
             self.get_handle("w")
             self._init_data()
@@ -219,7 +218,7 @@ class DataHub:
         datahub_config = Dict({
             "feature": self.feature_types,
             "target": self.target_types,
-            "transform_args": self.transforms,
+            "transforms": self.transforms,
             "neighbor_list": self.neighbor_list_type
         })
         handler.write_yaml(datahub_config)

@@ -1,45 +1,50 @@
 Datahub:
   data_path: "/my/dataset.pkl" # path to dataset: pickle, npz or hdf5
   data_format: pickle # pickle, npz or hdf5
+  # features and targets' key mappings which map standard data field name in enerzyme to the data field name in your dataset
+  # if some your name is exactly the same as the standard name, just leave the mapping value empty
   features:
-    Ra: coord
-    Za: atom_type
-    Q:
-    N: 
+    Ra: coord # Atomic positions, shape [Nframe, Natom, 3] (required)
+    Za: atom_type # Atomic numbers or symbols (will be automatically converted to numbers), shape [Nframe, Natom] (required)
+    Q: # Total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
+    N: # Total atom counts, shape [Nframe] 
+       # If not provided, will be infered from Za
+       # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
   targets:
-    E: energy
-    Fa: grad
-    Qa: chrg
+    E: energy # Total energy, shape [Nframe]
+    Fa: grad # Atomic forces, shape [Nframe, Natom, 3]
+    Qa: chrg # Atomic charges, shape [Nframe, Natom]
     Q:
-    M2: dipole
-  preload: false
-  neighbor_list: full
+    M2: dipole # Total dipole moment, shape [Nframe, 3]
+  preload: false # load the processed data from the dump directory
+  neighbor_list: full # neighbor list building algorithm:
+                      # full: all atom pairs are neighbors
   transforms:
-    atomic_energy: "/my/atomic/energy.csv" # path to store atomic_energy
-    global_normalize:
-      shift: null
-      scale: null
+    atomic_energy: "/my/atomic/energy.csv" # path to store atomic_energy. 
+    # The summation of atomic reference energies in each frame will be deducted from the total energy
+    negative_gradient: true # Flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
+    total_energy_normalization: false # Normalize the total energy globally by substract the mean and divide the standard deviation
 Modelhub:
-  internal_FFs:
-    FF01:
+  internal_FFs: # Force fields built in enerzyme
+    FF01: # arbitrary prefix
       suffix:
-      architecture: PhysNet
-      active: false
+      architecture: PhysNet # Architecture of the core
+      active: false # True if used in current training
       loss:
-        mae:
+        mae: # Mean absolute error, key-value pairs below are targets and weights
           Qa: 1
           Fa: 1
           E: 1
-        nh_penalty: 
+        nh_penalty: # Special loss term for PhysNet architecture
           weight: 0.01
-      build_params:
-        dim_embedding: 128
-        num_rbf: 64
-        max_Za: 94
-        cutoff_sr: 10.0
-        Hartree_in_E: 1
-        Bohr_in_R: 0.5291772108
-        cutoff_fn: polynomial
+      build_params: # Parameters shared by the whole model
+        dim_embedding: 128 # Dimension of atom embeddings
+        num_rbf: 64 # Number of radial basis functions
+        max_Za: 94 # Maximum atomic number
+        cutoff_sr: 10.0 # Short range cutoff distance
+        Hartree_in_E: 1 # Numerical value of one Hartree in the dataset
+        Bohr_in_R: 0.5291772108 # Numerical value of one Bohr in the dataset
+        cutoff_fn: polynomial # Flavor of the cutoff function
       layers:
         - name: RangeSeparation # cutoff_sr, cutoff_fn in build_params
         - name: ExponentialGaussianRBF
