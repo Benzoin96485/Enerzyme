@@ -21,7 +21,7 @@ class YamlHandler:
         self.file_path = file_path
         logger.info('yaml handler load path: {}'.format(self.file_path))
 
-    def read_yaml(self, encoding='utf-8'):
+    def read_yaml(self, encoding: str='utf-8') -> Dict:
         """ read yaml file and convert to easydict
 
         Parameters
