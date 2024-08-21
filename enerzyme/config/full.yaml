@@ -204,6 +204,9 @@ Trainer:
   batch_size: 8
   max_epochs: 1000
   dtype: float32
+  use_ema: true
+  ema_decay: 0.999
+  ema_use_num_updates: true
 Metric:
   Qa:
     rmse: 1
