@@ -194,6 +194,12 @@ Trainer:
     preload: false
     save: true
     seed: 114514
+  Monitor:
+    E_ele:
+      - mean
+      - std
+      - min
+      - max
   seed: 114514
   learning_rate: 0.001
   warmup_ratio: 0.1

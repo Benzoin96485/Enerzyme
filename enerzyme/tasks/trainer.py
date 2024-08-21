@@ -1,6 +1,6 @@
 from typing import Iterable, Optional, Callable
 from collections import defaultdict
-import time, os, logging, weakref, contextlib, copy
+import time, os, logging, contextlib
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -16,6 +16,7 @@ except:
 from transformers.optimization import get_linear_schedule_with_warmup
 import numpy as np
 from .splitter import Splitter
+from .monitor import Monitor
 from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform
 from ..utils import logger
 from .metrics import Metrics
@@ -106,6 +107,10 @@ class Trainer(object):
         self.out_dir = out_dir
         self.metrics = Metrics(metric_config)    
         self.splitter = Splitter(**params["Splitter"])
+        if "Monitor" in params:
+            self.monitor = Monitor(**params["Monitor"])
+        else:
+            self.monitor = None
         self.seed = params.get('seed', 114514)
         self.learning_rate = float(params.get('learning_rate', 1e-3))
         self.batch_size = params.get('batch_size', 8)
@@ -288,6 +293,8 @@ class Trainer(object):
             net_input, net_target = batch
             output = model(net_input)
             # Get model outputs
+            if self.monitor is not None:
+                self.monitor.collect(output)
             loss = 0
             with torch.no_grad():
                 if not load_model:
@@ -305,6 +312,9 @@ class Trainer(object):
                     loss="{:.04f}".format(float(np.sum(val_loss) / (i + 1)))
                 )
             batch_bar.update()
+
+        if self.monitor is not None:
+            self.monitor.summary()
 
         if transform is not None:
             transform.inverse_transform(y_preds)
