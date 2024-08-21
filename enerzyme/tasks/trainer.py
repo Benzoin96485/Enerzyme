@@ -1,12 +1,13 @@
+from typing import Iterable, Optional, Callable
 from collections import defaultdict
-import time
-import os, logging, sys
-from enerzyme.data.datatype import is_target
+import time, os, logging, weakref, contextlib, copy
 from tqdm import tqdm
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from torch.optim import Adam
+from torch.nn import Module
 from torch.nn.utils import clip_grad_norm_
+from torch_ema import ExponentialMovingAverage
 try:
     logging.getLogger('tensorflow').disabled = True
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
@@ -14,9 +15,8 @@ except:
     pass
 from transformers.optimization import get_linear_schedule_with_warmup
 import numpy as np
-import pandas as pd
 from .splitter import Splitter
-from ..data import is_atomic, is_int, is_idx, get_tensor_rank, requires_grad
+from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform
 from ..utils import logger
 from .metrics import Metrics
 
@@ -100,6 +100,7 @@ def _decorate_batch_output(output, features, targets):
 
     return y_pred, (y_truth if y_truth else None)
 
+
 class Trainer(object):
     def __init__(self, out_dir=None, metric_config=None, **params):
         self.out_dir = out_dir
@@ -113,10 +114,13 @@ class Trainer(object):
         self.patience = params.get('patience', 10)
         self.max_norm = params.get('max_norm', 1.0)
         self.cuda = params.get('cuda', False)
-        self.weight_decay = float(params.get('weight_decay', 1e-4))
+        self.weight_decay = float(params.get('weight_decay', 0))
         self.amsgrad = params.get('amsgrad', False)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
         self.data_in_memory = params.get("data_in_memory", False)
+        self.use_ema = params.get("use_ema", True)
+        self.ema_decay = params.get("ema_decay", 0.999)
+        self.ema_use_num_updates = params.get("ema_use_num_updates", True)
         self.dtype = DTYPE_MAPPING[params.get('dtype', "float32")]
 
     def decorate_batch_input(self, batch):
@@ -135,7 +139,7 @@ class Trainer(object):
         torch.cuda.manual_seed_all(seed)
         np.random.seed(seed)
 
-    def fit_predict(self, model, train_dataset, valid_dataset, loss_terms, dump_dir, transform, test_dataset=None):
+    def fit_predict(self, model: Module, train_dataset: Dataset, valid_dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, test_dataset: Optional[Dataset]=None):
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -151,6 +155,8 @@ class Trainer(object):
         num_training_steps = len(train_dataloader) * self.max_epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
         optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay, amsgrad=self.amsgrad)
+        if self.use_ema:
+            ema = ExponentialMovingAverage(model.parameters(), self.ema_decay, self.ema_use_num_updates)
         scheduler = get_linear_schedule_with_warmup(
             optimizer, 
             num_warmup_steps=num_warmup_steps, 
@@ -167,55 +173,58 @@ class Trainer(object):
             trn_loss = []
             
             for i, batch in enumerate(train_dataloader):
-                
                 net_input, net_target = batch
-                optimizer.zero_grad() # Zero gradients
-                # if self.scaler and self.device.type == 'cuda':
-                #     with torch.cuda.amp.autocast():
-                #         outputs = model(task=self.task, **net_input)
-                #         loss = loss_func(outputs, net_target)
-                # else:
+                
                 loss = 0
                 with torch.set_grad_enabled(True):
                     output = model(net_input)
                     for loss_term in loss_terms.values():
                         loss += loss_term(output, net_target)
                 trn_loss.append(float(loss.data))
-                # tqdm lets you add some details so you can monitor training as you train.
+
                 batch_bar.set_postfix(
                     Epoch="Epoch {}/{}".format(epoch+1, self.max_epochs),
                     loss="{:.04f}".format(float(sum(trn_loss) / (i + 1))),
                     lr="{:.04f}".format(float(optimizer.param_groups[0]['lr']))
                 )
-                # if self.scaler and self.device.type == 'cuda':
-                #     self.scaler.scale(loss).backward() # This is a replacement for loss.backward()
-                #     self.scaler.unscale_(optimizer) # unscale the gradients of optimizer's assigned params in-place
-                #     clip_grad_norm_(model.parameters(), self.max_norm)  # Clip the norm of the gradients to max_norm.
-                #     self.scaler.step(optimizer) # This is a replacement for optimizer.step()
-                #     self.scaler.update()
-                # else:
+
+                # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
+                optimizer.zero_grad(set_to_none=True)
                 loss.backward()
-                clip_grad_norm_(model.parameters(), self.max_norm)
+
+                if self.max_norm > 0:
+                    clip_grad_norm_(model.parameters(), self.max_norm)
+
                 optimizer.step()
+
+                if self.use_ema:
+                    ema.update()
+                
                 scheduler.step()
                 batch_bar.update()
 
             batch_bar.close()
             total_trn_loss = np.mean(trn_loss)
-            y_preds, val_loss, metric_score = self.predict(
-                model=model, 
-                dataset=valid_dataset, 
-                loss_terms=loss_terms, 
-                dump_dir=dump_dir, 
-                transform=transform, 
-                epoch=epoch, 
-                load_model=False,
-            )
-            end_time = time.time()
-            total_val_loss = np.mean(val_loss)
-            _score = metric_score["_judge_score"]
-            _metric = str(self.metrics)
-            is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, total_val_loss, min_val_loss, metric_score, max_score, model, dump_dir, self.patience, epoch)
+            if self.use_ema:
+                cm = ema.average_parameters()
+            else:
+                cm = contextlib.nullcontext()
+            with cm:
+                y_preds, val_loss, metric_score = self.predict(
+                    model=model, 
+                    dataset=valid_dataset, 
+                    loss_terms=loss_terms, 
+                    dump_dir=dump_dir, 
+                    transform=transform, 
+                    epoch=epoch, 
+                    load_model=False,
+                )
+                end_time = time.time()
+                total_val_loss = np.mean(val_loss)
+                _score = metric_score["_judge_score"]
+                _metric = str(self.metrics)
+                is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, min_val_loss, metric_score, max_score, model, dump_dir, self.patience, epoch)
+            
             message = f'Epoch [{epoch+1}/{self.max_epochs}] train_loss: {total_trn_loss:.4f}, ' + \
                 f'val_loss: {total_val_loss:.4f}, ' + \
                 ", ".join([f'val_{k}: {v:.4f}' for k, v in metric_score.items() if k != "_judge_score"]) + \
@@ -226,18 +235,19 @@ class Trainer(object):
             if is_early_stop:
                 break
         
-        y_preds, _, _ = self.predict(
-            model=model, 
-            dataset=test_dataset, 
-            loss_terms=loss_terms, 
-            dump_dir=dump_dir,  
-            transform=transform, 
-            epoch=epoch, 
-            load_model=True
-        )
+        if test_dataset is not None:
+            y_preds, _, _ = self.predict(
+                model=model, 
+                dataset=test_dataset, 
+                loss_terms=loss_terms, 
+                dump_dir=dump_dir,  
+                transform=transform, 
+                epoch=epoch, 
+                load_model=True
+            )
         return y_preds
     
-    def _early_stop_choice(self, wait, loss, min_loss, metric_score, max_score, model, dump_dir, patience, epoch):
+    def _early_stop_choice(self, wait, min_loss, metric_score, max_score, model, dump_dir, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, max_score, model, dump_dir, patience, epoch)
     
     # def _judge_early_stop_loss(self, wait, loss, min_loss, model, dump_dir, fold, patience, epoch):
