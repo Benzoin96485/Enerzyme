@@ -9,7 +9,7 @@ class MSELoss:
     def __call__(self, output, target):
         loss = 0
         for k, v in self.weights.items():
-            loss += self.mseloss(output[k], target[k]) * v
+            loss = loss + self.mseloss(output[k], target[k]) * v
         return loss
 
 
@@ -21,5 +21,5 @@ class MAELoss:
     def __call__(self, output, target):
         loss = 0
         for k, v in self.weights.items():
-            loss += self.maeloss(output[k], target[k]) * v
+            loss = loss + self.maeloss(output[k], target[k]) * v
         return loss
