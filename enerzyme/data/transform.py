@@ -56,12 +56,14 @@ class NegativeGradientTransform:
         self.transform_type = "scale"
 
     def transform(self, new_input):
-        for i in range(len(new_input["Fa"])):
-            new_input["Fa"][i] = -new_input["Fa"][i]
+        if "Fa" in new_input:
+            for i in range(len(new_input["Fa"])):
+                new_input["Fa"][i] = -new_input["Fa"][i]
     
     def inverse_transform(self, new_output):
-        for i in range(len(new_output["Fa"])):
-            new_output["Fa"][i] = -new_output["Fa"][i]
+        if "Fa" in new_output:
+            for i in range(len(new_output["Fa"])):
+                new_output["Fa"][i] = -new_output["Fa"][i]
 
 
 class TotalEnergyNormalization:

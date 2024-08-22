@@ -1,6 +1,4 @@
 import os
-import joblib
-import argparse
 import pandas as pd
 from .utils import YamlHandler, logger
 from .data import DataHub
@@ -21,7 +19,7 @@ class FFPredict(object):
         if config_path is not None:
             for k, v in new_config.Datahub.items():
                 if k not in ["transforms", "neighbor_list"]:
-                    config.Datahub.k = v
+                    config.Datahub[k] = v
             config.Metric = new_config.Metric
 
         logger.info('Config: {}'.format(config))
@@ -66,16 +64,13 @@ class FFPredict(object):
             y_pred, metric_score = ff.evaluate()
             
             for k, v in self.datahub.targets.items():
-                if k in self.datahub.feature_types:
-                    result[f"predict_{k}"] = y_pred[k]
-            for k, v in self.datahub.features.items():
-                if k not in ["target", "target_scaler"]:
-                    result[k] = v
+                result[f"predict_{k}"] = y_pred[k]
+                result[k] = v
             os.makedirs(self.output_dir, exist_ok=True)
-
+            pd.DataFrame({k: [vi for vi in v] for k, v in result.items()}).to_pickle(os.path.join(self.datahub.preload_path, f"{ff_name}-prediction.pkl"))
             metrics.append(metric_score)
         metrics_df = pd.concat(metrics)
-        metrics_df.to_csv(os.path.join(self.output_dir, f'metric.csv'))
+        metrics_df.to_csv(os.path.join(self.output_dir, 'metric.csv'))
         logger.info(f"final predict metrics score: \n{metrics_df.T}")
         logger.info("pipeline finish!")
 
