@@ -127,7 +127,6 @@ class Attention(Module):
         K = self._phi(K, False, num_batch, batch_seg)  # random projection of K
         if num_batch > 1:
             d = Q.shape[-1]
-            n = batch_seg.shape[0]
 
             # compute norm
             idx = batch_seg.unsqueeze(-1).expand(-1, d)

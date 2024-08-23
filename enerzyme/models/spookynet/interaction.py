@@ -66,14 +66,14 @@ class LocalInteraction(Module):
         self.radial_s = Linear(num_rbf, dim_embedding, bias=False)
         self.radial_p = Linear(num_rbf, dim_embedding, bias=False)
         self.radial_d = Linear(num_rbf, dim_embedding, bias=False)
-        self.resblock_x = ResidualMLP(dim_embedding, num_residual_x, activation_fn)
-        self.resblock_s = ResidualMLP(dim_embedding, num_residual_s, activation_fn)
-        self.resblock_p = ResidualMLP(dim_embedding, num_residual_p, activation_fn)
-        self.resblock_d = ResidualMLP(dim_embedding, num_residual_d, activation_fn)
+        self.resblock_x = ResidualMLP(dim_embedding, num_residual_x, activation_fn, zero_init=False)
+        self.resblock_s = ResidualMLP(dim_embedding, num_residual_s, activation_fn, zero_init=False)
+        self.resblock_p = ResidualMLP(dim_embedding, num_residual_p, activation_fn, zero_init=False)
+        self.resblock_d = ResidualMLP(dim_embedding, num_residual_d, activation_fn, zero_init=False)
         self.projection_p = Linear(dim_embedding, 2 * dim_embedding, bias=False)
         self.projection_d = Linear(dim_embedding, 2 * dim_embedding, bias=False)
         self.resblock = ResidualMLP(
-            dim_embedding, num_residual, activation_fn, zero_init=True
+            dim_embedding, num_residual, activation_fn, zero_init=False
         )
         self.reset_parameters()
 
