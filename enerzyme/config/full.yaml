@@ -1,0 +1,222 @@
+Datahub:
+  data_path: "/my/dataset.pkl" # path to dataset: pickle, npz or hdf5
+  data_format: pickle # pickle, npz or hdf5
+  # features and targets' key mappings which map standard data field name in enerzyme to the data field name in your dataset
+  # if some your name is exactly the same as the standard name, just leave the mapping value empty
+  features:
+    Ra: coord # Atomic positions, shape [Nframe, Natom, 3] (required)
+    Za: atom_type # Atomic numbers or symbols (will be automatically converted to numbers), shape [Nframe, Natom] (required)
+    Q: # Total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
+    N: # Total atom counts, shape [Nframe] 
+       # If not provided, will be infered from Za
+       # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
+  targets:
+    E: energy # Total energy, shape [Nframe]
+    Fa: grad # Atomic forces, shape [Nframe, Natom, 3]
+    Qa: chrg # Atomic charges, shape [Nframe, Natom]
+    Q:
+    M2: dipole # Total dipole moment, shape [Nframe, 3]
+  preload: false # load the processed data from the dump directory
+  neighbor_list: full # neighbor list building algorithm:
+                      # full: all atom pairs are neighbors
+  transforms:
+    atomic_energy: "/my/atomic/energy.csv" # path to store atomic_energy. 
+    # The summation of atomic reference energies in each frame will be deducted from the total energy
+    negative_gradient: true # Flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
+    total_energy_normalization: false # Normalize the total energy globally by substract the mean and divide the standard deviation
+Modelhub:
+  internal_FFs: # Force fields built in enerzyme
+    FF01: # arbitrary prefix
+      suffix:
+      architecture: PhysNet # Architecture of the core
+      active: false # True if used in current training
+      loss:
+        mae: # Mean absolute error, key-value pairs below are targets and weights
+          Qa: 1
+          Fa: 1
+          E: 1
+        nh_penalty: # Special loss term for PhysNet architecture
+          weight: 0.01
+      build_params: # Parameters shared by the whole model
+        dim_embedding: 128 # Dimension of atom embeddings
+        num_rbf: 64 # Number of radial basis functions
+        max_Za: 94 # Maximum atomic number
+        cutoff_sr: 10.0 # Short range cutoff distance
+        Hartree_in_E: 1 # Numerical value of one Hartree in the dataset
+        Bohr_in_R: 0.5291772108 # Numerical value of one Bohr in the dataset
+        cutoff_fn: polynomial # Flavor of the cutoff function
+      layers:
+        - name: RangeSeparation # cutoff_sr, cutoff_fn in build_params
+        - name: ExponentialGaussianRBF
+          params: # num_rbf, cutoff_sr, cutoff_fn in build_params
+            no_basis_at_infinity: false
+            init_alpha: 1
+            exp_weighting: false
+            learnable_shape: true
+            init_width_flavor: PhysNet
+        - name: RandomAtomEmbedding # dim_embedding, max_Za in build_params
+        - name: Core
+          params: # dim_embedding, num_rbf in build_params
+            num_blocks: 5
+            num_residual_atomic: 2
+            num_residual_interaction: 3
+            num_residual_output: 1
+            activation_fn: shifted_softplus
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            dropout_rate: 0.0
+        - name: AtomicAffine
+          params: # max_Za in build_params
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
+          params:
+            cutoff_lr: null
+            flavor: PhysNet
+        # - name: GrimmeD3Energy
+        #   params: # Hartree_in_E, Bohr_in_R in build_params
+        #     learnable: true
+        - name: EnergyReduce
+        - name: Force
+    FF02:
+      suffix:
+      architecture: SpookyNet
+      active: true
+      loss:
+        mae:
+          Qa: 1
+          Fa: 1
+          E: 1
+      build_params:
+        dim_embedding: 64
+        num_rbf: 16
+        max_Za: 86
+        cutoff_sr: 5.291772105638412
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+        activation_fn: swish
+      layers:
+        - name: RangeSeparation # cutoff_sr in build_params
+          params:
+            cutoff_fn: bump
+        - name: ExponentialBernsteinRBF
+          params: # num_rbf, cutoff_sr, cutoff_fn in build_params
+            no_basis_at_infinity: false
+            init_alpha: 0.9448630629184640
+            exp_weighting: false
+            learnable_shape: true
+        - name: NuclearEmbedding
+          params: # max_Za, dim_embedding in build_params
+            zero_init: false
+            use_electron_config: true
+        - name: ElectronicEmbedding
+          params: # dim_embedding, activation_fn in build_params
+            num_residual: 1
+            attribute: charge
+        - name: ElectronicEmbedding
+          params:
+            num_residual: 1
+            attribute: spin
+        - name: Core
+          params: # dim_embedding, num_rbf, activation_fn in build_params
+            num_modules: 3
+            num_residual_pre: 1
+            num_residual_local_x: 1
+            num_residual_local_s: 1
+            num_residual_local_p: 1
+            num_residual_local_d: 1
+            num_residual_local: 1
+            num_residual_nonlocal_q: 1
+            num_residual_nonlocal_k: 1
+            num_residual_nonlocal_v: 1
+            num_residual_post: 1
+            num_residual_output: 1
+            use_irreps: true
+            dropout_rate: 0.0
+        - name: AtomicAffine
+          params: # max_Za in build_params
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        # - name: ZBLRepulsionEnergy # Hartree_in_E, Bohr_in_R in build_params
+        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
+          params:
+            flavor: SpookyNet
+        # - name: GrimmeD4Energy
+        #   params: # Hartree_in_E, Bohr_in_R, max_Za in build_params
+        #     learnable: true
+        - name: EnergyReduce
+        - name: Force
+    # FF03:
+    #   suffix:
+    #   architecture: NequiP
+    # FF04:
+    #   suffix:
+    #   architecture: TensorNet
+    # FF05:
+    #   suffix:
+    #   architecture: Allegro
+Trainer:
+  Splitter:
+    method: random
+    parts: ["training", "validation", "test"]
+    ratios: [0.7, 0.1, 0.2]
+    preload: false
+    save: true
+    seed: 114514
+  Monitor:
+    E_ele:
+      - mean
+      - std
+      - min
+      - max
+  seed: 114514
+  learning_rate: 0.001
+  warmup_ratio: 0.1
+  patience: 50
+  max_norm: 1.0
+  cuda: true
+  weight_decay: 1e-4
+  batch_size: 8
+  max_epochs: 1000
+  dtype: float32
+  use_ema: true
+  ema_decay: 0.999
+  ema_use_num_updates: true
+Metric:
+  Qa:
+    rmse: 1
+  Fa:
+    rmse: 1
+  E:
+    rmse: 1

@@ -1,1 +1,1 @@
-from .spookynet import SpookyNet
+from .core import SpookyNetCore, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
