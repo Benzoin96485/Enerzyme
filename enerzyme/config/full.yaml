@@ -90,9 +90,9 @@ Modelhub:
           params:
             cutoff_lr: null
             flavor: PhysNet
-        - name: GrimmeD3Energy
-          params: # Hartree_in_E, Bohr_in_R in build_params
-            learnable: true
+        # - name: GrimmeD3Energy
+        #   params: # Hartree_in_E, Bohr_in_R in build_params
+        #     learnable: true
         - name: EnergyReduce
         - name: Force
     FF02:
@@ -124,7 +124,7 @@ Modelhub:
             learnable_shape: true
         - name: NuclearEmbedding
           params: # max_Za, dim_embedding in build_params
-            zero_init: true
+            zero_init: false
             use_electron_config: true
         - name: ElectronicEmbedding
           params: # dim_embedding, activation_fn in build_params
@@ -168,13 +168,13 @@ Modelhub:
                 learnable: true
         - name: ChargeConservation
         - name: AtomicCharge2Dipole
-        - name: ZBLRepulsionEnergy # Hartree_in_E, Bohr_in_R in build_params
+        # - name: ZBLRepulsionEnergy # Hartree_in_E, Bohr_in_R in build_params
         - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
           params:
             flavor: SpookyNet
-        - name: GrimmeD4Energy
-          params: # Hartree_in_E, Bohr_in_R, max_Za in build_params
-            learnable: true
+        # - name: GrimmeD4Energy
+        #   params: # Hartree_in_E, Bohr_in_R, max_Za in build_params
+        #     learnable: true
         - name: EnergyReduce
         - name: Force
     # FF03:

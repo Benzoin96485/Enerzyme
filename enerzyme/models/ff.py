@@ -9,17 +9,13 @@ from torch.nn import Module
 from torch.utils.data import Dataset
 from ..data import DataHub
 from ..tasks import Trainer
-from .loss import MAELoss, MSELoss
+from .loss import LOSS_REGISTER
 from ..utils import logger
 from . import layers as Layers
 
 
 SEP = "-"
 FF_REGISTER = {}
-LOSS_REGISTER = {
-    "mae": MAELoss,
-    "mse": MSELoss
-}
 
 
 def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, List]:

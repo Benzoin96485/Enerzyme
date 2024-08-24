@@ -133,7 +133,7 @@ class ResidualStack(NeuronLayer):
         dropout_rate: float=0,
         use_bias: bool=True
     ) -> None:
-        super().__init__(dim_feature, dim_feature, activation_fn, activation_params)
+        super().__init__(dim_feature, dim_feature)
         self.num_residual = num_residual
         self.stack = Sequential(*(ResidualLayer(
             dim_feature, dim_feature,
