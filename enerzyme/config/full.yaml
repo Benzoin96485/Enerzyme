@@ -34,8 +34,10 @@ Modelhub:
       loss:
         mae:                                # mean absolute error, key-value pairs below are targets and weights
           Qa: 1
-          Fa: 1
+          Fa: 52.917721
           E: 1
+          M2: 1.8897261
+          Q: 1
         nh_penalty:                         # special loss term for PhysNet architecture
           weight: 0.01
       build_params:                         # parameters shared by the whole model
@@ -105,8 +107,9 @@ Modelhub:
       loss:
         mae:
           Qa: 1
-          Fa: 1
+          Fa: 91.656181
           E: 1
+          M2: 3.2731016
       build_params:
         dim_embedding: 64
         num_rbf: 16
@@ -202,13 +205,13 @@ Trainer:
       - max
   seed: 114514
   learning_rate: 0.001
-  warmup_ratio: 0.1
-  patience: 50
+  warmup_ratio: 0.001
+  patience: 200
   max_norm: 1.0
   cuda: true
-  weight_decay: 1e-4
+  weight_decay: 0
   batch_size: 8
-  max_epochs: 1000
+  max_epochs: 10000
   dtype: float32
   use_ema: true
   ema_decay: 0.999
