@@ -1,0 +1,22 @@
+Datahub:                       # Datahub configurations in the training configuration file will be overriden
+                               # expect the neighbor list and transforms to make sure consistency
+  data_path: "/my/dataset.pkl" # dataset containing the features
+  data_format: pickle
+  features:
+    Ra: coord                               
+    Za: atom_type                           
+    Q:                                      
+    N:                                      
+  preload: true
+  targets:                     # model predicts the targets and store them in a pickle with this field name mapping
+    E: energy                               
+    Fa: grad                                
+    Qa: chrg                                
+    Q:
+    M2: dipole                              
+Metric:                        # Metric used for this prediction
+                               # Metric configurations in the training configuration file will be overriden
+  Qa:
+    rmse: 1
+  E:
+    rmse: 1
