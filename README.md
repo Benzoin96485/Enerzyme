@@ -1,5 +1,9 @@
 # Enerzyme
-Next generation machine learning force field on enzymatic catalysis
+Towards next generation machine learning force field on enzymatic catalysis.
+
+Current model architectures:
+- PhysNet: [J. Chem. Theory Comput. 2019, 15, 3678−3693](https://pubs.acs.org/doi/full/10.1021/acs.jctc.9b00181)
+- SpookyNet: [Nat. Commun. 2021, 12(1), 7273](https://www.nature.com/articles/s41467-021-27504-0)
 
 # Usage
 ## Installation
@@ -8,26 +12,34 @@ pip install -e .
 ```
 
 ## Training
+
+Energy (force) / Atomic / Charge Dipole moment fitting.
+
 ```bash
-python main.py -c config.yaml -o output_dir
+enerzyme train -c <configuration yaml file> -o <output directory>
 ```
-Charge / Energy (force) / Dipole moment fitting are all supported now. The config.yaml template is currently at `mlff/config/q_default.yaml` for charge fitting and `mlff/config/qe_default.yaml`for charge and energy fitting.
+Please see `enerzyme/config/train.yaml` for details and recommended configurations.
 
-The dataset in `data_path` should be a python pickle file containing a list of each frame's dictionary like
-```python
-{
-    "chrg": [...] # np.ndarray of shape (N,): atomic charges in e
-    "energy": ... # float: energy in Ha
-    "grad": [...] # np.ndarray of shape (N,3): energy gradient in Ha/Angstrom
-    "coord": [] # np.ndarray of shape (N,3): coordinates
-    "atom_type": [] # list of length N: atom types (element symbols in upper case)
-    "dipole": [] # np.ndarray of shape (3,): dipole in e·Angstrom
-}
+Enerzyme saves the preprocessed dataset, split indices, final `<configuration yaml file>`, and the best model to the `<output directory>`.
+
+## Evaluation
+
+Energy (force) / Atomic / Charge Dipole moment prediction.
+
+```bash
+enerzyme predict -c <configuration yaml file> -o <output directory> -m <model directory>
 ```
 
-# Test
-The `test_physnet.py` tests if the behavior of our torch implementation of PhysNet is the same as the [official tensorflow repo](https://github.com/MMunibas/PhysNet?tab=readme-ov-file) and the [paper](https://pubs.acs.org/doi/full/10.1021/acs.jctc.9b00181). 
+Please see `enerzyme/config/predict.yaml` for details.
+
+Enerzyme reads the `<model directory>` for the model configuration, load the models, predict the results from all active models, save the predicted values as a pickle in the corresponding model subfolders, and report the results as a csv file in the `<output directory>`.
+
+## Simulation
+
+Scanning on the distance between two atoms is supported.
+
+```bash
+enerzyme simulate -c <configuration yaml file> -o <output directory> -m <model directory>
 ```
-cd test
-pytest -v
-```
+
+Enerzyme reads the `<model directory>` for the model configuration, load the models, do simulation, and report the results in the `<output directory>`.
