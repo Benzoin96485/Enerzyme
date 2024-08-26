@@ -1,5 +1,6 @@
-import numpy as np
 import os
+from typing import Dict
+import numpy as np
 import torch
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from ..data import is_atomic, get_tensor_rank
@@ -16,13 +17,24 @@ def rmse(label, prediction, target_name=None):
     return score
 
 
+def mae(label, prediction, target_name=None):
+    y_true = label[target_name]
+    y_pred = prediction[target_name]
+    if is_atomic(target_name) or get_tensor_rank(target_name):
+        score = mean_absolute_error(np.concatenate(y_true), np.concatenate(y_pred), squared=False)
+    else:
+        score = mean_absolute_error(y_true, y_pred, squared=False)
+    return score
+
+
 METRICS_REGISTER = {
-    "rmse": rmse
+    "rmse": rmse,
+    "mae": mae
 }
 
 
 class Metrics(object):
-    def __init__(self, metric_config=None):
+    def __init__(self, metric_config: Dict=dict()) -> None:
         self.metric_config = dict()
         for target, metrics in metric_config.items():
             for metric, weight in metrics.items():
@@ -36,10 +48,10 @@ class Metrics(object):
             elif weight is not None and weight != 0:
                 terms.append(f"{weight:.2f} * {target_metric}")
         return " + ".join(terms)
-       
+
     def cal_single_metric(self, label, prediction, target_name, metric_name):
         return METRICS_REGISTER[metric_name](label, prediction, target_name)
-    
+
     def cal_judge_score(self, raw_metric_score):
         judge_score = 0
         for target_metric, weight in self.metric_config.items():
