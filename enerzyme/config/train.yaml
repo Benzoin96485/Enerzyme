@@ -40,9 +40,10 @@ Modelhub:
           Q: 1
         nh_penalty:                         # special loss term for PhysNet architecture
           weight: 0.01
-      Metric:
-        Qa:
-          rmse: 1
+      Metric:                               # metric defined for this model
+        Qa:                                 # metric term
+          rmse: 1                           # key-value pair of metric type (rmse/mae) and weight
+                                            # weighted summation of metric is the 'judge_score' for earlystopping
         Fa:
           rmse: 52.917721
         E:
@@ -205,34 +206,46 @@ Modelhub:
         - name: Force
 Trainer:
   Splitter:
-    method: random
-    parts:
+    method: random                          # splitting method: random
+    parts:                                  # partition names, at least training and validation are needed
       - training
       - validation
       - test
-    ratios:
-      - 0.7
-      - 0.1
+    ratios:                                 # partition ratio (float in (0,1)) or the number of datapoints (int)
+                                            # order corresponds to the parts' order
+      - 0.7                                  
+      - 0.1                                  
       - 0.2
-    preload: false
-    save: true
-    seed: 114514
-  Monitor:
-    E_ele:
-      - mean
-      - std
-      - min
-      - max
-  seed: 114514
-  learning_rate: 0.001
-  warmup_ratio: 0.001
-  patience: 200
-  max_norm: -1
-  cuda: true
-  weight_decay: 0
-  batch_size: 8
-  max_epochs: 10000
-  dtype: float32
-  use_ema: true
-  ema_decay: 0.999
-  ema_use_num_updates: true
+    preload: false                          # if saved splitting indices are loaded
+    save: true                              # if splitting indices are saved
+    seed: 114514                            # splitting random seed
+  Monitor:                                  # monitor prints statistics of energy terms in the total energy
+                                            # optional
+    E_ele:                                  # energy term name: 
+                                              # E_ele for ElectrostaticEnergy layer
+                                              # E_disp for GrimmeD3Energy or GrimmeD4Energy layer
+                                              # E_zbl for ZBLRepulsionEnergy layer
+                                            # four statistics are supported:
+      - mean                                # mean value
+      - std                                 # standard deviation
+      - min                                 # minimum value
+      - max                                 # maximum value
+  seed: 114514                              # trainer random seed: dataloader shuffling, pytorch random initialization, etc.
+  learning_rate: 0.001                      # learning rate, scientific notations like 1e-3 are supported, default 0.001
+  warmup_ratio: 0.001                       # ratio of warmup epochs in total epochs, default 0.01
+                                            # where the learning rate increases linearly from 0 to the set value
+  patience: 200                             # patience of earlystopping, default 50
+                                            # training stops when the number of epochs that 'judge score' doesn't decreases reach the patience
+  max_norm: -1                              # gradient clipping threshold of the norm, default -1 (negative value means no clipping)
+  cuda: true                                # if cuda is searched and used if possible
+  weight_decay: 0                           # weight decay rate of the Adam optimizer, default 0
+  batch_size: 8                             # batch size of the dataloader, default 8
+  max_epochs: 10000                         # maximum epochs of training if earlystopping isn't triggered, default 1000
+  dtype: float32                            # pytorch data type throughout the computation: float32 (single) / float64 (double), default float32
+  use_ema: true                             # if exponential moving average is used, default true
+  ema_decay: 0.999                          # decay rate of exponential moving average, default 0.999
+  ema_use_num_updates: true                 # if number of updates is used in exponential moving average, default true
+  data_in_memory: false                     # if whole datasets are loaded into memory, default false
+  amsgrad: true                             # if amsgrad is used in Adam optimizer, default true
+Metric:                                     # metrics can be defined here as default metrics
+                                            # if a metric configuration is defined under a specific model, it has precedence
