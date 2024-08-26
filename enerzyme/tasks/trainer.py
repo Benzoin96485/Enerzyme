@@ -102,10 +102,12 @@ def _decorate_batch_output(output, features, targets):
     return y_pred, (y_truth if y_truth else None)
 
 
-class Trainer(object):
-    def __init__(self, out_dir=None, metric_config=None, **params):
+class Trainer:
+    def __init__(self, out_dir: str=None, metric_config: Metrics=dict(), **params) -> None:
+        self.config = params
         self.out_dir = out_dir
-        self.metrics = Metrics(metric_config)    
+        self.metric_config = metric_config
+        self.metrics = Metrics(metric_config)
         self.splitter = Splitter(**params["Splitter"])
         if "Monitor" in params:
             self.monitor = Monitor(**params["Monitor"])
@@ -115,13 +117,18 @@ class Trainer(object):
         self.learning_rate = float(params.get('learning_rate', 1e-3))
         self.batch_size = params.get('batch_size', 8)
         self.max_epochs = params.get('max_epochs', 1000)
-        self.warmup_ratio = params.get('warmup_ratio', 0.1)
-        self.patience = params.get('patience', 10)
+        self.warmup_ratio = params.get('warmup_ratio', 0.01)
+        self.patience = params.get('patience', 50)
         self.max_norm = params.get('max_norm', 1.0)
         self.cuda = params.get('cuda', False)
         self.weight_decay = float(params.get('weight_decay', 0))
-        self.amsgrad = params.get('amsgrad', False)
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
+        self.amsgrad = params.get('amsgrad', True)
+        if torch.cuda.is_available():
+            logger.info("GPU found!")
+            self.device = torch.device("cuda:0" if self.cuda else "cpu")
+        else:
+            logger.info("GPU not found, turn to CPU!")
+            self.device = torch.device("cpu")
         self.data_in_memory = params.get("data_in_memory", False)
         self.use_ema = params.get("use_ema", True)
         self.ema_decay = params.get("ema_decay", 0.999)

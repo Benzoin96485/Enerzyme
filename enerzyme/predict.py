@@ -21,6 +21,9 @@ class FFPredict(object):
                 if k not in ["transforms", "neighbor_list"]:
                     config.Datahub[k] = v
             config.Metric = new_config.Metric
+            for ff in config.Modelhub.internal_FFs.values():
+                if "Metric" in ff:
+                    ff["Metric"] = new_config.Metric
 
         logger.info('Config: {}'.format(config))
         
@@ -73,25 +76,3 @@ class FFPredict(object):
         metrics_df.to_csv(os.path.join(self.output_dir, 'metric.csv'))
         logger.info(f"final predict metrics score: \n{metrics_df.T}")
         logger.info("pipeline finish!")
-
-    # def update_config(self, config, **params):
-    #     for key, value in params.items():
-    #         config[key] = value
-    #     return config
-
-
-# def get_parser():
-#     # Before creating the true parser, we need to import optional user module
-#     # in order to eagerly import custom tasks, optimizers, architectures, etc.
-#     parser = argparse.ArgumentParser()
-
-#     # fmt: off
-#     parser.add_argument('--data_path', type=str, help='test data path')
-#     parser.add_argument('--model_dir', type=str,
-#                     help='the output directory for saving artifact')
-#     parser.add_argument('--save_dir', type=str,
-#                 help='the output directory for saving artifact')    
-#     parser.add_argument('--metric_str', nargs="+", type=str,
-#                 help='the metric names separated by commas')    
-#     args = parser.parse_args()
-#     return args
