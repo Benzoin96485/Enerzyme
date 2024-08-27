@@ -1,7 +1,7 @@
-from typing import Optional, Literal
+from typing import Optional
 import torch
 from torch import Tensor
-from torch.nn import Module, Parameter, init
+from torch.nn import Parameter, init
 import torch.nn.functional as F
 from . import BaseFFLayer
 from ..functional import softplus_inverse, segment_sum

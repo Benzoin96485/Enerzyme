@@ -1,8 +1,6 @@
-import yaml
 import os
 from addict import Dict
-import logging
-
+import yaml
 from .base_logger import logger
 
 

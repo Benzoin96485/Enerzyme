@@ -1,13 +1,13 @@
-import os
-import math
+import os, math
+from typing import Optional
 import torch
 from torch import Tensor
-from torch.nn import Module, Parameter
+from torch.nn import Parameter
 import torch.nn.functional as F
 from .. import BaseFFLayer
 from ...functional import softplus_inverse, segment_sum
 from ...cutoff import smooth_transition
-from typing import Dict, Literal, Optional
+
 
 """
 computes D4 dispersion energy

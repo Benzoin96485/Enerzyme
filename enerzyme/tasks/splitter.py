@@ -1,7 +1,6 @@
 import os
 from hashlib import md5
 from addict import Dict
-from sklearn.model_selection import KFold
 import sklearn as skl
 import numpy as np
 from ..utils import logger, YamlHandler

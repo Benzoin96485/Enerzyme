@@ -1,8 +1,7 @@
-import ase
-import torch
 import os.path as osp
 import numpy as np
-import pandas as pd
+import ase
+import torch
 from ase.constraints import FixAtoms, FixBondLengths
 from ase.calculators.calculator import Calculator, all_changes
 from ase.optimize import BFGS

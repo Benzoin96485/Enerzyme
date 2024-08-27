@@ -1,9 +1,9 @@
 import os
-from typing import Dict, Optional
+from typing import Optional
 import numpy as np
 import torch
 from torch import Tensor
-from torch.nn import Module, Parameter
+from torch.nn import Parameter
 from torch.nn.functional import softmax
 from .. import BaseFFLayer
 from ...cutoff import polynomial_transition

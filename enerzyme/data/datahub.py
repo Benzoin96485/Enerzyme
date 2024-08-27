@@ -1,9 +1,8 @@
-import pickle
-import os
-import h5py
-import numpy as np
+import pickle, os
 from hashlib import md5
 from typing import Union, List, Dict
+import h5py
+import numpy as np
 from addict import Dict
 from tqdm import tqdm
 from .datatype import is_atomic, is_rounded

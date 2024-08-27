@@ -1,9 +1,10 @@
+import math
+from typing import Optional
 import torch
 from torch.nn import Module
 import torch.nn.functional as F
-import math
 import numpy as np
-from typing import Optional
+
 
 
 class Attention(Module):
