@@ -1,7 +1,7 @@
 import os
 import pathlib
 import joblib
-from typing import Dict
+from typing import Dict, Iterable, Union, List
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -15,7 +15,7 @@ PERIODIC_TABLE_PATH = os.path.join(
 PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="atom_type")
 
 
-def parse_Za(atom_types):
+def parse_Za(atom_types: Iterable[Union[str, int]]) -> Union[np.ndarray, List[int]]:
     if isinstance(atom_types[0], int):
         return np.array(atom_types)
     elif isinstance(atom_types[0], str):
@@ -28,17 +28,19 @@ def parse_Za(atom_types):
         return Zas
 
 
-def load_atomic_energy(atomic_energy_path):
+def load_atomic_energy(atomic_energy_path: str) -> pd.DataFrame:
     if os.path.exists(atomic_energy_path):
         atomic_energies = pd.read_csv(atomic_energy_path)
         atomic_energies["Za"] = parse_Za(atomic_energies["atom_type"])
-        return atomic_energies.set_index("Za")
+        atomic_energies.set_index("Za", inplace=True)
+        atomic_energies.loc[0] = {"atom_type": "", "atomic_energy": 0}
+        return atomic_energies
     else:
         raise FileNotFoundError(f"Atomic energy file {atomic_energy_path} not found!")
 
 
 class AtomicEnergyTransform:
-    def __init__(self, atomic_energy_path, *args, **kwargs):
+    def __init__(self, atomic_energy_path: str, *args, **kwargs) -> None:
         self.atomic_energies = load_atomic_energy(atomic_energy_path)
         self.transform_type = "shift"
 

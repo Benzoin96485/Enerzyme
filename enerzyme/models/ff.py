@@ -133,35 +133,33 @@ class FF:
         split = self.splitter.split(X, preload_path=self.datahub.preload_path)
         tr_idx = split["training"]
         vl_idx = split["validation"]
-        te_idx = split["test"]
-        train_dataset = FFDataset(X, y, tr_idx, self.trainer.data_in_memory)
-        valid_dataset = FFDataset(X, y, vl_idx, True)
-        if len(te_idx) > 0:
+        if "test" in split and len(split["test"]) > 0:
+            te_idx = split["test"]
             test_dataset = FFDataset(X, y, te_idx, True)
             y_test = test_dataset.targets
             y_test["Za"] = test_dataset.features["Za"]
-        try:
-            y_pred = self.trainer.fit_predict(
-                model=self.model, 
-                train_dataset=train_dataset, 
-                valid_dataset=valid_dataset, 
-                test_dataset=test_dataset,
-                loss_terms=self.loss_terms, 
-                transform=self.datahub.transform,
-                dump_dir=self.dump_dir
-            )
-        except RuntimeError as e:
-            logger.info("FF {0} failed...".format(self.model_str))
-            self.is_success = False
-            raise e
-        self.datahub.transform.inverse_transform(y_test)
-        self.dump(y_pred, self.dump_dir, 'test.data')
-        metric_score = self.metrics.cal_metric(y_test, y_pred)
-        self.dump(metric_score, self.dump_dir, 'metric.result')
-        logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
+        else:
+            test_dataset = None
+        train_dataset = FFDataset(X, y, tr_idx, self.trainer.data_in_memory)
+        valid_dataset = FFDataset(X, y, vl_idx, True)
+        y_pred = self.trainer.fit_predict(
+            model=self.model, 
+            train_dataset=train_dataset, 
+            valid_dataset=valid_dataset, 
+            test_dataset=test_dataset,
+            loss_terms=self.loss_terms, 
+            transform=self.datahub.transform,
+            dump_dir=self.dump_dir
+        )
         logger.info("{} FF done!".format(self.model_str))
-        logger.info("Metric result saved!")
         logger.info("{} Model saved!".format(self.model_str))
+        if test_dataset is not None:
+            self.datahub.transform.inverse_transform(y_test)
+            self.dump(y_pred, self.dump_dir, 'test.data')
+            metric_score = self.metrics.cal_metric(y_test, y_pred)
+            self.dump(metric_score, self.dump_dir, 'metric.result')
+            logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
+            logger.info("Metric result saved!")
 
     def evaluate(self):
         logger.info("start evaluate FF:{}".format(self.model_str))
