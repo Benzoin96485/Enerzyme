@@ -21,7 +21,7 @@ Datahub:
   neighbor_list: full                       # neighbor list building algorithm:
                                             # full: all atom pairs are neighbors
   transforms:
-    atomic_energy: "/my/atomic/energy.csv"  # path to store atomic_energy. 
+    atomic_energy: "/my/atomic/energy.csv"  # path to store atomic_energy with columns atom_type and atomic_energy
                                             # summation of atomic reference energies in each frame will be deducted from the total energy
     negative_gradient: true                 # flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
     total_energy_normalization: false       # normalize the total energy globally by substract the mean and divide the standard deviation
@@ -116,6 +116,7 @@ Modelhub:
       suffix:
       architecture: SpookyNet
       active: true
+      pretrain_path: /pretrained/model      # Path to the folder containing a pretrained pth ("model_best.pth") or to the pth itself
       loss:
         mae:
           Qa: 1

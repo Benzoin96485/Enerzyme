@@ -2,14 +2,16 @@ from setuptools import setup, find_packages
 
 setup(
     name='enerzyme',
-    version='0.0.1',
-    install_requires=['ase', 'joblib', 'addict'],
+    version='0.1.1',
+    install_requires=['numpy', 'h5py', 'tqdm', 'ase', 'joblib', 'addict', 
+                      'pandas', 'pytorch', 'scikit-learn', 'transformers',
+                      'transformers', 'torch-ema', 'pyyaml'],
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
     packages=find_packages(include=["enerzyme", "enerzyme.*"]),
     package_data={"enerzyme": [
         "data/periodic-table.csv", 
-        "models/physnet/tables/*.npy", 
-        "models/spookynet/modules/d4data/*.pth"
+        "models/layers/dispersion/grimme_d3_tables/*.npy", 
+        "models/layers/dispersion/grimme_d4_tables/*.pth"
     ]},
     auth='Benzoin96485',
     author_email='luowl7@mit.edu',

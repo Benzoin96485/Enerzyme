@@ -1,7 +1,7 @@
+from typing import Dict, List
 import torch
 from torch import Tensor
 from torch.nn import Module, Sequential
-from typing import Dict, List
 from .interaction import InteractionBlock, OutputBlock
 from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE

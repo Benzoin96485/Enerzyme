@@ -1,6 +1,6 @@
 import os
 import torch
-from .models import SEP, FF_REGISTER, get_model_str, build_model
+from .models import FF_REGISTER, get_model_str, build_model
 from .tasks import Simulation
 from .utils import YamlHandler, logger
 from .data import Transform

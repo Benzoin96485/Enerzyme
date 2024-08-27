@@ -1,8 +1,8 @@
-import pickle
-import os
+import pickle, os
+from hashlib import md5
+from typing import Union, List, Dict
 import h5py
 import numpy as np
-from hashlib import md5
 from addict import Dict
 from tqdm import tqdm
 from .datatype import is_atomic, is_rounded
@@ -23,11 +23,11 @@ def load_from_pickle(data_path=str):
         raise TypeError(f"Unknown data type in {data_path}!")
 
 
-def _collect_types(types: dict):
+def _collect_types(types: Union[List, Dict]) -> Dict:
     if isinstance(types, list):
         return {single_type: single_type for single_type in types}
     else:
-        return types
+        return {k: v if v is not None else k for k, v in types.items()}
 
 
 def array_padding(data, max_N, pad_value=0):
@@ -125,16 +125,16 @@ class DataHub:
                     sum(self.data[k + "a"][i][:self.data["N"][i]]) for i in range(self.n_datapoint)
                 ])
 
-    def _load_atomic_data(self, k, raw_data):
+    def _load_atomic_data(self, k: str, raw_data: Dict) -> None:
         if k in self.data:
             return
         values = raw_data[self.data_types[k]]
         if len(values) == self.n_datapoint:
-            self.data.create_dataset(k, data=[values[i] for i in range(self.n_datapoint)])
+            self.data.create_dataset(k, data=array_padding([values[i] for i in range(self.n_datapoint)], self.max_N))
         else:
             raise IndexError(f"Length of {k} ({self.data_types[k]}) should be n_datapoint")
 
-    def _init_data(self):
+    def _init_data(self) -> None:
         if not os.path.isfile(self.data_path):
             raise ValueError(f"Data path {self.data_path} doesn't exist.")
         suffix = self.data_path.split(".")[-1]
@@ -163,13 +163,15 @@ class DataHub:
             else:
                 self._load_molecular_data("N", raw_data)
                 self.data.create_dataset("Za", data=[Zas[i] for i in range(n_datapoint)])
+            self.max_N = max(self.data["N"])
         elif n_Za == n_datapoint:
             Zas = parse_Za(raw_data[self.data_types["Za"]])
             if self.data_types["N"] not in raw_data.keys():
                 self.data.create_dataset("N", data=[len(Za) for Za in Zas])
             else:
                 self._load_molecular_data("N", raw_data)
-            self.data.create_dataset("Za", data=Zas)
+            self.max_N = max(self.data["N"])
+            self.data.create_dataset("Za", data=array_padding(Zas, self.max_N))
         else:
             raise IndexError(f"Length of 'Za' should be n_datapoint or 1")
         

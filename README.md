@@ -7,13 +7,33 @@ Current model architectures:
 
 # Usage
 ## Installation
+
+Recommended environment
+```
+python==3.10.12
+pip==23.2.1
+setuptools==68.1.2
+h5py==3.9.0
+numpy==1.24.3
+addict==2.4.0
+tqdm==4.66.1
+joblib==1.3.2
+pandas==2.1.0
+pytorch==2.0.1
+scikit-learn==1.3.0
+ase==3.22.1
+transformers==4.33.1
+torch-ema==0.3
+pyyaml==6.0.1
+```
+
 ```bash
 pip install -e .
 ```
 
 ## Training
 
-Energy (force) / Atomic / Charge Dipole moment fitting.
+Energy (force) / Atomic Charge / Dipole moment fitting.
 
 ```bash
 enerzyme train -c <configuration yaml file> -o <output directory>
@@ -24,7 +44,7 @@ Enerzyme saves the preprocessed dataset, split indices, final `<configuration ya
 
 ## Evaluation
 
-Energy (force) / Atomic / Charge Dipole moment prediction.
+Energy (force) / Atomic Charge / Dipole moment prediction.
 
 ```bash
 enerzyme predict -c <configuration yaml file> -o <output directory> -m <model directory>

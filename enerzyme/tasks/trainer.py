@@ -1,8 +1,9 @@
-from typing import Iterable, Optional, Callable
+from typing import Iterable, Optional, Callable, Tuple, Dict
 from collections import defaultdict
 import time, os, logging, contextlib
 from tqdm import tqdm
 import torch
+from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torch.optim import Adam
 from torch.nn import Module
@@ -31,7 +32,7 @@ DTYPE_MAPPING = {
 }
 
 
-def _decorate_batch_input(batch, dtype, device):
+def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
     features, targets = zip(*batch)
     batch_features = dict()
     batch_targets = dict()
@@ -67,7 +68,7 @@ def _decorate_batch_input(batch, dtype, device):
         for k in targets[0]:
             if is_atomic(k): 
                 batch_targets[k] = torch.tensor(
-                    np.concatenate([target[k][:feature["N"]] for target in targets]), 
+                    np.concatenate([target[k][:features[i]["N"]] for i, target in enumerate(targets)]), 
                     dtype=torch.long if is_int(k) else dtype
                 ).to(device)
             else:
