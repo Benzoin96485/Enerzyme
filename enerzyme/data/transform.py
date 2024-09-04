@@ -100,7 +100,7 @@ class TotalEnergyNormalization:
 
 
 class Transform:
-    def __init__(self, transform_args: Dict, preload_path: Optional[str]=None) -> None:
+    def __init__(self, transform_args: Dict, preload_path: Optional[str]=None, simulation_mode: bool=False) -> None:
         self.backup_keys = set()
         self.shifts = []
         self.scales = []
@@ -109,7 +109,7 @@ class Transform:
             if k == "atomic_energy":
                 self.shifts.append(AtomicEnergyTransform(v))
                 self.backup_keys.add("E")
-            if k == "negative_gradient" and v:
+            if k == "negative_gradient" and v and (not simulation_mode):
                 self.scales.append(NegativeGradientTransform())
                 self.backup_keys.add("Fa")
             if k == "total_energy_normalization" and v:
