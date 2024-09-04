@@ -1,5 +1,5 @@
 import os, pathlib
-from typing import Dict, Iterable, Union, List
+from typing import Dict, Iterable, Union, List, Optional
 import joblib
 import pandas as pd
 import numpy as np
@@ -100,7 +100,7 @@ class TotalEnergyNormalization:
 
 
 class Transform:
-    def __init__(self, transform_args: Dict, preload_path: str) -> None:
+    def __init__(self, transform_args: Dict, preload_path: Optional[str]=None) -> None:
         self.backup_keys = set()
         self.shifts = []
         self.scales = []
