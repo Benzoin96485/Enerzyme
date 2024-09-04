@@ -1,6 +1,6 @@
 import os
 from inspect import signature
-from typing import Dict, Tuple, List, Any, Callable, Literal, Optional
+from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable
 import joblib
 import torch
 import pandas as pd
@@ -195,17 +195,17 @@ class FF:
     
 
 class FFDataset(Dataset):
-    def __init__(self, features, targets, indices=None, data_in_memory=True) -> None:
+    def __init__(self, features: Dict[str, Iterable], targets: Dict[str, Iterable], indices: Optional[Iterable[int]]=None, data_in_memory: bool=True) -> None:
         self.data_in_memory = data_in_memory
         self.indices = indices if indices is not None else np.arange(0, len(features["Za"]))
         if data_in_memory:
-            self.features = {k: np.array([v[idx] for idx in self.indices]) for k, v in features.items()}
-            self.targets = {k: np.array([v[idx] for idx in self.indices]) for k, v in targets.items()}
+            self.features = {k: np.array([v[0 if len(v) == 1 else idx] for idx in self.indices]) for k, v in features.items()}
+            self.targets = {k: np.array([v[0 if len(v) == 1 else idx] for idx in self.indices]) for k, v in targets.items()}
             self._getitem = lambda idx: ({k: v[idx] for k, v in self.features.items()}, {k: v[idx] for k, v in self.targets.items()})
         else:
             self.features = features
             self.targets = targets
-            self._getitem = lambda idx: ({k: v[self.indices[idx]] for k, v in self.features.items()}, {k: v[self.indices[idx]] for k, v in self.targets.items()})
+            self._getitem = lambda idx: ({k: v[0 if len(v) == 1 else self.indices[idx]] for k, v in self.features.items()}, {k: v[0 if len(v) == 1 else self.indices[idx]] for k, v in self.targets.items()})
 
     def __len__(self) -> int:
         return len(self.indices)

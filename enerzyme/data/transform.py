@@ -45,11 +45,11 @@ class AtomicEnergyTransform:
 
     def transform(self, new_input):
         for i in range(len(new_input["E"])):
-            new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][i]]["atomic_energy"])
+            new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][i % len(new_input["Za"])]]["atomic_energy"])
     
     def inverse_transform(self, new_output):
         for i in range(len(new_output["E"])):
-            new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][i]]["atomic_energy"])
+            new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][i % len(new_output["Za"])]]["atomic_energy"])
     
 
 class NegativeGradientTransform:

@@ -1,11 +1,11 @@
 import pickle, os
 from hashlib import md5
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Optional, Iterable
 import h5py
 import numpy as np
 from addict import Dict
 from tqdm import tqdm
-from .datatype import is_atomic, is_rounded
+from .datatype import is_atomic, is_rounded, is_int
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
 
@@ -40,14 +40,15 @@ def array_padding(data, max_N, pad_value=0):
 class DataHub:
     def __init__(self,  
         dump_dir=".",
-        data_format=None,
-        data_path=None, 
-        preload=True,
-        features=None,
-        targets=None,
-        transforms=None,
-        neighbor_list=None,
-        hash_length=16,
+        data_format: Optional[str]=None,
+        data_path: str="", 
+        preload: bool=True,
+        features: Dict[str, str]=dict(),
+        targets: Dict[str, str]=dict(),
+        transforms: Optional[Dict[str, Union[str, bool]]]=None,
+        neighbor_list: Optional[str]=None,
+        hash_length: int=16,
+        compressed: bool=True,
         **params
     ):
         self.data_path = os.path.abspath(data_path)
@@ -58,7 +59,9 @@ class DataHub:
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
+        self.neighbor_list_on_the_fly = False
         self.transforms = transforms
+        self.compressed = compressed
         datahub_str = data_path + neighbor_list + str(sorted(transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
@@ -78,9 +81,9 @@ class DataHub:
             if k == "N":
                 continue
             elif is_atomic(k):
-                self._load_atomic_data(k, loaded_data, preload=True)
+                self._load_atomic_data(k, loaded_data)
             else:
-                self._load_molecular_data(k, loaded_data, preload=True)
+                self._load_molecular_data(k, loaded_data)
         loaded_file.close()
 
     def preload_data(self): 
@@ -100,37 +103,58 @@ class DataHub:
                 logger.info(f"Data matched and preloaded from {self.preload_path}")
                 return True
         return False
+    
+    def _expand(self, k: str, values: Iterable) -> np.ndarray:
+        if isinstance(values, int) or isinstance(values, float):
+            if is_int(k) and self.compressed:
+                return np.array([values])
+            else:
+                logger.info(f"Values of {k} (data type {self.data_types[k]}) are single and repeated")
+                return np.full(values, self.n_datapoint)
+        else:
+            if is_int(k) and self.compressed:
+                return values
+            else:
+                logger.info(f"Values of {k} (data type {self.data_types[k]}) are single and repeated")
+                return np.repeat(values, self.n_datapoint, axis=0)
+    
+    def _compress(self, k: str, values: Iterable) -> np.ndarray:
+        # only works for equal length data
+        value_array = np.array(values)
+        if is_int(k) and self.compressed and (value_array == value_array[0]).all():
+            logger.info(f"Values of {k} (data type {self.data_types[k]}) are all the same and compressed into a single value")
+            return value_array[:1]
+        else:
+            return value_array
 
-    def _load_molecular_data(self, k, raw_data):
+    def _load_molecular_data(self, k: str, raw_data: Dict) -> None:
         if self.data_types[k] in raw_data.keys():
             values = raw_data[self.data_types[k]]
-            if isinstance(values, int) or isinstance(values, float):
-                self.data.create_dataset(k, data=np.full(values, self.n_datapoint))
+            if isinstance(values, int) or isinstance(values, float) or len(values) == 1:
+                self.data.create_dataset(k, data=self._expand(k, values))
+            elif len(values) == self.n_datapoint:
+                self.data.create_dataset(k, data=self._compress(k, values))
             else:
-                n_feature = len(values)
-                if n_feature == 1:
-                    self.data.create_dataset(k, data=np.full(values[0], self.n_datapoint))
-                elif n_feature == self.n_datapoint:
-                    self.data.create_dataset(k, data=values)
-                else:
-                    raise IndexError(f"Length of '{k}' should be n_datapoint or 1")
+                raise IndexError(f"Length of '{k}' should be n_datapoint or 1")
         elif self.data_types[k + "a"] in raw_data.keys():
             self._load_atomic_data(k + "a", raw_data)
+            # reduce atomic property into molecular property, mainly for Qa into Q
             if is_rounded(k):
-                self.data.create_dataset(k, data=[
-                    round(sum(self.data[k + "a"][i][:self.data["N"][i]])) for i in range(self.n_datapoint)
-                ])
+                values = [round(sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]])) for i in range(self.n_datapoint)]            
             else:
-                self.data.create_dataset(k, data=[
-                    sum(self.data[k + "a"][i][:self.data["N"][i]]) for i in range(self.n_datapoint)
-                ])
+                values = [sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]]) for i in range(self.n_datapoint)]
+            # don't compress summation of atomic property
+            self.data.create_dataset(k, data=np.array(values))
 
     def _load_atomic_data(self, k: str, raw_data: Dict) -> None:
         if k in self.data:
             return
         values = raw_data[self.data_types[k]]
         if len(values) == self.n_datapoint:
-            self.data.create_dataset(k, data=array_padding([values[i] for i in range(self.n_datapoint)], self.max_N))
+            values = array_padding([values[i] for i in range(self.n_datapoint)], self.max_N)
+            self.data.create_dataset(k, data=self._compress(k, values))
+        elif len(values) == 1:
+            self.data.create_dataset(k, data=self._expand(k, values))
         else:
             raise IndexError(f"Length of {k} ({self.data_types[k]}) should be n_datapoint")
 
@@ -148,30 +172,33 @@ class DataHub:
             raise ValueError(f"Data format of {self.data_path} is unknown")
 
         if "Ra" not in self.data_types:
+            # atomic position must be provided
             raise KeyError(f"Dataset must contain 'Ra' key (Atomic positions)")
+        # number of datapoints is defined as number of different configurations
         n_datapoint = len(raw_data[self.data_types["Ra"]])
         self.n_datapoint = n_datapoint
 
         if "Za" not in self.data_types:
+            # atomic number/type must be provided
             raise KeyError(f"Dataset must contain 'Za' key (Atomic numbers)")
+        
         n_Za = len(raw_data[self.data_types["Za"]])
+        Zas = parse_Za(raw_data[self.data_types["Za"]])
         if n_Za == 1:
-            Za = parse_Za(raw_data[self.data_types["Za"]])
             if self.data_types["N"] not in raw_data.keys():
-                self.data.create_dataset("N", data=np.full(n_datapoint, len(Za)))
-                self.data.create_dataset("Za", data=np.full(n_datapoint, Za[0]))
+                # atom count determined by length of atomic numbers
+                self.data.create_dataset("N", data=self._expand("N", len(Zas)))
             else:
                 self._load_molecular_data("N", raw_data)
-                self.data.create_dataset("Za", data=[Zas[i] for i in range(n_datapoint)])
+            self.data.create_dataset("Za", data=self._expand("Za", Zas))
             self.max_N = max(self.data["N"])
         elif n_Za == n_datapoint:
-            Zas = parse_Za(raw_data[self.data_types["Za"]])
             if self.data_types["N"] not in raw_data.keys():
-                self.data.create_dataset("N", data=[len(Za) for Za in Zas])
+                self.data.create_dataset("N", data=self._compress("N", [len(Za) for Za in Zas]))
             else:
                 self._load_molecular_data("N", raw_data)
             self.max_N = max(self.data["N"])
-            self.data.create_dataset("Za", data=array_padding(Zas, self.max_N))
+            self.data.create_dataset("Za", data=self._compress("Za", array_padding(Zas, self.max_N)))
         else:
             raise IndexError(f"Length of 'Za' should be n_datapoint or 1")
         
@@ -186,20 +213,28 @@ class DataHub:
         if not (self.data_format == "pickle" or suffix == "pkl" or suffix == "pickle"):
             raw_data.close()
 
-    def _init_neighbor_list(self):
+    def _init_neighbor_list(self) -> None:
         if self.neighbor_list_type == "full":
             from .neighbor_list import full_neighbor_list
-            max_N = max(self.data["N"])
-            max_N_pairs = max_N * (max_N - 1)
-            self.data.create_dataset("idx_i", shape=(self.n_datapoint, max_N_pairs), dtype=int)
-            self.data.create_dataset("idx_j", shape=(self.n_datapoint, max_N_pairs), dtype=int)
-            self.data.create_dataset("N_pair", shape=self.n_datapoint, dtype=int)
             logger.info("producing neighbor list")
-            for i in tqdm(range(self.n_datapoint)):
-                idx_i, idx_j = full_neighbor_list(self.data["N"][i])
-                self.data["N_pair"][i] = len(idx_i)
-                self.data["idx_i"][i] = array_padding([idx_i], max_N_pairs, pad_value=-1)
-                self.data["idx_j"][i] = array_padding([idx_j], max_N_pairs, pad_value=-1)
+            if self.compressed and len(self.data["N"]) == 1:
+                idx_i, idx_j = full_neighbor_list(self.data["N"][0])
+                self.data.create_dataset("idx_i", data=[idx_i])
+                self.data.create_dataset("idx_j", data=[idx_j])
+                self.data.create_dataset("N_pair", data=[len(idx_i)])
+            else:
+                max_N_pairs = self.max_N * (self.max_N - 1)
+                self.data.create_dataset("idx_i", shape=(self.n_datapoint, max_N_pairs), dtype=int)
+                self.data.create_dataset("idx_j", shape=(self.n_datapoint, max_N_pairs), dtype=int)
+                self.data.create_dataset("N_pair", shape=self.n_datapoint, dtype=int)
+                for i in tqdm(range(self.n_datapoint)):
+                    idx_i, idx_j = full_neighbor_list(self.data["N"][i])
+                    self.data["N_pair"][i] = len(idx_i)
+                    self.data["idx_i"][i] = array_padding([idx_i], max_N_pairs, pad_value=-1)
+                    self.data["idx_j"][i] = array_padding([idx_j], max_N_pairs, pad_value=-1)
+        elif self.neighbor_list_type == "on_the_fly":
+            # calculate neighbor list on the fly
+            self.neighbor_list_on_the_fly = True
         else:
             raise NotImplementedError
 
