@@ -5,6 +5,7 @@ import h5py
 import numpy as np
 from addict import Dict
 from tqdm import tqdm
+from torch.utils.data import Dataset, Subset
 from .datatype import is_atomic, is_rounded, is_int
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
@@ -37,6 +38,33 @@ def array_padding(data, max_N, pad_value=0):
     return np.array(data)
 
 
+class FieldDataset(Dataset):
+    def __init__(self, data: Dict[str, Iterable]) -> None:
+        self.data = data
+        self.compressed_keys = set()
+        for k, v in self.data.items():
+            if len(v) == 1:
+                self.compressed_keys.add(k)
+
+    def __getitem__(self, k) -> Iterable:
+        return self.data[k]
+
+    def __setitem__(self, k, v) -> None:
+        self.data[k] = v
+    
+    def loc(self, idx) -> Dict[str, Iterable]:
+        return {k: v[0 if k in self.compressed_keys else idx] for k, v in self.data.items()}
+
+    def load_subset(self, indices):
+        data = dict()
+        for k, v in self.data.items():
+            if k in self.compressed_keys:
+                data[k] = np.array(v)
+            else:
+                data[k] = np.array([v[idx] for idx in indices])
+        return FieldDataset(data)
+
+
 class DataHub:
     def __init__(self,  
         dump_dir=".",
@@ -59,7 +87,6 @@ class DataHub:
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
-        self.neighbor_list_on_the_fly = False
         self.transforms = transforms
         self.compressed = compressed
         datahub_str = data_path + neighbor_list + str(sorted(transforms.items()))
@@ -232,11 +259,6 @@ class DataHub:
                     self.data["N_pair"][i] = len(idx_i)
                     self.data["idx_i"][i] = array_padding([idx_i], max_N_pairs, pad_value=-1)
                     self.data["idx_j"][i] = array_padding([idx_j], max_N_pairs, pad_value=-1)
-        elif self.neighbor_list_type == "on_the_fly":
-            # calculate neighbor list on the fly
-            self.neighbor_list_on_the_fly = True
-        else:
-            raise NotImplementedError
 
     def get_handle(self, mode="r"):
         if os.path.exists(self.preload_path):
@@ -262,9 +284,9 @@ class DataHub:
         logger.info(f"Save preloaded dataset at {self.preload_path}")
 
     @property
-    def features(self):
-        return {k: v for k, v in self.data.items() if k in self.feature_types.keys() | {"idx_i", "idx_j", "N_pair"}}
+    def features(self) -> FieldDataset:
+        return FieldDataset({k: v for k, v in self.data.items() if k in self.feature_types.keys() | {"idx_i", "idx_j", "N_pair"}})
     
     @property
-    def targets(self):
-        return {k: v for k, v in self.data.items() if k in self.target_types}
+    def targets(self) -> FieldDataset:
+        return FieldDataset({k: v for k, v in self.data.items() if k in self.target_types})

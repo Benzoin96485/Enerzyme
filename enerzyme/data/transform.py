@@ -44,7 +44,7 @@ class AtomicEnergyTransform:
         self.transform_type = "shift"
 
     def transform(self, new_input):
-        for i in range(len(new_input["E"])):
+        for i in tqdm(range(len(new_input["E"]))):
             new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][i % len(new_input["Za"])]]["atomic_energy"])
     
     def inverse_transform(self, new_output):
