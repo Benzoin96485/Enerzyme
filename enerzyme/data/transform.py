@@ -44,6 +44,7 @@ class AtomicEnergyTransform:
         self.transform_type = "shift"
 
     def transform(self, new_input):
+        logger.info("Calculating total atomic energy offset")
         for i in tqdm(range(len(new_input["E"]))):
             new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][i % len(new_input["Za"])]]["atomic_energy"])
     

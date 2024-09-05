@@ -166,10 +166,11 @@ class DataHub:
         elif self.data_types[k + "a"] in raw_data.keys():
             self._load_atomic_data(k + "a", raw_data)
             # reduce atomic property into molecular property, mainly for Qa into Q
+            logger.info(f"Molecular property {k} are reduced from atomic property {k + 'a'} (self.data_types[k + 'a'])")
             if is_rounded(k):
-                values = [round(sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]])) for i in range(self.n_datapoint)]            
+                values = [round(sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]])) for i in tqdm(range(self.n_datapoint))]
             else:
-                values = [sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]]) for i in range(self.n_datapoint)]
+                values = [sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]]) for i in tqdm(range(self.n_datapoint))]
             # don't compress summation of atomic property
             self.data.create_dataset(k, data=np.array(values))
 
@@ -177,9 +178,15 @@ class DataHub:
         if k in self.data:
             return
         values = raw_data[self.data_types[k]]
+        v0 = np.array(values[0])
         if len(values) == self.n_datapoint:
-            values = array_padding([values[i] for i in range(self.n_datapoint)], self.max_N)
-            self.data.create_dataset(k, data=self._compress(k, values))
+            # for a datapoint, the shape of this property is (N, a, b, ...)
+            # for the whole dataset, the shape of this property is (n_datapoint, max_N, a, b, ...)
+            self.data.create_dataset(k, shape=(self.n_datapoint, self.max_N, *v0.shape[1:]), dtype=v0.dtype)
+            logger.info(f"Storing atomic data {k} ({self.data_types[k]})")
+            for i, v in tqdm(enumerate(values), total=self.n_datapoint):
+                self.data[k][i][:len(v)] = v
+
         elif len(values) == 1:
             self.data.create_dataset(k, data=self._expand(k, values))
         else:
@@ -225,7 +232,20 @@ class DataHub:
             else:
                 self._load_molecular_data("N", raw_data)
             self.max_N = max(self.data["N"])
-            self.data.create_dataset("Za", data=self._compress("Za", array_padding(Zas, self.max_N)))
+            Za_compressed_flag = True
+            Za0 = np.array(Zas[0])
+            N0 = len(Za0)
+            for Za in Zas:
+                if len(Za) != N0 or (Za != Za0).any():
+                    Za_compressed_flag = False
+                    break
+            if self.compressed and Za_compressed_flag:
+                self.data.create_dataset("Za", data=[Za0])
+            else:
+                self.data.create_dataset("Za", shape=(n_datapoint, self.max_N), dtype=int)
+                logger.info(f'Storing Za ({self.data_types["Za"]})')
+                for i, Za in tqdm(enumerate(Zas), total=self.n_datapoint):
+                    self.data["Za"][i][:len(Za)] = Za
         else:
             raise IndexError(f"Length of 'Za' should be n_datapoint or 1")
         
