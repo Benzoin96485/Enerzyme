@@ -20,6 +20,10 @@ Datahub:
   preload: false                            # load the processed data from the dump directory
   neighbor_list: full                       # neighbor list building algorithm:
                                             # full: all atom pairs are neighbors
+                                            # if left as blank, full neighbor lists will be calculated on-the-fly with the model
+  compressed: true                          # compress the integer fields to one datapoint if all-the-same in the dataset
+                                            # e.g. for configurations of the same molecule, Za, neighbor_list, N will be compressed
+  max_memory: 10                            # maximum memory (in GB) used as cache for reading hdf5 dataset
   transforms:
     atomic_energy: "/my/atomic/energy.csv"  # path to store atomic_energy with columns atom_type and atomic_energy
                                             # summation of atomic reference energies in each frame will be deducted from the total energy
@@ -246,7 +250,7 @@ Trainer:
   use_ema: true                             # if exponential moving average is used, default true
   ema_decay: 0.999                          # decay rate of exponential moving average, default 0.999
   ema_use_num_updates: true                 # if number of updates is used in exponential moving average, default true
-  data_in_memory: false                     # if whole datasets are loaded into memory, default false
+  data_in_memory: false                     # if whole training datasets are loaded into memory, default false
   amsgrad: true                             # if amsgrad is used in Adam optimizer, default true
 Metric:                                     # metrics can be defined here as default metrics
                                             # if a metric configuration is defined under a specific model, it has precedence

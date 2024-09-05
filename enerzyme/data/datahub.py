@@ -77,6 +77,7 @@ class DataHub:
         neighbor_list: Optional[str]=None,
         hash_length: int=16,
         compressed: bool=True,
+        max_memory: int=10,
         **params
     ):
         self.data_path = os.path.abspath(data_path)
@@ -89,6 +90,7 @@ class DataHub:
         self.neighbor_list_type = neighbor_list
         self.transforms = transforms
         self.compressed = compressed
+        self.max_memory = max_memory
         datahub_str = data_path + neighbor_list + str(sorted(transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
@@ -285,7 +287,7 @@ class DataHub:
             logger.warning(f"Preload path {self.preload_path} exists and will be covered")
         else:
             os.makedirs(self.preload_path, exist_ok=True)
-        self.file = h5py.File(os.path.join(self.preload_path, "pre_transformed.hdf5"), mode=mode, rdcc_nbytes=1024 ** 3 * 10)
+        self.file = h5py.File(os.path.join(self.preload_path, "pre_transformed.hdf5"), mode=mode, rdcc_nbytes=1024 ** 3 * self.max_memory)
         if mode == "r":
             self.data = self.file["data"]
         else:
