@@ -43,13 +43,22 @@ class AtomicEnergyTransform:
         self.atomic_energies = load_atomic_energy(atomic_energy_path)
         self.transform_type = "shift"
 
-    def transform(self, new_input):
-        for i in range(len(new_input["E"])):
-            new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][i]]["atomic_energy"])
+    def transform(self, new_input: Dict[str, Iterable]) -> None:
+        logger.info("Calculating total atomic energy offset")
+        if len(new_input["Za"]) == 1:
+            for i in tqdm(range(len(new_input["E"]))):
+                new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][0]]["atomic_energy"])
+        else:
+            for i in tqdm(range(len(new_input["E"]))):
+                new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][i]]["atomic_energy"])
     
-    def inverse_transform(self, new_output):
-        for i in range(len(new_output["E"])):
-            new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][i]]["atomic_energy"])
+    def inverse_transform(self, new_output: Dict[str, Iterable]) -> None:
+        if len(new_output["Za"]) == 1:
+            for i in tqdm(range(len(new_output["E"]))):
+                new_output["E"][i] -= sum(self.atomic_energies.loc[new_output["Za"][0]]["atomic_energy"])
+        else:
+            for i in range(len(new_output["E"])):
+                new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][i]]["atomic_energy"])
     
 
 class NegativeGradientTransform:
