@@ -187,7 +187,7 @@ class DataHub:
             self.data.create_dataset(k, shape=(self.n_datapoint, self.max_N, *v0.shape[1:]), dtype=v0.dtype)
             logger.info(f"Storing atomic data {k} ({self.data_types[k]})")
             for i, v in tqdm(enumerate(values), total=self.n_datapoint):
-                self.data[k][i][:len(v)] = v
+                self.data[k][i,:len(v)] = v
 
         elif len(values) == 1:
             self.data.create_dataset(k, data=self._expand(k, values))
@@ -247,7 +247,7 @@ class DataHub:
                 self.data.create_dataset("Za", shape=(n_datapoint, self.max_N), dtype=int)
                 logger.info(f'Storing Za ({self.data_types["Za"]})')
                 for i, Za in tqdm(enumerate(Zas), total=self.n_datapoint):
-                    self.data["Za"][i][:len(Za)] = Za
+                    self.data["Za"][i,:len(Za)] = Za
         else:
             raise IndexError(f"Length of 'Za' should be n_datapoint or 1")
         

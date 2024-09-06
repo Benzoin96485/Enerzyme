@@ -32,7 +32,7 @@ DTYPE_MAPPING = {
 }
 
 
-def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device, neighbor_list_on_the_fly: bool=False) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
+def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
     features, targets = zip(*batch)
     batch_features = dict()
     batch_targets = dict()
