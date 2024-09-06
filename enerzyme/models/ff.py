@@ -1,13 +1,13 @@
 import os
 from inspect import signature
-from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable
+from typing import Dict, Tuple, List, Any, Callable, Literal, Optional
 import joblib
 import torch
 import pandas as pd
 import numpy as np
 from torch.nn import Module
 from torch.utils.data import Dataset
-from ..data import DataHub, FieldDataset
+from ..data import DataHub
 from ..tasks import Trainer
 from .loss import LOSS_REGISTER
 from ..utils import logger
@@ -192,23 +192,23 @@ class FF:
         
     def count_parameters(self, model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
+    
 
 class FFDataset(Dataset):
-    def __init__(self, features: FieldDataset, targets: FieldDataset, indices: Optional[Iterable[int]]=None, data_in_memory: bool=True) -> None:
-        if indices is None:
-            indices = np.arange(0, len(features["Ra"]))
+    def __init__(self, features, targets, indices=None, data_in_memory=True) -> None:
+        self.data_in_memory = data_in_memory
+        self.indices = indices if indices is not None else np.arange(0, len(features["Za"]))
         if data_in_memory:
-            self.features = features.load_subset(indices)
-            self.targets = targets.load_subset(indices)
-            self.indices = np.arange(0, len(indices))
+            self.features = {k: np.array([v[idx] for idx in self.indices]) for k, v in features.items()}
+            self.targets = {k: np.array([v[idx] for idx in self.indices]) for k, v in targets.items()}
+            self._getitem = lambda idx: ({k: v[idx] for k, v in self.features.items()}, {k: v[idx] for k, v in self.targets.items()})
         else:
             self.features = features
             self.targets = targets
-            self.indices = indices
+            self._getitem = lambda idx: ({k: v[self.indices[idx]] for k, v in self.features.items()}, {k: v[self.indices[idx]] for k, v in self.targets.items()})
 
     def __len__(self) -> int:
         return len(self.indices)
     
-    def __getitem__(self, idx: int) -> Tuple[Dict[str, Iterable], Dict[str, Iterable]]:
-        return self.features.loc(self.indices[idx]), self.targets.loc(self.indices[idx])
+    def __getitem__(self, idx):
+        return self._getitem(idx)

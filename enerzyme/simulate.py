@@ -21,7 +21,7 @@ class FFSimulate:
         model_config_path = os.path.join(self.model_dir, 'config.yaml')
         model_config = YamlHandler(model_config_path).read_yaml()
         logger.info('Model Config: {}'.format(model_config))
-        self.transform = Transform(model_config.Datahub.transforms, simulation_mode=True)
+        self.transform = Transform(model_config.Datahub.transforms)
         for FF_key, FF_params in model_config.Modelhub.internal_FFs.items():
             if FF_params.get("active", False):
                 self._init_model(FF_key, FF_params)

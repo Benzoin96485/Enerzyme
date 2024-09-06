@@ -1,10 +1,9 @@
-import pickle, os
-from hashlib import md5
-from typing import Union, List, Dict
+import pickle
+import os
 import h5py
 import numpy as np
+from hashlib import md5
 from addict import Dict
-from tqdm import tqdm
 from .datatype import is_atomic, is_rounded
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
@@ -23,17 +22,17 @@ def load_from_pickle(data_path=str):
         raise TypeError(f"Unknown data type in {data_path}!")
 
 
-def _collect_types(types: Union[List, Dict]) -> Dict:
+def _collect_types(types: dict):
     if isinstance(types, list):
         return {single_type: single_type for single_type in types}
     else:
-        return {k: v if v is not None else k for k, v in types.items()}
+        return types
 
 
-def array_padding(data, max_N, pad_value=0):
+def array_padding(data, max_N):
     for i in range(len(data)):
         pad_shape = [(0, max_N - len(data[i]))] + [(0,0)] * (len(data[i].shape) - 1)
-        data[i] = np.pad(data[i], pad_shape, constant_values=pad_value)
+        data[i] = np.pad(data[i], pad_shape)
     return np.array(data)
 
 
@@ -43,6 +42,7 @@ class DataHub:
         data_format=None,
         data_path=None, 
         preload=True,
+        save=True,
         features=None,
         targets=None,
         transforms=None,
@@ -50,25 +50,26 @@ class DataHub:
         hash_length=16,
         **params
     ):
-        self.data_path = os.path.abspath(data_path)
+        self.data_path = data_path
         self.dump_dir = dump_dir
         self.data_format = data_format
         self.preload = preload
+        self.save = save
         self.feature_types = _collect_types(features)
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
+        self.data = dict()
         self.neighbor_list_type = neighbor_list
         self.transforms = transforms
-        datahub_str = data_path + neighbor_list + str(sorted(transforms.items()))
+        datahub_str = neighbor_list + str(sorted(transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
-        self.transform = Transform(self.transforms, self.preload_path)
         if not self.preload or not self.preload_data():
-            self.get_handle("w")
             self._init_data()
             self._init_neighbor_list()
-            self.transform.transform(self.data)
-            self._save_config()
+            self._init_transform()
+            if self.save:
+                self._save()
 
     def _preload_data(self, hdf5_path):
         loaded_file = h5py.File(hdf5_path, mode="r")
@@ -96,45 +97,44 @@ class DataHub:
             preload_data_types = _collect_types(datahub_config.feature) | _collect_types(datahub_config.target)
             if preload_data_types.keys() <= self.data_types.keys():
                 # all kinds of features and targets are contained in the processed dataset
-                self.get_handle()
+                self._preload_data(hdf5_path)
                 logger.info(f"Data matched and preloaded from {self.preload_path}")
                 return True
         return False
 
-    def _load_molecular_data(self, k, raw_data):
-        if self.data_types[k] in raw_data.keys():
-            values = raw_data[self.data_types[k]]
-            if isinstance(values, int) or isinstance(values, float):
-                self.data.create_dataset(k, data=np.full(values, self.n_datapoint))
-            else:
-                n_feature = len(values)
-                if n_feature == 1:
-                    self.data.create_dataset(k, data=np.full(values[0], self.n_datapoint))
-                elif n_feature == self.n_datapoint:
-                    self.data.create_dataset(k, data=values)
+    def _load_molecular_data(self, k, raw_data, preload=False):
+        if preload:
+            self.data[k] = [v for v in raw_data[k]]
+        else:
+            if self.data_types[k] in raw_data.keys():
+                values = raw_data[self.data_types[k]]
+                if isinstance(values, int) or isinstance(values, float):
+                    self.data[k] = [values] * self.n_datapoint
                 else:
-                    raise IndexError(f"Length of '{k}' should be n_datapoint or 1")
-        elif self.data_types[k + "a"] in raw_data.keys():
-            self._load_atomic_data(k + "a", raw_data)
-            if is_rounded(k):
-                self.data.create_dataset(k, data=[
-                    round(sum(self.data[k + "a"][i][:self.data["N"][i]])) for i in range(self.n_datapoint)
-                ])
-            else:
-                self.data.create_dataset(k, data=[
-                    sum(self.data[k + "a"][i][:self.data["N"][i]]) for i in range(self.n_datapoint)
-                ])
+                    n_feature = len(values)
+                    if n_feature == 1:
+                        self.data[k] = [values[0]] * self.n_datapoint
+                    elif n_feature == self.n_datapoint:
+                        self.data[k] = values
+                    else:
+                        raise IndexError(f"Length of '{k}' should be n_datapoint or 1")
+            elif self.data_types[k + "a"] in raw_data.keys():
+                self._load_atomic_data(k + "a", raw_data)
+                if is_rounded(k):
+                    self.data[k] = [round(sum(v)) for v in self.data[k + "a"]]
+                else:
+                    self.data[k] = [sum(v) for v in self.data[k + "a"]]
 
-    def _load_atomic_data(self, k: str, raw_data: Dict) -> None:
+    def _load_atomic_data(self, k, raw_data, preload=False):
         if k in self.data:
             return
-        values = raw_data[self.data_types[k]]
-        if len(values) == self.n_datapoint:
-            self.data.create_dataset(k, data=array_padding([values[i] for i in range(self.n_datapoint)], self.max_N))
+        values = raw_data[k if preload else self.data_types[k]]
+        if preload or len(values) == self.n_datapoint:
+            self.data[k] = [values[i][:self.data["N"][i]] for i in range(len(values))]
         else:
             raise IndexError(f"Length of {k} ({self.data_types[k]}) should be n_datapoint")
 
-    def _init_data(self) -> None:
+    def _init_data(self):
         if not os.path.isfile(self.data_path):
             raise ValueError(f"Data path {self.data_path} doesn't exist.")
         suffix = self.data_path.split(".")[-1]
@@ -158,20 +158,19 @@ class DataHub:
         if n_Za == 1:
             Za = parse_Za(raw_data[self.data_types["Za"]])
             if self.data_types["N"] not in raw_data.keys():
-                self.data.create_dataset("N", data=np.full(n_datapoint, len(Za)))
-                self.data.create_dataset("Za", data=np.full(n_datapoint, Za[0]))
+                self.data["N"] = [len(Za)] * n_datapoint
+                self.data["Za"] = [Za[0]] * n_datapoint
             else:
                 self._load_molecular_data("N", raw_data)
-                self.data.create_dataset("Za", data=[Zas[i] for i in range(n_datapoint)])
-            self.max_N = max(self.data["N"])
+                self.data["Za"] = [Zas[i][:self.data["N"][i]] for i in range(n_datapoint)]
         elif n_Za == n_datapoint:
             Zas = parse_Za(raw_data[self.data_types["Za"]])
             if self.data_types["N"] not in raw_data.keys():
-                self.data.create_dataset("N", data=[len(Za) for Za in Zas])
+                self.data["N"] = [len(Za) for Za in Zas]
+                self.data["Za"] = Zas
             else:
                 self._load_molecular_data("N", raw_data)
-            self.max_N = max(self.data["N"])
-            self.data.create_dataset("Za", data=array_padding(Zas, self.max_N))
+                self.data["Za"] = [Zas[i][:self.data["N"][i]] for i in range(n_datapoint)]
         else:
             raise IndexError(f"Length of 'Za' should be n_datapoint or 1")
         
@@ -183,44 +182,41 @@ class DataHub:
             else:
                 self._load_molecular_data(k, raw_data)
         
-        if not (self.data_format == "pickle" or suffix == "pkl" or suffix == "pickle"):
+        if self.data_format == "hdf5" or suffix == "hdf5":
             raw_data.close()
 
     def _init_neighbor_list(self):
         if self.neighbor_list_type == "full":
             from .neighbor_list import full_neighbor_list
-            max_N = max(self.data["N"])
-            max_N_pairs = max_N * (max_N - 1)
-            self.data.create_dataset("idx_i", shape=(self.n_datapoint, max_N_pairs), dtype=int)
-            self.data.create_dataset("idx_j", shape=(self.n_datapoint, max_N_pairs), dtype=int)
-            self.data.create_dataset("N_pair", shape=self.n_datapoint, dtype=int)
-            logger.info("producing neighbor list")
-            for i in tqdm(range(self.n_datapoint)):
-                idx_i, idx_j = full_neighbor_list(self.data["N"][i])
-                self.data["N_pair"][i] = len(idx_i)
-                self.data["idx_i"][i] = array_padding([idx_i], max_N_pairs, pad_value=-1)
-                self.data["idx_j"][i] = array_padding([idx_j], max_N_pairs, pad_value=-1)
+            idx_i, idx_j = full_neighbor_list(self.data["N"])
         else:
             raise NotImplementedError
+        self.data["idx_i"] = idx_i
+        self.data["idx_j"] = idx_j
 
-    def get_handle(self, mode="r"):
+    def _init_transform(self):
+        self.transform = Transform(self.data, self.transforms)
+        self.data = self.transform.transform(self.data)
+
+    def _save(self):
         if os.path.exists(self.preload_path):
             logger.warning(f"Preload path {self.preload_path} exists and will be covered")
         else:
             os.makedirs(self.preload_path, exist_ok=True)
-        self.file = h5py.File(os.path.join(self.preload_path, "pre_transformed.hdf5"), mode=mode, rdcc_nbytes=1024 ** 3 * 10)
-        if mode == "r":
-            self.data = self.file["data"]
-        else:
-            self.file.clear()
-            self.data = self.file.create_group("data")
-
-    def _save_config(self):
+        loaded_file = h5py.File(os.path.join(self.preload_path, "pre_transformed.hdf5"), mode="w")
+        loaded_data = loaded_file.create_group("data")
+        max_N = max(self.data["N"])
+        for k, v in self.data.items():
+            if is_atomic(k):
+                loaded_data.create_dataset(k, data=array_padding(v, max_N))
+            else:
+                loaded_data.create_dataset(k, data=np.array(v))
+        loaded_file.close()
         handler = YamlHandler(os.path.join(self.preload_path, "datahub.yaml"))
         datahub_config = Dict({
             "feature": self.feature_types,
             "target": self.target_types,
-            "transforms": self.transforms,
+            "transform_args": self.transforms,
             "neighbor_list": self.neighbor_list_type
         })
         handler.write_yaml(datahub_config)
@@ -228,7 +224,7 @@ class DataHub:
 
     @property
     def features(self):
-        return {k: v for k, v in self.data.items() if k in self.feature_types.keys() | {"idx_i", "idx_j", "N_pair"}}
+        return {k: v for k, v in self.data.items() if k in self.feature_types}
     
     @property
     def targets(self):
