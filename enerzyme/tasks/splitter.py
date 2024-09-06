@@ -62,7 +62,6 @@ class Splitter:
         self.splitter = self._init_split(method, **params)
         self.preload = preload
         self.save = save
-        self.split
 
     def _set_seed(self):
         skl.random.seed(self.seed)

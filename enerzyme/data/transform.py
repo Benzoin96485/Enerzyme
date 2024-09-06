@@ -1,5 +1,5 @@
 import os, pathlib
-from typing import Dict, Iterable, Union, List
+from typing import Dict, Iterable, Union, List, Optional
 import joblib
 import pandas as pd
 import numpy as np
@@ -43,13 +43,22 @@ class AtomicEnergyTransform:
         self.atomic_energies = load_atomic_energy(atomic_energy_path)
         self.transform_type = "shift"
 
-    def transform(self, new_input):
-        for i in range(len(new_input["E"])):
-            new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][i]]["atomic_energy"])
+    def transform(self, new_input: Dict[str, Iterable]) -> None:
+        logger.info("Calculating total atomic energy offset")
+        if len(new_input["Za"]) == 1:
+            for i in tqdm(range(len(new_input["E"]))):
+                new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][0]]["atomic_energy"])
+        else:
+            for i in tqdm(range(len(new_input["E"]))):
+                new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][i]]["atomic_energy"])
     
-    def inverse_transform(self, new_output):
-        for i in range(len(new_output["E"])):
-            new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][i]]["atomic_energy"])
+    def inverse_transform(self, new_output: Dict[str, Iterable]) -> None:
+        if len(new_output["Za"]) == 1:
+            for i in tqdm(range(len(new_output["E"]))):
+                new_output["E"][i] -= sum(self.atomic_energies.loc[new_output["Za"][0]]["atomic_energy"])
+        else:
+            for i in range(len(new_output["E"])):
+                new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][i]]["atomic_energy"])
     
 
 class NegativeGradientTransform:
@@ -100,7 +109,7 @@ class TotalEnergyNormalization:
 
 
 class Transform:
-    def __init__(self, transform_args: Dict, preload_path: str) -> None:
+    def __init__(self, transform_args: Dict, preload_path: Optional[str]=None, simulation_mode: bool=False) -> None:
         self.backup_keys = set()
         self.shifts = []
         self.scales = []
@@ -109,7 +118,7 @@ class Transform:
             if k == "atomic_energy":
                 self.shifts.append(AtomicEnergyTransform(v))
                 self.backup_keys.add("E")
-            if k == "negative_gradient" and v:
+            if k == "negative_gradient" and v and (not simulation_mode):
                 self.scales.append(NegativeGradientTransform())
                 self.backup_keys.add("Fa")
             if k == "total_energy_normalization" and v:
