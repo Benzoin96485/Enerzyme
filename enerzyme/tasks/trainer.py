@@ -18,7 +18,7 @@ from transformers.optimization import get_linear_schedule_with_warmup
 import numpy as np
 from .splitter import Splitter
 from .monitor import Monitor
-from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform
+from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform, full_neighbor_list
 from ..utils import logger
 from .metrics import Metrics
 
@@ -54,9 +54,15 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
     batch_idx_j = []
     batch_seg = []
     count = 0
+
     for i, feature in enumerate(features):
-        batch_idx_i.append(feature["idx_i"][:feature["N_pair"]] + count)
-        batch_idx_j.append(feature["idx_j"][:feature["N_pair"]] + count)
+        if "idx_i" in feature:
+            batch_idx_i.append(feature["idx_i"][:feature["N_pair"]] + count)
+            batch_idx_j.append(feature["idx_j"][:feature["N_pair"]] + count)
+        else:
+            idx_i, idx_j = full_neighbor_list(feature["N"])
+            batch_idx_i.append(idx_i + count)
+            batch_idx_j.append(idx_j + count)
         batch_seg.append(np.full(feature["N"], i, dtype=int))
         count += feature["N"]
     batch_features["N"] = [feature["N"] for feature in features]
@@ -130,7 +136,7 @@ class Trainer:
         else:
             logger.info("GPU not found, turn to CPU!")
             self.device = torch.device("cpu")
-        self.data_in_memory = params.get("data_in_memory", False)
+        self.data_in_memory = params.get("data_in_memory", True)
         self.use_ema = params.get("use_ema", True)
         self.ema_decay = params.get("ema_decay", 0.999)
         self.ema_use_num_updates = params.get("ema_use_num_updates", True)
@@ -262,21 +268,6 @@ class Trainer:
     
     def _early_stop_choice(self, wait, min_loss, metric_score, max_score, model, dump_dir, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, max_score, model, dump_dir, patience, epoch)
-    
-    # def _judge_early_stop_loss(self, wait, loss, min_loss, model, dump_dir, fold, patience, epoch):
-    #     is_early_stop = False
-    #     if loss <= min_loss :
-    #         min_loss = loss
-    #         wait = 0
-    #         info = {'model_state_dict': model.state_dict()}
-    #         os.makedirs(dump_dir, exist_ok=True)
-    #         torch.save(info, os.path.join(dump_dir, f'model_{fold}.pth'))
-    #     elif loss >= min_loss:
-    #         wait += 1
-    #         if wait == self.patience:
-    #             logger.warning(f'Early stopping at epoch: {epoch+1}')
-    #             is_early_stop = True
-    #     return is_early_stop, min_loss, wait
     
     def predict(self, model, dataset, loss_terms, dump_dir, transform, epoch=1, load_model=False):
         self._set_seed(self.seed)
