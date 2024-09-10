@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 from addict import Dict
 from tqdm import tqdm
-from torch.utils.data import Dataset, Subset
+from torch.utils.data import Dataset
 from .datatype import is_atomic, is_rounded, is_int
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
@@ -51,6 +51,15 @@ class FieldDataset(Dataset):
 
     def __setitem__(self, k, v) -> None:
         self.data[k] = v
+
+    def items(self):
+        return self.data.items()
+    
+    def keys(self):
+        return self.data.keys()
+    
+    def values(self):
+        return self.data.values()
     
     def loc(self, idx) -> Dict[str, Iterable]:
         return {k: v[0 if k in self.compressed_keys else idx] for k, v in self.data.items()}
