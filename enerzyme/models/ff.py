@@ -28,6 +28,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, List]:
         from .spookynet import SpookyNetCore as Core
         from .spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "leftnet":
+        from .leftnet import LEFTNet as Core
+        DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS = None, None
+        special_loss = {}
     LOSS_REGISTER.update(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
@@ -87,7 +91,7 @@ class FF:
         model_str: str, 
         loss: Dict, 
         architecture: str, 
-        build_params, layers=None,
+        build_params=dict(), layers=None,
         pretrain_path=None, **params
     ) -> None:
         self.datahub = datahub
