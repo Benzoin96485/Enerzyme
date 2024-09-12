@@ -51,6 +51,11 @@ class FieldDataset(Dataset):
 
     def __setitem__(self, k, v) -> None:
         self.data[k] = v
+        if len(v) == 1:
+            self.compressed_keys.add(k)
+
+    def __contains__(self, k) -> bool:
+        return k in self.data
 
     def items(self):
         return self.data.items()
