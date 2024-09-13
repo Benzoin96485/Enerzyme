@@ -39,7 +39,7 @@ def load_atomic_energy(atomic_energy_path: str) -> pd.DataFrame:
 
 
 class AtomicEnergyTransform:
-    def __init__(self, atomic_energy_path: str, *args, **kwargs) -> None:
+    def __init__(self, atomic_energy_path: str, simulation_mode=False, *args, **kwargs) -> None:
         self.atomic_energies = load_atomic_energy(atomic_energy_path)
         self.transform_type = "shift"
 
@@ -54,8 +54,8 @@ class AtomicEnergyTransform:
     
     def inverse_transform(self, new_output: Dict[str, Iterable]) -> None:
         if len(new_output["Za"]) == 1:
-            for i in tqdm(range(len(new_output["E"]))):
-                new_output["E"][i] -= sum(self.atomic_energies.loc[new_output["Za"][0]]["atomic_energy"])
+            for i in range(len(new_output["E"])):
+                new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][0]]["atomic_energy"])
         else:
             for i in range(len(new_output["E"])):
                 new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][i]]["atomic_energy"])

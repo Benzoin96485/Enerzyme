@@ -1,0 +1,19 @@
+Simulation:
+  environment: "ase"                                # simulation environment: ase
+  dtype: float64                                    # pytorch data type throughout the computation: float32 (single) / float64 (double), default float64, for better numerical behavior during optimization
+  cuda: true                                        # if cuda is searched and used if possible
+  task: md                                          # molecular dynamics
+  idx_start_from: 1                                 # for your confusion of indices starting from 0 or 1
+  neighbor_list: full                               # you want this to be the same as how the model is trained
+  fs_in_t: 1                                        # numerical value of one femtosecond in the time step, friction, etc.
+  Hartree_in_E: 1.0                                 # numerical value of one Hartree in the model
+  integrate:                                        
+    integrator: Langevin                            # md integrator: Langevin
+    time_step: 0.5                                  # md time step
+    temperature_in_K: 300                           # temperature in NVT ensemble
+    friction: 0.01                                  # friction coefficient for Langevin dynamics
+    n_step: 100000                                  # number of maximum step
+System:
+  structure_file: "/your/initial/configuration.xyz" # initial configuration of simulation
+  charge: -1                                        # total charge of the structure (only useful if the model is charge-aware)
+  multiplicity: 1                                   # multiplicity of the structure (only useful if the model is spin-aware)

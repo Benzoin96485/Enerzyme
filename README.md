@@ -56,7 +56,9 @@ Enerzyme reads the `<model directory>` for the model configuration, load the mod
 
 ## Simulation
 
-Scanning on the distance between two atoms is supported.
+Supported simulation types:
+- Flexible scanning on the distance between two atoms.
+- Constrained Langevin MD
 
 ```bash
 enerzyme simulate -c <configuration yaml file> -o <output directory> -m <model directory>
