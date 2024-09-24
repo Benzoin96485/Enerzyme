@@ -1,4 +1,6 @@
-from typing import Iterable, Optional, Callable, Tuple, Dict
+from ast import dump
+from functools import partial
+from typing import Iterable, Optional, Callable, Tuple, Dict, Any
 from collections import defaultdict
 import time, os, logging, contextlib
 from tqdm import tqdm
@@ -14,10 +16,11 @@ try:
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 except:
     pass
-from transformers.optimization import get_linear_schedule_with_warmup
+from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
 from .monitor import Monitor
+from ..models.modelhub import get_pretrain_path
 from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform, full_neighbor_list
 from ..utils import logger
 from .metrics import Metrics
@@ -109,6 +112,20 @@ def _decorate_batch_output(output, features, targets):
     return y_pred, (y_truth if y_truth else None)
 
 
+def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None) -> None:
+    if pretrain_path is None:
+        return
+    loaded_info = torch.load(pretrain_path, map_location=device)
+    if ema is not None and "ema_state_dict" in loaded_info:
+        ema.load_state_dict(loaded_info["ema_state_dict"])
+    else:
+        if "ema_state_dict" in loaded_info:
+            model.load_state_dict(loaded_info["ema_state_dict"]["collected_params"])
+        else:
+            model.load_state_dict(loaded_info["model_state_dict"])
+    logger.info(f"load model success from {pretrain_path}!")
+
+
 class Trainer:
     def __init__(self, out_dir: str=None, metric_config: Metrics=dict(), **params) -> None:
         self.config = params
@@ -128,6 +145,7 @@ class Trainer:
         self.patience = params.get('patience', 50)
         self.max_norm = params.get('max_norm', 1.0)
         self.cuda = params.get('cuda', False)
+        self.schedule = params.get('schedule', "linear")
         self.weight_decay = float(params.get('weight_decay', 0))
         self.amsgrad = params.get('amsgrad', True)
         if torch.cuda.is_available():
@@ -141,6 +159,10 @@ class Trainer:
         self.ema_decay = params.get("ema_decay", 0.999)
         self.ema_use_num_updates = params.get("ema_use_num_updates", True)
         self.dtype = DTYPE_MAPPING[params.get('dtype', "float32")]
+        self.committee_size = params.get("committee_size", 1)
+        active_learning_params = params.get("active_learning", None)
+        if active_learning_params is not None and active_learning_params.get("active", False):
+            self.active_learning = True
 
     def decorate_batch_input(self, batch):
         return _decorate_batch_input(batch, self.dtype, self.device)
@@ -158,8 +180,25 @@ class Trainer:
         torch.cuda.manual_seed_all(seed)
         np.random.seed(seed)
 
-    def fit_predict(self, model: Module, train_dataset: Dataset, valid_dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, test_dataset: Optional[Dataset]=None):
-        self._set_seed(self.seed)
+    def load_state_dict(self, model: Module, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None) -> None:
+        return _load_state_dict(model, self.device, pretrain_path, ema)
+
+    def save_state_dict(self, model: Module, dump_dir, ema: Optional[ExponentialMovingAverage]=None, suffix="last", model_rank=None):
+        if model_rank is None:
+            model_rank = ''
+        os.makedirs(dump_dir, exist_ok=True)
+        if ema is None:
+            info = {'model_state_dict': model.state_dict()}
+        else:
+            info = {'ema_state_dict': ema.state_dict()}
+        torch.save(info, os.path.join(dump_dir, f'model{model_rank}_{suffix}.pth'))
+
+    def fit_predict(self, 
+        model: Module, pretrain_path: Optional[str],
+        train_dataset: Dataset, valid_dataset: Dataset, 
+        loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
+        test_dataset: Optional[Dataset]=None, model_rank=None) -> Optional[defaultdict[Any]]:
+        self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
             dataset=train_dataset,
@@ -176,11 +215,10 @@ class Trainer:
         optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay, amsgrad=self.amsgrad)
         if self.use_ema:
             ema = ExponentialMovingAverage(model.parameters(), self.ema_decay, self.ema_use_num_updates)
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer, 
-            num_warmup_steps=num_warmup_steps, 
-            num_training_steps=num_training_steps
-        )
+        else:
+            ema = None
+        self.load_state_dict(model, pretrain_path, ema)
+        scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
 
         for epoch in range(self.max_epochs):
             model = model.train()
@@ -224,36 +262,44 @@ class Trainer:
 
             batch_bar.close()
             total_trn_loss = np.mean(trn_loss)
+            message = f'Epoch [{epoch+1}/{self.max_epochs}] train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
+
             if self.use_ema:
                 cm = ema.average_parameters()
+                cm = ema.state_dict
             else:
                 cm = contextlib.nullcontext()
-            with cm:
-                y_preds, val_loss, metric_score = self.predict(
-                    model=model, 
-                    dataset=valid_dataset, 
-                    loss_terms=loss_terms, 
-                    dump_dir=dump_dir, 
-                    transform=transform, 
-                    epoch=epoch, 
-                    load_model=False,
-                )
-                end_time = time.time()
-                total_val_loss = np.mean(val_loss)
-                _score = metric_score["_judge_score"]
-                _metric = str(self.metrics)
-                is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, min_val_loss, metric_score, max_score, model, dump_dir, self.patience, epoch)
+            y_preds = None
+            if valid_dataset is not None:
+                with cm:
+                    _, val_loss, metric_score = self.predict(
+                        model=model, 
+                        dataset=valid_dataset, 
+                        loss_terms=loss_terms, 
+                        dump_dir=dump_dir, 
+                        transform=transform, 
+                        epoch=epoch, 
+                        load_model=False,
+                    )
+                    end_time = time.time()
+                    total_val_loss = np.mean(val_loss)
+                    _score = metric_score["_judge_score"]
+                    _metric = str(self.metrics)
+                    save_handle = partial(self.save_state_dict, model=model, dump_dir=dump_dir, ema=None, suffix="best", model_rank=model_rank)
+                    is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, min_val_loss, metric_score, max_score, save_handle, self.patience, epoch)
+                    message += f', val_loss: {total_val_loss:.4f}, ' + \
+                        ", ".join([f'val_{k}: {v:.4f}' for k, v in metric_score.items() if k != "_judge_score"]) + \
+                        f', val_judge_score ({_metric}): {_score:.4f}' + \
+                        (f', Patience [{wait}/{self.patience}], min_val_judge_score: {min_val_loss:.4f}' if wait else '')
+            else:
+                is_early_stop = False
             
-            message = f'Epoch [{epoch+1}/{self.max_epochs}] train_loss: {total_trn_loss:.4f}, ' + \
-                f'val_loss: {total_val_loss:.4f}, ' + \
-                ", ".join([f'val_{k}: {v:.4f}' for k, v in metric_score.items() if k != "_judge_score"]) + \
-                f', val_judge_score ({_metric}): {_score:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}, ' + \
-                f'{(end_time - start_time):.1f}s' + \
-                (f', Patience [{wait}/{self.patience}], min_val_judge_score: {min_val_loss:.4f}' if wait else '')
+            message += f', {(end_time - start_time):.1f}s'
             logger.info(message)
+            self.save_state_dict(model, dump_dir, ema, "last", model_rank)
             if is_early_stop:
                 break
-        
+
         if test_dataset is not None:
             y_preds, _, _ = self.predict(
                 model=model, 
@@ -266,17 +312,16 @@ class Trainer:
             )
         return y_preds
     
-    def _early_stop_choice(self, wait, min_loss, metric_score, max_score, model, dump_dir, patience, epoch):
-        return self.metrics._early_stop_choice(wait, min_loss, metric_score, max_score, model, dump_dir, patience, epoch)
+    def _early_stop_choice(self, wait, min_loss, metric_score, max_score, save_handle, patience, epoch):
+        return self.metrics._early_stop_choice(wait, min_loss, metric_score, max_score, save_handle, patience, epoch)
     
-    def predict(self, model, dataset, loss_terms, dump_dir, transform, epoch=1, load_model=False):
+    def predict(self, model, dataset, loss_terms, dump_dir, transform, epoch=1, load_model=False, model_rank=None):
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         if load_model == True:
-            load_model_path = os.path.join(dump_dir, f'model_best.pth')
-            model_dict = torch.load(load_model_path, map_location=self.device)["model_state_dict"]
-            model.load_state_dict(model_dict)
-            logger.info(f"load model success from {load_model_path}!")
+            pretrain_path = get_pretrain_path(dump_dir, "best", model_rank)
+            self.load_state_dict(model, pretrain_path)
+            
         dataloader = DataLoader(
             dataset=dataset,
             batch_size=self.batch_size,

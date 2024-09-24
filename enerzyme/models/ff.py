@@ -80,120 +80,6 @@ def build_model(
     return core
 
 
-class FF:
-    def __init__(self, 
-        datahub: DataHub, 
-        trainer: Trainer, 
-        model_str: str, 
-        loss: Dict, 
-        architecture: str, 
-        build_params, layers=None,
-        pretrain_path=None, **params
-    ) -> None:
-        self.datahub = datahub
-        self.trainer = trainer
-        self.splitter = self.trainer.splitter
-        self.model_str = model_str
-        self.architecture = architecture
-        self.build_params = build_params
-        self.layer_params = layers
-        if pretrain_path is not None:
-            if os.path.isdir(pretrain_path):
-                self.pretrain_path = f"{pretrain_path}/model_best.pth"
-            elif os.path.isfile(pretrain_path):
-                self.pretrain_path = pretrain_path
-            else:
-                raise FileNotFoundError(f"Pretrained model not found at {self.pretrain_path}")
-        else:
-            self.pretrain_path = None
-        self.metrics = self.trainer.metrics
-        self.out_dir = self.trainer.out_dir
-        self.dump_dir = os.path.join(self.out_dir, self.model_str)
-        self.trainer._set_seed(self.trainer.seed)
-        self.model = self._init_model(self.build_params)
-        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
-        self.is_success = True
-    
-    def _init_model(self, build_params) -> Module:
-        if self.architecture in FF_REGISTER:
-            model = FF_REGISTER[self.architecture](**build_params)
-        else:
-            model = build_model(self.architecture, self.layer_params, self.build_params)
-        print(model.__str__())
-        if self.pretrain_path is not None:
-            model_dict = torch.load(self.pretrain_path, map_location=self.trainer.device)["model_state_dict"]
-            model.load_state_dict(model_dict, strict=False)
-            logger.info(f"load model success from {self.pretrain_path}!")
-        return model
-    
-    def train(self) -> None:
-        logger.info("start training FF:{}".format(self.model_str))
-        X = self.datahub.features
-        y = self.datahub.targets
-        split = self.splitter.split(X, preload_path=self.datahub.preload_path)
-        tr_idx = split["training"]
-        vl_idx = split["validation"]
-        if "test" in split and len(split["test"]) > 0:
-            te_idx = split["test"]
-            test_dataset = FFDataset(X, y, te_idx, True)
-            y_test = test_dataset.targets
-            y_test["Za"] = test_dataset.features["Za"]
-        else:
-            test_dataset = None
-        train_dataset = FFDataset(X, y, tr_idx, self.trainer.data_in_memory)
-        valid_dataset = FFDataset(X, y, vl_idx, True)
-        y_pred = self.trainer.fit_predict(
-            model=self.model, 
-            train_dataset=train_dataset, 
-            valid_dataset=valid_dataset, 
-            test_dataset=test_dataset,
-            loss_terms=self.loss_terms, 
-            transform=self.datahub.transform,
-            dump_dir=self.dump_dir
-        )
-        logger.info("{} FF done!".format(self.model_str))
-        logger.info("{} Model saved!".format(self.model_str))
-        if test_dataset is not None:
-            self.datahub.transform.inverse_transform(y_test)
-            self.dump(y_pred, self.dump_dir, 'test.data')
-            metric_score = self.metrics.cal_metric(y_test, y_pred)
-            self.dump(metric_score, self.dump_dir, 'metric.result')
-            logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
-            logger.info("Metric result saved!")
-
-    def evaluate(self):
-        logger.info("start evaluate FF:{}".format(self.model_str))
-        X = self.datahub.features
-        y = self.datahub.targets
-        test_dataset = FFDataset(X, y, data_in_memory=True)
-            # model_path = os.path.join(checkpoints_path, f'model_0.pth')
-            # self.model.load_state_dict(torch.load(model_path, map_location=self.trainer.device)['model_state_dict'])
-        y_pred, _, metric_score = self.trainer.predict(
-            model=self.model, 
-            dataset=test_dataset, 
-            loss_terms=self.loss_terms, 
-            dump_dir=self.dump_dir, 
-            transform=self.datahub.transform, 
-            epoch=1, 
-            load_model=True
-        )
-        # self.dump(y_pred, self.dump_dir, 'test.data')
-        # self.dump(metric_score, self.dump_dir, 'metric.result')
-        logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
-        logger.info("{} FF done!".format(self.model_str))
-        logger.info("Metric result saved!")
-        return y_pred, pd.DataFrame(metric_score, index=[self.model_str])
-
-    def dump(self, data, dir, name):
-        path = os.path.join(dir, name)
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        joblib.dump(data, path)
-        
-    def count_parameters(self, model):
-        return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-
 class FFDataset(Dataset):
     def __init__(self, features: FieldDataset, targets: FieldDataset, indices: Optional[Iterable[int]]=None, data_in_memory: bool=True) -> None:
         if indices is None:
@@ -212,3 +98,189 @@ class FFDataset(Dataset):
     
     def __getitem__(self, idx: int) -> Tuple[Dict[str, Iterable], Dict[str, Iterable]]:
         return self.features.loc(self.indices[idx]), self.targets.loc(self.indices[idx])
+
+
+class BaseFFLauncher:
+    def __init__(self, 
+        datahub: DataHub, 
+        trainer: Trainer, 
+        model_str: str, 
+        loss: Dict, 
+        architecture: str, 
+        build_params, layers=None,
+        pretrain_path=None
+    ) -> None:
+        self.datahub = datahub
+        self.trainer = trainer
+        self.splitter = self.trainer.splitter
+        self.model_str = model_str
+        self.architecture = architecture
+        self.build_params = build_params
+        self.layer_params = layers
+        if pretrain_path is not None:
+            self.pretrain_path = pretrain_path
+        else:
+            self.pretrain_path = None
+        self.metrics = self.trainer.metrics
+        self.out_dir = self.trainer.out_dir
+        self.dump_dir = os.path.join(self.out_dir, self.model_str)
+        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
+        self.trainer._set_seed(self.trainer.seed)
+
+    def _init_model(self, build_params: Dict[str, Any], pretrain_path: Optional[str]=None) -> Module:
+        if self.architecture in FF_REGISTER:
+            model = FF_REGISTER[self.architecture](**build_params)
+        else:
+            model = build_model(self.architecture, self.layer_params, self.build_params)
+        print(model.__str__())
+        # if pretrain_path is None and self.pretrain_path is not None:
+        #     pretrain_path = self.pretrain_path
+        # model_dict = torch.load(pretrain_path, map_location=self.trainer.device)["model_state_dict"]
+        # model.load_state_dict(model_dict, strict=False)
+        # logger.info(f"load model success from {self.pretrain_path}!")
+        return model
+
+    def _init_partition(self) -> Tuple[FFDataset, Optional[FFDataset], Optional[FFDataset]]:
+        X = self.datahub.features
+        y = self.datahub.targets
+        split = self.splitter.split(X, preload_path=self.datahub.preload_path)
+        tr_idx = split["training"]
+        train_dataset = FFDataset(X, y, tr_idx, self.trainer.data_in_memory)
+        if "validation" in split and len(split["validation"]) > 0:
+            vl_idx = split["validation"]
+            valid_dataset = FFDataset(X, y, vl_idx, True)
+        else:
+            valid_dataset = None
+        if "test" in split and len(split["test"]) > 0:
+            te_idx = split["test"]
+            test_dataset = FFDataset(X, y, te_idx, True)
+            y_test = test_dataset.targets
+            y_test["Za"] = test_dataset.features["Za"]
+        else:
+            test_dataset = None
+        return train_dataset, valid_dataset, test_dataset
+    
+    def dump(self, data: Any, dump_dir: str, name: str) -> None:
+        path = os.path.join(dump_dir, name)
+        if not os.path.exists(dump_dir):
+            os.makedirs(dump_dir)
+        joblib.dump(data, path)
+        
+    def count_parameters(self) -> int:
+        return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+
+class FF_single(BaseFFLauncher):
+    def __init__(self, 
+        datahub: DataHub, 
+        trainer: Trainer, 
+        model_str: str, 
+        loss: Dict, 
+        architecture: str, 
+        build_params, layers=None,
+        pretrain_path=None, **params
+    ) -> None:
+        super().__init__(datahub, trainer, model_str, loss, architecture, build_params, layers, pretrain_path)
+        if pretrain_path is not None and os.path.isdir(pretrain_path):
+            self.pretrain_path = f"{pretrain_path}/model_best.pth"
+            if self.pretrain_path is None:
+                raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
+        self.model = self._init_model(self.build_params)
+    
+    def train(self) -> None:
+        logger.info("start training FF:{}".format(self.model_str))
+        train_dataset, valid_dataset, test_dataset = self._init_partition()
+        y_pred = self.trainer.fit_predict(
+            model=self.model, 
+            train_dataset=train_dataset, 
+            valid_dataset=valid_dataset, 
+            test_dataset=test_dataset,
+            loss_terms=self.loss_terms, 
+            transform=self.datahub.transform,
+            dump_dir=self.dump_dir
+        )
+        logger.info("{} FF done!".format(self.model_str))
+        logger.info("{} Model saved!".format(self.model_str))
+        if test_dataset is not None:
+            y_test = test_dataset.targets
+            self.datahub.transform.inverse_transform(y_test)
+            self.dump(y_pred, self.dump_dir, 'test.data')
+            metric_score = self.metrics.cal_metric(y_test, y_pred)
+            self.dump(metric_score, self.dump_dir, 'metric.result')
+            logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
+            logger.info("Metric result saved!")
+
+    def evaluate(self):
+        logger.info("start evaluate FF:{}".format(self.model_str))
+        X = self.datahub.features
+        y = self.datahub.targets
+        test_dataset = FFDataset(X, y, data_in_memory=True)
+        y_pred, _, metric_score = self.trainer.predict(
+            model=self.model, 
+            dataset=test_dataset, 
+            loss_terms=self.loss_terms, 
+            dump_dir=self.dump_dir, 
+            transform=self.datahub.transform, 
+            epoch=1, 
+            load_model=True
+        )
+        logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
+        logger.info("{} FF done!".format(self.model_str))
+        return y_pred, pd.DataFrame(metric_score, index=[self.model_str])
+
+
+class FF_committee(BaseFFLauncher):
+    def __init__(self, 
+        committee_size: int,
+        datahub: DataHub, 
+        trainer: Trainer, 
+        model_str: str, 
+        loss: Dict, 
+        architecture: str, 
+        build_params, layers=None,
+        pretrain_path=None, **params
+    ) -> None:
+        super().__init__(
+            datahub, trainer, model_str, loss, architecture, build_params, layers, 
+            pretrain_path=None
+        )
+        self.size = committee_size
+        if pretrain_path is not None:
+            if os.path.isdir(pretrain_path):
+                self.pretrain_path = []
+                for i in range(committee_size):
+                    single_pretrain_path = f"{pretrain_path}/model{i}_best.pth"
+                    if os.path.isfile(single_pretrain_path):
+                        self.pretrain_path.append(single_pretrain_path)
+                    else:
+                        raise FileNotFoundError(f"Pretrained model {i} not found at {pretrain_path}")
+            else:
+                raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
+
+    def train(self) -> None:
+        train_dataset, valid_dataset, test_dataset = self._init_partition()
+        for i in range(self.size):
+            self.model = self._init_model(self.build_params)
+            y_pred = self.trainer.fit_predict(
+                model=self.model, 
+                train_dataset=train_dataset, 
+                valid_dataset=valid_dataset, 
+                test_dataset=test_dataset,
+                loss_terms=self.loss_terms, 
+                transform=self.datahub.transform,
+                dump_dir=self.dump_dir,
+                model_rank=i
+            )
+            logger.info(f"{self.model_str} FF ({i} / {self.size}) done!")
+            logger.info(f"{self.model_str} Model ({i}) saved!")
+            delattr(self, "model")
+
+    def evaluate(self) -> None:
+        pass
+
+    def dump(self) -> None:
+        pass
+
+    def count_parameters(self) -> int:
+        pass
+
+

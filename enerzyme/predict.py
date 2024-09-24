@@ -43,27 +43,12 @@ class FFPredict(object):
         )
         self.modelhub = ModelHub(self.datahub, self.trainer, **params['Modelhub'])
         self.metrics = self.trainer.metrics
-    
-    # def save_predict(self, data, dir, name="predict"):
-    #     prefix = self.data_path.split('/')[-1].split('.')[0]
-    #     run_id = 0
-    #     if not os.path.exists(dir):
-    #         os.makedirs(dir)
-    #     else:
-    #         folders = [x for x in os.listdir(dir)]
-    #         while name + f'_{run_id}' + '.csv' in folders:
-    #             run_id += 1
-    #     name = prefix + '.' + name + f'_{run_id}' + '.csv'
-    #     path = os.path.join(dir, name)
-    #     data.to_csv(path)
-    #     logger.info("save predict result to {}".format(path))
 
     def predict(self):
         FFs = self.modelhub.models.get('FF', None)
         metrics = []
         for ff_name, ff in FFs.items():
             result = dict()
-            #ff.evaluate(checkpoints_path=os.path.join(self.model_dir, ff_name))
             y_pred, metric_score = ff.evaluate()
             
             for k, v in self.datahub.targets.items():

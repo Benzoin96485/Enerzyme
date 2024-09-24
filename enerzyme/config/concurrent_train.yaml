@@ -117,9 +117,9 @@ Modelhub:
         - name: EnergyReduce                # Reduce atomic energy terms to the total energy
         - name: Force                       # Calculate the force from the total energy
 Trainer:
+  committee_size: 4
   active_learning: 
     active: true
-    committee_size: 4
     data_source: withheld
     error_lower_bound: 0.01
     error_upper_bound: 0.05

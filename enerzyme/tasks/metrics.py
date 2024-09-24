@@ -66,19 +66,17 @@ class Metrics(object):
         raw_metric_score["_judge_score"] = self.cal_judge_score(raw_metric_score)
         return raw_metric_score
 
-    def _early_stop_choice(self, wait, min_score, metric_score, max_score, model, dump_dir, patience, epoch):
+    def _early_stop_choice(self, wait, min_score, metric_score, max_score, save_handle, patience, epoch):
         judge_score = metric_score.get("_judge_score", self.cal_judge_score(metric_score))
-        is_early_stop, min_score, wait = self._judge_early_stop_decrease(wait, judge_score, min_score, model, dump_dir, patience, epoch)
+        is_early_stop, min_score, wait = self._judge_early_stop_decrease(wait, judge_score, min_score, save_handle, patience, epoch)
         return is_early_stop, min_score, wait, max_score
 
-    def _judge_early_stop_decrease(self, wait, score, min_score, model, dump_dir, patience, epoch):
+    def _judge_early_stop_decrease(self, wait, score, min_score, save_handle, patience, epoch):
         is_early_stop = False
         if score <= min_score:
             min_score = score
             wait = 0
-            info = {'model_state_dict': model.state_dict()}
-            os.makedirs(dump_dir, exist_ok=True)
-            torch.save(info, os.path.join(dump_dir, f'model_best.pth'))
+            save_handle()
         elif score >= min_score:
             wait += 1
             if wait == patience:

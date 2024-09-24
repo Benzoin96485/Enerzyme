@@ -9,7 +9,7 @@ from ase.optimize import BFGS
 from ase.units import Hartree, fs
 from ..data import full_neighbor_list
 from ..utils import logger
-from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input
+from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input, _load_state_dict
 
 class ASECalculator(Calculator):
     implemented_properties = ["energy", "forces", "dipole", "charges"]
@@ -74,7 +74,7 @@ class ASECalculator(Calculator):
 
 
 class Simulation:
-    def __init__(self, config, model, out_dir, transform):
+    def __init__(self, config, model, model_path, out_dir, transform):
         self.environment = config.Simulation.environment
         self.task = config.Simulation.task
         self.structure_file = config.System.structure_file
@@ -93,6 +93,7 @@ class Simulation:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
         # single ff simulation
         self.model = model.to(self.device).type(self.dtype)
+        _load_state_dict(model, self.device, model_path)
         self.model.eval()
         self.out_dir = out_dir
         # self.simulation_config = {k: (v.to_dict() if hasattr(v, "to_dict") else v) for k, v in config.Simulation.items() if not hasattr(self, k)}
