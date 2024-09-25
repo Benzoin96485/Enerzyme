@@ -1,12 +1,44 @@
+import os.path as osp
 from collections import defaultdict
+from typing import Literal, Optional
 from ..utils import logger
 from ..data import DataHub
 from ..tasks import Trainer
-from .ff import FF
+from .ff import FF_single, FF_committee
 
 
 def get_model_str(model_id, model_params):
     return f"{model_id}-{model_params.architecture}" + (f"-{model_params.suffix}" if model_params.suffix else "")
+
+
+def get_pretrain_path(pretrain_path: Optional[str]=None, preference: Literal["best", "last"]="best", model_rank: Optional[int]=None):
+    if pretrain_path is not None:
+        if osp.isfile(pretrain_path):
+            return pretrain_path
+        elif osp.isdir(pretrain_path):
+            if model_rank == None:
+                model_rank = ''
+            found_path = None
+            best_path = osp.join(pretrain_path, f"model{model_rank}_best.pth")
+            last_path = osp.join(pretrain_path, f"model{model_rank}_last.pth")
+            print(best_path, last_path)
+            if preference == "best":
+                if osp.isfile(best_path):
+                    found_path = best_path
+                elif osp.isfile(last_path):
+                    found_path = last_path
+            elif preference == "last":
+                if osp.isfile(last_path):
+                    found_path = last_path
+                elif osp.isfile(best_path):
+                    found_path = best_path
+            if found_path is None:
+                if model_rank is None:
+                    return get_pretrain_path(pretrain_path, preference, 0)
+                raise FileNotFoundError(f"Pretrained model{' ' if model_rank is None else 'ranked ' + str(model_rank)} not found in {pretrain_path}")
+            return found_path
+        else:
+            raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
 
 
 class ModelHub:
@@ -43,9 +75,9 @@ class ModelHub:
                 trainer = Trainer(self.out_dir, metric_config=metric_config, **trainer_config)   
                 
             if model_params['active']:
-                self.models['FF'][model_str] = self._init_ff(trainer, model_str, **model_params)
-    
-    def _init_ff(self, trainer, model_str, **model_params):
-        logger.info("Initiate {} Force Field".format(model_str))
-        model = FF(self.datahub, trainer, model_str, **model_params)
-        return model
+                if trainer.committee_size > 1:
+                    logger.info(f"Initiate {model_str} Force Field Committee of {trainer.committee_size}")
+                    self.models['FF'][model_str] = FF_committee(trainer.committee_size, self.datahub, trainer, model_str, **model_params)
+                else:
+                    logger.info(f"Initiate {model_str} Force Field")
+                    self.models['FF'][model_str] = FF_single(self.datahub, trainer, model_str, **model_params)

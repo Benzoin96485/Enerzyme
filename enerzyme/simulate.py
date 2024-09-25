@@ -1,7 +1,7 @@
 import os
 import torch
-from .models import FF_REGISTER, get_model_str, build_model
-from .tasks import Simulation
+from .models import FF_REGISTER, get_model_str, build_model, get_pretrain_path
+from .tasks import Simulation, _load_state_dict
 from .utils import YamlHandler, logger
 from .data import Transform
 
@@ -32,11 +32,8 @@ class FFSimulate:
             model = FF_REGISTER[FF_params.architecture](**FF_params.build_params)
         else:
             model = build_model(FF_params.architecture, FF_params.layers, FF_params.build_params)
-        model_path = os.path.join(self.model_dir, model_str, f'model_best.pth')
-        model_dict = torch.load(model_path)["model_state_dict"]
-        model.load_state_dict(model_dict)
-        logger.info(f"load model success from {model_path}")
-        self.simulations.append(Simulation(self.config, model, self.out_dir, self.transform))
+        model_path = get_pretrain_path(os.path.join(self.model_dir, model_str), "best")
+        self.simulations.append(Simulation(self.config, model, model_path, self.out_dir, self.transform))
         
     def run(self):
         for simulation in self.simulations:

@@ -56,6 +56,13 @@ class FieldDataset(Dataset):
 
     def __contains__(self, k) -> bool:
         return k in self.data
+    
+    def __len__(self) -> int:
+        for v in self.data.values():
+            if len(v) != 1:
+                return len(v)
+        else:
+            return 1
 
     def items(self):
         return self.data.items()
