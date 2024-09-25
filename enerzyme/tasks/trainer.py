@@ -20,7 +20,6 @@ from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
 from .monitor import Monitor
-from ..models.modelhub import get_pretrain_path
 from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform, full_neighbor_list
 from ..utils import logger
 from .metrics import Metrics
@@ -266,7 +265,6 @@ class Trainer:
 
             if self.use_ema:
                 cm = ema.average_parameters()
-                cm = ema.state_dict
             else:
                 cm = contextlib.nullcontext()
             y_preds = None
@@ -308,7 +306,8 @@ class Trainer:
                 dump_dir=dump_dir,  
                 transform=transform, 
                 epoch=epoch, 
-                load_model=True
+                load_model=True,
+                model_rank=model_rank
             )
         return y_preds
     
@@ -319,6 +318,7 @@ class Trainer:
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         if load_model == True:
+            from ..models import get_pretrain_path
             pretrain_path = get_pretrain_path(dump_dir, "best", model_rank)
             self.load_state_dict(model, pretrain_path)
             

@@ -4,7 +4,7 @@ from .utils import YamlHandler, logger
 from .data import DataHub
 from .tasks import Trainer
 from .models import ModelHub
-
+from .models import FF_single, FF_committee
 
 class FFPredict(object):
     def __init__(self, model_dir=None, output_dir=None, config_path=None):
@@ -52,8 +52,12 @@ class FFPredict(object):
             y_pred, metric_score = ff.evaluate()
             
             for k, v in self.datahub.targets.items():
-                result[f"predict_{k}"] = y_pred[k]
                 result[k] = v
+                if hasattr(ff, "size") and ff.size > 1:
+                    for i, y_pred_single in enumerate(y_pred):
+                        result[f"predict{i}_{k}"] = y_pred_single[k]
+                else:
+                    result[f"predict_{k}"] = y_pred[k]
             os.makedirs(self.output_dir, exist_ok=True)
             pd.DataFrame({k: [vi for vi in v] for k, v in result.items()}).to_pickle(os.path.join(self.datahub.preload_path, f"{ff_name}-prediction.pkl"))
             metrics.append(metric_score)

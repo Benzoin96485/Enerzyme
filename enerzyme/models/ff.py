@@ -2,7 +2,6 @@ import os
 from inspect import signature
 from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable
 import joblib
-import torch
 import pandas as pd
 import numpy as np
 from torch.nn import Module
@@ -124,7 +123,8 @@ class BaseFFLauncher:
         self.metrics = self.trainer.metrics
         self.out_dir = self.trainer.out_dir
         self.dump_dir = os.path.join(self.out_dir, self.model_str)
-        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in loss.items()}
+        self.loss_params = loss
+        self.loss_terms = {}
         self.trainer._set_seed(self.trainer.seed)
 
     def _init_model(self, build_params: Dict[str, Any], pretrain_path: Optional[str]=None) -> Module:
@@ -132,12 +132,8 @@ class BaseFFLauncher:
             model = FF_REGISTER[self.architecture](**build_params)
         else:
             model = build_model(self.architecture, self.layer_params, self.build_params)
+        self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in self.loss_params.items()}
         print(model.__str__())
-        # if pretrain_path is None and self.pretrain_path is not None:
-        #     pretrain_path = self.pretrain_path
-        # model_dict = torch.load(pretrain_path, map_location=self.trainer.device)["model_state_dict"]
-        # model.load_state_dict(model_dict, strict=False)
-        # logger.info(f"load model success from {self.pretrain_path}!")
         return model
 
     def _init_partition(self) -> Tuple[FFDataset, Optional[FFDataset], Optional[FFDataset]]:
@@ -244,9 +240,9 @@ class FF_committee(BaseFFLauncher):
             pretrain_path=None
         )
         self.size = committee_size
+        self.pretrain_path = []
         if pretrain_path is not None:
             if os.path.isdir(pretrain_path):
-                self.pretrain_path = []
                 for i in range(committee_size):
                     single_pretrain_path = f"{pretrain_path}/model{i}_best.pth"
                     if os.path.isfile(single_pretrain_path):
@@ -255,6 +251,8 @@ class FF_committee(BaseFFLauncher):
                         raise FileNotFoundError(f"Pretrained model {i} not found at {pretrain_path}")
             else:
                 raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
+        else:
+            self.pretrain_path = [None] * committee_size
 
     def train(self) -> None:
         train_dataset, valid_dataset, test_dataset = self._init_partition()
@@ -262,6 +260,7 @@ class FF_committee(BaseFFLauncher):
             self.model = self._init_model(self.build_params)
             y_pred = self.trainer.fit_predict(
                 model=self.model, 
+                pretrain_path=self.pretrain_path[i],
                 train_dataset=train_dataset, 
                 valid_dataset=valid_dataset, 
                 test_dataset=test_dataset,
@@ -270,17 +269,40 @@ class FF_committee(BaseFFLauncher):
                 dump_dir=self.dump_dir,
                 model_rank=i
             )
-            logger.info(f"{self.model_str} FF ({i} / {self.size}) done!")
+            logger.info(f"{self.model_str} FF ({i + 1} / {self.size}) done!")
             logger.info(f"{self.model_str} Model ({i}) saved!")
             delattr(self, "model")
+            if test_dataset is not None:
+                y_test = test_dataset.targets
+                self.datahub.transform.inverse_transform(y_test)
+                self.dump(y_pred, self.dump_dir, f'test{i}.data')
+                metric_score = self.metrics.cal_metric(y_test, y_pred)
+                logger.info(f"{self.model_str} FF ({i}) metrics score: \n{metric_score}")
+                self.dump(metric_score, self.dump_dir, f'metric{i}.result')
+                logger.info(f"Metric result ({i}) saved!")
 
     def evaluate(self) -> None:
-        pass
-
-    def dump(self) -> None:
-        pass
-
-    def count_parameters(self) -> int:
-        pass
-
-
+        X = self.datahub.features
+        y = self.datahub.targets
+        test_dataset = FFDataset(X, y, data_in_memory=True)
+        y_preds = []
+        metric_scores = []
+        for i in range(self.size):
+            self.model = self._init_model(self.build_params)
+            logger.info(f"start evaluate FF:{self.model_str} ({i})")
+            y_pred, _, metric_score = self.trainer.predict(
+                model=self.model, 
+                dataset=test_dataset, 
+                loss_terms=self.loss_terms, 
+                dump_dir=self.dump_dir, 
+                transform=self.datahub.transform, 
+                epoch=1, 
+                load_model=True,
+                model_rank=i
+            )
+            delattr(self, "model")
+            logger.info(f"{self.model_str} FF ({i}) metrics score: \n{metric_score}")
+            logger.info(f"{self.model_str} FF ({i}) done!")
+            y_preds.append(y_pred)
+            metric_scores.append(metric_score)
+        return y_preds, pd.DataFrame(metric_scores, index=[self.model_str + str(i) for i in range(self.size)])
