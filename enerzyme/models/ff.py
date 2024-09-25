@@ -185,7 +185,7 @@ class FF_single(BaseFFLauncher):
     def train(self) -> None:
         logger.info("start training FF:{}".format(self.model_str))
         train_dataset, valid_dataset, test_dataset = self._init_partition()
-        y_pred = self.trainer.fit_predict(
+        y_pred, metric_score = self.trainer.fit_predict(
             model=self.model, 
             train_dataset=train_dataset, 
             valid_dataset=valid_dataset, 
@@ -197,10 +197,7 @@ class FF_single(BaseFFLauncher):
         logger.info("{} FF done!".format(self.model_str))
         logger.info("{} Model saved!".format(self.model_str))
         if test_dataset is not None:
-            y_test = test_dataset.targets
-            self.datahub.transform.inverse_transform(y_test)
             self.dump(y_pred, self.dump_dir, 'test.data')
-            metric_score = self.metrics.cal_metric(y_test, y_pred)
             self.dump(metric_score, self.dump_dir, 'metric.result')
             logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
             logger.info("Metric result saved!")
@@ -210,7 +207,7 @@ class FF_single(BaseFFLauncher):
         X = self.datahub.features
         y = self.datahub.targets
         test_dataset = FFDataset(X, y, data_in_memory=True)
-        y_pred, _, metric_score = self.trainer.predict(
+        y_pred,_ , metric_score = self.trainer.predict(
             model=self.model, 
             dataset=test_dataset, 
             loss_terms=self.loss_terms, 
@@ -258,7 +255,7 @@ class FF_committee(BaseFFLauncher):
         train_dataset, valid_dataset, test_dataset = self._init_partition()
         for i in range(self.size):
             self.model = self._init_model(self.build_params)
-            y_pred = self.trainer.fit_predict(
+            y_pred, metric_score = self.trainer.fit_predict(
                 model=self.model, 
                 pretrain_path=self.pretrain_path[i],
                 train_dataset=train_dataset, 
@@ -273,10 +270,7 @@ class FF_committee(BaseFFLauncher):
             logger.info(f"{self.model_str} Model ({i}) saved!")
             delattr(self, "model")
             if test_dataset is not None:
-                y_test = test_dataset.targets
-                self.datahub.transform.inverse_transform(y_test)
                 self.dump(y_pred, self.dump_dir, f'test{i}.data')
-                metric_score = self.metrics.cal_metric(y_test, y_pred)
                 logger.info(f"{self.model_str} FF ({i}) metrics score: \n{metric_score}")
                 self.dump(metric_score, self.dump_dir, f'metric{i}.result')
                 logger.info(f"Metric result ({i}) saved!")

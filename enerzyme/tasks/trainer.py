@@ -196,7 +196,7 @@ class Trainer:
         model: Module, pretrain_path: Optional[str],
         train_dataset: Dataset, valid_dataset: Dataset, 
         loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
-        test_dataset: Optional[Dataset]=None, model_rank=None) -> Optional[defaultdict[Any]]:
+        test_dataset: Optional[Dataset]=None, model_rank=None) -> Tuple[Optional[defaultdict[Any]], Dict]:
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -299,7 +299,7 @@ class Trainer:
                 break
 
         if test_dataset is not None:
-            y_preds, _, _ = self.predict(
+            y_preds, _, metric_score = self.predict(
                 model=model, 
                 dataset=test_dataset, 
                 loss_terms=loss_terms, 
@@ -309,7 +309,9 @@ class Trainer:
                 load_model=True,
                 model_rank=model_rank
             )
-        return y_preds
+        else:
+            metric_score = None
+        return y_preds, metric_score
     
     def _early_stop_choice(self, wait, min_loss, metric_score, max_score, save_handle, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, max_score, save_handle, patience, epoch)
