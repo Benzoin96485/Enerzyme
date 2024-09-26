@@ -118,7 +118,7 @@ Modelhub:
         - name: Force                       # Calculate the force from the total energy
 Trainer:
   committee_size: 4
-  active_learning: 
+  active_learning_params: 
     active: true
     data_source: withheld
     error_lower_bound: 0.01
@@ -164,3 +164,4 @@ Trainer:
   ema_use_num_updates: true                 # if number of updates is used in exponential moving average, default true
   data_in_memory: false                     # if whole training datasets are loaded into memory, default false
   amsgrad: true                             # if amsgrad is used in Adam optimizer, default true
+      

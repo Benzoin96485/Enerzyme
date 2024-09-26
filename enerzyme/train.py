@@ -31,4 +31,7 @@ class FFTrain(object):
     def train_all(self):
         FFs = self.modelhub.models.get('FF', dict())
         for ff in FFs.values():
-            ff.train()
+            if ff.trainer.active_learning:
+                ff.active_learn()
+            else:
+                ff.train()

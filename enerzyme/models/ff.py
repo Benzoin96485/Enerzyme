@@ -1,11 +1,12 @@
 import os
 from inspect import signature
-from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable
+from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable, Union
+from abc import ABC, abstractmethod
 import joblib
 import pandas as pd
 import numpy as np
 from torch.nn import Module
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Subset
 from ..data import DataHub, FieldDataset
 from ..tasks import Trainer
 from .loss import LOSS_REGISTER
@@ -83,6 +84,9 @@ class FFDataset(Dataset):
     def __init__(self, features: FieldDataset, targets: FieldDataset, indices: Optional[Iterable[int]]=None, data_in_memory: bool=True) -> None:
         if indices is None:
             indices = np.arange(0, len(features["Ra"]))
+        self.data_in_memory = data_in_memory
+        self.full_features = features
+        self.full_targets = targets
         if data_in_memory:
             self.features = features.load_subset(indices)
             self.targets = targets.load_subset(indices)
@@ -91,15 +95,25 @@ class FFDataset(Dataset):
             self.features = features
             self.targets = targets
             self.indices = indices
+        self.raw_indices = np.array(indices)
 
     def __len__(self) -> int:
         return len(self.indices)
     
     def __getitem__(self, idx: int) -> Tuple[Dict[str, Iterable], Dict[str, Iterable]]:
         return self.features.loc(self.indices[idx]), self.targets.loc(self.indices[idx])
+    
+    def expand_with_indices(self, new_indices: List[int]) -> None:
+        self.raw_indices = np.concatenate((self.raw_indices, new_indices))
+        if self.data_in_memory:
+            self.features = self.full_features.load_subset(self.raw_indices)
+            self.targets = self.full_targets.load_subset(self.raw_indices)
+            self.indices = np.arange(0, len(self.raw_indices))
+        else:
+            self.indices = self.raw_indices
 
 
-class BaseFFLauncher:
+class BaseFFLauncher(ABC):
     def __init__(self, 
         datahub: DataHub, 
         trainer: Trainer, 
@@ -127,7 +141,7 @@ class BaseFFLauncher:
         self.loss_terms = {}
         self.trainer._set_seed(self.trainer.seed)
 
-    def _init_model(self, build_params: Dict[str, Any], pretrain_path: Optional[str]=None) -> Module:
+    def _init_model(self, build_params: Dict[str, Any]) -> Module:
         if self.architecture in FF_REGISTER:
             model = FF_REGISTER[self.architecture](**build_params)
         else:
@@ -136,26 +150,50 @@ class BaseFFLauncher:
         print(model.__str__())
         return model
 
-    def _init_partition(self) -> Tuple[FFDataset, Optional[FFDataset], Optional[FFDataset]]:
+    def _init_partition(self) -> Dict[str, FFDataset]:
         X = self.datahub.features
         y = self.datahub.targets
+        partitions = dict()
         split = self.splitter.split(X, preload_path=self.datahub.preload_path)
-        tr_idx = split["training"]
-        train_dataset = FFDataset(X, y, tr_idx, self.trainer.data_in_memory)
-        if "validation" in split and len(split["validation"]) > 0:
-            vl_idx = split["validation"]
-            valid_dataset = FFDataset(X, y, vl_idx, True)
-        else:
-            valid_dataset = None
-        if "test" in split and len(split["test"]) > 0:
-            te_idx = split["test"]
-            test_dataset = FFDataset(X, y, te_idx, True)
-            y_test = test_dataset.targets
-            y_test["Za"] = test_dataset.features["Za"]
-        else:
-            test_dataset = None
-        return train_dataset, valid_dataset, test_dataset
+        for k, v in split.items():
+            if len(v) > 0:
+                if k == "training":
+                    if "withheld" in split:
+                        partitions[k] = FFDataset(X, y, v, False)
+                    else:
+                        partitions[k] = FFDataset(X, y, v, self.trainer.data_in_memory)
+                elif k == "withheld":
+                    partitions[k] = FFDataset(X, y, v, False)
+                else:
+                    partitions[k] = FFDataset(X, y, v, True)
+        return partitions
     
+    def _init_default_partition(self) -> Tuple[FFDataset, Optional[FFDataset], Optional[FFDataset]]:
+        partitions = self._init_partition()
+        return partitions["training"], partitions.get("validation", None), partitions.get("test", None)
+    
+    @abstractmethod
+    def _train(
+        self, 
+        train_dataset: FFDataset, 
+        valid_dataset: Optional[FFDataset]=None, 
+        test_dataset: Optional[FFDataset]=None
+    ) -> None:
+        ...
+
+    @abstractmethod
+    def _evaluate(self, dataset: FFDataset) -> Tuple[Union[Dict, List[Dict]], pd.DataFrame]:
+        ...
+
+    def train(self) -> None:
+        self._train(*self._init_default_partition())
+
+    def evaluate(self) -> Tuple[Union[Dict, List[Dict]], pd.DataFrame]:
+        X = self.datahub.features
+        y = self.datahub.targets
+        test_dataset = FFDataset(X, y, data_in_memory=True)
+        return self._evaluate(test_dataset)
+
     def dump(self, data: Any, dump_dir: str, name: str) -> None:
         path = os.path.join(dump_dir, name)
         if not os.path.exists(dump_dir):
@@ -182,9 +220,13 @@ class FF_single(BaseFFLauncher):
                 raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
         self.model = self._init_model(self.build_params)
     
-    def train(self) -> None:
-        logger.info("start training FF:{}".format(self.model_str))
-        train_dataset, valid_dataset, test_dataset = self._init_partition()
+    def _train(
+        self, 
+        train_dataset: FFDataset, 
+        valid_dataset: Optional[FFDataset]=None, 
+        test_dataset: Optional[FFDataset]=None
+    ) -> None:
+        logger.info("start training FF: {}".format(self.model_str))
         y_pred, metric_score = self.trainer.fit_predict(
             model=self.model, 
             train_dataset=train_dataset, 
@@ -202,14 +244,11 @@ class FF_single(BaseFFLauncher):
             logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
             logger.info("Metric result saved!")
 
-    def evaluate(self):
+    def _evaluate(self, dataset: FFDataset) -> Tuple[Dict, pd.DataFrame]:
         logger.info("start evaluate FF:{}".format(self.model_str))
-        X = self.datahub.features
-        y = self.datahub.targets
-        test_dataset = FFDataset(X, y, data_in_memory=True)
         y_pred,_ , metric_score = self.trainer.predict(
             model=self.model, 
-            dataset=test_dataset, 
+            dataset=dataset, 
             loss_terms=self.loss_terms, 
             dump_dir=self.dump_dir, 
             transform=self.datahub.transform, 
@@ -251,9 +290,9 @@ class FF_committee(BaseFFLauncher):
         else:
             self.pretrain_path = [None] * committee_size
 
-    def train(self) -> None:
-        train_dataset, valid_dataset, test_dataset = self._init_partition()
+    def _train(self, train_dataset, valid_dataset=None, test_dataset=None) -> None:
         for i in range(self.size):
+            logger.info(f"start training FF: {self.model_str} ({i})")
             self.model = self._init_model(self.build_params)
             y_pred, metric_score = self.trainer.fit_predict(
                 model=self.model, 
@@ -275,10 +314,7 @@ class FF_committee(BaseFFLauncher):
                 self.dump(metric_score, self.dump_dir, f'metric{i}.result')
                 logger.info(f"Metric result ({i}) saved!")
 
-    def evaluate(self) -> None:
-        X = self.datahub.features
-        y = self.datahub.targets
-        test_dataset = FFDataset(X, y, data_in_memory=True)
+    def _evaluate(self, dataset: FFDataset) -> Tuple[Union[Dict, List[Dict]], pd.DataFrame]:
         y_preds = []
         metric_scores = []
         for i in range(self.size):
@@ -286,7 +322,7 @@ class FF_committee(BaseFFLauncher):
             logger.info(f"start evaluate FF:{self.model_str} ({i})")
             y_pred, _, metric_score = self.trainer.predict(
                 model=self.model, 
-                dataset=test_dataset, 
+                dataset=dataset, 
                 loss_terms=self.loss_terms, 
                 dump_dir=self.dump_dir, 
                 transform=self.datahub.transform, 
@@ -300,3 +336,45 @@ class FF_committee(BaseFFLauncher):
             y_preds.append(y_pred)
             metric_scores.append(metric_score)
         return y_preds, pd.DataFrame(metric_scores, index=[self.model_str + str(i) for i in range(self.size)])
+
+    def active_learn(self) -> None:
+        from ..tasks.active_learning import max_Fa_norm_std_picking
+        partitions = self._init_partition()
+        training_set = partitions["training"]
+        withheld_set = partitions["withheld"]
+        params = self.trainer.active_learning_params
+        lb = params["error_lower_bound"]
+        ub = params["error_upper_bound"]
+        data_source = params.get("data_source", "withheld")
+        sample_size = params["sample_size"]
+        
+        if data_source == "withheld":
+            withheld_size = len(withheld_set)
+            withheld_mask = np.full(withheld_size, True)
+            max_iter = (withheld_size + sample_size - 1) // sample_size
+            for i in range(max_iter):
+                self._train(training_set)
+                unmasked_relative_indices = withheld_mask.nonzero()[0]
+                unmasked_size = len(unmasked_relative_indices)
+                if unmasked_size == 0:
+                    logger.info(f"Withheld set is exhausted and active learning stops at iteration {i} / {max_iter}!")
+                    break
+                n_part = (unmasked_size + sample_size - 1) // sample_size
+                masked_relative_indices = []
+                for i in range(n_part):
+                    part_relative_indices = unmasked_relative_indices[i * sample_size: (i + 1) * sample_size]
+                    withheld_part = Subset(withheld_set, part_relative_indices)
+                    y_preds, _ = self._evaluate(withheld_part)
+                    masked_relative_indices += [part_relative_indices[idx] for idx in max_Fa_norm_std_picking(y_preds, lb, ub)]
+                    if len(masked_relative_indices) >= sample_size:
+                        break
+                if len(masked_relative_indices) == 0:
+                    logger.info(f"No uncertain samples are found and active learning stops at iteration {i + 1} / {max_iter}!")
+                    break
+                masked_relative_indices = masked_relative_indices[:sample_size]
+                expand_absolute_indices = withheld_set.raw_indices[masked_relative_indices]
+                training_set.expand_with_indices(expand_absolute_indices)
+                withheld_mask[masked_relative_indices] = False
+                logger.info(f"Active learning iteration {i + 1} / {max_iter} finished!")
+        else:
+            raise NotImplementedError
