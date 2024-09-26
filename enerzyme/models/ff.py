@@ -342,7 +342,6 @@ class FF_committee(BaseFFLauncher):
         partitions = self._init_partition()
         training_set = partitions["training"]
         withheld_set = partitions["withheld"]
-        stop_flag = True
         params = self.trainer.active_learning_params
         lb = params["error_lower_bound"]
         ub = params["error_upper_bound"]

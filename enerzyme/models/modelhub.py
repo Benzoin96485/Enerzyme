@@ -21,7 +21,6 @@ def get_pretrain_path(pretrain_path: Optional[str]=None, preference: Literal["be
             found_path = None
             best_path = osp.join(pretrain_path, f"model{model_rank}_best.pth")
             last_path = osp.join(pretrain_path, f"model{model_rank}_last.pth")
-            print(best_path, last_path)
             if preference == "best":
                 if osp.isfile(best_path):
                     found_path = best_path

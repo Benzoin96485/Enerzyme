@@ -76,9 +76,3 @@ def addict2dict(addict_obj):
         return dict_obj
     else:
         return addict_obj
-
-
-if __name__ == '__main__':
-    yaml_handler = YamlHandler('../config/default.yaml')
-    config = yaml_handler.read_yaml()
-    print(config.Modelhub)
