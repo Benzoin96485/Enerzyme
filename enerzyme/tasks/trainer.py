@@ -159,9 +159,11 @@ class Trainer:
         self.ema_use_num_updates = params.get("ema_use_num_updates", True)
         self.dtype = DTYPE_MAPPING[params.get('dtype', "float32")]
         self.committee_size = params.get("committee_size", 1)
-        active_learning_params = params.get("active_learning", None)
-        if active_learning_params is not None and active_learning_params.get("active", False):
+        self.active_learning_params = params.get("active_learning_params", None)
+        if self.active_learning_params is not None and self.active_learning_params.get("active", False):
             self.active_learning = True
+        else:
+            self.active_learning = False
 
     def decorate_batch_input(self, batch):
         return _decorate_batch_input(batch, self.dtype, self.device)
