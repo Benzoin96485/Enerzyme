@@ -141,7 +141,7 @@ class BaseFFLauncher(ABC):
         self.loss_terms = {}
         self.trainer._set_seed(self.trainer.seed)
 
-    def _init_model(self, build_params: Dict[str, Any], pretrain_path: Optional[str]=None) -> Module:
+    def _init_model(self, build_params: Dict[str, Any]) -> Module:
         if self.architecture in FF_REGISTER:
             model = FF_REGISTER[self.architecture](**build_params)
         else:
@@ -338,38 +338,38 @@ class FF_committee(BaseFFLauncher):
         return y_preds, pd.DataFrame(metric_scores, index=[self.model_str + str(i) for i in range(self.size)])
 
     def active_learn(self) -> None:
-        from .active_learning import max_Fa_stddev_picking
+        from ..tasks.active_learning import max_Fa_norm_std_picking
         partitions = self._init_partition()
-        training_set = partitions["train"]
+        training_set = partitions["training"]
         withheld_set = partitions["withheld"]
         stop_flag = True
         params = self.trainer.active_learning_params
         lb = params["error_lower_bound"]
         ub = params["error_upper_bound"]
         data_source = params.get("data_source", "withheld")
-        sample_size = params.get("data_source", "sample_size")
+        sample_size = params["sample_size"]
         
         if data_source == "withheld":
             withheld_size = len(withheld_set)
             withheld_mask = np.full(withheld_size, True)
             max_iter = (withheld_size + sample_size - 1) // sample_size
             for i in range(max_iter):
-                self.train(training_set)
+                self._train(training_set)
                 unmasked_relative_indices = withheld_mask.nonzero()[0]
                 unmasked_size = len(unmasked_relative_indices)
                 if unmasked_size == 0:
                     logger.info(f"Withheld set is exhausted and active learning stops at iteration {i} / {max_iter}!")
                     break
                 n_part = (unmasked_size + sample_size - 1) // sample_size
-                masked_indices = []
+                masked_relative_indices = []
                 for i in range(n_part):
-                    part_relative_indices = unmasked_relative_indices[i * sample_size, (i + 1) * sample_size]
+                    part_relative_indices = unmasked_relative_indices[i * sample_size: (i + 1) * sample_size]
                     withheld_part = Subset(withheld_set, part_relative_indices)
                     y_preds, _ = self._evaluate(withheld_part)
-                    masked_relative_indices += [part_relative_indices[idx] for idx in max_Fa_stddev_picking(y_preds, lb, ub)]
-                    if len(masked_indices) > sample_size:
+                    masked_relative_indices += [part_relative_indices[idx] for idx in max_Fa_norm_std_picking(y_preds, lb, ub)]
+                    if len(masked_relative_indices) >= sample_size:
                         break
-                if len(masked_indices) == 0:
+                if len(masked_relative_indices) == 0:
                     logger.info(f"No uncertain samples are found and active learning stops at iteration {i + 1} / {max_iter}!")
                     break
                 masked_relative_indices = masked_relative_indices[:sample_size]

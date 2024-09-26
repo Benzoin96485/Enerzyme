@@ -281,7 +281,6 @@ class Trainer:
                         epoch=epoch, 
                         load_model=False,
                     )
-                    end_time = time.time()
                     total_val_loss = np.mean(val_loss)
                     _score = metric_score["_judge_score"]
                     _metric = str(self.metrics)
@@ -293,7 +292,8 @@ class Trainer:
                         (f', Patience [{wait}/{self.patience}], min_val_judge_score: {min_val_loss:.4f}' if wait else '')
             else:
                 is_early_stop = False
-            
+                
+            end_time = time.time()
             message += f', {(end_time - start_time):.1f}s'
             logger.info(message)
             self.save_state_dict(model, dump_dir, ema, "last", model_rank)

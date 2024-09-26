@@ -9,7 +9,7 @@ def max_Fa_norm_std_picking(y_preds, lb, ub) -> List[int]:
     sample_size = len(y_preds[0]["Fa"])
     picked = []
     for i in tqdm(range(sample_size)):
-        Fas = np.array([y_preds[j]["Fa"] for j in range(committee_size)])
+        Fas = np.array([y_preds[j]["Fa"][i] for j in range(committee_size)])
         Fa_mean = np.mean(Fas, axis=0, keepdims=True)
         Fa_norm_dev = np.linalg.norm(Fas - Fa_mean, axis=2)
         Fa_norm_std = np.mean(Fa_norm_dev, axis=0)
