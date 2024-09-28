@@ -119,7 +119,9 @@ def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optiona
         ema.load_state_dict(loaded_info["ema_state_dict"])
     else:
         if "ema_state_dict" in loaded_info:
-            model.load_state_dict(loaded_info["ema_state_dict"]["collected_params"])
+            ema = ExponentialMovingAverage(model.parameters(), decay=1.0)
+            ema.load_state_dict(loaded_info["ema_state_dict"])
+            ema.copy_to()
         else:
             model.load_state_dict(loaded_info["model_state_dict"])
     logger.info(f"load model success from {pretrain_path}!")
@@ -296,7 +298,8 @@ class Trainer:
             end_time = time.time()
             message += f', {(end_time - start_time):.1f}s'
             logger.info(message)
-            self.save_state_dict(model, dump_dir, ema, "last", model_rank)
+            with cm:
+                self.save_state_dict(model, dump_dir, ema, "last", model_rank)
             if is_early_stop:
                 break
 
