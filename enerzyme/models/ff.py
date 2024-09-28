@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from torch.nn import Module
 from torch.utils.data import Dataset, Subset
+
 from ..data import DataHub, FieldDataset
 from ..tasks import Trainer
 from .loss import LOSS_REGISTER
@@ -49,7 +50,8 @@ def build_layer(layer: Callable, layer_params: Dict[str, Any], build_params: Dic
 def build_model(
     architecture: str, 
     layer_params: Optional[List[Dict[Literal["name", "params"], Any]]]=None, 
-    build_params: Optional[Dict]=None
+    build_params: Optional[Dict]=None,
+    verbose: int=1
 ) -> Module:
     Core, default_build_params, default_layer_params = get_ff_core(architecture)
     if layer_params is None:
@@ -73,7 +75,8 @@ def build_model(
         layer = build_layer(Layer, params, build_params, built_layers)
         if layer_name == "Core":
             core = layer
-        logger.info(f"built {layer_name}")
+        if verbose:
+            logger.info(f"built {layer_name}")
         built_layers.append(layer)
     
     core.build(built_layers)
@@ -141,13 +144,14 @@ class BaseFFLauncher(ABC):
         self.loss_terms = {}
         self.trainer._set_seed(self.trainer.seed)
 
-    def _init_model(self, build_params: Dict[str, Any]) -> Module:
+    def _init_model(self, build_params: Dict[str, Any], verbose=1) -> Module:
         if self.architecture in FF_REGISTER:
             model = FF_REGISTER[self.architecture](**build_params)
         else:
-            model = build_model(self.architecture, self.layer_params, self.build_params)
+            model = build_model(self.architecture, self.layer_params, self.build_params, verbose)
         self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in self.loss_params.items()}
-        print(model.__str__())
+        if verbose:
+            print(model.__str__())
         return model
 
     def _init_partition(self) -> Dict[str, FFDataset]:
@@ -203,6 +207,7 @@ class BaseFFLauncher(ABC):
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
 
+
 class FF_single(BaseFFLauncher):
     def __init__(self, 
         datahub: DataHub, 
@@ -214,10 +219,7 @@ class FF_single(BaseFFLauncher):
         pretrain_path=None, **params
     ) -> None:
         super().__init__(datahub, trainer, model_str, loss, architecture, build_params, layers, pretrain_path)
-        if pretrain_path is not None and os.path.isdir(pretrain_path):
-            self.pretrain_path = f"{pretrain_path}/model_best.pth"
-            if self.pretrain_path is None:
-                raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
+        self.pretrain_path = get_pretrain_path(pretrain_path, "best", None)
         self.model = self._init_model(self.build_params)
     
     def _train(
@@ -229,6 +231,7 @@ class FF_single(BaseFFLauncher):
         logger.info("start training FF: {}".format(self.model_str))
         y_pred, metric_score = self.trainer.fit_predict(
             model=self.model, 
+            pretrain_path=self.pretrain_path,
             train_dataset=train_dataset, 
             valid_dataset=valid_dataset, 
             test_dataset=test_dataset,
@@ -277,23 +280,17 @@ class FF_committee(BaseFFLauncher):
         )
         self.size = committee_size
         self.pretrain_path = []
-        if pretrain_path is not None:
-            if os.path.isdir(pretrain_path):
-                for i in range(committee_size):
-                    single_pretrain_path = f"{pretrain_path}/model{i}_best.pth"
-                    if os.path.isfile(single_pretrain_path):
-                        self.pretrain_path.append(single_pretrain_path)
-                    else:
-                        raise FileNotFoundError(f"Pretrained model {i} not found at {pretrain_path}")
-            else:
-                raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
-        else:
-            self.pretrain_path = [None] * committee_size
+        self.verbose = 1
+
+        from .modelhub import get_pretrain_path
+        for i in range(committee_size):
+            self.pretrain_path.append(get_pretrain_path(pretrain_path, "best", i))
 
     def _train(self, train_dataset, valid_dataset=None, test_dataset=None) -> None:
         for i in range(self.size):
             logger.info(f"start training FF: {self.model_str} ({i})")
-            self.model = self._init_model(self.build_params)
+            self.model = self._init_model(self.build_params, self.verbose)
+            self.verbose = 0
             y_pred, metric_score = self.trainer.fit_predict(
                 model=self.model, 
                 pretrain_path=self.pretrain_path[i],
@@ -318,7 +315,7 @@ class FF_committee(BaseFFLauncher):
         y_preds = []
         metric_scores = []
         for i in range(self.size):
-            self.model = self._init_model(self.build_params)
+            self.model = self._init_model(self.build_params, self.verbose)
             logger.info(f"start evaluate FF:{self.model_str} ({i})")
             y_pred, _, metric_score = self.trainer.predict(
                 model=self.model, 

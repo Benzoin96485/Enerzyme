@@ -38,6 +38,8 @@ def get_pretrain_path(pretrain_path: Optional[str]=None, preference: Literal["be
             return found_path
         else:
             raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
+    else:
+        return None
 
 
 class ModelHub:

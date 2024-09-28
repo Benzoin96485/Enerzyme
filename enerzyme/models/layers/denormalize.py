@@ -43,4 +43,21 @@ class AtomicAffineLayer(nn.Module):
         for name, scale in self.scales.items():
             output[name] = output[name] * scale.gather(0, output["Za"])
         return output
+    
+    def _load_from_state_dict(self, state_dict: Dict[str, Tensor], *args, **kwargs):
+        for k, v in state_dict.items():
+            if k.endswith("shifts.Ea") or k.endswith("shifts.Qa") or k.endswith("scales.Ea") or k.endswith("scales.Qa"):
+                if len(v) > self.max_Za + 1:
+                    state_dict[k] = v[:self.max_Za + 1]
+                    print(len(v), ">")
+                elif len(v) < self.max_Za + 1:
+                    if k.endswith("shifts.Ea"):
+                        state_dict[k] = torch.concat([v, self.shifts.Ea[len(v):]], dim=0)
+                    if k.endswith("shifts.Qa"):
+                        state_dict[k] = torch.concat([v, self.shifts.Qa[len(v):]], dim=0)
+                    if k.endswith("scales.Ea"):
+                        state_dict[k] = torch.concat([v, self.scales.Ea[len(v):]], dim=0)
+                    if k.endswith("scales.Qa"):
+                        state_dict[k] = torch.concat([v, self.scales.Qa[len(v):]], dim=0)
+        super()._load_from_state_dict(state_dict, *args, **kwargs)
         
