@@ -359,8 +359,8 @@ class FF_committee(BaseFFLauncher):
                     break
                 n_part = (unmasked_size + sample_size - 1) // sample_size
                 masked_relative_indices = []
-                for i in range(n_part):
-                    part_relative_indices = unmasked_relative_indices[i * sample_size: (i + 1) * sample_size]
+                for j in range(n_part):
+                    part_relative_indices = unmasked_relative_indices[j * sample_size: (j + 1) * sample_size]
                     withheld_part = Subset(withheld_set, part_relative_indices)
                     y_preds, _ = self._evaluate(withheld_part)
                     masked_relative_indices += [part_relative_indices[idx] for idx in max_Fa_norm_std_picking(y_preds, lb, ub)]
@@ -373,6 +373,10 @@ class FF_committee(BaseFFLauncher):
                 expand_absolute_indices = withheld_set.raw_indices[masked_relative_indices]
                 training_set.expand_with_indices(expand_absolute_indices)
                 withheld_mask[masked_relative_indices] = False
+                np.savez(os.path.join(self.dump_dir, "active_learning_split.npz"), {
+                    "training": training_set.raw_indices,
+                    "withheld": withheld_set.raw_indices
+                })
                 logger.info(f"Active learning iteration {i + 1} / {max_iter} finished!")
         else:
             raise NotImplementedError
