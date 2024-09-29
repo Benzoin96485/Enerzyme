@@ -27,27 +27,11 @@ class FFTrain(object):
                 logger.warning('Overwrite output directory: {}'.format(self.out_dir))
             out_path = os.path.join(self.out_dir, 'config.yaml')
             self.yamlhandler.write_yaml(data = config, out_file_path = out_path)
-
-    # def update_config(self, config, **params):
-    #     for key, value in params.items():
-    #         if value is not None:
-    #             config[key] = value
-    #     return config
         
     def train_all(self):
-        FFs = self.modelhub.models.get('FF', None)
+        FFs = self.modelhub.models.get('FF', dict())
         for ff in FFs.values():
-            ff.train()
-        
-
-def get_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config_path', type=str, default='', 
-        help='training config'
-    )
-    parser.add_argument('-o', '--output_dir', type=str, default='../results',
-                    help='the output directory for saving artifact') 
-    parser.add_argument('-m', '--model_name', type=str,
-                        help='training single model name')      
-    args = parser.parse_args()
-    return args
+            if ff.trainer.active_learning:
+                ff.active_learn()
+            else:
+                ff.train()

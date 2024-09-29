@@ -4,7 +4,7 @@ from .utils import YamlHandler, logger
 from .data import DataHub
 from .tasks import Trainer
 from .models import ModelHub
-
+from .models import FF_single, FF_committee
 
 class FFPredict(object):
     def __init__(self, model_dir=None, output_dir=None, config_path=None):
@@ -43,32 +43,21 @@ class FFPredict(object):
         )
         self.modelhub = ModelHub(self.datahub, self.trainer, **params['Modelhub'])
         self.metrics = self.trainer.metrics
-    
-    # def save_predict(self, data, dir, name="predict"):
-    #     prefix = self.data_path.split('/')[-1].split('.')[0]
-    #     run_id = 0
-    #     if not os.path.exists(dir):
-    #         os.makedirs(dir)
-    #     else:
-    #         folders = [x for x in os.listdir(dir)]
-    #         while name + f'_{run_id}' + '.csv' in folders:
-    #             run_id += 1
-    #     name = prefix + '.' + name + f'_{run_id}' + '.csv'
-    #     path = os.path.join(dir, name)
-    #     data.to_csv(path)
-    #     logger.info("save predict result to {}".format(path))
 
     def predict(self):
         FFs = self.modelhub.models.get('FF', None)
         metrics = []
         for ff_name, ff in FFs.items():
             result = dict()
-            #ff.evaluate(checkpoints_path=os.path.join(self.model_dir, ff_name))
             y_pred, metric_score = ff.evaluate()
             
             for k, v in self.datahub.targets.items():
-                result[f"predict_{k}"] = y_pred[k]
                 result[k] = v
+                if hasattr(ff, "size") and ff.size > 1:
+                    for i, y_pred_single in enumerate(y_pred):
+                        result[f"predict{i}_{k}"] = y_pred_single[k]
+                else:
+                    result[f"predict_{k}"] = y_pred[k]
             os.makedirs(self.output_dir, exist_ok=True)
             pd.DataFrame({k: [vi for vi in v] for k, v in result.items()}).to_pickle(os.path.join(self.datahub.preload_path, f"{ff_name}-prediction.pkl"))
             metrics.append(metric_score)

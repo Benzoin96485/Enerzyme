@@ -116,111 +116,23 @@ Modelhub:
         #     learnable: true
         - name: EnergyReduce                # Reduce atomic energy terms to the total energy
         - name: Force                       # Calculate the force from the total energy
-    FF02:
-      suffix:
-      architecture: SpookyNet
-      active: true
-      pretrain_path: /pretrained/model      # Path to the folder containing a pretrained pth ("model_best.pth") or to the pth itself
-      loss:
-        mae:
-          Qa: 1
-          Fa: 91.656181
-          E: 1
-          M2: 3.2731016
-      Metric:
-        Qa:
-          rmse: 1
-        Fa:
-          rmse: 91.656181
-        E:
-          rmse: 1
-        M2:
-          rmse: 3.2731016
-      build_params:
-        dim_embedding: 64
-        num_rbf: 16
-        max_Za: 86
-        cutoff_sr: 5.291772105638412
-        Hartree_in_E: 1
-        Bohr_in_R: 0.5291772108
-        activation_fn: swish
-      layers:
-        - name: RangeSeparation
-          params:
-            cutoff_fn: bump
-        - name: ExponentialBernsteinRBF     # exponential Bernstein polynomial radial basis function
-          params:
-            no_basis_at_infinity: false     # if a basis "centered at infinity" is contained
-            init_alpha: 0.9448630629184640  # initial exponential scaling factor
-            exp_weighting: false            # if exponential weighted basis function is used
-            learnable_shape: true           # if centers and widths of Gaussians are learnable
-        - name: NuclearEmbedding            # embedding based on the atomic number and the atomic electron configuration
-          params: 
-            zero_init: false                # If the embedding is initialized with zeros
-            use_electron_config: true       # If the electron configuration is used
-        - name: ElectronicEmbedding         # embedding based on the electron attributes
-          params:                           # dim_embedding, activation_fn in build_params
-            num_residual: 1                 # number of residual layers applied to features encoding the electronic state
-            attribute: charge               # electron attribute the embedding stands for, charge or spin
-        - name: ElectronicEmbedding
-          params:
-            num_residual: 1
-            attribute: spin
-        - name: Core                        # SpookyNet Core
-          params:                           # dim_embedding, num_rbf, activation_fn in build_params
-            num_modules: 3                  # number of modules (iterations) for constructing atomic features
-            num_residual_pre: 1             # number of residual blocks applied to atomic features in each module (before other transformations)
-            num_residual_local_x: 1         # number of residual blocks (per module) applied to atomic features in local interaction
-            num_residual_local_s: 1         # number of residual blocks (per module) applied to s-type interaction features in local interaction
-            num_residual_local_p: 1         # number of residual blocks (per module) applied to p-type interaction features in local interaction
-            num_residual_local_d: 1         # number of residual blocks (per module) applied to d-type interaction features in local interaction
-            num_residual_local: 1           # number of residual blocks applied to gathered atomic features in local interaction
-            num_residual_nonlocal_q: 1      # number of residual blocks (per module) applied to attention query in non-local interaction
-            num_residual_nonlocal_k: 1      # number of residual blocks (per module) applied to attention key in non-local interaction
-            num_residual_nonlocal_v: 1      # number of residual blocks (per module) applied to attention value in non-local interaction
-            num_residual_post: 1            # number of residual blocks applied to atomic features in each module (after other transformations)
-            num_residual_output: 1          # number of residual blocks applied to atomic features in output branches (per module)
-            use_irreps: true                # If irreducible representions (spherical harmonics) are used for p- and d-type features
-            dropout_rate: 0.0               # dropout rate of all dropout layers
-        - name: AtomicAffine
-          params:
-            shifts:
-              Ea:
-                values: 0
-                learnable: true
-              Qa:
-                values: 0
-                learnable: true
-            scales:
-              Ea:
-                values: 1
-                learnable: true
-              Qa:
-                values: 1
-                learnable: true
-        - name: ChargeConservation
-        - name: AtomicCharge2Dipole
-        # - name: ZBLRepulsionEnergy
-        - name: ElectrostaticEnergy
-          params:
-            flavor: SpookyNet
-        # - name: GrimmeD4Energy
-        #   params:
-        #     learnable: true
-        - name: EnergyReduce
-        - name: Force
 Trainer:
+  committee_size: 4
+  active_learning_params: 
+    active: true
+    data_source: withheld
+    error_lower_bound: 0.01
+    error_upper_bound: 0.05
+    sample_size: 10000
   Splitter:
     method: random                          # splitting method: random
     parts:                                  # partition names, at least training and validation are needed
       - training
-      - validation
-      - test
+      - withheld
     ratios:                                 # partition ratio (float in (0,1)) or the number of datapoints (int)
                                             # order corresponds to the parts' order
-      - 0.7                                  
-      - 0.1                                  
-      - 0.2
+      - 0.01                                  
+      - 0.99
     preload: false                          # if saved splitting indices are loaded
     save: true                              # if splitting indices are saved
     seed: 114514                            # splitting random seed
@@ -237,9 +149,8 @@ Trainer:
       - max                                 # maximum value
   seed: 114514                              # trainer random seed: dataloader shuffling, pytorch random initialization, etc.
   learning_rate: 0.001                      # learning rate, scientific notations like 1e-3 are supported, default 0.001
-  schedule: constant                        # learning rate scheduler: default linear
-                                            # (linear | cosine | cosine_with_restarts | polynomial | constant | constant_with_warmup | inverse_sqrt | reduce_lr_on_plateau)
-  warmup_ratio: 0.001                       # ratio of warmup epochs in total epochs, if applicable for the schedule
+  warmup_ratio: 0.001                       # ratio of warmup epochs in total epochs, default 0.01
+                                            # where the learning rate increases linearly from 0 to the set value
   patience: 200                             # patience of earlystopping, default 50
                                             # training stops when the number of epochs that 'judge score' doesn't decreases reach the patience
   max_norm: -1                              # gradient clipping threshold of the norm, default -1 (negative value means no clipping)
@@ -253,5 +164,4 @@ Trainer:
   ema_use_num_updates: true                 # if number of updates is used in exponential moving average, default true
   data_in_memory: false                     # if whole training datasets are loaded into memory, default false
   amsgrad: true                             # if amsgrad is used in Adam optimizer, default true
-Metric:                                     # metrics can be defined here as default metrics
-                                            # if a metric configuration is defined under a specific model, it has precedence
+      
