@@ -3,6 +3,7 @@ import torch
 from torch import Tensor
 from torch.nn import Parameter, init
 import torch.nn.functional as F
+from torch_scatter import segment_sum_coo
 from . import BaseFFLayer
 from ..functional import softplus_inverse, segment_sum
 from ..cutoff import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
@@ -119,4 +120,4 @@ class ZBLRepulsionEnergyLayer(BaseFFLayer):
             + c3 * torch.exp(-a3 * Dij_sr)
             + c4 * torch.exp(-a4 * Dij_sr)
         ) * cutoff_values_sr
-        return segment_sum(self.kehalf * f * zizj / Dij_sr, idx_i_sr)
+        return segment_sum_coo(self.kehalf * f * zizj / Dij_sr, idx_i_sr, dim_size=len(Za))
