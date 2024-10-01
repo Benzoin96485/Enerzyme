@@ -2,6 +2,7 @@ from typing import Dict, List
 import numpy as np
 import torch
 from torch import Tensor
+from torch_scatter import segment_sum_coo
 from ..utils import logger
 
 
@@ -19,8 +20,7 @@ class Monitor:
                 if k in output:
                     self.collection[k].extend(output[k].detach().cpu().numpy())
                 elif k + "_a" in output:
-                    from ..models.functional import segment_sum
-                    self.collection[k].extend(segment_sum(output[k + "_a"].detach(), output["batch_seg"]).cpu().numpy())
+                    self.collection[k].extend(segment_sum_coo(output[k + "_a"].detach(), output["batch_seg"]).cpu().numpy())
 
     def summary(self) -> None:
         message = []
