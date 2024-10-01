@@ -5,7 +5,7 @@ setup(
     version='0.1.1',
     install_requires=['numpy', 'h5py', 'tqdm', 'ase', 'joblib', 'addict', 
                       'pandas', 'pytorch', 'scikit-learn', 'transformers',
-                      'transformers', 'torch-ema', 'pyyaml'],
+                      'transformers', 'torch-ema', 'pyyaml', 'torch-scatter'],
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
     packages=find_packages(include=["enerzyme", "enerzyme.*"]),
     package_data={"enerzyme": [

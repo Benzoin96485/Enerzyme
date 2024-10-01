@@ -4,10 +4,10 @@ import torch
 from torch import Tensor
 from torch.nn import Linear, init
 import torch.nn.functional as F
+from torch_scatter import segment_sum_coo
 from .mlp import ResidualMLP as _ResidualMLP
 from . import BaseFFLayer
 from ..activation import ACTIVATION_KEY_TYPE
-from ..functional import segment_sum
 
 
 def ResidualMLP(
@@ -135,7 +135,7 @@ class ElectronicEmbedding(BaseElectronEmbedding):
         v = self.linear_v(e)[batch_seg]  # values
         dot = torch.sum(k * q, dim=-1) / self.sqrt_dim_embedding  # scaled dot product
         a = F.softplus(dot)  # unnormalized attention weights
-        anorm = segment_sum(a, batch_seg)
+        anorm = segment_sum_coo(a, batch_seg)
         if a.device.type == "cpu":  # indexing is faster on CPUs
             anorm = anorm[batch_seg]
         else:  # gathering is faster on GPUs
@@ -243,7 +243,7 @@ class NonlinearElectronicEmbedding(BaseElectronEmbedding):
         d = k.shape[-1]
         a = torch.exp((dot - maximum) / d ** 0.5)
 
-        anorm = segment_sum(a, batch_seg)
+        anorm = segment_sum_coo(a, batch_seg)
         if a.device.type == "cpu":  # indexing is faster on CPUs
             anorm = anorm[batch_seg]
         else:  # gathering is faster on GPUs

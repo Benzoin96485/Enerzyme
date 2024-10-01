@@ -25,6 +25,7 @@ ase==3.22.1
 transformers==4.33.1
 torch-ema==0.3
 pyyaml==6.0.1
+torch-scatter==2.1.2
 ```
 
 ```bash

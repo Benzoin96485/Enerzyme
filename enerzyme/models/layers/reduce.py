@@ -2,7 +2,7 @@ from typing import Dict
 import torch
 from torch import Tensor
 from torch.nn import Module
-from ..functional import segment_sum
+from torch_scatter import segment_sum_coo
 
 class EnergyReduceLayer(Module):
     def __init__(self) -> None:
@@ -17,5 +17,5 @@ class EnergyReduceLayer(Module):
             batch_seg = net_input["batch_seg"]
         else:
             batch_seg = torch.zeros_like(net_input["Za"])
-        output["E"] = segment_sum(net_input["Ea"], batch_seg)
+        output["E"] = segment_sum_coo(net_input["Ea"], batch_seg)
         return output

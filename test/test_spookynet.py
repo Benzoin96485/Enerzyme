@@ -270,6 +270,16 @@ def test_local_interaction():
     f2 = F2(dim_feature, dim_feature, 
         num_residual_local_x, num_residual_local_s, num_residual_local_p, num_residual_local_d, num_residual_local
     ).type(dtype)
+    f2.radial_s.weight.data.copy_(f1.radial_s.weight.data)
+    f2.radial_p.weight.data.copy_(f1.radial_p.weight.data)
+    f2.radial_d.weight.data.copy_(f1.radial_d.weight.data)
+    f2.resblock.linear.weight.data.copy_(f1.resblock.output.weight.data)
+    f2.resblock_x.linear.weight.data.copy_(f1.resblock_x.output.weight.data)
+    f2.resblock_p.linear.weight.data.copy_(f1.resblock_p.output.weight.data)
+    f2.resblock_s.linear.weight.data.copy_(f1.resblock_s.output.weight.data)
+    f2.resblock_d.linear.weight.data.copy_(f1.resblock_d.output.weight.data)
+    f2.projection_d.weight.data.copy_(f1.projection_d.weight.data)
+    f2.projection_p.weight.data.copy_(f1.projection_p.weight.data)
     assert_tensor_allclose(
         f1(atom_embedding, rbf, pij, dij, idx_i, idx_j),
         f2(atom_embedding, rbf, pij, dij, idx_i, idx_j)
