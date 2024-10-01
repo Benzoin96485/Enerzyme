@@ -16,14 +16,6 @@ def softplus_inverse(x: Union[Tensor, np.ndarray]) -> Tensor:
     return x + torch.log(-torch.expm1(-x))
 
 
-def segment_sum(x: Tensor, indices: Tensor, dim: int=0) -> Tensor:
-    """
-    http://t.csdnimg.cn/kUA0u
-    """
-    x_sum = torch.zeros_like(x)[:indices[-1] + 1]
-    return x_sum.index_add(dim, indices, x)
-
-
 def gather_nd(params: Tensor, indices: Tensor) -> Tensor:
     """ The same as tf.gather_nd but batched gather is not supported yet.
     indices is an k-dimensional integer tensor, best thought of as a (k-1)-dimensional tensor of indices into params, where each element defines a slice of params:

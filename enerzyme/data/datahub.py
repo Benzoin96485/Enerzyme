@@ -189,7 +189,7 @@ class DataHub:
         elif self.data_types[k + "a"] in raw_data.keys():
             self._load_atomic_data(k + "a", raw_data)
             # reduce atomic property into molecular property, mainly for Qa into Q
-            logger.info(f"Molecular property {k} are reduced from atomic property {k + 'a'} (self.data_types[k + 'a'])")
+            logger.info(f"Molecular property {k} are reduced from atomic property {k + 'a'} ({self.data_types[k + 'a']})")
             if is_rounded(k):
                 values = [round(sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]])) for i in tqdm(range(self.n_datapoint))]
             else:
