@@ -109,10 +109,10 @@ class DataHub:
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
-        self.transforms = transforms
+        self.transforms = dict() if transforms is None else transforms
         self.compressed = compressed
         self.max_memory = max_memory
-        datahub_str = data_path + neighbor_list + str(sorted(transforms.items()))
+        datahub_str = data_path + neighbor_list + str(sorted(self.transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
         self.transform = Transform(self.transforms, self.preload_path)
