@@ -1,6 +1,6 @@
 import pickle, os
 from hashlib import md5
-from typing import Union, List, Dict, Optional, Iterable
+from typing import Union, List, Dict, Optional, Iterable, Literal
 import h5py
 import numpy as np
 from addict import Dict
@@ -122,6 +122,7 @@ class DataHub:
             self._init_neighbor_list()
             self.transform.transform(self.data)
             self._save_config()
+            self.reset_handle()
 
     def _preload_data(self, hdf5_path):
         loaded_file = h5py.File(hdf5_path, mode="r")
@@ -303,8 +304,8 @@ class DataHub:
                     self.data["idx_i"][i] = array_padding([idx_i], max_N_pairs, pad_value=-1)
                     self.data["idx_j"][i] = array_padding([idx_j], max_N_pairs, pad_value=-1)
 
-    def get_handle(self, mode="r"):
-        if os.path.exists(self.preload_path):
+    def get_handle(self, mode: Literal["r", "w"]="r") -> None:
+        if mode == "w" and os.path.exists(self.preload_path):
             logger.warning(f"Preload path {self.preload_path} exists and will be covered")
         else:
             os.makedirs(self.preload_path, exist_ok=True)
@@ -314,6 +315,10 @@ class DataHub:
         else:
             self.file.clear()
             self.data = self.file.create_group("data")
+
+    def reset_handle(self):
+        self.file.close()
+        self.get_handle()
 
     def _save_config(self):
         handler = YamlHandler(os.path.join(self.preload_path, "datahub.yaml"))

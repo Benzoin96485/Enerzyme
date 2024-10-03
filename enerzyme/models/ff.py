@@ -280,12 +280,16 @@ class FF_committee(BaseFFLauncher):
             pretrain_path=None
         )
         self.size = committee_size
-        self.pretrain_path = []
+        self.base_pretrain_path = pretrain_path
         self.verbose = 1
+        self._init_pretrain_path()
 
+    def _init_pretrain_path(self, base_pretrain_path: Optional[str]=None) -> None:
         from .modelhub import get_pretrain_path
-        for i in range(committee_size):
-            self.pretrain_path.append(get_pretrain_path(pretrain_path, "best", i))
+        self.pretrain_path = [
+            get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "best", i) 
+            for i in range(self.size)
+        ]
 
     def _train(self, train_dataset, valid_dataset=None, test_dataset=None) -> None:
         for i in range(self.size):
@@ -351,6 +355,8 @@ class FF_committee(BaseFFLauncher):
             withheld_mask = np.full(withheld_size, True)
             max_iter = (withheld_size + sample_size - 1) // sample_size
             for i in range(max_iter):
+                if i > 0:
+                    self._init_pretrain_path(self.dump_dir)
                 self._train(training_set)
                 unmasked_relative_indices = withheld_mask.nonzero()[0]
                 unmasked_size = len(unmasked_relative_indices)

@@ -5,7 +5,7 @@ from torch.nn import Parameter, init
 import torch.nn.functional as F
 from torch_scatter import segment_sum_coo
 from . import BaseFFLayer
-from ..functional import softplus_inverse, segment_sum
+from ..functional import softplus_inverse
 from ..cutoff import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
 
 
