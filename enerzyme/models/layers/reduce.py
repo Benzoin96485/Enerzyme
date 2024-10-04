@@ -2,7 +2,7 @@ from typing import Dict
 import torch
 from torch import Tensor
 from torch.nn import Module
-from .. import segment_sum_coo
+from ..functional import segment_sum_coo
 
 
 class EnergyReduceLayer(Module):

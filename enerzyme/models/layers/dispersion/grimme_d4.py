@@ -4,9 +4,8 @@ import torch
 from torch import Tensor
 from torch.nn import Parameter
 import torch.nn.functional as F
-from ... import segment_sum_coo
 from .. import BaseFFLayer
-from ...functional import softplus_inverse
+from ...functional import softplus_inverse, segment_sum_coo
 from ...cutoff import smooth_transition
 
 

@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 import torch
 from torch.nn import Module, Linear, init
-from .. import segment_sum_coo
+from ..functional import segment_sum_coo
 from ..activation import ACTIVATION_KEY_TYPE
 from ..layers.electron_embedding import ResidualMLP
 from ..layers.mlp import ResidualStack as _ResidualStack

@@ -1,7 +1,18 @@
-from typing import Union
+from typing import Union, Optional
 import numpy as np
 import torch
 from torch import Tensor
+
+
+USE_SEGMENT_COO = False
+
+
+if USE_SEGMENT_COO:
+    from torch_scatter import segment_sum_coo
+else:
+    from torch_scatter import scatter_sum
+    def segment_sum_coo(src: Tensor, idx: Tensor, dim_size: Optional[int]=None) -> Tensor:
+        return scatter_sum(src, idx, dim=idx.dim() - 1, dim_size=dim_size)
 
 
 def softplus_inverse(x: Union[Tensor, np.ndarray]) -> Tensor:

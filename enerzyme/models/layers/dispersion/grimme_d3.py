@@ -5,10 +5,9 @@ import torch
 from torch import Tensor
 from torch.nn import Parameter
 from torch.nn.functional import softmax
-from ... import segment_sum_coo
 from .. import BaseFFLayer
 from ...cutoff import polynomial_transition
-from ...functional import gather_nd
+from ...functional import gather_nd, segment_sum_coo
 
 # parameters
 # grimme_d3_tables from https://github.com/MMunibas/PhysNet/commit/e243e2c383b4ac0a9d7062e654d9b4feb76ca859

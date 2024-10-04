@@ -2,8 +2,8 @@ from typing import Dict, Literal, Optional, Tuple
 import torch
 from torch import Tensor
 from torch.nn import Module
-from .. import segment_sum_coo
 from . import BaseFFLayer
+from ..functional import segment_sum_coo
 from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
