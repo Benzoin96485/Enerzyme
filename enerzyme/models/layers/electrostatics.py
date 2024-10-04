@@ -2,7 +2,7 @@ from typing import Dict, Literal, Optional, Tuple
 import torch
 from torch import Tensor
 from torch.nn import Module
-from torch_scatter import segment_sum_coo
+from .. import segment_sum_coo
 from . import BaseFFLayer
 from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 

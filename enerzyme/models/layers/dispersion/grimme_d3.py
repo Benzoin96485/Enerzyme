@@ -5,7 +5,7 @@ import torch
 from torch import Tensor
 from torch.nn import Parameter
 from torch.nn.functional import softmax
-from torch_scatter import segment_sum_coo
+from ... import segment_sum_coo
 from .. import BaseFFLayer
 from ...cutoff import polynomial_transition
 from ...functional import gather_nd

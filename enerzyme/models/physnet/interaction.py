@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import Dropout, Parameter
-from torch_scatter import segment_sum_coo
+from .. import segment_sum_coo
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 from ..layers.mlp import DenseLayer as _DenseLayer
 from ..layers.mlp import ResidualStack as _ResidualStack
