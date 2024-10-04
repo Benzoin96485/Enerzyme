@@ -3,7 +3,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module
 from . import BaseFFLayer
-from ..functional import segment_sum
+from ..functional import segment_sum_coo
 from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
@@ -46,8 +46,8 @@ class ChargeConservationLayer(BaseFFLayer):
         if batch_seg is None:
             batch_seg = torch.zeros_like(Za, dtype=torch.long)
         #number of atoms per batch (needed for charge scaling)
-        N_per_batch = segment_sum(torch.ones_like(batch_seg), batch_seg)
-        raw_Q = segment_sum(Qa, batch_seg)
+        N_per_batch = segment_sum_coo(torch.ones_like(batch_seg), batch_seg)
+        raw_Q = segment_sum_coo(Qa, batch_seg)
         if Q is None: #assume desired total charge zero if not given
             Q = torch.zeros_like(N_per_batch)
         #return scaled charges (such that they have the desired total charge)
@@ -163,7 +163,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             # combine shielded and ordinary interactions and apply prefactors
             Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary)
             Eele = torch.where(condition, Eele, zeros)
-        return segment_sum(Eele, idx_i)
+        return segment_sum_coo(Eele, idx_i, dim_size=len(Qa))
 
 
 class AtomicCharge2DipoleLayer(Module):
@@ -174,7 +174,7 @@ class AtomicCharge2DipoleLayer(Module):
         if batch_seg is None:
             batch_seg = torch.zeros_like(Qa, dtype=torch.long)
         Pa = Qa.unsqueeze(1) * Ra
-        return segment_sum(Pa, batch_seg)
+        return segment_sum_coo(Pa, batch_seg)
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()

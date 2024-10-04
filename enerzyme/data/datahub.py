@@ -1,6 +1,6 @@
 import pickle, os
 from hashlib import md5
-from typing import Union, List, Dict, Optional, Iterable
+from typing import Union, List, Dict, Optional, Iterable, Literal
 import h5py
 import numpy as np
 from addict import Dict
@@ -109,10 +109,10 @@ class DataHub:
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
-        self.transforms = transforms
+        self.transforms = dict() if transforms is None else transforms
         self.compressed = compressed
         self.max_memory = max_memory
-        datahub_str = data_path + neighbor_list + str(sorted(transforms.items()))
+        datahub_str = data_path + neighbor_list + str(sorted(self.transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
         self.transform = Transform(self.transforms, self.preload_path)
@@ -122,6 +122,7 @@ class DataHub:
             self._init_neighbor_list()
             self.transform.transform(self.data)
             self._save_config()
+            self.reset_handle()
 
     def _preload_data(self, hdf5_path):
         loaded_file = h5py.File(hdf5_path, mode="r")
@@ -189,7 +190,7 @@ class DataHub:
         elif self.data_types[k + "a"] in raw_data.keys():
             self._load_atomic_data(k + "a", raw_data)
             # reduce atomic property into molecular property, mainly for Qa into Q
-            logger.info(f"Molecular property {k} are reduced from atomic property {k + 'a'} (self.data_types[k + 'a'])")
+            logger.info(f"Molecular property {k} are reduced from atomic property {k + 'a'} ({self.data_types[k + 'a']})")
             if is_rounded(k):
                 values = [round(sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]])) for i in tqdm(range(self.n_datapoint))]
             else:
@@ -303,8 +304,8 @@ class DataHub:
                     self.data["idx_i"][i] = array_padding([idx_i], max_N_pairs, pad_value=-1)
                     self.data["idx_j"][i] = array_padding([idx_j], max_N_pairs, pad_value=-1)
 
-    def get_handle(self, mode="r"):
-        if os.path.exists(self.preload_path):
+    def get_handle(self, mode: Literal["r", "w"]="r") -> None:
+        if mode == "w" and os.path.exists(self.preload_path):
             logger.warning(f"Preload path {self.preload_path} exists and will be covered")
         else:
             os.makedirs(self.preload_path, exist_ok=True)
@@ -314,6 +315,10 @@ class DataHub:
         else:
             self.file.clear()
             self.data = self.file.create_group("data")
+
+    def reset_handle(self):
+        self.file.close()
+        self.get_handle()
 
     def _save_config(self):
         handler = YamlHandler(os.path.join(self.preload_path, "datahub.yaml"))

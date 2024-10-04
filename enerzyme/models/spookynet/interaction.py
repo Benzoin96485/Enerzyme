@@ -1,8 +1,8 @@
 from typing import Optional, Tuple
 import torch
 from torch.nn import Module, Linear, init
+from ..functional import segment_sum_coo
 from ..activation import ACTIVATION_KEY_TYPE
-from ..functional import segment_sum
 from ..layers.electron_embedding import ResidualMLP
 from ..layers.mlp import ResidualStack as _ResidualStack
 from ..layers.attention import Attention
@@ -129,9 +129,10 @@ class LocalInteraction(Module):
             xp = torch.gather(xp, 0, j)  # L=1
             xd = torch.gather(xd, 0, j)  # L=2
         # sum over neighbors
-        s = xx + segment_sum(gs * xs, idx_i)
-        p = segment_sum(gp * xp.unsqueeze(-2), idx_i)
-        d = segment_sum(gd * xd.unsqueeze(-2), idx_i)
+        N = len(x)
+        s = xx + segment_sum_coo(gs * xs, idx_i, dim_size=N)
+        p = segment_sum_coo(gp * xp.unsqueeze(-2), idx_i, dim_size=N)
+        d = segment_sum_coo(gd * xd.unsqueeze(-2), idx_i, dim_size=N)
         # project tensorial features to scalars
         pa, pb = torch.split(self.projection_p(p), p.shape[-1], dim=-1)
         da, db = torch.split(self.projection_d(d), d.shape[-1], dim=-1)

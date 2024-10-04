@@ -15,10 +15,14 @@ PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="atom_type")
 
 
 def parse_Za(atom_types: Iterable[Union[str, int]]) -> Union[np.ndarray, List[int]]:
-    if isinstance(atom_types[0], int):
-        return np.array(atom_types)
-    elif isinstance(atom_types[0], str):
+    if isinstance(atom_types[0], str):
+        # numpy.str_ is an instance of str
         return PERIODIC_TABLE.loc[atom_types]["Za"].to_numpy()
+    elif isinstance(atom_types, np.ndarray):
+        # numpy.int is not an instance of int
+        return atom_types.astype(int)
+    elif isinstance(atom_types[0], int):
+        return np.array(atom_types)
     else:
         logger.info("Parsing atom type")
         Zas = []

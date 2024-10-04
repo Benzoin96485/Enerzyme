@@ -111,20 +111,23 @@ def _decorate_batch_output(output, features, targets):
     return y_pred, (y_truth if y_truth else None)
 
 
-def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None) -> None:
+def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False) -> None:
     if pretrain_path is None:
         return
     loaded_info = torch.load(pretrain_path, map_location=device)
     if ema is not None and "ema_state_dict" in loaded_info:
+        model.load_state_dict(loaded_info["model_state_dict"])
         ema.load_state_dict(loaded_info["ema_state_dict"])
+        logger.info(f"loading ema state dict from {pretrain_path}...")
     else:
-        if "ema_state_dict" in loaded_info:
-            ema = ExponentialMovingAverage(model.parameters(), decay=1.0)
-            ema.load_state_dict(loaded_info["ema_state_dict"])
-            ema.copy_to()
+        if inference and "ema_state_dict" in loaded_info:
+            tmp_ema = ExponentialMovingAverage(model.parameters(), decay=1, use_num_updates=True)
+            tmp_ema.load_state_dict(loaded_info["ema_state_dict"])
+            tmp_ema.copy_to(model.parameters())
+            logger.info(f"loading averaged model state dict from {pretrain_path}...")
         else:
             model.load_state_dict(loaded_info["model_state_dict"])
-    logger.info(f"load model success from {pretrain_path}!")
+            logger.info(f"loading model state dict from {pretrain_path}...")
 
 
 class Trainer:
@@ -183,8 +186,8 @@ class Trainer:
         torch.cuda.manual_seed_all(seed)
         np.random.seed(seed)
 
-    def load_state_dict(self, model: Module, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None) -> None:
-        return _load_state_dict(model, self.device, pretrain_path, ema)
+    def load_state_dict(self, model: Module, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False) -> None:
+        return _load_state_dict(model, self.device, pretrain_path, ema, inference)
 
     def save_state_dict(self, model: Module, dump_dir, ema: Optional[ExponentialMovingAverage]=None, suffix="last", model_rank=None):
         if model_rank is None:
@@ -193,7 +196,7 @@ class Trainer:
         if ema is None:
             info = {'model_state_dict': model.state_dict()}
         else:
-            info = {'ema_state_dict': ema.state_dict()}
+            info = {'ema_state_dict': ema.state_dict(), 'model_state_dict': model.state_dict()}
         torch.save(info, os.path.join(dump_dir, f'model{model_rank}_{suffix}.pth'))
 
     def fit_predict(self, 
@@ -298,8 +301,7 @@ class Trainer:
             end_time = time.time()
             message += f', {(end_time - start_time):.1f}s'
             logger.info(message)
-            with cm:
-                self.save_state_dict(model, dump_dir, ema, "last", model_rank)
+            self.save_state_dict(model, dump_dir, ema, "last", model_rank)
             if is_early_stop:
                 break
 
@@ -327,7 +329,7 @@ class Trainer:
         if load_model == True:
             from ..models import get_pretrain_path
             pretrain_path = get_pretrain_path(dump_dir, "best", model_rank)
-            self.load_state_dict(model, pretrain_path)
+            self.load_state_dict(model, pretrain_path, inference=True)
             
         dataloader = DataLoader(
             dataset=dataset,
