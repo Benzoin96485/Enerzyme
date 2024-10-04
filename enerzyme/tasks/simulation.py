@@ -61,9 +61,11 @@ class ASECalculator(Calculator):
         )
         self.transform.inverse_transform(output)
         self.results["energy"] = output["E"][0]
-        self.results["dipole"] = output["M2"][0]
         self.results["forces"] = output["Fa"][0]
-        self.results["charges"] = output["Qa"][0]
+        if "M2" in output:
+            self.results["dipole"] = output["M2"][0]
+        if "Qa" in output:
+            self.results["charges"] = output["Qa"][0]
 
 
 class Simulation:

@@ -563,11 +563,15 @@ class EquiMessagePassing(MessagePassing):
             imagine = self.dropout(imagine)
 
         # complex invariant quantum state
+        if real.dtype == torch.float64:
+            cdtype = torch.complex128
+        elif real.dtype == torch.float32:
+            cdtype = torch.complex64
         phi = torch.complex(real, imagine)
         # phi_bar = torch.complex(real, -imagine)
         q = phi
         # k = phi_bar
-        a = torch.ones(q.shape[0], 1, (self.hidden_channels_chi) // self.head, device=self.device, dtype=torch.complex64)
+        a = torch.ones(q.shape[0], 1, (self.hidden_channels_chi) // self.head, device=self.device, dtype=cdtype)
         
 
         
@@ -576,7 +580,7 @@ class EquiMessagePassing(MessagePassing):
         # conv: E, chi2
         # print(torch.cat([a, q], dim=1).shape)
         # print(kernel.shape)
-        conv = torch.einsum(equation, torch.cat([a, q], dim=1), kernel.to(torch.complex64))
+        conv = torch.einsum(equation, torch.cat([a, q], dim=1), kernel.to(cdtype))
 
 
         a = 1.0 * self.activation(self.diagonal(rbfh_ij))
@@ -584,7 +588,7 @@ class EquiMessagePassing(MessagePassing):
         b = a.unsqueeze(-1) * self.diachi1.unsqueeze(0).unsqueeze(0) + torch.ones(kernel.shape[0], self.chi2, self.chi1, device=self.device)
         dia = self.dia(b)
         equation = 'ik,ikl->il'
-        kernel = torch.einsum(equation, conv, dia.to(torch.complex64))
+        kernel = torch.einsum(equation, conv, dia.to(cdtype))
         kernel_real,kernel_imag = kernel.real,kernel.imag
         kernel_real,kernel_imag  = self.fc_mps(kernel_real),self.fc_mps(kernel_imag)
         kernel = torch.angle(torch.complex(kernel_real, kernel_imag))
@@ -960,8 +964,8 @@ class LEFTNet(BaseFFCore):
 
             equation = 'ikl,bi,bl->bk'
             kerneli = torch.complex(self.kernels_real[i], self.kernels_imag[i])
-            quantum = torch.einsum(equation, kerneli, s.to(torch.cfloat), quantum)
-            quantum = quantum / quantum.abs().to(torch.cfloat)
+            quantum = torch.einsum(equation, kerneli, s.to(kerneli.dtype), quantum)
+            quantum = quantum / quantum.abs().to(kerneli.dtype)
 
             # FTE: frame transition encoding
             ds, dvec = self.FTEs[i](s, vec, node_frame)
@@ -1004,7 +1008,7 @@ class LEFTNet(BaseFFCore):
 
     def get_output(self, Ra, Za, batch_seg):
         E, Fa = self.__forward(pos=Ra, batch=batch_seg, z=Za)
-        return {"E": E.squeeze(), "Fa": Fa}
+        return {"E": E, "Fa": Fa}
         
     def cal_forces(self, energy, positions):
      # if not energy.requires_grad:

@@ -54,8 +54,8 @@ class AtomicEnergyTransform:
     
     def inverse_transform(self, new_output: Dict[str, Iterable]) -> None:
         if len(new_output["Za"]) == 1:
-            for i in tqdm(range(len(new_output["E"]))):
-                new_output["E"][i] -= sum(self.atomic_energies.loc[new_output["Za"][0]]["atomic_energy"])
+            for i in range(len(new_output["E"])):
+                new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][0]]["atomic_energy"])
         else:
             for i in range(len(new_output["E"])):
                 new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][i]]["atomic_energy"])
