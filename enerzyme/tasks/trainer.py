@@ -1,4 +1,3 @@
-from ast import dump
 from functools import partial
 from typing import Iterable, Optional, Callable, Tuple, Dict, Any
 from collections import defaultdict
@@ -7,7 +6,8 @@ from tqdm import tqdm
 import torch
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
-from torch.optim import Adam
+from torch.optim import Adam, Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch.nn import Module
 from torch.nn.utils import clip_grad_norm_
 from torch_ema import ExponentialMovingAverage
@@ -111,9 +111,10 @@ def _decorate_batch_output(output, features, targets):
     return y_pred, (y_truth if y_truth else None)
 
 
-def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False) -> None:
+def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None) -> Dict:
+    other_info = dict()
     if pretrain_path is None:
-        return
+        return other_info
     loaded_info = torch.load(pretrain_path, map_location=device)
     if ema is not None and "ema_state_dict" in loaded_info:
         model.load_state_dict(loaded_info["model_state_dict"])
@@ -128,6 +129,29 @@ def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optiona
         else:
             model.load_state_dict(loaded_info["model_state_dict"])
             logger.info(f"loading model state dict from {pretrain_path}...")
+    if not inference:
+        if optimizer is not None and "optimizer_state_dict" in loaded_info:
+            optimizer.load_state_dict(loaded_info["optimizer_state_dict"])
+            logger.info(f"loading optimizer state dict from {pretrain_path}...")
+        if scheduler is not None and "scheduler_state_dict" in loaded_info:
+            scheduler.load_state_dict(loaded_info["scheduler_state_dict"])
+            logger.info(f"loading scheduler state dict from {pretrain_path}...")
+        if "epoch" in loaded_info:
+            other_info["epoch"] = loaded_info["epoch"]
+        if "best_epoch" in loaded_info:
+            other_info["best_epoch"] = loaded_info["best_epoch"]
+        if "best_score" in loaded_info:
+            other_info["best_score"] = loaded_info["best_score"]
+    # if "torch_rng_state" in loaded_info:
+    #     torch.random.set_rng_state(loaded_info["torch_rng_state"])
+    #     logger.info(f"loading torch random generator state from {pretrain_path}...")
+    # if "torch_cuda_rng_state_all" in loaded_info:
+    #     torch.cuda.random.set_rng_state_all(loaded_info["torch_cuda_rng_state_all"])
+    #     logger.info(f"loading torch cuda random generator state from {pretrain_path}...")
+    # if "np_rng_state" in loaded_info:
+    #     np.random.set_state(loaded_info["np_rng_state"])
+    #     logger.info(f"loading numpy random generator state from {pretrain_path}...")
+    return other_info
 
 
 class Trainer:
@@ -169,6 +193,7 @@ class Trainer:
             self.active_learning = True
         else:
             self.active_learning = False
+        self.resume = params.get("resume", False)
 
     def decorate_batch_input(self, batch):
         return _decorate_batch_input(batch, self.dtype, self.device)
@@ -186,22 +211,41 @@ class Trainer:
         torch.cuda.manual_seed_all(seed)
         np.random.seed(seed)
 
-    def load_state_dict(self, model: Module, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False) -> None:
-        return _load_state_dict(model, self.device, pretrain_path, ema, inference)
+    def load_state_dict(
+        self, 
+        model: Module, 
+        optimizer: Optional[Optimizer]=None,
+        scheduler: Optional[LRScheduler]=None,
+        pretrain_path: Optional[str]=None, 
+        ema: Optional[ExponentialMovingAverage]=None, 
+        inference: bool=False
+    ) -> None:
+        return _load_state_dict(model, self.device, pretrain_path, ema, inference, optimizer, scheduler)
 
-    def save_state_dict(self, model: Module, dump_dir, ema: Optional[ExponentialMovingAverage]=None, suffix="last", model_rank=None):
+    def save_state_dict(self, model: Module, optimizer: Optimizer, scheduler: LRScheduler, dump_dir: str, ema: Optional[ExponentialMovingAverage]=None, suffix="last", model_rank=None, epoch: Optional[int]=None, best_score: Optional[float]=None, best_epoch: Optional[int]=None):
         if model_rank is None:
             model_rank = ''
         os.makedirs(dump_dir, exist_ok=True)
-        if ema is None:
-            info = {'model_state_dict': model.state_dict()}
-        else:
-            info = {'ema_state_dict': ema.state_dict(), 'model_state_dict': model.state_dict()}
+        info = {"model_state_dict": model.state_dict()}
+        if ema is not None:
+            info["ema_state_dict"] = ema.state_dict()
+        info["optimizer_state_dict"] = optimizer.state_dict()
+        info["scheduler_state_dict"] = scheduler.state_dict()
+        if epoch is not None:
+            info["epoch"] = epoch
+        if best_score is not None:
+            info["best_score"] = best_score
+        if best_epoch is not None:
+            info["best_epoch"] = best_epoch
+        # info["torch_rng_state"] = torch.random.get_rng_state()
+        # if self.cuda:
+        #     info["torch_cuda_rng_state_all"] = torch.cuda.random.get_rng_state_all()
+        # info["np_rng_state"] = np.random.get_state()
         torch.save(info, os.path.join(dump_dir, f'model{model_rank}_{suffix}.pth'))
 
     def fit_predict(self, 
         model: Module, pretrain_path: Optional[str],
-        train_dataset: Dataset, valid_dataset: Dataset, 
+        train_dataset: Dataset, valid_dataset: Optional[Dataset], 
         loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
         test_dataset: Optional[Dataset]=None, model_rank=None) -> Tuple[Optional[defaultdict[Any]], Dict]:
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
@@ -213,9 +257,7 @@ class Trainer:
             collate_fn=self.decorate_batch_input,
             drop_last=True 
         )
-        min_val_loss = float("inf")
-        max_score = float("-inf")
-        wait = 0
+        
         num_training_steps = len(train_dataloader) * self.max_epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
         optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay, amsgrad=self.amsgrad)
@@ -223,10 +265,32 @@ class Trainer:
             ema = ExponentialMovingAverage(model.parameters(), self.ema_decay, self.ema_use_num_updates)
         else:
             ema = None
-        self.load_state_dict(model, pretrain_path, ema)
         scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
+        other_info = self.load_state_dict(model, optimizer, scheduler, pretrain_path, ema)
+        
+        if self.resume and "best_epoch" in other_info and "epoch" in other_info:
+            wait = other_info["epoch"] - other_info["best_epoch"]
+            best_score = other_info.get("best_score", float("inf"))
+            start_epoch = other_info["epoch"] + 1
+        else:
+            wait = 0
+            start_epoch = other_info.get("epoch", -1) + 1
+            if valid_dataset is not None:
+                best_score = other_info.get("best_score", float("inf"))
+            else:
+                best_score = None
 
-        for epoch in range(self.max_epochs):
+        if self.resume:
+            max_epochs = self.max_epochs
+        else:
+            max_epochs = start_epoch + self.max_epochs
+        
+        if valid_dataset is not None:
+            best_epoch = other_info.get("best_epoch", start_epoch)
+        else:
+            best_epoch = None
+        
+        for epoch in range(start_epoch, max_epochs):
             model = model.train()
             start_time = time.time()
             batch_bar = tqdm(
@@ -246,7 +310,7 @@ class Trainer:
                 trn_loss.append(float(loss.data))
 
                 batch_bar.set_postfix(
-                    Epoch="Epoch {}/{}".format(epoch+1, self.max_epochs),
+                    Epoch="Epoch {}/{}".format(epoch+1, max_epochs),
                     loss="{:.04f}".format(float(sum(trn_loss) / (i + 1))),
                     lr="{:.04f}".format(float(optimizer.param_groups[0]['lr']))
                 )
@@ -289,19 +353,21 @@ class Trainer:
                     total_val_loss = np.mean(val_loss)
                     _score = metric_score["_judge_score"]
                     _metric = str(self.metrics)
-                    save_handle = partial(self.save_state_dict, model=model, dump_dir=dump_dir, ema=None, suffix="best", model_rank=model_rank)
-                    is_early_stop, min_val_loss, wait, max_score = self._early_stop_choice(wait, min_val_loss, metric_score, max_score, save_handle, self.patience, epoch)
+                    save_handle = partial(self.save_state_dict, model=model, optimizer=optimizer, scheduler=scheduler, dump_dir=dump_dir, ema=ema, suffix="best", model_rank=model_rank)
+                    is_early_stop, best_score, wait, saved = self._early_stop_choice(wait, best_score, metric_score, save_handle, self.patience, epoch)
+                    if saved:
+                        best_epoch = epoch
                     message += f', val_loss: {total_val_loss:.4f}, ' + \
                         ", ".join([f'val_{k}: {v:.4f}' for k, v in metric_score.items() if k != "_judge_score"]) + \
                         f', val_judge_score ({_metric}): {_score:.4f}' + \
-                        (f', Patience [{wait}/{self.patience}], min_val_judge_score: {min_val_loss:.4f}' if wait else '')
+                        (f', Patience [{wait}/{self.patience}], min_val_judge_score: {best_score:.4f}' if wait else '')
             else:
                 is_early_stop = False
                 
             end_time = time.time()
             message += f', {(end_time - start_time):.1f}s'
             logger.info(message)
-            self.save_state_dict(model, dump_dir, ema, "last", model_rank)
+            self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, "last", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
             if is_early_stop:
                 break
 
@@ -320,8 +386,8 @@ class Trainer:
             metric_score = None
         return y_preds, metric_score
     
-    def _early_stop_choice(self, wait, min_loss, metric_score, max_score, save_handle, patience, epoch):
-        return self.metrics._early_stop_choice(wait, min_loss, metric_score, max_score, save_handle, patience, epoch)
+    def _early_stop_choice(self, wait, min_loss, metric_score, save_handle, patience, epoch):
+        return self.metrics._early_stop_choice(wait, min_loss, metric_score, save_handle, patience, epoch)
     
     def predict(self, model, dataset, loss_terms, dump_dir, transform, epoch=1, load_model=False, model_rank=None):
         self._set_seed(self.seed)

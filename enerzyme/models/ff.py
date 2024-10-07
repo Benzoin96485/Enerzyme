@@ -220,7 +220,13 @@ class FF_single(BaseFFLauncher):
     ) -> None:
         super().__init__(datahub, trainer, model_str, loss, architecture, build_params, layers, pretrain_path)
         from .modelhub import get_pretrain_path
-        self.pretrain_path = get_pretrain_path(pretrain_path, "best", None)
+        if self.trainer.resume:
+            if pretrain_path is None:
+                self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
+            else:
+                self.pretrain_path = get_pretrain_path(pretrain_path, "last", None)
+        else:
+            self.pretrain_path = get_pretrain_path(pretrain_path, "best", None)
         self.model = self._init_model(self.build_params)
     
     def _train(
