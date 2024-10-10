@@ -289,7 +289,7 @@ class Trainer:
             best_epoch = other_info.get("best_epoch", start_epoch)
         else:
             best_epoch = None
-        
+
         for epoch in range(start_epoch, max_epochs):
             model = model.train()
             start_time = time.time()
@@ -332,12 +332,13 @@ class Trainer:
 
             batch_bar.close()
             total_trn_loss = np.mean(trn_loss)
-            message = f'Epoch [{epoch+1}/{self.max_epochs}] train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
+            message = f'Epoch [{epoch+1}/{max_epochs}] train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
 
             if self.use_ema:
                 cm = ema.average_parameters()
             else:
                 cm = contextlib.nullcontext()
+
             y_preds = None
             if valid_dataset is not None:
                 with cm:
@@ -372,16 +373,21 @@ class Trainer:
                 break
 
         if test_dataset is not None:
-            y_preds, _, metric_score = self.predict(
-                model=model, 
-                dataset=test_dataset, 
-                loss_terms=loss_terms, 
-                dump_dir=dump_dir,  
-                transform=transform, 
-                epoch=epoch, 
-                load_model=True,
-                model_rank=model_rank
-            )
+            if self.use_ema:
+                cm = ema.average_parameters()
+            else:
+                cm = contextlib.nullcontext()
+            with cm:
+                y_preds, _, metric_score = self.predict(
+                    model=model, 
+                    dataset=test_dataset, 
+                    loss_terms=loss_terms, 
+                    dump_dir=dump_dir,  
+                    transform=transform, 
+                    epoch=epoch, 
+                    load_model=True,
+                    model_rank=model_rank
+                )
         else:
             metric_score = None
         return y_preds, metric_score
@@ -395,7 +401,7 @@ class Trainer:
         if load_model == True:
             from ..models import get_pretrain_path
             pretrain_path = get_pretrain_path(dump_dir, "best", model_rank)
-            self.load_state_dict(model, pretrain_path, inference=True)
+            self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
             
         dataloader = DataLoader(
             dataset=dataset,
