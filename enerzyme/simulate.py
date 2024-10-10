@@ -1,7 +1,6 @@
 import os
-import torch
 from .models import FF_REGISTER, get_model_str, build_model, get_pretrain_path
-from .tasks import Simulation, _load_state_dict
+from .tasks import Simulation
 from .utils import YamlHandler, logger
 from .data import Transform
 
