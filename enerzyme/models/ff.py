@@ -350,6 +350,7 @@ class FF_committee(BaseFFLauncher):
         partitions = self._init_partition()
         training_set = partitions["training"]
         validation_set = partitions.get("validation", None)
+        test_set = partitions.get("test", None)
         withheld_set = partitions["withheld"]
         len_training = len(training_set)
         len_validation = len(validation_set) if validation_set is not None else 0
@@ -367,7 +368,7 @@ class FF_committee(BaseFFLauncher):
             for i in range(max_iter):
                 if i > 0:
                     self._init_pretrain_path(self.dump_dir)
-                self._train(training_set, validation_set)
+                self._train(training_set, validation_set, test_set)
                 unmasked_relative_indices = withheld_mask.nonzero()[0]
                 unmasked_size = len(unmasked_relative_indices)
                 if unmasked_size == 0:
