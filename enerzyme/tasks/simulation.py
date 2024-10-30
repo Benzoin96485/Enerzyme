@@ -93,7 +93,7 @@ class Simulation:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
         # single ff simulation
         self.model = model.to(self.device).type(self.dtype)
-        _load_state_dict(model, self.device, model_path)
+        _load_state_dict(model, self.device, model_path, inference=True)
         self.model.eval()
         self.out_dir = out_dir
         # self.simulation_config = {k: (v.to_dict() if hasattr(v, "to_dict") else v) for k, v in config.Simulation.items() if not hasattr(self, k)}

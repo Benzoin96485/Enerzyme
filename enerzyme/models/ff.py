@@ -220,7 +220,13 @@ class FF_single(BaseFFLauncher):
     ) -> None:
         super().__init__(datahub, trainer, model_str, loss, architecture, build_params, layers, pretrain_path)
         from .modelhub import get_pretrain_path
-        self.pretrain_path = get_pretrain_path(pretrain_path, "best", None)
+        if self.trainer.resume:
+            if pretrain_path is None:
+                self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
+            else:
+                self.pretrain_path = get_pretrain_path(pretrain_path, "last", None)
+        else:
+            self.pretrain_path = get_pretrain_path(pretrain_path, "best", None)
         self.model = self._init_model(self.build_params)
     
     def _train(
@@ -343,7 +349,12 @@ class FF_committee(BaseFFLauncher):
         from ..tasks.active_learning import max_Fa_norm_std_picking
         partitions = self._init_partition()
         training_set = partitions["training"]
+        validation_set = partitions.get("validation", None)
+        test_set = partitions.get("test", None)
         withheld_set = partitions["withheld"]
+        len_training = len(training_set)
+        len_validation = len(validation_set) if validation_set is not None else 0
+        ratio_training = len_training / (len_training + len_validation)
         params = self.trainer.active_learning_params
         lb = params["error_lower_bound"]
         ub = params["error_upper_bound"]
@@ -357,7 +368,7 @@ class FF_committee(BaseFFLauncher):
             for i in range(max_iter):
                 if i > 0:
                     self._init_pretrain_path(self.dump_dir)
-                self._train(training_set)
+                self._train(training_set, validation_set, test_set)
                 unmasked_relative_indices = withheld_mask.nonzero()[0]
                 unmasked_size = len(unmasked_relative_indices)
                 if unmasked_size == 0:
@@ -377,12 +388,19 @@ class FF_committee(BaseFFLauncher):
                     break
                 masked_relative_indices = masked_relative_indices[:sample_size]
                 expand_absolute_indices = withheld_set.raw_indices[masked_relative_indices]
-                training_set.expand_with_indices(expand_absolute_indices)
+                len_expanded = len(expand_absolute_indices)
+                len_expanded_training = int(len_expanded * ratio_training + 0.5)
+                training_set.expand_with_indices(expand_absolute_indices[:len_expanded_training])
+                if validation_set is not None:
+                    validation_set.expand_with_indices(expand_absolute_indices[len_expanded_training:])
                 withheld_mask[masked_relative_indices] = False
-                np.savez(os.path.join(self.dump_dir, "active_learning_split.npz"), {
+                new_indices = {
                     "training": training_set.raw_indices,
                     "withheld": withheld_set.raw_indices
-                })
+                }
+                if validation_set is not None:
+                    new_indices["validation"] = validation_set.raw_indices
+                np.savez(os.path.join(self.dump_dir, "active_learning_split.npz"), new_indices)
                 logger.info(f"Active learning iteration {i + 1} / {max_iter} finished!")
         else:
             raise NotImplementedError
