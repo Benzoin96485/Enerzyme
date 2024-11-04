@@ -193,7 +193,7 @@ class Trainer:
             self.active_learning = True
         else:
             self.active_learning = False
-        self.resume = params.get("resume", False)
+        self.resume = params.get("resume", 1)
 
     def decorate_batch_input(self, batch):
         return _decorate_batch_input(batch, self.dtype, self.device)
@@ -266,27 +266,42 @@ class Trainer:
         else:
             ema = None
         scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
-        other_info = self.load_state_dict(model, optimizer, scheduler, pretrain_path, ema)
+
+        if self.resume > 1:
+            other_info = self.load_state_dict(model, optimizer, scheduler, pretrain_path, ema)
+        elif self.resume == 1:
+            other_info = self.load_state_dict(model, pretrain_path=pretrain_path, ema=ema)
+        else:
+            other_info = self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
         
-        if self.resume and "best_epoch" in other_info and "epoch" in other_info:
+        if self.resume > 1 and "best_epoch" in other_info and "epoch" in other_info:
             wait = other_info["epoch"] - other_info["best_epoch"]
             best_score = other_info.get("best_score", float("inf"))
             start_epoch = other_info["epoch"] + 1
         else:
             wait = 0
-            start_epoch = other_info.get("epoch", -1) + 1
+            if self.resume > 1:
+                start_epoch = other_info.get("epoch", -1) + 1
+            else:
+                start_epoch = 0
             if valid_dataset is not None:
-                best_score = other_info.get("best_score", float("inf"))
+                if self.resume > 1:
+                    best_score = other_info.get("best_score", float("inf"))
+                else:
+                    best_score = float("inf")
             else:
                 best_score = None
 
-        if self.resume:
+        if self.resume > 1:
             max_epochs = self.max_epochs
         else:
             max_epochs = start_epoch + self.max_epochs
         
         if valid_dataset is not None:
-            best_epoch = other_info.get("best_epoch", start_epoch)
+            if self.resume > 1:
+                best_epoch = other_info.get("best_epoch", start_epoch)
+            else:
+                best_epoch = None
         else:
             best_epoch = None
 
