@@ -52,11 +52,7 @@ class ModelHub:
         self._init_models(**params)
     
     def _init_models(self, **params) -> None:
-        internal_FFs = params['internal_FFs']
-
-        for model_id, model_params in internal_FFs.items():
-            # WARNING: please carefully update the model_str function due to
-            # need to call each model one by one.
+        for model_id, model_params in {**params.get('internal_FFs', {}), **params.get('external_FFs', {})}.items():
             model_str = get_model_str(model_id, model_params)
             new_trainer_config = model_params.get('Trainer', None)
             new_metric_config = model_params.get('Metric', None)
