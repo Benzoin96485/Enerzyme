@@ -297,7 +297,7 @@ class FF_committee(BaseFFLauncher):
             for i in range(self.size)
         ]
 
-    def _train(self, train_dataset, valid_dataset=None, test_dataset=None) -> None:
+    def _train(self, train_dataset, valid_dataset=None, test_dataset=None, max_epoch_per_iter=-1) -> None:
         for i in range(self.size):
             logger.info(f"start training FF: {self.model_str} ({i})")
             self.model = self._init_model(self.build_params, self.verbose)
@@ -311,7 +311,8 @@ class FF_committee(BaseFFLauncher):
                 loss_terms=self.loss_terms, 
                 transform=self.datahub.transform,
                 dump_dir=self.dump_dir,
-                model_rank=i
+                model_rank=i,
+                max_epoch_per_iter=max_epoch_per_iter
             )
             logger.info(f"{self.model_str} FF ({i + 1} / {self.size}) done!")
             logger.info(f"{self.model_str} Model ({i}) saved!")
@@ -346,7 +347,6 @@ class FF_committee(BaseFFLauncher):
         return y_preds, pd.DataFrame(metric_scores, index=[self.model_str + str(i) for i in range(self.size)])
 
     def active_learn(self) -> None:
-        from ..tasks.active_learning import max_Fa_norm_std_picking
         partitions = self._init_partition()
         training_set = partitions["training"]
         validation_set = partitions.get("validation", None)
@@ -355,20 +355,21 @@ class FF_committee(BaseFFLauncher):
         len_training = len(training_set)
         len_validation = len(validation_set) if validation_set is not None else 0
         ratio_training = len_training / (len_training + len_validation)
-        params = self.trainer.active_learning_params
-        picking_method = params.get("picking_method", "max_Fa_norm_std")
+        active_learning_params = self.trainer.active_learning_params
+        picking_method = active_learning_params.get("picking_method", "max_Fa_norm_std")
+        max_epoch_per_iter = active_learning_params.get("max_epoch_per_iter", -1)
         if picking_method == "max_Fa_norm_std":
             from ..tasks.active_learning import max_Fa_norm_std_picking
             picking_func = max_Fa_norm_std_picking
-            picking_params = {"lb": params["error_lower_bound"], "ub": params["error_upper_bound"]}
+            picking_params = {"lb": active_learning_params["error_lower_bound"], "ub": active_learning_params["error_upper_bound"]}
         elif picking_method == "random":
             from ..tasks.active_learning import random_picking
             picking_func = random_picking
             picking_params = {}
         else:
             raise NotImplementedError(f"Picking method {picking_method} not implemented!")
-        data_source = params.get("data_source", "withheld")
-        sample_size = params["sample_size"]
+        data_source = active_learning_params.get("data_source", "withheld")
+        sample_size = active_learning_params["sample_size"]
         
         if data_source == "withheld":
             withheld_size = len(withheld_set)
@@ -377,7 +378,7 @@ class FF_committee(BaseFFLauncher):
             for i in range(max_iter):
                 if i > 0:
                     self._init_pretrain_path(self.dump_dir)
-                self._train(training_set, validation_set, test_set)
+                self._train(training_set, validation_set, test_set, max_epoch_per_iter)
                 unmasked_relative_indices = withheld_mask.nonzero()[0]
                 unmasked_size = len(unmasked_relative_indices)
                 if unmasked_size == 0:

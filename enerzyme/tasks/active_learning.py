@@ -29,4 +29,5 @@ def max_Fa_norm_std_picking(y_preds, lb, ub) -> List[int]:
 def random_picking(y_preds) -> List[int]:
     sample_size = len(y_preds[0]["Fa"])
     picked = list(range(sample_size))
+    logger.info(f"({len(picked)} / {sample_size}) picked!")
     return picked
