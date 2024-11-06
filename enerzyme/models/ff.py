@@ -356,8 +356,17 @@ class FF_committee(BaseFFLauncher):
         len_validation = len(validation_set) if validation_set is not None else 0
         ratio_training = len_training / (len_training + len_validation)
         params = self.trainer.active_learning_params
-        lb = params["error_lower_bound"]
-        ub = params["error_upper_bound"]
+        picking_method = params.get("picking_method", "max_Fa_norm_std")
+        if picking_method == "max_Fa_norm_std":
+            from ..tasks.active_learning import max_Fa_norm_std_picking
+            picking_func = max_Fa_norm_std_picking
+            picking_params = {"lb": params["error_lower_bound"], "ub": params["error_upper_bound"]}
+        elif picking_method == "random":
+            from ..tasks.active_learning import random_picking
+            picking_func = random_picking
+            picking_params = {}
+        else:
+            raise NotImplementedError(f"Picking method {picking_method} not implemented!")
         data_source = params.get("data_source", "withheld")
         sample_size = params["sample_size"]
         
@@ -380,7 +389,7 @@ class FF_committee(BaseFFLauncher):
                     part_relative_indices = unmasked_relative_indices[j * sample_size: (j + 1) * sample_size]
                     withheld_part = Subset(withheld_set, part_relative_indices)
                     y_preds, _ = self._evaluate(withheld_part)
-                    masked_relative_indices += [part_relative_indices[idx] for idx in max_Fa_norm_std_picking(y_preds, lb, ub)]
+                    masked_relative_indices += [part_relative_indices[idx] for idx in picking_func(y_preds, **picking_params)]
                     if len(masked_relative_indices) >= sample_size:
                         break
                 if len(masked_relative_indices) == 0:
