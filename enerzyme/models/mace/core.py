@@ -34,7 +34,7 @@ DEFAULT_LAYER_PARAMS = [{
         'radial_MLP': [64, 64, 64],
         'hidden_irreps': "128x0e + 128x1o",
         'gate': "silu",
-        'avg_num_neighbors': 1.0,
+        'avg_num_neighbors': 8.0,
     }
 }]
 
