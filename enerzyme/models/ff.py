@@ -222,7 +222,10 @@ class FF_single(BaseFFLauncher):
         from .modelhub import get_pretrain_path
         if self.trainer.resume:
             if pretrain_path is None:
-                self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
+                try:
+                    self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
+                except FileNotFoundError:
+                    self.pretrain_path = None
             else:
                 self.pretrain_path = get_pretrain_path(pretrain_path, "last", None)
         else:

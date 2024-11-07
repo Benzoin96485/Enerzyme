@@ -16,7 +16,7 @@ def load_from_pickle(data_path=str):
         data = pickle.load(f)
     if isinstance(data, list) and isinstance(data[0], dict):
         keys = data[0].keys()
-        dd = {key: [datapoint[key] for datapoint in data] for key in keys}
+        dd = {key: [datapoint.get(key, None) for datapoint in data] for key in keys}
         return dd
     elif isinstance(data, dict):
         return data
