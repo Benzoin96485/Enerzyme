@@ -1,9 +1,12 @@
 # Enerzyme
 Towards next generation machine learning force field on enzymatic catalysis.
 
-Current model architectures:
+Current internal model architectures:
 - PhysNet: [J. Chem. Theory Comput. 2019, 15, 3678−3693](https://pubs.acs.org/doi/full/10.1021/acs.jctc.9b00181)
 - SpookyNet: [Nat. Commun. 2021, 12(1), 7273](https://www.nature.com/articles/s41467-021-27504-0)
+
+Current external model architectures:
+- MACE: [NeurIPS 2022, 35, 11423-11436](https://openreview.net/forum?id=YPpSngE-ZU)
 
 # Usage
 ## Installation
@@ -25,6 +28,12 @@ ase==3.22.1
 transformers==4.33.1
 torch-ema==0.3
 pyyaml==6.0.1
+torch-scatter==2.1.2
+```
+
+External Force Fields (optional):
+```
+mace-torch==0.3.6
 ```
 
 ```bash
@@ -56,7 +65,9 @@ Enerzyme reads the `<model directory>` for the model configuration, load the mod
 
 ## Simulation
 
-Scanning on the distance between two atoms is supported.
+Supported simulation types:
+- Flexible scanning on the distance between two atoms.
+- Constrained Langevin MD
 
 ```bash
 enerzyme simulate -c <configuration yaml file> -o <output directory> -m <model directory>

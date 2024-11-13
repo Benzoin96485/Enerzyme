@@ -163,22 +163,20 @@ class ResidualMLP(NeuronLayer):
         use_bias_out: bool=True
     ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
-        residual_stack = ResidualStack(
+        self.stack = ResidualStack(
             dim_feature_in, num_residual, 
             activation_fn, activation_params,
             initial_weight1, initial_weight2, initial_bias_residual,
             dropout_rate, use_bias_residual
         )
-        output = DenseLayer(
+        self.output = DenseLayer(
             dim_feature_in, dim_feature_out,
             initial_weight=initial_weight_out, initial_bias=initial_bias_out,
             use_bias=use_bias_out
         )
-        if self.activation_fn is None:
-            self.stack = Sequential(residual_stack, output)
-        else:
-            self.stack = Sequential(residual_stack, self.activation_fn, output)
-        self.output = output
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.stack(x)
+        if self.activation_fn is None:
+            return self.output(self.stack(x))
+        else:
+            return self.output(self.activation_fn(self.stack(x)))

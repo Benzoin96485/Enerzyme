@@ -1,14 +1,15 @@
 import os.path as osp
+from addict import Dict
 import numpy as np
 import ase
 import torch
 from ase.constraints import FixAtoms, FixBondLengths
 from ase.calculators.calculator import Calculator, all_changes
 from ase.optimize import BFGS
+from ase.units import Hartree, fs
 from ..data import full_neighbor_list
 from ..utils import logger
-from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input
-
+from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input, _load_state_dict
 
 class ASECalculator(Calculator):
     implemented_properties = ["energy", "forces", "dipole", "charges"]
@@ -19,6 +20,11 @@ class ASECalculator(Calculator):
         restart=None,
         label=None,
         atoms=None,
+        device=None,
+        dtype=None,
+        transform=None,
+        neighbor_list_type=None,
+        Hartree_in_E=1,
         **params
     ):
         Calculator.__init__(
@@ -27,15 +33,16 @@ class ASECalculator(Calculator):
         self.model = model
         self.N = 0
         self.positions = None
-        self.device = self.parameters.device
+        self.device = device
         self.pbc = np.array([False])
         self.cell = None
         self.cell_offsets = None
-        self.dtype = self.parameters.dtype
-        self.neighbor_list_type = self.parameters.neighbor_list_type
-        self.transform = self.parameters.transform
+        self.dtype = dtype
+        self.neighbor_list_type = neighbor_list_type
+        self.transform = transform
+        self.Hartree_in_E = Hartree_in_E
 
-    def calculate(self, atoms=None, properties=["energy"], system_changes=all_changes):
+    def calculate(self, atoms=None, properties=["energy", "forces", "dipole", "charges"], system_changes=all_changes):
         Calculator.calculate(self, atoms, properties, system_changes)
         features = {
             "Q": self.parameters.charge,
@@ -60,8 +67,8 @@ class ASECalculator(Calculator):
             targets=None
         )
         self.transform.inverse_transform(output)
-        self.results["energy"] = output["E"][0]
-        self.results["forces"] = output["Fa"][0]
+        self.results["energy"] = output["E"][0] / self.Hartree_in_E * Hartree
+        self.results["forces"] = output["Fa"][0] / self.Hartree_in_E * Hartree
         if "M2" in output:
             self.results["dipole"] = output["M2"][0]
         if "Qa" in output:
@@ -69,7 +76,7 @@ class ASECalculator(Calculator):
 
 
 class Simulation:
-    def __init__(self, config, model, out_dir, transform):
+    def __init__(self, config, model, model_path, out_dir, transform):
         self.environment = config.Simulation.environment
         self.task = config.Simulation.task
         self.structure_file = config.System.structure_file
@@ -77,17 +84,21 @@ class Simulation:
         self.multiplicity = config.System.multiplicity
         self.transform = transform
         self.idx_start_from = config.Simulation.get("idx_start_from", 1)
+        self.integrate_config = config.Simulation.get("integrate", None)
         self.constraint_config = config.Simulation.get("constraint", None)
         self.sampling_config = config.Simulation.get("sampling", None)
+        self.fs_in_t = config.Simulation.get("fs_in_t", 1)
+        self.log_interval = config.Simulation.get("log_interval", 20)
         self.neighbor_list_type = config.Simulation.get("neighbor_list", "full")
         self.cuda = config.Simulation.get('cuda', False)
         self.dtype = DTYPE_MAPPING[config.Simulation.get("dtype", "float64")]
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
         # single ff simulation
         self.model = model.to(self.device).type(self.dtype)
+        _load_state_dict(model, self.device, model_path, inference=True)
         self.model.eval()
         self.out_dir = out_dir
-        self.simulation_config = {k: v for k, v in config.Simulation.items() if not hasattr(self, k)}
+        # self.simulation_config = {k: (v.to_dict() if hasattr(v, "to_dict") else v) for k, v in config.Simulation.items() if not hasattr(self, k)}
         # initialize
         getattr(self, f"_init_{self.environment}_env")()
 
@@ -101,7 +112,7 @@ class Simulation:
             dtype=self.dtype,
             neighbor_list_type=self.neighbor_list_type,
             transform=self.transform,
-            **self.simulation_config
+            #**self.simulation_config
         )
         self.system.calc = calculator
         if self.constraint_config is not None:
@@ -135,6 +146,22 @@ class Simulation:
                 ase.io.write(osp.join(self.out_dir, f"scan_optim.xyz"), self.system, append=True)
                 logger.info(f"Final energy: {self.system.get_potential_energy()}")
                 logger.info(f"Final distance: {self.system.get_distance(i0, i1)}")
+
+    def _run_md(self) -> None:
+        if self.integrate_config.integrator.lower() == "langevin":
+            from ase.md.langevin import Langevin
+            dyn = Langevin(self.system, 
+                timestep=self.integrate_config.time_step * fs / self.fs_in_t,
+                temperature_K=self.integrate_config.temperature_in_K,
+                friction=self.integrate_config.friction,
+                logfile="-",
+                loginterval=self.log_interval
+            )
+            def write_xyz(atoms=None):
+                ase.io.write(osp.join(self.out_dir, f"md.traj.xyz"), atoms, append=True)
+            dyn.attach(write_xyz, interval=self.log_interval, atoms=self.system) 
+            dyn.run(self.integrate_config.n_step)
+            
 
     def run(self):
         getattr(self, f"_run_{self.task}")()

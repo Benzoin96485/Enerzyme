@@ -7,7 +7,7 @@ from torch.nn import Parameter
 from torch.nn.functional import softmax
 from .. import BaseFFLayer
 from ...cutoff import polynomial_transition
-from ...functional import segment_sum, gather_nd
+from ...functional import gather_nd, segment_sum_coo
 
 # parameters
 # grimme_d3_tables from https://github.com/MMunibas/PhysNet/commit/e243e2c383b4ac0a9d7062e654d9b4feb76ca859
@@ -31,7 +31,7 @@ d3_rcov = torch.tensor(np.load(os.path.join(package_directory, "grimme_d3_tables
 d3_r2r4 = torch.tensor(np.load(os.path.join(package_directory, "grimme_d3_tables", "r2r4.npy")))
 
 
-def _ncoord(Zi: Tensor, Zj: Tensor, Dij: Tensor, idx_i: Tensor, cutoff: float=None, k1: float=d3_k1, rcov: Tensor=d3_rcov) -> Tensor:
+def _ncoord(Zi: Tensor, Zj: Tensor, Dij: Tensor, idx_i: Tensor, N: int, cutoff: float=None, k1: float=d3_k1, rcov: Tensor=d3_rcov) -> Tensor:
     r'''
     Compute coordination numbers (CN) [1] with an inverse damping function [2]
 
@@ -54,6 +54,8 @@ def _ncoord(Zi: Tensor, Zj: Tensor, Dij: Tensor, idx_i: Tensor, cutoff: float=No
 
     idx_i: Long tensor of the first pair indices, shape [N_pair * batch_size]
 
+    N: Actually N * batchsize
+
     cutoff: Cutoff in Bohr for the damping function
 
     k1: k_1
@@ -75,7 +77,7 @@ def _ncoord(Zi: Tensor, Zj: Tensor, Dij: Tensor, idx_i: Tensor, cutoff: float=No
     damp = 1.0 / (1.0 + torch.exp(-k1 * (rr - 1.0)))
     if cutoff is not None:
         damp *= polynomial_transition(Dij, cutoff, cutoff-1)
-    return segment_sum(damp, idx_i)
+    return segment_sum_coo(damp, idx_i, dim_size=N)
 
 
 def _getc6(Zi: Tensor, Zj: Tensor, nci: Tensor, ncj: Tensor, c6ab: Tensor=d3_c6ab, k3: float=d3_k3) -> Tensor:
@@ -206,8 +208,9 @@ def edisp(Za: Tensor, Dij: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: Optiona
     '''
     Zi = Za[idx_i]
     Zj = Za[idx_j]
+    N = len(Za)
     
-    nc = _ncoord(Zi, Zj, Dij, idx_i, cutoff=cutoff, rcov=rcov) # coordination numbers
+    nc = _ncoord(Zi, Zj, Dij, idx_i, N, cutoff=cutoff, rcov=rcov) # coordination numbers
     nci = nc[idx_i]
     ncj = nc[idx_j]
     c6 = _getc6(Zi, Zj, nci, ncj, c6ab=c6ab, k3=k3) # c6 coefficients
@@ -241,7 +244,7 @@ def edisp(Za: Tensor, Dij: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: Optiona
 
     e6 = -0.5 * s6 * c6 * e6
     e8 = -0.5 * s8 * c8 * e8
-    return segment_sum(e6 + e8, idx_i)
+    return segment_sum_coo(e6 + e8, idx_i, dim_size=N)
 
 
 class GrimmeD3EnergyLayer(BaseFFLayer):

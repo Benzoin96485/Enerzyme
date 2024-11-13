@@ -1,7 +1,5 @@
-import os
-from typing import Dict
+from typing import Dict, Callable, Tuple
 import numpy as np
-import torch
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from ..data import is_atomic, get_tensor_rank
 from ..utils.base_logger import logger
@@ -66,22 +64,21 @@ class Metrics(object):
         raw_metric_score["_judge_score"] = self.cal_judge_score(raw_metric_score)
         return raw_metric_score
 
-    def _early_stop_choice(self, wait, min_score, metric_score, max_score, model, dump_dir, patience, epoch):
+    def _early_stop_choice(self, wait: int, best_score: float, metric_score: Dict, save_handle: Callable, patience: int, epoch: int) -> Tuple[bool, float, int]:
         judge_score = metric_score.get("_judge_score", self.cal_judge_score(metric_score))
-        is_early_stop, min_score, wait = self._judge_early_stop_decrease(wait, judge_score, min_score, model, dump_dir, patience, epoch)
-        return is_early_stop, min_score, wait, max_score
+        return self._judge_early_stop_decrease(wait, judge_score, best_score, save_handle, patience, epoch)
 
-    def _judge_early_stop_decrease(self, wait, score, min_score, model, dump_dir, patience, epoch):
+    def _judge_early_stop_decrease(self, wait: int, score: float, min_score: float, save_handle: Callable, patience: int, epoch: int) -> Tuple[bool, float, int]:
         is_early_stop = False
+        saved = False
         if score <= min_score:
             min_score = score
             wait = 0
-            info = {'model_state_dict': model.state_dict()}
-            os.makedirs(dump_dir, exist_ok=True)
-            torch.save(info, os.path.join(dump_dir, f'model_best.pth'))
+            save_handle(best_score=score, best_epoch=epoch, epoch=epoch)
+            saved = True
         elif score >= min_score:
             wait += 1
             if wait == patience:
                 logger.warning(f'Early stopping at epoch: {epoch+1}')
                 is_early_stop = True
-        return is_early_stop, min_score, wait
+        return is_early_stop, min_score, wait, saved

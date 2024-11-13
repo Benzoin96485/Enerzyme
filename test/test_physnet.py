@@ -260,7 +260,8 @@ def test_ncoord():
         Zj=torch.from_numpy(Z)[torch.from_numpy(idx_j)], 
         Dij=torch.from_numpy(D),
         idx_i=torch.from_numpy(idx_i),
-        cutoff=2
+        cutoff=2,
+        N=50
     )
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -304,8 +305,7 @@ def test_electrostatic_energy_per_atom():
         cutoff_sr=cutoff,
         cutoff_lr=None,
         cutoff_fn="polynomial",
-        half_switch=True,
-        lr_flavor="simple"
+        flavor="PhysNet"
     )
     ele_layer.kehalf = physnet_tf.kehalf
     e_torch = ele_layer.get_E_ele_a(
@@ -329,8 +329,7 @@ def test_energy_from_scaled_atomic_properties():
         cutoff_sr=cutoff,
         cutoff_lr=None,
         cutoff_fn="polynomial",
-        half_switch=True,
-        lr_flavor="simple"
+        flavor="PhysNet"
     )
     ele_layer.reset_field_name(Dij_lr="Dij")
     ele_layer.kehalf = physnet_tf.kehalf
@@ -377,8 +376,7 @@ def test_energy_from_atomic_properties():
         cutoff_sr=cutoff,
         cutoff_lr=None,
         cutoff_fn="polynomial",
-        half_switch=True,
-        lr_flavor="simple"
+        flavor="PhysNet"
     )
     ele_layer.kehalf = physnet_tf.kehalf
     disp_layer = GrimmeD3EnergyLayer(Bohr_in_R=d3_autoang, Hartree_in_E=d3_autoev)

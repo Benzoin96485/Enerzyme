@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import Module, Embedding, Parameter, Linear, init
+from torch.nn.functional import pad
 
 
 class BaseAtomEmbedding(ABC, Module):
@@ -36,6 +37,16 @@ class RandomAtomEmbedding(BaseAtomEmbedding):
     @property
     def weight(self) -> Tensor:
         return self.embedding.weight
+    
+    def _load_from_state_dict(self, state_dict: Dict[str, Tensor], *args, **kwargs):
+        for k, v in state_dict.items():
+            if k.endswith("embedding.weight"):
+                if len(v) > self.max_Za + 1:
+                    state_dict[k] = v[:self.max_Za + 1]
+                    print(len(v), ">")
+                elif len(v) < self.max_Za + 1:  
+                    state_dict[k] = torch.concat([v, self.embedding.weight[len(v):]], dim=0)
+        super()._load_from_state_dict(state_dict, *args, **kwargs)
 
 
 ELECTRON_CONFIG = np.array([
