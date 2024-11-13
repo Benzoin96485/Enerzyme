@@ -19,7 +19,7 @@ SEP = "-"
 FF_REGISTER = {}
 
 
-def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, List]:
+def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], List[Dict[str, Any]]]:
     global LOSS_REGISTER
     if architecture.lower() == "physnet":
         from .physnet import PhysNetCore as Core
@@ -28,6 +28,14 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, List]:
     elif architecture.lower() == "spookynet":
         from .spookynet import SpookyNetCore as Core
         from .spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    elif architecture.lower() == "mace":
+        from .mace import MACEWrapper as Core
+        from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    elif architecture.lower() == "leftnet":
+        from .leftnet import LEFTNet as Core
+        DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS = None, None
         special_loss = {}
     LOSS_REGISTER.update(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
@@ -58,6 +66,7 @@ def build_model(
         layer_params = default_layer_params
     if build_params is None:
         build_params = default_build_params
+    print(layer_params, build_params)
     built_layers = []
     core = None
     for layer_param in layer_params:
@@ -123,8 +132,8 @@ class BaseFFLauncher(ABC):
         model_str: str, 
         loss: Dict, 
         architecture: str, 
-        build_params, layers=None,
-        pretrain_path=None
+        build_params: Optional[Dict]=None, layers: Optional[List[Dict]]=None,
+        pretrain_path: Optional[str]=None
     ) -> None:
         self.datahub = datahub
         self.trainer = trainer
@@ -215,7 +224,7 @@ class FF_single(BaseFFLauncher):
         model_str: str, 
         loss: Dict, 
         architecture: str, 
-        build_params, layers=None,
+        build_params=None, layers=None,
         pretrain_path=None, **params
     ) -> None:
         super().__init__(datahub, trainer, model_str, loss, architecture, build_params, layers, pretrain_path)
@@ -281,8 +290,8 @@ class FF_committee(BaseFFLauncher):
         model_str: str, 
         loss: Dict, 
         architecture: str, 
-        build_params, layers=None,
-        pretrain_path=None, **params
+        build_params: Optional[Dict]=None, layers: Optional[List[Dict]]=None,
+        pretrain_path: Optional[str]=None, **params
     ) -> None:
         super().__init__(
             datahub, trainer, model_str, loss, architecture, build_params, layers, 
