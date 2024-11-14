@@ -130,4 +130,4 @@ class NequIPWrapper(BaseFFCore):
             "batch": batch_seg,
             "ptr": ptr
         })
-        return {"E": raw_output["total_energy"], "Fa": raw_output["forces"]}
+        return {"E": raw_output["total_energy"].squeeze(), "Fa": raw_output["forces"]}
