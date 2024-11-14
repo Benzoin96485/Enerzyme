@@ -247,7 +247,7 @@ class Trainer:
         model: Module, pretrain_path: Optional[str],
         train_dataset: Dataset, valid_dataset: Optional[Dataset], 
         loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
-        test_dataset: Optional[Dataset]=None, model_rank=None) -> Tuple[Optional[defaultdict[Any]], Dict]:
+        test_dataset: Optional[Dataset]=None, model_rank=None, max_epoch_per_iter=-1) -> Tuple[Optional[defaultdict[Any]], Dict]:
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -306,6 +306,8 @@ class Trainer:
             best_epoch = None
 
         for epoch in range(start_epoch, max_epochs):
+            if max_epoch_per_iter > 0 and epoch >= max_epoch_per_iter + start_epoch:
+                break
             model = model.train()
             start_time = time.time()
             batch_bar = tqdm(

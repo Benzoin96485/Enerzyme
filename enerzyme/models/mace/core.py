@@ -89,24 +89,21 @@ class MACEWrapper(BaseFFCore):
         one_hot = to_one_hot(torch.tensor(indices, dtype=torch.long, device=Za.device).unsqueeze(-1), num_classes=len(self.z_table))
         mace_data["batch"] = batch_seg
         mace_data["ptr"] = [0]
-        mace_data["edge_index"], mace_data["shifts"], mace_data["unit_shifts"] = None, None, None
+        mace_data["edge_index"], mace_data["shifts"], mace_data["unit_shifts"] = None, 0, 0
+        count = 0
         for i in range(batch_seg[-1] + 1):
             mask = batch_seg == i
-            mace_data["ptr"].append(mask.sum().item())
             edge_index, shifts, unit_shifts = get_neighborhood(
                 positions=Ra[mask].detach().cpu().numpy(), cutoff=self.r_max, pbc=None, cell=None
             )
             edge_index = torch.tensor(edge_index, dtype=torch.long, device=Ra.device)
-            shifts = torch.tensor(shifts, dtype=Ra.dtype, device=Ra.device)
-            unit_shifts = torch.tensor(unit_shifts, dtype=Ra.dtype, device=Ra.device)
             if i == 0:
                 mace_data["edge_index"] = edge_index
-                mace_data["shifts"] = shifts
-                mace_data["unit_shifts"] = unit_shifts
             else:
-                mace_data["edge_index"] = torch.cat([mace_data["edge_index"], edge_index], dim=1)
-                mace_data["shifts"] = torch.cat([mace_data["shifts"], shifts], dim=0)
-                mace_data["unit_shifts"] = torch.cat([mace_data["unit_shifts"], unit_shifts], dim=0)
+                mace_data["edge_index"] = torch.cat([mace_data["edge_index"], edge_index + count], dim=1)
+            N = mask.sum().item()
+            count += N
+            mace_data["ptr"].append(count)
         mace_data["ptr"] = torch.tensor(mace_data["ptr"], dtype=torch.long, device=Ra.device)
         mace_data["positions"] = Ra
         mace_data["node_attrs"] = one_hot
