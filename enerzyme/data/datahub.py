@@ -15,7 +15,10 @@ def load_from_pickle(data_path=str):
     with open(data_path, "rb") as f:
         data = pickle.load(f)
     if isinstance(data, list) and isinstance(data[0], dict):
-        keys = data[0].keys()
+        keys = set()
+        for datapoint in data:
+            keys.update(datapoint.keys())
+        logger.info(f"Collected keys from data: {keys}")
         dd = {key: [datapoint.get(key, None) for datapoint in data] for key in keys}
         return dd
     elif isinstance(data, dict):
