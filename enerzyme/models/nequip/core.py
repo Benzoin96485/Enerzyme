@@ -1,6 +1,7 @@
 from typing import Dict, List
 import torch
 from torch import Tensor
+from torch_geometric.data import Data
 from ..layers import BaseFFCore
 try:
     from nequip.model import model_from_config
@@ -14,7 +15,7 @@ DEFAULT_BUILD_PARAMS = {
     "default_dtype": "float32",
     "model_dtype": "float32",
     "r_max": 6.0,
-
+    "chemical_symbols": ["H", "C", "N", "O", "P", "S"]
 }
 DEFAULT_LAYER_PARAMS = [{"name": "Core", "params": {
     "model_builders": [
@@ -46,7 +47,6 @@ DEFAULT_LAYER_PARAMS = [{"name": "Core", "params": {
     "invariant_neurons": 64,
     "avg_num_neighbors": 8,
     "use_sc": True,
-    "chemical_symbols": ["H", "C", "N", "O", "P", "S"]
 }}]
 
 

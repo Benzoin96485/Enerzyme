@@ -29,17 +29,21 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .spookynet import SpookyNetCore as Core
         from .spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
-    elif architecture.lower() == "mace":
-        from .mace import MACEWrapper as Core
-        from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
     elif architecture.lower() == "leftnet":
         from .leftnet import LEFTNet as Core
         DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS = None, None
         special_loss = {}
+    elif architecture.lower() == "mace":
+        from .mace import MACEWrapper as Core
+        from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "nequip":
         from .nequip import NequIPWrapper as Core
         from .nequip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    elif architecture.lower() == "xpainn":
+        from .xpainn import XPaiNNWrapper as Core
+        from .xpainn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     LOSS_REGISTER.update(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
