@@ -7,15 +7,15 @@ Datahub:
   features:
     Ra: coord                               # atomic positions, shape [Nframe, Natom, 3] (required)
     Za: atom_type                           # atomic numbers or symbols (will be automatically converted to numbers), shape [Nframe, Natom] (required)
-    Q:                                      # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
-    N:                                      # total atom counts, shape [Nframe] 
+    Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
+    N: null                                 # total atom counts, shape [Nframe] 
                                             # if not provided, will be infered from Za
                                             # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
   targets:
     E: energy                               # total energy, shape [Nframe]
     Fa: grad                                # atomic forces, shape [Nframe, Natom, 3]
     Qa: chrg                                # atomic charges, shape [Nframe, Natom]
-    Q:
+    Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
     M2: dipole                              # total dipole moment, shape [Nframe, 3]
   preload: false                            # load the processed data from the dump directory
   neighbor_list: full                       # neighbor list building algorithm:
@@ -209,6 +209,23 @@ Modelhub:
         #     learnable: true
         - name: EnergyReduce
         - name: Force
+    FF03:
+      suffix:
+      architecture: LEFTNet
+      active: true
+  external_FFs:
+    FF04:
+      suffix:
+      architecture: MACE
+      active: true
+    FF05:
+      suffix:
+      architecture: NequIP
+      active: true
+    FF06:
+      suffix:
+      architecture: XPaiNN
+      active: true
 Trainer:
   Splitter:
     method: random                          # splitting method: random
@@ -232,7 +249,8 @@ Trainer:
                                               # E_zbl for ZBLRepulsionEnergy layer
                                             # four statistics are supported:
       - mean                                # mean value
-      - std                                 # standard deviation
+      - std                                 # standard deviat
+      ion
       - min                                 # minimum value
       - max                                 # maximum value
   seed: 114514                              # trainer random seed: dataloader shuffling, pytorch random initialization, etc.

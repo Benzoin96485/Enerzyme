@@ -79,6 +79,13 @@ class MACEWrapper(BaseFFCore):
             gate=gate_dict[gate],
             radial_MLP=radial_MLP
         )
+    
+    def __str__(self) -> str:
+        return """
+#################################################
+# Wrapped MACE (NeurIPS 2022, arXiv:2206.07697) #
+#################################################
+"""
 
     def build(self, built_layers) -> None:
         pass

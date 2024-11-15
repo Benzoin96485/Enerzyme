@@ -16,7 +16,6 @@ from . import layers as Layers
 
 
 SEP = "-"
-FF_REGISTER = {}
 
 
 def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], List[Dict[str, Any]]]:
@@ -74,7 +73,6 @@ def build_model(
         layer_params = default_layer_params
     if build_params is None:
         build_params = default_build_params
-    print(layer_params, build_params)
     built_layers = []
     core = None
     for layer_param in layer_params:
@@ -96,7 +94,8 @@ def build_model(
             logger.info(f"built {layer_name}")
         built_layers.append(layer)
     
-    core.build(built_layers)
+    if hasattr(core, "build"):
+        core.build(built_layers)
     return core
 
 
@@ -150,10 +149,7 @@ class BaseFFLauncher(ABC):
         self.architecture = architecture
         self.build_params = build_params
         self.layer_params = layers
-        if pretrain_path is not None:
-            self.pretrain_path = pretrain_path
-        else:
-            self.pretrain_path = None
+        self.pretrain_path = pretrain_path
         self.metrics = self.trainer.metrics
         self.out_dir = self.trainer.out_dir
         self.dump_dir = os.path.join(self.out_dir, self.model_str)
@@ -161,11 +157,8 @@ class BaseFFLauncher(ABC):
         self.loss_terms = {}
         self.trainer._set_seed(self.trainer.seed)
 
-    def _init_model(self, build_params: Dict[str, Any], verbose=1) -> Module:
-        if self.architecture in FF_REGISTER:
-            model = FF_REGISTER[self.architecture](**build_params)
-        else:
-            model = build_model(self.architecture, self.layer_params, self.build_params, verbose)
+    def _init_model(self, verbose=1) -> Module:
+        model = build_model(self.architecture, self.layer_params, self.build_params, verbose)
         self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in self.loss_params.items()}
         if verbose:
             print(model.__str__())
@@ -247,7 +240,7 @@ class FF_single(BaseFFLauncher):
                 self.pretrain_path = get_pretrain_path(pretrain_path, "last", None)
         else:
             self.pretrain_path = get_pretrain_path(pretrain_path, "best", None)
-        self.model = self._init_model(self.build_params)
+        self.model = self._init_model()
     
     def _train(
         self, 
@@ -320,7 +313,7 @@ class FF_committee(BaseFFLauncher):
     def _train(self, train_dataset, valid_dataset=None, test_dataset=None, max_epoch_per_iter=-1) -> None:
         for i in range(self.size):
             logger.info(f"start training FF: {self.model_str} ({i})")
-            self.model = self._init_model(self.build_params, self.verbose)
+            self.model = self._init_model(self.verbose)
             self.verbose = 0
             y_pred, metric_score = self.trainer.fit_predict(
                 model=self.model, 
@@ -347,7 +340,7 @@ class FF_committee(BaseFFLauncher):
         y_preds = []
         metric_scores = []
         for i in range(self.size):
-            self.model = self._init_model(self.build_params, self.verbose)
+            self.model = self._init_model(self.verbose)
             logger.info(f"start evaluate FF:{self.model_str} ({i})")
             y_pred, _, metric_score = self.trainer.predict(
                 model=self.model, 

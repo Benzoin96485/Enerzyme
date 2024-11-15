@@ -855,6 +855,13 @@ class LEFTNet(BaseFFCore):
         self.use_pbc = use_pbc
         self.use_sigmoid = use_sigmoid
 
+    def __str__(self) -> str:
+        return """
+############################################
+# LEFTNet (NeurIPS 2023, arXiv:2304.04757) #
+############################################
+"""
+
     def reset_parameters(self):
         self.z_emb.reset_parameters()
         self.radial_emb.reset_parameters()

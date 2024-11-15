@@ -81,6 +81,13 @@ class XPaiNNWrapper(BaseFFCore):
         })
         self.model = XPaiNN(config)
 
+    def __str__(self) -> str:
+        return """
+####################################################################
+# Wrapped XPaiNN (J. Chem. Theory Comput. 2024, 20, 21, 9500–9511) #
+####################################################################
+"""
+
     def build(self, built_layers: List[Module]):
         calculate_distance = DistanceLayer()
         calculate_distance.reset_field_name(Dij="Dij_lr")

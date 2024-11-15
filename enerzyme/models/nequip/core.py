@@ -102,6 +102,13 @@ class NequIPWrapper(BaseFFCore):
         })
         self.type_mapper = TypeMapper(chemical_symbols=chemical_symbols)
 
+    def __str__(self) -> str:
+        return """
+###################################################
+# Wrapped NequIP (Nat. Commun. 2022, 13(1), 2453) #
+###################################################
+"""
+
     def build(self, built_layers) -> None:
         pass
 
