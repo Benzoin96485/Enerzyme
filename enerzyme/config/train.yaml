@@ -301,10 +301,80 @@ Modelhub:
       suffix:
       architecture: NequIP
       active: true
+      loss:
+        rmse:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          rmse: 52.917721
+        E:
+          rmse: 1
+      build_params:
+        r_max: 6.0
+        chemical_symbols: ["H", "C", "N", "O", "P", "S"]
+        default_dtype: float32
+        model_dtype: float32
+      layers:
+        - name: Core
+          params:
+            model_builders: [SimpleIrrepsConfig, EnergyModel, PerSpeciesRescale, ForceOutput, RescaleEnergyEtc]
+            num_layers: 4
+            l_max: 1
+            parity: true
+            num_features: 32
+            nonlinearity_type: gate
+            activation: silu
+            resnet: false
+            nonlinearity_scalars:
+              e: silu
+              o: tanh
+            nonlinearity_gates:
+              e: silu
+              o: tanh
+            num_basis: 8
+            BesselBasis_trainable: true
+            PolynomialCutoff_p: 6
+            invariant_layers: 2
+            invariant_neurons: 64
+            avg_num_neighbors: 8
+            use_sc: true
     FF06:
       suffix:
       architecture: XPaiNN
       active: true
+      loss:
+        rmse:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          rmse: 52.917721
+        E:
+          rmse: 1
+      build_params:
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: Core
+          params:
+            embed_basis: "gfn2-xtb"
+            aux_basis: "aux56"
+            node_dim: 128
+            edge_irreps: "128x0e + 64x1o + 32x2e"
+            hidden_dim: 64
+            hidden_irreps: "64x0e + 32x1o + 16x2e"
+            rbf_kernel: "bessel"
+            num_basis: 20
+            cutoff_fn: "cosine"
+            max_edges: 100
+            action_blocks: 3
+            activation: silu
+            norm_type: "nonorm"
+            output_mode: "grad"
+            output_dim: 1
+            node_average: false
+            default_dtype: "float32"
 Trainer:
   Splitter:
     method: random                          # splitting method: random
