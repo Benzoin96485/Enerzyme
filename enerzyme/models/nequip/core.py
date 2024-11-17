@@ -118,7 +118,6 @@ class NequIPWrapper(BaseFFCore):
         count = 0
         for i in range(batch_seg[-1] + 1):
             mask = batch_seg == i
-            
             edge_index_batch, _, _ = neighbor_list_and_relative_vec(
                 pos=Ra[mask], r_max=self.r_max, strict_self_interaction=False
             )

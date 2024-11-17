@@ -16,7 +16,48 @@ from torch_geometric.nn.conv import MessagePassing
 from torch_scatter import scatter
 from torch_scatter import scatter, segment_coo, segment_csr
 
-from ..layers import BaseFFCore
+from ..layers import BaseFFCore, DistanceLayer, RangeSeparationLayer
+
+
+DEFAULT_BUILD_PARAMS = {
+    "cutoff_sr": 5.0,
+    "max_Za": 94,
+}
+DEFAULT_LAYER_PARAMS = [
+    {'name': 'RangeSeparation'},
+    {"name": "Core", "params": {
+        "num_layers": 4,
+        "hidden_channels": 128,
+        "num_radial": 96,
+        "eps": 1e-10,
+        "head": 16,
+        "main_chi1": 24,
+        "mp_chi1": 24,
+        "chi2": 6,
+        "hidden_channels_chi": 96,
+        "has_dropout_flag": True,
+        "has_norm_before_flag": True,
+        "has_norm_after_flag": False,
+        "reduce_mode": "sum"
+    }},
+    {'name': 'AtomicAffine',
+        'params': {
+            'shifts': {
+                'Ea': {'values': 0, 'learnable': True},
+                'Qa': {'values': 0, 'learnable': True}},
+            'scales': {
+                'Ea': {'values': 1, 'learnable': True},
+                'Qa': {'values': 1, 'learnable': True}}}
+    },
+    {'name': 'ChargeConservation'},
+    {'name': 'AtomicCharge2Dipole'},
+    {'name': 'ElectrostaticEnergy',
+        'params': {'cutoff_lr': None, 'flavor': 'PhysNet'}},
+    {'name': 'EnergyReduce'},
+    {'name': 'Force'}
+]
+
+
 
 def print_fingerprint(s, batch, dump_file_path):
     s = scatter(s, batch, dim=0)
@@ -760,15 +801,9 @@ class GatedEquivariantBlock(nn.Module):
 class LEFTNet(BaseFFCore):
     def __init__(
             self,
-            output_dim=1,
-            compute_forces = True,
-            compute_stress = False,
-            cutoff=5.0, num_layers=4, readout="sum",
-            hidden_channels=128, num_radial=96, eps=1e-10,
-            use_pbc=False, use_sigmoid=False,
+            cutoff_sr=5.0, num_layers=4,
+            hidden_channels=128, num_radial=96, eps=1e-10, use_sigmoid=False,
             head: int = 16,
-            a: float =1,
-            b: float = 0,
             main_chi1: int = 24,
             mp_chi1: int = 24,
             chi2: int = 6,
@@ -776,32 +811,24 @@ class LEFTNet(BaseFFCore):
             has_dropout_flag=True,
             has_norm_before_flag=True,
             has_norm_after_flag=False,
-            reduce_mode='sum',
-            device=torch.device('cuda') if torch.cuda.is_available() else torch.device("cpu")
+            reduce_mode='sum'
     ):
-        super(LEFTNet, self).__init__(input_fields={"Ra", "Za", "batch_seg"}, output_fields={"E", "Fa"})
+        super(LEFTNet, self).__init__(input_fields={"Ra", "Za", "batch_seg", "idx_i_sr", "idx_j_sr", "Dij_sr", "vij_sr"}, output_fields={"Ea", "Qa"})
 
-        self.device = device
         self.eps = eps
         self.num_layers = num_layers
         self.hidden_channels = hidden_channels
-        self.a = nn.Parameter(torch.ones(108) * a)
-        self.b = nn.Parameter(torch.ones(108) * b)
-        self.cutoff = cutoff
-        self.readout = readout
+        self.cutoff = cutoff_sr
         self.chi1 = main_chi1
         self.pos_require_grad= True
         if self.pos_require_grad:
             self.out_forces = EquiOutput(hidden_channels)
         self.z_emb_ln = nn.LayerNorm(hidden_channels, elementwise_affine=False)
-        self.z_emb = Embedding (95, hidden_channels)
-        self.use_pbc = True
-        self.kernel1 = torch.nn.Parameter(torch.randn((hidden_channels, self.chi1 * 2), device=self.device))
+        self.z_emb = Embedding(95, hidden_channels)
+        self.kernel1 = torch.nn.Parameter(torch.randn((hidden_channels, self.chi1 * 2)))
         self.kernels_real = []
         self.kernels_imag = []
-        self.compute_forces = compute_forces
-        self.compute_stress = compute_stress
-        self.radial_emb = rbf_emb(num_radial, cutoff)
+        self.radial_emb = rbf_emb(num_radial, cutoff_sr)
         self.radial_lin = nn.Sequential(
             nn.Linear(num_radial, hidden_channels),
             nn.SiLU(inplace=True),
@@ -826,21 +853,18 @@ class LEFTNet(BaseFFCore):
                                    has_norm_before_flag=has_norm_before_flag,
                                    has_norm_after_flag=has_norm_after_flag,
                                    hidden_channels_chi=hidden_channels_chi,
-                                   device=device,
                                    reduce_mode=reduce_mode)
             )
             self.FTEs.append(FTE(hidden_channels))
-            kernel_real = torch.randn((hidden_channels, self.chi1, self.chi1), device=self.device)
-            kernel_imag = torch.randn((hidden_channels, self.chi1, self.chi1), device=self.device)
+            kernel_real = torch.randn((hidden_channels, self.chi1, self.chi1))
+            kernel_imag = torch.randn((hidden_channels, self.chi1, self.chi1))
             self.kernels_real.append(kernel_real)
             self.kernels_imag.append(kernel_imag)
 
-        # ���б�ת��Ϊ����
         self.kernels_real = torch.nn.Parameter(torch.stack(self.kernels_real))
         self.kernels_imag = torch.nn.Parameter(torch.stack(self.kernels_imag)) 
 
-        if output_dim != 0:
-            self.num_targets = output_dim
+        self.num_targets = 2
 
         self.last_layer = nn.Linear(hidden_channels, self.num_targets)
         self.last_layer_quantum = nn.Linear(self.chi1 * 2, self.num_targets)
@@ -852,7 +876,6 @@ class LEFTNet(BaseFFCore):
         self.inv_sqrt_2 = 1 / math.sqrt(2.0)
 
         self.reset_parameters()
-        self.use_pbc = use_pbc
         self.use_sigmoid = use_sigmoid
 
     def __str__(self) -> str:
@@ -870,7 +893,6 @@ class LEFTNet(BaseFFCore):
         for layer in self.FTEs:
             layer.reset_parameters()
         self.last_layer.reset_parameters()
-        # self.out_forces.reset_parameters()
         for layer in self.radial_lin:
             if hasattr(layer, 'reset_parameters'):
                 layer.reset_parameters()
@@ -879,28 +901,13 @@ class LEFTNet(BaseFFCore):
                 layer.reset_parameters()
 
     #@conditional_grad(torch.enable_grad())
-    def __forward(self, pos, batch, z):
-       
-        pos -= scatter(pos, batch, dim=0)[batch]
-        # if self.compute_forces:
-        #     pos.requires_grad = True
-       
-        #print(len(data.cell)/3)   
-        
-        edge_index = radius_graph(pos, r=self.cutoff, batch=batch, max_num_neighbors=1000)
-        j, i = edge_index
-        vecs = pos[j] - pos[i]
-        dist = vecs.norm(dim=-1)
+    def __forward(self, Ra, batch, Za, idx_i, idx_j, dist, vecs):
+        pos = Ra - scatter(Ra, batch, dim=0)[batch]
+        edge_index = torch.stack([idx_i, idx_j], dim=0)
 
         # embed z
-        z_emb = self.z_emb_ln(self.z_emb(z))
+        z_emb = self.z_emb_ln(self.z_emb(Za))
 
-        # # # # construct edges based on the cutoff value
-        # # # edge_index = radius_graph(pos, r=self.cutoff, batch=batch)
-        # # # i, j = edge_index
-
-        # embed pair-wise distance
-        # # # dist = torch.sqrt(torch.sum((pos[i] - pos[j]) ** 2, 1))
         # radial_emb shape: (num_edges, num_radial), radial_hidden shape: (num_edges, hidden_channels)
         radial_emb = self.radial_emb(dist)
         radial_hidden = self.radial_lin(radial_emb)
@@ -909,7 +916,7 @@ class LEFTNet(BaseFFCore):
 
         # init invariant node features
         # shape: (num_nodes, hidden_channels)
-        s = self.neighbor_emb(z, z_emb, edge_index, radial_hidden)
+        s = self.neighbor_emb(Za, z_emb, edge_index, radial_hidden)
 
         # init equivariant node features
         # shape: (num_nodes, 3, hidden_channels)
@@ -921,7 +928,7 @@ class LEFTNet(BaseFFCore):
 
         mean = scatter(pos[edge_index[0]], edge_index[1], reduce='mean', dim=0)
         # noise = torch.clip(torch.empty(1,3).to(z.device).normal_(mean=0.0, std=0.1), min=-0.1, max=0.1)
-        edge_cross = torch.cross(pos[i]-mean[i], pos[j]-mean[i])
+        edge_cross = torch.cross(pos[idx_i]-mean[idx_i], pos[idx_j]-mean[idx_i])
        # edge_cross = edge_cross / ((torch.sqrt(torch.sum((edge_cross) ** 2, 1).unsqueeze(1))) + self.eps)
         edge_vertical = torch.cross(edge_diff, edge_cross)
         # shape: (num_edges, 3, 3)
@@ -932,8 +939,8 @@ class LEFTNet(BaseFFCore):
         # LSE: local 3D substructure encoding
         # S_i_j shape: (num_nodes, 3, hidden_channels)
         S_i_j = self.S_vector(s, edge_diff.unsqueeze(-1), edge_index, radial_hidden)
-        scalrization1 = torch.sum(S_i_j[i].unsqueeze(2) * edge_frame.unsqueeze(-1), dim=1)
-        scalrization2 = torch.sum(S_i_j[j].unsqueeze(2) * edge_frame.unsqueeze(-1), dim=1)
+        scalrization1 = torch.sum(S_i_j[idx_i].unsqueeze(2) * edge_frame.unsqueeze(-1), dim=1)
+        scalrization2 = torch.sum(S_i_j[idx_j].unsqueeze(2) * edge_frame.unsqueeze(-1), dim=1)
         scalrization1[:, 1, :] = torch.abs(scalrization1[:, 1, :].clone())
         scalrization2[:, 1, :] = torch.abs(scalrization2[:, 1, :].clone())
 
@@ -946,8 +953,6 @@ class LEFTNet(BaseFFCore):
 
         edge_weight = torch.cat((scalar3, scalar4), dim=-1) * rbounds.unsqueeze(-1)
         edge_weight = torch.cat((edge_weight, radial_hidden, radial_emb), dim=-1)
-
-        # a = torch.ones(z_emb.shape[0],1).to(z_emb.device).detach()
 
         equation = 'ik,bi->bk'
         quantum = torch.einsum(equation, self.kernel1, z_emb)
@@ -963,8 +968,6 @@ class LEFTNet(BaseFFCore):
                 rope, ds, dvec = self.message_layers[i](
                 s, vec, edge_index, radial_emb, edge_weight, edge_diff,rope=None
             )
-          
-            
 
             s = s + ds
             vec = vec + dvec
@@ -980,57 +983,30 @@ class LEFTNet(BaseFFCore):
             s = s + ds
             vec = vec + dvec
 
-        ######
-        # print_fingerprint(s, batch, r'F:\yaonan\0229\out\rs_f.npy')
-        ######
-    
-        #if self.pos_require_grad:
-        
-    #      forces = self.out_forces(s, vec)
-        # s = self.last_layer(s) + self.last_layer_quantum(torch.cat([quantum.real,quantum.imag],dim=-1))
         s = self.last_layer(s) + self.last_layer_quantum(torch.cat([quantum.real, quantum.imag], dim=-1)) / self.chi1
-       
-        if s.dim() == 2:
-            s = (self.a[z].unsqueeze(1) * s + self.b[z].unsqueeze(1))
-        elif s.dim() == 1:
-            s = (self.a[z] * s + self.b[z]).unsqueeze(1)
-        else:
-            raise ValueError(f"Unexpected shape of s: {s.shape}")
-        
-        #print("s shape after:", s.shape)
-        
-        s = scatter(s, batch, dim=0, reduce=self.readout)
-        #print("s shape after scatter:", s.shape)
-        
-        if self.use_sigmoid:
-            s = torch.sigmoid((s - 0.5) * 5)
-        #if self.pos_require_grad:
-         # return s, forces
-    
-        forces= self.cal_forces(s, pos)
-        return s, forces
+        return s[:,0], s[:,1]
 
     def build(self, built_layers) -> None:
-        pass
+        calculate_distance = DistanceLayer()
+        calculate_distance.with_vector_on("vij_lr")
+        calculate_distance.reset_field_name(Dij="Dij_lr")
+        self.pre_sequence.append(calculate_distance)
 
-    def get_output(self, Ra, Za, batch_seg):
-        E, Fa = self.__forward(pos=Ra, batch=batch_seg, z=Za)
-        return {"E": E, "Fa": Fa}
-        
-    def cal_forces(self, energy, positions):
-     # if not energy.requires_grad:
-      #  energy.requires_grad = True
-      #print(f"Energy requires_grad: {energy.requires_grad}")
-      #print(f"Positions requires_grad: {positions.requires_grad}")
-        forces = -torch.autograd.grad(
-        outputs=energy,
-        inputs=positions,
-        grad_outputs=torch.ones_like(energy),
-        create_graph=True,
-        retain_graph=True,
-        allow_unused=True
-        )[0]
-        return forces
+        pre_core = True
+        for layer in built_layers:
+            if layer is self:
+                pre_core = False
+                continue
+            if pre_core:
+                if isinstance(layer, RangeSeparationLayer):
+                    layer.reset_field_name(idx_i_lr="idx_i", idx_j_lr="idx_j")
+                self.pre_sequence.append(layer)
+            else:
+                self.post_sequence.append(layer)
+
+    def get_output(self, Ra, Za, batch_seg, idx_i_sr, idx_j_sr, Dij_sr, vij_sr):
+        Ea, Qa = self.__forward(Ra, batch_seg, Za, idx_i_sr, idx_j_sr, Dij_sr, vij_sr)
+        return {"Ea": Ea, "Qa": Qa}
         
     @property
     def num_params(self):
