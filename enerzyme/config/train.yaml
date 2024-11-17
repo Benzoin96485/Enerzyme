@@ -219,7 +219,7 @@ Modelhub:
           Fa: 52.917721
           E: 1
           M2: 1.8897261
-      build_params:
+      build_params:                         # TODO: explain parameters
         max_Za: 94
         cutoff_sr: 5.0
         Hartree_in_E: 1
@@ -269,10 +269,7 @@ Modelhub:
     FF04:
       suffix:
       architecture: MACE
-      active: true
-      build_params:
-        r_max: 5.0
-        atomic_numbers: [1, 6, 7, 8, 15, 16]
+      active: true 
       loss:
         rmse:
           Fa: 52.917721
@@ -282,6 +279,9 @@ Modelhub:
           rmse: 52.917721
         E:
           rmse: 1
+      build_params:                          # TODO: explain parameters
+        r_max: 5.0
+        atomic_numbers: [1, 6, 7, 8, 15, 16]
       layers:
         - name: Core
           params:
@@ -310,7 +310,7 @@ Modelhub:
           rmse: 52.917721
         E:
           rmse: 1
-      build_params:
+      build_params:                                      # TODO: explain parameters
         r_max: 6.0
         chemical_symbols: ["H", "C", "N", "O", "P", "S"]
         default_dtype: float32
@@ -318,7 +318,12 @@ Modelhub:
       layers:
         - name: Core
           params:
-            model_builders: [SimpleIrrepsConfig, EnergyModel, PerSpeciesRescale, ForceOutput, RescaleEnergyEtc]
+            model_builders: 
+              - SimpleIrrepsConfig
+              - EnergyModel
+              - PerSpeciesRescale
+              - ForceOutput
+              - RescaleEnergyEtc
             num_layers: 4
             l_max: 1
             parity: true
@@ -352,7 +357,7 @@ Modelhub:
           rmse: 52.917721
         E:
           rmse: 1
-      build_params:
+      build_params:                                  # TODO: explain parameters
         cutoff_sr: 5.0
       layers:
         - name: RangeSeparation
@@ -387,10 +392,10 @@ Trainer:
       - 0.7                                  
       - 0.1                                  
       - 0.2
-    preload: false                          # if saved splitting indices are loaded
+    preload: true                           # if saved splitting indices are loaded
     save: true                              # if splitting indices are saved
     seed: 114514                            # splitting random seed
-  Monitor:                                  # monitor prints statistics of energy terms in the total energy
+  Monitor:                                  # monitor prints statistics of energy terms in the total energy on validation set
                                             # optional
     E_ele:                                  # energy term name: 
                                               # E_ele for ElectrostaticEnergy layer
@@ -398,8 +403,7 @@ Trainer:
                                               # E_zbl for ZBLRepulsionEnergy layer
                                             # four statistics are supported:
       - mean                                # mean value
-      - std                                 # standard deviat
-      ion
+      - std                                 # standard deviation
       - min                                 # minimum value
       - max                                 # maximum value
   seed: 114514                              # trainer random seed: dataloader shuffling, pytorch random initialization, etc.
