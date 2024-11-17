@@ -409,7 +409,7 @@ Trainer:
   seed: 114514                              # trainer random seed: dataloader shuffling, pytorch random initialization, etc.
   learning_rate: 0.001                      # learning rate, scientific notations like 1e-3 are supported, default 0.001
   schedule: constant                        # learning rate scheduler: default linear
-                                            # (linear | cosine | cosine_with_restarts | polynomial | constant | constant_with_warmup | inverse_sqrt | reduce_lr_on_plateau)
+                                            # (linear | cosine | cosine_with_restarts | polynomial | constant | constant_with_warmup | inverse_sqrt)
   warmup_ratio: 0.001                       # ratio of warmup epochs in total epochs, if applicable for the schedule
   patience: 200                             # patience of earlystopping, default 50
                                             # training stops when the number of epochs that 'judge score' doesn't decreases reach the patience
