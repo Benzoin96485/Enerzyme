@@ -5,7 +5,7 @@
 
 import math
 from math import pi
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -801,13 +801,13 @@ class GatedEquivariantBlock(nn.Module):
 class LEFTNet(BaseFFCore):
     def __init__(
             self,
-            cutoff_sr=5.0, num_layers=4,
-            hidden_channels=128, num_radial=96, eps=1e-10, use_sigmoid=False,
+            cutoff_sr: float = 5.0, num_layers: int = 4,
+            hidden_channels: int = 128, num_radial: int = 96, eps: Union[float, str] = 1e-10, use_sigmoid: bool = False,
             head: int = 16,
             main_chi1: int = 24,
             mp_chi1: int = 24,
             chi2: int = 6,
-            hidden_channels_chi=96,
+            hidden_channels_chi: int = 96,
             has_dropout_flag=True,
             has_norm_before_flag=True,
             has_norm_after_flag=False,
@@ -815,7 +815,7 @@ class LEFTNet(BaseFFCore):
     ):
         super(LEFTNet, self).__init__(input_fields={"Ra", "Za", "batch_seg", "idx_i_sr", "idx_j_sr", "Dij_sr", "vij_sr"}, output_fields={"Ea", "Qa"})
 
-        self.eps = eps
+        self.eps = float(eps)
         self.num_layers = num_layers
         self.hidden_channels = hidden_channels
         self.cutoff = cutoff_sr

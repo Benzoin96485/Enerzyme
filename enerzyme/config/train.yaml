@@ -122,7 +122,7 @@ Modelhub:
       active: true
       pretrain_path: /pretrained/model      # Path to the folder containing a pretrained pth ("model_best.pth") or to the pth itself
       loss:
-        mae:
+        rmse:
           Qa: 1
           Fa: 91.656181
           E: 1
@@ -213,6 +213,58 @@ Modelhub:
       suffix:
       architecture: LEFTNet
       active: true
+      loss:
+        rmse:
+          Qa: 1
+          Fa: 52.917721
+          E: 1
+          M2: 1.8897261
+      build_params:
+        max_Za: 94
+        cutoff_sr: 5.0
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+      layers:
+        - name: RangeSeparation
+        - name: Core
+          params:
+            num_layers: 4
+            hidden_channels: 128
+            num_radial: 96
+            eps: 1e-10
+            head: 16
+            main_chi1: 24
+            mp_chi1: 24
+            chi2: 6
+            hidden_channels_chi: 96
+            has_dropout_flag: true
+            has_norm_before_flag: true
+            has_norm_after_flag: false
+            reduce_mode: sum
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        - name: ElectrostaticEnergy
+          params:
+            flavor: PhysNet
+            cutoff_lr: null
+        - name: EnergyReduce
+        - name: Force
   external_FFs:
     FF04:
       suffix:
@@ -276,3 +328,12 @@ Trainer:
                                             # 2: try to load model parameter (and ema state if available), resume schduler, optimizer, epoch counting and earlystopping
 Metric:                                     # metrics can be defined here as default metrics
                                             # if a metric configuration is defined under a specific model, it has precedence
+  Qa:                                 # metric term
+    rmse: 1                           # key-value pair of metric type (rmse/mae) and weight
+                                      # weighted summation of metric is the 'judge_score' for earlystopping
+  Fa:
+    rmse: 52.917721
+  E:
+    rmse: 1
+  M2:
+    rmse: 1.8897261
