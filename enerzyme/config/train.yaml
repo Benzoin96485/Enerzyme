@@ -270,6 +270,33 @@ Modelhub:
       suffix:
       architecture: MACE
       active: true
+      build_params:
+        r_max: 5.0
+        atomic_numbers: [1, 6, 7, 8, 15, 16]
+      loss:
+        rmse:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          rmse: 52.917721
+        E:
+          rmse: 1
+      layers:
+        - name: Core
+          params:
+            num_bessel: 8
+            num_polynomial_cutoff: 5
+            interaction_cls: "RealAgnosticResidualInteractionBlock"
+            interaction_cls_first: "RealAgnosticResidualInteractionBlock"
+            max_ell: 3
+            correlation: 3
+            num_interactions: 2
+            MLP_irreps: "16x0e"
+            radial_MLP: [64, 64, 64]
+            hidden_irreps: "128x0e + 128x1o"
+            gate: "silu"
+            avg_num_neighbors: 8.0
     FF05:
       suffix:
       architecture: NequIP
