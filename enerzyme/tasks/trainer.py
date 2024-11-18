@@ -305,6 +305,7 @@ class Trainer:
         else:
             best_epoch = None
 
+        epoch = start_epoch
         for epoch in range(start_epoch, max_epochs):
             if max_epoch_per_iter > 0 and epoch >= max_epoch_per_iter + start_epoch:
                 break
