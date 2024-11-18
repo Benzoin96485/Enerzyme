@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='enerzyme',
-    version='0.1.1',
+    version='0.3',
     install_requires=['numpy', 'h5py', 'tqdm', 'ase', 'joblib', 'addict', 
                       'pandas', 'torch', 'scikit-learn', 'transformers',
                       'transformers', 'torch-ema', 'pyyaml', 'torch-scatter'],

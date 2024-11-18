@@ -305,6 +305,7 @@ class Trainer:
         else:
             best_epoch = None
 
+        epoch = start_epoch
         for epoch in range(start_epoch, max_epochs):
             if max_epoch_per_iter > 0 and epoch >= max_epoch_per_iter + start_epoch:
                 break
@@ -356,7 +357,6 @@ class Trainer:
             else:
                 cm = contextlib.nullcontext()
 
-            y_pred = None
             if valid_dataset is not None:
                 with cm:
                     predict_result = self.predict(
@@ -390,7 +390,7 @@ class Trainer:
             self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, "last", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
             if is_early_stop:
                 break
-
+        
         if test_dataset is not None:
             if self.use_ema:
                 cm = ema.average_parameters()
@@ -411,6 +411,8 @@ class Trainer:
                 y_truth = predict_result["y_truth"]
                 metric_score = predict_result["metric_score"]
         else:
+            y_pred = None
+            y_truth = None
             metric_score = None
         return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": metric_score}
     
