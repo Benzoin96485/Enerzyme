@@ -7,15 +7,15 @@ Datahub:
   features:
     Ra: coord                               # atomic positions, shape [Nframe, Natom, 3] (required)
     Za: atom_type                           # atomic numbers or symbols (will be automatically converted to numbers), shape [Nframe, Natom] (required)
-    Q:                                      # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
-    N:                                      # total atom counts, shape [Nframe] 
+    Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
+    N: null                                 # total atom counts, shape [Nframe] 
                                             # if not provided, will be infered from Za
                                             # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
   targets:
     E: energy                               # total energy, shape [Nframe]
     Fa: grad                                # atomic forces, shape [Nframe, Natom, 3]
     Qa: chrg                                # atomic charges, shape [Nframe, Natom]
-    Q:
+    Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
     M2: dipole                              # total dipole moment, shape [Nframe, 3]
   preload: false                            # load the processed data from the dump directory
   neighbor_list: full                       # neighbor list building algorithm:
@@ -122,7 +122,7 @@ Modelhub:
       active: true
       pretrain_path: /pretrained/model      # Path to the folder containing a pretrained pth ("model_best.pth") or to the pth itself
       loss:
-        mae:
+        rmse:
           Qa: 1
           Fa: 91.656181
           E: 1
@@ -209,6 +209,177 @@ Modelhub:
         #     learnable: true
         - name: EnergyReduce
         - name: Force
+    FF03:
+      suffix:
+      architecture: LEFTNet
+      active: true
+      loss:
+        rmse:
+          Qa: 1
+          Fa: 52.917721
+          E: 1
+          M2: 1.8897261
+      build_params:                         # TODO: explain parameters
+        max_Za: 94
+        cutoff_sr: 5.0
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+      layers:
+        - name: RangeSeparation
+        - name: Core
+          params:
+            num_layers: 4
+            hidden_channels: 128
+            num_radial: 96
+            eps: 1e-10
+            head: 16
+            main_chi1: 24
+            mp_chi1: 24
+            chi2: 6
+            hidden_channels_chi: 96
+            has_dropout_flag: true
+            has_norm_before_flag: true
+            has_norm_after_flag: false
+            reduce_mode: sum
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        - name: ElectrostaticEnergy
+          params:
+            flavor: PhysNet
+            cutoff_lr: null
+        - name: EnergyReduce
+        - name: Force
+  external_FFs:
+    FF04:
+      suffix:
+      architecture: MACE
+      active: true 
+      loss:
+        rmse:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          rmse: 52.917721
+        E:
+          rmse: 1
+      build_params:                          # TODO: explain parameters
+        r_max: 5.0
+        atomic_numbers: [1, 6, 7, 8, 15, 16]
+      layers:
+        - name: Core
+          params:
+            num_bessel: 8
+            num_polynomial_cutoff: 5
+            interaction_cls: "RealAgnosticResidualInteractionBlock"
+            interaction_cls_first: "RealAgnosticResidualInteractionBlock"
+            max_ell: 3
+            correlation: 3
+            num_interactions: 2
+            MLP_irreps: "16x0e"
+            radial_MLP: [64, 64, 64]
+            hidden_irreps: "128x0e + 128x1o"
+            gate: "silu"
+            avg_num_neighbors: 8.0
+    FF05:
+      suffix:
+      architecture: NequIP
+      active: true
+      loss:
+        rmse:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          rmse: 52.917721
+        E:
+          rmse: 1
+      build_params:                                      # TODO: explain parameters
+        r_max: 6.0
+        chemical_symbols: ["H", "C", "N", "O", "P", "S"]
+        default_dtype: float32
+        model_dtype: float32
+      layers:
+        - name: Core
+          params:
+            model_builders: 
+              - SimpleIrrepsConfig
+              - EnergyModel
+              - PerSpeciesRescale
+              - ForceOutput
+              - RescaleEnergyEtc
+            num_layers: 4
+            l_max: 1
+            parity: true
+            num_features: 32
+            nonlinearity_type: gate
+            activation: silu
+            resnet: false
+            nonlinearity_scalars:
+              e: silu
+              o: tanh
+            nonlinearity_gates:
+              e: silu
+              o: tanh
+            num_basis: 8
+            BesselBasis_trainable: true
+            PolynomialCutoff_p: 6
+            invariant_layers: 2
+            invariant_neurons: 64
+            avg_num_neighbors: 8
+            use_sc: true
+    FF06:
+      suffix:
+      architecture: XPaiNN
+      active: true
+      loss:
+        rmse:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          rmse: 52.917721
+        E:
+          rmse: 1
+      build_params:                                  # TODO: explain parameters
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: Core
+          params:
+            embed_basis: "gfn2-xtb"
+            aux_basis: "aux56"
+            node_dim: 128
+            edge_irreps: "128x0e + 64x1o + 32x2e"
+            hidden_dim: 64
+            hidden_irreps: "64x0e + 32x1o + 16x2e"
+            rbf_kernel: "bessel"
+            num_basis: 20
+            cutoff_fn: "cosine"
+            max_edges: 100
+            action_blocks: 3
+            activation: silu
+            norm_type: "nonorm"
+            output_mode: "grad"
+            output_dim: 1
+            node_average: false
+            default_dtype: "float32"
 Trainer:
   Splitter:
     method: random                          # splitting method: random
@@ -221,10 +392,10 @@ Trainer:
       - 0.7                                  
       - 0.1                                  
       - 0.2
-    preload: false                          # if saved splitting indices are loaded
+    preload: true                           # if saved splitting indices are loaded
     save: true                              # if splitting indices are saved
     seed: 114514                            # splitting random seed
-  Monitor:                                  # monitor prints statistics of energy terms in the total energy
+  Monitor:                                  # monitor prints statistics of energy terms in the total energy on validation set
                                             # optional
     E_ele:                                  # energy term name: 
                                               # E_ele for ElectrostaticEnergy layer
@@ -238,7 +409,7 @@ Trainer:
   seed: 114514                              # trainer random seed: dataloader shuffling, pytorch random initialization, etc.
   learning_rate: 0.001                      # learning rate, scientific notations like 1e-3 are supported, default 0.001
   schedule: constant                        # learning rate scheduler: default linear
-                                            # (linear | cosine | cosine_with_restarts | polynomial | constant | constant_with_warmup | inverse_sqrt | reduce_lr_on_plateau)
+                                            # (linear | cosine | cosine_with_restarts | polynomial | constant | constant_with_warmup | inverse_sqrt)
   warmup_ratio: 0.001                       # ratio of warmup epochs in total epochs, if applicable for the schedule
   patience: 200                             # patience of earlystopping, default 50
                                             # training stops when the number of epochs that 'judge score' doesn't decreases reach the patience
@@ -253,8 +424,17 @@ Trainer:
   ema_use_num_updates: true                 # if number of updates is used in exponential moving average, default true
   data_in_memory: false                     # if whole training datasets are loaded into memory, default false
   amsgrad: true                             # if amsgrad is used in Adam optimizer, default true
-  resume: 0                                 # 0: start from scratch. If pretrained model is given, load its ema averaged weights
-                                            # 1: try to load model parameter (and ema state if available)
-                                            # 2: try to load model parameter (and ema state if available), resume schduler, optimizer, epoch counting and earlystopping
+  resume: 0                                 # 0: start from scratch. If pretrained model is given, load its ema averaged weights, best-first unless specified
+                                            # 1: try to load model checkpoint (and ema state if available), last-first unless specified, resume epoch counting
+                                            # 2: try to load model checkpoint (and ema state if available), last-first unless specified, resume scheduler, optimizer, epoch counting and earlystopping
 Metric:                                     # metrics can be defined here as default metrics
                                             # if a metric configuration is defined under a specific model, it has precedence
+  Qa:                                       # metric term
+    rmse: 1                                 # key-value pair of metric type (rmse/mae) and weight
+                                            # weighted summation of metric is the 'judge_score' for earlystopping
+  Fa:
+    rmse: 52.917721
+  E:
+    rmse: 1
+  M2:
+    rmse: 1.8897261

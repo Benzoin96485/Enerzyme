@@ -117,13 +117,21 @@ Modelhub:
         - name: EnergyReduce                # Reduce atomic energy terms to the total energy
         - name: Force                       # Calculate the force from the total energy
 Trainer:
-  committee_size: 4
+  committee_size: 4                         # number of models in the committee
   active_learning_params: 
-    active: true
-    data_source: withheld
-    error_lower_bound: 0.01
-    error_upper_bound: 0.05
-    sample_size: 10000
+    active: true                            # if active learning is used
+    data_source: withheld                   # data source for active learning, withheld means the Splitter's withheld partition
+    picking_method: max_Fa_norm_std         # picking method for active learning
+                                              # random means random picking
+                                              # max_Fa_norm_std means picking according to the maximum standard deviation of force errors
+                                                # error_lower_bound and error_upper_bound are used to filter out the samples 
+                                                # whose force errors are larger than the upper bound or smaller than the lower bound
+                                                # see Comput. Phys. Commun., 253, 107206. for more details
+    error_lower_bound: 0.01                 # lower bound of the force error for active learning
+    error_upper_bound: 0.05                 # upper bound of the force error for active learning
+    sample_size: 10000                      # number of samples to be picked in each iteration
+    max_epoch_per_iter: 10000               # maximum epochs of training in each iteration
+    max_iter: 100                           # maximum number of iterations
   Splitter:
     method: random                          # splitting method: random
     parts:                                  # partition names, at least training and validation are needed
