@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Iterable, Optional, Callable, Tuple, Dict, Any
+from typing import Iterable, Optional, Callable, Tuple, Dict, Any, Literal
 from collections import defaultdict
 import time, os, logging, contextlib
 from tqdm import tqdm
@@ -193,7 +193,7 @@ class Trainer:
             self.active_learning = True
         else:
             self.active_learning = False
-        self.resume = params.get("resume", False)
+        self.resume = params.get("resume", 1)
 
     def decorate_batch_input(self, batch):
         return _decorate_batch_input(batch, self.dtype, self.device)
@@ -247,7 +247,7 @@ class Trainer:
         model: Module, pretrain_path: Optional[str],
         train_dataset: Dataset, valid_dataset: Optional[Dataset], 
         loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
-        test_dataset: Optional[Dataset]=None, model_rank=None) -> Tuple[Optional[defaultdict[Any]], Dict]:
+        test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -266,31 +266,49 @@ class Trainer:
         else:
             ema = None
         scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
-        other_info = self.load_state_dict(model, optimizer, scheduler, pretrain_path, ema)
+
+        if self.resume > 1:
+            other_info = self.load_state_dict(model, optimizer, scheduler, pretrain_path, ema)
+        elif self.resume == 1:
+            other_info = self.load_state_dict(model, pretrain_path=pretrain_path, ema=ema)
+        else:
+            other_info = self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
         
-        if self.resume and "best_epoch" in other_info and "epoch" in other_info:
+        if self.resume > 1 and "best_epoch" in other_info and "epoch" in other_info:
             wait = other_info["epoch"] - other_info["best_epoch"]
             best_score = other_info.get("best_score", float("inf"))
             start_epoch = other_info["epoch"] + 1
         else:
             wait = 0
-            start_epoch = other_info.get("epoch", -1) + 1
+            if self.resume > 1:
+                start_epoch = other_info.get("epoch", -1) + 1
+            else:
+                start_epoch = 0
             if valid_dataset is not None:
-                best_score = other_info.get("best_score", float("inf"))
+                if self.resume > 1:
+                    best_score = other_info.get("best_score", float("inf"))
+                else:
+                    best_score = float("inf")
             else:
                 best_score = None
 
-        if self.resume:
+        if self.resume > 1:
             max_epochs = self.max_epochs
         else:
             max_epochs = start_epoch + self.max_epochs
         
         if valid_dataset is not None:
-            best_epoch = other_info.get("best_epoch", start_epoch)
+            if self.resume > 1:
+                best_epoch = other_info.get("best_epoch", start_epoch)
+            else:
+                best_epoch = None
         else:
             best_epoch = None
 
+        epoch = start_epoch
         for epoch in range(start_epoch, max_epochs):
+            if max_epoch_per_iter > 0 and epoch >= max_epoch_per_iter + start_epoch:
+                break
             model = model.train()
             start_time = time.time()
             batch_bar = tqdm(
@@ -339,10 +357,9 @@ class Trainer:
             else:
                 cm = contextlib.nullcontext()
 
-            y_preds = None
             if valid_dataset is not None:
                 with cm:
-                    _, val_loss, metric_score = self.predict(
+                    predict_result = self.predict(
                         model=model, 
                         dataset=valid_dataset, 
                         loss_terms=loss_terms, 
@@ -351,6 +368,8 @@ class Trainer:
                         epoch=epoch, 
                         load_model=False,
                     )
+                    val_loss = predict_result["val_loss"]
+                    metric_score = predict_result["metric_score"]
                     total_val_loss = np.mean(val_loss)
                     _score = metric_score["_judge_score"]
                     _metric = str(self.metrics)
@@ -371,14 +390,14 @@ class Trainer:
             self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, "last", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
             if is_early_stop:
                 break
-
+        
         if test_dataset is not None:
             if self.use_ema:
                 cm = ema.average_parameters()
             else:
                 cm = contextlib.nullcontext()
             with cm:
-                y_preds, _, metric_score = self.predict(
+                predict_result = self.predict(
                     model=model, 
                     dataset=test_dataset, 
                     loss_terms=loss_terms, 
@@ -388,14 +407,19 @@ class Trainer:
                     load_model=True,
                     model_rank=model_rank
                 )
+                y_pred = predict_result["y_pred"]
+                y_truth = predict_result["y_truth"]
+                metric_score = predict_result["metric_score"]
         else:
+            y_pred = None
+            y_truth = None
             metric_score = None
-        return y_preds, metric_score
+        return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": metric_score}
     
     def _early_stop_choice(self, wait, min_loss, metric_score, save_handle, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, save_handle, patience, epoch)
     
-    def predict(self, model, dataset, loss_terms, dump_dir, transform, epoch=1, load_model=False, model_rank=None):
+    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         if load_model == True:
@@ -448,4 +472,4 @@ class Trainer:
         if load_model and "_judge_score" in metric_score:
             metric_score.pop("_judge_score")
         batch_bar.close()
-        return y_preds, val_loss, metric_score
+        return {"y_pred": y_preds, "y_truth": y_truths, "val_loss": val_loss, "metric_score": metric_score}
