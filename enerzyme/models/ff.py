@@ -202,7 +202,7 @@ class BaseFFLauncher(ABC):
     def train(self) -> None:
         self._train(*self._init_default_partition())
 
-    def evaluate(self) -> Tuple[Union[Dict, List[Dict]], pd.DataFrame]:
+    def evaluate(self) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         X = self.datahub.features
         y = self.datahub.targets
         test_dataset = FFDataset(X, y, data_in_memory=True)
@@ -249,7 +249,7 @@ class FF_single(BaseFFLauncher):
         test_dataset: Optional[FFDataset]=None
     ) -> None:
         logger.info("start training FF: {}".format(self.model_str))
-        y_pred, metric_score = self.trainer.fit_predict(
+        predict_result = self.trainer.fit_predict(
             model=self.model, 
             pretrain_path=self.pretrain_path,
             train_dataset=train_dataset, 
@@ -259,6 +259,8 @@ class FF_single(BaseFFLauncher):
             transform=self.datahub.transform,
             dump_dir=self.dump_dir
         )
+        y_pred = predict_result["y_pred"]
+        metric_score = predict_result["metric_score"]
         logger.info("{} FF done!".format(self.model_str))
         logger.info("{} Model saved!".format(self.model_str))
         if test_dataset is not None:
@@ -267,9 +269,9 @@ class FF_single(BaseFFLauncher):
             logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
             logger.info("Metric result saved!")
 
-    def _evaluate(self, dataset: FFDataset) -> Tuple[Dict, pd.DataFrame]:
+    def _evaluate(self, dataset: FFDataset) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         logger.info("start evaluate FF:{}".format(self.model_str))
-        y_pred,_ , metric_score = self.trainer.predict(
+        predict_result = self.trainer.predict(
             model=self.model, 
             dataset=dataset, 
             loss_terms=self.loss_terms, 
@@ -278,9 +280,12 @@ class FF_single(BaseFFLauncher):
             epoch=1, 
             load_model=True
         )
+        y_pred = predict_result["y_pred"]
+        y_truth = predict_result["y_truth"]
+        metric_score = predict_result["metric_score"]
         logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
         logger.info("{} FF done!".format(self.model_str))
-        return y_pred, pd.DataFrame(metric_score, index=[self.model_str])
+        return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": metric_score}
 
 
 class FF_committee(BaseFFLauncher):
@@ -315,7 +320,7 @@ class FF_committee(BaseFFLauncher):
             logger.info(f"start training FF: {self.model_str} ({i})")
             self.model = self._init_model(self.verbose)
             self.verbose = 0
-            y_pred, metric_score = self.trainer.fit_predict(
+            predict_result = self.trainer.fit_predict(
                 model=self.model, 
                 pretrain_path=self.pretrain_path[i],
                 train_dataset=train_dataset, 
@@ -327,6 +332,8 @@ class FF_committee(BaseFFLauncher):
                 model_rank=i,
                 max_epoch_per_iter=max_epoch_per_iter
             )
+            y_pred = predict_result["y_pred"]
+            metric_score = predict_result["metric_score"]
             logger.info(f"{self.model_str} FF ({i + 1} / {self.size}) done!")
             logger.info(f"{self.model_str} Model ({i}) saved!")
             delattr(self, "model")
@@ -336,13 +343,14 @@ class FF_committee(BaseFFLauncher):
                 self.dump(metric_score, self.dump_dir, f'metric{i}.result')
                 logger.info(f"Metric result ({i}) saved!")
 
-    def _evaluate(self, dataset: FFDataset) -> Tuple[Union[Dict, List[Dict]], pd.DataFrame]:
+    def _evaluate(self, dataset: FFDataset) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         y_preds = []
+        y_truth = None
         metric_scores = []
         for i in range(self.size):
             self.model = self._init_model(self.verbose)
             logger.info(f"start evaluate FF:{self.model_str} ({i})")
-            y_pred, _, metric_score = self.trainer.predict(
+            predict_result = self.trainer.predict(
                 model=self.model, 
                 dataset=dataset, 
                 loss_terms=self.loss_terms, 
@@ -352,12 +360,16 @@ class FF_committee(BaseFFLauncher):
                 load_model=True,
                 model_rank=i
             )
+            y_pred = predict_result["y_pred"]
+            if y_truth is None:
+                y_truth = predict_result["y_truth"]
+            metric_score = predict_result["metric_score"]
             delattr(self, "model")
             logger.info(f"{self.model_str} FF ({i}) metrics score: \n{metric_score}")
             logger.info(f"{self.model_str} FF ({i}) done!")
             y_preds.append(y_pred)
             metric_scores.append(metric_score)
-        return y_preds, pd.DataFrame(metric_scores, index=[self.model_str + str(i) for i in range(self.size)])
+        return {"y_pred": y_preds, "y_truth": y_truth, "metric_score": pd.DataFrame(metric_scores, index=[self.model_str + str(i) for i in range(self.size)])}
 
     def active_learn(self) -> None:
         partitions = self._init_partition()
@@ -409,8 +421,9 @@ class FF_committee(BaseFFLauncher):
                 for j in range(n_part):
                     part_relative_indices = unmasked_relative_indices[j * sample_size: (j + 1) * sample_size]
                     withheld_part = Subset(withheld_set, part_relative_indices)
-                    y_preds, _ = self._evaluate(withheld_part)
-                    masked_relative_indices += [part_relative_indices[idx] for idx in picking_func(y_preds, **picking_params)]
+                    predict_result = self._evaluate(withheld_part)
+                    y_pred = predict_result["y_pred"]
+                    masked_relative_indices += [part_relative_indices[idx] for idx in picking_func(y_pred, **picking_params)]
                     if len(masked_relative_indices) >= sample_size:
                         break
                 

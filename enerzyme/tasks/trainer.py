@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Iterable, Optional, Callable, Tuple, Dict, Any
+from typing import Iterable, Optional, Callable, Tuple, Dict, Any, Literal
 from collections import defaultdict
 import time, os, logging, contextlib
 from tqdm import tqdm
@@ -247,7 +247,7 @@ class Trainer:
         model: Module, pretrain_path: Optional[str],
         train_dataset: Dataset, valid_dataset: Optional[Dataset], 
         loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
-        test_dataset: Optional[Dataset]=None, model_rank=None, max_epoch_per_iter=-1) -> Tuple[Optional[defaultdict[Any]], Dict]:
+        test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -356,10 +356,10 @@ class Trainer:
             else:
                 cm = contextlib.nullcontext()
 
-            y_preds = None
+            y_pred = None
             if valid_dataset is not None:
                 with cm:
-                    _, val_loss, metric_score = self.predict(
+                    predict_result = self.predict(
                         model=model, 
                         dataset=valid_dataset, 
                         loss_terms=loss_terms, 
@@ -368,6 +368,8 @@ class Trainer:
                         epoch=epoch, 
                         load_model=False,
                     )
+                    val_loss = predict_result["val_loss"]
+                    metric_score = predict_result["metric_score"]
                     total_val_loss = np.mean(val_loss)
                     _score = metric_score["_judge_score"]
                     _metric = str(self.metrics)
@@ -395,7 +397,7 @@ class Trainer:
             else:
                 cm = contextlib.nullcontext()
             with cm:
-                y_preds, _, metric_score = self.predict(
+                predict_result = self.predict(
                     model=model, 
                     dataset=test_dataset, 
                     loss_terms=loss_terms, 
@@ -405,14 +407,17 @@ class Trainer:
                     load_model=True,
                     model_rank=model_rank
                 )
+                y_pred = predict_result["y_pred"]
+                y_truth = predict_result["y_truth"]
+                metric_score = predict_result["metric_score"]
         else:
             metric_score = None
-        return y_preds, metric_score
+        return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": metric_score}
     
     def _early_stop_choice(self, wait, min_loss, metric_score, save_handle, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, save_handle, patience, epoch)
     
-    def predict(self, model, dataset, loss_terms, dump_dir, transform, epoch=1, load_model=False, model_rank=None):
+    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         if load_model == True:
@@ -465,4 +470,4 @@ class Trainer:
         if load_model and "_judge_score" in metric_score:
             metric_score.pop("_judge_score")
         batch_bar.close()
-        return y_preds, val_loss, metric_score
+        return {"y_pred": y_preds, "y_truth": y_truths, "val_loss": val_loss, "metric_score": metric_score}

@@ -49,10 +49,12 @@ class FFPredict(object):
         metrics = []
         for ff_name, ff in FFs.items():
             result = dict()
-            y_pred, metric_score = ff.evaluate()
-            
-            for k, v in self.datahub.targets.items():
-                result[k] = v
+            predict_result = ff.evaluate()
+            y_pred = predict_result["y_pred"]
+            y_truth = predict_result["y_truth"]
+            metric_score = predict_result["metric_score"]
+            for k in self.datahub.targets.keys():
+                result[k] = y_truth[k]
                 if hasattr(ff, "size") and ff.size > 1:
                     for i, y_pred_single in enumerate(y_pred):
                         result[f"predict{i}_{k}"] = y_pred_single[k]
