@@ -3,19 +3,19 @@ Towards next-generation machine learning force fields for enzymatic catalysis.
 
 Currently supported model architectures:
 
-| Model | Type | energy and force prediction | charge and dipole prediction | fully modulized | Reference paper | Reference code |
+| Model | Type | Energy and force prediction | Charge and dipole prediction | Fully modulized | Reference paper | Reference code |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | PhysNet | internal | ✅ | ✅ | ✅ | [J. Chem. Theory Comput. 2019, 15, 3678–3693](https://pubs.acs.org/doi/full/10.1021/acs.jctc.9b00181) | [Github](https://github.com/MMunibas/PhysNet) |
 | SpookyNet | internal | ✅ | ✅ | ✅ | [Nat. Commun. 2021, 12(1), 7273](https://www.nature.com/articles/s41467-021-27504-0) | [Github](https://github.com/OUnke/SpookyNet) |
 | LEFTNet | internal | ✅ | ✅ | ❌ | [NeurIPS 2023, arXiv:2304.04757](https://arxiv.org/abs/2304.04757) | [Github](https://github.com/yuanqidu/M2Hub) |
 | MACE | external | ✅ | ❌ | ❌ | [NeurIPS 2022, arXiv:2206.07697](https://arxiv.org/abs/2206.07697) | [Github](https://github.com/ACEsuit/mace) |
-| NequIP | internal | ✅ | ❌ | ❌ | [Nat. Commun. 2022, 13(1), 2453](https://www.nature.com/articles/s41467-022-29939-5) | [Github](https://github.com/mir-group/nequip) |
+| NequIP | external | ✅ | ❌ | ❌ | [Nat. Commun. 2022, 13(1), 2453](https://www.nature.com/articles/s41467-022-29939-5) | [Github](https://github.com/mir-group/nequip) |
 | XPaiNN | external | ✅ | ❌ | ❌ | [J. Chem. Theory Comput. 2024, 20, 21, 9500–9511](https://pubs.acs.org/doi/10.1021/acs.jctc.4c01151) | [Github](https://github.com/X1X1010/XequiNet) |
 
 # Usage
 ## Installation
 
-Recommended environment
+Recommended environment for internal force fields
 ```
 python==3.10.12
 pip==23.2.1
@@ -28,18 +28,40 @@ joblib==1.3.2
 pandas==2.1.0
 pytorch==2.0.1
 scikit-learn==1.3.0
-ase==3.22.1
+ase==3.23.0
 transformers==4.33.1
 torch-ema==0.3
 pyyaml==6.0.1
 torch-scatter==2.1.2
+e3nn==0.4.4
 ```
 
-External Force Fields (optional):
+To test PhysNet, you also need
+```
+tensorflow==2.13.0
+```
+
+To invoke MACE, you need
 ```
 mace-torch==0.3.6
 ```
 
+To invoke NequIP, you need
+```
+nequip==0.6.1
+```
+
+To invoke XPaiNN, you need
+```
+XequiNet==0.3.6
+scipy==1.11.2
+pyscf==2.7.0
+torch_geometric==2.5.3
+pytorch-warmup==0.1.1
+pydantic==1.10.12
+```
+
+Then install the package
 ```bash
 pip install -e .
 ```
