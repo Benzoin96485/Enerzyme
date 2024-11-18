@@ -424,14 +424,14 @@ Trainer:
   ema_use_num_updates: true                 # if number of updates is used in exponential moving average, default true
   data_in_memory: false                     # if whole training datasets are loaded into memory, default false
   amsgrad: true                             # if amsgrad is used in Adam optimizer, default true
-  resume: 0                                 # 0: start from scratch. If pretrained model is given, load its ema averaged weights
-                                            # 1: try to load model parameter (and ema state if available)
-                                            # 2: try to load model parameter (and ema state if available), resume schduler, optimizer, epoch counting and earlystopping
+  resume: 0                                 # 0: start from scratch. If pretrained model is given, load its ema averaged weights, best-first unless specified
+                                            # 1: try to load model checkpoint (and ema state if available), last-first unless specified, resume epoch counting
+                                            # 2: try to load model checkpoint (and ema state if available), last-first unless specified, resume scheduler, optimizer, epoch counting and earlystopping
 Metric:                                     # metrics can be defined here as default metrics
                                             # if a metric configuration is defined under a specific model, it has precedence
-  Qa:                                 # metric term
-    rmse: 1                           # key-value pair of metric type (rmse/mae) and weight
-                                      # weighted summation of metric is the 'judge_score' for earlystopping
+  Qa:                                       # metric term
+    rmse: 1                                 # key-value pair of metric type (rmse/mae) and weight
+                                            # weighted summation of metric is the 'judge_score' for earlystopping
   Fa:
     rmse: 52.917721
   E:
