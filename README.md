@@ -1,12 +1,16 @@
 # Enerzyme
-Towards next generation machine learning force field on enzymatic catalysis.
+Towards next-generation machine learning force fields for enzymatic catalysis.
 
-Current internal model architectures:
-- PhysNet: [J. Chem. Theory Comput. 2019, 15, 3678−3693](https://pubs.acs.org/doi/full/10.1021/acs.jctc.9b00181)
-- SpookyNet: [Nat. Commun. 2021, 12(1), 7273](https://www.nature.com/articles/s41467-021-27504-0)
+Currently supported model architectures:
 
-Current external model architectures:
-- MACE: [NeurIPS 2022, 35, 11423-11436](https://openreview.net/forum?id=YPpSngE-ZU)
+| Model | Type | energy and force prediction | charge and dipole prediction | fully modulized | Reference paper | Reference code |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| PhysNet | internal | ✅ | ✅ | ✅ | [J. Chem. Theory Comput. 2019, 15, 3678–3693](https://pubs.acs.org/doi/full/10.1021/acs.jctc.9b00181) | [Github](https://github.com/MMunibas/PhysNet) |
+| SpookyNet | internal | ✅ | ✅ | ✅ | [Nat. Commun. 2021, 12(1), 7273](https://www.nature.com/articles/s41467-021-27504-0) | [Github](https://github.com/OUnke/SpookyNet) |
+| LEFTNet | internal | ✅ | ✅ | ❌ | [NeurIPS 2023, arXiv:2304.04757](https://arxiv.org/abs/2304.04757) | [Github](https://github.com/yuanqidu/M2Hub) |
+| MACE | external | ✅ | ❌ | ❌ | [NeurIPS 2022, arXiv:2206.07697](https://arxiv.org/abs/2206.07697) | [Github](https://github.com/ACEsuit/mace) |
+| NequIP | internal | ✅ | ❌ | ❌ | [Nat. Commun. 2022, 13(1), 2453](https://www.nature.com/articles/s41467-022-29939-5) | [Github](https://github.com/mir-group/nequip) |
+| XPaiNN | external | ✅ | ❌ | ❌ | [J. Chem. Theory Comput. 2024, 20, 21, 9500–9511](https://pubs.acs.org/doi/10.1021/acs.jctc.4c01151) | [Github](https://github.com/X1X1010/XequiNet) |
 
 # Usage
 ## Installation
@@ -49,7 +53,7 @@ enerzyme train -c <configuration yaml file> -o <output directory>
 ```
 Please see `enerzyme/config/train.yaml` for details and recommended configurations.
 
-Enerzyme saves the preprocessed dataset, split indices, final `<configuration yaml file>`, and the best model to the `<output directory>`.
+Enerzyme saves the preprocessed dataset, split indices, final `<configuration yaml file>`, and the best/last model to the `<output directory>`.
 
 ## Evaluation
 
