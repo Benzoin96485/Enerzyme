@@ -368,9 +368,12 @@ class FF_committee(BaseFFLauncher):
         len_training = len(training_set)
         len_validation = len(validation_set) if validation_set is not None else 0
         ratio_training = len_training / (len_training + len_validation)
+
         active_learning_params = self.trainer.active_learning_params
         picking_method = active_learning_params.get("picking_method", "max_Fa_norm_std")
         max_epoch_per_iter = active_learning_params.get("max_epoch_per_iter", -1)
+        max_iter = active_learning_params.get("max_iter", len(withheld_set))
+
         if picking_method == "max_Fa_norm_std":
             from ..tasks.active_learning import max_Fa_norm_std_picking
             picking_func = max_Fa_norm_std_picking
@@ -381,22 +384,26 @@ class FF_committee(BaseFFLauncher):
             picking_params = {}
         else:
             raise NotImplementedError(f"Picking method {picking_method} not implemented!")
+        
         data_source = active_learning_params.get("data_source", "withheld")
         sample_size = active_learning_params["sample_size"]
         
         if data_source == "withheld":
             withheld_size = len(withheld_set)
             withheld_mask = np.full(withheld_size, True)
-            max_iter = (withheld_size + sample_size - 1) // sample_size
-            for i in range(max_iter):
-                if i > 0:
-                    self._init_pretrain_path(self.dump_dir)
-                self._train(training_set, validation_set, test_set, max_epoch_per_iter)
+
+            iter_count = 0
+            while iter_count < max_iter:
                 unmasked_relative_indices = withheld_mask.nonzero()[0]
                 unmasked_size = len(unmasked_relative_indices)
                 if unmasked_size == 0:
-                    logger.info(f"Withheld set is exhausted and active learning stops at iteration {i} / {max_iter}!")
+                    logger.info(f"Withheld set is exhausted and active learning stops at iteration {iter_count}!")
                     break
+
+                if iter_count > 0:
+                    self._init_pretrain_path(self.dump_dir)
+
+                self._train(training_set, validation_set, test_set, max_epoch_per_iter)
                 n_part = (unmasked_size + sample_size - 1) // sample_size
                 masked_relative_indices = []
                 for j in range(n_part):
@@ -406,9 +413,11 @@ class FF_committee(BaseFFLauncher):
                     masked_relative_indices += [part_relative_indices[idx] for idx in picking_func(y_preds, **picking_params)]
                     if len(masked_relative_indices) >= sample_size:
                         break
+                
                 if len(masked_relative_indices) == 0:
-                    logger.info(f"No uncertain samples are found and active learning stops at iteration {i + 1} / {max_iter}!")
+                    logger.info(f"No uncertain samples are found and active learning stops at iteration {iter_count + 1}!")
                     break
+
                 masked_relative_indices = masked_relative_indices[:sample_size]
                 expand_absolute_indices = withheld_set.raw_indices[masked_relative_indices]
                 len_expanded = len(expand_absolute_indices)
@@ -424,6 +433,8 @@ class FF_committee(BaseFFLauncher):
                 if validation_set is not None:
                     new_indices["validation"] = validation_set.raw_indices
                 np.savez(os.path.join(self.dump_dir, "active_learning_split.npz"), new_indices)
-                logger.info(f"Active learning iteration {i + 1} / {max_iter} finished!")
+
+                logger.info(f"Active learning iteration {iter_count + 1} finished!")
+                iter_count += 1
         else:
             raise NotImplementedError

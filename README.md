@@ -77,6 +77,10 @@ Please see `enerzyme/config/train.yaml` for details and recommended configuratio
 
 Enerzyme saves the preprocessed dataset, split indices, final `<configuration yaml file>`, and the best/last model to the `<output directory>`.
 
+### Concurrent Training (Active Learning)
+
+Please see `enerzyme/config/concurrent_train.yaml` for details and recommended configurations.
+
 ## Evaluation
 
 Energy (force) / Atomic Charge / Dipole moment prediction.
