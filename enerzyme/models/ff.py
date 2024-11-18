@@ -266,7 +266,7 @@ class FF_single(BaseFFLauncher):
         if test_dataset is not None:
             self.dump(y_pred, self.dump_dir, 'test.data')
             self.dump(metric_score, self.dump_dir, 'metric.result')
-            logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
+            logger.info("{} FF metrics score on test set: \n{}".format(self.model_str, metric_score))
             logger.info("Metric result saved!")
 
     def _evaluate(self, dataset: FFDataset) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
@@ -339,7 +339,7 @@ class FF_committee(BaseFFLauncher):
             delattr(self, "model")
             if test_dataset is not None:
                 self.dump(y_pred, self.dump_dir, f'test{i}.data')
-                logger.info(f"{self.model_str} FF ({i}) metrics score: \n{metric_score}")
+                logger.info(f"{self.model_str} FF ({i}) metrics score on test set: \n{metric_score}")
                 self.dump(metric_score, self.dump_dir, f'metric{i}.result')
                 logger.info(f"Metric result ({i}) saved!")
 
@@ -349,7 +349,7 @@ class FF_committee(BaseFFLauncher):
         metric_scores = []
         for i in range(self.size):
             self.model = self._init_model(self.verbose)
-            logger.info(f"start evaluate FF:{self.model_str} ({i})")
+            logger.info(f"start evaluate FF: {self.model_str} ({i})")
             predict_result = self.trainer.predict(
                 model=self.model, 
                 dataset=dataset, 
