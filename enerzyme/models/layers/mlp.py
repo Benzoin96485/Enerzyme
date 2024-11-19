@@ -47,7 +47,7 @@ class DenseLayer(NeuronLayer):
 
         if initial_weight == "semi_orthogonal_glorot":
             self.weight = Parameter(semi_orthogonal_glorot_weights(dim_feature_in, dim_feature_out * shallow_ensemble_size))
-        elif initial_weight == "orthogonal":
+        elif initial_weight == "orthogonal" or shallow_ensemble_size > 1:
             self.weight = Parameter(torch.empty(dim_feature_out * shallow_ensemble_size, dim_feature_in))
             init.orthogonal_(self.weight)
         elif initial_weight == "zero":
