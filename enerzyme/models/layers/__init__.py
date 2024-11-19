@@ -9,7 +9,7 @@ from .atom_embedding import BaseAtomEmbedding, RandomAtomEmbedding, NuclearEmbed
 from .electron_embedding import BaseElectronEmbedding, ElectronicEmbedding
 from .electrostatics import ElectrostaticEnergyLayer, ChargeConservationLayer, AtomicCharge2DipoleLayer
 from .gradient import ForceLayer
-from .reduce import EnergyReduceLayer
+from .reduce import EnergyReduceLayer, ShallowEnsembleReduceLayer
 from .denormalize import AtomicAffineLayer
 from .dispersion import GrimmeD3EnergyLayer, GrimmeD4EnergyLayer
 from .zbl import ZBLRepulsionEnergyLayer

@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 import torch
 from torch import Tensor
 from torch.nn import Module
@@ -20,3 +20,18 @@ class EnergyReduceLayer(Module):
             batch_seg = torch.zeros_like(net_input["Za"])
         output["E"] = segment_sum_coo(net_input["Ea"], batch_seg)
         return output
+
+
+class ShallowEnsembleReduceLayer(Module):
+    def __init__(self, reduce_mean: List[str], var: List[str]) -> None:
+        super().__init__()
+        self.reduce_mean = reduce_mean
+        self.var = var
+
+    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        net_output = net_input.copy()
+        for name in self.var:
+            net_output[name + "_var"] = net_input[name].var(dim=-1)
+        for name in self.reduce_mean:
+            net_output[name] = net_input[name].mean(dim=-1)
+        return net_output
