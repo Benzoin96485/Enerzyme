@@ -52,7 +52,7 @@ class NLLLoss(WeightedLoss):
         self.eps = eps
 
     def loss_fn(self, output, target, k):
-        return torch.mean(0.5 * (torch.log(output[k + "_var"] + self.eps) + (output[k] - target[k]) ** 2 / (output[k + "_var"] + self.eps)))
+        return 0.5 * torch.mean(torch.log(output[k + "_var"] + self.eps) + (output[k] - target[k]) ** 2 / (output[k + "_var"] + self.eps))
 
 
 LOSS_REGISTER = {

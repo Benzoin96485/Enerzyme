@@ -175,5 +175,5 @@ class AtomicCharge2DipoleLayer(BaseFFLayer):
     def get_M2(self, Qa: Tensor, Ra: Tensor, batch_seg: Optional[Tensor]=None) -> Tensor:
         if batch_seg is None:
             batch_seg = torch.zeros_like(Qa, dtype=torch.long)
-        Pa = Qa.unsqueeze(1) * Ra.view((-1, 3, 1) if Qa.dim() > 1 else (-1, 3, 1))
+        Pa = Qa.unsqueeze(1) * Ra.view((-1, 3, 1) if Qa.dim() > 1 else (-1, 3))
         return segment_sum_coo(Pa, batch_seg)
