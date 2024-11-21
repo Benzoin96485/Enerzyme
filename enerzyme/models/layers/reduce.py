@@ -23,7 +23,7 @@ class EnergyReduceLayer(Module):
 
 
 class ShallowEnsembleReduceLayer(Module):
-    def __init__(self, reduce_mean: List[str], var: List[str]) -> None:
+    def __init__(self, reduce_mean: List[str]=[], var: List[str]=[]) -> None:
         super().__init__()
         self.reduce_mean = reduce_mean
         self.var = var

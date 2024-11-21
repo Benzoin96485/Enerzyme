@@ -285,7 +285,8 @@ class FF_single(BaseFFLauncher):
         metric_score = predict_result["metric_score"]
         logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
         logger.info("{} FF done!".format(self.model_str))
-        return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": metric_score}
+        print(metric_score)
+        return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": pd.DataFrame(metric_score, index=[self.model_str])}
 
 
 class FF_committee(BaseFFLauncher):

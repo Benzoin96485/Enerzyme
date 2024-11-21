@@ -56,8 +56,6 @@ class DenseLayer(NeuronLayer):
         else:
             if not isinstance(initial_weight, Tensor):
                 initial_weight = torch.tensor(initial_weight)
-            if initial_weight.shape == (dim_feature_out, dim_feature_in):
-                initial_weight = initial_weight.repeat(shallow_ensemble_size, 1)
             self.weight = Parameter(initial_weight)
         if use_bias:
             if initial_bias == "zero":
@@ -66,8 +64,6 @@ class DenseLayer(NeuronLayer):
             else:
                 if not isinstance(initial_bias, Tensor):
                     initial_bias = torch.tensor(initial_bias)
-                if initial_bias.shape == (dim_feature_out,):
-                    initial_bias = initial_bias.repeat(shallow_ensemble_size)
                 self.bias = Parameter(initial_bias)
         else:
             self.bias = None 
@@ -75,7 +71,7 @@ class DenseLayer(NeuronLayer):
     def forward(self, x: Tensor) -> Tensor:
         y = F.linear(x, self.weight, self.bias)
         if self.activation_fn is not None:
-            return self.activation_fn(y)
+            y = self.activation_fn(y)
         if self.shallow_ensemble_size > 1:
             return y.view(-1, self.dim_feature_out, self.shallow_ensemble_size)
         else:
