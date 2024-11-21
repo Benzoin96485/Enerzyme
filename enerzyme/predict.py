@@ -78,7 +78,11 @@ class FFPredict:
                 else:
                     result[f"predict_{k}"] = y_pred[k]
             for k in self.trainer.non_target_features:
-                result[k] = y_pred[k]
+                if hasattr(ff, "size") and ff.size > 1:
+                    for i, y_pred_single in enumerate(y_pred):
+                        result[f"{k}{i}"] = y_pred_single[k]
+                else:
+                    result[k] = y_pred[k]
             os.makedirs(self.output_dir, exist_ok=True)
             pd.DataFrame({k: [vi for vi in v] for k, v in result.items()}).to_pickle(os.path.join(self.datahub.preload_path, f"{ff_name}-prediction.pkl"))
             metrics.append(metric_score)
