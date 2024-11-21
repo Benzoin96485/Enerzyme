@@ -68,6 +68,7 @@ class PhysNetCore(BaseFFCore):
         activation_fn: ACTIVATION_KEY_TYPE="shifted_softplus",   # activation function
         activation_params: ACTIVATION_PARAM_TYPE=dict(),
         dropout_rate: float=0.0,
+        shallow_ensemble_size: int=1
     ) -> None:
         super().__init__(input_fields={"rbf", "atom_embedding", "idx_i_sr", "idx_j_sr"}, output_fields={"Ea", "Qa", "nh_loss"})
         self.num_blocks = num_blocks
@@ -81,7 +82,7 @@ class PhysNetCore(BaseFFCore):
         self.output_block = Sequential(*[
             OutputBlock(
                 dim_embedding, num_residual_output, 
-                activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate
+                activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate, shallow_ensemble_size=shallow_ensemble_size
             ) for _ in range(num_blocks)
         ])
 
@@ -110,8 +111,8 @@ class PhysNetCore(BaseFFCore):
         '''
         Compute raw atomic properties
         '''
-        Ea = 0 #atomic energy 
-        Qa = 0 #atomic charge
+        Ea = 0 # atomic energy 
+        Qa = 0 # atomic charge
         nhloss = 0 #non-hierarchicality loss
         for i in range(self.num_blocks):
             atom_embedding = self.interaction_block[i](atom_embedding, rbf, idx_i_sr, idx_j_sr)

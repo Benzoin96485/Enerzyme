@@ -39,9 +39,9 @@ class AtomicAffineLayer(nn.Module):
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = net_input.copy()
         for name, shift in self.shifts.items():
-            output[name] = output[name] + shift.gather(0, output["Za"])
+            output[name] = output[name] + shift.gather(0, output["Za"]).view((-1, ) if output[name].dim() == 1 else (-1, 1))
         for name, scale in self.scales.items():
-            output[name] = output[name] * scale.gather(0, output["Za"])
+            output[name] = output[name] * scale.gather(0, output["Za"]).view((-1, ) if output[name].dim() == 1 else (-1, 1))
         return output
     
     def _load_from_state_dict(self, state_dict: Dict[str, Tensor], *args, **kwargs):
@@ -49,7 +49,6 @@ class AtomicAffineLayer(nn.Module):
             if k.endswith("shifts.Ea") or k.endswith("shifts.Qa") or k.endswith("scales.Ea") or k.endswith("scales.Qa"):
                 if len(v) > self.max_Za + 1:
                     state_dict[k] = v[:self.max_Za + 1]
-                    print(len(v), ">")
                 elif len(v) < self.max_Za + 1:
                     if k.endswith("shifts.Ea"):
                         state_dict[k] = torch.concat([v, self.shifts.Ea[len(v):]], dim=0)

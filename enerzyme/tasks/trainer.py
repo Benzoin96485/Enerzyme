@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Iterable, Optional, Callable, Tuple, Dict, Any, Literal
+from typing import Iterable, Optional, Callable, Tuple, Dict, Any, Literal, List, Union
 from collections import defaultdict
 import time, os, logging, contextlib
 from tqdm import tqdm
@@ -88,7 +88,7 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
     return batch_features, batch_targets
 
 
-def _decorate_batch_output(output, features, targets):
+def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], targets: Optional[Dict[str, Any]], non_target_features: List[str]=[]) -> Tuple[Dict[str, Union[np.ndarray, List]], Optional[Dict[str, Union[np.ndarray, List]]]]:
     y_pred = dict()
     y_truth = dict()
     for k, v in output.items():
@@ -97,6 +97,13 @@ def _decorate_batch_output(output, features, targets):
                 y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
             else:
                 y_pred[k] = v.detach().cpu().numpy()
+    for k in non_target_features:
+        if len(output[k]) == len(features["Za"]):
+            y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(output[k], features["N"])))
+        elif len(output[k]) == len(features["N"]):
+            y_pred[k] = output[k].detach().cpu().numpy()
+        else:
+            raise ValueError(f"non-target feature {k} has invalid length {len(output[k])}")
     y_pred["Za"] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(features["Za"], features["N"])))
     
     if targets is not None:
@@ -194,12 +201,13 @@ class Trainer:
         else:
             self.active_learning = False
         self.resume = params.get("resume", 1)
+        self.non_target_features = params.get("non_target_features", [])
 
     def decorate_batch_input(self, batch):
         return _decorate_batch_input(batch, self.dtype, self.device)
     
     def decorate_batch_output(self, output, features, targets):
-        return _decorate_batch_output(output, features, targets)
+        return _decorate_batch_output(output, features, targets, self.non_target_features)
     
     def _set_seed(self, seed):
         """function used to set a random seed
