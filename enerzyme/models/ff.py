@@ -1,6 +1,7 @@
 import os
 from inspect import signature
 from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable, Union
+from functools import partial
 from abc import ABC, abstractmethod
 import joblib
 import pandas as pd
@@ -132,6 +133,23 @@ class FFDataset(Dataset):
             self.indices = self.raw_indices
 
 
+class MetaStateDict(dict):
+    def __init__(self, dump_path) -> None:
+        super().__init__()
+        self.dump_path = dump_path
+
+    def load(self) -> None:
+        if os.path.exists(self.dump_path):
+            self.update(joblib.load(self.dump_path))
+
+    def dump(self) -> None:
+        joblib.dump({k: v for k, v in self.items()}, self.dump_path)
+
+    def update(self, d: Dict) -> None:
+        super().update(d)
+        self.dump()
+
+
 class BaseFFLauncher(ABC):
     def __init__(self, 
         datahub: DataHub, 
@@ -156,6 +174,7 @@ class BaseFFLauncher(ABC):
         self.loss_params = loss
         self.loss_terms = {}
         self.trainer._set_seed(self.trainer.seed)
+        self.uq_mode = None
 
     def _init_model(self, verbose=1) -> Module:
         model = build_model(self.architecture, self.layer_params, self.build_params, verbose)
@@ -164,11 +183,12 @@ class BaseFFLauncher(ABC):
             print(model.__str__())
         return model
 
-    def _init_partition(self) -> Dict[str, FFDataset]:
+    def _init_partition(self, split: Optional[Dict[str, Iterable[int]]]=None) -> Dict[str, FFDataset]:
         X = self.datahub.features
         y = self.datahub.targets
         partitions = dict()
-        split = self.splitter.split(X, preload_path=self.datahub.preload_path)
+        if split is None:
+            split = self.splitter.split(X, preload_path=self.datahub.preload_path)
         for k, v in split.items():
             if len(v) > 0:
                 if k == "training":
@@ -191,7 +211,9 @@ class BaseFFLauncher(ABC):
         self, 
         train_dataset: FFDataset, 
         valid_dataset: Optional[FFDataset]=None, 
-        test_dataset: Optional[FFDataset]=None
+        test_dataset: Optional[FFDataset]=None,
+        max_epoch_per_iter: int=-1,
+        **kwargs
     ) -> None:
         ...
 
@@ -217,6 +239,97 @@ class BaseFFLauncher(ABC):
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
 
+    def active_learn(self) -> None:
+        assert self.uq_mode is not None
+        from ..tasks.active_learning import PICKING_REGISTER
+
+        active_learning_params = self.trainer.active_learning_params
+        picking_method = active_learning_params.get("picking_method", "max_Fa_norm_std")
+        max_epoch_per_iter = active_learning_params.get("max_epoch_per_iter", -1)
+        picking_params = active_learning_params.get("picking_params", {})
+        picking_func = partial(PICKING_REGISTER[picking_method], mode=self.uq_mode, **picking_params)
+        data_source = active_learning_params.get("data_source", "withheld")
+        sample_size = active_learning_params["sample_size"]
+        checkpoint_name = active_learning_params.get("checkpoint_name", "al_ckp.data")
+
+        resume = active_learning_params.get("resume", False)
+        al_state_dict = MetaStateDict(os.path.join(self.dump_dir, checkpoint_name))
+        if resume and self.trainer.resume:
+            al_state_dict.load()
+            partitions = self._init_partition(al_state_dict.get("new_indices", None))
+        else:
+            al_state_dict.dump()
+            partitions = self._init_partition()
+        training_set = partitions["training"]
+        validation_set = partitions.get("validation", None)
+        test_set = partitions.get("test", None)
+        withheld_set = partitions["withheld"]
+        len_training = len(training_set)
+        len_validation = len(validation_set) if validation_set is not None else 0
+        ratio_training = len_training / (len_training + len_validation)
+        max_iter = active_learning_params.get("max_iter", len(withheld_set))
+        
+        if data_source == "withheld":
+            withheld_size = len(withheld_set)
+            withheld_mask = np.full(withheld_size, True)
+
+            iter_count = al_state_dict.get("iter_count", 0)
+            if iter_count > 0:
+                logger.info(f"Active learning iteration {iter_count + 1} resumed!")
+            while iter_count < max_iter:
+                if iter_count > 0:
+                    self.trainer.resume = 2
+                unmasked_relative_indices = withheld_mask.nonzero()[0]
+                unmasked_size = len(unmasked_relative_indices)
+                if unmasked_size == 0:
+                    logger.info(f"Withheld set is exhausted and active learning stops at iteration {iter_count}!")
+                    break
+
+                if iter_count > 0:
+                    self._init_pretrain_path(self.dump_dir)
+
+                if al_state_dict.get("stage", 0) < 1: # training in this iteration unfinished
+                    self._train(training_set, validation_set, test_set, max_epoch_per_iter, meta_state_dict=al_state_dict)
+                    al_state_dict.update({"stage": 1, "epoch_in_iter": 0})
+                else:
+                    logger.info(f"Model training in active learning iteration {iter_count + 1} has finished, start evaluating!")
+                
+                n_part = (unmasked_size + sample_size - 1) // sample_size
+                masked_relative_indices = []
+                for j in range(n_part):
+                    part_relative_indices = unmasked_relative_indices[j * sample_size: (j + 1) * sample_size]
+                    withheld_part = Subset(withheld_set, part_relative_indices)
+                    predict_result = self._evaluate(withheld_part)
+                    y_pred = predict_result["y_pred"]
+                    masked_relative_indices += [part_relative_indices[idx] for idx in picking_func(y_pred)]
+                    if len(masked_relative_indices) >= sample_size:
+                        break
+                
+                if len(masked_relative_indices) == 0:
+                    logger.info(f"No uncertain samples are found and active learning stops at iteration {iter_count + 1}!")
+                    break
+
+                masked_relative_indices = masked_relative_indices[:sample_size]
+                expand_absolute_indices = withheld_set.raw_indices[masked_relative_indices]
+                len_expanded = len(expand_absolute_indices)
+                len_expanded_training = int(len_expanded * ratio_training + 0.5)
+                training_set.expand_with_indices(expand_absolute_indices[:len_expanded_training])
+                if validation_set is not None:
+                    validation_set.expand_with_indices(expand_absolute_indices[len_expanded_training:])
+                withheld_mask[masked_relative_indices] = False
+                new_indices = {
+                    "training": training_set.raw_indices,
+                    "withheld": withheld_set.raw_indices
+                }
+                if validation_set is not None:
+                    new_indices["validation"] = validation_set.raw_indices
+                if test_set is not None:
+                    new_indices["test"] = test_set.raw_indices
+                iter_count += 1
+                al_state_dict.update({"new_indices": new_indices, "iter_count": iter_count, "stage": 0, "model_rank": 0})
+                logger.info(f"Active learning iteration {iter_count + 1} finished!")
+        else:
+            raise NotImplementedError
 
 class FF_single(BaseFFLauncher):
     def __init__(self, 
@@ -241,12 +354,16 @@ class FF_single(BaseFFLauncher):
         else:
             self.pretrain_path = get_pretrain_path(pretrain_path, "best", None)
         self.model = self._init_model()
+        self.uq_mode = "single"
     
     def _train(
         self, 
         train_dataset: FFDataset, 
         valid_dataset: Optional[FFDataset]=None, 
-        test_dataset: Optional[FFDataset]=None
+        test_dataset: Optional[FFDataset]=None,
+        max_epoch_per_iter=-1,
+        meta_state_dict: MetaStateDict=dict(),
+        **kwargs
     ) -> None:
         logger.info("start training FF: {}".format(self.model_str))
         predict_result = self.trainer.fit_predict(
@@ -257,7 +374,8 @@ class FF_single(BaseFFLauncher):
             test_dataset=test_dataset,
             loss_terms=self.loss_terms, 
             transform=self.datahub.transform,
-            dump_dir=self.dump_dir
+            dump_dir=self.dump_dir,
+            max_epoch_per_iter=max_epoch_per_iter
         )
         y_pred = predict_result["y_pred"]
         metric_score = predict_result["metric_score"]
@@ -308,16 +426,41 @@ class FF_committee(BaseFFLauncher):
         self.base_pretrain_path = pretrain_path
         self.verbose = 1
         self._init_pretrain_path()
+        self.uq_mode = "committee"
 
     def _init_pretrain_path(self, base_pretrain_path: Optional[str]=None) -> None:
         from .modelhub import get_pretrain_path
-        self.pretrain_path = [
-            get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "best", i) 
-            for i in range(self.size)
-        ]
+        if self.trainer.resume:
+            if base_pretrain_path is None:
+                try:
+                    self.pretrain_path = [get_pretrain_path(self.dump_dir, "last", i) for i in range(self.size)]
+                except FileNotFoundError:
+                    self.pretrain_path = None
+            else:
+                self.pretrain_path = [
+                    get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "last", i) 
+                    for i in range(self.size)
+                ]
+        else:
+            self.pretrain_path = [
+                get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "best", i) 
+                for i in range(self.size)
+            ]
 
-    def _train(self, train_dataset, valid_dataset=None, test_dataset=None, max_epoch_per_iter=-1) -> None:
-        for i in range(self.size):
+    def _train(self, 
+        train_dataset: FFDataset, 
+        valid_dataset: Optional[FFDataset]=None, 
+        test_dataset: Optional[FFDataset]=None, 
+        max_epoch_per_iter: int=-1, 
+        meta_state_dict: MetaStateDict=dict(),
+        **kwargs
+    ) -> None:
+        model_rank = meta_state_dict.get("model_rank", 0)
+        if model_rank > 0 and model_rank < self.size:
+            logger.info(f"Training from model rank {model_rank} resumed!")
+        elif model_rank >= self.size:
+            logger.info(f"Training skipped!")
+        for i in range(model_rank, self.size):
             logger.info(f"start training FF: {self.model_str} ({i})")
             self.model = self._init_model(self.verbose)
             self.verbose = 0
@@ -331,7 +474,8 @@ class FF_committee(BaseFFLauncher):
                 transform=self.datahub.transform,
                 dump_dir=self.dump_dir,
                 model_rank=i,
-                max_epoch_per_iter=max_epoch_per_iter
+                max_epoch_per_iter=max_epoch_per_iter,
+                meta_state_dict=meta_state_dict,
             )
             y_pred = predict_result["y_pred"]
             metric_score = predict_result["metric_score"]
@@ -371,84 +515,3 @@ class FF_committee(BaseFFLauncher):
             y_preds.append(y_pred)
             metric_scores.append(metric_score)
         return {"y_pred": y_preds, "y_truth": y_truth, "metric_score": pd.DataFrame(metric_scores, index=[self.model_str + str(i) for i in range(self.size)])}
-
-    def active_learn(self) -> None:
-        partitions = self._init_partition()
-        training_set = partitions["training"]
-        validation_set = partitions.get("validation", None)
-        test_set = partitions.get("test", None)
-        withheld_set = partitions["withheld"]
-        len_training = len(training_set)
-        len_validation = len(validation_set) if validation_set is not None else 0
-        ratio_training = len_training / (len_training + len_validation)
-
-        active_learning_params = self.trainer.active_learning_params
-        picking_method = active_learning_params.get("picking_method", "max_Fa_norm_std")
-        max_epoch_per_iter = active_learning_params.get("max_epoch_per_iter", -1)
-        max_iter = active_learning_params.get("max_iter", len(withheld_set))
-
-        if picking_method == "max_Fa_norm_std":
-            from ..tasks.active_learning import max_Fa_norm_std_picking
-            picking_func = max_Fa_norm_std_picking
-            picking_params = {"lb": active_learning_params["error_lower_bound"], "ub": active_learning_params["error_upper_bound"]}
-        elif picking_method == "random":
-            from ..tasks.active_learning import random_picking
-            picking_func = random_picking
-            picking_params = {}
-        else:
-            raise NotImplementedError(f"Picking method {picking_method} not implemented!")
-        
-        data_source = active_learning_params.get("data_source", "withheld")
-        sample_size = active_learning_params["sample_size"]
-        
-        if data_source == "withheld":
-            withheld_size = len(withheld_set)
-            withheld_mask = np.full(withheld_size, True)
-
-            iter_count = 0
-            while iter_count < max_iter:
-                unmasked_relative_indices = withheld_mask.nonzero()[0]
-                unmasked_size = len(unmasked_relative_indices)
-                if unmasked_size == 0:
-                    logger.info(f"Withheld set is exhausted and active learning stops at iteration {iter_count}!")
-                    break
-
-                if iter_count > 0:
-                    self._init_pretrain_path(self.dump_dir)
-
-                self._train(training_set, validation_set, test_set, max_epoch_per_iter)
-                n_part = (unmasked_size + sample_size - 1) // sample_size
-                masked_relative_indices = []
-                for j in range(n_part):
-                    part_relative_indices = unmasked_relative_indices[j * sample_size: (j + 1) * sample_size]
-                    withheld_part = Subset(withheld_set, part_relative_indices)
-                    predict_result = self._evaluate(withheld_part)
-                    y_pred = predict_result["y_pred"]
-                    masked_relative_indices += [part_relative_indices[idx] for idx in picking_func(y_pred, **picking_params)]
-                    if len(masked_relative_indices) >= sample_size:
-                        break
-                
-                if len(masked_relative_indices) == 0:
-                    logger.info(f"No uncertain samples are found and active learning stops at iteration {iter_count + 1}!")
-                    break
-
-                masked_relative_indices = masked_relative_indices[:sample_size]
-                expand_absolute_indices = withheld_set.raw_indices[masked_relative_indices]
-                len_expanded = len(expand_absolute_indices)
-                len_expanded_training = int(len_expanded * ratio_training + 0.5)
-                training_set.expand_with_indices(expand_absolute_indices[:len_expanded_training])
-                if validation_set is not None:
-                    validation_set.expand_with_indices(expand_absolute_indices[len_expanded_training:])
-                withheld_mask[masked_relative_indices] = False
-                new_indices = {
-                    "training": training_set.raw_indices,
-                    "withheld": withheld_set.raw_indices
-                }
-                if validation_set is not None:
-                    new_indices["validation"] = validation_set.raw_indices
-                np.savez(os.path.join(self.dump_dir, "active_learning_split.npz"), new_indices)
-
-                logger.info(f"Active learning iteration {iter_count + 1} finished!")
-                iter_count += 1
-        else:
-            raise NotImplementedError

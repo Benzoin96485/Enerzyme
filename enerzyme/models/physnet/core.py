@@ -73,6 +73,7 @@ class PhysNetCore(BaseFFCore):
         super().__init__(input_fields={"rbf", "atom_embedding", "idx_i_sr", "idx_j_sr"}, output_fields={"Ea", "Qa", "nh_loss"})
         self.num_blocks = num_blocks
         self.drop_out = dropout_rate
+        self.shallow_ensemble_size = shallow_ensemble_size
         self.interaction_block = Sequential(*[
             InteractionBlock(
                 num_rbf, dim_embedding, num_residual_atomic, num_residual_interaction, 
@@ -124,4 +125,9 @@ class PhysNetCore(BaseFFCore):
             if i > 0:
                 nhloss += torch.mean(out2 / (out2 + lastout2 + 1e-7))
             lastout2 = out2
-        return {"Ea": Ea, "Qa": Qa, "nh_loss": nhloss}
+        output = {"Ea": Ea, "Qa": Qa, "nh_loss": nhloss}
+        if self.shallow_ensemble_size > 1:
+            output["l2_penalty"] = 0
+            for i in range(self.num_blocks):
+                output["l2_penalty"] += self.output_block[i].output.l2loss()
+        return output

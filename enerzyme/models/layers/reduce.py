@@ -31,7 +31,10 @@ class ShallowEnsembleReduceLayer(Module):
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         net_output = net_input.copy()
         for name in self.var:
-            net_output[name + "_var"] = net_input[name].var(dim=-1)
+            if name.startswith("E"):
+                net_output[name + "_var"] = (net_input[name] - net_input[name].mean(dim=0)).var(dim=-1, unbiased=True)
+            else:
+                net_output[name + "_var"] = net_input[name].var(dim=-1, unbiased=True)
         for name in self.reduce_mean:
             net_output[name] = net_input[name].mean(dim=-1)
         return net_output

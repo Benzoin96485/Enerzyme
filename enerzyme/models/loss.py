@@ -16,7 +16,13 @@ class WeightedLoss(ABC):
     def __call__(self, output: Dict[str, torch.Tensor], target: Dict[str, torch.Tensor]) -> torch.Tensor:
         loss = 0
         for k, v in self.weights.items():
-            loss = loss + v * self.loss_fn(output, target, k)
+            if output[k].dim() == target[k].dim() + 1:
+                target[k] = target[k].unsqueeze(-1).expand_as(output[k])
+                loss_term = self.loss_fn(output, target, k)
+                target[k] = target[k].narrow(-1, 0, 1).squeeze(-1)
+            else:
+                loss_term = self.loss_fn(output, target, k)
+            loss = loss + v * loss_term
         return loss
 
 
@@ -53,7 +59,7 @@ class NLLLoss(WeightedLoss):
         self.eps = eps
 
     def loss_fn(self, output: Dict[str, torch.Tensor], target: Dict[str, torch.Tensor], k: str) -> torch.Tensor:
-        return 0.5 * torch.mean(torch.log(output[k + "_var"] + self.eps) + (output[k] - target[k]) ** 2 / (output[k + "_var"] + self.eps))
+        return 0.5 * torch.mean(torch.log(torch.clamp(output[k + "_var"], self.eps, 1)) + (output[k] - target[k]) ** 2 / torch.clamp(output[k + "_var"], self.eps, 1))
 
 
 class NLLLossVarOnly(WeightedLoss):
@@ -67,10 +73,19 @@ class NLLLossVarOnly(WeightedLoss):
         return 0.5 * torch.mean(torch.log(output[k + "_var"] + self.eps) + mse / (output[k + "_var"] + self.eps))
 
 
+class L2Penalty:
+    def __init__(self, weight: float) -> None:
+        self.weight = weight
+
+    def __call__(self, output: Dict[str, torch.Tensor], target: Dict[str, torch.Tensor]) -> torch.Tensor:
+        return output.get("l2_penalty", 0) * self.weight
+
+
 LOSS_REGISTER = {
     "mae": MAELoss,
     "mse": MSELoss,
     "rmse": RMSELoss,
     "nll": NLLLoss,
-    "nll_var_only": NLLLossVarOnly
+    "nll_var_only": NLLLossVarOnly,
+    "l2_penalty": L2Penalty
 }

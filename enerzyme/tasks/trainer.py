@@ -255,7 +255,8 @@ class Trainer:
         model: Module, pretrain_path: Optional[str],
         train_dataset: Dataset, valid_dataset: Optional[Dataset], 
         loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
-        test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
+        test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1,
+        meta_state_dict: Dict=dict()) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -314,8 +315,14 @@ class Trainer:
             best_epoch = None
 
         epoch = start_epoch
+        epoch_in_iter = meta_state_dict.get("epoch_in_iter", 0)
+        if start_epoch > 0:
+            if epoch_in_iter > 0:
+                logger.info(f"Resuming from epoch {start_epoch + 1}, epoch {epoch_in_iter + 1} in active learning iteration")
+            else:
+                logger.info(f"Resuming from epoch {start_epoch + 1}...")
         for epoch in range(start_epoch, max_epochs):
-            if max_epoch_per_iter > 0 and epoch >= max_epoch_per_iter + start_epoch:
+            if max_epoch_per_iter > 0 and epoch_in_iter >= max_epoch_per_iter:
                 break
             model = model.train()
             start_time = time.time()
@@ -358,7 +365,7 @@ class Trainer:
 
             batch_bar.close()
             total_trn_loss = np.mean(trn_loss)
-            message = f'Epoch [{epoch+1}/{max_epochs}] train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
+            message = f'Epoch [{epoch + 1}/{max_epochs}]' + (f' ({epoch_in_iter + 1}/{max_epoch_per_iter})' if max_epoch_per_iter > 0 else '') + f', train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
 
             if self.use_ema:
                 cm = ema.average_parameters()
@@ -391,14 +398,17 @@ class Trainer:
                         (f', Patience [{wait}/{self.patience}], min_val_judge_score: {best_score:.4f}' if wait else '')
             else:
                 is_early_stop = False
-                
+
+            epoch_in_iter += 1
+            meta_state_dict.update({"epoch_in_iter": epoch_in_iter})   
             end_time = time.time()
             message += f', {(end_time - start_time):.1f}s'
             logger.info(message)
             self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, "last", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
             if is_early_stop:
                 break
-        
+
+        meta_state_dict.update({"model_rank": model_rank + 1, "epoch_in_iter": 0})
         if test_dataset is not None:
             if self.use_ema:
                 cm = ema.average_parameters()
