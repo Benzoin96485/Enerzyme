@@ -1,11 +1,11 @@
-from typing import List, Callable, Literal
+from typing import List, Callable, Literal, Dict, Any
 import numpy as np
 from tqdm import tqdm
 from ..utils import logger
 
 
 def build_Fa_picking(criterion: Literal["std_mean", "norm_std_max"]) -> Callable:
-    def picking_func(y_preds, error_lower_bound: float, error_upper_bound: float, mode: Literal["single", "committee"]) -> List[int]:
+    def picking_func(y_preds, error_lower_bound: float=0.0, error_upper_bound: float=float("inf"), mode: Literal["single", "committee"]="single") -> Dict[str, Any]:
         if mode == "single":
             Fas = y_preds["Fa"]
         elif mode == "committee":
@@ -37,7 +37,10 @@ def build_Fa_picking(criterion: Literal["std_mean", "norm_std_max"]) -> Callable
         lower = np.where(lower_bool)[0].tolist()
         logger.info(f"Estimated error: {np.mean(est_error):.4f} +/- {np.std(est_error):.4f}")
         logger.info(f"({len(picked)} / {sample_size}) picked, {len(lower)} lower, {len(upper)} upper!")
-        return picked
+        return {
+            "picked_indices": picked,
+            "estimated_error_mean": np.mean(est_error),
+        }
     return picking_func
 
 

@@ -246,8 +246,8 @@ class BaseFFLauncher(ABC):
         active_learning_params = self.trainer.active_learning_params
         picking_method = active_learning_params.get("picking_method", "max_Fa_norm_std")
         max_epoch_per_iter = active_learning_params.get("max_epoch_per_iter", -1)
-        picking_params = active_learning_params.get("picking_params", {})
-        picking_func = partial(PICKING_REGISTER[picking_method], mode=self.uq_mode, **picking_params)
+        picking_params_ = active_learning_params.get("picking_params", {})
+        relative_bound_on_validation = picking_params_.get("relative_bound_on_validation", False)
         data_source = active_learning_params.get("data_source", "withheld")
         sample_size = active_learning_params["sample_size"]
         checkpoint_name = active_learning_params.get("checkpoint_name", "al_ckp.data")
@@ -260,14 +260,26 @@ class BaseFFLauncher(ABC):
         else:
             al_state_dict.dump()
             partitions = self._init_partition()
+        
         training_set = partitions["training"]
         validation_set = partitions.get("validation", None)
         test_set = partitions.get("test", None)
         withheld_set = partitions["withheld"]
+
         len_training = len(training_set)
         len_validation = len(validation_set) if validation_set is not None else 0
         ratio_training = len_training / (len_training + len_validation)
         max_iter = active_learning_params.get("max_iter", len(withheld_set))
+
+        picking_func_ = PICKING_REGISTER[picking_method]
+        picking_params = {}
+        for name, attr in signature(picking_func_).parameters.items():
+            if name in picking_params_:
+                picking_params[name] = picking_params_[name]
+            elif name != "y_preds" and attr.default is attr.empty:
+                raise ValueError(f"Parameter {name} is missing in picking_params!")
+        
+        picking_func = partial(picking_func_, mode=self.uq_mode)
         
         if data_source == "withheld":
             withheld_size = len(withheld_set)
@@ -276,9 +288,7 @@ class BaseFFLauncher(ABC):
             iter_count = al_state_dict.get("iter_count", 0)
             if iter_count > 0:
                 logger.info(f"Active learning iteration {iter_count + 1} resumed!")
-            while iter_count < max_iter:
-                if iter_count > 0:
-                    self.trainer.resume = 2
+            while iter_count < max_iter:   
                 unmasked_relative_indices = withheld_mask.nonzero()[0]
                 unmasked_size = len(unmasked_relative_indices)
                 if unmasked_size == 0:
@@ -286,6 +296,7 @@ class BaseFFLauncher(ABC):
                     break
 
                 if iter_count > 0:
+                    self.trainer.resume = 2
                     self._init_pretrain_path(self.dump_dir)
 
                 if al_state_dict.get("stage", 0) < 1: # training in this iteration unfinished
@@ -293,6 +304,27 @@ class BaseFFLauncher(ABC):
                     al_state_dict.update({"stage": 1, "epoch_in_iter": 0})
                 else:
                     logger.info(f"Model training in active learning iteration {iter_count + 1} has finished, start evaluating!")
+
+                if relative_bound_on_validation:
+                    if "relative_error_lower_bound" not in picking_params_ or "relative_error_upper_bound" not in picking_params_:
+                        raise ValueError("Relative error lower bound and upper bound are required for relative bound on validation set!")
+                    if "estimated_error_mean" in al_state_dict:
+                        estimated_error_mean = al_state_dict["estimated_error_mean"]
+                    else:
+                        if validation_set is None:
+                            raise ValueError("Validation set is required for relative bound on validation set!")
+                        validation_result = self._evaluate(validation_set)
+                        y_pred = validation_result["y_pred"]
+                        logger.info(f"Estimating error mean on validation set...")
+                        estimated_error_mean = picking_func(y_pred, **picking_params)["estimated_error_mean"]
+                        al_state_dict.update({"estimated_error_mean": estimated_error_mean})
+                    if al_state_dict.get("relative_error_lower_bound", None) != picking_params_["relative_error_lower_bound"] or al_state_dict.get("relative_error_upper_bound", None) != picking_params_["relative_error_upper_bound"]:
+                        al_state_dict.update({
+                            "relative_error_lower_bound": picking_params_["relative_error_lower_bound"],
+                            "relative_error_upper_bound": picking_params_["relative_error_upper_bound"]
+                        })
+                    picking_params["error_lower_bound"] = picking_params_["relative_error_lower_bound"] * estimated_error_mean
+                    picking_params["error_upper_bound"] = picking_params_["relative_error_upper_bound"] * estimated_error_mean
                 
                 n_part = (unmasked_size + sample_size - 1) // sample_size
                 masked_relative_indices = []
@@ -301,7 +333,7 @@ class BaseFFLauncher(ABC):
                     withheld_part = Subset(withheld_set, part_relative_indices)
                     predict_result = self._evaluate(withheld_part)
                     y_pred = predict_result["y_pred"]
-                    masked_relative_indices += [part_relative_indices[idx] for idx in picking_func(y_pred)]
+                    masked_relative_indices += [part_relative_indices[idx] for idx in picking_func(y_pred, **picking_params)["picked_indices"]]
                     if len(masked_relative_indices) >= sample_size:
                         break
                 
@@ -327,7 +359,7 @@ class BaseFFLauncher(ABC):
                     new_indices["test"] = test_set.raw_indices
                 iter_count += 1
                 al_state_dict.update({"new_indices": new_indices, "iter_count": iter_count, "stage": 0, "model_rank": 0})
-                logger.info(f"Active learning iteration {iter_count + 1} finished!")
+                logger.info(f"Active learning iteration {iter_count} finished!")
         else:
             raise NotImplementedError
 
