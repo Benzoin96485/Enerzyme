@@ -23,18 +23,25 @@ class EnergyReduceLayer(Module):
 
 
 class ShallowEnsembleReduceLayer(Module):
-    def __init__(self, reduce_mean: List[str]=[], var: List[str]=[]) -> None:
+    def __init__(self, reduce_mean: List[str]=[], var: List[str]=[], std: List[str]=[], relative_energy: bool=False) -> None:
         super().__init__()
         self.reduce_mean = reduce_mean
         self.var = var
+        self.std = std
+        self.relative_energy = relative_energy
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         net_output = net_input.copy()
         for name in self.var:
-            if name.startswith("E"):
+            if self.relative_energy and name.startswith("E"):
                 net_output[name + "_var"] = (net_input[name] - net_input[name].mean(dim=0)).var(dim=-1, unbiased=True)
             else:
                 net_output[name + "_var"] = net_input[name].var(dim=-1, unbiased=True)
+        for name in self.std:
+            if self.relative_energy and name.startswith("E"):
+                net_output[name + "_std"] = (net_input[name] - net_input[name].mean(dim=0)).std(dim=-1)
+            else:
+                net_output[name + "_std"] = net_input[name].std(dim=-1)
         for name in self.reduce_mean:
             net_output[name] = net_input[name].mean(dim=-1)
         return net_output

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import math
 from typing import Dict
 import torch
 from torch.nn import MSELoss as MSELoss_
@@ -73,6 +74,25 @@ class NLLLossVarOnly(WeightedLoss):
         return 0.5 * torch.mean(torch.log(output[k + "_var"] + self.eps) + mse / (output[k + "_var"] + self.eps))
 
 
+class CRPSLoss(WeightedLoss):
+    def __init__(self, eps: float = 1e-6, **weights: Dict[str, float]) -> None:
+        from torch.distributions.normal import Normal
+        super().__init__(**weights)
+        self.normal = Normal(0, 1)
+        self.eps = eps
+        self.phi = lambda x: self.normal.log_prob(x).exp()
+        self.Phi = self.normal.cdf
+        self.sqrt_pi = math.sqrt(math.pi)
+
+    def loss_fn(self, output: Dict[str, torch.Tensor], target: Dict[str, torch.Tensor], k: str) -> torch.Tensor:
+        if k + "_std" in output:
+            std = output[k + "_std"] + self.eps
+        elif k + "_var" in output:
+            std = torch.sqrt(output[k + "_var"] + self.eps) 
+        dev = (output[k] - target[k]) / std
+        return torch.mean(std * (dev * (2 * self.Phi(dev) - 1) + 2 * self.phi(dev) - 1 / self.sqrt_pi))
+
+
 class L2Penalty:
     def __init__(self, weight: float) -> None:
         self.weight = weight
@@ -87,5 +107,6 @@ LOSS_REGISTER = {
     "rmse": RMSELoss,
     "nll": NLLLoss,
     "nll_var_only": NLLLossVarOnly,
-    "l2_penalty": L2Penalty
+    "l2_penalty": L2Penalty,
+    "crps": CRPSLoss
 }
