@@ -139,6 +139,7 @@ Trainer:
     sample_size: 10000                      # number of samples to be picked in each iteration
     max_epoch_per_iter: 10000               # maximum epochs of training in each iteration
     max_iter: 100                           # maximum number of iterations
+    resume: true                             # if resume from the last active learning checkpoint
   Splitter:
     method: random                          # splitting method: random
     parts:                                  # partition names, at least training and validation are needed
