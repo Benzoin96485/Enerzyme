@@ -175,6 +175,7 @@ class Trainer:
         self.seed = params.get('seed', 114514)
         self.learning_rate = float(params.get('learning_rate', 1e-3))
         self.batch_size = params.get('batch_size', 8)
+        self.inference_batch_size = params.get('inference_batch_size', self.batch_size)
         self.max_epochs = params.get('max_epochs', 1000)
         self.warmup_ratio = params.get('warmup_ratio', 0.01)
         self.patience = params.get('patience', 50)
@@ -408,7 +409,7 @@ class Trainer:
             if is_early_stop:
                 break
 
-        meta_state_dict.update({"model_rank": model_rank + 1, "epoch_in_iter": 0})
+        meta_state_dict.update({"model_rank": model_rank + 1 if model_rank is not None else 0, "epoch_in_iter": 0})
         if test_dataset is not None:
             if self.use_ema:
                 cm = ema.average_parameters()
@@ -447,7 +448,7 @@ class Trainer:
             
         dataloader = DataLoader(
             dataset=dataset,
-            batch_size=self.batch_size,
+            batch_size=self.inference_batch_size,
             shuffle=False,
             collate_fn=self.decorate_batch_input
         )

@@ -258,7 +258,7 @@ class BaseFFLauncher(ABC):
             al_state_dict.load()
             partitions = self._init_partition(al_state_dict.get("new_indices", None))
         else:
-            al_state_dict.dump()
+            self.dump({}, self.dump_dir, checkpoint_name)
             partitions = self._init_partition()
         
         training_set = partitions["training"]

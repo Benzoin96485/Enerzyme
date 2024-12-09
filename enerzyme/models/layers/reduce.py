@@ -23,14 +23,21 @@ class EnergyReduceLayer(Module):
 
 
 class ShallowEnsembleReduceLayer(Module):
-    def __init__(self, reduce_mean: List[str]=[], var: List[str]=[], std: List[str]=[], relative_energy: bool=False) -> None:
+    def __init__(self, reduce_mean: List[str]=[], var: List[str]=[], std: List[str]=[], relative_energy: bool=False, train_only: bool=False, eval_only: bool=False) -> None:
         super().__init__()
         self.reduce_mean = reduce_mean
         self.var = var
         self.std = std
         self.relative_energy = relative_energy
+        self.train_only = train_only
+        self.eval_only = eval_only
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        if self.train_only and not self.training:
+            return net_input
+        if self.eval_only and self.training:
+            return net_input
+        
         net_output = net_input.copy()
         for name in self.var:
             if self.relative_energy and name.startswith("E"):
