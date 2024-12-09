@@ -33,7 +33,7 @@ class FFPredict:
                     if "Metric" in ff:
                         ff["Metric"] = new_metric_config
             for k, v in new_config.get("Trainer", dict()).items():
-                if k in ["non_target_features"]:
+                if k in ["non_target_features", "inference_batch_size"]:
                     config.Trainer[k] = v
         else:
             config = new_config
