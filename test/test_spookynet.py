@@ -323,9 +323,22 @@ def test_interaction_module():
         num_residual_pre, num_residual_local_x, num_residual_local_s, num_residual_local_p, num_residual_local_d, num_residual_local,
         num_residual_nonlocal_q, num_residual_nonlocal_k, num_residual_nonlocal_v, num_residual_post, num_residual_output
     ).type(dtype)
+    g1 = f1.local_interaction
+    g2 = f2.local_interaction
+    g2.radial_s.weight.data.copy_(g1.radial_s.weight.data)
+    g2.radial_p.weight.data.copy_(g1.radial_p.weight.data)
+    g2.radial_d.weight.data.copy_(g1.radial_d.weight.data)
+    g2.resblock.linear.weight.data.copy_(g1.resblock.output.weight.data)
+    g2.resblock_x.linear.weight.data.copy_(g1.resblock_x.output.weight.data)
+    g2.resblock_p.linear.weight.data.copy_(g1.resblock_p.output.weight.data)
+    g2.resblock_s.linear.weight.data.copy_(g1.resblock_s.output.weight.data)
+    g2.resblock_d.linear.weight.data.copy_(g1.resblock_d.output.weight.data)
+    g2.projection_d.weight.data.copy_(g1.projection_d.weight.data)
+    g2.projection_p.weight.data.copy_(g1.projection_p.weight.data)
     f1.nonlocal_interaction.attention.omega.copy_(f2.nonlocal_interaction.attention.omega)
     with torch.no_grad():
-        f1.resblock.stack[-1].weight.copy_(f2.resblock.linear.weight)
+        f1.resblock.output.weight.copy_(f2.resblock.linear.weight)
+        f1.resblock.output.bias.copy_(f2.resblock.linear.bias)
     x1, y1 = f1(atom_embedding, rbf, pij, dij, idx_i, idx_j, 1, None)
     x2, y2 = f2(atom_embedding, rbf, pij, dij, idx_i, idx_j, 1, None)
     assert_tensor_allclose(x1, x2)
