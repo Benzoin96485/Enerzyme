@@ -25,15 +25,16 @@ class Monitor:
     def summary(self) -> None:
         message = []
         for term, stats in self.terms.items():
+            message.append(f"-------- {term} ---------")
             for stat in stats:
                 if stat == "mean":
-                    message.append(f"{stat} of {term}: {np.mean(self.collection[term])}")
+                    message.append(f"{stat}: {np.mean(self.collection[term])}")
                 if stat == "std":
-                    message.append(f"{stat} of {term}: {np.std(self.collection[term])}")
+                    message.append(f"{stat}: {np.std(self.collection[term])}")
                 if stat == "max":
-                    message.append(f"{stat} of {term}: {np.max(self.collection[term])}")
+                    message.append(f"{stat}: {np.max(self.collection[term])}")
                 if stat == "min":
-                    message.append(f"{stat} of {term}: {np.min(self.collection[term])}")
+                    message.append(f"{stat}: {np.min(self.collection[term])}")
 
-        logger.info(", ".join(message))
+        logger.info("\n" + "\n".join(message) + f"\n-------------------------")
         self._reset()

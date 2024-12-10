@@ -1,44 +1,47 @@
-from typing import Dict, Callable, Tuple
+from typing import Dict, Callable, Tuple, List, Union
 import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from ..data import is_atomic, get_tensor_rank
 from ..utils.base_logger import logger
 
 
-def rmse(label, prediction, target_name=None):
-    y_true = label[target_name]
-    y_pred = prediction[target_name]
-    if is_atomic(target_name) or get_tensor_rank(target_name):
-        score = mean_squared_error(np.concatenate(y_true), np.concatenate(y_pred), squared=False)
+def build_single_metric(metric_str: str) -> Callable[[Dict[str, Union[List, np.ndarray]], Dict[str, Union[List, np.ndarray]], str], float]:
+    if metric_str == "rmse":
+        metric_func = lambda x, y: mean_squared_error(x, y, squared=False)
+    elif metric_str == "mae":
+        metric_func = lambda x, y: mean_absolute_error(x, y)
     else:
-        score = mean_squared_error(y_true, y_pred, squared=False)
-    return score
-
-
-def mae(label, prediction, target_name=None):
-    y_true = label[target_name]
-    y_pred = prediction[target_name]
-    if is_atomic(target_name) or get_tensor_rank(target_name):
-        score = mean_absolute_error(np.concatenate(y_true), np.concatenate(y_pred), squared=False)
-    else:
-        score = mean_absolute_error(y_true, y_pred, squared=False)
-    return score
-
-
-METRICS_REGISTER = {
-    "rmse": rmse,
-    "mae": mae
-}
+        raise ValueError(f"Unknown metric: {metric_str}")
+    def metric(label: Dict[str, Union[List, np.ndarray]], prediction: Dict[str, Union[List, np.ndarray]], target_name: str) -> float:
+        y_true = label[target_name]
+        y_pred = prediction[target_name]
+        if is_atomic(target_name) or get_tensor_rank(target_name):
+            y_trues, y_preds = np.concatenate(y_true), np.concatenate(y_pred)
+            if y_preds.ndim == y_trues.ndim + 1:
+                score = metric_func(y_trues, np.mean(y_preds, axis=-1))
+            else:
+                score = metric_func(y_trues, y_preds)
+        else:
+            y_trues, y_preds = np.array(y_true), np.array(y_pred)
+            if y_preds.ndim == y_trues.ndim + 1:
+                score = metric_func(y_trues, np.mean(y_preds, axis=-1))
+            else:
+                score = metric_func(y_true, y_pred)
+        return score
+    return metric
 
 
 class Metrics(object):
     def __init__(self, metric_config: Dict=dict()) -> None:
         self.metric_config = dict()
+        self.metrics_register = dict()
         for target, metrics in metric_config.items():
             for metric, weight in metrics.items():
                 self.metric_config[f"{target}_{metric}"] = weight
+                if metric not in self.metrics_register:
+                    self.metrics_register[metric] = build_single_metric(metric)
 
-    def __str__(self):
+    def __str__(self) -> str:
         terms = []
         for target_metric, weight in self.metric_config.items():
             if weight == 1:
@@ -47,24 +50,24 @@ class Metrics(object):
                 terms.append(f"{weight:.2f} * {target_metric}")
         return " + ".join(terms)
 
-    def cal_single_metric(self, label, prediction, target_name, metric_name):
-        return METRICS_REGISTER[metric_name](label, prediction, target_name)
+    def cal_single_metric(self, label: Dict[str, Union[List, np.ndarray]], prediction: Dict[str, Union[List, np.ndarray]], target_name: str, metric_name: str) -> float:
+        return self.metrics_register[metric_name](label, prediction, target_name)
 
-    def cal_judge_score(self, raw_metric_score):
+    def cal_judge_score(self, raw_metric_score: Dict[str, float]) -> float:
         judge_score = 0
         for target_metric, weight in self.metric_config.items():
             if weight is not None and weight != 0:
                 judge_score += weight * raw_metric_score[target_metric]
         return judge_score
 
-    def cal_metric(self, label, predict):
+    def cal_metric(self, label: Dict[str, Union[List, np.ndarray]], predict: Dict[str, Union[List, np.ndarray]]) -> Dict[str, float]:
         raw_metric_score = dict()
         for target_metric in self.metric_config:
             raw_metric_score[target_metric] = self.cal_single_metric(label, predict, *target_metric.split("_"))
         raw_metric_score["_judge_score"] = self.cal_judge_score(raw_metric_score)
         return raw_metric_score
 
-    def _early_stop_choice(self, wait: int, best_score: float, metric_score: Dict, save_handle: Callable, patience: int, epoch: int) -> Tuple[bool, float, int]:
+    def _early_stop_choice(self, wait: int, best_score: float, metric_score: Dict[str, float], save_handle: Callable, patience: int, epoch: int) -> Tuple[bool, float, int]:
         judge_score = metric_score.get("_judge_score", self.cal_judge_score(metric_score))
         return self._judge_early_stop_decrease(wait, judge_score, best_score, save_handle, patience, epoch)
 

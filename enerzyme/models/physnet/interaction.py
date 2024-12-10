@@ -129,12 +129,12 @@ class InteractionBlock(NeuronLayer):
 def OutputBlock(
     dim_embedding: int, num_residual: int, 
     activation_fn: ACTIVATION_KEY_TYPE=None, activation_params: ACTIVATION_PARAM_TYPE=dict(),
-    dropout_rate: float=0.0
+    dropout_rate: float=0.0, shallow_ensemble_size: int=1
 ) -> ResidualMLP:
     default_initial_weight = weight_default()
     return ResidualMLP(
         dim_feature_in=dim_embedding, dim_feature_out=2, num_residual=num_residual,
         activation_fn=activation_fn, activation_params=activation_params,
         initial_weight1=default_initial_weight, initial_weight2=default_initial_weight, initial_weight_out="zero",
-        initial_bias_residual=bias_default(), use_bias_out=False, dropout_rate=dropout_rate
+        initial_bias_residual=bias_default(), use_bias_out=False, dropout_rate=dropout_rate, shallow_ensemble_size=shallow_ensemble_size
     )

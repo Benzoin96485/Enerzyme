@@ -1,6 +1,6 @@
 Datahub:                       # Datahub configurations in the training configuration file will be overriden
                                # expect the neighbor list and transforms to make sure consistency
-  data_path: "/my/dataset.pkl" # dataset containing the features
+  data_path: "/my/dataset.pkl" # external test set, if not provided, the dataset will be loaded from the training configuration file
   data_format: pickle
   features:
     Ra: coord                               
@@ -20,3 +20,7 @@ Metric:                        # Metric used for this prediction
     rmse: 1
   E:
     rmse: 1
+Trainer:
+  non_target_features:         # non-target features to be saved in the prediction artifact
+    - E_var
+    - Qa_var

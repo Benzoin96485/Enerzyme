@@ -417,6 +417,7 @@ Trainer:
   cuda: true                                # if cuda is searched and used if possible
   weight_decay: 0                           # weight decay rate of the Adam optimizer, default 0
   batch_size: 8                             # batch size of the dataloader, default 8
+  inference_batch_size: 4                   # batch size of the dataloader for inference, default the same as batch_size
   max_epochs: 10000                         # maximum epochs of training if earlystopping isn't triggered, default 1000
   dtype: float32                            # pytorch data type throughout the computation: float32 (single) / float64 (double), default float32
   use_ema: true                             # if exponential moving average is used, default true

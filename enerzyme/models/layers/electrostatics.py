@@ -47,12 +47,13 @@ class ChargeConservationLayer(BaseFFLayer):
             batch_seg = torch.zeros_like(Za, dtype=torch.long)
         #number of atoms per batch (needed for charge scaling)
         N_per_batch = segment_sum_coo(torch.ones_like(batch_seg), batch_seg)
+        view_shape = (-1, ) if Qa.dim() == 1 else (-1, 1)
         raw_Q = segment_sum_coo(Qa, batch_seg)
         if Q is None: #assume desired total charge zero if not given
             Q = torch.zeros_like(N_per_batch)
         #return scaled charges (such that they have the desired total charge)
         return {
-            "Qa": Qa + ((Q - raw_Q) / N_per_batch).gather(0, batch_seg), 
+            "Qa": Qa + ((Q.view(view_shape) - raw_Q) / N_per_batch.view(view_shape))[batch_seg], 
             "Q": raw_Q
         }
 
@@ -148,35 +149,31 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         -----
         Ea: Float tensor of atomic electrostatic energy, shape [N * batch_size]
         '''
-        if Qa.device.type == "cpu":
+        if Qa.device.type == "cpu" or Qa.dim() > 1:
             fac = self.kehalf * Qa[idx_i] * Qa[idx_j]
         else:
             fac = self.kehalf * Qa.gather(0, idx_i) * Qa.gather(0, idx_j)
         switch = self.cutoff_fn(Dij_lr, self.cutoff, self.cuton)
         cswitch = 1 - switch
+        view_shape = (-1, 1) if Qa.dim() > 1 else (-1,)
         if self.cutoff_lr is None or self.cutoff_lr <= 0:
             Eele_ordinary = 1.0 / Dij_lr
             Eele_shielded = 1.0 / self._shield(Dij_lr)
-            Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary)
+            Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary).view(view_shape)
         else:
             Eele_ordinary, Eele_shielded, condition, zeros = self.lr_shield(Dij_lr)
             # combine shielded and ordinary interactions and apply prefactors
-            Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary)
+            Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary).view(view_shape)
             Eele = torch.where(condition, Eele, zeros)
         return segment_sum_coo(Eele, idx_i, dim_size=len(Qa))
 
 
-class AtomicCharge2DipoleLayer(Module):
+class AtomicCharge2DipoleLayer(BaseFFLayer):
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(input_fields={"Qa", "Ra", "batch_seg"}, output_fields={"M2"})
 
-    def get_dipole(self, Qa: Tensor, Ra: Tensor, batch_seg: Optional[Tensor]=None, **kwargs) -> Tensor:
+    def get_M2(self, Qa: Tensor, Ra: Tensor, batch_seg: Optional[Tensor]=None) -> Tensor:
         if batch_seg is None:
             batch_seg = torch.zeros_like(Qa, dtype=torch.long)
-        Pa = Qa.unsqueeze(1) * Ra
+        Pa = Qa.unsqueeze(1) * Ra.view((-1, 3, 1) if Qa.dim() > 1 else (-1, 3))
         return segment_sum_coo(Pa, batch_seg)
-
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output["M2"] = self.get_dipole(**net_input)
-        return output
