@@ -300,7 +300,7 @@ class BaseFFLauncher(ABC):
                     self._init_pretrain_path(self.dump_dir)
 
                 if al_state_dict.get("stage", 0) < 1: # training in this iteration unfinished
-                    self._train(training_set, validation_set, test_set, max_epoch_per_iter, meta_state_dict=al_state_dict)
+                    self._train(training_set, validation_set, test_set, max_epoch_per_iter, meta_state_dict=al_state_dict, refresh_patience=True)
                     al_state_dict.update({"stage": 1, "epoch_in_iter": 0})
                 else:
                     logger.info(f"Model training in active learning iteration {iter_count + 1} has finished, start evaluating!")
@@ -485,6 +485,7 @@ class FF_committee(BaseFFLauncher):
         test_dataset: Optional[FFDataset]=None, 
         max_epoch_per_iter: int=-1, 
         meta_state_dict: MetaStateDict=dict(),
+        refresh_patience: bool=False,
         **kwargs
     ) -> None:
         model_rank = meta_state_dict.get("model_rank", 0)
@@ -508,6 +509,7 @@ class FF_committee(BaseFFLauncher):
                 model_rank=i,
                 max_epoch_per_iter=max_epoch_per_iter,
                 meta_state_dict=meta_state_dict,
+                refresh_patience=refresh_patience
             )
             y_pred = predict_result["y_pred"]
             metric_score = predict_result["metric_score"]

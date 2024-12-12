@@ -2,6 +2,7 @@ from functools import partial
 from typing import Iterable, Optional, Callable, Tuple, Dict, Any, Literal, List, Union
 from collections import defaultdict
 import time, os, logging, contextlib
+from sympy import sqf
 from tqdm import tqdm
 import torch
 from torch import Tensor
@@ -257,7 +258,8 @@ class Trainer:
         train_dataset: Dataset, valid_dataset: Optional[Dataset], 
         loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
         test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1,
-        meta_state_dict: Dict=dict()) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
+        meta_state_dict: Dict=dict(), refresh_patience: bool=False
+    ) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -288,6 +290,8 @@ class Trainer:
             wait = other_info["epoch"] - other_info["best_epoch"]
             best_score = other_info.get("best_score", float("inf"))
             start_epoch = other_info["epoch"] + 1
+            if wait >= self.patience and refresh_patience:
+                wait = 0
         else:
             wait = 0
             if self.resume > 1:
