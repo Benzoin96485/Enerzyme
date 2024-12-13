@@ -207,6 +207,10 @@ class BaseFFLauncher(ABC):
         return partitions["training"], partitions.get("validation", None), partitions.get("test", None)
     
     @abstractmethod
+    def _init_pretrain_path(self) -> None:
+        ...
+    
+    @abstractmethod
     def _train(
         self, 
         train_dataset: FFDataset, 
@@ -316,7 +320,7 @@ class BaseFFLauncher(ABC):
                         validation_result = self._evaluate(validation_set)
                         y_pred = validation_result["y_pred"]
                         logger.info(f"Estimating error mean on validation set...")
-                        estimated_error_mean = picking_func(y_pred, **picking_params)["estimated_error_mean"]
+                        estimated_error_mean = picking_func(y_pred, stat_only=True, **picking_params)["estimated_error_mean"]
                         al_state_dict.update({"estimated_error_mean": estimated_error_mean})
                     if al_state_dict.get("relative_error_lower_bound", None) != picking_params_["relative_error_lower_bound"] or al_state_dict.get("relative_error_upper_bound", None) != picking_params_["relative_error_upper_bound"]:
                         al_state_dict.update({
@@ -374,20 +378,24 @@ class FF_single(BaseFFLauncher):
         pretrain_path=None, **params
     ) -> None:
         super().__init__(datahub, trainer, model_str, loss, architecture, build_params, layers, pretrain_path)
+        self.base_pretrain_path = pretrain_path
+        self._init_pretrain_path()
+        self.model = self._init_model()
+        self.uq_mode = "single"
+    
+    def _init_pretrain_path(self, base_pretrain_path: Optional[str]=None) -> None:
         from .modelhub import get_pretrain_path
         if self.trainer.resume:
-            if pretrain_path is None:
+            if base_pretrain_path is None:
                 try:
                     self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
                 except FileNotFoundError:
                     self.pretrain_path = None
             else:
-                self.pretrain_path = get_pretrain_path(pretrain_path, "last", None)
+                self.pretrain_path = get_pretrain_path(base_pretrain_path, "last", None)
         else:
-            self.pretrain_path = get_pretrain_path(pretrain_path, "best", None)
-        self.model = self._init_model()
-        self.uq_mode = "single"
-    
+            self.pretrain_path = get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "best", None)
+
     def _train(
         self, 
         train_dataset: FFDataset, 
@@ -470,7 +478,7 @@ class FF_committee(BaseFFLauncher):
                     self.pretrain_path = None
             else:
                 self.pretrain_path = [
-                    get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "last", i) 
+                    get_pretrain_path(base_pretrain_path, "last", i) 
                     for i in range(self.size)
                 ]
         else:

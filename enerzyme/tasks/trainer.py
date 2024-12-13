@@ -21,7 +21,7 @@ from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
 from .monitor import Monitor
-from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform, full_neighbor_list
+from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform, full_neighbor_list, is_target_uq
 from ..utils import logger
 from .metrics import Metrics
 
@@ -98,7 +98,15 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
                 y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
             else:
                 y_pred[k] = v.detach().cpu().numpy()
+        elif is_target_uq(k):
+            target = k[:-4]
+            if is_atomic(target):
+                y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
+            else:
+                y_pred[k] = v.detach().cpu().numpy()
     for k in non_target_features:
+        if k in y_pred:
+            continue
         if len(output[k]) == len(features["Za"]):
             y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(output[k], features["N"])))
         elif len(output[k]) == len(features["N"]):
