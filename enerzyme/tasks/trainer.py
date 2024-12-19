@@ -1,7 +1,8 @@
 from functools import partial
-from typing import Iterable, Optional, Callable, Tuple, Dict, Any, Literal
+from typing import Iterable, Optional, Callable, Tuple, Dict, Any, Literal, List, Union
 from collections import defaultdict
 import time, os, logging, contextlib
+from sympy import sqf
 from tqdm import tqdm
 import torch
 from torch import Tensor
@@ -20,7 +21,7 @@ from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
 from .monitor import Monitor
-from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform, full_neighbor_list
+from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform, full_neighbor_list, is_target_uq
 from ..utils import logger
 from .metrics import Metrics
 
@@ -88,7 +89,7 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
     return batch_features, batch_targets
 
 
-def _decorate_batch_output(output, features, targets):
+def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], targets: Optional[Dict[str, Any]], non_target_features: List[str]=[]) -> Tuple[Dict[str, Union[np.ndarray, List]], Optional[Dict[str, Union[np.ndarray, List]]]]:
     y_pred = dict()
     y_truth = dict()
     for k, v in output.items():
@@ -97,6 +98,21 @@ def _decorate_batch_output(output, features, targets):
                 y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
             else:
                 y_pred[k] = v.detach().cpu().numpy()
+        elif is_target_uq(k):
+            target = k[:-4]
+            if is_atomic(target):
+                y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
+            else:
+                y_pred[k] = v.detach().cpu().numpy()
+    for k in non_target_features:
+        if k in y_pred:
+            continue
+        if len(output[k]) == len(features["Za"]):
+            y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(output[k], features["N"])))
+        elif len(output[k]) == len(features["N"]):
+            y_pred[k] = output[k].detach().cpu().numpy()
+        else:
+            raise ValueError(f"non-target feature {k} has invalid length {len(output[k])}")
     y_pred["Za"] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(features["Za"], features["N"])))
     
     if targets is not None:
@@ -168,6 +184,7 @@ class Trainer:
         self.seed = params.get('seed', 114514)
         self.learning_rate = float(params.get('learning_rate', 1e-3))
         self.batch_size = params.get('batch_size', 8)
+        self.inference_batch_size = params.get('inference_batch_size', self.batch_size)
         self.max_epochs = params.get('max_epochs', 1000)
         self.warmup_ratio = params.get('warmup_ratio', 0.01)
         self.patience = params.get('patience', 50)
@@ -194,12 +211,13 @@ class Trainer:
         else:
             self.active_learning = False
         self.resume = params.get("resume", 1)
+        self.non_target_features = params.get("non_target_features", [])
 
     def decorate_batch_input(self, batch):
         return _decorate_batch_input(batch, self.dtype, self.device)
     
     def decorate_batch_output(self, output, features, targets):
-        return _decorate_batch_output(output, features, targets)
+        return _decorate_batch_output(output, features, targets, self.non_target_features)
     
     def _set_seed(self, seed):
         """function used to set a random seed
@@ -247,7 +265,9 @@ class Trainer:
         model: Module, pretrain_path: Optional[str],
         train_dataset: Dataset, valid_dataset: Optional[Dataset], 
         loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
-        test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
+        test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1,
+        meta_state_dict: Dict=dict(), refresh_patience: bool=False
+    ) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -278,6 +298,8 @@ class Trainer:
             wait = other_info["epoch"] - other_info["best_epoch"]
             best_score = other_info.get("best_score", float("inf"))
             start_epoch = other_info["epoch"] + 1
+            if wait >= self.patience and refresh_patience:
+                wait = 0
         else:
             wait = 0
             if self.resume > 1:
@@ -306,8 +328,14 @@ class Trainer:
             best_epoch = None
 
         epoch = start_epoch
+        epoch_in_iter = meta_state_dict.get("epoch_in_iter", 0)
+        if start_epoch > 0:
+            if epoch_in_iter > 0:
+                logger.info(f"Resuming from epoch {start_epoch + 1}, epoch {epoch_in_iter + 1} in active learning iteration")
+            else:
+                logger.info(f"Resuming from epoch {start_epoch + 1}...")
         for epoch in range(start_epoch, max_epochs):
-            if max_epoch_per_iter > 0 and epoch >= max_epoch_per_iter + start_epoch:
+            if max_epoch_per_iter > 0 and epoch_in_iter >= max_epoch_per_iter:
                 break
             model = model.train()
             start_time = time.time()
@@ -350,7 +378,7 @@ class Trainer:
 
             batch_bar.close()
             total_trn_loss = np.mean(trn_loss)
-            message = f'Epoch [{epoch+1}/{max_epochs}] train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
+            message = f'Epoch [{epoch + 1}/{max_epochs}]' + (f' ({epoch_in_iter + 1}/{max_epoch_per_iter})' if max_epoch_per_iter > 0 else '') + f', train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
 
             if self.use_ema:
                 cm = ema.average_parameters()
@@ -383,14 +411,17 @@ class Trainer:
                         (f', Patience [{wait}/{self.patience}], min_val_judge_score: {best_score:.4f}' if wait else '')
             else:
                 is_early_stop = False
-                
+
+            epoch_in_iter += 1
+            meta_state_dict.update({"epoch_in_iter": epoch_in_iter})   
             end_time = time.time()
             message += f', {(end_time - start_time):.1f}s'
             logger.info(message)
             self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, "last", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
             if is_early_stop:
                 break
-        
+
+        meta_state_dict.update({"model_rank": model_rank + 1 if model_rank is not None else 0, "epoch_in_iter": 0})
         if test_dataset is not None:
             if self.use_ema:
                 cm = ema.average_parameters()
@@ -429,7 +460,7 @@ class Trainer:
             
         dataloader = DataLoader(
             dataset=dataset,
-            batch_size=self.batch_size,
+            batch_size=self.inference_batch_size,
             shuffle=False,
             collate_fn=self.decorate_batch_input
         )

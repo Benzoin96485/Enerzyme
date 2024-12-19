@@ -40,7 +40,13 @@ def is_idx(k):
 def is_target(k):
     return bool(DATA_TYPES.get(k, 0) & IS_TARGET)
 
+def is_target_uq(k):
+    if k.endswith("_var") or k.endswith("_std"):
+        target = k[:-4]
+        return is_target(target)
+    return False
+
 def get_tensor_rank(k):
     return bool(DATA_TYPES.get(k, 0) >> TENSOR_RANK_BIT)
 
-__all__ = ["is_int", "is_rounded", "is_atomic", "requires_grad", "is_idx", "get_tensor_rank", "is_target"]
+__all__ = ["is_int", "is_rounded", "is_atomic", "requires_grad", "is_idx", "get_tensor_rank", "is_target", "is_target_uq"]

@@ -39,42 +39,46 @@ class DenseLayer(NeuronLayer):
         activation_fn: Optional[ACTIVATION_KEY_TYPE]=None, activation_params: ACTIVATION_PARAM_TYPE=dict(), 
         initial_weight: INITIAL_WEIGHT_TYPE="orthogonal", 
         initial_bias: INITIAL_BIAS_TYPE="zero",
-        use_bias: bool=True
+        use_bias: bool=True,
+        shallow_ensemble_size: int=1
     ) -> None:
+        self.shallow_ensemble_size = shallow_ensemble_size
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
 
         if initial_weight == "semi_orthogonal_glorot":
-            self.weight = Parameter(semi_orthogonal_glorot_weights(dim_feature_in, dim_feature_out))
-        elif initial_weight == "orthogonal":
-            self.weight = Parameter(torch.empty(dim_feature_out, dim_feature_in))
+            self.weight = Parameter(semi_orthogonal_glorot_weights(dim_feature_in, dim_feature_out * shallow_ensemble_size))
+        elif initial_weight == "orthogonal" or shallow_ensemble_size > 1:
+            self.weight = Parameter(torch.empty(dim_feature_out * shallow_ensemble_size, dim_feature_in))
             init.orthogonal_(self.weight)
         elif initial_weight == "zero":
-            self.weight = Parameter(torch.empty(dim_feature_out, dim_feature_in))
+            self.weight = Parameter(torch.empty(dim_feature_out * shallow_ensemble_size, dim_feature_in))
             init.zeros_(self.weight)
-        elif isinstance(initial_weight, Tensor):
-            self.weight = Parameter(initial_weight)
         else:
-            self.weight = Parameter(torch.tensor(initial_weight))
+            if not isinstance(initial_weight, Tensor):
+                initial_weight = torch.tensor(initial_weight)
+            self.weight = Parameter(initial_weight)
         if use_bias:
             if initial_bias == "zero":
-                self.bias = Parameter(torch.empty(dim_feature_out))
+                self.bias = Parameter(torch.empty(dim_feature_out * shallow_ensemble_size))
                 init.zeros_(self.bias)
-            elif isinstance(initial_bias, Tensor):
-                self.bias = Parameter(initial_bias)
             else:
-                self.bias = Parameter(torch.tensor(initial_bias))
+                if not isinstance(initial_bias, Tensor):
+                    initial_bias = torch.tensor(initial_bias)
+                self.bias = Parameter(initial_bias)
         else:
             self.bias = None 
 
     def forward(self, x: Tensor) -> Tensor:
         y = F.linear(x, self.weight, self.bias)
-        if self.activation_fn is None:
-            return y
+        if self.activation_fn is not None:
+            y = self.activation_fn(y)
+        if self.shallow_ensemble_size > 1:
+            return y.view(-1, self.dim_feature_out, self.shallow_ensemble_size)
         else:
-            return self.activation_fn(y)
+            return y
 
     def l2loss(self) -> Tensor:
-        return F.mse_loss(self.weight, torch.zeros_like(self.weight), reduction="sum") / 2
+        return F.mse_loss(self.weight, torch.zeros_like(self.weight), reduction="sum") / 2 / self.shallow_ensemble_size
     
 
 class ResidualLayer(NeuronLayer):
@@ -160,7 +164,8 @@ class ResidualMLP(NeuronLayer):
         initial_bias_out: INITIAL_BIAS_TYPE="zero",
         dropout_rate: float=0,
         use_bias_residual: bool=True,
-        use_bias_out: bool=True
+        use_bias_out: bool=True,
+        shallow_ensemble_size: int=1
     ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
         self.stack = ResidualStack(
@@ -172,7 +177,8 @@ class ResidualMLP(NeuronLayer):
         self.output = DenseLayer(
             dim_feature_in, dim_feature_out,
             initial_weight=initial_weight_out, initial_bias=initial_bias_out,
-            use_bias=use_bias_out
+            use_bias=use_bias_out, 
+            shallow_ensemble_size=shallow_ensemble_size
         )
 
     def forward(self, x: Tensor) -> Tensor:

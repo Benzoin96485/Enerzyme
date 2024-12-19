@@ -5,6 +5,7 @@ from torch import Tensor
 from torch.nn import Module, ModuleList, Linear
 import torch.nn.functional as F
 from .interaction import InteractionModule
+from ..layers.mlp import DenseLayer
 from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore, BaseAtomEmbedding, BaseElectronEmbedding, BaseRBF, ChargeConservationLayer
 from ..activation import ACTIVATION_KEY_TYPE
 
@@ -70,7 +71,8 @@ class SpookyNetCore(BaseFFCore):
         num_residual_local_x: int, num_residual_local_s: int, num_residual_local_p: int, 
         num_residual_local_d: int, num_residual_local: int,
         num_residual_nonlocal_q: int, num_residual_nonlocal_k: int, num_residual_nonlocal_v: int,
-        num_residual_post: int, num_residual_output: int, activation_fn: ACTIVATION_KEY_TYPE, use_irreps: bool, dropout_rate: float=0.0
+        num_residual_post: int, num_residual_output: int, activation_fn: ACTIVATION_KEY_TYPE, use_irreps: bool, dropout_rate: float=0.0,
+        shallow_ensemble_size: int=1
     ) -> None:
         super().__init__()
         self.interaction = ModuleList(
@@ -94,7 +96,10 @@ class SpookyNetCore(BaseFFCore):
                 for _ in range(num_modules)
             ]
         )
-        self.output = Linear(dim_embedding, 2, bias=False)
+        if shallow_ensemble_size > 1:
+            self.output = DenseLayer(dim_embedding, 2, use_bias=False, shallow_ensemble_size=shallow_ensemble_size)
+        else:
+            self.output = Linear(dim_embedding, 2, bias=False)
         self.use_irreps = use_irreps
         self._sqrt2 = math.sqrt(2.0)
         self._sqrt3 = math.sqrt(3.0)
