@@ -255,6 +255,7 @@ class BaseFFLauncher(ABC):
         data_source = active_learning_params.get("data_source", "withheld")
         sample_size = active_learning_params["sample_size"]
         checkpoint_name = active_learning_params.get("checkpoint_name", "al_ckp.data")
+        refresh_best_score = active_learning_params.get("refresh_best_score", False)
 
         resume = active_learning_params.get("resume", False)
         al_state_dict = MetaStateDict(os.path.join(self.dump_dir, checkpoint_name))
@@ -304,7 +305,7 @@ class BaseFFLauncher(ABC):
                     self._init_pretrain_path(self.dump_dir)
 
                 if al_state_dict.get("stage", 0) < 1: # training in this iteration unfinished
-                    self._train(training_set, validation_set, test_set, max_epoch_per_iter, meta_state_dict=al_state_dict, refresh_patience=True)
+                    self._train(training_set, validation_set, test_set, max_epoch_per_iter, meta_state_dict=al_state_dict, refresh_patience=True, refresh_best_score=refresh_best_score)
                     al_state_dict.update({"stage": 1, "epoch_in_iter": 0})
                 else:
                     logger.info(f"Model training in active learning iteration {iter_count + 1} has finished, start evaluating!")
@@ -403,6 +404,8 @@ class FF_single(BaseFFLauncher):
         test_dataset: Optional[FFDataset]=None,
         max_epoch_per_iter=-1,
         meta_state_dict: MetaStateDict=dict(),
+        refresh_patience: bool=False,
+        refresh_best_score: bool=False,
         **kwargs
     ) -> None:
         logger.info("start training FF: {}".format(self.model_str))
@@ -415,7 +418,9 @@ class FF_single(BaseFFLauncher):
             loss_terms=self.loss_terms, 
             transform=self.datahub.transform,
             dump_dir=self.dump_dir,
-            max_epoch_per_iter=max_epoch_per_iter
+            max_epoch_per_iter=max_epoch_per_iter,
+            refresh_patience=refresh_patience,
+            refresh_best_score=refresh_best_score
         )
         y_pred = predict_result["y_pred"]
         metric_score = predict_result["metric_score"]
@@ -494,6 +499,7 @@ class FF_committee(BaseFFLauncher):
         max_epoch_per_iter: int=-1, 
         meta_state_dict: MetaStateDict=dict(),
         refresh_patience: bool=False,
+        refresh_best_score: bool=False,
         **kwargs
     ) -> None:
         model_rank = meta_state_dict.get("model_rank", 0)
@@ -517,7 +523,8 @@ class FF_committee(BaseFFLauncher):
                 model_rank=i,
                 max_epoch_per_iter=max_epoch_per_iter,
                 meta_state_dict=meta_state_dict,
-                refresh_patience=refresh_patience
+                refresh_patience=refresh_patience,
+                refresh_best_score=refresh_best_score
             )
             y_pred = predict_result["y_pred"]
             metric_score = predict_result["metric_score"]

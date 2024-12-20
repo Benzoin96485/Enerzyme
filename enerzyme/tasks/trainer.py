@@ -266,7 +266,7 @@ class Trainer:
         train_dataset: Dataset, valid_dataset: Optional[Dataset], 
         loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, 
         test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1,
-        meta_state_dict: Dict=dict(), refresh_patience: bool=False
+        meta_state_dict: Dict=dict(), refresh_patience: bool=False, refresh_best_score: bool=False
     ) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
@@ -296,9 +296,12 @@ class Trainer:
         
         if self.resume > 1 and "best_epoch" in other_info and "epoch" in other_info:
             wait = other_info["epoch"] - other_info["best_epoch"]
-            best_score = other_info.get("best_score", float("inf"))
+            if refresh_best_score:
+                best_score = float("inf")
+            else:
+                best_score = other_info.get("best_score", float("inf"))
             start_epoch = other_info["epoch"] + 1
-            if wait >= self.patience and refresh_patience:
+            if (wait >= self.patience and refresh_patience) or refresh_best_score:
                 wait = 0
         else:
             wait = 0
@@ -307,12 +310,13 @@ class Trainer:
             else:
                 start_epoch = 0
             if valid_dataset is not None:
-                if self.resume > 1:
+                if self.resume > 1 and not refresh_best_score:
                     best_score = other_info.get("best_score", float("inf"))
                 else:
                     best_score = float("inf")
             else:
                 best_score = None
+        print("best_score", best_score)
 
         if self.resume > 1:
             max_epochs = self.max_epochs
