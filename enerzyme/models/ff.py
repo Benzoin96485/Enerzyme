@@ -256,6 +256,7 @@ class BaseFFLauncher(ABC):
         sample_size = active_learning_params["sample_size"]
         checkpoint_name = active_learning_params.get("checkpoint_name", "al_ckp.data")
         refresh_best_score = active_learning_params.get("refresh_best_score", False)
+        extend_validation_set = active_learning_params.get("extend_validation_set", False)
 
         resume = active_learning_params.get("resume", False)
         al_state_dict = MetaStateDict(os.path.join(self.dump_dir, checkpoint_name))
@@ -289,6 +290,14 @@ class BaseFFLauncher(ABC):
         if data_source == "withheld":
             withheld_size = len(withheld_set)
             withheld_mask = np.full(withheld_size, True)
+            training_index_set = set(training_set.raw_indices)
+            validation_index_set = set(validation_set.raw_indices) if validation_set is not None else set()
+            withheld_index_set = set(withheld_set.raw_indices)
+            if training_index_set & withheld_index_set or validation_index_set & withheld_index_set:
+                logger.warning("Masking overlap between training/validation set and withheld set!")
+                for i, idx in enumerate(withheld_set.raw_indices):
+                    if idx in training_index_set or idx in validation_index_set:
+                        withheld_mask[i] = False
 
             iter_count = al_state_dict.get("iter_count", 0)
             if iter_count > 0:
@@ -349,10 +358,13 @@ class BaseFFLauncher(ABC):
                 masked_relative_indices = masked_relative_indices[:sample_size]
                 expand_absolute_indices = withheld_set.raw_indices[masked_relative_indices]
                 len_expanded = len(expand_absolute_indices)
-                len_expanded_training = int(len_expanded * ratio_training + 0.5)
-                training_set.expand_with_indices(expand_absolute_indices[:len_expanded_training])
-                if validation_set is not None:
-                    validation_set.expand_with_indices(expand_absolute_indices[len_expanded_training:])
+                if extend_validation_set:
+                    len_expanded_training = int(len_expanded * ratio_training + 0.5)
+                    training_set.expand_with_indices(expand_absolute_indices[:len_expanded_training])
+                    if validation_set is not None:
+                        validation_set.expand_with_indices(expand_absolute_indices[len_expanded_training:])
+                else:
+                    training_set.expand_with_indices(expand_absolute_indices)
                 withheld_mask[masked_relative_indices] = False
                 new_indices = {
                     "training": training_set.raw_indices,

@@ -1,0 +1,183 @@
+Datahub:
+  data_path: "/my/dataset.pkl"              # path to dataset: pickle, npz or hdf5
+  data_format: pickle                       # pickle, npz or hdf5
+                                            # features and targets' key mappings which map standard data field name in enerzyme to the data field name in your dataset
+                                            # atomic quantities always end with "a" in standard field names
+                                            # if some your name is exactly the same as the standard name, just leave the mapping value empty
+  features:
+    Ra: coord                               # atomic positions, shape [Nframe, Natom, 3] (required)
+    Za: atom_type                           # atomic numbers or symbols (will be automatically converted to numbers), shape [Nframe, Natom] (required)
+    Q:                                      # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
+    N:                                      # total atom counts, shape [Nframe] 
+                                            # if not provided, will be infered from Za
+                                            # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
+  targets:
+    E: energy                               # total energy, shape [Nframe]
+    Fa: grad                                # atomic forces, shape [Nframe, Natom, 3]
+    Qa: chrg                                # atomic charges, shape [Nframe, Natom]
+    Q:
+    M2: dipole                              # total dipole moment, shape [Nframe, 3]
+  preload: false                            # load the processed data from the dump directory
+  neighbor_list: full                       # neighbor list building algorithm:
+                                            # full: all atom pairs are neighbors
+                                            # if left as blank, full neighbor lists will be calculated on-the-fly with the model
+  compressed: true                          # compress the integer fields to one datapoint if all-the-same in the dataset
+                                            # e.g. for configurations of the same molecule, Za, neighbor_list, N will be compressed
+  max_memory: 10                            # maximum memory (in GB) used as cache for reading hdf5 dataset
+  transforms:
+    atomic_energy: "/my/atomic/energy.csv"  # path to store atomic_energy with columns atom_type and atomic_energy
+                                            # summation of atomic reference energies in each frame will be deducted from the total energy
+    negative_gradient: true                 # flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
+    total_energy_normalization: false       # normalize the total energy globally by substract the mean and divide the standard deviation
+Modelhub:
+  internal_FFs:                             # force fields built in enerzyme
+    FF01:                                   # force field ID
+      suffix:                               # descriptive suffix
+      architecture: PhysNet                 # architecture of the core
+      active: false                         # if used in current training
+      loss:
+        mae:                                # mean absolute error, key-value pairs below are targets and weights
+          Qa: 1
+          Fa: 52.917721
+          E: 1
+          M2: 1.8897261
+          Q: 1
+        nh_penalty:                         # special loss term for PhysNet architecture
+          weight: 0.01
+      Metric:                               # metric defined for this model
+        Qa:                                 # metric term
+          rmse: 1                           # key-value pair of metric type (rmse/mae) and weight
+                                            # weighted summation of metric is the 'judge_score' for earlystopping
+        Fa:
+          rmse: 52.917721
+        E:
+          rmse: 1
+        M2:
+          rmse: 1.8897261
+        Q:
+          rmse: 1
+      build_params:                         # parameters shared by the whole model
+        dim_embedding: 128                  # dimension of atom embeddings
+        num_rbf: 64                         # number of radial basis functions
+        max_Za: 94                          # maximum atomic number
+        cutoff_sr: 10.0                     # short range cutoff distance
+        cutoff_lr: null                     # long range cutoff distance
+        Hartree_in_E: 1                     # numerical value of one Hartree in the dataset
+        Bohr_in_R: 0.5291772108             # numerical value of one Bohr in the dataset
+        cutoff_fn: polynomial               # flavor of the cutoff function, polynomial / bump / smooth
+      layers:
+        - name: RangeSeparation             # separate short range distances from long range distances and calculate the cutoff function values
+                                            # cutoff_sr, cutoff_fn in build_params
+        - name: ExponentialGaussianRBF      # exponential Gaussian radial basis function
+          params:                           # num_rbf, cutoff_sr, cutoff_fn in build_params
+            no_basis_at_infinity: false     # if a basis "centered at infinity" is contained
+            init_alpha: 1                   # initial exponential scaling factor
+            exp_weighting: false            # if exponential weighted basis function is used
+            learnable_shape: true           # if centers and widths of Gaussians are learnable
+            init_width_flavor: PhysNet      # widths initialization flavor, PhysNet or SpookyNet
+        - name: RandomAtomEmbedding         # random embedding based on the atomic number
+                                            # dim_embedding, max_Za in build_params
+        - name: Core                        # physNet Core
+          params:                           # dim_embedding, num_rbf in build_params
+            num_blocks: 5                   # number of interaction blocks and output blocks to accumulate atomic properties
+            num_residual_atomic: 2          # number of residual layers in the post residual stack of the interaction block
+            num_residual_interaction: 3     # number of residual layers in the interaction layer
+            num_residual_output: 1          # number of residual layers in the output block
+            activation_fn: shifted_softplus # activation function type: shifted_softplus or swiss
+            activation_params:
+              dim_feature: 1                # dimension of features passing through the activation function, 1 is compatible with any shape of features
+              initial_alpha: 1              # initial scaling parameter
+              initial_beta: 1               # initial temperature parameter
+              learnable: false              # learnable scaling and temperature parameter
+            dropout_rate: 0.0               # dropout rate of all dropout layers
+        - name: AtomicAffine                # scale and shift raw atomic prediction
+          params:                           # max_Za in build_params
+            shifts:
+              Ea:
+                values: 0                   # initial shift of atomic energy
+                learnable: true             # if shifts of atomic energy is learnable
+              Qa:
+                values: 0                   # initial shift of atomic charge
+                learnable: true         
+            scales:
+              Ea:
+                values: 1                   # initial scale of atomic charge
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation          # Scale the atomic charge to make sure the summation of atomic charges is equal to the total charge
+        - name: AtomicCharge2Dipole         # Calculate the dipole moment from the atomic charge
+        - name: ElectrostaticEnergy         # Calculate the atomic electrostatic energy from the atomic charge
+          params:                           # Hartree_in_E, Bohr_in_R, cutoff_lr in build_params
+            flavor: PhysNet                 # damping flavor, PhysNet or SpookyNet
+        # - name: GrimmeD3Energy
+        #   params:
+        #     learnable: true
+        - name: EnergyReduce                # Reduce atomic energy terms to the total energy
+        - name: Force                       # Calculate the force from the total energy
+Trainer:
+  committee_size: 4                         # number of models in the committee
+  active_learning_params: 
+    active: true                            # if active learning is used
+    data_source: withheld                   # data source for active learning, withheld means the Splitter's withheld partition
+    picking_method: max_Fa_norm_std         # picking method for active learning
+                                              # random means random picking
+                                              # mean_Fa_std means picking according to the mean of standard deviation of force errors
+                                                # See J. Chem. Inf. Model. 2024, 64, 16, 6377–6387 for more details
+                                              # max_Fa_norm_std means picking according to the maximum standard deviation of force errors
+                                                # See Comput. Phys. Commun., 253, 107206. for more details
+    picking_params:
+      relative_bound_on_validation: true      # if the bounds are relative to the validation set (using relative_error_lower/upper_bound)
+      relative_error_lower_bound: 0.5
+      relative_error_upper_bound: 5
+      error_lower_bound: 0.01                 # lower bound of the force error for active learning
+      error_upper_bound: 0.05                 # upper bound of the force error for active learning
+                                                # error_lower_bound and error_upper_bound are used to filter out the samples 
+                                                # whose predicted force errors are larger than the upper bound or smaller than the lower bound
+                                                # see Comput. Phys. Commun., 253, 107206. for more details
+    sample_size: 10000                      # number of samples to be picked in each iteration
+    max_epoch_per_iter: 10000               # maximum epochs of training in each iteration
+    max_iter: 100                           # maximum number of iterations
+    resume: true                             # if resume from the last active learning checkpoint
+  Splitter:
+    method: random                          # splitting method: random
+    parts:                                  # partition names, at least training and validation are needed
+      - training
+      - withheld
+    ratios:                                 # partition ratio (float in (0,1)) or the number of datapoints (int)
+                                            # order corresponds to the parts' order
+      - 0.01                                  
+      - 0.99
+    preload: false                          # if saved splitting indices are loaded
+    save: true                              # if splitting indices are saved
+    seed: 114514                            # splitting random seed
+  Monitor:                                  # monitor prints statistics of energy terms in the total energy
+                                            # optional
+    E_ele:                                  # energy term name: 
+                                              # E_ele for ElectrostaticEnergy layer
+                                              # E_disp for GrimmeD3Energy or GrimmeD4Energy layer
+                                              # E_zbl for ZBLRepulsionEnergy layer
+                                            # four statistics are supported:
+      - mean                                # mean value
+      - std                                 # standard deviation
+      - min                                 # minimum value
+      - max                                 # maximum value
+  seed: 114514                              # trainer random seed: dataloader shuffling, pytorch random initialization, etc.
+  learning_rate: 0.001                      # learning rate, scientific notations like 1e-3 are supported, default 0.001
+  warmup_ratio: 0.001                       # ratio of warmup epochs in total epochs, default 0.01
+                                            # where the learning rate increases linearly from 0 to the set value
+  patience: 200                             # patience of earlystopping, default 50
+                                            # training stops when the number of epochs that 'judge score' doesn't decreases reach the patience
+  max_norm: -1                              # gradient clipping threshold of the norm, default -1 (negative value means no clipping)
+  cuda: true                                # if cuda is searched and used if possible
+  weight_decay: 0                           # weight decay rate of the Adam optimizer, default 0
+  batch_size: 8                             # batch size of the dataloader, default 8
+  max_epochs: 10000                         # maximum epochs of training if earlystopping isn't triggered, default 1000
+  dtype: float32                            # pytorch data type throughout the computation: float32 (single) / float64 (double), default float32
+  use_ema: true                             # if exponential moving average is used, default true
+  ema_decay: 0.999                          # decay rate of exponential moving average, default 0.999
+  ema_use_num_updates: true                 # if number of updates is used in exponential moving average, default true
+  data_in_memory: false                     # if whole training datasets are loaded into memory, default false
+  amsgrad: true                             # if amsgrad is used in Adam optimizer, default true
+      
