@@ -142,7 +142,7 @@ class Simulation:
                 def write_xyz(atoms=None):
                     ase.io.write(osp.join(self.out_dir, f"traj-{i}.xyz"), atoms, append=True)
                 optimizer.attach(write_xyz, interval=1, atoms=self.system) 
-                optimizer.run(fmax=4.5e-4)
+                optimizer.run(fmax=4.5e-4 / self.system.calc.Hartree_in_E * Hartree)
                 ase.io.write(osp.join(self.out_dir, f"scan_optim.xyz"), self.system, append=True)
                 logger.info(f"Final energy: {self.system.get_potential_energy()}")
                 logger.info(f"Final distance: {self.system.get_distance(i0, i1)}")
