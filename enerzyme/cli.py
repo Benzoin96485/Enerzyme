@@ -11,7 +11,7 @@ def get_parser():
 
     parser_train = subparsers.add_parser(
         "train",
-        help="train Enerzyme command",
+        help="train a machine learning force field",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser_train.add_argument('-c', '--config_path', type=str, 
@@ -22,7 +22,7 @@ def get_parser():
 
     parser_predict = subparsers.add_parser(
         "predict",
-        help="predict Enerzyme command",
+        help="predict properties of molecules with machine learning force fields",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser_predict.add_argument('-m', '--model_dir', type=str,
@@ -35,7 +35,7 @@ def get_parser():
 
     parser_simulate = subparsers.add_parser(
         "simulate",
-        help="simulate Enerzyme command",
+        help="simulate molecules with machine learning force fields",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser_simulate.add_argument('-c', '--config_path', type=str, default='', 
@@ -44,6 +44,19 @@ def get_parser():
     parser_simulate.add_argument('-m', '--model_dir', type=str,
                     help='the directory of models')
     parser_simulate.add_argument('-o', '--output_dir', type=str, default='../results',
+        help='the output directory for saving artifact')
+    
+    parser_extract = subparsers.add_parser(
+        "extract",
+        help="extract substructures from molecules with machine learning force fields",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser_extract.add_argument('-c', '--config_path', type=str, default='', 
+        help='extraction config'
+    )
+    parser_extract.add_argument('-m', '--model_dir', type=str,
+                    help='the directory of models')
+    parser_extract.add_argument('-o', '--output_dir', type=str, default='../results',
         help='the output directory for saving artifact')
 
     parser_data_process = subparsers.add_parser(
@@ -90,6 +103,22 @@ def simulate(args):
     molsimulate.run()
 
 
+def extract(args):
+    from .predict import FFPredict
+    from .extract import FFExtract
+    molpredict = FFPredict(
+        model_dir=args.model_dir,
+        output_dir=args.output_dir,
+        config_path=args.config_path
+    )
+    molextract = FFExtract(
+        predictor=molpredict,
+        model_dir=args.model_dir,
+        config_path=args.config_path,
+        output_dir=args.output_dir
+    )
+    molextract.extract()
+
 def data_process(args):
     from .data_process import FFDataProcess
     FFDataProcess(
@@ -108,6 +137,8 @@ def main():
         simulate(args)
     elif args.command == 'data_process':
         data_process(args)
+    elif args.command == 'extract':
+        extract(args)
     else:
         raise NotImplementedError(f"Command {args.command} is not supported now.")
     logger.info("job complete")

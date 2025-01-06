@@ -12,6 +12,7 @@ PERIODIC_TABLE_PATH = os.path.join(
     'periodic-table.csv'
 )
 PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="atom_type")
+REVERSED_PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="Za")
 
 
 def parse_Za(atom_types: Iterable[Union[str, int]]) -> Union[np.ndarray, List[int]]:
