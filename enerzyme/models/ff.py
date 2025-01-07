@@ -245,7 +245,7 @@ class BaseFFLauncher(ABC):
 
     def active_learn(self) -> None:
         assert self.uq_mode is not None
-        from ..tasks.active_learning import PICKING_REGISTER
+        from ..tasks.picker import PICKING_REGISTER
 
         active_learning_params = self.trainer.active_learning_params
         picking_method = active_learning_params.get("picking_method", "max_Fa_norm_std")

@@ -70,6 +70,20 @@ def get_parser():
     parser_data_process.add_argument('-o', '--output_dir', type=str, default='../results',
         help='the output directory for saving artifact')
 
+    parser_annotate = subparsers.add_parser(
+        "annotate",
+        help="Drive QM calculations",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser_annotate.add_argument('-c', '--config_path', type=str, default='', 
+        help='QM annotate config'
+    )
+    parser_annotate.add_argument('-t', '--tmp_dir', type=str, default='.', 
+        help='QM annotate tmp directory'
+    )
+    parser_annotate.add_argument('-o', '--output_dir', type=str, default='.', 
+        help='QM annotate output directory'
+    )
     args = parser.parse_args()
     return args
 
@@ -119,12 +133,23 @@ def extract(args):
     )
     molextract.extract()
 
+
 def data_process(args):
     from .data_process import FFDataProcess
     FFDataProcess(
         out_dir=args.output_dir,
         config_path=args.config_path
     )
+
+
+def annotate(args):
+    from .annotate import QMAnnotate
+    molannotate = QMAnnotate(
+        config_path=args.config_path,
+        tmp_dir=args.tmp_dir,
+        out_dir=args.output_dir
+    )
+    molannotate.drive()
 
 
 def main():
@@ -139,6 +164,8 @@ def main():
         data_process(args)
     elif args.command == 'extract':
         extract(args)
+    elif args.command == 'annotate':
+        annotate(args)
     else:
         raise NotImplementedError(f"Command {args.command} is not supported now.")
     logger.info("job complete")
