@@ -44,7 +44,7 @@ class QMDriver(ABC):
         ...
 
     @abstractmethod
-    def collect_results(self) -> None:
+    def collect_results(self, input_file: Path, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any]) -> Dict[str, Any]:
         ...
 
     def copy_files(self, output_file: Path, molden_file: Optional[Path]) -> None:
@@ -63,7 +63,7 @@ class QMDriver(ABC):
         input_file = self.make_input(package=package)
         output_file = self.invoke_qm(input_file)
         try:
-            results = self.collect_results(input_file)
+            results = self.collect_results(input_file, package)
         except FileNotFoundError as e:
             logger.warning(f"Calculation of {input_file} failed: {e}")
             results = {}
@@ -151,13 +151,17 @@ scrdir ./scr_{index}
         os.chdir(current_dir)
         return output_file
 
-    def collect_results(self, input_file: Path):
+    def collect_results(self, input_file: Path, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any]):
         scr_dir = self.tmp_dir / f"scr_{input_file.stem}"
         if not (scr_dir / "results.dat").exists():
             raise FileNotFoundError(f"Results file {scr_dir / 'results.dat'} not found")
         if not (scr_dir / "grad.xyz").exists():
             raise FileNotFoundError(f"Gradients file {scr_dir / 'grad.xyz'} not found")
-        dipole = np.loadtxt(scr_dir / "results.dat", skiprows=5) * 0.20819434 # Debye to e Angstrom
+        with open(scr_dir / "results.dat", "r") as f:
+            lines = f.readlines()
+            com = np.array(list(map(float, lines[2].split())))
+            dipole = np.array(list(map(float, lines[5].split()))) * 0.20819434 # Debye to e Angstrom
+            dipole = dipole + com * package["Q"]
         with open(scr_dir / "grad.xyz", "r") as f:
             _ = f.readline()
             title = f.readline()
