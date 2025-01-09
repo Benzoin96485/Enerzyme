@@ -185,7 +185,7 @@ class Extractor:
             for bond in mol.GetBonds():
                 begin_atom_idx = bond.GetBeginAtomIdx()
                 end_atom_idx = bond.GetEndAtomIdx()
-                if mol.GetBondBetweenAtoms(begin_atom_idx, end_atom_idx) is None:
+                if self.reference_mol.GetBondBetweenAtoms(begin_atom_idx, end_atom_idx) is None:
                     dual_topology.append((begin_atom_idx, end_atom_idx, None))
             
             if "Fa_std" in y_pred:

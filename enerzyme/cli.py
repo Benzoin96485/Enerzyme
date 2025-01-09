@@ -84,6 +84,21 @@ def get_parser():
     parser_annotate.add_argument('-o', '--output_dir', type=str, default='.', 
         help='QM annotate output directory'
     )
+
+    parser_bond = subparsers.add_parser(
+        "bond",
+        help="Give bonds to molecules",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser_bond.add_argument('-p', '--pdb_path', type=str, default='', 
+        help='input pdb file path'
+    )
+    parser_bond.add_argument('-m', '--mol_path', type=str, default='', 
+        help='output mol file path'
+    )
+    parser_bond.add_argument('-i', '--img_path', type=str, default='', 
+        help='output img file path'
+    )
     args = parser.parse_args()
     return args
 
@@ -152,6 +167,11 @@ def annotate(args):
     molannotate.drive()
 
 
+def bond(args):
+    from .bond import pdb2mol
+    pdb2mol(args.pdb_path, args.mol_path, args.img_path)
+
+
 def main():
     args = get_parser()
     if args.command == 'train':
@@ -166,6 +186,9 @@ def main():
         extract(args)
     elif args.command == 'annotate':
         annotate(args)
+    elif args.command == 'bond':
+        logger.disabled = True
+        bond(args)
     else:
         raise NotImplementedError(f"Command {args.command} is not supported now.")
     logger.info("job complete")
