@@ -99,6 +99,9 @@ def get_parser():
     parser_bond.add_argument('-i', '--img_path', type=str, default='', 
         help='output img file path'
     )
+    parser_bond.add_argument('-t', '--template_path', type=str, default='', 
+        help='template pdb file path'
+    )
     args = parser.parse_args()
     return args
 
@@ -169,7 +172,7 @@ def annotate(args):
 
 def bond(args):
     from .bond import pdb2mol
-    pdb2mol(args.pdb_path, args.mol_path, args.img_path)
+    pdb2mol(args.pdb_path, args.mol_path, args.img_path, args.template_path)
 
 
 def main():

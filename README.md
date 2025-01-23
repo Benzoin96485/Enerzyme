@@ -20,23 +20,23 @@ Currently supported model architectures:
 Recommended environment for internal force fields
 
 ```
-python==3.10.12
-pip==23.2.1
-setuptools==68.1.2
-h5py==3.9.0
-numpy==1.24.3
+python==3.13.1
+pip==24.3.1
+setuptools==75.8.0
+h5py==3.12.1
+numpy==2.2.2
 addict==2.4.0
-tqdm==4.66.1
-joblib==1.3.2
-pandas==2.1.0
-pytorch==2.0.1
-scikit-learn==1.3.0
-ase==3.23.0
-transformers==4.33.1
+tqdm==4.67.1
+joblib==1.4.2
+pandas==2.2.3
+pytorch==2.5.1
+scikit-learn==1.6.1
+ase==3.24.0
+transformers==4.48.1
 torch-ema==0.3
-pyyaml==6.0.1
-torch-scatter==2.1.2
-e3nn==0.4.4
+pyyaml==6.0.2
+torch-scatter==2.1.1
+e3nn==0.5.4
 ```
 
 To test PhysNet, you also need
