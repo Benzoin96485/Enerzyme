@@ -250,7 +250,7 @@ def pdb2mol(pdb_path: str, mol_path: str, img_path: str='', template_path: str='
     if img_path:
         # save img as a png file
         frag_assign = []
-        raw_frags = Chem.GetMolFrags(mol, asMols=True, fragsMolAtomMapping=frag_assign, sanitizeFrags=False)
+        raw_frags = Chem.GetMolFrags(mol, asMols=True, fragsMolAtomMapping=frag_assign, sanitizeFrags=True)
         processed_frags = []
         for i, frag in enumerate(raw_frags):
             processed_frag = frag.__copy__()

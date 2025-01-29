@@ -168,3 +168,12 @@ scrdir ./scr_{index}
             energy = float(title.split()[6])
         grad = np.loadtxt(scr_dir / "grad.xyz", skiprows=2, usecols=(1,2,3)) / 0.5291772108 # Bohr to Angstrom
         return {"dipole": dipole, "grad": grad, "energy": energy, "molden_file": scr_dir / (input_file.stem + ".molden")}
+
+class ORCADriver(QMDriver):
+    pass
+
+class PySCFDriver(QMDriver):
+    pass
+
+class Psi4Driver(QMDriver):
+    pass

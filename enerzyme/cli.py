@@ -59,15 +59,15 @@ def get_parser():
     parser_extract.add_argument('-o', '--output_dir', type=str, default='../results',
         help='the output directory for saving artifact')
 
-    parser_data_process = subparsers.add_parser(
-        "data_process",
+    parser_collect = subparsers.add_parser(
+        "collect",
         help="Process and save preloaded data",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_data_process.add_argument('-c', '--config_path', type=str, default='', 
+    parser_collect.add_argument('-c', '--config_path', type=str, default='', 
         help='data process config'
     )
-    parser_data_process.add_argument('-o', '--output_dir', type=str, default='../results',
+    parser_collect.add_argument('-o', '--output_dir', type=str, default='../results',
         help='the output directory for saving artifact')
 
     parser_annotate = subparsers.add_parser(
@@ -152,9 +152,9 @@ def extract(args):
     molextract.extract()
 
 
-def data_process(args):
-    from .data_process import FFDataProcess
-    FFDataProcess(
+def collect(args):
+    from .collect import FFCollect
+    FFCollect(
         out_dir=args.output_dir,
         config_path=args.config_path
     )
@@ -183,8 +183,8 @@ def main():
         predict(args)   
     elif args.command == 'simulate':
         simulate(args)
-    elif args.command == 'data_process':
-        data_process(args)
+    elif args.command == 'collect':
+        collect(args)
     elif args.command == 'extract':
         extract(args)
     elif args.command == 'annotate':

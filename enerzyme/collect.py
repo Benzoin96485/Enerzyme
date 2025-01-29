@@ -2,7 +2,7 @@ from .data import DataHub
 from .tasks import Splitter
 from .utils import YamlHandler
 
-class FFDataProcess(object):
+class FFCollect(object):
     def __init__(self, config_path=None, out_dir=None, **params):
         self.yamlhandler = YamlHandler(config_path)
         config = self.yamlhandler.read_yaml()
