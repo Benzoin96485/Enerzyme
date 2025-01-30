@@ -1,5 +1,5 @@
 from queue import Queue
-from typing import List, Optional
+from typing import List, Optional, Union
 from tqdm import tqdm
 import numpy as np
 from rdkit.Chem import MolFromMolFile, MolFromXYZBlock
@@ -162,12 +162,17 @@ def make_xyz_block(Za: List[int], Ra: List[List[float]], title: str="") -> str:
 
 class Extractor:
     def __init__(self, 
-        reference_mol_path: str,
+        reference_mol_path: Optional[str]=None,
+        reference_mol_field_name: Optional[str]=None,
         fragment_per_frame: int = 1,
         local_uncertainty_radius: float = 5,
         fragment_radius: float = 5
     ) -> None:
-        self.reference_mol = MolFromMolFile(reference_mol_path, removeHs=False)
+        if reference_mol_path is not None:
+            self.reference_mol = MolFromMolFile(reference_mol_path, removeHs=False)
+        else:
+            self.reference_mol = None
+        self.reference_mol_field_name = reference_mol_field_name
         self.fragment_per_frame = fragment_per_frame
         self.local_uncertainty_radius = local_uncertainty_radius
         self.fragment_radius = fragment_radius
@@ -175,6 +180,10 @@ class Extractor:
     def build_fragment(self, y_pred: dict, xyzblocks: Optional[List[str]] = None, prefix: str = "") -> None:
         suppl = Chem.SDWriter(f"{prefix}_fragments.sdf")
         for frame_idx in tqdm(range(len(y_pred["Ra"]))):
+            if self.reference_mol is None:
+                reference_mol = y_pred[self.reference_mol_field_name][frame_idx]
+            else:
+                reference_mol = self.reference_mol
             Ra = y_pred["Ra"][frame_idx]
             Za = y_pred["Za"][frame_idx]
             # gen dual topology
@@ -185,7 +194,7 @@ class Extractor:
             for bond in mol.GetBonds():
                 begin_atom_idx = bond.GetBeginAtomIdx()
                 end_atom_idx = bond.GetEndAtomIdx()
-                if self.reference_mol.GetBondBetweenAtoms(begin_atom_idx, end_atom_idx) is None:
+                if reference_mol.GetBondBetweenAtoms(begin_atom_idx, end_atom_idx) is None:
                     dual_topology.append((begin_atom_idx, end_atom_idx, None))
             
             if "Fa_std" in y_pred:
@@ -203,11 +212,11 @@ class Extractor:
             sorted_atom_idx = np.argsort(local_uncertainty)
 
             coord = mol.GetConformer().GetPositions()
-            self.reference_mol.GetConformer().SetPositions(coord)
+            reference_mol.GetConformer().SetPositions(coord)
             
             submol_indices = []
             for i in range(-1, -len(sorted_atom_idx) + 1, -1):
-                submol, atom_map = extract_submol_with_center(self.reference_mol, sorted_atom_idx[i], self.fragment_radius, dual_topology)
+                submol, atom_map = extract_submol_with_center(reference_mol, sorted_atom_idx[i], self.fragment_radius, dual_topology)
                 dup_flag = False
                 for submol_index in submol_indices:
                     if atom_map.keys() == submol_index:

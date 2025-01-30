@@ -49,6 +49,8 @@ class AtomicEnergyTransform:
         self.transform_type = "shift"
 
     def transform(self, new_input: Dict[str, Iterable]) -> None:
+        if "E" not in new_input:
+            return
         logger.info("Calculating total atomic energy offset")
         if len(new_input["Za"]) == 1:
             for i in tqdm(range(len(new_input["E"]))):
@@ -95,6 +97,8 @@ class TotalEnergyNormalization:
             self.loaded = True
 
     def transform(self, new_input):
+        if "E" not in new_input:
+            return
         if not self.loaded:
             self.shift = np.mean(new_input["E"])
             self.scale = np.std(new_input["E"])
