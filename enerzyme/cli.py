@@ -58,6 +58,7 @@ def get_parser():
                     help='the directory of models')
     parser_extract.add_argument('-o', '--output_dir', type=str, default='../results',
         help='the output directory for saving artifact')
+    parser_extract.add_argument('-s', '--skip_prediction', default=False, action='store_true')
 
     parser_collect = subparsers.add_parser(
         "collect",
@@ -147,7 +148,8 @@ def extract(args):
         predictor=molpredict,
         model_dir=args.model_dir,
         config_path=args.config_path,
-        output_dir=args.output_dir
+        output_dir=args.output_dir,
+        skip_prediction=args.skip_prediction
     )
     molextract.extract()
 

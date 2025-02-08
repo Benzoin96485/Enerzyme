@@ -156,23 +156,21 @@ def extract_submol_with_center(mol, center_atom_idx, radius=5, dual_topology=[])
 def make_xyz_block(Za: List[int], Ra: List[List[float]], title: str="") -> str:
     xyz_lines = [f"{len(Za)}\n", f"{title}\n"]
     for Za_, Ra_ in zip(Za, Ra):
-        xyz_lines.append(f"{REVERSED_PERIODIC_TABLE.loc[Za_]['atom_type']} {Ra_[0]} {Ra_[1]} {Ra_[2]}\n")
+        xyz_lines.append(f"{REVERSED_PERIODIC_TABLE.loc[Za_]['atom_type']} {Ra_[0]:.15f} {Ra_[1]:.15f} {Ra_[2]:.15f}\n")
     return "".join(xyz_lines)
 
 
 class Extractor:
     def __init__(self, 
-        reference_mol_path: Optional[str]=None,
-        reference_mol_field_name: Optional[str]=None,
+        reference_mol_path: str,
         fragment_per_frame: int = 1,
         local_uncertainty_radius: float = 5,
         fragment_radius: float = 5
     ) -> None:
-        if reference_mol_path is not None:
-            self.reference_mol = MolFromMolFile(reference_mol_path, removeHs=False)
+        if reference_mol_path.endswith(".sdf"):
+            self.reference_mol = list(Chem.SDMolSupplier(reference_mol_path, removeHs=False))
         else:
-            self.reference_mol = None
-        self.reference_mol_field_name = reference_mol_field_name
+            self.reference_mol = [MolFromMolFile(reference_mol_path, removeHs=False)]
         self.fragment_per_frame = fragment_per_frame
         self.local_uncertainty_radius = local_uncertainty_radius
         self.fragment_radius = fragment_radius
@@ -180,16 +178,16 @@ class Extractor:
     def build_fragment(self, y_pred: dict, xyzblocks: Optional[List[str]] = None, prefix: str = "") -> None:
         suppl = Chem.SDWriter(f"{prefix}_fragments.sdf")
         for frame_idx in tqdm(range(len(y_pred["Ra"]))):
-            if self.reference_mol is None:
-                reference_mol = y_pred[self.reference_mol_field_name][frame_idx]
+            if len(self.reference_mol) == 1:
+                reference_mol = self.reference_mol[0]
             else:
-                reference_mol = self.reference_mol
+                reference_mol = self.reference_mol[frame_idx]
             Ra = y_pred["Ra"][frame_idx]
             Za = y_pred["Za"][frame_idx]
             # gen dual topology
             xyzblock = xyzblocks[frame_idx] if xyzblocks is not None else make_xyz_block(Za, Ra)
             mol = MolFromXYZBlock(xyzblock)
-            DetermineConnectivity(mol, charge=Chem.GetFormalCharge(self.reference_mol))
+            DetermineConnectivity(mol, charge=Chem.GetFormalCharge(reference_mol))
             dual_topology = []
             for bond in mol.GetBonds():
                 begin_atom_idx = bond.GetBeginAtomIdx()

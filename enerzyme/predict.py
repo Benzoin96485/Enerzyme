@@ -1,6 +1,7 @@
 import os
-import pandas as pd
+import pickle
 from typing import Dict, Optional, List, Literal, Any
+import pandas as pd
 from .utils import YamlHandler, logger
 from .data import DataHub
 from .tasks import Trainer
@@ -89,10 +90,22 @@ class FFPredict:
         logger.info(f"final predict metrics score: \n{metrics_df.T}")
         logger.info("pipeline finish!")
 
-    def _simple_predict(self, non_target_features: List[str]) -> Dict[str, Dict[Literal["y_pred", "y_truth", "metric_score"], Any]]:
+    def _simple_predict(self, non_target_features: List[str], save: bool=True) -> Dict[str, Dict[Literal["y_pred", "y_truth", "metric_score"], Any]]:
         FFs: Dict[str, BaseFFLauncher] = self.modelhub.models.get('FF', dict())
         predict_results = dict()
         for ff_name, ff in FFs.items():
             ff.trainer.non_target_features.extend(non_target_features)
             predict_results[ff_name] = ff.evaluate()
+            if save:
+                os.makedirs(self.output_dir, exist_ok=True)
+                pd.DataFrame({k: [vi for vi in v] for k, v in predict_results[ff_name]["y_pred"].items()}).to_pickle(os.path.join(self.datahub.preload_path, f"{ff_name}-prediction.pkl"))
+        return predict_results
+
+    def _simple_load_prediction(self):
+        FFs: Dict[str, BaseFFLauncher] = self.modelhub.models.get('FF', dict())
+        predict_results = dict()
+        for ff_name, ff in FFs.items():
+            predict_result = dict()
+            predict_result["y_pred"] = pd.read_pickle(os.path.join(self.datahub.preload_path, f"{ff_name}-prediction.pkl"))
+            predict_results[ff_name] = predict_result
         return predict_results
