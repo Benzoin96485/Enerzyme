@@ -85,6 +85,12 @@ def get_parser():
     parser_annotate.add_argument('-o', '--output_dir', type=str, default='.', 
         help='QM annotate output directory'
     )
+    parser_annotate.add_argument('-s', '--start', type=int, default=0, 
+        help='QM annotate start index'
+    )
+    parser_annotate.add_argument('-e', '--end', type=int, default=-1, 
+        help='QM annotate end index'
+    )
 
     parser_bond = subparsers.add_parser(
         "bond",
@@ -167,7 +173,9 @@ def annotate(args):
     molannotate = QMAnnotate(
         config_path=args.config_path,
         tmp_dir=args.tmp_dir,
-        out_dir=args.output_dir
+        out_dir=args.output_dir,
+        start=args.start,
+        end=args.end
     )
     molannotate.drive()
 

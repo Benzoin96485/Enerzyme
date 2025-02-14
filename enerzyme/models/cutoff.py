@@ -18,8 +18,8 @@ def polynomial_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     """
     Polynomial cutoff function that goes from f(x) = 1 to f(x) = 0 in the interval
     from x = 0 to x = 1 with sufficiently many smooth derivatives [1]. 
-    For x >= 0, f(x) = 0. 
-    For x <= 1, f(x) = 1. 
+    For x >= 1, f(x) = 0. 
+    For x <= 0, f(x) = 1. 
 
     Params:
     -----
