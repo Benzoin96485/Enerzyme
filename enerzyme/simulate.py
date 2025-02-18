@@ -1,5 +1,5 @@
 import os
-from .models import FF_REGISTER, get_model_str, build_model, get_pretrain_path
+from .models import get_model_str, build_model, get_pretrain_path
 from .tasks import Simulation
 from .utils import YamlHandler, logger
 from .data import Transform
@@ -27,10 +27,7 @@ class FFSimulate:
     
     def _init_model(self, FF_key, FF_params):
         model_str = get_model_str(FF_key, FF_params)
-        if FF_params.architecture in FF_REGISTER:
-            model = FF_REGISTER[FF_params.architecture](**FF_params.build_params)
-        else:
-            model = build_model(FF_params.architecture, FF_params.layers, FF_params.build_params)
+        model = build_model(FF_params.architecture, FF_params.layers, FF_params.build_params)
         model_path = get_pretrain_path(os.path.join(self.model_dir, model_str), "best")
         self.simulations.append(Simulation(self.config, model, model_path, self.out_dir, self.transform))
         

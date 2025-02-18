@@ -1,0 +1,14 @@
+Supplier:
+  path: /your/molecules.sdf                         # path to molecules, sdf format, containing total charge
+QMDriver:
+  engine: TeraChem                                  # quantum chemistry engine: TeraChem
+  bs: 6-31gs                                        # basis set: 6-31gs
+  xc: b3lyp                                         # exchange-correlation functional: b3lyp
+  pcm: cosmo                                        # polarizable continuum model: cosmo
+  dftd: d3                                          # dispersion correction: d3
+  pcm_radii_file: /your/pcm_radii_file              # path to PCM radii file
+  epsilon: 10                                       # dielectric constant
+  keep_molden: false                                # if molden file is saved
+  keep_output: false                                # if output log is saved
+  clean_tmp: true                                   # if temporary files are cleaned
+  pickle_name: /your/annotated/dataset.pkl          # path to save the labeled clusters

@@ -245,7 +245,7 @@ class BaseFFLauncher(ABC):
 
     def active_learn(self) -> None:
         assert self.uq_mode is not None
-        from ..tasks.active_learning import PICKING_REGISTER
+        from ..tasks.picker import PICKING_REGISTER
 
         active_learning_params = self.trainer.active_learning_params
         picking_method = active_learning_params.get("picking_method", "max_Fa_norm_std")
@@ -255,6 +255,8 @@ class BaseFFLauncher(ABC):
         data_source = active_learning_params.get("data_source", "withheld")
         sample_size = active_learning_params["sample_size"]
         checkpoint_name = active_learning_params.get("checkpoint_name", "al_ckp.data")
+        refresh_best_score = active_learning_params.get("refresh_best_score", False)
+        extend_validation_set = active_learning_params.get("extend_validation_set", False)
 
         resume = active_learning_params.get("resume", False)
         al_state_dict = MetaStateDict(os.path.join(self.dump_dir, checkpoint_name))
@@ -288,6 +290,14 @@ class BaseFFLauncher(ABC):
         if data_source == "withheld":
             withheld_size = len(withheld_set)
             withheld_mask = np.full(withheld_size, True)
+            training_index_set = set(training_set.raw_indices)
+            validation_index_set = set(validation_set.raw_indices) if validation_set is not None else set()
+            withheld_index_set = set(withheld_set.raw_indices)
+            if training_index_set & withheld_index_set or validation_index_set & withheld_index_set:
+                logger.warning("Masking overlap between training/validation set and withheld set!")
+                for i, idx in enumerate(withheld_set.raw_indices):
+                    if idx in training_index_set or idx in validation_index_set:
+                        withheld_mask[i] = False
 
             iter_count = al_state_dict.get("iter_count", 0)
             if iter_count > 0:
@@ -304,7 +314,7 @@ class BaseFFLauncher(ABC):
                     self._init_pretrain_path(self.dump_dir)
 
                 if al_state_dict.get("stage", 0) < 1: # training in this iteration unfinished
-                    self._train(training_set, validation_set, test_set, max_epoch_per_iter, meta_state_dict=al_state_dict, refresh_patience=True)
+                    self._train(training_set, validation_set, test_set, max_epoch_per_iter, meta_state_dict=al_state_dict, refresh_patience=True, refresh_best_score=refresh_best_score)
                     al_state_dict.update({"stage": 1, "epoch_in_iter": 0})
                 else:
                     logger.info(f"Model training in active learning iteration {iter_count + 1} has finished, start evaluating!")
@@ -348,10 +358,13 @@ class BaseFFLauncher(ABC):
                 masked_relative_indices = masked_relative_indices[:sample_size]
                 expand_absolute_indices = withheld_set.raw_indices[masked_relative_indices]
                 len_expanded = len(expand_absolute_indices)
-                len_expanded_training = int(len_expanded * ratio_training + 0.5)
-                training_set.expand_with_indices(expand_absolute_indices[:len_expanded_training])
-                if validation_set is not None:
-                    validation_set.expand_with_indices(expand_absolute_indices[len_expanded_training:])
+                if extend_validation_set:
+                    len_expanded_training = int(len_expanded * ratio_training + 0.5)
+                    training_set.expand_with_indices(expand_absolute_indices[:len_expanded_training])
+                    if validation_set is not None:
+                        validation_set.expand_with_indices(expand_absolute_indices[len_expanded_training:])
+                else:
+                    training_set.expand_with_indices(expand_absolute_indices)
                 withheld_mask[masked_relative_indices] = False
                 new_indices = {
                     "training": training_set.raw_indices,
@@ -403,6 +416,8 @@ class FF_single(BaseFFLauncher):
         test_dataset: Optional[FFDataset]=None,
         max_epoch_per_iter=-1,
         meta_state_dict: MetaStateDict=dict(),
+        refresh_patience: bool=False,
+        refresh_best_score: bool=False,
         **kwargs
     ) -> None:
         logger.info("start training FF: {}".format(self.model_str))
@@ -415,7 +430,9 @@ class FF_single(BaseFFLauncher):
             loss_terms=self.loss_terms, 
             transform=self.datahub.transform,
             dump_dir=self.dump_dir,
-            max_epoch_per_iter=max_epoch_per_iter
+            max_epoch_per_iter=max_epoch_per_iter,
+            refresh_patience=refresh_patience,
+            refresh_best_score=refresh_best_score
         )
         y_pred = predict_result["y_pred"]
         metric_score = predict_result["metric_score"]
@@ -494,6 +511,7 @@ class FF_committee(BaseFFLauncher):
         max_epoch_per_iter: int=-1, 
         meta_state_dict: MetaStateDict=dict(),
         refresh_patience: bool=False,
+        refresh_best_score: bool=False,
         **kwargs
     ) -> None:
         model_rank = meta_state_dict.get("model_rank", 0)
@@ -517,7 +535,8 @@ class FF_committee(BaseFFLauncher):
                 model_rank=i,
                 max_epoch_per_iter=max_epoch_per_iter,
                 meta_state_dict=meta_state_dict,
-                refresh_patience=refresh_patience
+                refresh_patience=refresh_patience,
+                refresh_best_score=refresh_best_score
             )
             y_pred = predict_result["y_pred"]
             metric_score = predict_result["metric_score"]

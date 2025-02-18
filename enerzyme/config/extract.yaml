@@ -1,0 +1,19 @@
+Datahub:
+  data_format: pickle
+  data_path: "/my/dataset.pkl"
+  features:
+    N: null
+    Q: Q
+    Ra: Ra
+    Za: Za
+  targets: null
+  neighbor_list: full
+  preload: true
+Metric: null
+Extractor:
+  reference_mol_path: "/your/reference/mol.sdf" # path to reference molecule, sdf format.
+                                                # if only one molecule is given, it will be used as the reference molecule for all frames
+                                                # if multiple molecules are given, the same index of molecules will be used for all frames
+  fragment_per_frame: 1                         # number of fragments to be extracted per frame
+  local_uncertainty_radius: 5                   # radius of neighborhood for local uncertainty, see J. Chem. Inform. Model., 64(16), 6377-6387.
+  fragment_radius: 5                            # at least all heavy atoms within the fragment radius (angstrom) will be included in the fragment
