@@ -107,7 +107,7 @@ def get_parser():
         help='output img file path'
     )
     parser_bond.add_argument('-t', '--template_path', type=str, default='', 
-        help='template pdb file path'
+        help='template sdf file path'
     )
     args = parser.parse_args()
     return args

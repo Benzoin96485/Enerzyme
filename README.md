@@ -20,8 +20,8 @@ Currently supported model architectures:
 Recommended environment for internal force fields
 
 ```
-python==3.13.1
-pip==24.3.1
+python==3.12.8
+pip==25.0
 setuptools==75.8.0
 h5py==3.12.1
 numpy==2.2.2
@@ -32,11 +32,11 @@ pandas==2.2.3
 pytorch==2.5.1
 scikit-learn==1.6.1
 ase==3.24.0
-transformers==4.48.1
+transformers==4.48.2
 torch-ema==0.3
 pyyaml==6.0.2
-torch-scatter==2.1.1
-e3nn==0.5.4
+torch-scatter==2.1.2
+e3nn==0.5.5
 ```
 
 To test PhysNet, you also need
@@ -86,9 +86,9 @@ Please see `enerzyme/config/train.yaml` for details and recommended configuratio
 
 Enerzyme saves the preprocessed dataset, split indices, final `<configuration yaml file>`, and the best/last model to the `<output directory>`.
 
-### Concurrent Training (Active Learning)
+### Active Learning Training
 
-Please see `enerzyme/config/concurrent_train.yaml` for details and recommended configurations.
+Please see `enerzyme/config/active_learning_train.yaml` for details and recommended configurations.
 
 ## Evaluation
 
@@ -106,11 +106,40 @@ Enerzyme reads the `<model directory>` for the model configuration, load the mod
 
 Supported simulation types:
 
-- Flexible scanning on the distance between two atoms.
-- Constrained Langevin MD
+- Constrained optimization. See `enerzyme/config/opt.yaml`
+- Constrained flexible scan on the distance between two atoms. See `enerzyme/config/scan.yaml`
+- Constrained Langevin MD. See `enerzyme/config/nvt_md.yaml`
 
 ```bash
 enerzyme simulate -c <configuration yaml file> -o <output directory> -m <model directory>
 ```
 
 Enerzyme reads the `<model directory>` for the model configuration, load the models, do simulation, and report the results in the `<output directory>`.
+
+## Fragment Extraction
+
+Extract fragments based on local uncertainty from the prediction
+
+```bash
+enerzyme extract -c <configuration yaml file> -o <output directory> -m <model directory>
+```
+
+Please see `enerzyme/config/extract.yaml` for details.
+
+## Data annotation
+
+Label molecules with energies, forces and dipoles from QM calculation. Please get your QM engine's environment prepared first.
+
+```bash
+enerzyme annotate -c <configuration yaml file> -o <output directory> -t <temporary directory> -s <start index> -e <end index>
+```
+
+Please see `enerzyme/config/annotate.yaml` for details.
+
+## Bond order assignment
+
+Guess bond orders from pdb file. Compatible with [QuantumPDB](https://github.com/davidkastner/quantumPDB), where the pdb file should be the output of cluster building and the template sdf file should be ligands.sdf.
+
+```bash
+enerzyme bond -p <pdb file> -m <output mol file> -i <output image file> -t <template sdf file>
+```
