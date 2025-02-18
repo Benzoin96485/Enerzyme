@@ -122,6 +122,17 @@ class Simulation:
                     c = FixAtoms(indices=[idx - self.idx_start_from for idx in v.indices])
                     self.constraints.append(c)
             self.system.set_constraint(self.constraints)
+
+
+    def _run_opt(self):
+        optimizer = BFGS(self.system)
+        def write_xyz(atoms=None):
+            ase.io.write(osp.join(self.out_dir, f"traj-opt.xyz"), atoms, append=True)
+        optimizer.attach(write_xyz, interval=1, atoms=self.system) 
+        optimizer.run(fmax=4.5e-4 / self.system.calc.Hartree_in_E * Hartree)
+        ase.io.write(osp.join(self.out_dir, f"optim.xyz"), self.system, append=True)
+        logger.info(f"Final energy: {self.system.get_potential_energy()}")
+
                 
     def _run_scan(self):
         if self.sampling_config.cv == "distance":
