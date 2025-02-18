@@ -1,19 +1,28 @@
-from typing import Dict, Callable, Tuple, List, Union
+from typing import Dict, Callable, Tuple, List, Union, Optional
 import numpy as np
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 from ..data import is_atomic, get_tensor_rank
 from ..utils.base_logger import logger
 
 
-def build_single_metric(metric_str: str) -> Callable[[Dict[str, Union[List, np.ndarray]], Dict[str, Union[List, np.ndarray]], str], float]:
+def build_single_metric(metric_str: str) -> Callable[[Dict[str, Union[List, np.ndarray]], Dict[str, Union[List, np.ndarray]], str], Optional[float]]:
     if metric_str == "rmse":
-        metric_func = lambda x, y: mean_squared_error(x, y, squared=False)
+        try:
+            from sklearn.metrics import root_mean_squared_error
+        except ImportError:
+            from sklearn.metrics import mean_squared_error
+            metric_func = lambda x, y: mean_squared_error(x, y, squared=False)
+        else:
+            metric_func = lambda x, y: root_mean_squared_error(x, y)
     elif metric_str == "mae":
+        from sklearn.metrics import mean_absolute_error
         metric_func = lambda x, y: mean_absolute_error(x, y)
     else:
         raise ValueError(f"Unknown metric: {metric_str}")
-    def metric(label: Dict[str, Union[List, np.ndarray]], prediction: Dict[str, Union[List, np.ndarray]], target_name: str) -> float:
-        y_true = label[target_name]
+    
+    def metric(label: Dict[str, Union[List, np.ndarray]], prediction: Dict[str, Union[List, np.ndarray]], target_name: str) -> Optional[float]:
+        y_true = label.get(target_name, [])
+        if not y_true:
+            return 0
         y_pred = prediction[target_name]
         if is_atomic(target_name) or get_tensor_rank(target_name):
             y_trues, y_preds = np.concatenate(y_true), np.concatenate(y_pred)

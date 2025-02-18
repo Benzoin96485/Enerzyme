@@ -27,8 +27,10 @@ def load_from_pickle(data_path=str):
         raise TypeError(f"Unknown data type in {data_path}!")
 
 
-def _collect_types(types: Union[List, Dict]) -> Dict:
-    if isinstance(types, list):
+def _collect_types(types: Optional[Union[List, Dict]]) -> Dict:
+    if types is None:
+        return dict()
+    elif isinstance(types, list):
         return {single_type: single_type for single_type in types}
     else:
         return {k: v if v is not None else k for k, v in types.items()}

@@ -211,7 +211,13 @@ class Trainer:
         else:
             self.active_learning = False
         self.resume = params.get("resume", 1)
-        self.non_target_features = params.get("non_target_features", [])
+        non_target_features = params.get("non_target_features", [])
+        if isinstance(non_target_features, list):
+            self.non_target_features = non_target_features
+        elif isinstance(non_target_features, str):
+            self.non_target_features = [non_target_features]
+        else:
+            raise ValueError(f"non_target_features must be a list or a string, but got {type(non_target_features)}")
 
     def decorate_batch_input(self, batch):
         return _decorate_batch_input(batch, self.dtype, self.device)
