@@ -100,6 +100,7 @@ class Trainer:
                 accelerator="auto",
                 callbacks=[early_stopping_callback],
                 devices="auto",
+                num_nodes=os.environ.get("SLURM_NNODES", 1),
                 strategy="auto",
                 gradient_clip_val=self.max_norm if self.max_norm > 0 else None,
                 inference_mode=False
@@ -234,7 +235,8 @@ class Trainer:
                 shuffle=True,
                 collate_fn=self.decorate_batch_input,
                 drop_last=True,
-                num_workers=max(1, os.cpu_count() - 1)
+                pin_memory=True,
+                num_workers=max(1, (os.cpu_count() - 4) // self.lightning_trainer.num_devices)
             )
             if valid_dataset is not None:
                 valid_dataloader = DataLoader(
@@ -242,7 +244,8 @@ class Trainer:
                     batch_size=self.inference_batch_size,
                     shuffle=False,
                     collate_fn=self.decorate_batch_input,
-                    num_workers=max(1, os.cpu_count() - 1)
+                    pin_memory=True,
+                    num_workers=max(1, (os.cpu_count() - 4) // self.lightning_trainer.num_devices)
                 )
             else:
                 valid_dataloader = None
@@ -254,7 +257,8 @@ class Trainer:
                     batch_size=self.inference_batch_size,
                     shuffle=False,
                     collate_fn=self.decorate_batch_input,
-                    num_workers=max(1, os.cpu_count() - 1)
+                    pin_memory=True,
+                    num_workers=max(1, (os.cpu_count() - 1) // self.lightning_trainer.num_devices // 2)
                 )
                 self.lightning_trainer.test(model, test_dataloader)
         else:
