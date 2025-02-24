@@ -2,7 +2,6 @@ from functools import partial
 from typing import Iterable, Optional, Callable, Tuple, Dict, Any, Literal, List, Union
 from collections import defaultdict
 import time, os, logging, contextlib
-from sympy import sqf
 from tqdm import tqdm
 import torch
 from torch import Tensor
@@ -46,12 +45,12 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
                 np.concatenate([feature[k][:feature["N"]] for feature in features]), 
                 dtype=torch.long if is_int(k) else dtype,
                 requires_grad=requires_grad(k)
-            ).to(device)
+            )
         elif not is_idx(k):
             batch_features[k] = torch.tensor(
                 np.array([feature[k] for feature in features]), 
                 dtype=torch.long if is_int(k) else dtype,
-            ).to(device)
+            )
 
     batch_idx_i = []
     batch_idx_j = []
@@ -69,9 +68,9 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
         batch_seg.append(np.full(feature["N"], i, dtype=int))
         count += feature["N"]
     batch_features["N"] = [feature["N"] for feature in features]
-    batch_features["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long).to(device)
-    batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long).to(device)
-    batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long).to(device)
+    batch_features["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
+    batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long)
+    batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long)
 
     if targets[0] is not None:
         for k in targets[0]:
@@ -79,13 +78,27 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
                 batch_targets[k] = torch.tensor(
                     np.concatenate([target[k][:features[i]["N"]] for i, target in enumerate(targets)]), 
                     dtype=torch.long if is_int(k) else dtype
-                ).to(device)
+                )
             else:
                 batch_targets[k] = torch.tensor(
                     np.array([target[k] for target in targets]), 
                     dtype=torch.long if is_int(k) else dtype,
-                ).to(device)
+                )
     
+    return batch_features, batch_targets
+
+
+def _to_device(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
+    features, targets = batch
+    batch_features = dict()
+    batch_targets = dict()
+    for k, v in features.items():
+        if k != "N":
+            batch_features[k] = v.to(device)
+        else:
+            batch_features[k] = v
+    for k, v in targets.items():
+        batch_targets[k] = v.to(device)
     return batch_features, batch_targets
 
 
@@ -281,6 +294,7 @@ class Trainer:
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=self.decorate_batch_input,
+            num_workers=max(1, os.cpu_count() // 2 - 1),
             drop_last=True 
         )
         
@@ -356,7 +370,7 @@ class Trainer:
             trn_loss = []
             
             for i, batch in enumerate(train_dataloader):
-                net_input, net_target = batch
+                net_input, net_target = _to_device(batch, self.device)
                 
                 loss = 0
                 with torch.set_grad_enabled(True):
@@ -472,7 +486,8 @@ class Trainer:
             dataset=dataset,
             batch_size=self.inference_batch_size,
             shuffle=False,
-            collate_fn=self.decorate_batch_input
+            collate_fn=self.decorate_batch_input,
+            num_workers=max(1, os.cpu_count() // 2 - 1),
         )
         model = model.eval()
         batch_bar = tqdm(total=len(dataloader), dynamic_ncols=True, position=0, leave=False, desc='val', ncols=5)
@@ -480,7 +495,7 @@ class Trainer:
         y_preds = defaultdict(list)
         y_truths = defaultdict(list)
         for i, batch in enumerate(dataloader):
-            net_input, net_target = batch
+            net_input, net_target = _to_device(batch, self.device)
             output = model(net_input)
             # Get model outputs
             if self.monitor is not None:
