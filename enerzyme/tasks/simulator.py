@@ -1,5 +1,4 @@
 import os.path as osp
-from addict import Dict
 import numpy as np
 import ase
 import torch
@@ -9,7 +8,7 @@ from ase.optimize import BFGS
 from ase.units import Hartree, fs
 from ..data import full_neighbor_list
 from ..utils import logger
-from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input, _load_state_dict
+from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input, _load_state_dict, _to_device
 
 class ASECalculator(Calculator):
     implemented_properties = ["energy", "forces", "dipole", "charges"]
@@ -60,6 +59,7 @@ class ASECalculator(Calculator):
             device=self.device,
             dtype=self.dtype
         )
+        net_input, _ = _to_device((net_input, {}), self.device)
         net_output = self.model(net_input)
         output, _ = _decorate_batch_output(
             output=net_output,
@@ -97,6 +97,7 @@ class Simulation:
         self.model = model.to(self.device).type(self.dtype)
         _load_state_dict(model, self.device, model_path, inference=True)
         self.model.eval()
+        self.calculator = None
         self.out_dir = out_dir
         # self.simulation_config = {k: (v.to_dict() if hasattr(v, "to_dict") else v) for k, v in config.Simulation.items() if not hasattr(self, k)}
         # initialize
@@ -104,7 +105,7 @@ class Simulation:
 
     def _init_ase_env(self):
         self.system = ase.io.read(self.structure_file)
-        calculator = ASECalculator(
+        self.calculator = ASECalculator(
             model=self.model,
             charge=self.charge,
             magmom=self.multiplicity - 1,
@@ -114,7 +115,6 @@ class Simulation:
             transform=self.transform,
             #**self.simulation_config
         )
-        self.system.calc = calculator
         if self.constraint_config is not None:
             self.constraints = []
             for k, v in self.constraint_config.items():
@@ -123,8 +123,8 @@ class Simulation:
                     self.constraints.append(c)
             self.system.set_constraint(self.constraints)
 
-
     def _run_opt(self):
+        self.system.calc = self.calculator
         optimizer = BFGS(self.system)
         def write_xyz(atoms=None):
             ase.io.write(osp.join(self.out_dir, f"traj-opt.xyz"), atoms, append=True)
@@ -135,6 +135,7 @@ class Simulation:
 
                 
     def _run_scan(self):
+        self.system.calc = self.calculator
         if self.sampling_config.cv == "distance":
             i0 = self.sampling_config.params.i0 - self.idx_start_from
             i1 = self.sampling_config.params.i1 - self.idx_start_from
@@ -158,7 +159,7 @@ class Simulation:
                 logger.info(f"Final energy: {self.system.get_potential_energy()}")
                 logger.info(f"Final distance: {self.system.get_distance(i0, i1)}")
 
-    def _run_md(self) -> None:
+    def _get_integrator(self, traj_file):
         if self.integrate_config.integrator.lower() == "langevin":
             from ase.md.langevin import Langevin
             dyn = Langevin(self.system, 
@@ -169,10 +170,19 @@ class Simulation:
                 loginterval=self.log_interval
             )
             def write_xyz(atoms=None):
-                ase.io.write(osp.join(self.out_dir, f"md.traj.xyz"), atoms, append=True)
+                ase.io.write(osp.join(self.out_dir, traj_file), atoms, append=True)
             dyn.attach(write_xyz, interval=self.log_interval, atoms=self.system) 
-            dyn.run(self.integrate_config.n_step)
-            
+        return dyn
+
+    def _run_md(self) -> None:
+        self.system.calc = self.calculator
+        dyn = self._get_integrator(traj_file="md.traj.xyz")
+        dyn.run(self.integrate_config.n_step)
+
+    def _run_metad(self):
+        from ase.calculators.plumed import Plumed
+        dyn = self._get_integrator(traj_file="metad.traj.xyz")
+        dyn.run(self.integrate_config.n_step)
 
     def run(self):
         getattr(self, f"_run_{self.task}")()
