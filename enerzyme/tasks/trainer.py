@@ -224,6 +224,8 @@ class Trainer:
         else:
             self.active_learning = False
         self.resume = params.get("resume", 1)
+        self.refresh_best_score = params.get("refresh_best_score", None)
+        self.refresh_patience = params.get("refresh_patience", None)
         non_target_features = params.get("non_target_features", [])
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
@@ -287,6 +289,10 @@ class Trainer:
         test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1,
         meta_state_dict: Dict=dict(), refresh_patience: bool=False, refresh_best_score: bool=False
     ) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
+        if self.refresh_best_score is not None:
+            refresh_best_score = self.refresh_best_score
+        if self.refresh_patience is not None:
+            refresh_patience = self.refresh_patience
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -336,7 +342,6 @@ class Trainer:
                     best_score = float("inf")
             else:
                 best_score = None
-        print("best_score", best_score)
 
         if self.resume > 1:
             max_epochs = self.max_epochs
