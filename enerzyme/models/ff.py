@@ -403,7 +403,7 @@ class FF_single(BaseFFLauncher):
                 try:
                     self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
                 except FileNotFoundError:
-                    self.pretrain_path = get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "best", None)
+                    self.pretrain_path = get_pretrain_path(self.base_pretrain_path, "best", None)
             else:
                 self.pretrain_path = get_pretrain_path(base_pretrain_path, "last", None)
         else:

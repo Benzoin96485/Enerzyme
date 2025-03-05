@@ -8,7 +8,11 @@ from .ff import FF_single, FF_committee
 
 
 def get_model_str(model_id, model_params):
-    return f"{model_id}-{model_params.architecture}" + (f"-{model_params.suffix}" if model_params.suffix else "")
+    if model_params.get("suffix", None) is not None:
+        suffix = f"-{model_params["suffix"]}"
+    else:
+        suffix = ""
+    return f"{model_id}-{model_params.architecture}" + suffix
 
 
 def get_pretrain_path(pretrain_path: Optional[str]=None, preference: Literal["best", "last"]="best", model_rank: Optional[int]=None):
