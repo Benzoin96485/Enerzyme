@@ -2,10 +2,15 @@ import math
 from abc import ABC, abstractmethod
 from typing import Dict
 import numpy as np
+from regex import B
 import torch
 from torch import Tensor
 from torch.nn import Module, Embedding, Parameter, Linear, init
-from torch.nn.functional import pad
+
+from test.spookynet.modules import nuclear_embedding
+from . import BaseFFLayer
+from .electron_embedding import ElectronicEmbedding
+from enerzyme.models.layers import electron_embedding
 
 
 class BaseAtomEmbedding(ABC, Module):
@@ -209,3 +214,25 @@ class NuclearEmbedding(BaseAtomEmbedding):
             return torch.gather(
                 self.embedding, 0, Za.view(-1, 1).expand(-1, self.dim_embedding)
             )
+
+
+class NuclearElectronEmbedding(BaseFFLayer):
+    def __init__(self, 
+        max_Za: int, 
+        dim_embedding: int, 
+        num_residual_charge: int,
+        num_residual_spin: int,
+        zero_init: bool=True, 
+        use_electron_config: bool=True,
+        activation_fn: str="swish"
+    ) -> None:
+        super().__init__(input_fields={"Za", "Q", "S", "batch_seg"}, output_fields={"atom_embedding"})
+        self.nuclear_embedding = NuclearEmbedding(max_Za, dim_embedding, zero_init, use_electron_config)
+        self.charge_embedding = ElectronicEmbedding(dim_embedding, num_residual_charge, activation_fn, "charge")
+        self.spin_embedding = ElectronicEmbedding(dim_embedding, num_residual_spin, activation_fn, "spin")
+
+    def get_atom_embedding(self, Za: Tensor, Q: Tensor, S: Tensor, batch_seg: Tensor) -> Tensor:
+        nuclear_embedding = self.nuclear_embedding.get_embedding(Za)
+        charge_embedding = self.charge_embedding.get_electron_embedding(nuclear_embedding, Q, S, batch_seg)
+        spin_embedding = self.spin_embedding.get_electron_embedding(nuclear_embedding, Q, S, batch_seg)
+        return nuclear_embedding + charge_embedding + spin_embedding
