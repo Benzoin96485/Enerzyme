@@ -9,7 +9,7 @@ from .ff import FF_single, FF_committee
 
 def get_model_str(model_id, model_params):
     if model_params.get("suffix", None) is not None:
-        suffix = f"-{model_params["suffix"]}"
+        suffix = f"-{model_params['suffix']}"
     else:
         suffix = ""
     return f"{model_id}-{model_params.architecture}" + suffix
