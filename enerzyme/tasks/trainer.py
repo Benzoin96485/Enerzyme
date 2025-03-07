@@ -227,6 +227,11 @@ class Trainer:
         self.refresh_best_score = params.get("refresh_best_score", None)
         self.refresh_patience = params.get("refresh_patience", None)
         non_target_features = params.get("non_target_features", [])
+        if "SLURM_NTASKS" in os.environ:
+            self.num_workers = max(1, int(os.environ["SLURM_NTASKS"]) // 2 - 1)
+        else:
+            self.num_workers = max(1, os.cpu_count() // 2 - 1)
+        logger.info(f"using {self.num_workers} workers for dataloader")
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
         elif isinstance(non_target_features, str):
@@ -300,7 +305,7 @@ class Trainer:
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=self.decorate_batch_input,
-            num_workers=max(1, os.cpu_count() // 2 - 1),
+            num_workers=self.num_workers,
             drop_last=True 
         )
         
@@ -492,7 +497,7 @@ class Trainer:
             batch_size=self.inference_batch_size,
             shuffle=False,
             collate_fn=self.decorate_batch_input,
-            num_workers=max(1, os.cpu_count() // 2 - 1),
+            num_workers=self.num_workers,
         )
         model = model.eval()
         batch_bar = tqdm(total=len(dataloader), dynamic_ncols=True, position=0, leave=False, desc='val', ncols=5)
