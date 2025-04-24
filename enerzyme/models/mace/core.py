@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from torch import Tensor
 import torch.nn.functional as F
+from torch_scatter import scatter_sum
 from e3nn.o3 import Irreps, SphericalHarmonics
 from .interaction import RealAgnosticResidualInteractionBlock, EquivariantProductBasisBlock, LinearReadoutBlock, NonLinearReadoutBlock
 from ..layers import BaseFFCore
@@ -133,6 +134,11 @@ class MACECore(BaseFFCore):
         interaction_cls_first: Literal["RealAgnosticResidualInteractionBlock"],
         interaction_cls: Literal["RealAgnosticResidualInteractionBlock"],
         correlation: Union[int, List[int]],
+        num_interactions: int, 
+        avg_num_neighbors: float,
+        MLP_irreps: str, 
+        radial_MLP: List[int], 
+        gate: str,
         *args, **kwargs
     ):
         super().__init__()
@@ -157,7 +163,7 @@ class MACECore(BaseFFCore):
         self.interactions = torch.nn.ModuleList([inter_first])
 
         use_sc_first = False
-        if "Residual" in str(interaction_cls_first):
+        if "Residual" in interaction_cls_first:
             use_sc_first = True
 
         node_feats_irreps_out = inter_first.target_irreps
@@ -170,6 +176,7 @@ class MACECore(BaseFFCore):
         )
         self.products = torch.nn.ModuleList([prod])
         self.readouts = torch.nn.ModuleList([LinearReadoutBlock(hidden_irreps)])
+
         for i in range(num_interactions - 1):
             if i == num_interactions - 2:
                 hidden_irreps_out = str(
@@ -192,7 +199,7 @@ class MACECore(BaseFFCore):
                 node_feats_irreps=interaction_irreps,
                 target_irreps=hidden_irreps_out,
                 correlation=correlation[i + 1],
-                num_elements=num_elements,
+                num_elements=max_Za,
                 use_sc=True,
             )
             self.products.append(prod)
@@ -220,7 +227,7 @@ class MACECore(BaseFFCore):
             atom_embedding: Tensor, charge_embedding: Optional[Tensor]=None, spin_embedding: Optional[Tensor]=None
         ) -> Dict[str, Tensor]:
         # prepare initial attributes and features
-        node_attrs = F.one_hot(Za, num_classes=self.max_Za)
+        node_attrs = F.one_hot(Za, num_classes=self.max_Za + 1)
         if charge_embedding is None:
             charge_embedding = torch.zeros_like(atom_embedding)
         if spin_embedding is None:
@@ -228,6 +235,8 @@ class MACECore(BaseFFCore):
         node_feats = atom_embedding + charge_embedding + spin_embedding
         edge_attrs = self.spherical_harmonics(vij_sr)
         edge_feats = rbf
+        node_feats_list = []
+        node_es_list = []
         for interaction, product, readout in zip(
             self.interactions, self.products, self.readouts
         ):
@@ -239,3 +248,16 @@ class MACECore(BaseFFCore):
                 idx_i_sr=idx_i_sr,
                 idx_j_sr=idx_j_sr,
             )
+            node_feats = product(
+                node_feats=node_feats, sc=sc, node_attrs=node_attrs
+            )
+            node_feats_list.append(node_feats)
+            node_es_list.append(readout(node_feats).squeeze(-1))
+        node_feats_out = torch.cat(node_feats_list, dim=-1)
+        node_inter_es = torch.sum(
+            torch.stack(node_es_list, dim=0), dim=0
+        )
+        inter_e = scatter_sum(
+            src=node_inter_es, index=batch_seg, dim=-1, dim_size=batch_seg[-1] + 1
+        )
+        return {"E": inter_e, "Fa": None}

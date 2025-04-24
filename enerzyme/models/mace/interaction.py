@@ -302,8 +302,9 @@ class InteractionBlock(ABC, Module):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        edge_index: Tensor,
-    ) -> Tensor:
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+    ) -> Tuple[Tensor, Tensor]:
         ...
 
 class RealAgnosticResidualInteractionBlock(InteractionBlock):
