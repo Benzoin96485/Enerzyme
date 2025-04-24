@@ -139,6 +139,7 @@ class MACECore(BaseFFCore):
         MLP_irreps: str, 
         radial_MLP: List[int], 
         gate: str,
+        shallow_ensemble_size: int=1,
         *args, **kwargs
     ):
         super().__init__()
@@ -205,10 +206,10 @@ class MACECore(BaseFFCore):
             self.products.append(prod)
             if i == num_interactions - 2:
                 self.readouts.append(
-                    NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, gate)
+                    NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, gate, shallow_ensemble_size)
                 )
             else:
-                self.readouts.append(LinearReadoutBlock(hidden_irreps))
+                self.readouts.append(LinearReadoutBlock(hidden_irreps, shallow_ensemble_size))
         
 
     def __str__(self) -> str:
@@ -235,8 +236,7 @@ class MACECore(BaseFFCore):
         node_feats = atom_embedding + charge_embedding + spin_embedding
         edge_attrs = self.spherical_harmonics(vij_sr)
         edge_feats = rbf
-        node_feats_list = []
-        node_es_list = []
+        node_properties_list = []
         for interaction, product, readout in zip(
             self.interactions, self.products, self.readouts
         ):
@@ -251,13 +251,8 @@ class MACECore(BaseFFCore):
             node_feats = product(
                 node_feats=node_feats, sc=sc, node_attrs=node_attrs
             )
-            node_feats_list.append(node_feats)
-            node_es_list.append(readout(node_feats).squeeze(-1))
-        node_feats_out = torch.cat(node_feats_list, dim=-1)
-        node_inter_es = torch.sum(
-            torch.stack(node_es_list, dim=0), dim=0
+            node_properties_list.append(readout(node_feats).reshape(-1, 2, self.shallow_ensemble_size))
+        node_properties = torch.sum(
+            torch.stack(node_properties_list, dim=0), dim=0
         )
-        inter_e = scatter_sum(
-            src=node_inter_es, index=batch_seg, dim=-1, dim_size=batch_seg[-1] + 1
-        )
-        return {"E": inter_e, "Fa": None}
+        return {"Ea": node_properties[:, 0], "Qa": node_properties[:, 1]}

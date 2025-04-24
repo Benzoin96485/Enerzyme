@@ -380,26 +380,26 @@ class RealAgnosticResidualInteractionBlock(InteractionBlock):
 
 
 class LinearReadoutBlock(nn.Module):
-    def __init__(self, irreps_in: Irreps):
+    def __init__(self, irreps_in: Irreps, shallow_ensemble_size: int):
         super().__init__()
-        self.linear = o3.Linear(irreps_in=irreps_in, irreps_out=Irreps("0e"))
+        self.linear = o3.Linear(irreps_in=irreps_in, irreps_out=Irreps(f"{shallow_ensemble_size * 2}x0e"))
 
     def forward(self, x: Tensor) -> Tensor:  # [n_nodes, irreps]  # [..., ]
-        return self.linear(x)  # [n_nodes, 1]
+        return self.linear(x)  # [n_nodes, 2 * shallow_ensemble_size]
 
 
 class NonLinearReadoutBlock(nn.Module):
     def __init__(
-        self, irreps_in: Irreps, MLP_irreps: Irreps, gate: Optional[Callable]
+        self, irreps_in: Irreps, MLP_irreps: Irreps, gate: Optional[Callable], shallow_ensemble_size: int
     ):
         super().__init__()
         self.hidden_irreps = MLP_irreps
         self.linear_1 = o3.Linear(irreps_in=irreps_in, irreps_out=self.hidden_irreps)
         self.non_linearity = Activation(irreps_in=self.hidden_irreps, acts=[gate])
         self.linear_2 = o3.Linear(
-            irreps_in=self.hidden_irreps, irreps_out=Irreps("0e")
+            irreps_in=self.hidden_irreps, irreps_out=Irreps(f"{shallow_ensemble_size * 2}x0e")
         )
 
     def forward(self, x: Tensor) -> Tensor:  # [n_nodes, irreps]  # [..., ]
         x = self.non_linearity(self.linear_1(x))
-        return self.linear_2(x)  # [n_nodes, 1]
+        return self.linear_2(x)  # [n_nodes, 2 * shallow_ensemble_size]
