@@ -6,7 +6,7 @@ from tqdm import tqdm
 import torch
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
-from torch.optim import Adam, Optimizer
+from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.nn import Module
 from torch.nn.utils import clip_grad_norm_
@@ -195,6 +195,7 @@ class Trainer:
         else:
             self.monitor = None
         self.seed = params.get('seed', 114514)
+        self.optimizer = params.get('optimizer', "Adam")
         self.learning_rate = float(params.get('learning_rate', 1e-3))
         self.batch_size = params.get('batch_size', 8)
         self.inference_batch_size = params.get('inference_batch_size', self.batch_size)
@@ -311,7 +312,26 @@ class Trainer:
         
         num_training_steps = len(train_dataloader) * self.max_epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
-        optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay, amsgrad=self.amsgrad)
+        if self.optimizer == "Adam":
+            from torch.optim import Adam
+            optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay, amsgrad=self.amsgrad)
+        elif self.optimizer == "CoRe":
+            #from .core_old import CoRe
+            from core_optimizer import CoRe
+            optimizer = CoRe(
+                model.parameters(),
+                lr=self.learning_rate,
+                step_sizes=(1e-6, 1.0),
+                etas=(0.5, 1.2),
+                betas=(0.45, 0.725, 500, 0.999),
+                weight_decay=0.1,
+                score_history=500,
+                frozen=0.1,
+                foreach=True,
+                eps=1e-6
+            )
+        else:
+            raise ValueError(f"optimizer {self.optimizer} not supported")
         if self.use_ema:
             ema = ExponentialMovingAverage(model.parameters(), self.ema_decay, self.ema_use_num_updates)
         else:
