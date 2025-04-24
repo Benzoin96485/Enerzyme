@@ -332,6 +332,7 @@ class Trainer:
             )
         else:
             raise ValueError(f"optimizer {self.optimizer} not supported")
+        logger.info(f"using {self.optimizer} optimizer")
         if self.use_ema:
             ema = ExponentialMovingAverage(model.parameters(), self.ema_decay, self.ema_use_num_updates)
         else:
