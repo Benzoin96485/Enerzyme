@@ -8,6 +8,7 @@ import opt_einsum_fx
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Activation
 from e3nn.o3 import Irreps, TensorProduct, FullyConnectedTensorProduct
+from e3nn.util.jit import compile_mode
 from torch_scatter import scatter_sum
 from ..irreps_tools import tp_out_irreps_with_instructions, reshape_irreps, _wigner_nj, U_matrix_real
 
@@ -16,6 +17,7 @@ BATCH_EXAMPLE = 10
 ALPHABET = ["w", "x", "v", "n", "z", "r", "t", "y", "u", "o", "p", "s"]
 
 
+@compile_mode("script")
 class Contraction(nn.Module):
     def __init__(
         self,
@@ -165,6 +167,7 @@ class Contraction(nn.Module):
         return dict(self.named_buffers())[f"U_matrix_{nu}"]
 
 
+@compile_mode("script")
 class SymmetricContraction(nn.Module):
     def __init__(
         self,
@@ -227,6 +230,7 @@ class SymmetricContraction(nn.Module):
         return torch.cat(outs, dim=-1)
 
 
+@compile_mode("script")
 class EquivariantProductBasisBlock(nn.Module):
     def __init__(
         self,
@@ -265,6 +269,7 @@ class EquivariantProductBasisBlock(nn.Module):
         return self.linear(node_feats)
 
 
+@compile_mode("script")
 class InteractionBlock(ABC, Module):
     def __init__(
         self,
@@ -307,7 +312,12 @@ class InteractionBlock(ABC, Module):
     ) -> Tuple[Tensor, Tensor]:
         ...
 
+
+@compile_mode("script")
 class RealAgnosticResidualInteractionBlock(InteractionBlock):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def _setup(self) -> None:
         # First linear
         self.linear_up = o3.Linear(
@@ -379,8 +389,9 @@ class RealAgnosticResidualInteractionBlock(InteractionBlock):
         )  # [n_nodes, channels, (lmax + 1)**2]
 
 
+@compile_mode("script")
 class LinearReadoutBlock(nn.Module):
-    def __init__(self, irreps_in: Irreps, shallow_ensemble_size: int):
+    def __init__(self, irreps_in: Irreps, shallow_ensemble_size: int=1):
         super().__init__()
         self.linear = o3.Linear(irreps_in=irreps_in, irreps_out=Irreps(f"{shallow_ensemble_size * 2}x0e"))
 
@@ -388,9 +399,10 @@ class LinearReadoutBlock(nn.Module):
         return self.linear(x)  # [n_nodes, 2 * shallow_ensemble_size]
 
 
+@compile_mode("script")
 class NonLinearReadoutBlock(nn.Module):
     def __init__(
-        self, irreps_in: Irreps, MLP_irreps: Irreps, gate: Optional[Callable], shallow_ensemble_size: int
+        self, irreps_in: Irreps, MLP_irreps: Irreps, gate: Optional[Callable], shallow_ensemble_size: int=1
     ):
         super().__init__()
         self.hidden_irreps = MLP_irreps

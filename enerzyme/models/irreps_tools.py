@@ -1,20 +1,21 @@
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from collections import namedtuple
 import torch
 import e3nn.o3 as o3
-
+from e3nn.util.jit import compile_mode
+from e3nn.o3 import Irreps
 
 _INPUT = namedtuple("_INPUT", "tensor, start, stop")
 _TP = namedtuple("_TP", "op, args")
 
 
 def tp_out_irreps_with_instructions(
-    irreps1: o3.Irreps, irreps2: o3.Irreps, target_irreps: o3.Irreps
-) -> Tuple[o3.Irreps, List]:
+    irreps1: Irreps, irreps2: Irreps, target_irreps: Irreps
+) -> Tuple[Irreps, List]:
     trainable = True
 
     # Collect possible irreps and their instructions
-    irreps_out_list: List[Tuple[int, o3.Irreps]] = []
+    irreps_out_list: List[Tuple[int, Irreps]] = []
     instructions = []
     for i, (mul, ir_in) in enumerate(irreps1):
         for j, (_, ir_edge) in enumerate(irreps2):
@@ -26,7 +27,7 @@ def tp_out_irreps_with_instructions(
 
     # We sort the output irreps of the tensor product so that we can simplify them
     # when they are provided to the second o3.Linear
-    irreps_out = o3.Irreps(irreps_out_list)
+    irreps_out = Irreps(irreps_out_list)
     irreps_out, permut, _ = irreps_out.sort()
 
     # Permute the output indexes of the instructions to match the sorted irreps:
@@ -40,10 +41,11 @@ def tp_out_irreps_with_instructions(
     return irreps_out, instructions
 
 
+@compile_mode("script")
 class reshape_irreps(torch.nn.Module):
-    def __init__(self, irreps: o3.Irreps) -> None:
+    def __init__(self, irreps: Irreps) -> None:
         super().__init__()
-        self.irreps = o3.Irreps(irreps)
+        self.irreps = Irreps(irreps)
         self.dims = []
         self.muls = []
         for mul, ir in self.irreps:
@@ -64,12 +66,12 @@ class reshape_irreps(torch.nn.Module):
     
 
 def _wigner_nj(
-    irrepss: List[o3.Irreps],
+    irrepss: List[Irreps],
     normalization: str = "component",
     filter_ir_mid=None,
     dtype=None,
 ):
-    irrepss = [o3.Irreps(irreps) for irreps in irrepss]
+    irrepss = [Irreps(irreps) for irreps in irrepss]
     if filter_ir_mid is not None:
         filter_ir_mid = [o3.Irrep(ir) for ir in filter_ir_mid]
 

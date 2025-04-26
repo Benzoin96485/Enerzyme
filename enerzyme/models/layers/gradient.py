@@ -11,6 +11,6 @@ class ForceLayer(BaseFFLayer):
 
     def get_Fa(self, E: Tensor, Ra: Tensor) -> Tensor:
         if E.dim() > 1:
-            return torch.stack([-grad(torch.sum(E[:,i]), Ra, retain_graph=True, create_graph=True)[0] for i in range(E.shape[-1])]).permute(1, 2, 0)
+            return torch.stack([-grad(torch.sum(E[:,i]), Ra, retain_graph=True, create_graph=self.training)[0] for i in range(E.shape[-1])]).permute(1, 2, 0)
         else:
-            return -grad(torch.sum(E), Ra, retain_graph=True, create_graph=True)[0]
+            return -grad(torch.sum(E), Ra, retain_graph=True, create_graph=self.training)[0]
