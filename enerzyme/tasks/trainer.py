@@ -227,10 +227,12 @@ class Trainer:
         self.refresh_best_score = params.get("refresh_best_score", None)
         self.refresh_patience = params.get("refresh_patience", None)
         non_target_features = params.get("non_target_features", [])
-        if "SLURM_NTASKS" in os.environ:
-            self.num_workers = max(1, int(os.environ["SLURM_NTASKS"]) // 2 - 1)
-        else:
-            self.num_workers = max(1, os.cpu_count() // 2 - 1)
+        self.num_workers = params.get("num_workers", 0)
+        if self.num_workers <= 0:
+            if "SLURM_NTASKS" in os.environ:
+                self.num_workers = max(1, int(os.environ["SLURM_NTASKS"]) // 2 - 1)
+            else:
+                self.num_workers = max(1, os.cpu_count() // 2 - 1)
         logger.info(f"using {self.num_workers} workers for dataloader")
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
