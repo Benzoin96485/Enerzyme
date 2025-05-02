@@ -1,7 +1,6 @@
 from typing import Dict, List
 import torch
 from torch import Tensor
-from torch_geometric.data import Data
 from ..layers import BaseFFCore
 try:
     from nequip.model import model_from_config
@@ -137,3 +136,7 @@ class NequIPWrapper(BaseFFCore):
             "ptr": ptr
         })
         return {"E": raw_output["total_energy"].squeeze(-1), "Fa": raw_output["forces"]}
+
+
+class NequIPCore(BaseFFCore):
+    pass

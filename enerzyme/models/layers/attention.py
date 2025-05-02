@@ -6,7 +6,6 @@ import torch.nn.functional as F
 import numpy as np
 
 
-
 class Attention(Module):
     """
     Efficient (linear scaling) approximation for attention described in

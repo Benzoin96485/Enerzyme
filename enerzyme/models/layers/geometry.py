@@ -1,6 +1,7 @@
 from typing import Optional, Dict, Literal
 from torch import Tensor
 import torch.nn.functional as F
+from e3nn.o3 import SphericalHarmonics, Irreps
 from . import BaseFFLayer
 from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
@@ -75,3 +76,18 @@ class RangeSeparationLayer(BaseFFLayer):
         if vij_lr is not None:
             relevant_output["vij_sr"] = vij_lr[cutmask]
         return relevant_output
+
+
+class SphericalHarmonicsLayer(BaseFFLayer):
+    def __init__(self, irreps, normalization: str="component", normalize: bool=True) -> None:
+        super().__init__(input_fields={"vij_sr"}, output_fields={"sh_sr"})
+        if isinstance(irreps, int):
+            self.irreps_edge_sh = Irreps.spherical_harmonics(irreps)
+        else:
+            self.irreps_edge_sh = Irreps(irreps)
+        self.sh = SphericalHarmonics(
+            self.irreps_edge_sh, normalize, normalization
+        )
+
+    def get_output(self, vij_sr: Tensor) -> Dict[str, Tensor]:
+        return {"sh_sr": self.sh(vij_sr)}
