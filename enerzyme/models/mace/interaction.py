@@ -3,7 +3,7 @@ from typing import Optional, List, Tuple, Dict, Union, Callable
 import numpy as np
 import torch
 from torch import nn, Tensor
-from torch.nn import Module, ModuleList, Parameter,ParameterList
+from torch.nn import Module, ModuleList, Parameter, ParameterList
 import torch.nn.functional as F
 from opt_einsum_fx import optimize_einsums_full
 from e3nn import o3
@@ -437,9 +437,9 @@ class AgnosticNonlinearInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = nn.FullyConnectedNet(
+        self.conv_tp_weights = FullyConnectedNet(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
-            torch.nn.functional.silu,
+            F.silu,
         )
 
         # Linear
@@ -505,9 +505,9 @@ class AgnosticResidualNonlinearInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = nn.FullyConnectedNet(
+        self.conv_tp_weights = FullyConnectedNet(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
-            torch.nn.functional.silu,
+            F.silu,
         )
 
         # Linear
@@ -579,9 +579,9 @@ class RealAgnosticInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = nn.FullyConnectedNet(
+        self.conv_tp_weights = FullyConnectedNet(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
-            torch.nn.functional.silu,
+            F.silu,
         )
 
         # Linear
@@ -742,9 +742,9 @@ class RealAgnosticAttResidualInteractionBlock(InteractionBlock):
             self.edge_feats_irreps.num_irreps
             + 2 * self.node_feats_down_irreps.num_irreps
         )
-        self.conv_tp_weights = nn.FullyConnectedNet(
+        self.conv_tp_weights = FullyConnectedNet(
             [input_dim] + 3 * [256] + [self.conv_tp.weight_numel],
-            torch.nn.functional.silu,
+            F.silu,
         )
 
         # Linear
@@ -829,7 +829,6 @@ class NonLinearReadoutBlock(nn.Module):
 
 INTERACTION_CLASSES = {
     "ResidualElementDependentInteractionBlock": ResidualElementDependentInteractionBlock,
-    "RealAgnosticResidualInteractionBlock": RealAgnosticResidualInteractionBlock,
     "AgnosticNonlinearInteractionBlock": AgnosticNonlinearInteractionBlock,
     "AgnosticResidualNonlinearInteractionBlock": AgnosticResidualNonlinearInteractionBlock,
     "RealAgnosticInteractionBlock": RealAgnosticInteractionBlock,
