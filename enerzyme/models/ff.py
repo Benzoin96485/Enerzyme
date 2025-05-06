@@ -34,7 +34,7 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .leftnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "mace":
-        from .mace import MACEWrapper as Core
+        from .mace import MACECore as Core
         from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "nequip":
