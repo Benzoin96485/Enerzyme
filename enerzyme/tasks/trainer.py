@@ -224,7 +224,16 @@ class Trainer:
         else:
             self.active_learning = False
         self.resume = params.get("resume", 1)
+        self.refresh_best_score = params.get("refresh_best_score", None)
+        self.refresh_patience = params.get("refresh_patience", None)
         non_target_features = params.get("non_target_features", [])
+        self.num_workers = params.get("num_workers", 0)
+        if self.num_workers <= 0:
+            if "SLURM_NTASKS" in os.environ:
+                self.num_workers = max(1, int(os.environ["SLURM_NTASKS"]) // 2 - 1)
+            else:
+                self.num_workers = max(1, os.cpu_count() // 2 - 1)
+        logger.info(f"using {self.num_workers} workers for dataloader")
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
         elif isinstance(non_target_features, str):
@@ -287,6 +296,10 @@ class Trainer:
         test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1,
         meta_state_dict: Dict=dict(), refresh_patience: bool=False, refresh_best_score: bool=False
     ) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
+        if self.refresh_best_score is not None:
+            refresh_best_score = self.refresh_best_score
+        if self.refresh_patience is not None:
+            refresh_patience = self.refresh_patience
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         model = model.to(self.device).type(self.dtype)
         train_dataloader = DataLoader(
@@ -294,7 +307,7 @@ class Trainer:
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=self.decorate_batch_input,
-            num_workers=max(1, os.cpu_count() // 2 - 1),
+            num_workers=self.num_workers,
             drop_last=True 
         )
         
@@ -336,7 +349,6 @@ class Trainer:
                     best_score = float("inf")
             else:
                 best_score = None
-        print("best_score", best_score)
 
         if self.resume > 1:
             max_epochs = self.max_epochs
@@ -487,7 +499,7 @@ class Trainer:
             batch_size=self.inference_batch_size,
             shuffle=False,
             collate_fn=self.decorate_batch_input,
-            num_workers=max(1, os.cpu_count() // 2 - 1),
+            num_workers=self.num_workers,
         )
         model = model.eval()
         batch_bar = tqdm(total=len(dataloader), dynamic_ncols=True, position=0, leave=False, desc='val', ncols=5)

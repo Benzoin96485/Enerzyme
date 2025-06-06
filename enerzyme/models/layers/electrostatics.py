@@ -127,7 +127,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         condition = Dij < self.cutoff_lr
         return (
             torch.where(condition, self._lr_ordinary(Dij), zeros), 
-            torch.where(condition, self._lr_ordinary(1.0 / Dij_shield + Dij * self.rcutconstant - self.cutconstant), zeros),
+            torch.where(condition, 1.0 / Dij_shield + Dij * self.rcutconstant - self.cutconstant, zeros),
             condition, zeros
         )
 
