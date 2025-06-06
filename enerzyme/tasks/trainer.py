@@ -330,7 +330,7 @@ class Trainer:
                 score_history=500,
                 frozen=0.1,
                 foreach=True,
-                eps=1e-6
+                eps=1e-8
             )
         else:
             raise ValueError(f"optimizer {self.optimizer} not supported")
