@@ -140,7 +140,7 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
     return y_pred, (y_truth if y_truth else None)
 
 
-def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None) -> Dict:
+def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None, strict: bool=True) -> Dict:
     other_info = dict()
     if pretrain_path is None:
         return other_info
@@ -156,7 +156,8 @@ def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optiona
             tmp_ema.copy_to(model.parameters())
             logger.info(f"loading averaged model state dict from {pretrain_path}...")
         else:
-            model.load_state_dict(loaded_info["model_state_dict"])
+            model.load_state_dict(loaded_info["model_state_dict"], strict=strict)
+            other_info["model_state_dict"] = loaded_info["model_state_dict"]
             logger.info(f"loading model state dict from {pretrain_path}...")
     if not inference:
         if optimizer is not None and "optimizer_state_dict" in loaded_info:
@@ -226,6 +227,7 @@ class Trainer:
         self.resume = params.get("resume", 1)
         self.refresh_best_score = params.get("refresh_best_score", None)
         self.refresh_patience = params.get("refresh_patience", None)
+        self.freeze_pretrain_weights = params.get("freeze_pretrain_weights", False)
         non_target_features = params.get("non_target_features", [])
         self.num_workers = params.get("num_workers", 0)
         if self.num_workers <= 0:
@@ -264,9 +266,10 @@ class Trainer:
         scheduler: Optional[LRScheduler]=None,
         pretrain_path: Optional[str]=None, 
         ema: Optional[ExponentialMovingAverage]=None, 
-        inference: bool=False
+        inference: bool=False,
+        strict: bool=True
     ) -> None:
-        return _load_state_dict(model, self.device, pretrain_path, ema, inference, optimizer, scheduler)
+        return _load_state_dict(model, self.device, pretrain_path, ema, inference, optimizer, scheduler, strict)
 
     def save_state_dict(self, model: Module, optimizer: Optimizer, scheduler: LRScheduler, dump_dir: str, ema: Optional[ExponentialMovingAverage]=None, suffix="last", model_rank=None, epoch: Optional[int]=None, best_score: Optional[float]=None, best_epoch: Optional[int]=None):
         if model_rank is None:
@@ -325,7 +328,13 @@ class Trainer:
         elif self.resume == 1:
             other_info = self.load_state_dict(model, pretrain_path=pretrain_path, ema=ema)
         else:
-            other_info = self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
+            other_info = self.load_state_dict(model, pretrain_path=pretrain_path, inference=True, strict=False)
+
+        if self.freeze_pretrain_weights:
+            for name, param in model.named_parameters():
+                if name in other_info.get("model_state_dict", dict()):
+                    param.requires_grad = False
+                    logger.info(f"Freezing pretrained weights for {name}")
         
         if self.resume > 1 and "best_epoch" in other_info and "epoch" in other_info:
             wait = other_info["epoch"] - other_info["best_epoch"]

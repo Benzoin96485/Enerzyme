@@ -1,15 +1,15 @@
 import os.path as osp
-from addict import Dict
 import numpy as np
 import ase
+import ase.io
 import torch
+from copy import copy
 from ase.constraints import FixAtoms, FixBondLengths
 from ase.calculators.calculator import Calculator, all_changes
-from ase.optimize import BFGS
-from ase.units import Hartree, fs
+from ase.units import Hartree, fs, kB, Bohr
 from ..data import full_neighbor_list
 from ..utils import logger
-from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input, _load_state_dict
+from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input, _load_state_dict, _to_device
 
 class ASECalculator(Calculator):
     implemented_properties = ["energy", "forces", "dipole", "charges"]
@@ -60,6 +60,7 @@ class ASECalculator(Calculator):
             device=self.device,
             dtype=self.dtype
         )
+        net_input, _ = _to_device((net_input, {}), self.device)
         net_output = self.model(net_input)
         output, _ = _decorate_batch_output(
             output=net_output,
@@ -75,6 +76,32 @@ class ASECalculator(Calculator):
             self.results["charges"] = output["Qa"][0]
 
 
+def get_optimizer(optimizer_name):
+    if optimizer_name == "BFGS":
+        from ase.optimize import BFGS
+        return BFGS
+    elif optimizer_name == "LBFGS":
+        from ase.optimize import LBFGS
+        return LBFGS
+    elif optimizer_name == "MDMin":
+        from ase.optimize import MDMin
+        return MDMin
+    elif optimizer_name == "FIRE":
+        from ase.optimize import FIRE
+        return FIRE
+    elif optimizer_name == "GPMin":
+        from ase.optimize import GPMin
+        return GPMin
+    elif optimizer_name == "BFGSLineSearch":
+        from ase.optimize import BFGSLineSearch
+        return BFGSLineSearch
+    elif optimizer_name == "LBFGSLineSearch":
+        from ase.optimize import LBFGSLineSearch
+        return LBFGSLineSearch
+    else:
+        raise ValueError(f"Optimizer {optimizer_name} not supported")
+
+
 class Simulation:
     def __init__(self, config, model, model_path, out_dir, transform):
         self.environment = config.Simulation.environment
@@ -87,6 +114,7 @@ class Simulation:
         self.integrate_config = config.Simulation.get("integrate", None)
         self.constraint_config = config.Simulation.get("constraint", None)
         self.sampling_config = config.Simulation.get("sampling", None)
+        self.optimize_config = config.Simulation.get("optimize", None)
         self.fs_in_t = config.Simulation.get("fs_in_t", 1)
         self.log_interval = config.Simulation.get("log_interval", 20)
         self.neighbor_list_type = config.Simulation.get("neighbor_list", "full")
@@ -97,14 +125,17 @@ class Simulation:
         self.model = model.to(self.device).type(self.dtype)
         _load_state_dict(model, self.device, model_path, inference=True)
         self.model.eval()
+        self.calculator = None
         self.out_dir = out_dir
         # self.simulation_config = {k: (v.to_dict() if hasattr(v, "to_dict") else v) for k, v in config.Simulation.items() if not hasattr(self, k)}
         # initialize
         getattr(self, f"_init_{self.environment}_env")()
 
     def _init_ase_env(self):
-        self.system = ase.io.read(self.structure_file)
-        calculator = ASECalculator(
+        self.initial_structures = ase.io.read(self.structure_file, ":")
+        self.systems = self.initial_structures.copy()
+        self.system = self.systems[-1]
+        self.calculator = ASECalculator(
             model=self.model,
             charge=self.charge,
             magmom=self.multiplicity - 1,
@@ -114,22 +145,32 @@ class Simulation:
             transform=self.transform,
             #**self.simulation_config
         )
-        self.system.calc = calculator
         if self.constraint_config is not None:
             self.constraints = []
             for k, v in self.constraint_config.items():
                 if k == "fix_atom":
                     c = FixAtoms(indices=[idx - self.idx_start_from for idx in v.indices])
                     self.constraints.append(c)
-            self.system.set_constraint(self.constraints)
 
+        for system in self.systems:
+            system.calc = copy(self.calculator)
+            system.set_constraint(self.constraints)
+            
+
+    def _run_sp(self):
+        for system in self.systems:
+            for property in ["energy", "forces", "dipole", "charges"]:
+                if property in system.info:
+                    system.info.pop(property)
+            system.get_potential_energy()
+            ase.io.write(osp.join(self.out_dir, f"sp.xyz"), system, append=True)
 
     def _run_opt(self):
-        optimizer = BFGS(self.system)
+        optimizer = get_optimizer(self.optimize_config.optimizer)(self.system)
         def write_xyz(atoms=None):
             ase.io.write(osp.join(self.out_dir, f"traj-opt.xyz"), atoms, append=True)
         optimizer.attach(write_xyz, interval=1, atoms=self.system) 
-        optimizer.run(fmax=4.5e-4 / self.system.calc.Hartree_in_E * Hartree)
+        optimizer.run(fmax=self.optimize_config.get("fmax", 4.5e-4) / self.system.calc.Hartree_in_E * Hartree / Bohr)
         ase.io.write(osp.join(self.out_dir, f"optim.xyz"), self.system, append=True)
         logger.info(f"Final energy: {self.system.get_potential_energy()}")
 
@@ -149,16 +190,16 @@ class Simulation:
                 self.system.set_distance(i0, i1, x)
                 c = FixBondLengths([(i0, i1)], bondlengths=[x], tolerance=1e-6)
                 self.system.set_constraint(self.constraints + [c])
-                optimizer = BFGS(self.system)
+                optimizer = get_optimizer(self.optimize_config.optimizer)(self.system)
                 def write_xyz(atoms=None):
                     ase.io.write(osp.join(self.out_dir, f"traj-{i}.xyz"), atoms, append=True)
                 optimizer.attach(write_xyz, interval=1, atoms=self.system) 
-                optimizer.run(fmax=4.5e-4 / self.system.calc.Hartree_in_E * Hartree)
+                optimizer.run(fmax=4.5e-4 / self.system.calc.Hartree_in_E * Hartree / Bohr)
                 ase.io.write(osp.join(self.out_dir, f"scan_optim.xyz"), self.system, append=True)
                 logger.info(f"Final energy: {self.system.get_potential_energy()}")
                 logger.info(f"Final distance: {self.system.get_distance(i0, i1)}")
 
-    def _run_md(self) -> None:
+    def _get_integrator(self, traj_file):
         if self.integrate_config.integrator.lower() == "langevin":
             from ase.md.langevin import Langevin
             dyn = Langevin(self.system, 
@@ -169,10 +210,62 @@ class Simulation:
                 loginterval=self.log_interval
             )
             def write_xyz(atoms=None):
-                ase.io.write(osp.join(self.out_dir, f"md.traj.xyz"), atoms, append=True)
+                ase.io.write(osp.join(self.out_dir, traj_file), atoms, append=True)
             dyn.attach(write_xyz, interval=self.log_interval, atoms=self.system) 
-            dyn.run(self.integrate_config.n_step)
-            
+        return dyn
+
+    def _run_md(self) -> None:
+        dyn = self._get_integrator(traj_file="md.traj.xyz")
+        dyn.run(self.integrate_config.n_step)
+
+    def _run_neb(self):
+        from ase.mep.neb import NEB
+        num_images = self.sampling_config.params.num_images
+        assert num_images > 2, "Number of images must be greater than 2"
+        if len(self.initial_structures) == 2:
+            images = []
+            for _ in range(num_images - 1):
+                images.append(self.initial_structures[0].copy())
+            images.append(self.initial_structures[1].copy())
+        elif len(self.initial_structures) == num_images:
+            images = self.systems
+        else:
+            raise ValueError(f"Number of initial structures {len(self.initial_structures)} is not capatible with the number of images {num_images}")
+        neb = NEB(
+            images, 
+            k=self.sampling_config.params.spring_constants / self.calculator.Hartree_in_E * Hartree, 
+            climb=self.sampling_config.params.climb, 
+            allow_shared_calculator=True
+        )
+        if len(self.initial_structures) == 2:
+            neb.interpolate(
+                images=images,
+                method=self.sampling_config.params.interpolation.method,
+                apply_constraints=self.sampling_config.params.interpolation.apply_constraints
+            )
+        for image in images:
+            image.calc = copy(self.calculator)
+            image.set_constraint(self.constraints)
+        optimizer = get_optimizer(self.optimize_config.optimizer)(neb)
+        def write_xyz(images=None):
+            for i, image in enumerate(images):
+                ase.io.write(osp.join(self.out_dir, f"neb-{i}.xyz"), image, append=True)
+            ase.io.write(osp.join(self.out_dir, f"neb.xyz"), images, append=False)
+        optimizer.attach(write_xyz, interval=1, images=images)
+        optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr)
+        
+    def _run_plumed(self):
+        plumed_setup = self.sampling_config.params.plumed_setup
+        from ase.calculators.plumed import Plumed
+        plumed_calc = Plumed(self.calculator, plumed_setup, 
+            timestep=self.integrate_config.time_step * fs / self.fs_in_t,
+            atoms=self.system,
+            kT=self.integrate_config.temperature_in_K * kB,
+            log=osp.join(self.out_dir, "plumed.log"),
+            restart=False
+        )
+        dyn = self._get_integrator(traj_file="plumed.traj.xyz")
+        dyn.run(self.integrate_config.n_step)
 
     def run(self):
         getattr(self, f"_run_{self.task}")()
