@@ -389,6 +389,10 @@ class Trainer:
                 desc='Train', ncols=5
             ) 
             trn_loss = []
+
+            for loss_term in loss_terms.values():
+                if epoch > 0 and hasattr(loss_term, "adaptive") and loss_term.adaptive:
+                    loss_term.record()
             
             for i, batch in enumerate(train_dataloader):
                 net_input, net_target = _to_device(batch, self.device)
@@ -424,6 +428,10 @@ class Trainer:
             batch_bar.close()
             total_trn_loss = np.mean(trn_loss)
             message = f'Epoch [{epoch + 1}/{max_epochs}]' + (f' ({epoch_in_iter + 1}/{max_epoch_per_iter})' if max_epoch_per_iter > 0 else '') + f', train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
+            for loss_term in loss_terms.values():
+                if epoch > 0 and hasattr(loss_term, "adaptive") and loss_term.adaptive:
+                    message += f', adaptive loss weights:{loss_term.weights}'
+                    loss_term.update()
 
             if self.use_ema:
                 cm = ema.average_parameters()
