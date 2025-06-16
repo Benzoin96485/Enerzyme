@@ -95,3 +95,17 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
     y_truth["Za"] = y_pred["Za"]
 
     return y_pred, (y_truth if y_truth else None)
+
+
+def _to_device(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
+    features, targets = batch
+    batch_features = dict()
+    batch_targets = dict()
+    for k, v in features.items():
+        if k != "N":
+            batch_features[k] = v.to(device)
+        else:
+            batch_features[k] = v
+    for k, v in targets.items():
+        batch_targets[k] = v.to(device)
+    return batch_features, batch_targets
