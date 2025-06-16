@@ -262,7 +262,6 @@ class Simulation:
             atoms=self.system,
             kT=self.integrate_config.temperature_in_K * kB,
             log=osp.join(self.out_dir, "plumed.log"),
-            loginterval=self.log_interval,
             restart=False
         )
         dyn = self._get_integrator(traj_file="plumed.traj.xyz")
