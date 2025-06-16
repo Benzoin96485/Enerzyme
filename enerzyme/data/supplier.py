@@ -2,6 +2,8 @@ from rdkit import Chem
 from typing import Iterator, Dict, Any
 from abc import ABC, abstractmethod
 import numpy as np
+import pickle
+from .transform import REVERSED_PERIODIC_TABLE
 
 
 class Supplier(ABC):
@@ -46,8 +48,36 @@ class SDFSupplier(Supplier):
             i += 1
 
 
+class PickleSupplier:
+    def __init__(self, pkl_file: str, start: int = 0, end: int = -1, **kwargs):
+        with open(pkl_file, "rb") as f:
+            self.supplier = pickle.load(f)
+        self.start = start
+        to_end = True
+        if end >= 0:
+            self.end = end
+            to_end = False
+        else:
+            self.end = len(self.supplier)
+        self.name = pkl_file.split("/")[-1].split(".")[0] + (
+            f"_{start}_{end}" if (start != 0 or not to_end) else ""
+        )
+    
+    def suppl(self):
+        i = self.start
+        for item in self.supplier[self.start:self.end]:
+            yield {
+                "atom_type": item["Za"],
+                "Ra": item["Ra"],
+                "Q": item["Q"],
+                "index": i,
+            }
+            i += 1
+
 def get_supplier(path: str, start: int = 0, end: int = -1, **kwargs) -> Supplier:
     if path.endswith(".sdf"):
         return SDFSupplier(path, start, end, **kwargs)
+    elif path.endswith(".pkl"):
+        return PickleSupplier(path, start, end, **kwargs)
     else:
         raise ValueError(f"File type of {path} not supported")

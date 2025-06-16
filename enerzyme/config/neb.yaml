@@ -2,7 +2,7 @@ Simulation:
   environment: "ase"                                # simulation environment: ase
   dtype: float64                                    # pytorch data type throughout the computation: float32 (single) / float64 (double), default float64, for better numerical behavior during optimization
   cuda: true                                        # if cuda is searched and used if possible
-  task: metad                                       # metadynamics
+  task: neb                                         # nudge elastic band
   idx_start_from: 1                                 # for your confusion of indices starting from 0 or 1
   neighbor_list: full                               # you want this to be the same as how the model is trained
   constraint:
@@ -14,8 +14,12 @@ Simulation:
     optimizer: LBFGS                                # optimizer: LBFGS
   sampling:
     params:
-      plumed_setup: plumed.dat
-      well_tempered_kT: 0.1
+      num_images: 25
+      spring_constants: 0.1
+      climb: true
+      interpolation:
+        method: "idpp"
+        apply_constraints: true
 System:
   structure_file: "/your/initial/configuration.xyz" # initial configuration of scanning
   charge: -1                                        # total charge of the structure
