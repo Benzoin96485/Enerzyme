@@ -1,6 +1,7 @@
 import math
 from abc import abstractmethod
 from typing import Literal, Optional
+import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import Parameter
@@ -416,3 +417,31 @@ class ExponentialBernsteinRBFLayer(ExponentialRBF):
 
     def inner_fn(self, alphar: Tensor, expalphar: Tensor) -> Tensor:
         return self.logc + self.n * alphar + self.v * torch.log(-torch.expm1(alphar))
+    
+
+class BesselRBFLayer(BaseRBF):
+    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: Literal["polynomial", "bump"]="polynomial", trainable: bool=False) -> None:
+        super().__init__(num_rbf, cutoff_sr, cutoff_fn)
+        bessel_weights = (
+            np.pi
+            / cutoff_sr
+            * torch.linspace(
+                start=1.0,
+                end=num_rbf,
+                steps=num_rbf,
+                dtype=torch.get_default_dtype(),
+            )
+        )
+        if trainable:
+            self.bessel_weights = torch.nn.Parameter(bessel_weights)
+        else:
+            self.register_buffer("bessel_weights", bessel_weights)
+
+        self.register_buffer(
+            "prefactor",
+            torch.tensor(np.sqrt(2.0 / cutoff_sr), dtype=torch.get_default_dtype()),
+        )
+
+    def _get_rbf(self, x: Tensor) -> Tensor:  # [..., 1]
+        numerator = torch.sin(self.bessel_weights.view(1, -1) * x.view(-1, 1))  # [..., num_basis]
+        return self.prefactor * (numerator / x.view(-1, 1))

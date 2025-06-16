@@ -6,6 +6,9 @@ from rdkit.Chem.Draw import MolsToGridImage
 
 
 def get_atom_map(pdb_coords: list, mol_coords: list, tol: float=0.01):
+    '''
+    atom_map[i] is the index of the atom in the pdb that is closest to the i-th atom in the mol
+    '''
     pdb_coords = np.array(pdb_coords)
     mol_coords = np.array(mol_coords)
     dists = np.linalg.norm(pdb_coords[:, None] - mol_coords, axis=2)
@@ -17,7 +20,6 @@ def get_atom_map(pdb_coords: list, mol_coords: list, tol: float=0.01):
         if raw_atom_map[i] == -1:
             continue
         clean_atom_map[raw_atom_map[i]] = i
-    # clean_atom_map[i] is the index of the atom in the pdb that is closest to the i-th atom in the mol
     return clean_atom_map
 
 

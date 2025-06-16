@@ -18,7 +18,7 @@ except:
 from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
-from .batch import _decorate_batch_input, _decorate_batch_output
+from .batch import _decorate_batch_input, _decorate_batch_output, _to_device
 from .monitor import Monitor
 from ..data import Transform
 from ..utils import logger
@@ -34,7 +34,7 @@ DTYPE_MAPPING = {
 }
 
 
-def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None) -> Dict:
+def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None, strict: bool=True) -> Dict:
     other_info = dict()
     if pretrain_path is None:
         return other_info
@@ -50,7 +50,8 @@ def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optiona
             tmp_ema.copy_to(model.parameters())
             logger.info(f"loading averaged model state dict from {pretrain_path}...")
         else:
-            model.load_state_dict(loaded_info["model_state_dict"])
+            model.load_state_dict(loaded_info["model_state_dict"], strict=strict)
+            other_info["model_state_dict"] = loaded_info["model_state_dict"]
             logger.info(f"loading model state dict from {pretrain_path}...")
     if not inference:
         if optimizer is not None and "optimizer_state_dict" in loaded_info:
@@ -138,7 +139,17 @@ class Trainer:
         else:
             self.active_learning = False
         self.resume = params.get("resume", 1)
+        self.refresh_best_score = params.get("refresh_best_score", None)
+        self.refresh_patience = params.get("refresh_patience", None)
+        self.freeze_pretrain_weights = params.get("freeze_pretrain_weights", False)
         non_target_features = params.get("non_target_features", [])
+        self.num_workers = params.get("num_workers", 0)
+        if self.num_workers <= 0:
+            if "SLURM_NTASKS" in os.environ:
+                self.num_workers = max(1, int(os.environ["SLURM_NTASKS"]) // 2 - 1)
+            else:
+                self.num_workers = max(1, os.cpu_count() // 2 - 1)
+        logger.info(f"using {self.num_workers} workers for dataloader")
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
         elif isinstance(non_target_features, str):
@@ -172,9 +183,10 @@ class Trainer:
         scheduler: Optional[LRScheduler]=None,
         pretrain_path: Optional[str]=None, 
         ema: Optional[ExponentialMovingAverage]=None, 
-        inference: bool=False
+        inference: bool=False,
+        strict: bool=True
     ) -> None:
-        return _load_state_dict(model, self.device, pretrain_path, ema, inference, optimizer, scheduler)
+        return _load_state_dict(model, self.device, pretrain_path, ema, inference, optimizer, scheduler, strict)
 
     def save_state_dict(self, model: Module, optimizer: Optimizer, scheduler: LRScheduler, dump_dir: str, ema: Optional[ExponentialMovingAverage]=None, suffix="last", model_rank=None, epoch: Optional[int]=None, best_score: Optional[float]=None, best_epoch: Optional[int]=None):
         if model_rank is None:
@@ -204,12 +216,17 @@ class Trainer:
         test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1,
         meta_state_dict: Dict=dict(), refresh_patience: bool=False, refresh_best_score: bool=False
     ) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
+        if self.refresh_best_score is not None:
+            refresh_best_score = self.refresh_best_score
+        if self.refresh_patience is not None:
+            refresh_patience = self.refresh_patience
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
         train_dataloader = DataLoader(
             dataset=train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=self.decorate_batch_input,
+            num_workers=self.num_workers,
             drop_last=True 
         )
         num_training_steps = len(train_dataloader) * self.max_epochs
@@ -276,8 +293,14 @@ class Trainer:
             elif self.resume == 1:
                 other_info = self.load_state_dict(model, pretrain_path=pretrain_path, ema=ema)
             else:
-                other_info = self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
-            
+                other_info = self.load_state_dict(model, pretrain_path=pretrain_path, inference=True, strict=False)
+
+            if self.freeze_pretrain_weights:
+                for name, param in model.named_parameters():
+                    if name in other_info.get("model_state_dict", dict()):
+                        param.requires_grad = False
+                        logger.info(f"Freezing pretrained weights for {name}")
+
             if self.resume > 1 and "best_epoch" in other_info and "epoch" in other_info:
                 wait = other_info["epoch"] - other_info["best_epoch"]
                 if refresh_best_score:
@@ -300,7 +323,6 @@ class Trainer:
                         best_score = float("inf")
                 else:
                     best_score = None
-            print("best_score", best_score)
 
             if self.resume > 1:
                 max_epochs = self.max_epochs
@@ -334,7 +356,7 @@ class Trainer:
                 trn_loss = []
                 
                 for i, batch in enumerate(train_dataloader):
-                    net_input, net_target = batch
+                    net_input, net_target = _to_device(batch, self.device)
                     
                     loss = 0
                     with torch.set_grad_enabled(True):
@@ -434,7 +456,6 @@ class Trainer:
                 y_truth = None
                 metric_score = None
             return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": metric_score}
-        
     
     def _early_stop_choice(self, wait, min_loss, metric_score, save_handle, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, save_handle, patience, epoch)
@@ -451,7 +472,8 @@ class Trainer:
             dataset=dataset,
             batch_size=self.inference_batch_size,
             shuffle=False,
-            collate_fn=self.decorate_batch_input
+            collate_fn=self.decorate_batch_input,
+            num_workers=self.num_workers,
         )
         model = model.eval()
         batch_bar = tqdm(total=len(dataloader), dynamic_ncols=True, position=0, leave=False, desc='val', ncols=5)
@@ -459,7 +481,7 @@ class Trainer:
         y_preds = defaultdict(list)
         y_truths = defaultdict(list)
         for i, batch in enumerate(dataloader):
-            net_input, net_target = batch
+            net_input, net_target = _to_device(batch, self.device)
             output = model(net_input)
             # Get model outputs
             if self.monitor is not None:

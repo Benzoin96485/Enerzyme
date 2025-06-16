@@ -1,8 +1,8 @@
 from queue import Queue
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple
 from tqdm import tqdm
 import numpy as np
-from rdkit.Chem import MolFromMolFile, MolFromXYZBlock
+from rdkit.Chem import MolFromMolFile, MolFromXYZBlock, Mol
 from rdkit.Chem.rdDetermineBonds import DetermineConnectivity
 from sklearn.neighbors import NearestNeighbors, BallTree
 from rdkit import Chem
@@ -13,7 +13,7 @@ def get_bond_lengths(conformer, begin_atom_idx, end_atom_idx):
     return np.linalg.norm(conformer.GetAtomPosition(begin_atom_idx) - conformer.GetAtomPosition(end_atom_idx))
 
 
-def extract_submol(original_mol, subidx, dual_topology=[]):
+def extract_submol(original_mol: Mol, subidx: List[int], dual_topology: List[Tuple[int, int, Optional[int]]]=[]):
     # collect internal bonds and linkings
     subidx_set = set(subidx)
     cappings = dict()
@@ -22,26 +22,27 @@ def extract_submol(original_mol, subidx, dual_topology=[]):
     CH_bond_lengths = []
     searched = set()
     mol_conformer = original_mol.GetConformer()
+    original_pair_set = set([frozenset((bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())) for bond in original_mol.GetBonds()])
 
     ts_mol = Chem.EditableMol(original_mol)
+    dual_topology_pair_set = set()
     for atom1, atom2, bondtype in dual_topology:
-        original_bond = original_mol.GetBondBetweenAtoms(atom1, atom2)
-        if original_bond is None:
-            if bondtype is None:
-                bondtype = Chem.BondType.SINGLE
-            ts_mol.AddBond(atom1, atom2, bondtype)
+        dual_topology_pair_set.add(frozenset((atom1, atom2)))
+        if bondtype is None:
+            ts_mol.AddBond(atom1, atom2, Chem.BondType.SINGLE)
             
     mol = ts_mol.GetMol()
 
     added_bonds = set()
     for atom1, atom2, bondtype in dual_topology:
         changing_bond = mol.GetBondBetweenAtoms(atom1, atom2)
-        original_bond = original_mol.GetBondBetweenAtoms(atom1, atom2)
-        if original_bond is None:
+        if bondtype is None:
             added_bonds.add(changing_bond.GetIdx())
-        elif original_bond.GetBondType() == Chem.BondType.SINGLE and bondtype != Chem.BondType.SINGLE:
-            changing_bond.SetBondType(bondtype)
+        # elif original_bond.GetBondType() == Chem.BondType.SINGLE and bondtype != Chem.BondType.SINGLE:
+        #     changing_bond.SetBondType(bondtype)
     
+    overlap_pair_set = original_pair_set & dual_topology_pair_set
+
     for bond in mol.GetBonds():
         # completely internal
         bond_idx = bond.GetIdx()
@@ -55,11 +56,12 @@ def extract_submol(original_mol, subidx, dual_topology=[]):
             if end_atom_idx in subidx_set:
                 linking_queue.put((end_atom_idx, begin_atom_idx))
 
-        if bond.GetBeginAtom().GetAtomicNum() == 6 and bond.GetEndAtom().GetAtomicNum() == 6:
-            CC_bond_lengths.append(get_bond_lengths(mol_conformer, bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()))
-        elif (bond.GetBeginAtom().GetAtomicNum() == 6 and bond.GetEndAtom().GetAtomicNum() == 1) \
-            or (bond.GetBeginAtom().GetAtomicNum() == 1 and bond.GetEndAtom().GetAtomicNum() == 6):
-            CH_bond_lengths.append(get_bond_lengths(mol_conformer, bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()))
+        if frozenset((begin_atom_idx, end_atom_idx)) in overlap_pair_set:
+            if bond.GetBeginAtom().GetAtomicNum() == 6 and bond.GetEndAtom().GetAtomicNum() == 6:
+                CC_bond_lengths.append(get_bond_lengths(mol_conformer, bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()))
+            elif (bond.GetBeginAtom().GetAtomicNum() == 6 and bond.GetEndAtom().GetAtomicNum() == 1) \
+                or (bond.GetBeginAtom().GetAtomicNum() == 1 and bond.GetEndAtom().GetAtomicNum() == 6):
+                CH_bond_lengths.append(get_bond_lengths(mol_conformer, bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()))
 
     CC_mean = np.mean(CC_bond_lengths)
     CC_std = np.std(CC_bond_lengths)
@@ -146,7 +148,7 @@ def extract_submol(original_mol, subidx, dual_topology=[]):
     return submol, atom_map
 
 
-def extract_submol_with_center(mol, center_atom_idx, radius=5, dual_topology=[]):
+def extract_submol_with_center(mol: Mol, center_atom_idx: int, radius: float=5, dual_topology: List[Tuple[int, int, Optional[int]]]=[]):
     tree = BallTree(mol.GetConformer().GetPositions())
     subidx = tree.query_radius([mol.GetConformer().GetPositions()[center_atom_idx]], r=radius)[0]
     subidx = set(subidx)
@@ -192,8 +194,8 @@ class Extractor:
             for bond in mol.GetBonds():
                 begin_atom_idx = bond.GetBeginAtomIdx()
                 end_atom_idx = bond.GetEndAtomIdx()
-                if reference_mol.GetBondBetweenAtoms(begin_atom_idx, end_atom_idx) is None:
-                    dual_topology.append((begin_atom_idx, end_atom_idx, None))
+                bond = reference_mol.GetBondBetweenAtoms(begin_atom_idx, end_atom_idx)
+                dual_topology.append((begin_atom_idx, end_atom_idx, bond.GetBondType() if bond is not None else None))
             
             if "Fa_std" in y_pred:
                 Fa_std = np.array(y_pred["Fa_std"][frame_idx])

@@ -34,7 +34,7 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .leftnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "mace":
-        from .mace import MACEWrapper as Core
+        from .mace import MACECore as Core
         from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "nequip":
@@ -403,7 +403,7 @@ class FF_single(BaseFFLauncher):
                 try:
                     self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
                 except FileNotFoundError:
-                    self.pretrain_path = None
+                    self.pretrain_path = get_pretrain_path(self.base_pretrain_path, "best", None)
             else:
                 self.pretrain_path = get_pretrain_path(base_pretrain_path, "last", None)
         else:

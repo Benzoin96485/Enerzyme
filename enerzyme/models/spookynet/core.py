@@ -202,8 +202,8 @@ class SpookyNetCore(BaseFFCore):
                 dropout_mask = dropout_mask * torch.bernoulli(self.keep_prob * torch.ones_like(dropout_mask))
             f = f + y
         out = self.output(f)
-        ea = out.narrow(-1, 0, 1).squeeze(-1)  # atomic energy
-        qa = out.narrow(-1, 1, 1).squeeze(-1)  # partial charge
+        ea = out.narrow(1, 0, 1).squeeze(1)  # atomic energy
+        qa = out.narrow(1, 1, 1).squeeze(1)  # partial charge
         return ea, qa
 
     def get_output(
