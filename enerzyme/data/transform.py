@@ -84,22 +84,31 @@ class NegativeGradientTransform:
 
 
 class TotalEnergyNormalization:
-    def __init__(self, preload_path):
+    def __init__(self, preload_path=".", scale=None, shift=None):
         self.transform_type = "normalization"
-        self.statistics = os.path.join(preload_path, "statistics.data")
         self.scale = 1
         self.shift = 0
-        self.loaded = False
-        if os.path.isfile(self.statistics):
-            stat = joblib.load(self.statistics)
-            self.scale = stat["scale"]
-            self.shift = stat["shift"]
-            self.loaded = True
+        self.loaded = True
+        self.statistics = os.path.join(preload_path, "statistics.data")
+        if scale is not None:
+            self.scale = scale  
+        if shift is not None:
+            self.shift = shift
+        if scale is None and shift is None:
+            self.loaded = False
+            if os.path.isfile(self.statistics):
+                stat = joblib.load(self.statistics)
+                self.scale = stat["scale"]
+                self.shift = stat["shift"]
+                self.loaded = True
+        else:
+            joblib.dump({"shift": self.shift, "scale": self.scale}, self.statistics)
 
     def transform(self, new_input):
         if "E" not in new_input:
             return
         if not self.loaded:
+            logger.info("Calculating total energy normalization statistics")    
             self.shift = np.mean(new_input["E"])
             self.scale = np.std(new_input["E"])
             joblib.dump({"shift": self.shift, "scale": self.scale}, self.statistics)
