@@ -140,9 +140,14 @@ class Transform:
                 self.scales.append(NegativeGradientTransform())
                 self.backup_keys.add("Fa")
             if k == "total_energy_normalization" and v:
-                if not isinstance(v, str):
+                if v is None:
                     v = preload_path
-                self.normalizations.append(TotalEnergyNormalization(v))
+                if isinstance(v, str):
+                    self.normalizations.append(TotalEnergyNormalization(v))
+                elif isinstance(v, dict):
+                    self.normalizations.append(TotalEnergyNormalization(**v))
+                else:
+                    raise ValueError(f"Invalid total energy normalization: {v}")
                 self.backup_keys.add("E")
 
     def transform(self, raw_input: Dict):
