@@ -151,6 +151,7 @@ def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optiona
         logger.info(f"loading ema state dict from {pretrain_path}...")
     else:
         if inference and "ema_state_dict" in loaded_info:
+            model.load_state_dict(loaded_info["model_state_dict"])
             tmp_ema = ExponentialMovingAverage(model.parameters(), decay=1, use_num_updates=True)
             tmp_ema.load_state_dict(loaded_info["ema_state_dict"])
             tmp_ema.copy_to(model.parameters())
