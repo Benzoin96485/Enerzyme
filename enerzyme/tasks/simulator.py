@@ -4,6 +4,8 @@ import ase
 import ase.io
 import torch
 from copy import copy
+from typing import Literal
+from functools import partial
 from ase.constraints import FixAtoms, FixBondLengths
 from ase.calculators.calculator import Calculator, all_changes
 from ase.units import Hartree, fs, kB, Bohr
@@ -76,7 +78,10 @@ class ASECalculator(Calculator):
             self.results["charges"] = output["Qa"][0]
 
 
-def get_optimizer(optimizer_name):
+def get_optimizer(
+    optimizer_name: Literal["BFGS", "LBFGS", "MDMin", "FIRE", "GPMin", "BFGSLineSearch", "LBFGSLineSearch", "odesolver", "static"], 
+    neb: bool=False
+):
     if optimizer_name == "BFGS":
         from ase.optimize import BFGS
         return BFGS
@@ -98,6 +103,14 @@ def get_optimizer(optimizer_name):
     elif optimizer_name == "LBFGSLineSearch":
         from ase.optimize import LBFGSLineSearch
         return LBFGSLineSearch
+    elif neb == True:
+        from ase.mep.neb import NEBOptimizer
+        if optimizer_name == "odesolver":
+            return partial(NEBOptimizer, method="ODE", verbose=1)
+        elif optimizer_name == "static":
+            return partial(NEBOptimizer, method="static")
+        else:
+            raise ValueError(f"NEB optimizer {optimizer_name} not supported")
     else:
         raise ValueError(f"Optimizer {optimizer_name} not supported")
 
@@ -219,7 +232,7 @@ class Simulation:
         dyn.run(self.integrate_config.n_step)
 
     def _run_neb(self):
-        from ase.mep.neb import NEB, NEBOptimizer, NEBTools
+        from ase.mep.neb import NEB, NEBTools
         num_images = self.sampling_config.params.num_images
         assert num_images > 2, "Number of images must be greater than 2"
         requires_interpolation = 0
@@ -262,7 +275,7 @@ class Simulation:
                 interpolated_neb = NEB(images)
                 interpolated_neb.interpolate(
                     method=self.sampling_config.params.interpolation.method,
-                    apply_constraints=self.sampling_config.params.interpolation.apply_constraints
+                    apply_constraint=self.sampling_config.params.interpolation.apply_constraint
                 )
             elif requires_interpolation == 2:
                 logger.info(f"Interpolating {num_images} images between reactant, guessed TS and product")
@@ -270,12 +283,12 @@ class Simulation:
                 first_half_neb = NEB(images[:middle_idx])
                 first_half_neb.interpolate(
                     method=self.sampling_config.params.interpolation.method,
-                    apply_constraints=self.sampling_config.params.interpolation.apply_constraints
+                    apply_constraint=self.sampling_config.params.interpolation.apply_constraint
                 )
                 second_half_neb = NEB(images[middle_idx:])
                 second_half_neb.interpolate(
                     method=self.sampling_config.params.interpolation.method,
-                    apply_constraints=self.sampling_config.params.interpolation.apply_constraints
+                    apply_constraint=self.sampling_config.params.interpolation.apply_constraint
                 )
             
         neb = NEB(
@@ -287,7 +300,9 @@ class Simulation:
         neb_tools = NEBTools(neb.images)
 
         # plain neb
-        optimizer = NEBOptimizer(neb, trajectory="neb.traj")
+        neb_optimizer_name = self.sampling_config.params.get("neb_optimizer", "odesolver")
+        optimizer = get_optimizer(neb_optimizer_name, neb=True)(neb, trajectory=osp.join(self.out_dir, "neb.traj"))
+        
         def write_xyz(images=None):
             for i, image in enumerate(images):
                 ase.io.write(osp.join(self.out_dir, f"neb-{i}.xyz"), image, append=True)
@@ -300,7 +315,8 @@ class Simulation:
 
         if self.sampling_config.params.get("climb", False):
             neb.climb = True
-            optimizer = NEBOptimizer(neb, trajectory="ci-neb.traj")
+            ci_neb_optimizer_name = self.sampling_config.params.get("ci_neb_optimizer", neb_optimizer_name)
+            optimizer = get_optimizer(ci_neb_optimizer_name, neb=True)(neb, trajectory=osp.join(self.out_dir, "ci-neb.traj"))
             def write_xyz(images=None):
                 for i, image in enumerate(images):
                     ase.io.write(osp.join(self.out_dir, f"ci-neb-{i}.xyz"), image, append=True)
