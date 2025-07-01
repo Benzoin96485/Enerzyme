@@ -4,6 +4,8 @@ import ase
 import ase.io
 import torch
 from copy import copy
+from typing import Literal
+from functools import partial
 from ase.constraints import FixAtoms, FixBondLengths
 from ase.calculators.calculator import Calculator, all_changes
 from ase.units import Hartree, fs, kB, Bohr
@@ -76,7 +78,10 @@ class ASECalculator(Calculator):
             self.results["charges"] = output["Qa"][0]
 
 
-def get_optimizer(optimizer_name):
+def get_optimizer(
+    optimizer_name: Literal["BFGS", "LBFGS", "MDMin", "FIRE", "GPMin", "BFGSLineSearch", "LBFGSLineSearch", "odesolver", "static"], 
+    neb: bool=False
+):
     if optimizer_name == "BFGS":
         from ase.optimize import BFGS
         return BFGS
@@ -98,6 +103,14 @@ def get_optimizer(optimizer_name):
     elif optimizer_name == "LBFGSLineSearch":
         from ase.optimize import LBFGSLineSearch
         return LBFGSLineSearch
+    elif neb == True:
+        from ase.mep.neb import NEBOptimizer
+        if optimizer_name == "odesolver":
+            return partial(NEBOptimizer, method="ODE")
+        elif optimizer_name == "static":
+            return partial(NEBOptimizer, method="static")
+        else:
+            raise ValueError(f"NEB optimizer {optimizer_name} not supported")
     else:
         raise ValueError(f"Optimizer {optimizer_name} not supported")
 
@@ -166,6 +179,7 @@ class Simulation:
             ase.io.write(osp.join(self.out_dir, f"sp.xyz"), system, append=True)
 
     def _run_opt(self):
+        logger.info(f"Running optimization with {self.optimize_config.optimizer} optimizer")
         optimizer = get_optimizer(self.optimize_config.optimizer)(self.system)
         def write_xyz(atoms=None):
             ase.io.write(osp.join(self.out_dir, f"traj-opt.xyz"), atoms, append=True)
@@ -219,40 +233,105 @@ class Simulation:
         dyn.run(self.integrate_config.n_step)
 
     def _run_neb(self):
-        from ase.mep.neb import NEB
+        from ase.mep.neb import NEB, NEBTools
         num_images = self.sampling_config.params.num_images
         assert num_images > 2, "Number of images must be greater than 2"
+        requires_interpolation = 0
         if len(self.initial_structures) == 2:
+            requires_interpolation = 1
             images = []
             for _ in range(num_images - 1):
                 images.append(self.initial_structures[0].copy())
             images.append(self.initial_structures[1].copy())
         elif len(self.initial_structures) == num_images:
             images = self.systems
+        elif len(self.initial_structures) == 3:
+            requires_interpolation = 2
+            images = []
         else:
             raise ValueError(f"Number of initial structures {len(self.initial_structures)} is not capatible with the number of images {num_images}")
+        
+        if requires_interpolation:
+            for image in images:
+                image.calc = copy(self.calculator)
+                image.set_constraint(self.constraints)
+
+        if self.sampling_config.params.get("relax_endpoints", True):
+            logger.info("Relaxing endpoints")
+            # relaxing reactant
+            optimizer = get_optimizer(self.optimize_config.optimizer)(images[0])
+            def write_xyz(atoms=None):
+                ase.io.write(osp.join(self.out_dir, f"neb-relax-reactant.xyz"), atoms, append=True)
+            optimizer.attach(write_xyz, interval=1, atoms=images[0])
+            optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr)
+            # relaxing product
+            optimizer = get_optimizer(self.optimize_config.optimizer)(images[-1])
+            def write_xyz(atoms=None):
+                ase.io.write(osp.join(self.out_dir, f"neb-relax-product.xyz"), atoms, append=True)
+            optimizer.attach(write_xyz, interval=1, atoms=images[-1])
+            optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr)
+
+        if requires_interpolation:
+            if requires_interpolation == 1:
+                logger.info(f"Interpolating {num_images} images between reactant and product")
+                interpolated_neb = NEB(images)
+                interpolated_neb.interpolate(
+                    method=self.sampling_config.params.interpolation.method,
+                    apply_constraint=self.sampling_config.params.interpolation.apply_constraint
+                )
+            elif requires_interpolation == 2:
+                logger.info(f"Interpolating {num_images} images between reactant, guessed TS and product")
+                middle_idx = num_images // 2
+                first_half_neb = NEB(images[:middle_idx])
+                first_half_neb.interpolate(
+                    method=self.sampling_config.params.interpolation.method,
+                    apply_constraint=self.sampling_config.params.interpolation.apply_constraint
+                )
+                second_half_neb = NEB(images[middle_idx:])
+                second_half_neb.interpolate(
+                    method=self.sampling_config.params.interpolation.method,
+                    apply_constraint=self.sampling_config.params.interpolation.apply_constraint
+                )
+            
         neb = NEB(
-            images, 
+            images,
             k=self.sampling_config.params.spring_constants / self.calculator.Hartree_in_E * Hartree, 
-            climb=self.sampling_config.params.climb, 
+            climb=False, 
             allow_shared_calculator=True
         )
-        if len(self.initial_structures) == 2:
-            neb.interpolate(
-                images=images,
-                method=self.sampling_config.params.interpolation.method,
-                apply_constraints=self.sampling_config.params.interpolation.apply_constraints
-            )
-        for image in images:
-            image.calc = copy(self.calculator)
-            image.set_constraint(self.constraints)
-        optimizer = get_optimizer(self.optimize_config.optimizer)(neb)
+        neb_tools = NEBTools(neb.images)
+
+        # plain neb
+        neb_optimizer_name = self.sampling_config.params.get("neb_optimizer", "odesolver")
+        optimizer = get_optimizer(neb_optimizer_name, neb=True)(neb, trajectory=osp.join(self.out_dir, "neb.traj"))
+        
         def write_xyz(images=None):
             for i, image in enumerate(images):
                 ase.io.write(osp.join(self.out_dir, f"neb-{i}.xyz"), image, append=True)
             ase.io.write(osp.join(self.out_dir, f"neb.xyz"), images, append=False)
         optimizer.attach(write_xyz, interval=1, images=images)
-        optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr)
+        if self.sampling_config.params.get("climb", False):
+            optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr * 2)
+        else:
+            optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr)
+        barrier, dE = neb_tools.get_barrier()
+        logger.info(f"NEB barrier: {barrier}, dE: {dE}")
+        ase.io.write(osp.join(self.out_dir, f"neb.xyz"), images, append=False)
+
+        if self.sampling_config.params.get("climb", False):
+            neb.climb = True
+            ci_neb_optimizer_name = self.sampling_config.params.get("ci_neb_optimizer", neb_optimizer_name)
+            optimizer = get_optimizer(ci_neb_optimizer_name, neb=True)(neb, trajectory=osp.join(self.out_dir, "ci-neb.traj"))
+            def write_xyz(images=None):
+                for i, image in enumerate(images):
+                    ase.io.write(osp.join(self.out_dir, f"ci-neb-{i}.xyz"), image, append=True)
+                ase.io.write(osp.join(self.out_dir, f"ci-neb.xyz"), images, append=False)
+            optimizer.attach(write_xyz, interval=1, images=images)
+            optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr)
+            barrier, dE = neb_tools.get_barrier()
+            logger.info(f"CI-NEB barrier: {barrier}, dE: {dE}")
+            ase.io.write(osp.join(self.out_dir, f"ci-neb.xyz"), images, append=False)
+
         
     def _run_plumed(self):
         plumed_setup = self.sampling_config.params.plumed_setup

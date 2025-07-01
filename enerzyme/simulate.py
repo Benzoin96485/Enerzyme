@@ -24,6 +24,9 @@ class FFSimulate:
         for FF_key, FF_params in model_config.Modelhub.internal_FFs.items():
             if FF_params.get("active", False):
                 self._init_model(FF_key, FF_params)
+        for FF_key, FF_params in model_config.Modelhub.external_FFs.items():
+            if FF_params.get("active", False):
+                self._init_model(FF_key, FF_params)
     
     def _init_model(self, FF_key, FF_params):
         model_str = get_model_str(FF_key, FF_params)
@@ -32,5 +35,6 @@ class FFSimulate:
         self.simulations.append(Simulation(self.config, model, model_path, self.out_dir, self.transform))
         
     def run(self):
+        print()
         for simulation in self.simulations:
             simulation.run()
