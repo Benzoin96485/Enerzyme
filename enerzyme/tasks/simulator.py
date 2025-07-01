@@ -106,7 +106,7 @@ def get_optimizer(
     elif neb == True:
         from ase.mep.neb import NEBOptimizer
         if optimizer_name == "odesolver":
-            return partial(NEBOptimizer, method="ODE", verbose=1)
+            return partial(NEBOptimizer, method="ODE")
         elif optimizer_name == "static":
             return partial(NEBOptimizer, method="static")
         else:
@@ -179,6 +179,7 @@ class Simulation:
             ase.io.write(osp.join(self.out_dir, f"sp.xyz"), system, append=True)
 
     def _run_opt(self):
+        logger.info(f"Running optimization with {self.optimize_config.optimizer} optimizer")
         optimizer = get_optimizer(self.optimize_config.optimizer)(self.system)
         def write_xyz(atoms=None):
             ase.io.write(osp.join(self.out_dir, f"traj-opt.xyz"), atoms, append=True)
@@ -249,6 +250,11 @@ class Simulation:
             images = []
         else:
             raise ValueError(f"Number of initial structures {len(self.initial_structures)} is not capatible with the number of images {num_images}")
+        
+        if requires_interpolation:
+            for image in images:
+                image.calc = copy(self.calculator)
+                image.set_constraint(self.constraints)
 
         if self.sampling_config.params.get("relax_endpoints", True):
             logger.info("Relaxing endpoints")
@@ -266,10 +272,6 @@ class Simulation:
             optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr)
 
         if requires_interpolation:
-            for image in images:
-                image.calc = copy(self.calculator)
-                image.set_constraint(self.constraints)
-
             if requires_interpolation == 1:
                 logger.info(f"Interpolating {num_images} images between reactant and product")
                 interpolated_neb = NEB(images)
@@ -308,7 +310,10 @@ class Simulation:
                 ase.io.write(osp.join(self.out_dir, f"neb-{i}.xyz"), image, append=True)
             ase.io.write(osp.join(self.out_dir, f"neb.xyz"), images, append=False)
         optimizer.attach(write_xyz, interval=1, images=images)
-        optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr)
+        if self.sampling_config.params.get("climb", False):
+            optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr * 2)
+        else:
+            optimizer.run(fmax=4.5e-4 / self.calculator.Hartree_in_E * Hartree / Bohr)
         barrier, dE = neb_tools.get_barrier()
         logger.info(f"NEB barrier: {barrier}, dE: {dE}")
         ase.io.write(osp.join(self.out_dir, f"neb.xyz"), images, append=False)
