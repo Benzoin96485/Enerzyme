@@ -65,6 +65,7 @@ class CollectOutputCallback(L.Callback):
             pl_module.metrics
         )
         pl_module.log("val_loss", total_loss, sync_dist=True)
+        pl_module.log("lr", pl_module.optimizer.param_groups[0]["lr"], sync_dist=True)
         pl_module.log_dict(metric_score, sync_dist=True)
 
     def on_test_batch_end(self, 
@@ -227,7 +228,11 @@ class LightningModel(L.LightningModule):
     def configure_optimizers(self):
         return {
             "optimizer": self.optimizer,
-            "lr_scheduler": self.scheduler
+            "lr_scheduler": {
+                "scheduler": self.scheduler,
+                "interval": "step",
+                "frequency": 1
+            }
         }
 
     def configure_callbacks(self):
@@ -245,8 +250,10 @@ class LightningModel(L.LightningModule):
         )
         last_checkpoint_callback.FILE_EXTENSION = ".pt"
         collect_output_callback = CollectOutputCallback()
-        monitor_callback = MonitorCallback(self.monitor)
-        callbacks = [best_checkpoint_callback, last_checkpoint_callback, collect_output_callback, monitor_callback]
+        callbacks = [best_checkpoint_callback, last_checkpoint_callback, collect_output_callback]
+        if self.monitor is not None:
+            monitor_callback = MonitorCallback(self.monitor)
+            callbacks.append(monitor_callback)
         if self.use_ema:
             callbacks.append(EMACallback(
                 self.use_ema,

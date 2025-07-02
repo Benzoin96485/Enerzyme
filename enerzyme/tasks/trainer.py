@@ -34,7 +34,7 @@ DTYPE_MAPPING = {
 }
 
 
-def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None, strict: bool=True) -> Dict:
+def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrain_path: Optional[str]=None, ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None, strict: bool=True) -> Dict:
     other_info = dict()
     if pretrain_path is None:
         return other_info
@@ -88,25 +88,6 @@ class Trainer:
         self.config = params
         self.out_dir = out_dir
         self.metric_config = metric_config
-        if self.lightning:
-            import lightning as L
-            from lightning.pytorch.callbacks import EarlyStopping
-            early_stopping_callback = EarlyStopping(
-                monitor="_judge_score",
-                mode="min",
-                patience=self.patience,
-                min_delta=0
-            )
-            self.lightning_trainer = L.Trainer(
-                default_root_dir=out_dir,
-                accelerator="auto",
-                callbacks=[early_stopping_callback],
-                devices="auto",
-                num_nodes=os.environ.get("SLURM_NNODES", 1),
-                strategy="auto",
-                gradient_clip_val=self.max_norm if self.max_norm > 0 else None,
-                inference_mode=False
-            )
         self.metrics = Metrics(metric_config)
         self.splitter = Splitter(**params["Splitter"])
         if "Monitor" in params:
@@ -122,12 +103,6 @@ class Trainer:
         self.schedule = params.get('schedule', "linear")
         self.weight_decay = float(params.get('weight_decay', 0))
         self.amsgrad = params.get('amsgrad', True)
-        if torch.cuda.is_available():
-            logger.info("GPU found!")
-            self.device = torch.device("cuda:0" if self.cuda else "cpu")
-        else:
-            logger.info("GPU not found, turn to CPU!")
-            self.device = torch.device("cpu")
         self.data_in_memory = params.get("data_in_memory", True)
         self.use_ema = params.get("use_ema", True)
         self.ema_decay = params.get("ema_decay", 0.999)
@@ -148,21 +123,47 @@ class Trainer:
         if self.num_workers <= 0:
             if "SLURM_NTASKS" in os.environ:
                 self.num_workers = max(1, int(os.environ["SLURM_NTASKS"]) // 2 - 1)
+                logger.info(f"using {self.num_workers} workers for dataloader given {os.environ['SLURM_NTASKS']} tasks")
             else:
                 self.num_workers = max(1, os.cpu_count() // 2 - 1)
-        logger.info(f"using {self.num_workers} workers for dataloader")
+                logger.info(f"using {self.num_workers} workers for dataloader given {os.cpu_count()} cpus")
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
         elif isinstance(non_target_features, str):
             self.non_target_features = [non_target_features]
         else:
             raise ValueError(f"non_target_features must be a list or a string, but got {type(non_target_features)}")
+        if self.lightning:
+            self.device = None
+            import lightning as L
+            from lightning.pytorch.callbacks import EarlyStopping
+            early_stopping_callback = EarlyStopping(
+                monitor="_judge_score",
+                mode="min",
+                patience=self.patience,
+                min_delta=0
+            )
+            self.lightning_trainer = L.Trainer(
+                default_root_dir=out_dir,
+                accelerator="auto",
+                callbacks=[early_stopping_callback],
+                devices="auto",
+                num_nodes=os.environ.get("SLURM_NNODES", 1),
+                strategy="auto",
+                gradient_clip_val=self.max_norm if self.max_norm > 0 else None,
+                inference_mode=False,
+                max_epochs=self.max_epochs
+            )
+        else:
+            if torch.cuda.is_available():
+                logger.info("GPU found!")
+                self.device = torch.device("cuda:0" if self.cuda else "cpu")
+            else:
+                logger.info("GPU not found, turn to CPU!")
+                self.device = torch.device("cpu")
 
     def decorate_batch_input(self, batch):
-        if self.lightning:
-            return _decorate_batch_input(batch, self.dtype, None)
-        else:
-            return _decorate_batch_input(batch, self.dtype, self.device)
+        return _decorate_batch_input(batch, self.dtype, self.device)
     
     def decorate_batch_output(self, output, features, targets):
         return _decorate_batch_output(output, features, targets, self.non_target_features)
@@ -230,7 +231,7 @@ class Trainer:
             num_workers=self.num_workers,
             drop_last=True 
         )
-        num_training_steps = len(train_dataloader) * self.max_epochs
+        num_training_steps = len(train_dataloader) * self.max_epochs // self.lightning_trainer.world_size
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
         optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay, amsgrad=self.amsgrad)
         scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
@@ -254,7 +255,7 @@ class Trainer:
                 collate_fn=self.decorate_batch_input,
                 drop_last=True,
                 pin_memory=True,
-                num_workers=max(1, (os.cpu_count() - 4) // self.lightning_trainer.num_devices)
+                num_workers=max(1, self.num_workers)
             )
             if valid_dataset is not None:
                 valid_dataloader = DataLoader(
@@ -263,7 +264,7 @@ class Trainer:
                     shuffle=False,
                     collate_fn=self.decorate_batch_input,
                     pin_memory=True,
-                    num_workers=max(1, (os.cpu_count() - 4) // self.lightning_trainer.num_devices)
+                    num_workers=max(1, self.num_workers)
                 )
             else:
                 valid_dataloader = None
@@ -276,7 +277,7 @@ class Trainer:
                     shuffle=False,
                     collate_fn=self.decorate_batch_input,
                     pin_memory=True,
-                    num_workers=max(1, (os.cpu_count() - 1) // self.lightning_trainer.num_devices // 2)
+                    num_workers=max(1, self.num_workers)
                 )
                 self.lightning_trainer.test(model, test_dataloader)
         else:
