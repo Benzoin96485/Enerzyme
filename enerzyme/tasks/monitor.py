@@ -22,19 +22,29 @@ class Monitor:
                 elif k + "_a" in output:
                     self.collection[k].extend(segment_sum_coo(output[k + "_a"].detach(), output["batch_seg"]).cpu().numpy())
 
-    def summary(self) -> None:
-        message = []
+
+    def _summary(self) -> Dict[str, Dict[str, float]]:
+        summary_dict = {}
         for term, stats in self.terms.items():
-            message.append(f"-------- {term} ---------")
+            summary_dict[term] = {}
             for stat in stats:
                 if stat == "mean":
-                    message.append(f"{stat}: {np.mean(self.collection[term])}")
+                    summary_dict[term][stat] = np.mean(self.collection[term])
                 if stat == "std":
-                    message.append(f"{stat}: {np.std(self.collection[term])}")
+                    summary_dict[term][stat] = np.std(self.collection[term])
                 if stat == "max":
-                    message.append(f"{stat}: {np.max(self.collection[term])}")
+                    summary_dict[term][stat] = np.max(self.collection[term])
                 if stat == "min":
-                    message.append(f"{stat}: {np.min(self.collection[term])}")
+                    summary_dict[term][stat] = np.min(self.collection[term])
+        return summary_dict
+
+    def summary(self) -> None:
+        message = []
+        summary_dict = self._summary()
+        for term, stats in summary_dict.items():
+            message.append(f"-------- {term} ---------")
+            for stat, value in stats.items():
+                message.append(f"{stat}: {value}")
 
         logger.info("\n" + "\n".join(message) + f"\n-------------------------")
         self._reset()

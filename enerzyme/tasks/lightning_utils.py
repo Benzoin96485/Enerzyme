@@ -8,7 +8,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch_ema import ExponentialMovingAverage
 import lightning as L
-from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from .monitor import Monitor
 from ..data import Transform
 from .metrics import Metrics
@@ -66,6 +66,8 @@ class CollectOutputCallback(L.Callback):
         )
         pl_module.log("val_loss", total_loss, sync_dist=True)
         pl_module.log("lr", pl_module.optimizer.param_groups[0]["lr"], sync_dist=True)
+        pl_module.log("last_wait_count", trainer.early_stopping_callback.wait_count)
+        pl_module.log("last_best_score", trainer.early_stopping_callback.best_score)
         pl_module.log_dict(metric_score, sync_dist=True)
 
     def on_test_batch_end(self, 
@@ -104,7 +106,11 @@ class MonitorCallback(L.Callback):
         self.monitor.collect(outputs["raw_output"])
 
     def on_validation_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        self.monitor.summary()
+        summary_dict = self.monitor._summary()
+        for term, stats in summary_dict.items():
+            for stat, value in stats.items():
+                pl_module.log(f"test_{term}_{stat}", value, sync_dist=True)
+        self.monitor._reset()
 
     def on_test_batch_end(self, 
         pl_module: L.LightningModule, 
@@ -116,7 +122,11 @@ class MonitorCallback(L.Callback):
         self.monitor.collect(outputs["raw_output"])
 
     def on_test_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
-        self.monitor.summary()
+        summary_dict = self.monitor._summary()
+        for term, stats in summary_dict.items():
+            for stat, value in stats.items():
+                pl_module.log(f"test_{term}_{stat}", value, sync_dist=True)
+        self.monitor._reset()
 
 
 class EMACallback(L.Callback):
@@ -165,7 +175,7 @@ class EMACallback(L.Callback):
         if self.use_ema and state_dict:
             self.ema.load_state_dict(state_dict)
         if not self.use_ema:
-            self.ema.copy_to(self.model.parameters())
+            self.ema.copy_to(self.model.parameters())  
 
 
 class LightningModel(L.LightningModule):
