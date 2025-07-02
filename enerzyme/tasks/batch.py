@@ -16,12 +16,12 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
                 np.concatenate([feature[k][:feature["N"]] for feature in features]), 
                 dtype=torch.long if is_int(k) else dtype,
                 requires_grad=requires_grad(k)
-            ).to(device)
+            )
         elif not is_idx(k):
             batch_features[k] = torch.tensor(
                 np.array([feature[k] for feature in features]), 
                 dtype=torch.long if is_int(k) else dtype,
-            ).to(device)
+            )
 
     batch_idx_i = []
     batch_idx_j = []
@@ -39,9 +39,9 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
         batch_seg.append(np.full(feature["N"], i, dtype=int))
         count += feature["N"]
     batch_features["N"] = [feature["N"] for feature in features]
-    batch_features["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long).to(device)
-    batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long).to(device)
-    batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long).to(device)
+    batch_features["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
+    batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long)
+    batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long)
 
     if targets[0] is not None:
         for k in targets[0]:
@@ -49,12 +49,12 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
                 batch_targets[k] = torch.tensor(
                     np.concatenate([target[k][:features[i]["N"]] for i, target in enumerate(targets)]), 
                     dtype=torch.long if is_int(k) else dtype
-                ).to(device)
+                )
             else:
                 batch_targets[k] = torch.tensor(
                     np.array([target[k] for target in targets]), 
                     dtype=torch.long if is_int(k) else dtype,
-                ).to(device)
+                )
     
     return batch_features, batch_targets
 
