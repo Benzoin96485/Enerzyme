@@ -34,11 +34,35 @@ DTYPE_MAPPING = {
 }
 
 
+def _convert_lightning_state_dict(lightning_loaded_info: Dict) -> Dict:
+    loaded_info = dict()
+    if "state_dict" in lightning_loaded_info:
+        loaded_info["model_state_dict"] = lightning_loaded_info["state_dict"]
+    if "epoch" in lightning_loaded_info:
+        loaded_info["epoch"] = lightning_loaded_info["epoch"]
+    if "lr_schedulers" in lightning_loaded_info:
+        loaded_info["scheduler_state_dict"] = lightning_loaded_info["lr_schedulers"][0]
+    if 'optimizer_states' in lightning_loaded_info:
+        loaded_info["optimizer_state_dict"] = lightning_loaded_info["optimizer_states"][0]
+    if "callbacks" in lightning_loaded_info:
+        for k, v in lightning_loaded_info["callbacks"].items():
+            if k == "EMACallback":
+                loaded_info["ema_state_dict"] = v
+            elif k.startswith("EarlyStopping"):
+                if 'best_score' in v:
+                    loaded_info["best_score"] = v['best_score']
+                if 'wait_count' in v and "epoch" in loaded_info:
+                    loaded_info["best_epoch"] = loaded_info["epoch"] - v['wait_count']
+    return loaded_info
+
+
 def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrain_path: Optional[str]=None, ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None, strict: bool=True) -> Dict:
     other_info = dict()
     if pretrain_path is None:
         return other_info
     loaded_info = torch.load(pretrain_path, map_location=device)
+    if 'pytorch-lightning_version' in loaded_info:
+        loaded_info = _convert_lightning_state_dict(loaded_info)
     if ema is not None and "ema_state_dict" in loaded_info:
         model.load_state_dict(loaded_info["model_state_dict"])
         ema.load_state_dict(loaded_info["ema_state_dict"])
