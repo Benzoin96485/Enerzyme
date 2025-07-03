@@ -5,7 +5,7 @@ from torch import Tensor
 import torch.nn.functional as F
 from e3nn.util.jit import compile_mode
 from e3nn.o3 import Irreps, SphericalHarmonics
-from .interaction import RealAgnosticResidualInteractionBlock, EquivariantProductBasisBlock, LinearReadoutBlock, NonLinearReadoutBlock
+from .interaction import INTERACTION_CLASSES, EquivariantProductBasisBlock, LinearReadoutBlock, NonLinearReadoutBlock
 from ..layers import BaseFFCore, DistanceLayer, RangeSeparationLayer, BaseAtomEmbedding, BaseElectronEmbedding, BaseRBF, ChargeConservationLayer
 
 DEFAULT_BUILD_PARAMS = {
@@ -29,9 +29,6 @@ DEFAULT_LAYER_PARAMS = [{
         'avg_num_neighbors': 8.0,
     }
 }]
-INTERACTION_CLASSES = {
-    "RealAgnosticResidualInteractionBlock": RealAgnosticResidualInteractionBlock,
-}
 GATE_FUNCTIONS = {
     "abs": torch.abs,
     "tanh": torch.tanh,

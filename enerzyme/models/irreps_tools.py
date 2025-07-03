@@ -9,6 +9,24 @@ _INPUT = namedtuple("_INPUT", "tensor, start, stop")
 _TP = namedtuple("_TP", "op, args")
 
 
+def linear_out_irreps(irreps: Irreps, target_irreps: Irreps) -> Irreps:
+    # Assuming simplified irreps
+    irreps_mid = []
+    for _, ir_in in irreps:
+        found = False
+
+        for mul, ir_out in target_irreps:
+            if ir_in == ir_out:
+                irreps_mid.append((mul, ir_out))
+                found = True
+                break
+
+        if not found:
+            raise RuntimeError(f"{ir_in} not in {target_irreps}")
+
+    return Irreps(irreps_mid)
+
+
 def tp_out_irreps_with_instructions(
     irreps1: Irreps, irreps2: Irreps, target_irreps: Irreps
 ) -> Tuple[Irreps, List]:
