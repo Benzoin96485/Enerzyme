@@ -251,9 +251,6 @@ class Trainer:
                 ema_decay=self.ema_decay,
                 ema_use_num_updates=self.ema_use_num_updates
             )
-            if self.resume > 1:
-                logger.info(f"loading lightning model state dict from {pretrain_path}...")
-                lightning_model.load_from_checkpoint(pretrain_path)
             train_dataloader = DataLoader(
                 dataset=train_dataset,
                 batch_size=self.batch_size,
@@ -274,7 +271,7 @@ class Trainer:
                 )
             else:
                 valid_dataloader = None
-            self.lightning_trainer.fit(lightning_model, train_dataloader, valid_dataloader)
+            self.lightning_trainer.fit(lightning_model, train_dataloader, valid_dataloader, ckpt_path=pretrain_path if self.resume > 1 else None)
             
             if test_dataset is not None:
                 test_dataloader = DataLoader(

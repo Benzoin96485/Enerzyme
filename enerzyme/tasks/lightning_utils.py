@@ -253,12 +253,12 @@ class LightningModel(L.LightningModule):
             save_top_k=1,
             filename="model_best"
         )
-        best_checkpoint_callback.FILE_EXTENSION = ".pt"
+        best_checkpoint_callback.FILE_EXTENSION = ".pth"
         last_checkpoint_callback = ModelCheckpoint(
             dirpath=self.dump_dir,
             filename="model_last"
         )
-        last_checkpoint_callback.FILE_EXTENSION = ".pt"
+        last_checkpoint_callback.FILE_EXTENSION = ".pth"
         collect_output_callback = CollectOutputCallback()
         callbacks = [best_checkpoint_callback, last_checkpoint_callback, collect_output_callback]
         if self.monitor is not None:
