@@ -295,7 +295,7 @@ class Simulation:
             
         neb = NEB(
             images,
-            k=self.sampling_config.params.spring_constants / self.calculator.Hartree_in_E * Hartree, 
+            k=self.sampling_config.params.spring_constants / self.calculator.Hartree_in_E * Hartree / (Bohr ** 2), 
             climb=False, 
             allow_shared_calculator=True
         )
