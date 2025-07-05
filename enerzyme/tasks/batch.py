@@ -24,8 +24,14 @@ def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str,
                     dtype=torch.long if is_int(k) else dtype,
                 )
             data_dict["N"] = torch.tensor(feature["N"], dtype=torch.long)
-        data = Data(pos=data_dict["Ra"], edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), **data_dict)
-        feature_list.append(data)
+        if "idx_i" in feature and "idx_j" in feature:
+            data_dict["idx_i"] = torch.tensor(data_dict["idx_i"], dtype=torch.long)
+            data_dict["idx_j"] = torch.tensor(data_dict["idx_j"], dtype=torch.long)
+        else:
+            idx_i, idx_j = full_neighbor_list(feature["N"])
+            data_dict["idx_i"] = torch.tensor(idx_i, dtype=torch.long)
+            data_dict["idx_j"] = torch.tensor(idx_j, dtype=torch.long)
+        feature_list.append(Data(edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), **data_dict))
     batch_features = Batch.from_data_list(feature_list)
 
     target_list = []
