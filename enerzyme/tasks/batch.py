@@ -5,6 +5,51 @@ from torch import Tensor
 from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, is_target_uq, full_neighbor_list
 
 
+def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
+    from torch_geometric.data import Data, Batch
+    features, targets = zip(*batch)
+    feature_list = []
+    for feature in features:
+        data_dict = dict()
+        for k, v in feature.items():
+            if is_atomic(k):
+                data_dict[k] = torch.tensor(
+                    v[:feature["N"]],
+                    dtype=torch.long if is_int(k) else dtype,
+                    requires_grad=requires_grad(k)
+                )
+            elif not is_idx(k):
+                data_dict[k] = torch.tensor(
+                    v,
+                    dtype=torch.long if is_int(k) else dtype,
+                )
+            data_dict["N"] = torch.tensor(feature["N"], dtype=torch.long)
+        data = Data(pos=data_dict["Ra"], edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), **data_dict)
+        feature_list.append(data)
+    batch_features = Batch.from_data_list(feature_list)
+
+    target_list = []
+    for target in targets:
+        data_dict = dict()
+        for k, v in target.items():
+            if is_atomic(k): 
+                data_dict[k] = torch.tensor(
+                    v[:target["N"]],
+                    dtype=torch.long if is_int(k) else dtype,
+                    requires_grad=requires_grad(k)
+                )
+            else:
+                data_dict[k] = torch.tensor(
+                    v,
+                    dtype=torch.long if is_int(k) else dtype,
+                )
+            data_dict["N"] = torch.tensor(target["N"], dtype=torch.long)
+        data = Data(**data_dict)
+        target_list.append(data)
+    batch_targets = Batch.from_data_list(target_list)
+    return batch_features, batch_targets
+
+
 def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
     features, targets = zip(*batch)
     batch_features = dict()
