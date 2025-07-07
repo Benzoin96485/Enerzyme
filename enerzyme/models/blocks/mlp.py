@@ -8,7 +8,7 @@ from ..activation import get_activation_fn, ACTIVATION_PARAM_TYPE, ACTIVATION_KE
 from ..init import semi_orthogonal_glorot_weights
 
 
-INITIAL_WEIGHT_TYPE = Union[Tensor, ndarray, Literal["semi_orthogonal_glorot", "orthogonal", "zero"]]
+INITIAL_WEIGHT_TYPE = Union[Tensor, ndarray, Literal["semi_orthogonal_glorot", "orthogonal", "zero", "xavier_uniform"]]
 INITIAL_BIAS_TYPE = Union[Tensor, ndarray, Literal["zero"]]
 
 
@@ -53,6 +53,9 @@ class DenseLayer(NeuronLayer):
         elif initial_weight == "zero":
             self.weight = Parameter(torch.empty(dim_feature_out * shallow_ensemble_size, dim_feature_in))
             init.zeros_(self.weight)
+        elif initial_weight == "xavier_uniform":
+            self.weight = Parameter(torch.empty(dim_feature_out * shallow_ensemble_size, dim_feature_in))
+            init.xavier_uniform_(self.weight)
         else:
             if not isinstance(initial_weight, Tensor):
                 initial_weight = torch.tensor(initial_weight)

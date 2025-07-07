@@ -21,7 +21,11 @@ SEP = "-"
 
 def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], List[Dict[str, Any]]]:
     global LOSS_REGISTER
-    if architecture.lower() == "physnet":
+    if architecture.lower() == "schnet":
+        from .schnet import SchNetCore as Core
+        from .schnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    elif architecture.lower() == "physnet":
         from .physnet import PhysNetCore as Core
         from .physnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         from .physnet import LOSS_REGISTER as special_loss

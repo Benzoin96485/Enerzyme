@@ -18,7 +18,7 @@ except:
 from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
-from .batch import _decorate_batch_input, _decorate_batch_output, _to_device
+from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input
 from .monitor import Monitor
 from ..data import Transform
 from ..utils import logger
@@ -106,6 +106,7 @@ def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrai
 class Trainer:
     def __init__(self, out_dir: str=None, metric_config: Metrics=dict(), **params) -> None:
         self.batch_size = params.get('batch_size', 8)
+        self.pyg = params.get("pyg", False)
         self.lightning = params.get("lightning", False)
         self.patience = params.get('patience', 50)
         self.max_norm = params.get('max_norm', -1)
@@ -187,7 +188,10 @@ class Trainer:
                 self.device = torch.device("cpu")
 
     def decorate_batch_input(self, batch):
-        return _decorate_batch_input(batch, self.dtype, self.device)
+        if self.pyg:
+            return _decorate_pyg_batch_input(batch, self.dtype, self.device)
+        else:
+            return _decorate_batch_input(batch, self.dtype, self.device)
     
     def decorate_batch_output(self, output, features, targets):
         return _decorate_batch_output(output, features, targets, self.non_target_features)

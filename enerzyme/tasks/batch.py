@@ -38,7 +38,7 @@ def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str,
     for target in targets:
         data_dict = dict()
         for k, v in target.items():
-            if is_atomic(k): 
+            if is_atomic(k):
                 data_dict[k] = torch.tensor(
                     v[:target["N"]],
                     dtype=torch.long if is_int(k) else dtype,
