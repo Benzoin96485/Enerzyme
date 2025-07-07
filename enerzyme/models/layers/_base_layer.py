@@ -47,6 +47,9 @@ class BaseFFModule(ABC, Module):
         for field_name in self._relevant_fields:
             self._name_mapping[field_name] = field_name
 
+    def get_relevant_input_fields(self, net_input: Optional[Dict[str, Tensor]]=None) -> Set[str]:
+        return self._relevant_fields
+
     @abstractmethod
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         ...
@@ -54,7 +57,7 @@ class BaseFFModule(ABC, Module):
     def _forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         net_output = net_input.copy()
         relevant_input = dict()
-        for k in self._input_fields:
+        for k in self.get_relevant_input_fields(net_input):
             new_k = self._name_mapping[k]
             relevant_input[k] = net_input.get(new_k, None)
         relevant_output = self.get_output(**relevant_input)
@@ -66,8 +69,15 @@ class BaseFFModule(ABC, Module):
 
 
 class BaseFFLayer(BaseFFModule):
-    def __init__(self, input_fields: Optional[Set[str]]=None, output_fields: Optional[Set[str]]=None) -> None:
+    def __init__(self, 
+        input_fields: Optional[Set[str]]=None, 
+        output_fields: Optional[Set[str]]=None,
+        train_only: bool=False,
+        eval_only: bool=False
+    ) -> None:
         super().__init__(input_fields, output_fields)
+        self.train_only = train_only
+        self.eval_only = eval_only
 
     def reset_field_name(self, **mapping: Dict[str, str]) -> None:
         self._relevant_fields = self._input_fields | self._output_fields
@@ -84,6 +94,10 @@ class BaseFFLayer(BaseFFModule):
         return relevant_output
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        if self.train_only and not self.training:
+            return net_input
+        if self.eval_only and self.training:
+            return net_input
         return self._forward(net_input)
 
 

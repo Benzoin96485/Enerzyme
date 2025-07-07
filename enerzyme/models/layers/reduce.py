@@ -1,54 +1,58 @@
-from typing import Dict, List
+from typing import Dict, List, Set
 import torch
 from torch import Tensor
-from torch.nn import Module
+from . import BaseFFLayer
 from ..functional import segment_sum_coo
 
 
-class EnergyReduceLayer(Module):
+class EnergyReduceLayer(BaseFFLayer):
     def __init__(self) -> None:
-        super().__init__()
-    
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        for k, v in net_input.items():
+        super().__init__(input_fields={"Ea"}, output_fields={"E", "Ea"})
+
+    def get_relevant_input_fields(self, net_input: Dict[str, Tensor]) -> Set[str]:
+        relevant_input_fields = set()
+        for k in net_input.keys():
             if k[0] == "E" and k[-1] == "a" and len(k) > 2:
-                output["Ea"] += v
+                relevant_input_fields.add(k)
         if "batch_seg" in net_input:
-            batch_seg = net_input["batch_seg"]
+            relevant_input_fields.add("batch_seg")
         else:
-            batch_seg = torch.zeros_like(net_input["Za"])
-        output["E"] = segment_sum_coo(net_input["Ea"], batch_seg)
-        return output
+            relevant_input_fields.add("Za")
+        return relevant_input_fields
+
+    def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        Ea = relevant_input["Ea"]
+        for k, v in relevant_input.items():
+            if k[0] == "E" and k[-1] == "a" and len(k) > 2:
+                Ea = Ea + v
+        if "batch_seg" in relevant_input:
+            batch_seg = relevant_input["batch_seg"]
+        else:
+            batch_seg = torch.zeros_like(relevant_input["Za"])
+        return {"E": segment_sum_coo(Ea, batch_seg), "Ea": Ea}
 
 
-class ShallowEnsembleReduceLayer(Module):
+class ShallowEnsembleReduceLayer(BaseFFLayer):
     def __init__(self, reduce_mean: List[str]=[], var: List[str]=[], std: List[str]=[], relative_energy: bool=False, train_only: bool=False, eval_only: bool=False) -> None:
-        super().__init__()
-        self.reduce_mean = reduce_mean
-        self.var = var
-        self.std = std
-        self.relative_energy = relative_energy
-        self.train_only = train_only
-        self.eval_only = eval_only
-
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        if self.train_only and not self.training:
-            return net_input
-        if self.eval_only and self.training:
-            return net_input
-        
-        net_output = net_input.copy()
-        for name in self.var:
-            if self.relative_energy and name.startswith("E"):
-                net_output[name + "_var"] = (net_input[name] - net_input[name].mean(dim=0)).var(dim=-1, unbiased=True)
+        super().__init__(
+            input_fields=set(reduce_mean) | set(var) | set(std), 
+            output_fields=set(reduce_mean) | set(
+                [name + "_var" for name in reduce_mean]
+            ) | set(
+                [name + "_std" for name in reduce_mean]
+            ),
+            train_only=train_only,
+            eval_only=eval_only
+        )
+        for name in reduce_mean:
+            setattr(self, f"get_{name}", lambda x: x.mean(dim=-1))
+        for name in var:
+            if relative_energy and name.startswith("E"):
+                setattr(self, f"get_{name}_var", lambda x: (x - x.mean(dim=0)).var(dim=-1, unbiased=True))
             else:
-                net_output[name + "_var"] = net_input[name].var(dim=-1, unbiased=True)
-        for name in self.std:
-            if self.relative_energy and name.startswith("E"):
-                net_output[name + "_std"] = (net_input[name] - net_input[name].mean(dim=0)).std(dim=-1)
+                setattr(self, f"get_{name}_var", lambda x: x.var(dim=-1, unbiased=True))
+        for name in std:
+            if relative_energy and name.startswith("E"):
+                setattr(self, f"get_{name}_std", lambda x: (x - x.mean(dim=0)).std(dim=-1, unbiased=True))
             else:
-                net_output[name + "_std"] = net_input[name].std(dim=-1)
-        for name in self.reduce_mean:
-            net_output[name] = net_input[name].mean(dim=-1)
-        return net_output
+                setattr(self, f"get_{name}_std", lambda x: x.std(dim=-1, unbiased=True))
