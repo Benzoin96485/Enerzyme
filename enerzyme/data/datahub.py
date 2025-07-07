@@ -360,4 +360,31 @@ class DataHub:
         elif isinstance(datasets, dict):
             self.datahubs = {name: SingleDataHub(**dataset_params) for name, dataset_params in datasets.items()}
         else:
-            raise ValueError(f"Unknown type of datasets: {type(datasets)}")
+            raise ValueError(f"Unknown type of datasets: {type(datasets)}")\
+            
+    @property
+    def features(self) -> Union[FieldDataset, List[FieldDataset], Dict[str, FieldDataset]]:
+        if isinstance(self.datahubs, SingleDataHub):
+            return self.datahubs.features
+        elif isinstance(self.datahubs, list):
+            return [datahub.features for datahub in self.datahubs]
+        elif isinstance(self.datahubs, dict):
+            return {name: datahub.features for name, datahub in self.datahubs.items()}
+
+    @property
+    def targets(self) -> Union[FieldDataset, List[FieldDataset], Dict[str, FieldDataset]]:
+        if isinstance(self.datahubs, SingleDataHub):
+            return self.datahubs.targets
+        elif isinstance(self.datahubs, list):
+            return [datahub.targets for datahub in self.datahubs]
+        elif isinstance(self.datahubs, dict):
+            return {name: datahub.targets for name, datahub in self.datahubs.items()}
+    
+    @property
+    def preload_path(self) -> Union[str, List[str], Dict[str, str]]:
+        if isinstance(self.datahubs, SingleDataHub):
+            return self.datahubs.preload_path
+        elif isinstance(self.datahubs, list):
+            return [datahub.preload_path for datahub in self.datahubs]
+        elif isinstance(self.datahubs, dict):
+            return {name: datahub.preload_path for name, datahub in self.datahubs.items()}
