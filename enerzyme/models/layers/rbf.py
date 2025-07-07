@@ -447,18 +447,18 @@ class BesselRBFLayer(BaseRBF):
         return self.prefactor * (numerator / x.view(-1, 1))
 
 
-class GaussianSmearing(torch.nn.Module):
+class GaussianSmearing(BaseFFLayer):
     def __init__(
-            self,
-            start: float = 0.0,
-            stop: float = 5.0,
-            num_gaussians: int = 50,
+        self,
+        num_rbf: int,
+        cutoff: float,
+        cuton: float=0.0,
     ):
-        super().__init__()
-        offset = torch.linspace(start, stop, num_gaussians)
+        super().__init__(input_fields={"Dij_sr"}, output_fields={"rbf"})
+        offset = torch.linspace(cuton, cutoff, num_rbf)
         self.coeff = -0.5 / (offset[1] - offset[0]).item() ** 2
         self.register_buffer('offset', offset)
 
-    def forward(self, dist: Tensor) -> Tensor:
-        dist = dist.view(-1, 1) - self.offset.view(1, -1)
+    def _get_rbf(self, Dij_sr: Tensor) -> Tensor:
+        dist = Dij_sr.view(-1, 1) - self.offset.view(1, -1)
         return torch.exp(self.coeff * torch.pow(dist, 2))
