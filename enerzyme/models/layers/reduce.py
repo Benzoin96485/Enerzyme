@@ -9,12 +9,12 @@ class EnergyReduceLayer(BaseFFLayer):
     def __init__(self) -> None:
         super().__init__(input_fields={"Ea"}, output_fields={"E", "Ea"})
 
-    def get_relevant_input_fields(self, net_input: Dict[str, Tensor]) -> Set[str]:
+    def get_relevant_input_fields(self, net_input_fields: Set[str]) -> Set[str]:
         relevant_input_fields = set()
-        for k in net_input.keys():
+        for k in net_input_fields:
             if k[0] == "E" and k[-1] == "a" and len(k) > 2:
                 relevant_input_fields.add(k)
-        if "batch_seg" in net_input:
+        if "batch_seg" in net_input_fields:
             relevant_input_fields.add("batch_seg")
         else:
             relevant_input_fields.add("Za")

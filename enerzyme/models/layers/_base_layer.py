@@ -1,8 +1,9 @@
-from typing import Dict, Set, List, Optional
+from typing import Dict, Set, List, Optional, Union
 from inspect import signature
 from abc import ABC, abstractmethod
 from torch import Tensor
 from torch.nn import Module, Sequential
+from torch_geometric.data import Data
 
 
 def get_output_fields(func):
@@ -47,19 +48,27 @@ class BaseFFModule(ABC, Module):
         for field_name in self._relevant_fields:
             self._name_mapping[field_name] = field_name
 
-    def get_relevant_input_fields(self, net_input: Optional[Dict[str, Tensor]]=None) -> Set[str]:
+    def get_relevant_input_fields(self, net_input_fields: Optional[Set[str]]=None) -> Set[str]:
         return self._relevant_fields
 
     @abstractmethod
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         ...
 
-    def _forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        net_output = net_input.copy()
+    def _forward(self, net_input: Union[Dict[str, Tensor], Data]) -> Dict[str, Tensor]:
         relevant_input = dict()
-        for k in self.get_relevant_input_fields(net_input):
-            new_k = self._name_mapping[k]
-            relevant_input[k] = net_input.get(new_k, None)
+        relevant_input_fields = self.get_relevant_input_fields(net_input.keys())
+        new_input_keys = {self._name_mapping[k] for k in relevant_input_fields}
+        net_output = net_input.copy()
+        if isinstance(net_input, Data):
+            for k in new_input_keys:
+                if k == "batch_seg":
+                    relevant_input[k] = net_input["batch"]
+                else:
+                    relevant_input[k] = net_input[k]
+        else:
+            for k in new_input_keys:
+                relevant_input[k] = net_input.get(k, None)
         relevant_output = self.get_output(**relevant_input)
         for k in self._output_fields:
             new_k = self._name_mapping[k]
