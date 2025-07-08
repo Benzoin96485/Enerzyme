@@ -354,9 +354,9 @@ class DataHub:
     ):
         self.dump_dir = dump_dir
         if datasets is None:
-            self.datahubs = SingleDataHub(**params)
+            self.datahubs = {"default": SingleDataHub(**params)}
         elif isinstance(datasets, list):
-            self.datahubs = [SingleDataHub(**dataset_params) for dataset_params in datasets]
+            self.datahubs = {str(i): SingleDataHub(**dataset_params) for i, dataset_params in enumerate(datasets)}
         elif isinstance(datasets, dict):
             self.datahubs = {name: SingleDataHub(**dataset_params) for name, dataset_params in datasets.items()}
         else:
@@ -364,27 +364,12 @@ class DataHub:
             
     @property
     def features(self) -> Union[FieldDataset, List[FieldDataset], Dict[str, FieldDataset]]:
-        if isinstance(self.datahubs, SingleDataHub):
-            return self.datahubs.features
-        elif isinstance(self.datahubs, list):
-            return [datahub.features for datahub in self.datahubs]
-        elif isinstance(self.datahubs, dict):
-            return {name: datahub.features for name, datahub in self.datahubs.items()}
+        return {name: datahub.features for name, datahub in self.datahubs.items()}
 
     @property
     def targets(self) -> Union[FieldDataset, List[FieldDataset], Dict[str, FieldDataset]]:
-        if isinstance(self.datahubs, SingleDataHub):
-            return self.datahubs.targets
-        elif isinstance(self.datahubs, list):
-            return [datahub.targets for datahub in self.datahubs]
-        elif isinstance(self.datahubs, dict):
-            return {name: datahub.targets for name, datahub in self.datahubs.items()}
+        return {name: datahub.targets for name, datahub in self.datahubs.items()}
     
     @property
     def preload_path(self) -> Union[str, List[str], Dict[str, str]]:
-        if isinstance(self.datahubs, SingleDataHub):
-            return self.datahubs.preload_path
-        elif isinstance(self.datahubs, list):
-            return [datahub.preload_path for datahub in self.datahubs]
-        elif isinstance(self.datahubs, dict):
-            return {name: datahub.preload_path for name, datahub in self.datahubs.items()}
+        return {name: datahub.preload_path for name, datahub in self.datahubs.items()}
