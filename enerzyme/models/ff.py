@@ -112,12 +112,14 @@ class FFDataset(Dataset):
     def __init__(self, 
         features: Dict[str, FieldDataset], 
         targets: Dict[str, FieldDataset], 
-        indices: Optional[OrderedDict[str, Iterable[int]]]=None, 
+        indices: Optional[Union[OrderedDict[str, Iterable[int]], List[int]]]=None, 
         data_in_memory: bool=True,
         bisect_search: bool=False
     ) -> None:
         if indices is None:
             indices = {data_key: np.arange(0, len(data["Ra"])) for data_key, data in features.items()}
+        elif isinstance(indices, list):
+            indices = {features.keys()[0]: indices}
         self.data_in_memory = data_in_memory
         self.full_features = features
         self.full_targets = targets

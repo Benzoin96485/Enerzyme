@@ -45,8 +45,8 @@ class RandomSplit:
             return OrderedDict(
                 (
                     part_key, (
-                        OrderedDict([(part_info["source"], [])]) if "source" in part_info
-                        else OrderedDict((data_key, []) for data_key in part_info["sources"])
+                        OrderedDict((data_key, []) for data_key in part_info["sources"]) if "sources" in part_info
+                        else OrderedDict((data_key, []) for data_key in part_info.get("dataset", data.keys()[0]))
                     )
                 ) for part_key, part_info in self.parts.items()
             )
@@ -70,17 +70,16 @@ class RandomSplit:
             for part_info in self.parts:
                 if "name" not in part_info:
                     raise KeyError("Name should be provided for each part")
-                if "dataset" in part_info:
-                    canonical_partition[part_info["name"]][part_info["dataset"]] = part_info.get("ratio", -1)
-                    sorted_data_keys[part_info["name"]].append(part_info["dataset"])
-                elif "sources" in part_info:
+                if "sources" in part_info:
                     for source_info in part_info["sources"]:
                         if "dataset" not in source_info:
                             raise KeyError("Dataset should be provided for each source")
                         canonical_partition[part_info["name"]][source_info["dataset"]] = source_info.get("ratio", -1)
                         sorted_data_keys[part_info["name"]].append(source_info["dataset"])
-                else:
-                    raise KeyError("One dataset or multiplesources should be provided for each part")
+                elif "dataset" in part_info:
+                    data_key = part_info.get("dataset", data.keys()[0])
+                    canonical_partition[part_info["name"]][data_key] = part_info.get("ratio", -1)
+                    sorted_data_keys[part_info["name"]].append(data_key)
                 part_keys.append(part_info["name"])
 
         l = {k: len(data[k]["Ra"]) for k in data.keys()}
