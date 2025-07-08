@@ -1,6 +1,9 @@
 import os
+import itertools
+import bisect
 from inspect import signature
 from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable, Union
+from collections import OrderedDict
 from functools import partial
 from abc import ABC, abstractmethod
 import joblib
@@ -14,6 +17,7 @@ from ..tasks import Trainer
 from .loss import LOSS_REGISTER
 from ..utils import logger
 from . import layers as Layers
+from enerzyme import data
 
 
 SEP = "-"
@@ -105,36 +109,65 @@ def build_model(
 
 
 class FFDataset(Dataset):
-    def __init__(self, features: FieldDataset, targets: FieldDataset, indices: Optional[Iterable[int]]=None, data_in_memory: bool=True) -> None:
+    def __init__(self, 
+        features: Dict[str, FieldDataset], 
+        targets: Dict[str, FieldDataset], 
+        indices: Optional[OrderedDict[str, Iterable[int]]]=None, 
+        data_in_memory: bool=True,
+        bisect_search: bool=False
+    ) -> None:
         if indices is None:
-            indices = np.arange(0, len(features["Ra"]))
+            indices = {data_key: np.arange(0, len(data["Ra"])) for data_key, data in features.items()}
         self.data_in_memory = data_in_memory
         self.full_features = features
         self.full_targets = targets
         if data_in_memory:
-            self.features = features.load_subset(indices)
-            self.targets = targets.load_subset(indices)
-            self.indices = np.arange(0, len(indices))
+            self.features = {
+                data_key: data[data_key].load_subset(data_indices) for data_key, data_indices in indices.items() if len(data_indices) > 0
+            }
+            self.targets = {
+                data_key: data[data_key].load_subset(data_indices) for data_key, data_indices in indices.items() if len(data_indices) > 0
+            }
+            self.indices = OrderedDict((data_key, np.arange(0, len(data_indices))) for data_key, data_indices in indices.items() if len(data_indices) > 0)
         else:
             self.features = features
             self.targets = targets
-            self.indices = indices
-        self.raw_indices = np.array(indices)
+            self.indices = OrderedDict((data_key, np.array(data_indices)) for data_key, data_indices in indices.items() if len(data_indices) > 0)
+        self.raw_indices = OrderedDict((data_key, np.array(data_indices)) for data_key, data_indices in indices.items() if len(data_indices) > 0)
+        self._update_indices_map()
+
+    def _update_indices_map(self) -> None:
+        self.prefix_sum = list(itertools.accumulate([len(data_indices) for data_indices in self.indices.values()]))
+        self.indices_map = sum([[i] * len(data_indices) for i, data_indices in enumerate(self.indices.values())], [])
+
+    def _bisect_search(self, idx: int) -> int:
+        return bisect.bisect_right(self.prefix_sum, idx)
 
     def __len__(self) -> int:
-        return len(self.indices)
+        return self.prefix_sum[-1]
     
     def __getitem__(self, idx: int) -> Tuple[Dict[str, Iterable], Dict[str, Iterable]]:
-        return self.features.loc(self.indices[idx]), self.targets.loc(self.indices[idx])
+        data_key_idx = self.indices_map[idx]
+        data_key = self.indices.keys()[data_key_idx]
+        if data_key_idx == 0:
+            residue_idx = idx
+        else:
+            residue_idx = idx - self.prefix_sum[data_key_idx - 1]
+        return self.features[data_key][residue_idx], self.targets[data_key][residue_idx]
     
-    def expand_with_indices(self, new_indices: List[int]) -> None:
-        self.raw_indices = np.concatenate((self.raw_indices, new_indices))
+    def expand_with_indices(self, new_indices: OrderedDict[str, Iterable[int]]) -> None:
+        for k in new_indices.keys():
+            if k in self.raw_indices:
+                self.raw_indices[k] = np.concatenate((self.raw_indices[k], new_indices[k]))
+            else:
+                self.raw_indices[k] = new_indices[k]
         if self.data_in_memory:
             self.features = self.full_features.load_subset(self.raw_indices)
             self.targets = self.full_targets.load_subset(self.raw_indices)
-            self.indices = np.arange(0, len(self.raw_indices))
+            self.indices = OrderedDict((k, np.arange(0, len(self.raw_indices[k]))) for k in self.raw_indices.keys())
         else:
-            self.indices = self.raw_indices
+            self.indices = self.raw_indices.copy()
+        self._update_indices_map()
 
 
 class MetaStateDict(dict):
@@ -193,17 +226,17 @@ class BaseFFLauncher(ABC):
         partitions = dict()
         if split is None:
             split = self.splitter.split(X, preload_path=self.datahub.preload_path)
-        for k, v in split.items():
-            if len(v) > 0:
-                if k == "training":
+        for part_key, part_info in split.items():
+            if len(part_info) > 0:
+                if part_key == "training":
                     if "withheld" in split:
-                        partitions[k] = FFDataset(X, y, v, False)
+                        partitions[part_key] = FFDataset(X, y, part_info, False)
                     else:
-                        partitions[k] = FFDataset(X, y, v, self.trainer.data_in_memory)
-                elif k == "withheld":
-                    partitions[k] = FFDataset(X, y, v, False)
+                        partitions[part_key] = FFDataset(X, y, part_info, self.trainer.data_in_memory)
+                elif part_key == "withheld":
+                    partitions[part_key] = FFDataset(X, y, part_info, False)
                 else:
-                    partitions[k] = FFDataset(X, y, v, True)
+                    partitions[part_key] = FFDataset(X, y, part_info, True)
         return partitions
     
     def _init_default_partition(self) -> Tuple[FFDataset, Optional[FFDataset], Optional[FFDataset]]:

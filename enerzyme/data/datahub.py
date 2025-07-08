@@ -82,7 +82,7 @@ class FieldDataset(Dataset):
     def loc(self, idx) -> Dict[str, Iterable]:
         return {k: v[0 if k in self.compressed_keys else idx] for k, v in self.data.items()}
 
-    def load_subset(self, indices):
+    def load_subset(self, indices: Iterable[int]) -> "FieldDataset":
         data = dict()
         for k, v in self.data.items():
             if k in self.compressed_keys:

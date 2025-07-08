@@ -1,7 +1,6 @@
 import os
 from collections import defaultdict, OrderedDict
 from typing import Union, List, Dict, Optional, Literal
-from typing import OrderedDict as OrderedDictType
 from hashlib import md5
 import addict
 import sklearn as skl
@@ -37,7 +36,7 @@ class RandomSplit:
         splitstr = "random" + str(parts) + str(ratios)
         self.hash = md5(splitstr.encode("utf-8")).hexdigest()[:16]
 
-    def _get_empty_split(self, data: Dict[str, FieldDataset]) -> OrderedDictType[str, OrderedDictType[str, List[int]]]:
+    def _get_empty_split(self, data: Dict[str, FieldDataset]) -> OrderedDict[str, OrderedDict[str, List[int]]]:
         if self.mode == "old":
             return OrderedDict(
                 (part_key, OrderedDict([(data.keys()[0], [])])) for part_key in self.parts
@@ -188,7 +187,7 @@ class Splitter:
                 for part_key, part_info in self.split.items():
                     for k, indices in part_info.items():
                         if k == data_key:
-                            split_dict[part_key] = indices
+                            split_dict[part_key] = np.array(indices)
                 np.savez(split_file, **split_dict)
                 handler = YamlHandler(os.path.join(split_path, "splitter.yaml"))
                 splitter_config = addict.Dict({
