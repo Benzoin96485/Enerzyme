@@ -1,5 +1,4 @@
 import os
-import itertools
 import bisect
 from inspect import signature
 from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable, Union
@@ -120,6 +119,7 @@ class FFDataset(Dataset):
             indices = {data_key: np.arange(0, len(data["Ra"])) for data_key, data in features.items()}
         elif isinstance(indices, list):
             indices = {features.keys()[0]: indices}
+        self.key_order = {k: i for i, k in enumerate(features.keys())}
         self.data_in_memory = data_in_memory
         self.full_features = features
         self.full_targets = targets
@@ -139,30 +139,42 @@ class FFDataset(Dataset):
         self._update_indices_map()
 
     def _update_indices_map(self) -> None:
-        self.prefix_sum = list(itertools.accumulate([len(data_indices) for data_indices in self.indices.values()]))
-        self.indices_map = sum([[i] * len(data_indices) for i, data_indices in enumerate(self.indices.values())], [])
+        self.prefix_sum = np.cumsum([len(data_indices) for data_indices in self.indices.values()])
+        self.indices_map = np.concatenate([[i] * len(data_indices) for i, data_indices in enumerate(self.indices.values())])
 
     def _bisect_search(self, idx: int) -> int:
         return bisect.bisect_right(self.prefix_sum, idx)
 
-    def __len__(self) -> int:
-        return self.prefix_sum[-1]
-    
-    def __getitem__(self, idx: int) -> Tuple[Dict[str, Iterable], Dict[str, Iterable]]:
+    def _index_to_key_index(self, idx: int) -> Tuple[str, int]:
         data_key_idx = self.indices_map[idx]
         data_key = self.indices.keys()[data_key_idx]
         if data_key_idx == 0:
             residue_idx = idx
         else:
             residue_idx = idx - self.prefix_sum[data_key_idx - 1]
-        return self.features[data_key][residue_idx], self.targets[data_key][residue_idx]
+        return data_key, residue_idx
     
-    def expand_with_indices(self, new_indices: OrderedDict[str, Iterable[int]]) -> None:
-        for k in new_indices.keys():
+    def _indices_to_key_indices(self, indices: Iterable[int]) -> Dict[str, np.ndarray[int]]:
+        _indices = np.array(indices)
+        data_key_indices = self.indices_map[_indices]
+        return {k: _indices[data_key_indices == self.key_order[k]] for k in self.indices.keys()}
+
+    def _key_indices_to_indices(self, key_indices: Dict[str, Iterable[int]]) -> np.ndarray[int]:
+        return np.concatenate([self.prefix_sum[self.key_order[k]] + np.array(v) for k, v in key_indices.items()])
+
+    def __len__(self) -> int:
+        return self.prefix_sum[-1]
+    
+    def __getitem__(self, idx: int) -> Tuple[Dict[str, Iterable], Dict[str, Iterable]]:
+        data_key, residue_idx = self._index_to_key_index(idx)
+        return self.features[data_key].loc(residue_idx), self.targets[data_key].loc(residue_idx)
+
+    def expand_with_indices(self, new_raw_indices: Dict[str, Iterable[int]]) -> None:
+        for k in new_raw_indices.keys():
             if k in self.raw_indices:
-                self.raw_indices[k] = np.concatenate((self.raw_indices[k], new_indices[k]))
+                self.raw_indices[k] = np.concatenate((self.raw_indices[k], new_raw_indices[k]))
             else:
-                self.raw_indices[k] = new_indices[k]
+                self.raw_indices[k] = new_raw_indices[k]
         if self.data_in_memory:
             self.features = self.full_features.load_subset(self.raw_indices)
             self.targets = self.full_targets.load_subset(self.raw_indices)
@@ -222,23 +234,25 @@ class BaseFFLauncher(ABC):
             print(model.__str__())
         return model
 
-    def _init_partition(self, split: Optional[Dict[str, Iterable[int]]]=None) -> Dict[str, FFDataset]:
+    def _init_partition(self, split: Optional[Dict[str, Union[OrderedDict[str, Iterable[int]], List[int]]]]=None) -> Dict[str, FFDataset]:
         X = self.datahub.features
         y = self.datahub.targets
         partitions = dict()
         if split is None:
             split = self.splitter.split(X, preload_path=self.datahub.preload_path)
         for part_key, part_info in split.items():
-            if len(part_info) > 0:
-                if part_key == "training":
-                    if "withheld" in split:
-                        partitions[part_key] = FFDataset(X, y, part_info, False)
-                    else:
-                        partitions[part_key] = FFDataset(X, y, part_info, self.trainer.data_in_memory)
-                elif part_key == "withheld":
+            if part_key == "training":
+                if "withheld" in split:
                     partitions[part_key] = FFDataset(X, y, part_info, False)
                 else:
-                    partitions[part_key] = FFDataset(X, y, part_info, True)
+                    partitions[part_key] = FFDataset(X, y, part_info, self.trainer.data_in_memory)
+            elif part_key == "withheld":
+                partitions[part_key] = FFDataset(X, y, part_info, False)
+            else:
+                partitions[part_key] = FFDataset(X, y, part_info, True)
+        for k, partition in partitions.items():
+            if len(partition) == 0:
+                partitions.pop(k)
         return partitions
     
     def _init_default_partition(self) -> Tuple[FFDataset, Optional[FFDataset], Optional[FFDataset]]:
@@ -327,22 +341,20 @@ class BaseFFLauncher(ABC):
         picking_func = partial(picking_func_, mode=self.uq_mode)
         
         if data_source == "withheld":
-            withheld_size = len(withheld_set)
-            withheld_mask = np.full(withheld_size, True)
-            training_index_set = set(training_set.raw_indices)
-            validation_index_set = set(validation_set.raw_indices) if validation_set is not None else set()
-            withheld_index_set = set(withheld_set.raw_indices)
-            if training_index_set & withheld_index_set or validation_index_set & withheld_index_set:
-                logger.warning("Masking overlap between training/validation set and withheld set!")
-                for i, idx in enumerate(withheld_set.raw_indices):
-                    if idx in training_index_set or idx in validation_index_set:
-                        withheld_mask[i] = False
+            withheld_size = {k: len(v) for k, v in withheld_set.raw_indices.items()}
+            withheld_mask = {k: np.full(withheld_size[k], True) for k in withheld_size.keys()}
+            logger.warning("Masking potentialoverlap between training/validation set and withheld set!")
+            for k, v in withheld_set.raw_indices.items():
+                if k in training_set.raw_indices:
+                    withheld_mask[k] &= ~np.isin(v, training_set.raw_indices[k])
+                if k in validation_set.raw_indices:
+                    withheld_mask[k] &= ~np.isin(v, validation_set.raw_indices[k])
 
             iter_count = al_state_dict.get("iter_count", 0)
             if iter_count > 0:
                 logger.info(f"Active learning iteration {iter_count + 1} resumed!")
             while iter_count < max_iter:   
-                unmasked_relative_indices = withheld_mask.nonzero()[0]
+                unmasked_relative_indices = withheld_set._key_indices_to_indices({k: np.flatnonzero(v) for k, v in withheld_mask.items()})
                 unmasked_size = len(unmasked_relative_indices)
                 if unmasked_size == 0:
                     logger.info(f"Withheld set is exhausted and active learning stops at iteration {iter_count}!")
@@ -395,16 +407,21 @@ class BaseFFLauncher(ABC):
                     break
 
                 masked_relative_indices = masked_relative_indices[:sample_size]
-                expand_absolute_indices = withheld_set.raw_indices[masked_relative_indices]
+                masked_relative_key_indices = withheld_set._indices_to_key_indices(masked_relative_indices)
+                expand_absolute_key_indices = {k: withheld_set.raw_indices[k][v] for k, v in masked_relative_key_indices.items()}
+                expand_absolute_indices = withheld_set._key_indices_to_indices(expand_absolute_key_indices)
                 len_expanded = len(expand_absolute_indices)
                 if extend_validation_set:
                     len_expanded_training = int(len_expanded * ratio_training + 0.5)
-                    training_set.expand_with_indices(expand_absolute_indices[:len_expanded_training])
+                    expand_absolute_key_indices_training = withheld_set._indices_to_key_indices(expand_absolute_indices[:len_expanded_training])
+                    training_set.expand_with_indices(expand_absolute_key_indices_training)
                     if validation_set is not None:
-                        validation_set.expand_with_indices(expand_absolute_indices[len_expanded_training:])
+                        expand_absolute_key_indices_validation = withheld_set._indices_to_key_indices(expand_absolute_indices[len_expanded_training:])
+                        validation_set.expand_with_indices(expand_absolute_key_indices_validation)
                 else:
                     training_set.expand_with_indices(expand_absolute_indices)
-                withheld_mask[masked_relative_indices] = False
+                for k, v in masked_relative_key_indices.items():
+                    withheld_mask[k][v] = False
                 new_indices = {
                     "training": training_set.raw_indices,
                     "withheld": withheld_set.raw_indices
