@@ -37,22 +37,30 @@ class ShallowEnsembleReduceLayer(BaseFFLayer):
         super().__init__(
             input_fields=set(reduce_mean) | set(var) | set(std), 
             output_fields=set(reduce_mean) | set(
-                [name + "_var" for name in reduce_mean]
+                [name + "_var" for name in var]
             ) | set(
-                [name + "_std" for name in reduce_mean]
+                [name + "_std" for name in std]
             ),
             train_only=train_only,
             eval_only=eval_only
         )
-        for name in reduce_mean:
-            setattr(self, f"get_{name}", lambda x: x.mean(dim=-1))
-        for name in var:
-            if relative_energy and name.startswith("E"):
-                setattr(self, f"get_{name}_var", lambda x: (x - x.mean(dim=0)).var(dim=-1, unbiased=True))
+        self.var = var
+        self.std = std
+        self.reduce_mean = reduce_mean
+        self.relative_energy = relative_energy
+
+    def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        output = dict()
+        for name in self.var:
+            if self.relative_energy and name.startswith("E"):
+                output[name + "_var"] = (relevant_input[name] - relevant_input[name].mean(dim=0)).var(dim=-1, unbiased=True)
             else:
-                setattr(self, f"get_{name}_var", lambda x: x.var(dim=-1, unbiased=True))
-        for name in std:
-            if relative_energy and name.startswith("E"):
-                setattr(self, f"get_{name}_std", lambda x: (x - x.mean(dim=0)).std(dim=-1, unbiased=True))
+                output[name + "_var"] = relevant_input[name].var(dim=-1, unbiased=True)
+        for name in self.std:
+            if self.relative_energy and name.startswith("E"):
+                output[name + "_std"] = (relevant_input[name] - relevant_input[name].mean(dim=0)).std(dim=-1, unbiased=True)
             else:
-                setattr(self, f"get_{name}_std", lambda x: x.std(dim=-1, unbiased=True))
+                output[name + "_std"] = relevant_input[name].std(dim=-1, unbiased=True)
+        for name in self.reduce_mean:
+            output[name] = relevant_input[name].mean(dim=-1)
+        return output

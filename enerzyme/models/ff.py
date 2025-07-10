@@ -16,7 +16,6 @@ from ..tasks import Trainer
 from .loss import LOSS_REGISTER
 from ..utils import logger
 from . import layers as Layers
-from enerzyme import data
 
 
 SEP = "-"
@@ -125,10 +124,10 @@ class FFDataset(Dataset):
         self.full_targets = targets
         if data_in_memory:
             self.features = {
-                data_key: data[data_key].load_subset(data_indices) for data_key, data_indices in indices.items() if len(data_indices) > 0
+                data_key: features[data_key].load_subset(data_indices) for data_key, data_indices in indices.items() if len(data_indices) > 0
             }
             self.targets = {
-                data_key: data[data_key].load_subset(data_indices) for data_key, data_indices in indices.items() if len(data_indices) > 0
+                data_key: targets[data_key].load_subset(data_indices) for data_key, data_indices in indices.items() if len(data_indices) > 0
             }
             self.indices = OrderedDict((data_key, np.arange(0, len(data_indices))) for data_key, data_indices in indices.items() if len(data_indices) > 0)
         else:
@@ -147,7 +146,7 @@ class FFDataset(Dataset):
 
     def _index_to_key_index(self, idx: int) -> Tuple[str, int]:
         data_key_idx = self.indices_map[idx]
-        data_key = self.indices.keys()[data_key_idx]
+        data_key = list(self.indices.keys())[data_key_idx]
         if data_key_idx == 0:
             residue_idx = idx
         else:
@@ -239,7 +238,7 @@ class BaseFFLauncher(ABC):
         y = self.datahub.targets
         partitions = dict()
         if split is None:
-            split = self.splitter.split(X, preload_path=self.datahub.preload_path)
+            split = self.splitter.get_split(X, preload_path=self.datahub.preload_path)
         for part_key, part_info in split.items():
             if part_key == "training":
                 if "withheld" in split:

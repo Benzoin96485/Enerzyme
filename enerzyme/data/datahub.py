@@ -119,7 +119,7 @@ class SingleDataHub:
         self.max_memory = max_memory
         datahub_str = data_path + neighbor_list + str(sorted(self.transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
-        self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
+        self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
         logger.info(f"Preload path {self.preload_path} is created")
         self.transform = Transform(self.transforms, self.preload_path)
         if not self.preload or not self.preload_data():

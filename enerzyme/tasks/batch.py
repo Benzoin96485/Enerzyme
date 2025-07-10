@@ -103,14 +103,12 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
                     np.concatenate([target[k][:features[i]["N"]] for i, target in enumerate(targets)]), 
                     dtype=torch.long if is_int(k) else dtype
                 )
-            elif k == "data_key":
-                batch_targets[k] = [target[k] for target in targets]
             else:
                 batch_targets[k] = torch.tensor(
                     np.array([target[k] for target in targets]), 
                     dtype=torch.long if is_int(k) else dtype,
                 )
-    
+        batch_targets["data_key"] = data_keys
     return batch_features, batch_targets
 
 
@@ -164,5 +162,8 @@ def _to_device(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dev
         else:
             batch_features[k] = v
     for k, v in targets.items():
-        batch_targets[k] = v.to(device)
+        if k != "data_key":
+            batch_targets[k] = v.to(device)
+        else:
+            batch_targets[k] = v
     return batch_features, batch_targets

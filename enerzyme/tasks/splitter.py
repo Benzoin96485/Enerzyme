@@ -39,7 +39,7 @@ class RandomSplit:
     def _get_empty_split(self, data: Dict[str, FieldDataset]) -> OrderedDict[str, OrderedDict[str, List[int]]]:
         if self.mode == "old":
             return OrderedDict(
-                (part_key, OrderedDict([(data.keys()[0], [])])) for part_key in self.parts
+                (part_key, OrderedDict([(list(data.keys())[0], [])])) for part_key in self.parts
             )
         else:
             return OrderedDict(
@@ -61,10 +61,10 @@ class RandomSplit:
                 raise ValueError("Source should be provided for multiple datasets")
             for i, part_key in enumerate(self.parts):
                 if i >= len(self.ratios):
-                    canonical_partition[part_key][data.keys()[0]] = -1
+                    canonical_partition[part_key][list(data.keys())[0]] = -1
                 else:
-                    canonical_partition[part_key][data.keys()[0]] = self.ratios[i]
-                sorted_data_keys[part_key].append(data.keys()[0])
+                    canonical_partition[part_key][list(data.keys())[0]] = self.ratios[i]
+                sorted_data_keys[part_key].append(list(data.keys())[0])
             part_keys = self.parts
         else:
             for part_info in self.parts:
@@ -77,7 +77,7 @@ class RandomSplit:
                         canonical_partition[part_info["name"]][source_info["dataset"]] = source_info.get("ratio", -1)
                         sorted_data_keys[part_info["name"]].append(source_info["dataset"])
                 elif "dataset" in part_info:
-                    data_key = part_info.get("dataset", data.keys()[0])
+                    data_key = part_info.get("dataset", list(data.keys())[0])
                     canonical_partition[part_info["name"]][data_key] = part_info.get("ratio", -1)
                     sorted_data_keys[part_info["name"]].append(data_key)
                 part_keys.append(part_info["name"])
@@ -130,6 +130,7 @@ class RandomSplit:
                 ])
             ) for i, part_key in enumerate(part_keys)
         )
+        return self.split
 
 
 class Splitter:
@@ -199,7 +200,7 @@ class Splitter:
             else:
                 raise FileNotFoundError(f"Preload path {path} for dataset {data_key} not found")
 
-    def split(self, data: Dict[str, FieldDataset], preload_path: Optional[Dict[str, str]]=None) -> Dict[str, Dict[str, List[int]]]: 
+    def get_split(self, data: Dict[str, FieldDataset], preload_path: Optional[Dict[str, str]]=None) -> Dict[str, Dict[str, List[int]]]: 
         self._set_seed()
         self.split = self.splitter._get_empty_split(data)
         if self.preload and self.preload_split(preload_path):

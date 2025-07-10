@@ -48,8 +48,19 @@ class BaseFFModule(ABC, Module):
         for field_name in self._relevant_fields:
             self._name_mapping[field_name] = field_name
 
+        self.adapted_relevant_fields = False
+
+    def _get_relevant_input_fields(self, net_input_fields: Optional[Set[str]]=None) -> Set[str]:
+        new_input_fields = self.get_relevant_input_fields(net_input_fields)
+        self._input_fields |= new_input_fields
+        self._relevant_fields |= new_input_fields
+        for field_name in new_input_fields:
+            if field_name not in self._name_mapping:
+                self._name_mapping[field_name] = field_name
+        self.adapted_relevant_fields = True
+
     def get_relevant_input_fields(self, net_input_fields: Optional[Set[str]]=None) -> Set[str]:
-        return self._relevant_fields
+        return self._input_fields
 
     @abstractmethod
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
@@ -57,18 +68,19 @@ class BaseFFModule(ABC, Module):
 
     def _forward(self, net_input: Union[Dict[str, Tensor], Data]) -> Dict[str, Tensor]:
         relevant_input = dict()
-        relevant_input_fields = self.get_relevant_input_fields(net_input.keys())
-        new_input_keys = {self._name_mapping[k] for k in relevant_input_fields}
+        if not self.adapted_relevant_fields:
+            self._get_relevant_input_fields(net_input.keys())
+        relevant_input_fields = self._input_fields
         net_output = net_input.copy()
         if isinstance(net_input, Data):
-            for k in new_input_keys:
+            for k in relevant_input_fields:
                 if k == "batch_seg":
                     relevant_input[k] = net_input["batch"]
                 else:
-                    relevant_input[k] = net_input[k]
+                    relevant_input[k] = net_input[self._name_mapping[k]]
         else:
-            for k in new_input_keys:
-                relevant_input[k] = net_input.get(k, None)
+            for k in relevant_input_fields:
+                relevant_input[k] = net_input.get(self._name_mapping[k], None)
         relevant_output = self.get_output(**relevant_input)
         for k in self._output_fields:
             new_k = self._name_mapping[k]
