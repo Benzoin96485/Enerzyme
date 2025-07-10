@@ -167,7 +167,7 @@ class FFDataset(Dataset):
     
     def __getitem__(self, idx: int) -> Tuple[Dict[str, Iterable], Dict[str, Iterable]]:
         data_key, residue_idx = self._index_to_key_index(idx)
-        return self.features[data_key].loc(residue_idx), self.targets[data_key].loc(residue_idx)
+        return self.features[data_key].loc(residue_idx), self.targets[data_key].loc(residue_idx), data_key
 
     def expand_with_indices(self, new_raw_indices: Dict[str, Iterable[int]]) -> None:
         for k in new_raw_indices.keys():

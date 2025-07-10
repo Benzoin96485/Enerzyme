@@ -363,13 +363,17 @@ class DataHub:
             raise ValueError(f"Unknown type of datasets: {type(datasets)}")\
             
     @property
-    def features(self) -> Union[FieldDataset, List[FieldDataset], Dict[str, FieldDataset]]:
+    def features(self) -> Dict[str, FieldDataset]:
         return {name: datahub.features for name, datahub in self.datahubs.items()}
 
     @property
-    def targets(self) -> Union[FieldDataset, List[FieldDataset], Dict[str, FieldDataset]]:
+    def targets(self) -> Dict[str, FieldDataset]:
         return {name: datahub.targets for name, datahub in self.datahubs.items()}
     
     @property
-    def preload_path(self) -> Union[str, List[str], Dict[str, str]]:
+    def preload_path(self) -> Dict[str, str]:
         return {name: datahub.preload_path for name, datahub in self.datahubs.items()}
+    
+    @property
+    def transform(self) -> Dict[str, Transform]:
+        return {name: datahub.transform for name, datahub in self.datahubs.items()}

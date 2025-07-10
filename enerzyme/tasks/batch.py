@@ -7,7 +7,7 @@ from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, is_targe
 
 def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
     from torch_geometric.data import Data, Batch
-    features, targets = zip(*batch)
+    features, targets, data_keys = zip(*batch)
     feature_list = []
     for feature in features:
         data_dict = dict()
@@ -44,6 +44,8 @@ def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str,
                     dtype=torch.long if is_int(k) else dtype,
                     requires_grad=requires_grad(k)
                 )
+            elif k == "data_key":
+                data_dict[k] = v
             else:
                 data_dict[k] = torch.tensor(
                     v,
@@ -57,7 +59,7 @@ def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str,
 
 
 def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
-    features, targets = zip(*batch)
+    features, targets, data_keys = zip(*batch)
     batch_features = dict()
     batch_targets = dict()
     
@@ -101,6 +103,8 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
                     np.concatenate([target[k][:features[i]["N"]] for i, target in enumerate(targets)]), 
                     dtype=torch.long if is_int(k) else dtype
                 )
+            elif k == "data_key":
+                batch_targets[k] = [target[k] for target in targets]
             else:
                 batch_targets[k] = torch.tensor(
                     np.array([target[k] for target in targets]), 
@@ -134,6 +138,7 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
             y_pred[k] = output[k].detach().cpu().numpy()
         else:
             raise ValueError(f"non-target feature {k} has invalid length {len(output[k])}")
+    y_pred["data_key"] = targets["data_key"]
     y_pred["Za"] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(features["Za"], features["N"])))
     
     if targets is not None:
@@ -143,6 +148,7 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
                     y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
                 else:
                     y_truth[k] = v.detach().cpu().numpy()
+    y_truth["data_key"] = targets["data_key"]
     y_truth["Za"] = y_pred["Za"]
 
     return y_pred, (y_truth if y_truth else None)
