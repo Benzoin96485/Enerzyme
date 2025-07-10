@@ -71,14 +71,15 @@ class BaseFFModule(ABC, Module):
         if not self.adapted_relevant_fields:
             self._get_relevant_input_fields(net_input.keys())
         relevant_input_fields = self._input_fields
-        net_output = net_input.copy()
         if isinstance(net_input, Data):
+            net_output = net_input
             for k in relevant_input_fields:
                 if k == "batch_seg":
                     relevant_input[k] = net_input["batch"]
                 else:
-                    relevant_input[k] = net_input[self._name_mapping[k]]
+                    relevant_input[k] = net_input.get(self._name_mapping[k], None)
         else:
+            net_output = net_input.copy()
             for k in relevant_input_fields:
                 relevant_input[k] = net_input.get(self._name_mapping[k], None)
         relevant_output = self.get_output(**relevant_input)

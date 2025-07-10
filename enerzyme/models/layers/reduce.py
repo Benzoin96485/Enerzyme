@@ -7,17 +7,13 @@ from ..functional import segment_sum_coo
 
 class EnergyReduceLayer(BaseFFLayer):
     def __init__(self) -> None:
-        super().__init__(input_fields={"Ea"}, output_fields={"E", "Ea"})
+        super().__init__(input_fields={"Ea", "batch_seg", "Za"}, output_fields={"E", "Ea"})
 
     def get_relevant_input_fields(self, net_input_fields: Set[str]) -> Set[str]:
         relevant_input_fields = set()
         for k in net_input_fields:
             if k[0] == "E" and k[-1] == "a" and len(k) > 2:
                 relevant_input_fields.add(k)
-        if "batch_seg" in net_input_fields:
-            relevant_input_fields.add("batch_seg")
-        else:
-            relevant_input_fields.add("Za")
         return relevant_input_fields
 
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
@@ -25,7 +21,7 @@ class EnergyReduceLayer(BaseFFLayer):
         for k, v in relevant_input.items():
             if k[0] == "E" and k[-1] == "a" and len(k) > 2:
                 Ea = Ea + v
-        if "batch_seg" in relevant_input:
+        if relevant_input["batch_seg"] is not None:
             batch_seg = relevant_input["batch_seg"]
         else:
             batch_seg = torch.zeros_like(relevant_input["Za"])

@@ -18,7 +18,7 @@ except:
 from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
-from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input
+from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input, _pyg_to_device
 from .monitor import Monitor
 from ..data import Transform
 from ..utils import logger
@@ -152,6 +152,11 @@ class Trainer:
             else:
                 self.num_workers = max(1, os.cpu_count() // 2 - 1)
                 logger.info(f"using {self.num_workers} workers for dataloader given {os.cpu_count()} cpus")
+        
+        # Disable multiprocessing for PyG batches to avoid CUDA multiprocessing issues
+        if self.pyg:
+            self.num_workers = 0
+            logger.info("PyG mode detected, setting num_workers=0 to avoid CUDA multiprocessing issues")
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
         elif isinstance(non_target_features, str):
@@ -192,6 +197,12 @@ class Trainer:
             return _decorate_pyg_batch_input(batch, self.dtype, self.device)
         else:
             return _decorate_batch_input(batch, self.dtype, self.device)
+        
+    def to_device(self, batch):
+        if self.pyg:
+            return _pyg_to_device(batch, self.device)
+        else:
+            return _to_device(batch, self.device)
     
     def decorate_batch_output(self, output, features, targets):
         return _decorate_batch_output(output, features, targets, self.non_target_features)
@@ -251,6 +262,7 @@ class Trainer:
         if self.refresh_patience is not None:
             refresh_patience = self.refresh_patience
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
+        
         train_dataloader = DataLoader(
             dataset=train_dataset,
             batch_size=self.batch_size,
@@ -389,7 +401,7 @@ class Trainer:
                 trn_loss = []
                 
                 for i, batch in enumerate(train_dataloader):
-                    net_input, net_target = _to_device(batch, self.device)
+                    net_input, net_target = self.to_device(batch)
                     
                     loss = 0
                     with torch.set_grad_enabled(True):
@@ -514,7 +526,7 @@ class Trainer:
         y_preds = defaultdict(list)
         y_truths = defaultdict(list)
         for i, batch in enumerate(dataloader):
-            net_input, net_target = _to_device(batch, self.device)
+            net_input, net_target = self.to_device(batch)
             output = model(net_input)
             # Get model outputs
             if self.monitor is not None:
