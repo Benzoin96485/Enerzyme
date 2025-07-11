@@ -44,11 +44,11 @@ class RandomSplit:
         else:
             return OrderedDict(
                 (
-                    part_key, (
+                    part_info["name"], (
                         OrderedDict((data_key, []) for data_key in part_info["sources"]) if "sources" in part_info
-                        else OrderedDict((data_key, []) for data_key in part_info.get("dataset", data.keys()[0]))
+                        else OrderedDict((data_key, []) for data_key in part_info.get("dataset", list(data.keys())[0]))
                     )
-                ) for part_key, part_info in self.parts.items()
+                ) for part_info in self.parts
             )
 
 
@@ -117,10 +117,14 @@ class RandomSplit:
             for data_key in sorted_data_keys[part_key]:
                 data_count = final_partition[part_key][data_key]
                 allocation[data_key].append(data_count + allocation[data_key][-1])
+            for data_key in data.keys() - sorted_data_keys[part_key]:
+                allocation[data_key].append(allocation[data_key][-1])
 
         full_indices = {k: list(range(l[k])) for k in data.keys()}
         for indices in full_indices.values():
             np.random.shuffle(indices)
+        # print(part_keys, allocation, {k: len(v) for k, v in full_indices.items()})
+        # print(sorted_data_keys)
         self.split = OrderedDict(
             (
                 part_key, 

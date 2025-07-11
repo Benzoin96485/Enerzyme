@@ -152,11 +152,9 @@ class Trainer:
             else:
                 self.num_workers = max(1, os.cpu_count() // 2 - 1)
                 logger.info(f"using {self.num_workers} workers for dataloader given {os.cpu_count()} cpus")
+        else:
+            logger.info(f"using {self.num_workers} workers for dataloader")
         
-        # Disable multiprocessing for PyG batches to avoid CUDA multiprocessing issues
-        if self.pyg:
-            self.num_workers = 0
-            logger.info("PyG mode detected, setting num_workers=0 to avoid CUDA multiprocessing issues")
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
         elif isinstance(non_target_features, str):
