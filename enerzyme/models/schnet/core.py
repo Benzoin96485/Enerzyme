@@ -84,6 +84,13 @@ class SchNetCore(BaseFFCore):
         self.lin2 = DenseLayer(hidden_channels // 2, 2, initial_weight="xavier_uniform", initial_bias="zero", shallow_ensemble_size=shallow_ensemble_size)
         self.reset_parameters()
 
+    def __str__(self) -> str:
+        return """
+######################################################
+# Augmented SchNet (NeurIPS 2017, arXiv: 1706.08566) #
+######################################################
+"""
+
     def reset_parameters(self):
         r"""Resets all learnable parameters of the module."""
         for interaction in self.interactions:

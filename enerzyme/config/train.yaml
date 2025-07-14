@@ -1,34 +1,36 @@
 Datahub:
-  data_path: "/my/dataset.pkl"              # path to dataset: pickle, npz or hdf5
-  data_format: pickle                       # pickle, npz or hdf5
-                                            # features and targets' key mappings which map standard data field name in enerzyme to the data field name in your dataset
-                                            # atomic quantities always end with "a" in standard field names
-                                            # if some your name is exactly the same as the standard name, just leave the mapping value empty
-  features:
-    Ra: coord                               # atomic positions, shape [Nframe, Natom, 3] (required)
-    Za: atom_type                           # atomic numbers or symbols (will be automatically converted to numbers), shape [Nframe, Natom] (required)
-    Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
-    N: null                                 # total atom counts, shape [Nframe] 
-                                            # if not provided, will be infered from Za
-                                            # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
-  targets:
-    E: energy                               # total energy, shape [Nframe]
-    Fa: grad                                # atomic forces, shape [Nframe, Natom, 3]
-    Qa: chrg                                # atomic charges, shape [Nframe, Natom]
-    Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
-    M2: dipole                              # total dipole moment, shape [Nframe, 3]
-  preload: false                            # load the processed data from the dump directory
-  neighbor_list: full                       # neighbor list building algorithm:
-                                            # full: all atom pairs are neighbors
-                                            # if left as blank, full neighbor lists will be calculated on-the-fly with the model
-  compressed: true                          # compress the integer fields to one datapoint if all-the-same in the dataset
-                                            # e.g. for configurations of the same molecule, Za, neighbor_list, N will be compressed
-  max_memory: 10                            # maximum memory (in GB) used as cache for reading hdf5 dataset
-  transforms:
-    atomic_energy: "/my/atomic/energy.csv"  # path to store atomic_energy with columns atom_type and atomic_energy
-                                            # summation of atomic reference energies in each frame will be deducted from the total energy
-    negative_gradient: true                 # flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
-    total_energy_normalization: false       # normalize the total energy globally by substract the mean and divide the standard deviation
+  datasets:                                     # Dictionary of datasets
+    my_dataset_1:                               # dataset key
+      data_path: "/my/dataset.pkl"              # path to dataset: pickle, npz or hdf5
+      data_format: pickle                       # pickle, npz or hdf5
+                                                # features and targets' key mappings which map standard data field name in enerzyme to the data field name in your dataset
+                                                # atomic quantities always end with "a" in standard field names
+                                                # if some your name is exactly the same as the standard name, just leave the mapping value empty
+      features:
+        Ra: coord                               # atomic positions, shape [Nframe, Natom, 3] (required)
+        Za: atom_type                           # atomic numbers or symbols (will be automatically converted to numbers), shape [Nframe, Natom] (required)
+        Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
+        N: null                                 # total atom counts, shape [Nframe] 
+                                                # if not provided, will be infered from Za
+                                                # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
+      targets:
+        E: energy                               # total energy, shape [Nframe]
+        Fa: grad                                # atomic forces, shape [Nframe, Natom, 3]
+        Qa: chrg                                # atomic charges, shape [Nframe, Natom]
+        Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
+        M2: dipole                              # total dipole moment, shape [Nframe, 3]
+      preload: false                            # load the processed data from the dump directory
+      neighbor_list: full                       # neighbor list building algorithm:
+                                                # full: all atom pairs are neighbors
+                                                # if left as blank, full neighbor lists will be calculated on-the-fly with the model
+      compressed: true                          # compress the integer fields to one datapoint if all-the-same in the dataset
+                                                # e.g. for configurations of the same molecule, Za, neighbor_list, N will be compressed
+      max_memory: 10                            # maximum memory (in GB) used as cache for reading hdf5 dataset
+      transforms:
+        atomic_energy: "/my/atomic/energy.csv"  # path to store atomic_energy with columns atom_type and atomic_energy
+                                                # summation of atomic reference energies in each frame will be deducted from the total energy
+        negative_gradient: true                 # flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
+        total_energy_normalization: false       # normalize the total energy globally by substract the mean and divide the standard deviation
 Modelhub:
   internal_FFs:                             # force fields built in enerzyme
     FF01:                                   # force field ID
@@ -278,57 +280,57 @@ Modelhub:
         max_Za: 86
         cutoff_fn: polynomial
       layers:
-      - name: RangeSeparation # cutoff_sr, cutoff_fn in build_params
-      - name: BesselRBF # cutoff_sr, cutoff_fn in build_params
-        params: 
-          trainable: false
-      - name: NuclearEmbedding
-        params: # max_Za, dim_embedding in build_params
-          zero_init: false
-          use_electron_config: true
-      - name: ElectronicEmbedding
-        params: # dim_embedding, activation_fn in build_params
-          num_residual: 1
-          attribute: charge
-      - name: ElectronicEmbedding
-        params:
-          num_residual: 1
-          attribute: spin
-      - name: Core # max_Za, num_rbf, dim_embedding in build_params
-        params: 
-          max_ell: 3
-          additional_hidden_irreps: 128x1o
-          interaction_cls_first: RealAgnosticResidualInteractionBlock
-          interaction_cls: RealAgnosticResidualInteractionBlock
-          correlation: 3
-          num_interactions: 2
-          avg_num_neighbors: 8.0
-          MLP_irreps: 16x0e
-          radial_MLP: [64, 64, 64]
-          gate: silu
-      - name: AtomicAffine
-        params:
-          scales:
-            Ea:
-              learnable: true
-              values: 1
-            Qa:
-              learnable: true
-              values: 1
-          shifts:
-            Ea:
-              learnable: true
-              values: 0
-            Qa:
-              learnable: true
-              values: 0
-      - name: ChargeConservation
-      - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
-        params:
-          flavor: PhysNet
-      - name: AtomicCharge2Dipole
-      - name: EnergyReduce                # Reduce atomic energy terms to the total energy
-      - name: Force                       # Calculate the force from the total energy
+        - name: RangeSeparation # cutoff_sr, cutoff_fn in build_params
+        - name: BesselRBF # cutoff_sr, cutoff_fn in build_params
+          params: 
+            trainable: false
+        - name: NuclearEmbedding
+          params: # max_Za, dim_embedding in build_params
+            zero_init: false
+            use_electron_config: true
+        - name: ElectronicEmbedding
+          params: # dim_embedding, activation_fn in build_params
+            num_residual: 1
+            attribute: charge
+        - name: ElectronicEmbedding
+          params:
+            num_residual: 1
+            attribute: spin
+        - name: Core # max_Za, num_rbf, dim_embedding in build_params
+          params: 
+            max_ell: 3
+            additional_hidden_irreps: 128x1o
+            interaction_cls_first: RealAgnosticResidualInteractionBlock
+            interaction_cls: RealAgnosticResidualInteractionBlock
+            correlation: 3
+            num_interactions: 2
+            avg_num_neighbors: 8.0
+            MLP_irreps: 16x0e
+            radial_MLP: [64, 64, 64]
+            gate: silu
+        - name: AtomicAffine
+          params:
+            scales:
+              Ea:
+                learnable: true
+                values: 1
+              Qa:
+                learnable: true
+                values: 1
+            shifts:
+              Ea:
+                learnable: true
+                values: 0
+              Qa:
+                learnable: true
+                values: 0
+        - name: ChargeConservation
+        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
+          params:
+            flavor: PhysNet
+        - name: AtomicCharge2Dipole
+        - name: EnergyReduce                # Reduce atomic energy terms to the total energy
+        - name: Force                       # Calculate the force from the total energy
       loss:
         mae:
           Fa: 52.917721
@@ -480,15 +482,19 @@ Modelhub:
 Trainer:
   Splitter:
     method: random                          # splitting method: random
-    parts:                                  # partition names, at least training and validation are needed
-      - training
-      - validation
-      - test
-    ratios:                                 # partition ratio (float in (0,1)) or the number of datapoints (int)
-                                            # order corresponds to the parts' order
-      - 0.7                                  
-      - 0.1                                  
-      - 0.2
+    parts:                                  # partitions, at least training and validation are needed
+      - name: training                      # each partition has a name and sources
+        sources:
+          - dataset: my_dataset_1           # using multiple datasets with its datahub key as sources
+            ratio: 0.7                      # with different ratios, the sum of ratios should be 1
+      - name: validation
+        sources:
+          - dataset: my_dataset_1
+          - ratio: 0.1
+      - name: test
+        sources:
+          - dataset: my_dataset_1
+          - ratio: 0.2
     preload: true                           # if saved splitting indices are loaded
     save: true                              # if splitting indices are saved
     seed: 114514                            # splitting random seed
