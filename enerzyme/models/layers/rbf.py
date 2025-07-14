@@ -451,11 +451,11 @@ class GaussianSmearing(BaseFFLayer):
     def __init__(
         self,
         num_rbf: int,
-        cutoff: float,
+        cutoff_sr: float,
         cuton: float=0.0,
     ):
         super().__init__(input_fields={"Dij_sr"}, output_fields={"rbf"})
-        offset = torch.linspace(cuton, cutoff, num_rbf)
+        offset = torch.linspace(cuton, cutoff_sr, num_rbf)
         self.coeff = -0.5 / (offset[1] - offset[0]).item() ** 2
         self.register_buffer('offset', offset)
 

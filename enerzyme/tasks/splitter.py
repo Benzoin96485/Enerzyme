@@ -21,7 +21,7 @@ class RandomSplit:
         **params
     ):
         self.parts = parts
-        self.ratios = ratios.copy()
+        self.ratios = ratios.copy() if ratios is not None else None
         self.mode = "old"
 
         # sanity check
@@ -46,7 +46,7 @@ class RandomSplit:
                 (
                     part_info["name"], (
                         OrderedDict((source["dataset"], []) for source in part_info["sources"]) if "sources" in part_info
-                        else OrderedDict((data_key, []) for data_key in part_info.get("dataset", list(data.keys())[0]))
+                        else OrderedDict([(part_info.get("dataset", list(data.keys())[0]), [])])
                     )
                 ) for part_info in self.parts
             )
