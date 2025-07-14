@@ -97,8 +97,6 @@ class SchNetCore(BaseFFCore):
             interaction.reset_parameters()
         torch.nn.init.xavier_uniform_(self.lin1.weight)
         self.lin1.bias.data.fill_(0)
-        torch.nn.init.xavier_uniform_(self.lin2.weight)
-        self.lin2.bias.data.fill_(0)
 
     def build(self, built_layers: List[Module]) -> None:
         # build necessary fixed pre-core layers
