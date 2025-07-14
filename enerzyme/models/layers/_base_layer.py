@@ -95,11 +95,15 @@ class BaseFFLayer(BaseFFModule):
         input_fields: Optional[Set[str]]=None, 
         output_fields: Optional[Set[str]]=None,
         train_only: bool=False,
-        eval_only: bool=False
+        eval_only: bool=False,
+        test_only: bool=False,
+        test_exclude: bool=False
     ) -> None:
         super().__init__(input_fields, output_fields)
         self.train_only = train_only
         self.eval_only = eval_only
+        self.test_only = test_only
+        self.test_exclude = test_exclude
 
     def reset_field_name(self, **mapping: Dict[str, str]) -> None:
         self._relevant_fields = self._input_fields | self._output_fields
@@ -128,9 +132,25 @@ class BaseFFCore(BaseFFModule):
         super().__init__(input_fields, output_fields)
         self.pre_sequence = Sequential()
         self.post_sequence = Sequential()
+        self.test_mode = False
 
     def forward(self, net_input):
-        return self.post_sequence(self._forward(self.pre_sequence(net_input)))
+        for layer in self.pre_sequence:
+            if layer.test_only and not self.test_mode:
+                continue
+            elif layer.test_exclude and self.test_mode:
+                continue
+            else:
+                net_input = layer(net_input)
+        net_output = self._forward(net_input)
+        for layer in self.post_sequence:
+            if layer.test_only and not self.test_mode:
+                continue
+            elif layer.test_exclude and self.test_mode:
+                continue
+            else:
+                net_output = layer(net_output)
+        return net_output
     
     @abstractmethod
     def build(self, built_layers: List[Module]) -> None:

@@ -45,7 +45,7 @@ class RandomSplit:
             return OrderedDict(
                 (
                     part_info["name"], (
-                        OrderedDict((data_key, []) for data_key in part_info["sources"]) if "sources" in part_info
+                        OrderedDict((source["dataset"], []) for source in part_info["sources"]) if "sources" in part_info
                         else OrderedDict((data_key, []) for data_key in part_info.get("dataset", list(data.keys())[0]))
                     )
                 ) for part_info in self.parts

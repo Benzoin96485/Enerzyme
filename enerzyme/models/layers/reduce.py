@@ -29,7 +29,16 @@ class EnergyReduceLayer(BaseFFLayer):
 
 
 class ShallowEnsembleReduceLayer(BaseFFLayer):
-    def __init__(self, reduce_mean: List[str]=[], var: List[str]=[], std: List[str]=[], relative_energy: bool=False, train_only: bool=False, eval_only: bool=False) -> None:
+    def __init__(self, 
+        reduce_mean: List[str]=[], 
+        var: List[str]=[], 
+        std: List[str]=[], 
+        relative_energy: bool=False, 
+        train_only: bool=False, 
+        eval_only: bool=False,
+        test_only: bool=False,
+        test_exclude: bool=False
+    ) -> None:
         super().__init__(
             input_fields=set(reduce_mean) | set(var) | set(std), 
             output_fields=set(reduce_mean) | set(
@@ -38,7 +47,9 @@ class ShallowEnsembleReduceLayer(BaseFFLayer):
                 [name + "_std" for name in std]
             ),
             train_only=train_only,
-            eval_only=eval_only
+            eval_only=eval_only,
+            test_only=test_only,
+            test_exclude=test_exclude
         )
         self.var = var
         self.std = std

@@ -156,7 +156,7 @@ class FFDataset(Dataset):
     def _indices_to_key_indices(self, indices: Iterable[int]) -> Dict[str, np.ndarray[int]]:
         _indices = np.array(indices)
         data_key_indices = self.indices_map[_indices]
-        return {k: _indices[data_key_indices == self.key_order[k]] for k in self.indices.keys()}
+        return {k: _indices[data_key_indices == self.key_order[k]] - self.prefix_sum[self.key_order[k]] for k in self.indices.keys()}
 
     def _key_indices_to_indices(self, key_indices: Dict[str, Iterable[int]]) -> np.ndarray[int]:
         return np.concatenate([self.prefix_sum[self.key_order[k]] + np.array(v) for k, v in key_indices.items()])
@@ -342,7 +342,7 @@ class BaseFFLauncher(ABC):
         if data_source == "withheld":
             withheld_size = {k: len(v) for k, v in withheld_set.raw_indices.items()}
             withheld_mask = {k: np.full(withheld_size[k], True) for k in withheld_size.keys()}
-            logger.warning("Masking potentialoverlap between training/validation set and withheld set!")
+            logger.warning("Masking potential overlap between training/validation set and withheld set!")
             for k, v in withheld_set.raw_indices.items():
                 if k in training_set.raw_indices:
                     withheld_mask[k] &= ~np.isin(v, training_set.raw_indices[k])
@@ -418,7 +418,7 @@ class BaseFFLauncher(ABC):
                         expand_absolute_key_indices_validation = withheld_set._indices_to_key_indices(expand_absolute_indices[len_expanded_training:])
                         validation_set.expand_with_indices(expand_absolute_key_indices_validation)
                 else:
-                    training_set.expand_with_indices(expand_absolute_indices)
+                    training_set.expand_with_indices(expand_absolute_key_indices)
                 for k, v in masked_relative_key_indices.items():
                     withheld_mask[k][v] = False
                 new_indices = {
@@ -508,7 +508,8 @@ class FF_single(BaseFFLauncher):
             dump_dir=self.dump_dir, 
             transform=self.datahub.transform, 
             epoch=1, 
-            load_model=True
+            load_model=True,
+            test_mode=True
         )
         y_pred = predict_result["y_pred"]
         y_truth = predict_result["y_truth"]
@@ -619,7 +620,8 @@ class FF_committee(BaseFFLauncher):
                 transform=self.datahub.transform, 
                 epoch=1, 
                 load_model=True,
-                model_rank=i
+                model_rank=i,
+                test_mode=True
             )
             y_pred = predict_result["y_pred"]
             if y_truth is None:
