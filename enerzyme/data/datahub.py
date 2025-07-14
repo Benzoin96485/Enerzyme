@@ -6,6 +6,7 @@ import numpy as np
 from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
+from torch_geometric.data import InMemoryDataset, OnDiskDataset
 from .datatype import is_atomic, is_rounded, is_int
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
@@ -81,7 +82,7 @@ class FieldDataset(Dataset):
     def loc(self, idx) -> Dict[str, Iterable]:
         return {k: v[0 if k in self.compressed_keys else idx] for k, v in self.data.items()}
 
-    def load_subset(self, indices):
+    def load_subset(self, indices: Iterable[int]) -> "FieldDataset":
         data = dict()
         for k, v in self.data.items():
             if k in self.compressed_keys:
@@ -91,7 +92,7 @@ class FieldDataset(Dataset):
         return FieldDataset(data)
 
 
-class DataHub:
+class SingleDataHub:
     def __init__(self,  
         dump_dir=".",
         data_format: Optional[str]=None,
@@ -107,7 +108,6 @@ class DataHub:
         **params
     ):
         self.data_path = os.path.abspath(data_path)
-        self.dump_dir = dump_dir
         self.data_format = data_format
         self.preload = preload
         self.feature_types = _collect_types(features)
@@ -119,7 +119,8 @@ class DataHub:
         self.max_memory = max_memory
         datahub_str = data_path + neighbor_list + str(sorted(self.transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
-        self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
+        self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
+        logger.info(f"Preload path {self.preload_path} is created")
         self.transform = Transform(self.transforms, self.preload_path)
         if not self.preload or not self.preload_data():
             self.get_handle("w")
@@ -141,7 +142,7 @@ class DataHub:
             else:
                 self._load_molecular_data(k, loaded_data)
         loaded_file.close()
-
+    
     def preload_data(self): 
         hdf5_path = os.path.join(self.preload_path, "pre_transformed.hdf5")
         config_path = os.path.join(self.preload_path, "datahub.yaml")
@@ -159,7 +160,7 @@ class DataHub:
                 logger.info(f"Data matched and preloaded from {self.preload_path}")
                 return True
         return False
-    
+
     def _expand(self, k: str, values: Iterable) -> np.ndarray:
         if isinstance(values, int) or isinstance(values, float):
             if is_int(k) and self.compressed:
@@ -311,7 +312,7 @@ class DataHub:
 
     def get_handle(self, mode: Literal["r", "w"]="r") -> None:
         if mode == "w" and os.path.exists(self.preload_path):
-            logger.warning(f"Preload path {self.preload_path} exists and will be covered")
+            logger.warning(f"Preload path {self.preload_path} exists and will be overwritten")
         else:
             os.makedirs(self.preload_path, exist_ok=True)
         self.file = h5py.File(os.path.join(self.preload_path, "pre_transformed.hdf5"), mode=mode, rdcc_nbytes=1024 ** 3 * self.max_memory)
@@ -343,3 +344,36 @@ class DataHub:
     @property
     def targets(self) -> FieldDataset:
         return FieldDataset({k: v for k, v in self.data.items() if k in self.target_types})
+
+
+class DataHub:
+    def __init__(self,  
+        dump_dir=".",
+        datasets: Optional[Union[List, Dict]]=None,
+        **params
+    ):
+        self.dump_dir = dump_dir
+        if datasets is None:
+            self.datahubs = {"default": SingleDataHub(**params)}
+        elif isinstance(datasets, list):
+            self.datahubs = {str(i): SingleDataHub(**dataset_params) for i, dataset_params in enumerate(datasets)}
+        elif isinstance(datasets, dict):
+            self.datahubs = {name: SingleDataHub(**dataset_params) for name, dataset_params in datasets.items()}
+        else:
+            raise ValueError(f"Unknown type of datasets: {type(datasets)}")\
+            
+    @property
+    def features(self) -> Dict[str, FieldDataset]:
+        return {name: datahub.features for name, datahub in self.datahubs.items()}
+
+    @property
+    def targets(self) -> Dict[str, FieldDataset]:
+        return {name: datahub.targets for name, datahub in self.datahubs.items()}
+    
+    @property
+    def preload_path(self) -> Dict[str, str]:
+        return {name: datahub.preload_path for name, datahub in self.datahubs.items()}
+    
+    @property
+    def transform(self) -> Dict[str, Transform]:
+        return {name: datahub.transform for name, datahub in self.datahubs.items()}

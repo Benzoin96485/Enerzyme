@@ -18,7 +18,7 @@ except:
 from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
-from .batch import _decorate_batch_input, _decorate_batch_output, _to_device
+from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input, _pyg_to_device
 from .monitor import Monitor
 from ..data import Transform
 from ..utils import logger
@@ -106,6 +106,7 @@ def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrai
 class Trainer:
     def __init__(self, out_dir: str=None, metric_config: Metrics=dict(), **params) -> None:
         self.batch_size = params.get('batch_size', 8)
+        self.pyg = params.get("pyg", False)
         self.lightning = params.get("lightning", False)
         self.patience = params.get('patience', 50)
         self.max_norm = params.get('max_norm', -1)
@@ -151,6 +152,9 @@ class Trainer:
             else:
                 self.num_workers = max(1, os.cpu_count() // 2 - 1)
                 logger.info(f"using {self.num_workers} workers for dataloader given {os.cpu_count()} cpus")
+        else:
+            logger.info(f"using {self.num_workers} workers for dataloader")
+        
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
         elif isinstance(non_target_features, str):
@@ -187,7 +191,16 @@ class Trainer:
                 self.device = torch.device("cpu")
 
     def decorate_batch_input(self, batch):
-        return _decorate_batch_input(batch, self.dtype, self.device)
+        if self.pyg:
+            return _decorate_pyg_batch_input(batch, self.dtype, self.device)
+        else:
+            return _decorate_batch_input(batch, self.dtype, self.device)
+        
+    def to_device(self, batch):
+        if self.pyg:
+            return _pyg_to_device(batch, self.device)
+        else:
+            return _to_device(batch, self.device)
     
     def decorate_batch_output(self, output, features, targets):
         return _decorate_batch_output(output, features, targets, self.non_target_features)
@@ -247,6 +260,7 @@ class Trainer:
         if self.refresh_patience is not None:
             refresh_patience = self.refresh_patience
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
+        
         train_dataloader = DataLoader(
             dataset=train_dataset,
             batch_size=self.batch_size,
@@ -385,7 +399,7 @@ class Trainer:
                 trn_loss = []
                 
                 for i, batch in enumerate(train_dataloader):
-                    net_input, net_target = _to_device(batch, self.device)
+                    net_input, net_target = self.to_device(batch)
                     
                     loss = 0
                     with torch.set_grad_enabled(True):
@@ -489,7 +503,7 @@ class Trainer:
     def _early_stop_choice(self, wait, min_loss, metric_score, save_handle, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, save_handle, patience, epoch)
     
-    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
+    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Dict[str, Transform], epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None, test_mode: bool=False) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         if load_model == True:
@@ -505,12 +519,13 @@ class Trainer:
             num_workers=self.num_workers,
         )
         model = model.eval()
+        model.test_mode = test_mode
         batch_bar = tqdm(total=len(dataloader), dynamic_ncols=True, position=0, leave=False, desc='val', ncols=5)
         val_loss = []
         y_preds = defaultdict(list)
         y_truths = defaultdict(list)
         for i, batch in enumerate(dataloader):
-            net_input, net_target = _to_device(batch, self.device)
+            net_input, net_target = self.to_device(batch)
             output = model(net_input)
             # Get model outputs
             if self.monitor is not None:
@@ -537,10 +552,16 @@ class Trainer:
             self.monitor.summary()
 
         if transform is not None:
-            transform.inverse_transform(y_preds)
-            transform.inverse_transform(y_truths)
+            selected_indices_dict = defaultdict(list)
+            for i, data_key in enumerate(y_preds["data_key"]):
+                selected_indices_dict[data_key].append(i)
+            for data_key, selected_indices in selected_indices_dict.items():
+                if selected_indices:
+                    transform[data_key].inverse_transform(y_preds, selected_indices)
+                    transform[data_key].inverse_transform(y_truths, selected_indices)
         metric_score = self.metrics.cal_metric(y_truths, y_preds)
         if load_model and "_judge_score" in metric_score:
             metric_score.pop("_judge_score")
         batch_bar.close()
+        model.test_mode = False
         return {"y_pred": y_preds, "y_truth": y_truths, "val_loss": val_loss, "metric_score": metric_score}

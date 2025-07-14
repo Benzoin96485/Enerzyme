@@ -3,7 +3,7 @@ from .geometry import DistanceLayer, RangeSeparationLayer
 from .rbf import (
     BaseRBF, 
     ExponentialGaussianRBFLayer, ExponentialBernsteinRBFLayer,
-    GaussianRBFLayer, BernsteinRBFLayer, SincRBFLayer, BesselRBFLayer
+    GaussianRBFLayer, BernsteinRBFLayer, SincRBFLayer, BesselRBFLayer, GaussianSmearing
 )
 from .atom_embedding import BaseAtomEmbedding, RandomAtomEmbedding, NuclearEmbedding
 from .electron_embedding import BaseElectronEmbedding, ElectronicEmbedding

@@ -126,7 +126,7 @@ def test_swish():
 
 
 def test_residual_layer():
-    from enerzyme.models.layers.mlp import ResidualLayer as F1
+    from enerzyme.models.blocks.mlp import ResidualLayer as F1
     from spookynet.modules.residual import Residual as F2
     f1 = F1(
         dim_feature_in=dim_feature, dim_feature_out=dim_feature, 
@@ -141,7 +141,7 @@ def test_residual_layer():
 
 
 def test_residual_stack():
-    from enerzyme.models.layers.mlp import ResidualStack as F1
+    from enerzyme.models.blocks.mlp import ResidualStack as F1
     from spookynet.modules.residual_stack import ResidualStack as F2
     f1 = F1(
         dim_feature=dim_feature, num_residual=3, 
@@ -156,7 +156,7 @@ def test_residual_stack():
 
 
 def test_residual_mlp():
-    from enerzyme.models.layers.mlp import ResidualMLP as F1
+    from enerzyme.models.blocks.mlp import ResidualMLP as F1
     from spookynet.modules.residual_mlp import ResidualMLP as F2
     f2 = F2(dim_feature, 3).type(dtype)
     f1 = F1(
@@ -287,7 +287,7 @@ def test_local_interaction():
 
 
 def test_attention():
-    from enerzyme.models.layers.attention import Attention as F1
+    from enerzyme.models.blocks.attention import Attention as F1
     from spookynet.modules.attention import Attention as F2
     f2 = F2(dim_feature, dim_feature, dim_feature).type(dtype)
     f1 = F1(dim_feature, dim_feature).type(dtype)

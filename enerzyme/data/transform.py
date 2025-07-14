@@ -1,4 +1,5 @@
 import os, pathlib
+from abc import ABC, abstractmethod
 from typing import Dict, Iterable, Union, List, Optional
 import joblib
 import pandas as pd
@@ -43,8 +44,26 @@ def load_atomic_energy(atomic_energy_path: str) -> pd.DataFrame:
         raise FileNotFoundError(f"Atomic energy file {atomic_energy_path} not found!")
 
 
-class AtomicEnergyTransform:
+class BaseTransform(ABC):
+    def __init__(self, major_key: str, *args, **kwargs) -> None:
+        pass
+    
+    @abstractmethod
+    def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
+        ...
+
+    def inverse_transform(self, new_output: Dict[str, Iterable], selected_indices: Optional[Iterable[int]]=None) -> None:
+        if selected_indices is None:
+            for i in range(len(new_output[self.major_key])):
+                self.single_inverse_transform(new_output, i)
+        else:
+            for i in selected_indices:
+                self.single_inverse_transform(new_output, i)
+    
+
+class AtomicEnergyTransform(BaseTransform):
     def __init__(self, atomic_energy_path: str, simulation_mode=False, *args, **kwargs) -> None:
+        super().__init__(major_key="E")
         self.atomic_energies = load_atomic_energy(atomic_energy_path)
         self.transform_type = "shift"
 
@@ -59,17 +78,16 @@ class AtomicEnergyTransform:
             for i in tqdm(range(len(new_input["E"]))):
                 new_input["E"][i] -= sum(self.atomic_energies.loc[new_input["Za"][i]]["atomic_energy"])
     
-    def inverse_transform(self, new_output: Dict[str, Iterable]) -> None:
+    def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
         if len(new_output["Za"]) == 1:
-            for i in range(len(new_output["E"])):
-                new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][0]]["atomic_energy"])
+            new_output["E"][idx] += sum(self.atomic_energies.loc[new_output["Za"][0]]["atomic_energy"])
         else:
-            for i in range(len(new_output["E"])):
-                new_output["E"][i] += sum(self.atomic_energies.loc[new_output["Za"][i]]["atomic_energy"])
+            new_output["E"][idx] += sum(self.atomic_energies.loc[new_output["Za"][idx]]["atomic_energy"])
     
 
-class NegativeGradientTransform:
+class NegativeGradientTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
+        super().__init__(major_key="Fa")
         self.transform_type = "scale"
 
     def transform(self, new_input):
@@ -77,14 +95,13 @@ class NegativeGradientTransform:
             for i in range(len(new_input["Fa"])):
                 new_input["Fa"][i] = -new_input["Fa"][i]
     
-    def inverse_transform(self, new_output):
-        if "Fa" in new_output:
-            for i in range(len(new_output["Fa"])):
-                new_output["Fa"][i] = -new_output["Fa"][i]
+    def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
+        new_output["Fa"][idx] = -new_output["Fa"][idx]
 
 
-class TotalEnergyNormalization:
+class TotalEnergyNormalization(BaseTransform):
     def __init__(self, preload_path=".", scale=None, shift=None):
+        super().__init__(major_key="E")
         self.transform_type = "normalization"
         self.scale = 1
         self.shift = 0
@@ -118,12 +135,11 @@ class TotalEnergyNormalization:
             new_input["E"][i] = (new_input["E"][i] - self.shift) / self.scale
             new_input["Fa"][i] /= self.scale
 
-    def inverse_transform(self, new_output):
+    def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
         if not self.loaded:
             raise RuntimeError("Shift and scale parameters not loaded")
-        for i in range(len(new_output["E"])):
-            new_output["E"][i] = new_output["E"][i] * self.scale + self.shift
-            new_output["Fa"][i] *= self.scale
+        new_output["E"][idx] = new_output["E"][idx] * self.scale + self.shift
+        new_output["Fa"][idx] *= self.scale
 
 
 class Transform:
@@ -158,12 +174,12 @@ class Transform:
         for normalization in self.normalizations:
             normalization.transform(raw_input)
 
-    def inverse_transform(self, raw_output: Dict):
+    def inverse_transform(self, raw_output: Dict, data_key: Optional[str]=None):
         for normalization in self.normalizations:
-            normalization.inverse_transform(raw_output)
+            normalization.inverse_transform(raw_output, data_key)
         for scale in self.scales:
-            scale.inverse_transform(raw_output)
+            scale.inverse_transform(raw_output, data_key)
         for shift in self.shifts:
-            shift.inverse_transform(raw_output)
+            shift.inverse_transform(raw_output, data_key)
 
 

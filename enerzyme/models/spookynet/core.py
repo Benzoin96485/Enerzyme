@@ -5,7 +5,7 @@ from torch import Tensor
 from torch.nn import Module, ModuleList, Linear
 import torch.nn.functional as F
 from .interaction import InteractionModule
-from ..layers.mlp import DenseLayer
+from ..blocks.mlp import DenseLayer
 from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore, BaseAtomEmbedding, BaseElectronEmbedding, BaseRBF, ChargeConservationLayer
 from ..activation import ACTIVATION_KEY_TYPE
 
