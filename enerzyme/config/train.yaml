@@ -336,6 +336,63 @@ Modelhub:
           Q: 1
           Qa: 1
           E: 1
+    FF07:
+      suffix:
+      architecture: SchNet
+      active: true
+      loss:
+        rmse:
+          Fa: 52.917721
+          Qa: 1
+          E: 1
+          M2: 1.8897261
+          Q: 1
+      build_params:                        
+        dim_embedding: 128
+        num_rbf: 128
+        max_Za: 94
+        cutoff_sr: 5.0
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+      layers:
+        - name: RangeSeparation             
+        - name: GaussianSmearing            # Gaussian smearing radial basis function
+          params:                           # num_rbf, cutoff_sr in build_params
+            cuton: 0.0                      # cuton distance of the Gaussian smearing function
+        - name: RandomAtomEmbedding        
+        - name: Core                        # SchNet Core
+          params:                           # dim_embedding, num_rbf in build_params
+            num_interactions: 4             # number of interaction blocks
+            hidden_channels: 128            # dimension of hidden channels
+            activation_fn: shifted_softplus
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true         
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        - name: ElectrostaticEnergy
+          params:
+            flavor: PhysNet
+        - name: EnergyReduce
+        - name: Force
   external_FFs:
     FF05:
       suffix:

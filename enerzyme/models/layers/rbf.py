@@ -459,6 +459,6 @@ class GaussianSmearing(BaseFFLayer):
         self.coeff = -0.5 / (offset[1] - offset[0]).item() ** 2
         self.register_buffer('offset', offset)
 
-    def _get_rbf(self, Dij_sr: Tensor) -> Tensor:
+    def get_rbf(self, Dij_sr: Tensor) -> Tensor:
         dist = Dij_sr.view(-1, 1) - self.offset.view(1, -1)
         return torch.exp(self.coeff * torch.pow(dist, 2))
