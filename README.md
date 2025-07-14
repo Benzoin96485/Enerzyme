@@ -12,8 +12,7 @@ Currently supported model architectures:
 |   MACE   | internal |             ✅             |              ✅              |       ❌       |        ✅        |                   [NeurIPS 2022, arXiv:2206.07697](https://arxiv.org/abs/2206.07697)                   |   [Github](https://github.com/ACEsuit/mace)   |
 |  NequIP  | external |             ✅             |              ❌              |       ❌       |        ❌        |          [Nat. Commun. 2022, 13(1), 2453](https://www.nature.com/articles/s41467-022-29939-5)          | [Github](https://github.com/mir-group/nequip) |
 |  XPaiNN  | external |             ✅             |              ❌              |       ❌       |        ❌        | [J. Chem. Theory Comput. 2024, 20, 21, 9500–9511](https://pubs.acs.org/doi/10.1021/acs.jctc.4c01151) | [Github](https://github.com/X1X1010/XequiNet) |
-|  SchNet  | internal |             ✅             |              ✅              |       ❌       | [NeurIPS 2017, arXiv: 1706.08566](https://arxiv.org/abs/1706.08566) |
- [Github](https://github.com/pyg-team/pytorch_geometric/blob/master/torch_geometric/nn/models/schnet.py) |
+|  SchNet  | internal |             ✅             |              ✅              |       ❌       |  ✅       |  [NeurIPS 2017, arXiv: 1706.08566](https://arxiv.org/abs/1706.08566) | [Github](https://github.com/pyg-team/pytorch_geometric/blob/master/torch_geometric/nn/models/schnet.py) |
 # Usage
 
 ## Installation
@@ -38,6 +37,7 @@ torch-ema==0.3
 pyyaml==6.0.2
 torch-scatter==2.1.2
 e3nn==0.5.5
+pytorch_geometric==2.6.1
 ```
 
 To test PhysNet, you also need
@@ -59,7 +59,6 @@ To invoke XPaiNN, you need
 XequiNet==0.3.6
 scipy==1.11.2
 pyscf==2.7.0
-torch_geometric==2.5.3
 pytorch-warmup==0.1.1
 pydantic==1.10.12
 ```
