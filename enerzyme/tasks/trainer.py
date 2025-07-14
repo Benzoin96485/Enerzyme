@@ -176,7 +176,7 @@ class Trainer:
                 accelerator="auto",
                 callbacks=[early_stopping_callback],
                 devices="auto",
-                num_nodes=os.environ.get("SLURM_NNODES", 1),
+                num_nodes=int(os.environ.get("SLURM_NNODES", 1)),
                 strategy="auto",
                 gradient_clip_val=self.max_norm if self.max_norm > 0 else None,
                 inference_mode=False,
