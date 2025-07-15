@@ -35,6 +35,5 @@ class FFSimulate:
         self.simulations.append(Simulation(self.config, model, model_path, self.out_dir, self.transform))
         
     def run(self):
-        print()
         for simulation in self.simulations:
             simulation.run()

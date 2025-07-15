@@ -185,6 +185,29 @@ def bond(args):
     pdb2mol(args.pdb_path, args.mol_path, args.img_path, args.template_path)
 
 
+def listen(args):
+    from .listen import FFListen
+    FFListen(
+        config_path=args.config_path, 
+        model_dir=args.model_dir, 
+        out_dir=args.out_dir,
+        bind=args.bind
+    ).listen()
+
+
+def request(args):
+    from .listen import FFRequest
+    FFRequest(
+        config_path=args.config_path, 
+        model_dir=args.model_dir, 
+        out_dir=args.out_dir
+    ).request()
+
+
+def kill(args):
+    pass
+
+
 def main():
     args = get_parser()
     if args.command == 'train':
@@ -202,6 +225,14 @@ def main():
     elif args.command == 'bond':
         logger.disabled = True
         bond(args)
+    elif args.command == 'listen':
+        listen(args)
+    elif args.command == 'request':
+        logger.disabled = True
+        request(args)
+    elif args.command == 'kill':
+        logger.disabled = True
+        kill(args)
     else:
         raise NotImplementedError(f"Command {args.command} is not supported now.")
     logger.info("job complete")

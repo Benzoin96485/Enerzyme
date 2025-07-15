@@ -100,7 +100,8 @@ class SingleDataHub:
         preload: bool=True,
         features: Dict[str, str]=dict(),
         targets: Dict[str, str]=dict(),
-        transforms: Optional[Dict[str, Union[str, bool]]]=None,
+        preprocessings: Optional[Dict[str, Union[str, bool]]]=None,
+        global_transforms: Optional[Dict[str, Union[str, bool]]]=None,
         neighbor_list: Optional[str]=None,
         hash_length: int=16,
         compressed: bool=True,
@@ -114,19 +115,21 @@ class SingleDataHub:
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
-        self.transforms = dict() if transforms is None else transforms
         self.compressed = compressed
         self.max_memory = max_memory
-        datahub_str = data_path + neighbor_list + str(sorted(self.transforms.items()))
+        datahub_str = data_path + neighbor_list + str(sorted(self.preprocessings.items())) + \
+            str(sorted(self.global_transforms.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
         logger.info(f"Preload path {self.preload_path} is created")
-        self.transform = Transform(self.transforms, self.preload_path)
+        self.preprocessing = Transform(preprocessings, self.preload_path)
+        self.global_transform = Transform(global_transforms, self.preload_path)
         if not self.preload or not self.preload_data():
             self.get_handle("w")
             self._init_data()
             self._init_neighbor_list()
-            self.transform.transform(self.data)
+            self.preprocessing.transform(self.data)
+            self.global_transform.transform(self.data)
             self._save_config()
             self.reset_handle()
 
@@ -354,6 +357,8 @@ class DataHub:
     ):
         self.dump_dir = dump_dir
         if datasets is None:
+            if "global_transforms" not in params:
+                params["global_transforms"] = params.get("transforms", None)
             self.datahubs = {"default": SingleDataHub(**params)}
         elif isinstance(datasets, list):
             self.datahubs = {str(i): SingleDataHub(**dataset_params) for i, dataset_params in enumerate(datasets)}
@@ -375,5 +380,5 @@ class DataHub:
         return {name: datahub.preload_path for name, datahub in self.datahubs.items()}
     
     @property
-    def transform(self) -> Dict[str, Transform]:
-        return {name: datahub.transform for name, datahub in self.datahubs.items()}
+    def transform(self) -> Transform:
+        return list(self.datahubs.values())[0].global_transform

@@ -144,6 +144,7 @@ class TotalEnergyNormalization(BaseTransform):
 
 class Transform:
     def __init__(self, transform_args: Dict, preload_path: Optional[str]=None, simulation_mode: bool=False) -> None:
+        self.transform_args = transform_args
         self.backup_keys = set()
         self.shifts = []
         self.scales = []
