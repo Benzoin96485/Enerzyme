@@ -39,10 +39,10 @@ class AtomicAffineLayer(BaseFFLayer):
         return nn.ParameterDict(affine_dict)
     
     def get_Ea(self, Ea: Tensor, Qa: Tensor, Za: Tensor) -> Tensor:
-        return Ea + self.shifts.Ea.gather(0, Za).view((-1, ) if Ea.dim() == 1 else (-1, 1))
+        return (Ea + self.shifts.Ea.gather(0, Za).view((-1, ) if Ea.dim() == 1 else (-1, 1))) * self.scales.Ea.gather(0, Za).view((-1, ) if Ea.dim() == 1 else (-1, 1))
     
     def get_Qa(self, Ea: Tensor, Qa: Tensor, Za: Tensor) -> Tensor:
-        return Qa + self.shifts.Qa.gather(0, Za).view((-1, ) if Qa.dim() == 1 else (-1, 1))
+        return (Qa + self.shifts.Qa.gather(0, Za).view((-1, ) if Qa.dim() == 1 else (-1, 1))) * self.scales.Qa.gather(0, Za).view((-1, ) if Qa.dim() == 1 else (-1, 1))
     
     def _load_from_state_dict(self, state_dict: Dict[str, Tensor], *args, **kwargs):
         for k, v in state_dict.items():
