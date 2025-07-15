@@ -1,5 +1,4 @@
 import os
-import pickle
 from typing import Dict, Optional, List, Literal, Any
 import pandas as pd
 from .utils import YamlHandler, logger
@@ -69,21 +68,26 @@ class FFPredict:
             y_pred = predict_result["y_pred"]
             y_truth = predict_result["y_truth"]
             metric_score = predict_result["metric_score"]
-            for k in self.datahub.targets.keys():
-                result[k] = y_truth[k]
+            result = pd.DataFrame({"data_key": y_pred["data_key"]})
+            all_target_keys = set()
+            for data_key, target in self.datahub.targets.items():
+                all_target_keys.update(target.data.keys())
+            for k in all_target_keys:
                 if hasattr(ff, "size") and ff.size > 1:
                     for i, y_pred_single in enumerate(y_pred):
-                        result[f"predict{i}_{k}"] = y_pred_single[k]
+                        result[f"predict{i}_{k}"] = list(y_pred_single[k])
                 else:
-                    result[f"predict_{k}"] = y_pred[k]
+                    result[f"predict_{k}"] = list(y_pred[k])
+                result[k] = list(y_truth[k])
             for k in self.trainer.non_target_features:
                 if hasattr(ff, "size") and ff.size > 1:
                     for i, y_pred_single in enumerate(y_pred):
-                        result[f"{k}{i}"] = y_pred_single[k]
+                        result[f"{k}{i}"] = list(y_pred_single[k])
                 else:
-                    result[k] = y_pred[k]
+                    result[k] = list(y_pred[k])
             os.makedirs(self.output_dir, exist_ok=True)
-            pd.DataFrame({k: [vi for vi in v] for k, v in result.items()}).to_pickle(os.path.join(self.datahub.preload_path, f"{ff_name}-prediction.pkl"))
+            for data_key, datahub in self.datahub.datahubs.items():
+                result[result["data_key"] == data_key].to_pickle(os.path.join(datahub.preload_path, f"{ff_name}-prediction.pkl"))
             metrics.append(metric_score)
         metrics_df = pd.concat(metrics)
         metrics_df.to_csv(os.path.join(self.output_dir, 'metric.csv'))
