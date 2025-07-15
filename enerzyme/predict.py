@@ -102,7 +102,10 @@ class FFPredict:
             predict_results[ff_name] = ff.evaluate()
             if save:
                 os.makedirs(self.output_dir, exist_ok=True)
-                pd.DataFrame({k: [vi for vi in v] for k, v in predict_results[ff_name]["y_pred"].items()}).to_pickle(os.path.join(self.datahub.preload_path, f"{ff_name}-prediction.pkl"))
+                y_pred = predict_results[ff_name]["y_pred"]
+                result = pd.DataFrame({k: list(v) for k, v in y_pred.items()})
+                for data_key, datahub in self.datahub.datahubs.items():
+                    result[result["data_key"] == data_key].to_pickle(os.path.join(datahub.preload_path, f"{ff_name}-prediction.pkl"))
         return predict_results
 
     def _simple_load_prediction(self):
