@@ -183,6 +183,7 @@ class ResidualMLP(NeuronLayer):
             use_bias=use_bias_out, 
             shallow_ensemble_size=shallow_ensemble_size
         )
+        self.num_residual = num_residual
 
     def forward(self, x: Tensor) -> Tensor:
         if self.activation_fn is None:
