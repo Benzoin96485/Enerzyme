@@ -6,7 +6,6 @@ import numpy as np
 from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from torch_geometric.data import InMemoryDataset, OnDiskDataset
 from .datatype import is_atomic, is_rounded, is_int
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
@@ -117,13 +116,16 @@ class SingleDataHub:
         self.neighbor_list_type = neighbor_list
         self.compressed = compressed
         self.max_memory = max_memory
-        datahub_str = data_path + neighbor_list + str(sorted(self.preprocessings.items())) + \
-            str(sorted(self.global_transforms.items()))
+        datahub_str = data_path + neighbor_list + \
+            str(sorted(preprocessings.items()) if preprocessings is not None else '') + \
+            str(sorted(global_transforms.items()) if global_transforms is not None else '')
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
         logger.info(f"Preload path {self.preload_path} is created")
         self.preprocessing = Transform(preprocessings, self.preload_path)
         self.global_transform = Transform(global_transforms, self.preload_path)
+        self.preprocessings = preprocessings
+        self.global_transforms = global_transforms
         if not self.preload or not self.preload_data():
             self.get_handle("w")
             self._init_data()
@@ -334,7 +336,8 @@ class SingleDataHub:
         datahub_config = Dict({
             "feature": self.feature_types,
             "target": self.target_types,
-            "transforms": self.transforms,
+            "preprocessings": self.preprocessings,
+            "global_transforms": self.global_transforms,
             "neighbor_list": self.neighbor_list_type
         })
         handler.write_yaml(datahub_config)
@@ -361,9 +364,9 @@ class DataHub:
                 params["global_transforms"] = params.get("transforms", None)
             self.datahubs = {"default": SingleDataHub(**params)}
         elif isinstance(datasets, list):
-            self.datahubs = {str(i): SingleDataHub(**dataset_params) for i, dataset_params in enumerate(datasets)}
+            self.datahubs = {str(i): SingleDataHub(global_transforms=params.get("global_transforms", None), **dataset_params) for i, dataset_params in enumerate(datasets)}
         elif isinstance(datasets, dict):
-            self.datahubs = {name: SingleDataHub(**dataset_params) for name, dataset_params in datasets.items()}
+            self.datahubs = {name: SingleDataHub(global_transforms=params.get("global_transforms", None), **dataset_params) for name, dataset_params in datasets.items()}
         else:
             raise ValueError(f"Unknown type of datasets: {type(datasets)}")\
             

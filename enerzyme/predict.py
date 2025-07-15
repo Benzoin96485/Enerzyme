@@ -4,7 +4,7 @@ from typing import Dict, Optional, List, Literal, Any
 import pandas as pd
 from .utils import YamlHandler, logger
 from .data import DataHub
-from .tasks import Trainer
+from .tasks.trainer import Trainer
 from .models import ModelHub
 from .models import BaseFFLauncher
 

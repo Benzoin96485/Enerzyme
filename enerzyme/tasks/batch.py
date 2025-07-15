@@ -65,7 +65,11 @@ def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str,
 
 
 def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
-    features, targets, data_keys = zip(*batch)
+    if len(batch[0]) == 3:
+        features, targets, data_keys = zip(*batch)
+    else:
+        features, targets = zip(*batch)
+        data_keys = None
     batch_features = dict()
     batch_targets = dict()
     
@@ -142,7 +146,7 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
             y_pred[k] = output[k].detach().cpu().numpy()
         else:
             raise ValueError(f"non-target feature {k} has invalid length {len(output[k])}")
-    y_pred["data_key"] = targets["data_key"]
+    
     y_pred["Za"] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(features["Za"], features["N"])))
     
     if targets is not None:
@@ -152,7 +156,8 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
                     y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
                 else:
                     y_truth[k] = v.detach().cpu().numpy()
-    y_truth["data_key"] = targets["data_key"]
+        y_pred["data_key"] = targets["data_key"]
+        y_truth["data_key"] = targets["data_key"]
     y_truth["Za"] = y_pred["Za"]
 
     return y_pred, (y_truth if y_truth else None)

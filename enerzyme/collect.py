@@ -1,5 +1,5 @@
 from .data import DataHub
-from .tasks import Splitter
+from .tasks.splitter import Splitter
 from .utils import YamlHandler
 
 class FFCollect(object):

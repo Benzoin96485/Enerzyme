@@ -12,7 +12,7 @@ from torch.nn import Module
 from torch.utils.data import Dataset, Subset
 
 from ..data import DataHub, FieldDataset
-from ..tasks import Trainer
+from ..tasks.trainer import Trainer
 from .loss import LOSS_REGISTER
 from ..utils import logger
 from . import layers as Layers

@@ -5,7 +5,7 @@ import logging
 from .utils import YamlHandler, logger
 from .data import Transform
 from .models import get_model_str, build_model, get_pretrain_path
-from .tasks import Server
+from .tasks.server import Server
 
 
 app = Flask("enerzyme")
