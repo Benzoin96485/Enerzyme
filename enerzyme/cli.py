@@ -109,6 +109,36 @@ def get_parser():
     parser_bond.add_argument('-t', '--template_path', type=str, default='', 
         help='template sdf file path'
     )
+
+    parser_listen = subparsers.add_parser(
+        "listen",
+        help="Listen to requests",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser_listen.add_argument('-c', '--config_path', type=str, default='', 
+        help='listen config'
+    )
+    parser_listen.add_argument('-m', '--model_dir', type=str,
+                    help='the directory of models')
+    parser_listen.add_argument('-o', '--out_dir', type=str, default='../results',
+        help='the output directory for saving artifact')
+    parser_listen.add_argument('-b', '--bind', type=str, default='0.0.0.0:5000',
+        help='the address to bind to')
+
+    parser_request = subparsers.add_parser(
+        "request",
+        help="Request a calculation",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser_request.add_argument('-u', '--url', type=str, default='0.0.0.0:5000', 
+        help='the url of the server')
+    parser_request.add_argument('-f', '--format', type=str, default='ORCA',
+        help='the format of the input file')
+    parser_request.add_argument('-i', '--input_file', type=str, default='',
+        help='the input file')
+    parser_request.add_argument('-k', '--model_key', type=str, default='',
+        help='the key of the model')
+
     args = parser.parse_args()
     return args
 
@@ -196,12 +226,13 @@ def listen(args):
 
 
 def request(args):
-    from .listen import FFRequest
+    from .request import FFRequest
     FFRequest(
-        config_path=args.config_path, 
-        model_dir=args.model_dir, 
-        out_dir=args.out_dir
-    ).request()
+        url=args.url,
+        format=args.format,
+        input_file=args.input_file,
+        model_key=args.model_key
+    )
 
 
 def kill(args):

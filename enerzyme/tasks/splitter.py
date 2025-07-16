@@ -6,7 +6,7 @@ import addict
 import sklearn as skl
 import numpy as np
 from ..utils import logger, YamlHandler
-from ..data import FieldDataset
+from ..data.datahub import FieldDataset
 
 SIMPLE_PART_INFO_TYPE = Dict[Literal["name", "dataset", "ratio"], Union[str, float, int]]
 FULL_PART_INFO_TYPE = Dict[Literal["name", "sources"], Union[str, List[Dict[Literal["dataset", "ratio"], Union[str, float, int]]]]]

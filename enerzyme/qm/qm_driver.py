@@ -8,7 +8,7 @@ from tqdm import tqdm
 from pickle import dump
 from rdkit import Chem
 from ..utils import logger
-from ..data import Supplier
+from ..data.supplier import Supplier
 
 
 class QMDriver(ABC):

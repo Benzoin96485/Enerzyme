@@ -6,12 +6,9 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from ..utils import logger
+from . import PERIODIC_TABLE_PATH
 
 
-PERIODIC_TABLE_PATH = os.path.join(
-    pathlib.Path(__file__).parent.resolve(),
-    'periodic-table.csv'
-)
 PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="atom_type")
 REVERSED_PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="Za")
 

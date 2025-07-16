@@ -1,7 +1,6 @@
 import os
-import argparse
 from .utils import YamlHandler, logger
-from .data import DataHub
+from .data.datahub import DataHub
 from .models import ModelHub
 from .tasks.trainer import Trainer
 

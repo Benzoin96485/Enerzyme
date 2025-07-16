@@ -1,4 +1,4 @@
-from .data import DataHub
+from .data.datahub import DataHub
 from .tasks.splitter import Splitter
 from .utils import YamlHandler
 

@@ -2,7 +2,7 @@ import os
 from typing import Dict, Optional, List, Literal, Any
 import pandas as pd
 from .utils import YamlHandler, logger
-from .data import DataHub
+from .data.datahub import DataHub
 from .tasks.trainer import Trainer
 from .models import ModelHub
 from .models import BaseFFLauncher

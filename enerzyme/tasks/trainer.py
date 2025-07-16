@@ -20,7 +20,7 @@ import numpy as np
 from .splitter import Splitter
 from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input, _pyg_to_device
 from .monitor import Monitor
-from ..data import Transform
+from ..data.transform import Transform
 from ..utils import logger
 from .metrics import Metrics
 

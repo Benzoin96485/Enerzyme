@@ -3,7 +3,8 @@ import torch
 from torch import Tensor
 from torch_geometric.data import Data, Batch
 import numpy as np
-from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, is_target_uq, full_neighbor_list, get_tensor_rank
+from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, is_target_uq, get_tensor_rank
+from ..data.neighbor_list import full_neighbor_list
 
 
 def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:

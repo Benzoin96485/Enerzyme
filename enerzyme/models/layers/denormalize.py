@@ -2,7 +2,7 @@ from typing import Dict, Union, Literal
 import torch
 from torch import nn, Tensor
 from . import BaseFFLayer
-from ...data import PERIODIC_TABLE
+from ...data.transform import PERIODIC_TABLE
 
 
 class AtomicAffineLayer(BaseFFLayer):

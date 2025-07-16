@@ -2,7 +2,7 @@ import os
 from .models import get_model_str, build_model, get_pretrain_path
 from .tasks.simulator import Simulation
 from .utils import YamlHandler, logger
-from .data import Transform
+from .data.transform import Transform
 
 
 class FFSimulate:
