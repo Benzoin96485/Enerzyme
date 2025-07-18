@@ -26,9 +26,9 @@ def parse_orca_input(orca_input_file: str) -> Tuple[Dict[str, Any], str]:
     basename = orca_input_file.replace(".extinp.tmp", "")
     with open(orca_input_file, "r") as f:
         lines = f.readlines()
-    xyz_file = lines[0].strip()
-    charge = int(lines[1].strip())
-    multiplicity = int(lines[2].strip())
+    xyz_file = lines[0].split("#")[0].strip()
+    charge = int(lines[1].split("#")[0].strip())
+    multiplicity = int(lines[2].split("#")[0].strip())
     features = simple_xyz_supplier(xyz_file)
     features["Q"] = charge
     features["S"] = multiplicity - 1
@@ -36,7 +36,7 @@ def parse_orca_input(orca_input_file: str) -> Tuple[Dict[str, Any], str]:
 
 
 def write_orca_output(results: Dict[str, Any], basename: str):
-    with open(f"{basename}_EXT.engrad", "w") as f:
+    with open(f"{basename}.engrad", "w") as f:
         f.write(f'''
 #
 # Number of atoms: must match the XYZ
@@ -45,14 +45,14 @@ def write_orca_output(results: Dict[str, Any], basename: str):
 #
 # The current total energy in Eh
 #
-{results["outputs"]["E"] / results["units"]["Hartree_in_E"]}
+{results["outputs"]["E"] / results["units"]["Hartree_in_E"]:.12f}
 #
 # The current gradient in Eh/bohr: Atom1X, Atom1Y, Atom1Z, Atom2X, etc.
 #
 ''')
         for atom_Fa in results["outputs"]["Fa"]:
             for component in atom_Fa:
-                f.write(f"{component / results["units"]["Hartree_in_E"] * results["units"]["Bohr_in_R"]}\n")
+                f.write(f"{-component / results['units']['Hartree_in_E'] * results['units']['Bohr_in_R']:.12f}\n")
 
 
 def FFRequest(

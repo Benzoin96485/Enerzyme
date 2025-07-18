@@ -139,6 +139,14 @@ def get_parser():
     parser_request.add_argument('-k', '--model_key', type=str, default='',
         help='the key of the model')
 
+    parser_kill = subparsers.add_parser(
+        "kill",
+        help="Send shutdown signal to listening server",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser_kill.add_argument('-u', '--url', type=str, default='0.0.0.0:5000', 
+        help='the url of the server to shutdown')
+
     args = parser.parse_args()
     return args
 
@@ -236,7 +244,22 @@ def request(args):
 
 
 def kill(args):
-    pass
+    import requests
+    import time
+    
+    try:
+        # Send shutdown request to the server
+        response = requests.post(f'http://{args.url}/shutdown', timeout=5)
+        if response.status_code == 200:
+            print(f"Shutdown signal sent successfully to {args.url}")
+        else:
+            print(f"Failed to send shutdown signal. Status code: {response.status_code}")
+    except requests.exceptions.ConnectionError:
+        print(f"Could not connect to server at {args.url}. Server may already be stopped.")
+    except requests.exceptions.Timeout:
+        print(f"Request to {args.url} timed out.")
+    except Exception as e:
+        print(f"Error sending shutdown signal: {e}")
 
 
 def main():

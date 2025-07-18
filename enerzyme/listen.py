@@ -64,10 +64,25 @@ class FFListen:
         _ff_listen_instance = self
         waitress.serve(app, listen=self.bind)
 
-    def stop(self):
-        pass
+    def stop_signal(self):
+        logger.info("Stop signal received")
 
 
 @app.route('/calculate', methods=['POST'])
 def run():
     return _ff_listen_instance.run_calculate()
+
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    import threading
+    import os
+    
+    def shutdown_server():
+        _ff_listen_instance.stop_signal()
+        time.sleep(1)  # Give time for the response to be sent
+        os._exit(0)  # Force exit the process
+    
+    # Start shutdown in a separate thread to allow response to be sent
+    threading.Thread(target=shutdown_server).start()
+    return jsonify({"message": "Server shutdown initiated"}), 200
