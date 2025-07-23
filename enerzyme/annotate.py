@@ -1,4 +1,4 @@
-from .data import Supplier, get_supplier
+from .data.supplier import get_supplier
 from .utils import YamlHandler
 
 class QMAnnotate:

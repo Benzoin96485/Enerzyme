@@ -9,7 +9,7 @@ from functools import partial
 from ase.constraints import FixAtoms, FixBondLengths
 from ase.calculators.calculator import Calculator, all_changes
 from ase.units import Hartree, fs, kB, Bohr
-from ..data import full_neighbor_list
+from ..data.neighbor_list import full_neighbor_list
 from ..utils import logger
 from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input, _load_state_dict, _to_device
 

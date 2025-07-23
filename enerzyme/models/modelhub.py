@@ -1,4 +1,6 @@
 import os.path as osp
+from functools import partial, cmp_to_key
+from glob import glob
 from collections import defaultdict
 from typing import Literal, Optional
 from ..utils import logger
@@ -11,6 +13,50 @@ def get_model_str(model_id, model_params):
     return f"{model_id}-{model_params.architecture}" + (f"-{model_params.suffix}" if model_params.suffix is not None else "")
 
 
+def get_all_possible_paths(pretrain_path: str, prefix: str):
+    return glob(osp.join(pretrain_path, f"{prefix}_best-v*.pth")) + glob(osp.join(pretrain_path, f"{prefix}_last-v*.pth")) + glob(osp.join(pretrain_path, f"{prefix}_best.pth")) + glob(osp.join(pretrain_path, f"{prefix}_last.pth"))
+
+
+def get_all_possible_paths_with_rank(pretrain_path: str, model_rank: Optional[int]=None):
+    if model_rank is None:
+        return get_all_possible_paths(pretrain_path, "model") + get_all_possible_paths(pretrain_path, "model0")
+    else:
+        return get_all_possible_paths(pretrain_path, f"model{model_rank}")
+
+
+def path_resolve(path, target_preference: Literal["best", "last"]="best", target_model_rank: Optional[int]=None):
+    basename = osp.basename(path).split(".")[0]
+    model_prefix, model_suffix = basename.split("_")
+    if len(model_prefix) == 5:
+        if target_model_rank is None:
+            model_rank = 1
+        else:
+            model_rank = -1
+    else:
+        model_rank = int(model_prefix[5:])
+    version_split = model_suffix.split("-")
+    if len(version_split) == 1:
+        version = 0
+    else:
+        version = int(version_split[1][1:])
+    return {
+        "model_rank": model_rank,
+        "preference": int(target_preference == version_split[0]),
+        "version": version,
+    }
+
+
+def compare_path(path1, path2, preference: Literal["best", "last"]="best", model_rank: Optional[int]=None):
+    path1_info = path_resolve(path1, preference, model_rank)
+    path2_info = path_resolve(path2, preference, model_rank)
+    if path1_info["preference"] != path2_info["preference"]:
+        return path1_info["preference"] > path2_info["preference"]
+    elif path1_info["model_rank"] != path2_info["model_rank"]:
+        return path1_info["model_rank"] > path2_info["model_rank"]
+    else:
+        return path1_info["version"] > path2_info["version"]
+    
+
 def get_pretrain_path(pretrain_path: Optional[str]=None, preference: Literal["best", "last"]="best", model_rank: Optional[int]=None):
     if pretrain_path is not None:
         if osp.isfile(pretrain_path):
@@ -18,24 +64,17 @@ def get_pretrain_path(pretrain_path: Optional[str]=None, preference: Literal["be
         elif osp.isdir(pretrain_path):
             if model_rank == None:
                 model_rank = ''
-            found_path = None
-            best_path = osp.join(pretrain_path, f"model{model_rank}_best.pth")
-            last_path = osp.join(pretrain_path, f"model{model_rank}_last.pth")
-            if preference == "best":
-                if osp.isfile(best_path):
-                    found_path = best_path
-                elif osp.isfile(last_path):
-                    found_path = last_path
-            elif preference == "last":
-                if osp.isfile(last_path):
-                    found_path = last_path
-                elif osp.isfile(best_path):
-                    found_path = best_path
-            if found_path is None:
-                if model_rank is None:
-                    return get_pretrain_path(pretrain_path, preference, 0)
+            all_possible_paths = sorted(
+                get_all_possible_paths_with_rank(pretrain_path, model_rank), 
+                key=cmp_to_key(partial(
+                    compare_path, 
+                    preference=preference, 
+                    model_rank=model_rank
+                )), reverse=True
+            )
+            if len(all_possible_paths) == 0:
                 raise FileNotFoundError(f"Pretrained model{' ' if model_rank is None else 'ranked ' + str(model_rank)} not found in {pretrain_path}")
-            return found_path
+            return all_possible_paths[0]
         else:
             raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
     else:

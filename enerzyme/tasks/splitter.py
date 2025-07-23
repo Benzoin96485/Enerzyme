@@ -6,7 +6,7 @@ import addict
 import sklearn as skl
 import numpy as np
 from ..utils import logger, YamlHandler
-from ..data import FieldDataset
+from ..data.datahub import FieldDataset
 
 SIMPLE_PART_INFO_TYPE = Dict[Literal["name", "dataset", "ratio"], Union[str, float, int]]
 FULL_PART_INFO_TYPE = Dict[Literal["name", "sources"], Union[str, List[Dict[Literal["dataset", "ratio"], Union[str, float, int]]]]]
@@ -173,6 +173,9 @@ class Splitter:
                         logger.info(f"Split matched and preloaded from {split_path} for dataset {data_key}")
                         for part_key, indices in np.load(split_file).items():
                             self.split[part_key][data_key] = indices.tolist()
+                    else:
+                        logger.warning(f"Split file {split_file} for dataset {data_key} not found")
+                        return False
                 else:
                     logger.warning(f"Split path {path} for dataset {data_key} not found")
                     return False

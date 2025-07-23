@@ -1,8 +1,8 @@
 import os
 from .models import get_model_str, build_model, get_pretrain_path
-from .tasks import Simulation
+from .tasks.simulator import Simulation
 from .utils import YamlHandler, logger
-from .data import Transform
+from .data.transform import Transform
 
 
 class FFSimulate:
@@ -35,6 +35,5 @@ class FFSimulate:
         self.simulations.append(Simulation(self.config, model, model_path, self.out_dir, self.transform))
         
     def run(self):
-        print()
         for simulation in self.simulations:
             simulation.run()

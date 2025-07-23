@@ -6,7 +6,6 @@ import numpy as np
 from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from torch_geometric.data import InMemoryDataset, OnDiskDataset
 from .datatype import is_atomic, is_rounded, is_int
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
@@ -100,7 +99,8 @@ class SingleDataHub:
         preload: bool=True,
         features: Dict[str, str]=dict(),
         targets: Dict[str, str]=dict(),
-        transforms: Optional[Dict[str, Union[str, bool]]]=None,
+        preprocessings: Optional[Dict[str, Union[str, bool]]]=None,
+        global_transforms: Optional[Dict[str, Union[str, bool]]]=None,
         neighbor_list: Optional[str]=None,
         hash_length: int=16,
         compressed: bool=True,
@@ -114,19 +114,24 @@ class SingleDataHub:
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
-        self.transforms = dict() if transforms is None else transforms
         self.compressed = compressed
         self.max_memory = max_memory
-        datahub_str = data_path + neighbor_list + str(sorted(self.transforms.items()))
+        datahub_str = data_path + neighbor_list + \
+            str(sorted(preprocessings.items()) if preprocessings is not None else '') + \
+            str(sorted(global_transforms.items()) if global_transforms is not None else '')
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
         logger.info(f"Preload path {self.preload_path} is created")
-        self.transform = Transform(self.transforms, self.preload_path)
+        self.preprocessing = Transform(preprocessings, self.preload_path)
+        self.global_transform = Transform(global_transforms, self.preload_path)
+        self.preprocessings = preprocessings
+        self.global_transforms = global_transforms
         if not self.preload or not self.preload_data():
             self.get_handle("w")
             self._init_data()
             self._init_neighbor_list()
-            self.transform.transform(self.data)
+            self.preprocessing.transform(self.data)
+            self.global_transform.transform(self.data)
             self._save_config()
             self.reset_handle()
 
@@ -331,7 +336,8 @@ class SingleDataHub:
         datahub_config = Dict({
             "feature": self.feature_types,
             "target": self.target_types,
-            "transforms": self.transforms,
+            "preprocessings": self.preprocessings,
+            "global_transforms": self.global_transforms,
             "neighbor_list": self.neighbor_list_type
         })
         handler.write_yaml(datahub_config)
@@ -354,11 +360,13 @@ class DataHub:
     ):
         self.dump_dir = dump_dir
         if datasets is None:
+            if "global_transforms" not in params:
+                params["global_transforms"] = params.get("transforms", None)
             self.datahubs = {"default": SingleDataHub(**params)}
         elif isinstance(datasets, list):
-            self.datahubs = {str(i): SingleDataHub(**dataset_params) for i, dataset_params in enumerate(datasets)}
+            self.datahubs = {str(i): SingleDataHub(global_transforms=params.get("global_transforms", None), **dataset_params) for i, dataset_params in enumerate(datasets)}
         elif isinstance(datasets, dict):
-            self.datahubs = {name: SingleDataHub(**dataset_params) for name, dataset_params in datasets.items()}
+            self.datahubs = {name: SingleDataHub(global_transforms=params.get("global_transforms", None), **dataset_params) for name, dataset_params in datasets.items()}
         else:
             raise ValueError(f"Unknown type of datasets: {type(datasets)}")\
             
@@ -375,5 +383,5 @@ class DataHub:
         return {name: datahub.preload_path for name, datahub in self.datahubs.items()}
     
     @property
-    def transform(self) -> Dict[str, Transform]:
-        return {name: datahub.transform for name, datahub in self.datahubs.items()}
+    def transform(self) -> Transform:
+        return list(self.datahubs.values())[0].global_transform

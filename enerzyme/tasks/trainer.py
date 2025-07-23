@@ -20,7 +20,7 @@ import numpy as np
 from .splitter import Splitter
 from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input, _pyg_to_device
 from .monitor import Monitor
-from ..data import Transform
+from ..data.transform import Transform
 from ..utils import logger
 from .metrics import Metrics
 
@@ -503,7 +503,7 @@ class Trainer:
     def _early_stop_choice(self, wait, min_loss, metric_score, save_handle, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, save_handle, patience, epoch)
     
-    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Dict[str, Transform], epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None, test_mode: bool=False) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
+    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None, test_mode: bool=False) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         if load_model == True:
@@ -552,13 +552,8 @@ class Trainer:
             self.monitor.summary()
 
         if transform is not None:
-            selected_indices_dict = defaultdict(list)
-            for i, data_key in enumerate(y_preds["data_key"]):
-                selected_indices_dict[data_key].append(i)
-            for data_key, selected_indices in selected_indices_dict.items():
-                if selected_indices:
-                    transform[data_key].inverse_transform(y_preds, selected_indices)
-                    transform[data_key].inverse_transform(y_truths, selected_indices)
+            transform.inverse_transform(y_preds)
+            transform.inverse_transform(y_truths)
         metric_score = self.metrics.cal_metric(y_truths, y_preds)
         if load_model and "_judge_score" in metric_score:
             metric_score.pop("_judge_score")

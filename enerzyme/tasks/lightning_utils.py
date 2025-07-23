@@ -10,7 +10,7 @@ from torch_ema import ExponentialMovingAverage
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from .monitor import Monitor
-from ..data import Transform
+from ..data.transform import Transform
 from .metrics import Metrics
 from .batch import _decorate_batch_output
 

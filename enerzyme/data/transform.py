@@ -6,12 +6,9 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from ..utils import logger
+from . import PERIODIC_TABLE_PATH
 
 
-PERIODIC_TABLE_PATH = os.path.join(
-    pathlib.Path(__file__).parent.resolve(),
-    'periodic-table.csv'
-)
 PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="atom_type")
 REVERSED_PERIODIC_TABLE = pd.read_csv(PERIODIC_TABLE_PATH, index_col="Za")
 
@@ -46,7 +43,7 @@ def load_atomic_energy(atomic_energy_path: str) -> pd.DataFrame:
 
 class BaseTransform(ABC):
     def __init__(self, major_key: str, *args, **kwargs) -> None:
-        pass
+        self.major_key = major_key
     
     @abstractmethod
     def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
@@ -143,11 +140,14 @@ class TotalEnergyNormalization(BaseTransform):
 
 
 class Transform:
-    def __init__(self, transform_args: Dict, preload_path: Optional[str]=None, simulation_mode: bool=False) -> None:
+    def __init__(self, transform_args: Optional[Dict]=None, preload_path: Optional[str]=None, simulation_mode: bool=False) -> None:
+        self.transform_args = transform_args
         self.backup_keys = set()
         self.shifts = []
         self.scales = []
         self.normalizations = []
+        if transform_args is None:
+            return
         for k, v in transform_args.items():
             if k == "atomic_energy":
                 self.shifts.append(AtomicEnergyTransform(v))
