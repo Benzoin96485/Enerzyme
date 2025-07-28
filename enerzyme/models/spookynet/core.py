@@ -6,7 +6,7 @@ from torch.nn import Module, ModuleList, Linear
 import torch.nn.functional as F
 from .interaction import InteractionModule
 from ..blocks.mlp import DenseLayer
-from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore, BaseAtomEmbedding, BaseElectronEmbedding, BaseRBF, ChargeConservationLayer
+from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore, BaseAtomEmbedding, BaseElectronEmbedding, BaseRBF, ChargeConservationLayer, GatherAtomEmbedding
 from ..activation import ACTIVATION_KEY_TYPE
 
 
@@ -141,6 +141,7 @@ class SpookyNetCore(BaseFFCore):
                 if isinstance(layer, ChargeConservationLayer):
                     self.charge_conservation = layer
                 self.post_sequence.append(layer)
+        self.pre_sequence.append(GatherAtomEmbedding())
 
     def _atomic_properties_static(self, Dij_sr: Tensor, vij_sr: Tensor, batch_seg: Optional[Tensor]=None) -> Tuple[Tensor, Tensor, Tensor, int]:
         pij = vij_sr / Dij_sr.unsqueeze(-1)
@@ -187,9 +188,9 @@ class SpookyNetCore(BaseFFCore):
         return pij, dij, mask, num_batch
     
     def _atomic_properties_dynamic(
-        self, atom_embedding: Tensor, charge_embedding: Tensor, spin_embedding: Tensor, num_batch: int,
+        self, atom_embedding: Tensor, num_batch: int,
         rbf: Tensor, pij: Tensor, dij: Tensor, idx_i_sr: Tensor, idx_j_sr: Tensor, mask: Tensor, batch_seg: Optional[Tensor]=None):
-        x = atom_embedding + charge_embedding + spin_embedding
+        x = atom_embedding
         dropout_mask = torch.ones((num_batch, 1), dtype=x.dtype, device=x.device)
         f = x.new_zeros(x.size())
         for module in self.interaction:
@@ -208,10 +209,10 @@ class SpookyNetCore(BaseFFCore):
 
     def get_output(
         self, Dij_sr: Tensor, vij_sr: Tensor, idx_i_sr: Tensor, idx_j_sr: Tensor, 
-        rbf: Tensor, atom_embedding: Tensor, charge_embedding: Tensor, spin_embedding: Tensor, batch_seg: Optional[Tensor]=None
+        rbf: Tensor, atom_embedding: Tensor, batch_seg: Optional[Tensor]=None
     ) -> Dict[Literal["Ea", "Qa"], Tensor]:
         pij, dij, mask, num_batch = self._atomic_properties_static(Dij_sr, vij_sr, batch_seg)
         ea, qa = self._atomic_properties_dynamic(
-            atom_embedding, charge_embedding, spin_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg
+            atom_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg
         )
         return {"Ea": ea, "Qa": qa}
