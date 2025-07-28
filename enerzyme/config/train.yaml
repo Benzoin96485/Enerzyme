@@ -1,7 +1,7 @@
 Datahub:
-  fields:
-    Qa_xTB:
-      is_atomic: true
+  fields:                                       # new data fields to be registered beyond what are listed below
+    Qa_xTB:                                     # new data field name
+      is_atomic: true                           # if the data field is an atomic feature. This is the only supported type for now.
   datasets:                                     # Dictionary of datasets
     my_dataset_1:                               # dataset key
       data_path: "/my/dataset.pkl"              # path to dataset: pickle, npz or hdf5
@@ -16,7 +16,7 @@ Datahub:
         N: null                                 # total atom counts, shape [Nframe] 
                                                 # if not provided, will be infered from Za
                                                 # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
-        Qa_xTB: xtb_chrg
+        Qa_xTB: xtb_chrg                        # Then you can use the newly registered data field "Qa_xTB" in the datahub as a feature
       targets:
         E: energy                               # total energy, shape [Nframe]
         Fa: grad                                # atomic forces, shape [Nframe, Natom, 3]
@@ -83,6 +83,19 @@ Modelhub:
             init_width_flavor: PhysNet      # widths initialization flavor, PhysNet or SpookyNet
         - name: RandomAtomEmbedding         # random embedding based on the atomic number
                                             # dim_embedding, max_Za in build_params
+        - name: ScalarDenseEmbedding        # a dense embedding (perceptron or linear layer) of a scalar feature
+          params:                           # dim_embedding in build_params
+            embed_field: Qa_xTB             # the field to be embedded
+            activation_fn: swish            # activation function type: swish (as a perceptron) or None (as a linear layer)
+            activation_params:
+              dim_feature: 1                # dimension of features passing through the activation function, 1 is compatible with any shape of features
+              initial_alpha: 1              # initial scaling parameter
+              initial_beta: 1               # initial temperature parameter
+              learnable: false              # learnable scaling and temperature parameter
+            initial_weight: orthogonal    # initial weight initialization flavor, orthogonal, xavier_uniform
+            initial_bias: zero            # initial bias initialization flavor, zero
+            use_bias: true                # if bias is used
+        - name: GatherAtomEmbedding         # gather atom embeddings to a single atom embedding
         - name: Core                        # physNet Core
           params:                           # dim_embedding, num_rbf in build_params
             num_blocks: 5                   # number of interaction blocks and output blocks to accumulate atomic properties
@@ -91,10 +104,10 @@ Modelhub:
             num_residual_output: 1          # number of residual layers in the output block
             activation_fn: shifted_softplus # activation function type: shifted_softplus or swiss
             activation_params:
-              dim_feature: 1                # dimension of features passing through the activation function, 1 is compatible with any shape of features
-              initial_alpha: 1              # initial scaling parameter
-              initial_beta: 1               # initial temperature parameter
-              learnable: false              # learnable scaling and temperature parameter
+              dim_feature: 1                
+              initial_alpha: 1              
+              initial_beta: 1               
+              learnable: false              
             dropout_rate: 0.0               # dropout rate of all dropout layers
         - name: AtomicAffine                # scale and shift raw atomic prediction
           params:                           # max_Za in build_params
@@ -172,6 +185,23 @@ Modelhub:
           params:
             num_residual: 1
             attribute: spin
+        - name: ScalarResidualMLPEmbedding  # a residual MLP of an atomicscalar feature
+          params:                           # dim_embedding in build_params
+            embed_field: Qa_xTB             
+            activation_fn: swish            # activation function type: swish (as a perceptron) or None (as a linear layer)
+            activation_params:
+              dim_feature: 1                # dimension of features passing through the activation function, 1 is compatible with any shape of features
+              initial_alpha: 1              # initial scaling parameter
+              initial_beta: 1               # initial temperature parameter
+            learnable: false                # learnable scaling and temperature parameter
+            initial_weight1: orthogonal     # initial weight initialization flavor for the first linear layer in each residual block
+            initial_weight2: orthogonal     # initial weight initialization flavor for the second linear layer in each residual block
+            initial_weight_out: orthogonal  # initial weight initialization flavor for the output linear layer
+            initial_bias_residual: zero     # initial bias initialization flavor for residual blocks
+            initial_bias_out: zero          # initial bias initialization flavor for the output linear layer
+            use_bias_residual: true         # if bias is used in residual blocks
+            use_bias_out: true              # if bias is used in the output layer
+            use_residual: true              # if residual connections are used
         - name: Core                        # SpookyNet Core
           params:                           # dim_embedding, num_rbf, activation_fn in build_params
             num_modules: 3                  # number of modules (iterations) for constructing atomic features
