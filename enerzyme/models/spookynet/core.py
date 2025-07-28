@@ -141,7 +141,8 @@ class SpookyNetCore(BaseFFCore):
                 if isinstance(layer, ChargeConservationLayer):
                     self.charge_conservation = layer
                 self.post_sequence.append(layer)
-        self.pre_sequence.append(GatherAtomEmbedding())
+        self.gather_embedding = GatherAtomEmbedding()
+        self.pre_sequence.append(self.gather_embedding)
 
     def _atomic_properties_static(self, Dij_sr: Tensor, vij_sr: Tensor, batch_seg: Optional[Tensor]=None) -> Tuple[Tensor, Tensor, Tensor, int]:
         pij = vij_sr / Dij_sr.unsqueeze(-1)

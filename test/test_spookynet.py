@@ -424,13 +424,13 @@ def test_atomic_properties_dynamic():
     )
     net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S}
     pre_layers = Sequential(
-        f1.calculate_distance, f1.range_separation, f1.atom_embedding, f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function
+        f1.calculate_distance, f1.range_separation, f1.atom_embedding, 
+        f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function,
+        f1.gather_embedding
     )
     output = pre_layers(net_input)
     ea1, qa1 = f1._atomic_properties_dynamic(
         output["atom_embedding"],
-        output["charge_embedding"],
-        output["spin_embedding"],
         1,
         output["rbf"],
         pij, dij, output["idx_i_sr"], output["idx_j_sr"], None
@@ -446,7 +446,9 @@ def test_atomic_properties():
     _, ea2, qa2, _, _, _, _, _ = f2.atomic_properties(Za, Q, S, R, idx_i, idx_j)
     net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S}
     pre_layers = Sequential(
-        f1.calculate_distance, f1.range_separation, f1.atom_embedding, f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function
+        f1.calculate_distance, f1.range_separation, f1.atom_embedding, 
+        f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function,
+        f1.gather_embedding
     )
     output = pre_layers(net_input)
     pij1, dij1, _, _ = f1._atomic_properties_static(
@@ -455,8 +457,6 @@ def test_atomic_properties():
     )
     ea1, qa1 = f1._atomic_properties_dynamic(
         output["atom_embedding"],
-        output["charge_embedding"],
-        output["spin_embedding"],
         1,
         output["rbf"],
         pij1, dij1, output["idx_i_sr"], output["idx_j_sr"], None
