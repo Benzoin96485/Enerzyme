@@ -6,7 +6,7 @@ import numpy as np
 from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from .datatype import is_atomic, is_rounded, is_int
+from .datatype import is_atomic, is_rounded, is_int, register_data_type
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
 
@@ -356,9 +356,13 @@ class DataHub:
     def __init__(self,  
         dump_dir=".",
         datasets: Optional[Union[List, Dict]]=None,
+        fields: Optional[Dict[str, str]]=None,
         **params
     ):
         self.dump_dir = dump_dir
+        if fields is not None:
+            for k, v in fields.items():
+                register_data_type(k, **v)
         if datasets is None:
             if "global_transforms" not in params:
                 params["global_transforms"] = params.get("transforms", None)
