@@ -13,3 +13,5 @@ from .reduce import EnergyReduceLayer, ShallowEnsembleReduceLayer
 from .denormalize import AtomicAffineLayer
 from .dispersion import GrimmeD3EnergyLayer, GrimmeD4EnergyLayer
 from .zbl import ZBLRepulsionEnergyLayer
+from .gather_embedding import GatherAtomEmbedding
+from .scalar_embedding import ScalarDenseEmbedding, ScalarResidualMLPEmbedding

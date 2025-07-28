@@ -4,8 +4,8 @@ from glob import glob
 from collections import defaultdict
 from typing import Literal, Optional
 from ..utils import logger
-from ..data import DataHub
-from ..tasks import Trainer
+from ..data.datahub import DataHub
+from ..tasks.trainer import Trainer
 from .ff import FF_single, FF_committee
 
 

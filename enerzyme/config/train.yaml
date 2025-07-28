@@ -1,4 +1,7 @@
 Datahub:
+  fields:
+    Qa_xTB:
+      is_atomic: true
   datasets:                                     # Dictionary of datasets
     my_dataset_1:                               # dataset key
       data_path: "/my/dataset.pkl"              # path to dataset: pickle, npz or hdf5
@@ -13,6 +16,7 @@ Datahub:
         N: null                                 # total atom counts, shape [Nframe] 
                                                 # if not provided, will be infered from Za
                                                 # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
+        Qa_xTB: xtb_chrg
       targets:
         E: energy                               # total energy, shape [Nframe]
         Fa: grad                                # atomic forces, shape [Nframe, Natom, 3]
