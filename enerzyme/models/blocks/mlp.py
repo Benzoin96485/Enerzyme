@@ -95,10 +95,11 @@ class ResidualLayer(NeuronLayer):
         initial_weight2: INITIAL_WEIGHT_TYPE="zero", 
         initial_bias: INITIAL_BIAS_TYPE="zero",
         dropout_rate: float=0,
-        use_bias: bool=True
+        use_bias: bool=True,
+        use_residual: bool=True
     ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
-        
+        self.use_residual = use_residual
         dropout = Dropout(dropout_rate)
         dense1 = DenseLayer(
             dim_feature_in=dim_feature_in, 
@@ -124,7 +125,10 @@ class ResidualLayer(NeuronLayer):
         
 
     def forward(self, x: Tensor) -> Tensor:
-        return x + self.residual(x)
+        if self.use_residual:
+            return x + self.residual(x)
+        else:
+            return self.residual(x)
     
 
 class ResidualStack(NeuronLayer):
@@ -138,7 +142,8 @@ class ResidualStack(NeuronLayer):
         initial_weight2: INITIAL_WEIGHT_TYPE="zero", 
         initial_bias: INITIAL_BIAS_TYPE="zero",
         dropout_rate: float=0,
-        use_bias: bool=True
+        use_bias: bool=True,
+        use_residual: bool=True
     ) -> None:
         super().__init__(dim_feature, dim_feature)
         self.num_residual = num_residual
@@ -146,7 +151,7 @@ class ResidualStack(NeuronLayer):
             dim_feature, dim_feature,
             activation_fn, activation_params,
             initial_weight1, initial_weight2, initial_bias,
-            dropout_rate, use_bias
+            dropout_rate, use_bias, use_residual=use_residual
         ) for _ in range(num_residual)))
 
     def forward(self, x: Tensor) -> Tensor:
@@ -168,14 +173,15 @@ class ResidualMLP(NeuronLayer):
         dropout_rate: float=0,
         use_bias_residual: bool=True,
         use_bias_out: bool=True,
-        shallow_ensemble_size: int=1
+        shallow_ensemble_size: int=1,
+        use_residual: bool=True
     ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
         self.stack = ResidualStack(
             dim_feature_in, num_residual, 
             activation_fn, activation_params,
             initial_weight1, initial_weight2, initial_bias_residual,
-            dropout_rate, use_bias_residual
+            dropout_rate, use_bias_residual, use_residual=use_residual
         )
         self.output = DenseLayer(
             dim_feature_in, dim_feature_out,
