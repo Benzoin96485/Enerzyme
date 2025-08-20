@@ -232,11 +232,19 @@ class SingleDataHub:
             raise ValueError(f"Data path {self.data_path} doesn't exist.")
         suffix = self.data_path.split(".")[-1]
         if self.data_format == "hdf5" or suffix == "hdf5":
+            self.data_format = "hdf5"
             raw_data = h5py.File(self.data_path, mode="r")["data"]
         elif self.data_format == "pickle" or suffix == "pkl" or suffix == "pickle":
+            self.data_format = "pickle"
             raw_data = load_from_pickle(self.data_path)
         elif self.data_format == "npz" or suffix == "npz":
+            self.data_format = "npz"
             raw_data = np.load(self.data_path, allow_pickle=True)
+        elif self.data_format == "sdf" or suffix == "sdf":
+            self.data_format = "sdf"
+            from .supplier import SDFSupplier
+            supplier = SDFSupplier(self.data_path, supplying_fields=self.data_types.keys())
+            raw_data = supplier.raw_data()
         else:
             raise ValueError(f"Data format of {self.data_path} is unknown")
 
@@ -292,7 +300,7 @@ class SingleDataHub:
             else:
                 self._load_molecular_data(k, raw_data)
         
-        if not (self.data_format == "pickle" or suffix == "pkl" or suffix == "pickle"):
+        if self.data_format in ["hdf5", "npz"]:
             raw_data.close()
 
     def _init_neighbor_list(self) -> None:
