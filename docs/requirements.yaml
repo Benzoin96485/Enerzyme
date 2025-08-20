@@ -27,7 +27,7 @@ dependencies:
     - transformers
     - torch-ema
     - pyyaml
-    - torch-scatter
+    - torch-geometric
     - rdkit
     - e3nn
     - pytorch-lightning

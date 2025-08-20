@@ -5,7 +5,7 @@ setup(
     version='0.5.0',
     install_requires=['numpy', 'h5py', 'tqdm', 'ase', 'joblib', 'addict', 
                       'pandas', 'torch', 'scikit-learn', 'transformers',
-                      'torch-ema', 'pyyaml', 'torch-scatter', 'rdkit', 'e3nn',
+                      'torch-ema', 'pyyaml', 'torch-geometric', 'rdkit', 'e3nn',
                       'pytorch-lightning'
                       ],
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
