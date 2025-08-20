@@ -1,6 +1,6 @@
 # Enerzyme
 
-Towards next-generation machine learning force fields for enzymatic catalysis.
+Towards next-generation computational enzymatic catalysis with neural network potentials.
 
 Currently supported model architectures:
 
@@ -13,9 +13,9 @@ Currently supported model architectures:
 |  NequIP  | external |             ✅             |              ❌              |       ❌       |        ❌        |          [Nat. Commun. 2022, 13(1), 2453](https://www.nature.com/articles/s41467-022-29939-5)          | [Github](https://github.com/mir-group/nequip) |
 |  XPaiNN  | external |             ✅             |              ❌              |       ❌       |        ❌        | [J. Chem. Theory Comput. 2024, 20, 21, 9500–9511](https://pubs.acs.org/doi/10.1021/acs.jctc.4c01151) | [Github](https://github.com/X1X1010/XequiNet) |
 |  SchNet  | internal |             ✅             |              ✅              |       ❌       |  ✅       |  [NeurIPS 2017, arXiv: 1706.08566](https://arxiv.org/abs/1706.08566) | [Github](https://github.com/pyg-team/pytorch_geometric/blob/master/torch_geometric/nn/models/schnet.py) |
-# Usage
+## Usage
 
-## Installation
+### Installation
 
 Recommended environment for internal force fields
 
@@ -69,7 +69,7 @@ Then install the package
 pip install -e .
 ```
 
-## Training
+### Training
 
 Energy (force) / Atomic Charge / Dipole moment fitting.
 
@@ -81,11 +81,11 @@ Please see `enerzyme/config/train.yaml` for details and recommended configuratio
 
 Enerzyme saves the preprocessed dataset, split indices, final `<configuration yaml file>`, and the best/last model to the `<output directory>`.
 
-### Active Learning Training
+#### Active Learning Training
 
 Please see `enerzyme/config/active_learning_train.yaml` for details and recommended configurations.
 
-## Evaluation
+### Evaluation
 
 Energy (force) / Atomic Charge / Dipole moment prediction.
 
@@ -97,7 +97,7 @@ Please see `enerzyme/config/predict.yaml` for details.
 
 Enerzyme reads the `<model directory>` for the model configuration, load the models, predict the results from all active models, save the predicted values as a pickle in the corresponding model subfolders, and report the results as a csv file in the `<output directory>`.
 
-## Simulation
+### Simulation
 
 Supported simulation types:
 
@@ -111,7 +111,7 @@ enerzyme simulate -c <configuration yaml file> -o <output directory> -m <model d
 
 Enerzyme reads the `<model directory>` for the model configuration, load the models, do simulation, and report the results in the `<output directory>`.
 
-## Fragment Extraction
+### Fragment Extraction
 
 Extract fragments based on local uncertainty from the prediction
 
@@ -121,7 +121,7 @@ enerzyme extract -c <configuration yaml file> -o <output directory> -m <model di
 
 Please see `enerzyme/config/extract.yaml` for details.
 
-## Data annotation
+### Data annotation
 
 Label molecules with energies, forces and dipoles from QM calculation. Please get your QM engine's environment prepared first.
 
@@ -131,10 +131,20 @@ enerzyme annotate -c <configuration yaml file> -o <output directory> -t <tempora
 
 Please see `enerzyme/config/annotate.yaml` for details.
 
-## Bond order assignment
+### Bond order assignment
 
 Guess bond orders from pdb file. Compatible with [QuantumPDB](https://github.com/davidkastner/quantumPDB), where the pdb file should be the output of cluster building and the template sdf file should be ligands.sdf.
 
 ```bash
 enerzyme bond -p <pdb file> -m <output mol file> -i <output image file> -t <template sdf file>
 ```
+
+### Copyright
+
+Copyright (c) 2025, Weiliang Luo
+
+
+#### Acknowledgements
+ 
+Project based on the 
+[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.11.
