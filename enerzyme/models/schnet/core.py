@@ -1,8 +1,6 @@
 """
-===============================================================================
 Description:    Code is adapted from torch geometric implementation https://github.com/pyg-team/pytorch_geometric/blob/master/torch_geometric/nn/models/schnet.py.
 All rights reserved to original authors.
-===============================================================================
 """
 
 from typing import List

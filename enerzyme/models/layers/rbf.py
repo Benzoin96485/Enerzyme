@@ -35,10 +35,12 @@ class BaseRBF(BaseFFLayer):
 
 class GaussianRBFLayer(BaseRBF):
     """
-    Radial basis functions based on Gaussian functions given by:
-    g_i(x) = exp(-width*(x-center_i)**2)
-    Here, i takes values from 0 to num_basis_functions-1. The centers are chosen
-    to optimally cover the range x = 0...cutoff and the width parameter is
+    Radial basis functions based on Gaussian functions:
+
+    .. math:: g_i(x) = \\exp(-\\mathtt{width}\\cdot(x-\\mathtt{center}_i)^2)
+
+    Here, :math:`i` takes values from :math:`0` to :math:`\\mathtt{num\\_rbf}-1`. The `center` is chosen
+    to optimally span the range :math:`x\\in (0,\\mathtt{cutoff}]` and the :math:`\\mathtt{width}` parameter is
     selected to give optimal overlap between adjacent Gaussian functions.
 
     Arguments:
@@ -193,7 +195,7 @@ class ExponentialRBF(BaseRBF):
         RBF(r; alpha) = cutoff_fn(r) * exp(inner_fn(r; alpha)) * (exp(-alpha*r) if exp_weighting)
 
         Params:
-        -----
+        ----------
         num_basis_functions: Number of radial basis functions.
 
         no_basis_function_at_infinity: If True, no basis function is put at exp(-alpha*x) = 0, i.e.
@@ -212,7 +214,7 @@ class ExponentialRBF(BaseRBF):
         where x is the distance.
 
         References: 
-        -----
+        ----------
         [1] Commun. Math. Phys. 1973, 32, 319−340.
 
         [2] J. Chem. Theory Comput. 2019, 15, 3678−3693.
@@ -237,14 +239,14 @@ class ExponentialRBF(BaseRBF):
         Evaluate the RBF values
 
         Params:
-        -----
+        ----------
         r: Float tensor of distances, shape [M]
 
         cutoff_values: Float tensor of pre-calculated cutoff distances, shape [M]. 
         If not provided, the cutoff distances are calculated by `cutoff_fn`.
 
         Returns:
-        -----
+        ----------
         rbf: Float tensor of RBFs, shape [M, `num_basis_functions`]
         '''
         alphar = -F.softplus(self.alpha) * Dij.view(-1, 1)
@@ -270,7 +272,7 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
         g_i(x) = exp(-width_i*(exp(-alpha*x)-center_i)**2)
 
         Params:
-        -----
+        ----------
         num_basis_functions: Number of radial basis functions.
 
         dtype: Data type of floating numbers.
@@ -301,7 +303,7 @@ class ExponentialGaussianRBFLayer(ExponentialRBF):
         - `SpookyNet`: A constant number K or K+1 (`no_basis_function_at_infinity=True`).
 
         References: 
-        -----
+        ----------
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         '''
         super().__init__(
@@ -392,7 +394,7 @@ class ExponentialBernsteinRBFLayer(ExponentialRBF):
         r = 0, which will not occur with chemically meaningful inputs.
 
         References:
-        -----
+        ----------
         [1] Commun. Kharkov Math. Soc. 1912, 13, 1.
         '''
         super().__init__(

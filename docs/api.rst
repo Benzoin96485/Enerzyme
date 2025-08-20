@@ -3,5 +3,11 @@ API Documentation
 
 .. autosummary::
    :toctree: autosummary
+   :recursive:
 
-   enerzyme.canvas
+   enerzyme.bond
+   enerzyme.data
+   enerzyme.models
+   enerzyme.qm
+   enerzyme.tasks
+   enerzyme.utils

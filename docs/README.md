@@ -1,23 +1,59 @@
-# Compiling Enerzyme's Documentation
+# Enerzyme Documentation
 
-The docs for this project are built with [Sphinx](http://www.sphinx-doc.org/en/master/).
-To compile the docs, first ensure that the necessary dependencies are installed.
+This directory contains the documentation for the Enerzyme package.
 
+## Building the Documentation
 
+To build the documentation, run:
 
-Once installed, you can use the `Makefile` in this directory to compile static HTML pages by
 ```bash
+cd docs
 make html
 ```
 
-The documentation contains default pages for "Getting Started", "User Guide", "Developer Guide" and API reference. 
-We recommend adopting these sections of documentation for your project to ensure comprehensive documentation for all aspects of your project.
+The built documentation will be available in `_build/html/`.
 
-The compiled docs will be in the `_build` directory and can be viewed by opening `index.html` (which may itself 
-be inside a directory called `html/` depending on what version of Sphinx is installed).
+## Documentation Structure
 
+The documentation follows a hierarchical structure:
 
-A configuration file for [Read The Docs](https://readthedocs.org/) (readthedocs.yaml) is included in the top level of the repository. To use Read the Docs to host your documentation, go to https://readthedocs.org/ and connect this repository. You may need to change your default branch to `main` under Advanced Settings for the project.
+### Level 1: Main API Documentation (`api.rst`)
+- Contains the top-level table of contents for all `enerzyme.*` modules
+- Each module links to its dedicated documentation page
 
-If you would like to use Read The Docs with `autodoc` (included automatically) and your package has dependencies, you will need to include those dependencies in your documentation yaml file (`docs/requirements.yaml`).
+### Level 2: Module Documentation (`modules/*.rst`)
+- Individual documentation files for each top-level module
+- Shows the module's contents, classes, functions, and submodules
+- Each submodule links to its own documentation page
+
+### Level 3: Submodule Documentation (Auto-generated)
+- Documentation for `enerzyme.*.*` submodules
+- Generated automatically by Sphinx autosummary
+- Uses custom templates for consistent formatting
+
+## Custom Templates
+
+The documentation uses custom Sphinx templates located in `_templates/`:
+
+- `custom-module-template.rst`: Template for module documentation
+- `custom-class-template.rst`: Template for class documentation  
+- `custom-function-template.rst`: Template for function documentation
+
+## Features
+
+- **Hierarchical Navigation**: Easy navigation between different levels of the API
+- **Auto-generated Content**: Uses Sphinx autosummary for automatic documentation generation
+- **Consistent Formatting**: Custom templates ensure consistent appearance
+- **Comprehensive Coverage**: Documents all public modules, classes, and functions
+
+## Adding New Modules
+
+To add documentation for a new module:
+
+1. Create a new `.rst` file in the `modules/` directory
+2. Add the module to `modules/index.rst`
+3. Add the module to `api.rst` if it's a top-level module
+4. Rebuild the documentation
+
+The hierarchical structure will automatically handle the navigation and organization.
 
