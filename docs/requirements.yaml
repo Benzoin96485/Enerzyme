@@ -13,10 +13,23 @@ dependencies:
   - sphinx-design
   - sphinx-copybutton
 
-
-
-
     # Pip-only installs
   - pip:
+    - numpy
+    - h5py
+    - tqdm
+    - ase
+    - joblib
+    - addict
+    - pandas
+    - torch
+    - scikit-learn
+    - transformers
+    - torch-ema
+    - pyyaml
+    - torch-scatter
+    - rdkit
+    - e3nn
+    - pytorch-lightning
     - -e ../
 
