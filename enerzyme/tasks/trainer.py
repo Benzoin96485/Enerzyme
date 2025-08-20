@@ -34,10 +34,31 @@ DTYPE_MAPPING = {
 }
 
 
+def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> Dict:
+    loaded_info = torch.load(lightning_ckpt_path, map_location="cpu")
+    if "callbacks" in loaded_info:
+        for k, v in loaded_info["callbacks"].items():
+            if k.startswith("EarlyStopping"):
+                if 'patience' in v and v['patience'] < patience:
+                    v['patience'] = patience
+                    logger.info(f"increase patience of EarlyStopping to {patience}")
+    torch.save(loaded_info, lightning_ckpt_path)
+
+
+def _convert_lightning_model_state_dict(lightning_model_state_dict: Dict) -> Dict:
+    model_state_dict = dict()
+    for k, v in lightning_model_state_dict.items():
+        if k.startswith("model."):
+            model_state_dict[k[6:]] = v
+        else:
+            model_state_dict[k] = v
+    return model_state_dict
+
+
 def _convert_lightning_state_dict(lightning_loaded_info: Dict) -> Dict:
     loaded_info = dict()
     if "state_dict" in lightning_loaded_info:
-        loaded_info["model_state_dict"] = lightning_loaded_info["state_dict"]
+        loaded_info["model_state_dict"] = _convert_lightning_model_state_dict(lightning_loaded_info["state_dict"])
     if "epoch" in lightning_loaded_info:
         loaded_info["epoch"] = lightning_loaded_info["epoch"]
     if "lr_schedulers" in lightning_loaded_info:
@@ -309,6 +330,8 @@ class Trainer:
                 )
             else:
                 valid_dataloader = None
+            if self.resume > 1:
+                _modify_lightning_state_dict(pretrain_path, self.patience)
             self.lightning_trainer.fit(lightning_model, train_dataloader, valid_dataloader, ckpt_path=pretrain_path if self.resume > 1 else None)
             
             if test_dataset is not None:
