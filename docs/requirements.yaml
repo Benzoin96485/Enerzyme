@@ -27,9 +27,10 @@ dependencies:
     - transformers
     - torch-ema
     - pyyaml
-    - torch-geometric
+    - torch_geometric
     - rdkit
     - e3nn
-    - pytorch-lightning
+    - lightning
+    - https://data.pyg.org/whl/torch-2.8.0%2Bcpu/torch_scatter-2.1.2%2Bpt28cpu-cp313-cp313-linux_x86_64.whl
     - -e ../
 
