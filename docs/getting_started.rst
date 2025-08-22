@@ -1,9 +1,9 @@
 Getting Started
 ===============
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
 
-You might choose to write an overview tutorial or set of tutorials.
-
-.. code-block:: python
-    
-    import enerzyme
+   getting_started/installation
+   
