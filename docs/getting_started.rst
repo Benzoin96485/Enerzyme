@@ -6,4 +6,6 @@ Getting Started
    :caption: Contents:
 
    getting_started/installation
+   getting_started/preparing_dataset
+   getting_started/training
    

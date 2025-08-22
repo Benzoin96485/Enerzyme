@@ -1,13 +1,26 @@
-Installation
-============
+Installation (development version)
+==================================
 
-We recommend first creating a conda environment with a yaml file :code:`requirements.yaml` by
+This is the installation guide for the development version of the Enerzyme package. You can get the package from the `GitHub repository <https://github.com/Benzoin96485/Enerzyme>`_:
+
+.. code-block:: bash
+
+    git clone https://github.com/Benzoin96485/Enerzyme.git
+    cd Enerzyme
+
+Checkout the development branch:
+
+.. code-block:: bash
+
+    git checkout devel
+
+We recommend creating a conda environment with a yaml file :code:`requirements.yaml` for the dependencies:
 
 .. code-block:: bash
 
     conda env create -f requirements.yaml
 
-which includes the following dependencies:
+which includes the following contents:
 
 .. code-block:: yaml
 
@@ -46,30 +59,26 @@ Then activate the environment:
 
 and go to https://data.pyg.org/whl/ and find the latest wheel file for :code:`torch-scatter` that matches your PyTorch version, CUDA version, Python version, and platform. For example, if you are using PyTorch 2.5.1, CUDA 12.4, Python 3.12, and Linux x86_64 platform, you can click on the `torch-2.5.1+cu124 <https://data.pyg.org/whl/torch-2.5.1%2Bcu124.html>`_ link and find the link to the wheel file `torch_scatter-2.1.2+pt25cu124-cp312-cp312-linux_x86_64.whl <https://data.pyg.org/whl/torch-2.5.0%2Bcu124/torch_scatter-2.1.2%2Bpt25cu124-cp312-cp312-linux_x86_64.whl>`_.
 
-Then install the wheel file by
+Then install the wheel file:
 
 .. code-block:: bash
 
     pip install https://data.pyg.org/whl/torch-2.5.0%2Bcu124/torch_scatter-2.1.2%2Bpt25cu124-cp312-cp312-linux_x86_64.whl
 
-Finally, install the package in the repository root directory by
+Finally, install the package in the repository root directory:
 
 .. code-block:: bash
 
     pip install -e .
 
-Check the library installation by
+Check the library installation:
 
-.. code-block:: python
+.. code-block:: bash
 
-    import enerzyme
+    python -c "import enerzyme"
 
-and the command line interface by
+and the command line interface:
 
 .. code-block:: bash
 
     enerzyme -h
-
-
-
-

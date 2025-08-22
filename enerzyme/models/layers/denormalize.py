@@ -9,8 +9,8 @@ class AtomicAffineLayer(BaseFFLayer):
     def __init__(
         self, 
         max_Za: int, 
-        shifts: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]],
-        scales: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]
+        shifts: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 0, "learnable": True}, "Qa": {"values": 0, "learnable": True}},
+        scales: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 1, "learnable": True}, "Qa": {"values": 1, "learnable": True}}
     ) -> None:
         atomic_properties = shifts.keys() | scales.keys()
         super().__init__(input_fields={"Za"} | atomic_properties, output_fields=atomic_properties)
