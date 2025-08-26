@@ -1,8 +1,8 @@
 import os
 from .models import get_model_str, build_model, get_pretrain_path
-from .tasks import Simulation
+from .tasks.simulator import Simulation
 from .utils import YamlHandler, logger
-from .data import Transform
+from .data.transform import Transform
 
 
 class FFSimulate:
@@ -22,6 +22,9 @@ class FFSimulate:
         logger.info('Model Config: {}'.format(model_config))
         self.transform = Transform(model_config.Datahub.transforms, simulation_mode=True)
         for FF_key, FF_params in model_config.Modelhub.internal_FFs.items():
+            if FF_params.get("active", False):
+                self._init_model(FF_key, FF_params)
+        for FF_key, FF_params in model_config.Modelhub.external_FFs.items():
             if FF_params.get("active", False):
                 self._init_model(FF_key, FF_params)
     

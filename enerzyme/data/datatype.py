@@ -49,4 +49,17 @@ def is_target_uq(k):
 def get_tensor_rank(k):
     return bool(DATA_TYPES.get(k, 0) >> TENSOR_RANK_BIT)
 
-__all__ = ["is_int", "is_rounded", "is_atomic", "requires_grad", "is_idx", "get_tensor_rank", "is_target", "is_target_uq"]
+TYPE_ATTRS = {
+    "is_atomic": IS_ATOMIC,
+}
+
+def register_data_type(k, **type_info):
+    DATA_TYPES[k] = 0
+    for type_attr, v in type_info.items():
+        if v is True:
+            DATA_TYPES[k] |= TYPE_ATTRS[type_attr]
+        else:
+            DATA_TYPES[k] &= ~TYPE_ATTRS[type_attr]
+        
+
+__all__ = ["is_int", "is_rounded", "is_atomic", "requires_grad", "is_idx", "get_tensor_rank", "is_target", "is_target_uq", "register_data_type"]

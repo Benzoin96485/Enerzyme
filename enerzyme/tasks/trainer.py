@@ -1,10 +1,9 @@
 from functools import partial
-from typing import Iterable, Optional, Callable, Tuple, Dict, Any, Literal, List, Union
+from typing import Iterable, Optional, Callable, Dict, Any, Literal
 from collections import defaultdict
 import time, os, logging, contextlib
 from tqdm import tqdm
 import torch
-from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
@@ -19,8 +18,9 @@ except:
 from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
+from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input, _pyg_to_device
 from .monitor import Monitor
-from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, Transform, full_neighbor_list, is_target_uq
+from ..data.transform import Transform
 from ..utils import logger
 from .metrics import Metrics
 
@@ -34,129 +34,70 @@ DTYPE_MAPPING = {
 }
 
 
-def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
-    features, targets = zip(*batch)
-    batch_features = dict()
-    batch_targets = dict()
-    
-    for k in features[0]:
-        if is_atomic(k):
-            batch_features[k] = torch.tensor(
-                np.concatenate([feature[k][:feature["N"]] for feature in features]), 
-                dtype=torch.long if is_int(k) else dtype,
-                requires_grad=requires_grad(k)
-            )
-        elif not is_idx(k):
-            batch_features[k] = torch.tensor(
-                np.array([feature[k] for feature in features]), 
-                dtype=torch.long if is_int(k) else dtype,
-            )
+def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> Dict:
+    loaded_info = torch.load(lightning_ckpt_path, map_location="cpu")
+    if "callbacks" in loaded_info:
+        for k, v in loaded_info["callbacks"].items():
+            if k.startswith("EarlyStopping"):
+                if 'patience' in v and v['patience'] < patience:
+                    v['patience'] = patience
+                    logger.info(f"increase patience of EarlyStopping to {patience}")
+    torch.save(loaded_info, lightning_ckpt_path)
 
-    batch_idx_i = []
-    batch_idx_j = []
-    batch_seg = []
-    count = 0
 
-    for i, feature in enumerate(features):
-        if "idx_i" in feature:
-            batch_idx_i.append(feature["idx_i"][:feature["N_pair"]] + count)
-            batch_idx_j.append(feature["idx_j"][:feature["N_pair"]] + count)
+def _convert_lightning_model_state_dict(lightning_model_state_dict: Dict) -> Dict:
+    model_state_dict = dict()
+    for k, v in lightning_model_state_dict.items():
+        if k.startswith("model."):
+            model_state_dict[k[6:]] = v
         else:
-            idx_i, idx_j = full_neighbor_list(feature["N"])
-            batch_idx_i.append(idx_i + count)
-            batch_idx_j.append(idx_j + count)
-        batch_seg.append(np.full(feature["N"], i, dtype=int))
-        count += feature["N"]
-    batch_features["N"] = [feature["N"] for feature in features]
-    batch_features["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
-    batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long)
-    batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long)
-
-    if targets[0] is not None:
-        for k in targets[0]:
-            if is_atomic(k): 
-                batch_targets[k] = torch.tensor(
-                    np.concatenate([target[k][:features[i]["N"]] for i, target in enumerate(targets)]), 
-                    dtype=torch.long if is_int(k) else dtype
-                )
-            else:
-                batch_targets[k] = torch.tensor(
-                    np.array([target[k] for target in targets]), 
-                    dtype=torch.long if is_int(k) else dtype,
-                )
-    
-    return batch_features, batch_targets
+            model_state_dict[k] = v
+    return model_state_dict
 
 
-def _to_device(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
-    features, targets = batch
-    batch_features = dict()
-    batch_targets = dict()
-    for k, v in features.items():
-        if k != "N":
-            batch_features[k] = v.to(device)
-        else:
-            batch_features[k] = v
-    for k, v in targets.items():
-        batch_targets[k] = v.to(device)
-    return batch_features, batch_targets
+def _convert_lightning_state_dict(lightning_loaded_info: Dict) -> Dict:
+    loaded_info = dict()
+    if "state_dict" in lightning_loaded_info:
+        loaded_info["model_state_dict"] = _convert_lightning_model_state_dict(lightning_loaded_info["state_dict"])
+    if "epoch" in lightning_loaded_info:
+        loaded_info["epoch"] = lightning_loaded_info["epoch"]
+    if "lr_schedulers" in lightning_loaded_info:
+        loaded_info["scheduler_state_dict"] = lightning_loaded_info["lr_schedulers"][0]
+    if 'optimizer_states' in lightning_loaded_info:
+        loaded_info["optimizer_state_dict"] = lightning_loaded_info["optimizer_states"][0]
+    if "callbacks" in lightning_loaded_info:
+        for k, v in lightning_loaded_info["callbacks"].items():
+            if k == "EMACallback":
+                loaded_info["ema_state_dict"] = v
+            elif k.startswith("EarlyStopping"):
+                if 'best_score' in v:
+                    loaded_info["best_score"] = v['best_score']
+                if 'wait_count' in v and "epoch" in loaded_info:
+                    loaded_info["best_epoch"] = loaded_info["epoch"] - v['wait_count']
+    return loaded_info
 
 
-def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], targets: Optional[Dict[str, Any]], non_target_features: List[str]=[]) -> Tuple[Dict[str, Union[np.ndarray, List]], Optional[Dict[str, Union[np.ndarray, List]]]]:
-    y_pred = dict()
-    y_truth = dict()
-    for k, v in output.items():
-        if is_target(k):
-            if is_atomic(k):
-                y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
-            else:
-                y_pred[k] = v.detach().cpu().numpy()
-        elif is_target_uq(k):
-            target = k[:-4]
-            if is_atomic(target):
-                y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
-            else:
-                y_pred[k] = v.detach().cpu().numpy()
-    for k in non_target_features:
-        if k in y_pred:
-            continue
-        if len(output[k]) == len(features["Za"]):
-            y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(output[k], features["N"])))
-        elif len(output[k]) == len(features["N"]):
-            y_pred[k] = output[k].detach().cpu().numpy()
-        else:
-            raise ValueError(f"non-target feature {k} has invalid length {len(output[k])}")
-    y_pred["Za"] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(features["Za"], features["N"])))
-    
-    if targets is not None:
-        for k, v in targets.items():
-            if is_target(k):
-                if is_atomic(k):
-                    y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
-                else:
-                    y_truth[k] = v.detach().cpu().numpy()
-    y_truth["Za"] = y_pred["Za"]
-
-    return y_pred, (y_truth if y_truth else None)
-
-
-def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optional[str], ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None) -> Dict:
+def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrain_path: Optional[str]=None, ema: Optional[ExponentialMovingAverage]=None, inference: bool=False, optimizer: Optional[Optimizer]=None, scheduler: Optional[LRScheduler]=None, strict: bool=True) -> Dict:
     other_info = dict()
     if pretrain_path is None:
         return other_info
     loaded_info = torch.load(pretrain_path, map_location=device)
+    if 'pytorch-lightning_version' in loaded_info:
+        loaded_info = _convert_lightning_state_dict(loaded_info)
     if ema is not None and "ema_state_dict" in loaded_info:
         model.load_state_dict(loaded_info["model_state_dict"])
         ema.load_state_dict(loaded_info["ema_state_dict"])
         logger.info(f"loading ema state dict from {pretrain_path}...")
     else:
         if inference and "ema_state_dict" in loaded_info:
+            model.load_state_dict(loaded_info["model_state_dict"])
             tmp_ema = ExponentialMovingAverage(model.parameters(), decay=1, use_num_updates=True)
             tmp_ema.load_state_dict(loaded_info["ema_state_dict"])
             tmp_ema.copy_to(model.parameters())
             logger.info(f"loading averaged model state dict from {pretrain_path}...")
         else:
-            model.load_state_dict(loaded_info["model_state_dict"])
+            model.load_state_dict(loaded_info["model_state_dict"], strict=strict)
+            other_info["model_state_dict"] = loaded_info["model_state_dict"]
             logger.info(f"loading model state dict from {pretrain_path}...")
     if not inference:
         if optimizer is not None and "optimizer_state_dict" in loaded_info:
@@ -185,6 +126,11 @@ def _load_state_dict(model: Module, device: torch.device, pretrain_path: Optiona
 
 class Trainer:
     def __init__(self, out_dir: str=None, metric_config: Metrics=dict(), **params) -> None:
+        self.batch_size = params.get('batch_size', 8)
+        self.pyg = params.get("pyg", False)
+        self.lightning = params.get("lightning", False)
+        self.patience = params.get('patience', 50)
+        self.max_norm = params.get('max_norm', -1)
         self.config = params
         self.out_dir = out_dir
         self.metric_config = metric_config
@@ -197,22 +143,13 @@ class Trainer:
         self.seed = params.get('seed', 114514)
         self.optimizer = params.get('optimizer', "Adam")
         self.learning_rate = float(params.get('learning_rate', 1e-3))
-        self.batch_size = params.get('batch_size', 8)
         self.inference_batch_size = params.get('inference_batch_size', self.batch_size)
         self.max_epochs = params.get('max_epochs', 1000)
         self.warmup_ratio = params.get('warmup_ratio', 0.01)
-        self.patience = params.get('patience', 50)
-        self.max_norm = params.get('max_norm', 1.0)
         self.cuda = params.get('cuda', False)
         self.schedule = params.get('schedule', "linear")
         self.weight_decay = float(params.get('weight_decay', 0))
         self.amsgrad = params.get('amsgrad', True)
-        if torch.cuda.is_available():
-            logger.info("GPU found!")
-            self.device = torch.device("cuda:0" if self.cuda else "cpu")
-        else:
-            logger.info("GPU not found, turn to CPU!")
-            self.device = torch.device("cpu")
         self.data_in_memory = params.get("data_in_memory", True)
         self.use_ema = params.get("use_ema", True)
         self.ema_decay = params.get("ema_decay", 0.999)
@@ -227,23 +164,65 @@ class Trainer:
         self.resume = params.get("resume", 1)
         self.refresh_best_score = params.get("refresh_best_score", None)
         self.refresh_patience = params.get("refresh_patience", None)
+        self.freeze_pretrain_weights = params.get("freeze_pretrain_weights", False)
         non_target_features = params.get("non_target_features", [])
         self.num_workers = params.get("num_workers", 0)
         if self.num_workers <= 0:
             if "SLURM_NTASKS" in os.environ:
                 self.num_workers = max(1, int(os.environ["SLURM_NTASKS"]) // 2 - 1)
+                logger.info(f"using {self.num_workers} workers for dataloader given {os.environ['SLURM_NTASKS']} tasks")
             else:
                 self.num_workers = max(1, os.cpu_count() // 2 - 1)
-        logger.info(f"using {self.num_workers} workers for dataloader")
+                logger.info(f"using {self.num_workers} workers for dataloader given {os.cpu_count()} cpus")
+        else:
+            logger.info(f"using {self.num_workers} workers for dataloader")
+        
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
         elif isinstance(non_target_features, str):
             self.non_target_features = [non_target_features]
         else:
             raise ValueError(f"non_target_features must be a list or a string, but got {type(non_target_features)}")
+        if self.lightning:
+            self.device = None
+            import lightning as L
+            from lightning.pytorch.callbacks import EarlyStopping
+            early_stopping_callback = EarlyStopping(
+                monitor="_judge_score",
+                mode="min",
+                patience=self.patience,
+                min_delta=0
+            )
+            self.lightning_trainer = L.Trainer(
+                default_root_dir=out_dir,
+                accelerator="auto",
+                callbacks=[early_stopping_callback],
+                devices="auto",
+                num_nodes=int(os.environ.get("SLURM_NNODES", 1)),
+                strategy="auto",
+                gradient_clip_val=self.max_norm if self.max_norm > 0 else None,
+                inference_mode=False,
+                max_epochs=self.max_epochs
+            )
+        else:
+            if torch.cuda.is_available():
+                logger.info("GPU found!")
+                self.device = torch.device("cuda:0" if self.cuda else "cpu")
+            else:
+                logger.info("GPU not found, turn to CPU!")
+                self.device = torch.device("cpu")
 
     def decorate_batch_input(self, batch):
-        return _decorate_batch_input(batch, self.dtype, self.device)
+        if self.pyg:
+            return _decorate_pyg_batch_input(batch, self.dtype, self.device)
+        else:
+            return _decorate_batch_input(batch, self.dtype, self.device)
+        
+    def to_device(self, batch):
+        if self.pyg:
+            return _pyg_to_device(batch, self.device)
+        else:
+            return _to_device(batch, self.device)
     
     def decorate_batch_output(self, output, features, targets):
         return _decorate_batch_output(output, features, targets, self.non_target_features)
@@ -265,9 +244,10 @@ class Trainer:
         scheduler: Optional[LRScheduler]=None,
         pretrain_path: Optional[str]=None, 
         ema: Optional[ExponentialMovingAverage]=None, 
-        inference: bool=False
+        inference: bool=False,
+        strict: bool=True
     ) -> None:
-        return _load_state_dict(model, self.device, pretrain_path, ema, inference, optimizer, scheduler)
+        return _load_state_dict(model, self.device, pretrain_path, ema, inference, optimizer, scheduler, strict)
 
     def save_state_dict(self, model: Module, optimizer: Optimizer, scheduler: LRScheduler, dump_dir: str, ema: Optional[ExponentialMovingAverage]=None, suffix="last", model_rank=None, epoch: Optional[int]=None, best_score: Optional[float]=None, best_epoch: Optional[int]=None):
         if model_rank is None:
@@ -302,7 +282,7 @@ class Trainer:
         if self.refresh_patience is not None:
             refresh_patience = self.refresh_patience
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
-        model = model.to(self.device).type(self.dtype)
+        
         train_dataloader = DataLoader(
             dataset=train_dataset,
             batch_size=self.batch_size,
@@ -311,8 +291,10 @@ class Trainer:
             num_workers=self.num_workers,
             drop_last=True 
         )
-        
-        num_training_steps = len(train_dataloader) * self.max_epochs
+        if self.lightning:
+            num_training_steps = len(train_dataloader) * self.max_epochs // self.lightning_trainer.world_size
+        else:
+            num_training_steps = len(train_dataloader) * self.max_epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
         if self.optimizer == "Adam":
             from torch.optim import Adam
@@ -334,180 +316,238 @@ class Trainer:
             )
         else:
             raise ValueError(f"optimizer {self.optimizer} not supported")
-        logger.info(f"using {self.optimizer} optimizer")
-        if self.use_ema:
-            ema = ExponentialMovingAverage(model.parameters(), self.ema_decay, self.ema_use_num_updates)
-        else:
-            ema = None
         scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
-
-        if self.resume > 1:
-            other_info = self.load_state_dict(model, optimizer, scheduler, pretrain_path, ema)
-        elif self.resume == 1:
-            other_info = self.load_state_dict(model, pretrain_path=pretrain_path, ema=ema)
-        else:
-            other_info = self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
         
-        if self.resume > 1 and "best_epoch" in other_info and "epoch" in other_info:
-            wait = other_info["epoch"] - other_info["best_epoch"]
-            if refresh_best_score:
-                best_score = float("inf")
-            else:
-                best_score = other_info.get("best_score", float("inf"))
-            start_epoch = other_info["epoch"] + 1
-            if (wait >= self.patience and refresh_patience) or refresh_best_score:
-                wait = 0
-        else:
-            wait = 0
-            if self.resume > 1:
-                start_epoch = other_info.get("epoch", -1) + 1
-            else:
-                start_epoch = 0
+        if self.lightning:
+            logger.info("Using Lightning Trainer")
+            from .lightning_utils import LightningModel
+            lightning_model = LightningModel(
+                model.type(self.dtype), loss_terms, dump_dir,
+                optimizer, scheduler,
+                monitor=self.monitor,
+                transform=transform,
+                metrics=self.metrics,
+                use_ema=self.use_ema,
+                ema_decay=self.ema_decay,
+                ema_use_num_updates=self.ema_use_num_updates
+            )
+            train_dataloader = DataLoader(
+                dataset=train_dataset,
+                batch_size=self.batch_size,
+                shuffle=True,
+                collate_fn=self.decorate_batch_input,
+                drop_last=True,
+                pin_memory=True,
+                num_workers=max(1, self.num_workers)
+            )
             if valid_dataset is not None:
-                if self.resume > 1 and not refresh_best_score:
-                    best_score = other_info.get("best_score", float("inf"))
-                else:
-                    best_score = float("inf")
+                valid_dataloader = DataLoader(
+                    dataset=valid_dataset,
+                    batch_size=self.inference_batch_size,
+                    shuffle=False,
+                    collate_fn=self.decorate_batch_input,
+                    pin_memory=True,
+                    num_workers=max(1, self.num_workers)
+                )
             else:
-                best_score = None
-
-        if self.resume > 1:
-            max_epochs = self.max_epochs
-        else:
-            max_epochs = start_epoch + self.max_epochs
-        
-        if valid_dataset is not None:
+                valid_dataloader = None
             if self.resume > 1:
-                best_epoch = other_info.get("best_epoch", start_epoch)
+                _modify_lightning_state_dict(pretrain_path, self.patience)
+            self.lightning_trainer.fit(lightning_model, train_dataloader, valid_dataloader, ckpt_path=pretrain_path if self.resume > 1 else None)
+            
+            if test_dataset is not None:
+                test_dataloader = DataLoader(
+                    dataset=test_dataset,
+                    batch_size=self.inference_batch_size,
+                    shuffle=False,
+                    collate_fn=self.decorate_batch_input,
+                    pin_memory=True,
+                    num_workers=max(1, self.num_workers)
+                )
+                self.lightning_trainer.test(model, test_dataloader)
+        else:
+            model = model.to(self.device).type(self.dtype)
+            if self.use_ema:
+                ema = ExponentialMovingAverage(
+                    model.parameters(), 
+                    self.ema_decay, 
+                    self.ema_use_num_updates
+                )
+            else:
+                ema = None
+            if self.resume > 1:
+                other_info = self.load_state_dict(model, optimizer, scheduler, pretrain_path, ema)
+            elif self.resume == 1:
+                other_info = self.load_state_dict(model, pretrain_path=pretrain_path, ema=ema)
+            else:
+                other_info = self.load_state_dict(model, pretrain_path=pretrain_path, inference=True, strict=False)
+
+            if self.freeze_pretrain_weights:
+                for name, param in model.named_parameters():
+                    if name in other_info.get("model_state_dict", dict()):
+                        param.requires_grad = False
+                        logger.info(f"Freezing pretrained weights for {name}")
+
+            if self.resume > 1 and "best_epoch" in other_info and "epoch" in other_info:
+                wait = other_info["epoch"] - other_info["best_epoch"]
+                if refresh_best_score:
+                    best_score = float("inf")
+                else:
+                    best_score = other_info.get("best_score", float("inf"))
+                start_epoch = other_info["epoch"] + 1
+                if (wait >= self.patience and refresh_patience) or refresh_best_score:
+                    wait = 0
+            else:
+                wait = 0
+                if self.resume > 1:
+                    start_epoch = other_info.get("epoch", -1) + 1
+                else:
+                    start_epoch = 0
+                if valid_dataset is not None:
+                    if self.resume > 1 and not refresh_best_score:
+                        best_score = other_info.get("best_score", float("inf"))
+                    else:
+                        best_score = float("inf")
+                else:
+                    best_score = None
+
+            if self.resume > 1:
+                max_epochs = self.max_epochs
+            else:
+                max_epochs = start_epoch + self.max_epochs
+            
+            if valid_dataset is not None:
+                if self.resume > 1:
+                    best_epoch = other_info.get("best_epoch", start_epoch)
+                else:
+                    best_epoch = None
             else:
                 best_epoch = None
-        else:
-            best_epoch = None
 
-        epoch = start_epoch
-        epoch_in_iter = meta_state_dict.get("epoch_in_iter", 0)
-        if start_epoch > 0:
-            if epoch_in_iter > 0:
-                logger.info(f"Resuming from epoch {start_epoch + 1}, epoch {epoch_in_iter + 1} in active learning iteration")
-            else:
-                logger.info(f"Resuming from epoch {start_epoch + 1}...")
-        for epoch in range(start_epoch, max_epochs):
-            if max_epoch_per_iter > 0 and epoch_in_iter >= max_epoch_per_iter:
-                break
-            model = model.train()
-            start_time = time.time()
-            batch_bar = tqdm(
-                total=len(train_dataloader), dynamic_ncols=True, leave=False, position=0, 
-                desc='Train', ncols=5
-            ) 
-            trn_loss = []
-            
-            for i, batch in enumerate(train_dataloader):
-                net_input, net_target = _to_device(batch, self.device)
+            epoch = start_epoch
+            epoch_in_iter = meta_state_dict.get("epoch_in_iter", 0)
+            if start_epoch > 0:
+                if epoch_in_iter > 0:
+                    logger.info(f"Resuming from epoch {start_epoch + 1}, epoch {epoch_in_iter + 1} in active learning iteration")
+                else:
+                    logger.info(f"Resuming from epoch {start_epoch + 1}...")
+            for epoch in range(start_epoch, max_epochs):
+                if max_epoch_per_iter > 0 and epoch_in_iter >= max_epoch_per_iter:
+                    break
+                model = model.train()
+                start_time = time.time()
+                batch_bar = tqdm(
+                    total=len(train_dataloader), dynamic_ncols=True, leave=False, position=0, 
+                    desc='Train', ncols=5
+                ) 
+                trn_loss = []
                 
-                loss = 0
-                with torch.set_grad_enabled(True):
-                    output = model(net_input)
-                    for loss_term in loss_terms.values():
-                        loss += loss_term(output, net_target)
-                trn_loss.append(float(loss.data))
+                for i, batch in enumerate(train_dataloader):
+                    net_input, net_target = self.to_device(batch)
+                    
+                    loss = 0
+                    with torch.set_grad_enabled(True):
+                        output = model(net_input)
+                        for loss_term in loss_terms.values():
+                            loss += loss_term(output, net_target)
+                    trn_loss.append(float(loss.data))
 
-                batch_bar.set_postfix(
-                    Epoch="Epoch {}/{}".format(epoch+1, max_epochs),
-                    loss="{:.04f}".format(float(sum(trn_loss) / (i + 1))),
-                    lr="{:.04f}".format(float(optimizer.param_groups[0]['lr']))
-                )
+                    batch_bar.set_postfix(
+                        Epoch="Epoch {}/{}".format(epoch+1, max_epochs),
+                        loss="{:.04f}".format(float(sum(trn_loss) / (i + 1))),
+                        lr="{:.04f}".format(float(optimizer.param_groups[0]['lr']))
+                    )
 
-                # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
-                optimizer.zero_grad(set_to_none=True)
-                loss.backward()
+                    # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
 
-                if self.max_norm > 0:
-                    clip_grad_norm_(model.parameters(), self.max_norm)
+                    if self.max_norm > 0:
+                        clip_grad_norm_(model.parameters(), self.max_norm)
 
-                optimizer.step()
+                    optimizer.step()
+
+                    if self.use_ema:
+                        ema.update()
+                    
+                    scheduler.step()
+                    batch_bar.update()
+
+                batch_bar.close()
+                total_trn_loss = np.mean(trn_loss)
+                message = f'Epoch [{epoch + 1}/{max_epochs}]' + (f' ({epoch_in_iter + 1}/{max_epoch_per_iter})' if max_epoch_per_iter > 0 else '') + f', train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
 
                 if self.use_ema:
-                    ema.update()
-                
-                scheduler.step()
-                batch_bar.update()
+                    cm = ema.average_parameters()
+                else:
+                    cm = contextlib.nullcontext()
 
-            batch_bar.close()
-            total_trn_loss = np.mean(trn_loss)
-            message = f'Epoch [{epoch + 1}/{max_epochs}]' + (f' ({epoch_in_iter + 1}/{max_epoch_per_iter})' if max_epoch_per_iter > 0 else '') + f', train_loss: {total_trn_loss:.4f}, lr: {optimizer.param_groups[0]["lr"]:.6f}'
+                if valid_dataset is not None:
+                    with cm:
+                        predict_result = self.predict(
+                            model=model, 
+                            dataset=valid_dataset, 
+                            loss_terms=loss_terms, 
+                            dump_dir=dump_dir, 
+                            transform=transform, 
+                            epoch=epoch, 
+                            load_model=False,
+                        )
+                        val_loss = predict_result["val_loss"]
+                        metric_score = predict_result["metric_score"]
+                        total_val_loss = np.mean(val_loss)
+                        _score = metric_score["_judge_score"]
+                        _metric = str(self.metrics)
+                        save_handle = partial(self.save_state_dict, model=model, optimizer=optimizer, scheduler=scheduler, dump_dir=dump_dir, ema=ema, suffix="best", model_rank=model_rank)
+                        is_early_stop, best_score, wait, saved = self._early_stop_choice(wait, best_score, metric_score, save_handle, self.patience, epoch)
+                        if saved:
+                            best_epoch = epoch
+                        message += f', val_loss: {total_val_loss:.4f}, ' + \
+                            ", ".join([f'val_{k}: {v:.4f}' for k, v in metric_score.items() if k != "_judge_score"]) + \
+                            f', val_judge_score ({_metric}): {_score:.4f}' + \
+                            (f', Patience [{wait}/{self.patience}], min_val_judge_score: {best_score:.4f}' if wait else '')
+                else:
+                    is_early_stop = False
 
-            if self.use_ema:
-                cm = ema.average_parameters()
-            else:
-                cm = contextlib.nullcontext()
+                epoch_in_iter += 1
+                meta_state_dict.update({"epoch_in_iter": epoch_in_iter})   
+                end_time = time.time()
+                message += f', {(end_time - start_time):.1f}s'
+                logger.info(message)
+                self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, "last", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
+                if is_early_stop:
+                    break
 
-            if valid_dataset is not None:
+            meta_state_dict.update({"model_rank": model_rank + 1 if model_rank is not None else 0, "epoch_in_iter": 0})
+            if test_dataset is not None:
+                if self.use_ema:
+                    cm = ema.average_parameters()
+                else:
+                    cm = contextlib.nullcontext()
                 with cm:
                     predict_result = self.predict(
                         model=model, 
-                        dataset=valid_dataset, 
+                        dataset=test_dataset, 
                         loss_terms=loss_terms, 
-                        dump_dir=dump_dir, 
+                        dump_dir=dump_dir,  
                         transform=transform, 
                         epoch=epoch, 
-                        load_model=False,
+                        load_model=True,
+                        model_rank=model_rank
                     )
-                    val_loss = predict_result["val_loss"]
+                    y_pred = predict_result["y_pred"]
+                    y_truth = predict_result["y_truth"]
                     metric_score = predict_result["metric_score"]
-                    total_val_loss = np.mean(val_loss)
-                    _score = metric_score["_judge_score"]
-                    _metric = str(self.metrics)
-                    save_handle = partial(self.save_state_dict, model=model, optimizer=optimizer, scheduler=scheduler, dump_dir=dump_dir, ema=ema, suffix="best", model_rank=model_rank)
-                    is_early_stop, best_score, wait, saved = self._early_stop_choice(wait, best_score, metric_score, save_handle, self.patience, epoch)
-                    if saved:
-                        best_epoch = epoch
-                    message += f', val_loss: {total_val_loss:.4f}, ' + \
-                        ", ".join([f'val_{k}: {v:.4f}' for k, v in metric_score.items() if k != "_judge_score"]) + \
-                        f', val_judge_score ({_metric}): {_score:.4f}' + \
-                        (f', Patience [{wait}/{self.patience}], min_val_judge_score: {best_score:.4f}' if wait else '')
             else:
-                is_early_stop = False
-
-            epoch_in_iter += 1
-            meta_state_dict.update({"epoch_in_iter": epoch_in_iter})   
-            end_time = time.time()
-            message += f', {(end_time - start_time):.1f}s'
-            logger.info(message)
-            self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, "last", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
-            if is_early_stop:
-                break
-
-        meta_state_dict.update({"model_rank": model_rank + 1 if model_rank is not None else 0, "epoch_in_iter": 0})
-        if test_dataset is not None:
-            if self.use_ema:
-                cm = ema.average_parameters()
-            else:
-                cm = contextlib.nullcontext()
-            with cm:
-                predict_result = self.predict(
-                    model=model, 
-                    dataset=test_dataset, 
-                    loss_terms=loss_terms, 
-                    dump_dir=dump_dir,  
-                    transform=transform, 
-                    epoch=epoch, 
-                    load_model=True,
-                    model_rank=model_rank
-                )
-                y_pred = predict_result["y_pred"]
-                y_truth = predict_result["y_truth"]
-                metric_score = predict_result["metric_score"]
-        else:
-            y_pred = None
-            y_truth = None
-            metric_score = None
-        return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": metric_score}
+                y_pred = None
+                y_truth = None
+                metric_score = None
+            return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": metric_score}
     
     def _early_stop_choice(self, wait, min_loss, metric_score, save_handle, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, save_handle, patience, epoch)
     
-    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
+    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None, test_mode: bool=False) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         if load_model == True:
@@ -523,12 +563,13 @@ class Trainer:
             num_workers=self.num_workers,
         )
         model = model.eval()
+        model.test_mode = test_mode
         batch_bar = tqdm(total=len(dataloader), dynamic_ncols=True, position=0, leave=False, desc='val', ncols=5)
         val_loss = []
         y_preds = defaultdict(list)
         y_truths = defaultdict(list)
         for i, batch in enumerate(dataloader):
-            net_input, net_target = _to_device(batch, self.device)
+            net_input, net_target = self.to_device(batch)
             output = model(net_input)
             # Get model outputs
             if self.monitor is not None:
@@ -561,4 +602,5 @@ class Trainer:
         if load_model and "_judge_score" in metric_score:
             metric_score.pop("_judge_score")
         batch_bar.close()
+        model.test_mode = False
         return {"y_pred": y_preds, "y_truth": y_truths, "val_loss": val_loss, "metric_score": metric_score}

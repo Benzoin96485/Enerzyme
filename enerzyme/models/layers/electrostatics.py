@@ -61,7 +61,7 @@ class ChargeConservationLayer(BaseFFLayer):
 class ElectrostaticEnergyLayer(BaseFFLayer):
     def __init__(
         self, cutoff_sr: float, cutoff_lr: Optional[float]=None, 
-        Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1,
+        Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1, dielectric_constant: float=1,
         cutoff_fn: CUTOFF_KEY_TYPE="smooth", flavor: Literal["PhysNet", "SpookyNet"]="SpookyNet"
     ) -> None:
         r"""
@@ -95,6 +95,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             self.cuton = cutoff_sr * 0.25
         self.cutoff_lr = cutoff_lr
         self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
+        self.dielectric_constant = dielectric_constant
         
         if cutoff_lr is not None and cutoff_lr > 0:
             self.cutoff_lr2 = self.cutoff_lr * self.cutoff_lr
@@ -150,9 +151,9 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         Ea: Float tensor of atomic electrostatic energy, shape [N * batch_size]
         '''
         if Qa.device.type == "cpu" or Qa.dim() > 1:
-            fac = self.kehalf * Qa[idx_i] * Qa[idx_j]
+            fac = self.kehalf * Qa[idx_i] * Qa[idx_j] / self.dielectric_constant
         else:
-            fac = self.kehalf * Qa.gather(0, idx_i) * Qa.gather(0, idx_j)
+            fac = self.kehalf * Qa.gather(0, idx_i) * Qa.gather(0, idx_j) / self.dielectric_constant
         switch = self.cutoff_fn(Dij_lr, self.cutoff, self.cuton)
         cswitch = 1 - switch
         view_shape = (-1, 1) if Qa.dim() > 1 else (-1,)

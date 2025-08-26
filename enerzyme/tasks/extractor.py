@@ -6,7 +6,7 @@ from rdkit.Chem import MolFromMolFile, MolFromXYZBlock, Mol
 from rdkit.Chem.rdDetermineBonds import DetermineConnectivity
 from sklearn.neighbors import NearestNeighbors, BallTree
 from rdkit import Chem
-from ..data import REVERSED_PERIODIC_TABLE
+from ..data.transform import REVERSED_PERIODIC_TABLE
 
 
 def get_bond_lengths(conformer, begin_atom_idx, end_atom_idx):

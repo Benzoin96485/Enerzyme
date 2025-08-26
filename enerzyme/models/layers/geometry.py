@@ -75,3 +75,15 @@ class RangeSeparationLayer(BaseFFLayer):
         if vij_lr is not None:
             relevant_output["vij_sr"] = vij_lr[cutmask]
         return relevant_output
+
+
+class RadiusGraphLayer(BaseFFLayer):
+    def __init__(self, cutoff: float, max_num_neighbors: int) -> None:
+        super().__init__(input_fields={"Ra", "batch_seg"}, output_fields={"idx_i_sr", "idx_j_sr"})
+        self.cutoff = cutoff
+        self.max_num_neighbors = max_num_neighbors
+
+    def get_output(self, Ra: Tensor, batch_seg: Tensor) -> Dict[str, Tensor]:
+        from torch_geometric.nn import radius_graph
+        edge_index = radius_graph(Ra, r=self.cutoff, batch=batch_seg, max_num_neighbors=self.max_num_neighbors)
+        return {"idx_i_sr": edge_index[0], "idx_j_sr": edge_index[1]}

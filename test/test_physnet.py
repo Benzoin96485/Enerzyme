@@ -159,7 +159,7 @@ def test_DenseLayer():
 
 
 def test_ResidualLayer():
-    from enerzyme.models.layers.mlp import ResidualLayer as ResidualLayer_torch
+    from enerzyme.models.blocks.mlp import ResidualLayer as ResidualLayer_torch
     from physnet.layers.ResidualLayer import ResidualLayer as ResidualLayer_tf
     residual_layer_torch = ResidualLayer_torch(F, F, initial_weight1=W_init, initial_weight2=W_init, initial_bias=torch.from_numpy(b_init)).type(dtype_torch)
     residual_layer_tf = ResidualLayer_tf(F, F, W_init=W_init.T.detach().numpy(), b_init=b_init, scope="test", dtype=dtype_tf)

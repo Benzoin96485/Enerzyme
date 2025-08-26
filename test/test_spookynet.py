@@ -126,7 +126,7 @@ def test_swish():
 
 
 def test_residual_layer():
-    from enerzyme.models.layers.mlp import ResidualLayer as F1
+    from enerzyme.models.blocks.mlp import ResidualLayer as F1
     from spookynet.modules.residual import Residual as F2
     f1 = F1(
         dim_feature_in=dim_feature, dim_feature_out=dim_feature, 
@@ -141,7 +141,7 @@ def test_residual_layer():
 
 
 def test_residual_stack():
-    from enerzyme.models.layers.mlp import ResidualStack as F1
+    from enerzyme.models.blocks.mlp import ResidualStack as F1
     from spookynet.modules.residual_stack import ResidualStack as F2
     f1 = F1(
         dim_feature=dim_feature, num_residual=3, 
@@ -156,7 +156,7 @@ def test_residual_stack():
 
 
 def test_residual_mlp():
-    from enerzyme.models.layers.mlp import ResidualMLP as F1
+    from enerzyme.models.blocks.mlp import ResidualMLP as F1
     from spookynet.modules.residual_mlp import ResidualMLP as F2
     f2 = F2(dim_feature, 3).type(dtype)
     f1 = F1(
@@ -287,7 +287,7 @@ def test_local_interaction():
 
 
 def test_attention():
-    from enerzyme.models.layers.attention import Attention as F1
+    from enerzyme.models.blocks.attention import Attention as F1
     from spookynet.modules.attention import Attention as F2
     f2 = F2(dim_feature, dim_feature, dim_feature).type(dtype)
     f1 = F1(dim_feature, dim_feature).type(dtype)
@@ -424,13 +424,13 @@ def test_atomic_properties_dynamic():
     )
     net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S}
     pre_layers = Sequential(
-        f1.calculate_distance, f1.range_separation, f1.atom_embedding, f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function
+        f1.calculate_distance, f1.range_separation, f1.atom_embedding, 
+        f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function,
+        f1.gather_embedding
     )
     output = pre_layers(net_input)
     ea1, qa1 = f1._atomic_properties_dynamic(
         output["atom_embedding"],
-        output["charge_embedding"],
-        output["spin_embedding"],
         1,
         output["rbf"],
         pij, dij, output["idx_i_sr"], output["idx_j_sr"], None
@@ -446,7 +446,9 @@ def test_atomic_properties():
     _, ea2, qa2, _, _, _, _, _ = f2.atomic_properties(Za, Q, S, R, idx_i, idx_j)
     net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S}
     pre_layers = Sequential(
-        f1.calculate_distance, f1.range_separation, f1.atom_embedding, f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function
+        f1.calculate_distance, f1.range_separation, f1.atom_embedding, 
+        f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function,
+        f1.gather_embedding
     )
     output = pre_layers(net_input)
     pij1, dij1, _, _ = f1._atomic_properties_static(
@@ -455,8 +457,6 @@ def test_atomic_properties():
     )
     ea1, qa1 = f1._atomic_properties_dynamic(
         output["atom_embedding"],
-        output["charge_embedding"],
-        output["spin_embedding"],
         1,
         output["rbf"],
         pij1, dij1, output["idx_i_sr"], output["idx_j_sr"], None

@@ -8,7 +8,7 @@ from tqdm import tqdm
 from pickle import dump
 from rdkit import Chem
 from ..utils import logger
-from ..data import Supplier
+from ..data.supplier import Supplier
 
 
 class QMDriver(ABC):
@@ -140,7 +140,16 @@ scrdir ./scr_{index}
         input_file = self.tmp_dir / f"{index}.in"
         with open(input_file, "w") as f:
             f.write(base_input)
-        Chem.MolToXYZFile(package["mol"], self.tmp_dir / f"{index}.xyz")
+        if "mol" in package:
+            Chem.MolToXYZFile(package["mol"], self.tmp_dir / f"{index}.xyz")
+        elif "Ra" in package:
+            with open(self.tmp_dir / f"{index}.xyz", "w") as f:
+                f.write(f"{len(package['Ra'])}\n")
+                f.write("\n")
+                for i, (x, y, z) in enumerate(package["Ra"]):
+                    f.write(f"{package['atom_type'][i]} {x} {y} {z}\n")
+        else:
+            raise ValueError(f"Invalid package: {package}")
         return input_file
     
     def invoke_qm(self, input_file: Path):

@@ -1,34 +1,40 @@
 Datahub:
-  data_path: "/my/dataset.pkl"              # path to dataset: pickle, npz or hdf5
-  data_format: pickle                       # pickle, npz or hdf5
-                                            # features and targets' key mappings which map standard data field name in enerzyme to the data field name in your dataset
-                                            # atomic quantities always end with "a" in standard field names
-                                            # if some your name is exactly the same as the standard name, just leave the mapping value empty
-  features:
-    Ra: coord                               # atomic positions, shape [Nframe, Natom, 3] (required)
-    Za: atom_type                           # atomic numbers or symbols (will be automatically converted to numbers), shape [Nframe, Natom] (required)
-    Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
-    N: null                                 # total atom counts, shape [Nframe] 
-                                            # if not provided, will be infered from Za
-                                            # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
-  targets:
-    E: energy                               # total energy, shape [Nframe]
-    Fa: grad                                # atomic forces, shape [Nframe, Natom, 3]
-    Qa: chrg                                # atomic charges, shape [Nframe, Natom]
-    Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
-    M2: dipole                              # total dipole moment, shape [Nframe, 3]
-  preload: false                            # load the processed data from the dump directory
-  neighbor_list: full                       # neighbor list building algorithm:
-                                            # full: all atom pairs are neighbors
-                                            # if left as blank, full neighbor lists will be calculated on-the-fly with the model
-  compressed: true                          # compress the integer fields to one datapoint if all-the-same in the dataset
-                                            # e.g. for configurations of the same molecule, Za, neighbor_list, N will be compressed
-  max_memory: 10                            # maximum memory (in GB) used as cache for reading hdf5 dataset
-  transforms:
-    atomic_energy: "/my/atomic/energy.csv"  # path to store atomic_energy with columns atom_type and atomic_energy
-                                            # summation of atomic reference energies in each frame will be deducted from the total energy
-    negative_gradient: true                 # flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
-    total_energy_normalization: false       # normalize the total energy globally by substract the mean and divide the standard deviation
+  fields:                                       # new data fields to be registered beyond what are listed below
+    Qa_xTB:                                     # new data field name
+      is_atomic: true                           # if the data field is an atomic feature. This is the only supported type for now.
+  datasets:                                     # Dictionary of datasets
+    my_dataset_1:                               # dataset key
+      data_path: "/my/dataset.pkl"              # path to dataset: pickle, npz or hdf5
+      data_format: pickle                       # pickle, npz or hdf5
+                                                # features and targets' key mappings which map standard data field name in enerzyme to the data field name in your dataset
+                                                # atomic quantities always end with "a" in standard field names
+                                                # if some your name is exactly the same as the standard name, just leave the mapping value empty
+      features:
+        Ra: coord                               # atomic positions, shape [Nframe, Natom, 3] (required)
+        Za: atom_type                           # atomic numbers or symbols (will be automatically converted to numbers), shape [Nframe, Natom] (required)
+        Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
+        N: null                                 # total atom counts, shape [Nframe] 
+                                                # if not provided, will be infered from Za
+                                                # if provided, other atomic properties can be padded to the same length and truncated to the atom count when reading
+        Qa_xTB: xtb_chrg                        # Then you can use the newly registered data field "Qa_xTB" in the datahub as a feature
+      targets:
+        E: energy                               # total energy, shape [Nframe]
+        Fa: grad                                # atomic forces, shape [Nframe, Natom, 3]
+        Qa: chrg                                # atomic charges, shape [Nframe, Natom]
+        Q: null                                 # total charges, shape [Nframe]. If not provided, 0 is assumed for each frame
+        M2: dipole                              # total dipole moment, shape [Nframe, 3]
+      preload: false                            # load the processed data from the dump directory
+      neighbor_list: full                       # neighbor list building algorithm:
+                                                # full: all atom pairs are neighbors
+                                                # if left as blank, full neighbor lists will be calculated on-the-fly with the model
+      compressed: true                          # compress the integer fields to one datapoint if all-the-same in the dataset
+                                                # e.g. for configurations of the same molecule, Za, neighbor_list, N will be compressed
+      max_memory: 10                            # maximum memory (in GB) used as cache for reading hdf5 dataset
+      transforms:
+        atomic_energy: "/my/atomic/energy.csv"  # path to store atomic_energy with columns atom_type and atomic_energy
+                                                # summation of atomic reference energies in each frame will be deducted from the total energy
+        negative_gradient: true                 # flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
+        total_energy_normalization: false       # normalize the total energy globally by substract the mean and divide the standard deviation
 Modelhub:
   internal_FFs:                             # force fields built in enerzyme
     FF01:                                   # force field ID
@@ -77,6 +83,19 @@ Modelhub:
             init_width_flavor: PhysNet      # widths initialization flavor, PhysNet or SpookyNet
         - name: RandomAtomEmbedding         # random embedding based on the atomic number
                                             # dim_embedding, max_Za in build_params
+        - name: ScalarDenseEmbedding        # a dense embedding (perceptron or linear layer) of a scalar feature
+          params:                           # dim_embedding in build_params
+            embed_field: Qa_xTB             # the field to be embedded
+            activation_fn: swish            # activation function type: swish (as a perceptron) or None (as a linear layer)
+            activation_params:
+              dim_feature: 1                # dimension of features passing through the activation function, 1 is compatible with any shape of features
+              initial_alpha: 1              # initial scaling parameter
+              initial_beta: 1               # initial temperature parameter
+              learnable: false              # learnable scaling and temperature parameter
+            initial_weight: orthogonal    # initial weight initialization flavor, orthogonal, xavier_uniform
+            initial_bias: zero            # initial bias initialization flavor, zero
+            use_bias: true                # if bias is used
+        - name: GatherAtomEmbedding         # gather atom embeddings to a single atom embedding
         - name: Core                        # physNet Core
           params:                           # dim_embedding, num_rbf in build_params
             num_blocks: 5                   # number of interaction blocks and output blocks to accumulate atomic properties
@@ -85,10 +104,10 @@ Modelhub:
             num_residual_output: 1          # number of residual layers in the output block
             activation_fn: shifted_softplus # activation function type: shifted_softplus or swiss
             activation_params:
-              dim_feature: 1                # dimension of features passing through the activation function, 1 is compatible with any shape of features
-              initial_alpha: 1              # initial scaling parameter
-              initial_beta: 1               # initial temperature parameter
-              learnable: false              # learnable scaling and temperature parameter
+              dim_feature: 1                
+              initial_alpha: 1              
+              initial_beta: 1               
+              learnable: false              
             dropout_rate: 0.0               # dropout rate of all dropout layers
         - name: AtomicAffine                # scale and shift raw atomic prediction
           params:                           # max_Za in build_params
@@ -166,6 +185,23 @@ Modelhub:
           params:
             num_residual: 1
             attribute: spin
+        - name: ScalarResidualMLPEmbedding  # a residual MLP of an atomicscalar feature
+          params:                           # dim_embedding in build_params
+            embed_field: Qa_xTB             
+            activation_fn: swish            # activation function type: swish (as a perceptron) or None (as a linear layer)
+            activation_params:
+              dim_feature: 1                # dimension of features passing through the activation function, 1 is compatible with any shape of features
+              initial_alpha: 1              # initial scaling parameter
+              initial_beta: 1               # initial temperature parameter
+            learnable: false                # learnable scaling and temperature parameter
+            initial_weight1: orthogonal     # initial weight initialization flavor for the first linear layer in each residual block
+            initial_weight2: orthogonal     # initial weight initialization flavor for the second linear layer in each residual block
+            initial_weight_out: orthogonal  # initial weight initialization flavor for the output linear layer
+            initial_bias_residual: zero     # initial bias initialization flavor for residual blocks
+            initial_bias_out: zero          # initial bias initialization flavor for the output linear layer
+            use_bias_residual: true         # if bias is used in residual blocks
+            use_bias_out: true              # if bias is used in the output layer
+            use_residual: true              # if residual connections are used
         - name: Core                        # SpookyNet Core
           params:                           # dim_embedding, num_rbf, activation_fn in build_params
             num_modules: 3                  # number of modules (iterations) for constructing atomic features
@@ -278,57 +314,57 @@ Modelhub:
         max_Za: 86
         cutoff_fn: polynomial
       layers:
-      - name: RangeSeparation # cutoff_sr, cutoff_fn in build_params
-      - name: BesselRBF # cutoff_sr, cutoff_fn in build_params
-        params: 
-          trainable: false
-      - name: NuclearEmbedding
-        params: # max_Za, dim_embedding in build_params
-          zero_init: false
-          use_electron_config: true
-      - name: ElectronicEmbedding
-        params: # dim_embedding, activation_fn in build_params
-          num_residual: 1
-          attribute: charge
-      - name: ElectronicEmbedding
-        params:
-          num_residual: 1
-          attribute: spin
-      - name: Core # max_Za, num_rbf, dim_embedding in build_params
-        params: 
-          max_ell: 3
-          additional_hidden_irreps: 128x1o
-          interaction_cls_first: RealAgnosticResidualInteractionBlock
-          interaction_cls: RealAgnosticResidualInteractionBlock
-          correlation: 3
-          num_interactions: 2
-          avg_num_neighbors: 8.0
-          MLP_irreps: 16x0e
-          radial_MLP: [64, 64, 64]
-          gate: silu
-      - name: AtomicAffine
-        params:
-          scales:
-            Ea:
-              learnable: true
-              values: 1
-            Qa:
-              learnable: true
-              values: 1
-          shifts:
-            Ea:
-              learnable: true
-              values: 0
-            Qa:
-              learnable: true
-              values: 0
-      - name: ChargeConservation
-      - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
-        params:
-          flavor: PhysNet
-      - name: AtomicCharge2Dipole
-      - name: EnergyReduce                # Reduce atomic energy terms to the total energy
-      - name: Force                       # Calculate the force from the total energy
+        - name: RangeSeparation # cutoff_sr, cutoff_fn in build_params
+        - name: BesselRBF # cutoff_sr, cutoff_fn in build_params
+          params: 
+            trainable: false
+        - name: NuclearEmbedding
+          params: # max_Za, dim_embedding in build_params
+            zero_init: false
+            use_electron_config: true
+        - name: ElectronicEmbedding
+          params: # dim_embedding, activation_fn in build_params
+            num_residual: 1
+            attribute: charge
+        - name: ElectronicEmbedding
+          params:
+            num_residual: 1
+            attribute: spin
+        - name: Core # max_Za, num_rbf, dim_embedding in build_params
+          params: 
+            max_ell: 3
+            additional_hidden_irreps: 128x1o
+            interaction_cls_first: RealAgnosticResidualInteractionBlock
+            interaction_cls: RealAgnosticResidualInteractionBlock
+            correlation: 3
+            num_interactions: 2
+            avg_num_neighbors: 8.0
+            MLP_irreps: 16x0e
+            radial_MLP: [64, 64, 64]
+            gate: silu
+        - name: AtomicAffine
+          params:
+            scales:
+              Ea:
+                learnable: true
+                values: 1
+              Qa:
+                learnable: true
+                values: 1
+            shifts:
+              Ea:
+                learnable: true
+                values: 0
+              Qa:
+                learnable: true
+                values: 0
+        - name: ChargeConservation
+        - name: ElectrostaticEnergy # Hartree_in_E, Bohr_in_R in build_params; cutoff_lr as default
+          params:
+            flavor: PhysNet
+        - name: AtomicCharge2Dipole
+        - name: EnergyReduce                # Reduce atomic energy terms to the total energy
+        - name: Force                       # Calculate the force from the total energy
       loss:
         mae:
           Fa: 52.917721
@@ -336,6 +372,63 @@ Modelhub:
           Q: 1
           Qa: 1
           E: 1
+    FF07:
+      suffix:
+      architecture: SchNet
+      active: true
+      loss:
+        rmse:
+          Fa: 52.917721
+          Qa: 1
+          E: 1
+          M2: 1.8897261
+          Q: 1
+      build_params:                        
+        dim_embedding: 128
+        num_rbf: 128
+        max_Za: 94
+        cutoff_sr: 5.0
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+      layers:
+        - name: RangeSeparation             
+        - name: GaussianSmearing            # Gaussian smearing radial basis function
+          params:                           # num_rbf, cutoff_sr in build_params
+            cuton: 0.0                      # cuton distance of the Gaussian smearing function
+        - name: RandomAtomEmbedding        
+        - name: Core                        # SchNet Core
+          params:                           # dim_embedding, num_rbf in build_params
+            num_interactions: 4             # number of interaction blocks
+            hidden_channels: 128            # dimension of hidden channels
+            activation_fn: shifted_softplus
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true         
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        - name: ElectrostaticEnergy
+          params:
+            flavor: PhysNet
+        - name: EnergyReduce
+        - name: Force
   external_FFs:
     FF05:
       suffix:
@@ -423,15 +516,19 @@ Modelhub:
 Trainer:
   Splitter:
     method: random                          # splitting method: random
-    parts:                                  # partition names, at least training and validation are needed
-      - training
-      - validation
-      - test
-    ratios:                                 # partition ratio (float in (0,1)) or the number of datapoints (int)
-                                            # order corresponds to the parts' order
-      - 0.7                                  
-      - 0.1                                  
-      - 0.2
+    parts:                                  # partitions, at least training and validation are needed
+      - name: training                      # each partition has a name and sources
+        sources:
+          - dataset: my_dataset_1           # using multiple datasets with its datahub key as sources
+            ratio: 0.7                      # with different ratios, the sum of ratios should be 1
+      - name: validation
+        sources:
+          - dataset: my_dataset_1
+          - ratio: 0.1
+      - name: test
+        sources:
+          - dataset: my_dataset_1
+          - ratio: 0.2
     preload: true                           # if saved splitting indices are loaded
     save: true                              # if splitting indices are saved
     seed: 114514                            # splitting random seed
@@ -469,6 +566,7 @@ Trainer:
                                             # 1: try to load model checkpoint (and ema state if available), last-first unless specified, resume epoch counting
                                             # 2: try to load model checkpoint (and ema state if available), last-first unless specified, resume scheduler, optimizer, epoch counting and earlystopping
   num_workers: -1                           # number of workers for dataloader, default -1 (automatically adjusted)
+  lightning: false                          # if true, use pytorch-lightning for training, which automatically handles multi-GPU training.
 Metric:                                     # metrics can be defined here as default metrics
                                             # if a metric configuration is defined under a specific model, it has precedence
   Qa:                                       # metric term

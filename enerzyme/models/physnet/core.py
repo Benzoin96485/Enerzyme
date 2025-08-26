@@ -89,12 +89,18 @@ class PhysNetCore(BaseFFCore):
 
     def build(self, built_layers: List[Module]) -> None:
         # build necessary fixed pre-core layers
-        calculate_distance = DistanceLayer()
-        calculate_distance.reset_field_name(Dij="Dij_lr")
-        self.pre_sequence.append(calculate_distance)
-
+        # TODO: make this more flexible
         pre_core = True
-        for layer in built_layers:
+        for i, layer in enumerate(built_layers):
+            if i == 0:
+                if isinstance(layer, DistanceLayer):
+                    layer.reset_field_name(Dij="Dij_lr")
+                    self.pre_sequence.append(layer)
+                else:
+                    calculate_distance = DistanceLayer()
+                    calculate_distance.reset_field_name(Dij="Dij_lr")
+                    self.pre_sequence.append(calculate_distance)
+            
             if layer is self:
                 pre_core = False
                 continue

@@ -8,7 +8,7 @@ from ..activation import get_activation_fn, ACTIVATION_PARAM_TYPE, ACTIVATION_KE
 from ..init import semi_orthogonal_glorot_weights
 
 
-INITIAL_WEIGHT_TYPE = Union[Tensor, ndarray, Literal["semi_orthogonal_glorot", "orthogonal", "zero"]]
+INITIAL_WEIGHT_TYPE = Union[Tensor, ndarray, Literal["semi_orthogonal_glorot", "orthogonal", "zero", "xavier_uniform"]]
 INITIAL_BIAS_TYPE = Union[Tensor, ndarray, Literal["zero"]]
 
 
@@ -53,6 +53,9 @@ class DenseLayer(NeuronLayer):
         elif initial_weight == "zero":
             self.weight = Parameter(torch.empty(dim_feature_out * shallow_ensemble_size, dim_feature_in))
             init.zeros_(self.weight)
+        elif initial_weight == "xavier_uniform":
+            self.weight = Parameter(torch.empty(dim_feature_out * shallow_ensemble_size, dim_feature_in))
+            init.xavier_uniform_(self.weight)
         else:
             if not isinstance(initial_weight, Tensor):
                 initial_weight = torch.tensor(initial_weight)
@@ -92,10 +95,11 @@ class ResidualLayer(NeuronLayer):
         initial_weight2: INITIAL_WEIGHT_TYPE="zero", 
         initial_bias: INITIAL_BIAS_TYPE="zero",
         dropout_rate: float=0,
-        use_bias: bool=True
+        use_bias: bool=True,
+        use_residual: bool=True
     ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
-        
+        self.use_residual = use_residual
         dropout = Dropout(dropout_rate)
         dense1 = DenseLayer(
             dim_feature_in=dim_feature_in, 
@@ -121,7 +125,10 @@ class ResidualLayer(NeuronLayer):
         
 
     def forward(self, x: Tensor) -> Tensor:
-        return x + self.residual(x)
+        if self.use_residual:
+            return x + self.residual(x)
+        else:
+            return self.residual(x)
     
 
 class ResidualStack(NeuronLayer):
@@ -135,7 +142,8 @@ class ResidualStack(NeuronLayer):
         initial_weight2: INITIAL_WEIGHT_TYPE="zero", 
         initial_bias: INITIAL_BIAS_TYPE="zero",
         dropout_rate: float=0,
-        use_bias: bool=True
+        use_bias: bool=True,
+        use_residual: bool=True
     ) -> None:
         super().__init__(dim_feature, dim_feature)
         self.num_residual = num_residual
@@ -143,7 +151,7 @@ class ResidualStack(NeuronLayer):
             dim_feature, dim_feature,
             activation_fn, activation_params,
             initial_weight1, initial_weight2, initial_bias,
-            dropout_rate, use_bias
+            dropout_rate, use_bias, use_residual=use_residual
         ) for _ in range(num_residual)))
 
     def forward(self, x: Tensor) -> Tensor:
@@ -165,14 +173,15 @@ class ResidualMLP(NeuronLayer):
         dropout_rate: float=0,
         use_bias_residual: bool=True,
         use_bias_out: bool=True,
-        shallow_ensemble_size: int=1
+        shallow_ensemble_size: int=1,
+        use_residual: bool=True
     ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
         self.stack = ResidualStack(
             dim_feature_in, num_residual, 
             activation_fn, activation_params,
             initial_weight1, initial_weight2, initial_bias_residual,
-            dropout_rate, use_bias_residual
+            dropout_rate, use_bias_residual, use_residual=use_residual
         )
         self.output = DenseLayer(
             dim_feature_in, dim_feature_out,
@@ -180,6 +189,7 @@ class ResidualMLP(NeuronLayer):
             use_bias=use_bias_out, 
             shallow_ensemble_size=shallow_ensemble_size
         )
+        self.num_residual = num_residual
 
     def forward(self, x: Tensor) -> Tensor:
         if self.activation_fn is None:
