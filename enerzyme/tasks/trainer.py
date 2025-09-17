@@ -35,7 +35,26 @@ DTYPE_MAPPING = {
 }
 
 
-def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> Dict:
+def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> None:
+    '''
+    Modify the patience of the EarlyStopping callback in the Lightning checkpoint.
+
+    .. danger::
+
+    This function should be only used in the world rank 0 during distributed training. Otherwise, the checkpoint will be corrupted.
+
+    Params:
+    ----------
+    lightning_ckpt_path: str
+        The path to the Lightning checkpoint.
+        
+    patience: int
+        The patience to set.
+
+    Returns:
+    ----------
+    None
+    '''
     loaded_info = torch.load(lightning_ckpt_path, map_location="cpu")
     if "callbacks" in loaded_info:
         for k, v in loaded_info["callbacks"].items():
@@ -43,6 +62,8 @@ def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> Dic
                 if 'patience' in v and v['patience'] < patience:
                     v['patience'] = patience
                     logger.info(f"increase patience of EarlyStopping to {patience}")
+                else:
+                    return
     torch.save(loaded_info, lightning_ckpt_path)
 
 
@@ -405,7 +426,11 @@ class Trainer:
             else:
                 valid_dataloader = None
             if self.resume > 1:
-                _modify_lightning_state_dict(pretrain_path, self.patience)
+                # if the world rank is 0, modify the state dict
+                if self.lightning_trainer.is_global_zero:
+                    _modify_lightning_state_dict(pretrain_path, self.patience)
+            if self.resume > 1 and pretrain_path is not None:
+                logger.info(f"Resuming from {pretrain_path}...")
             self.lightning_trainer.fit(lightning_model, train_dataloader, valid_dataloader, ckpt_path=pretrain_path if self.resume > 1 else None)
             
             if test_dataset is not None:

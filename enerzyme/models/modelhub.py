@@ -46,15 +46,38 @@ def path_resolve(path, target_preference: Literal["best", "last"]="best", target
     }
 
 
-def compare_path(path1, path2, preference: Literal["best", "last"]="best", model_rank: Optional[int]=None):
+def compare_path(path1, path2, preference: Literal["best", "last"]="best", model_rank: Optional[int]=None) -> int:
+    '''
+    Compare two paths in the order of
+
+    - preference: if the preference is "best", then the path of the best checkpoint is prioritized; otherwise, the path of the last checkpoint is prioritized.
+    - model_rank: explicit model rank is prioritized.
+    - version: latest version is prioritized.
+
+    Params:
+    ----------
+    path1: str
+        The first path to compare.
+    path2: str
+        The second path to compare.
+    preference: Literal["best", "last"]
+        The preference between the best checkpoint and the last checkpoint.
+    model_rank: Optional[int]
+        The model rank. Only used for deep ensemble to make sure that the model with the correct rank is selected.
+
+    Returns:
+    ----------
+    int
+        The difference between the two paths. When the difference is positive, path1 prioritized over path2.
+    '''
     path1_info = path_resolve(path1, preference, model_rank)
     path2_info = path_resolve(path2, preference, model_rank)
     if path1_info["preference"] != path2_info["preference"]:
-        return path1_info["preference"] > path2_info["preference"]
+        return path1_info["preference"] - path2_info["preference"]
     elif path1_info["model_rank"] != path2_info["model_rank"]:
-        return path1_info["model_rank"] > path2_info["model_rank"]
+        return path1_info["model_rank"] - path2_info["model_rank"]
     else:
-        return path1_info["version"] > path2_info["version"]
+        return path1_info["version"] - path2_info["version"]
     
 
 def get_pretrain_path(pretrain_path: Optional[str]=None, preference: Literal["best", "last"]="best", model_rank: Optional[int]=None):
