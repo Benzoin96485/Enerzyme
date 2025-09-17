@@ -5,7 +5,7 @@ import time, os, logging, contextlib
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader, Dataset
-from torch.optim import Adam, Optimizer
+from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.nn import Module
 from torch.nn.utils import clip_grad_norm_
@@ -20,6 +20,7 @@ import numpy as np
 from .splitter import Splitter
 from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input, _pyg_to_device
 from .monitor import Monitor
+from .optimizer import get_optimizer, get_optimizer_config
 from ..data.transform import Transform
 from ..utils import logger
 from .metrics import Metrics
@@ -34,7 +35,26 @@ DTYPE_MAPPING = {
 }
 
 
-def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> Dict:
+def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> None:
+    '''
+    Modify the patience of the EarlyStopping callback in the Lightning checkpoint.
+
+    .. danger::
+
+    This function should be only used in the world rank 0 during distributed training. Otherwise, the checkpoint will be corrupted.
+
+    Params:
+    ----------
+    lightning_ckpt_path: str
+        The path to the Lightning checkpoint.
+        
+    patience: int
+        The patience to set.
+
+    Returns:
+    ----------
+    None
+    '''
     loaded_info = torch.load(lightning_ckpt_path, map_location="cpu")
     if "callbacks" in loaded_info:
         for k, v in loaded_info["callbacks"].items():
@@ -42,6 +62,8 @@ def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> Dic
                 if 'patience' in v and v['patience'] < patience:
                     v['patience'] = patience
                     logger.info(f"increase patience of EarlyStopping to {patience}")
+                else:
+                    return
     torch.save(loaded_info, lightning_ckpt_path)
 
 
@@ -125,7 +147,22 @@ def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrai
 
 
 class Trainer:
-    def __init__(self, out_dir: str=None, metric_config: Metrics=dict(), **params) -> None:
+    def __init__(self, out_dir: str=None, metric_config: Dict=dict(), **params) -> None:
+        '''
+        The trainer class for training and evaluating the model.
+
+        Params:
+        ----------
+        out_dir: str
+            The directory to save the model.
+
+        metric_config: dict
+            The configuration for the :doc:`Metrics <enerzyme.tasks.metrics.Metrics>` class.
+
+        **params: dict
+            The configuration for the trainer.
+        
+        '''
         self.batch_size = params.get('batch_size', 8)
         self.pyg = params.get("pyg", False)
         self.lightning = params.get("lightning", False)
@@ -135,20 +172,18 @@ class Trainer:
         self.out_dir = out_dir
         self.metric_config = metric_config
         self.metrics = Metrics(metric_config)
+        self.optimizer_name, self.optimizer_hyper_params = get_optimizer_config(**params)
         self.splitter = Splitter(**params["Splitter"])
         if "Monitor" in params:
             self.monitor = Monitor(**params["Monitor"])
         else:
             self.monitor = None
         self.seed = params.get('seed', 114514)
-        self.learning_rate = float(params.get('learning_rate', 1e-3))
         self.inference_batch_size = params.get('inference_batch_size', self.batch_size)
         self.max_epochs = params.get('max_epochs', 1000)
         self.warmup_ratio = params.get('warmup_ratio', 0.01)
         self.cuda = params.get('cuda', False)
         self.schedule = params.get('schedule', "linear")
-        self.weight_decay = float(params.get('weight_decay', 0))
-        self.amsgrad = params.get('amsgrad', True)
         self.data_in_memory = params.get("data_in_memory", True)
         self.use_ema = params.get("use_ema", True)
         self.ema_decay = params.get("ema_decay", 0.999)
@@ -276,6 +311,64 @@ class Trainer:
         test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1,
         meta_state_dict: Dict=dict(), refresh_patience: bool=False, refresh_best_score: bool=False
     ) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
+        '''
+        Train the model on the training set, validate it on the validation set, and test the model on the test set.
+
+        Params:
+        ----------
+        model: Module
+            The model to train
+
+        pretrain_path: Optional[str]
+            The path to the pretrained model or the checkpoint of the model
+
+        train_dataset: Dataset
+            The training dataset.
+
+        valid_dataset: Optional[Dataset]
+            The validation dataset. If not provided, the model will not be validated.
+
+        loss_terms: Iterable[Callable]
+            The loss functions with multiple terms to use.
+
+        dump_dir: str
+            The directory to save the model
+
+        transform: Transform
+            The data transform in preprocessing. The inverse transform will be applied to the prediction results when calculating the metrics during validation and testing.
+
+        test_dataset: Optional[Dataset]
+            The test dataset. If not provided, the model will not be tested.
+
+        model_rank: Optional[int]
+            Only used in deep ensemble training. The rank of the model.
+
+        max_epoch_per_iter: int
+            Only used in active learning. The maximum number of epochs per active learning iteration.
+
+        meta_state_dict: Dict
+            Only used in active learning checkpointing. The meta state dictionary.
+
+        refresh_patience: bool
+            Whether to refresh the patience when loading the checkpoint.
+
+        refresh_best_score: bool
+            Whether to refresh the best score when loading the checkpoint.
+
+        Returns:
+        ----------
+        The prediction results on the test set. A dictionary with the following keys:
+
+        y_pred
+            The predicted results.
+
+        y_truth
+            The true results.
+            
+        metric_score
+            The metrics score based on the predicted and true results.
+
+        '''
         if self.refresh_best_score is not None:
             refresh_best_score = self.refresh_best_score
         if self.refresh_patience is not None:
@@ -295,8 +388,10 @@ class Trainer:
         else:
             num_training_steps = len(train_dataloader) * self.max_epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
-        optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay, amsgrad=self.amsgrad)
+
+        optimizer = get_optimizer(self.optimizer_name, model, self.optimizer_hyper_params)
         scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
+        
         if self.lightning:
             logger.info("Using Lightning Trainer")
             from .lightning_utils import LightningModel
@@ -331,7 +426,11 @@ class Trainer:
             else:
                 valid_dataloader = None
             if self.resume > 1:
-                _modify_lightning_state_dict(pretrain_path, self.patience)
+                # if the world rank is 0, modify the state dict
+                if self.lightning_trainer.is_global_zero:
+                    _modify_lightning_state_dict(pretrain_path, self.patience)
+            if self.resume > 1 and pretrain_path is not None:
+                logger.info(f"Resuming from {pretrain_path}...")
             self.lightning_trainer.fit(lightning_model, train_dataloader, valid_dataloader, ckpt_path=pretrain_path if self.resume > 1 else None)
             
             if test_dataset is not None:
