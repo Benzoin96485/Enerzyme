@@ -190,6 +190,7 @@ class Trainer:
         self.ema_use_num_updates = params.get("ema_use_num_updates", True)
         self.dtype = DTYPE_MAPPING[params.get('dtype', "float32")]
         self.committee_size = params.get("committee_size", 1)
+        self.dump_interval = params.get("dump_interval", -1)
         self.active_learning_params = params.get("active_learning_params", None)
         if self.active_learning_params is not None and self.active_learning_params.get("active", False):
             self.active_learning = True
@@ -403,7 +404,8 @@ class Trainer:
                 metrics=self.metrics,
                 use_ema=self.use_ema,
                 ema_decay=self.ema_decay,
-                ema_use_num_updates=self.ema_use_num_updates
+                ema_use_num_updates=self.ema_use_num_updates,
+                dump_interval=self.dump_interval
             )
             train_dataloader = DataLoader(
                 dataset=train_dataset,
@@ -593,6 +595,8 @@ class Trainer:
                 message += f', {(end_time - start_time):.1f}s'
                 logger.info(message)
                 self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, "last", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
+                if self.dump_interval > 0 and (epoch + 1) % self.dump_interval == 0:
+                    self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, f"epoch={epoch}", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
                 if is_early_stop:
                     break
 
