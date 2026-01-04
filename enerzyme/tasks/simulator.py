@@ -1,4 +1,6 @@
 import os.path as osp
+from typing import Dict, Optional
+from torch.nn import Module
 import numpy as np
 import ase
 import ase.io
@@ -7,75 +9,10 @@ from copy import copy
 from typing import Literal
 from functools import partial
 from ase.constraints import FixAtoms, FixBondLengths
-from ase.calculators.calculator import Calculator, all_changes
 from ase.units import Hartree, fs, kB, Bohr
-from ..data.neighbor_list import full_neighbor_list
+from ..data.transform import Transform
 from ..utils import logger
-from .trainer import DTYPE_MAPPING, _decorate_batch_output, _decorate_batch_input, _load_state_dict, _to_device
-
-class ASECalculator(Calculator):
-    implemented_properties = ["energy", "forces", "dipole", "charges"]
-
-    def __init__(
-        self,
-        model=None,
-        restart=None,
-        label=None,
-        atoms=None,
-        device=None,
-        dtype=None,
-        transform=None,
-        neighbor_list_type=None,
-        Hartree_in_E=1,
-        **params
-    ):
-        Calculator.__init__(
-            self, restart=restart, label=label, atoms=atoms, **params
-        )
-        self.model = model
-        self.N = 0
-        self.positions = None
-        self.device = device
-        self.pbc = np.array([False])
-        self.cell = None
-        self.cell_offsets = None
-        self.dtype = dtype
-        self.neighbor_list_type = neighbor_list_type
-        self.transform = transform
-        self.Hartree_in_E = Hartree_in_E
-
-    def calculate(self, atoms=None, properties=["energy", "forces", "dipole", "charges"], system_changes=all_changes):
-        Calculator.calculate(self, atoms, properties, system_changes)
-        features = {
-            "Q": self.parameters.charge,
-            "Ra": atoms.positions,
-            "Za": atoms.numbers,
-            "N": len(atoms)
-        }
-        if self.neighbor_list_type == "full":
-            idx_i, idx_j = full_neighbor_list(features["N"])
-            features["idx_i"] = idx_i
-            features["idx_j"] = idx_j
-            features["N_pair"] = len(idx_i)
-        net_input, _ = _decorate_batch_input(
-            batch=[(features, None)],
-            device=self.device,
-            dtype=self.dtype
-        )
-        net_input, _ = _to_device((net_input, {}), self.device)
-        net_output = self.model(net_input)
-        output, _ = _decorate_batch_output(
-            output=net_output,
-            features=net_input,
-            targets=None
-        )
-        self.transform.inverse_transform(output)
-        self.results["energy"] = output["E"][0] / self.Hartree_in_E * Hartree
-        self.results["forces"] = output["Fa"][0] / self.Hartree_in_E * Hartree
-        if "M2" in output:
-            self.results["dipole"] = output["M2"][0]
-        if "Qa" in output:
-            self.results["charges"] = output["Qa"][0]
+from .trainer import DTYPE_MAPPING, _load_state_dict
 
 
 def get_optimizer(
@@ -116,15 +53,19 @@ def get_optimizer(
 
 
 class Simulation:
-    def __init__(self, config, model, model_path, out_dir, transform):
+    def __init__(self, config: Dict, model: Module, model_path: str, out_dir: str, transform: Transform, patch_module: Optional[object]=None) -> None:
         self.environment = config.Simulation.environment
         self.task = config.Simulation.task
         self.structure_file = config.System.structure_file
         self.charge = config.System.charge
         self.multiplicity = config.System.multiplicity
         self.transform = transform
+        self.external_calculator_config = config.Simulation.get("external_calculator", dict())
+        self.uncertainty_calculator_config = config.Simulation.get("uncertainty_calculator", None)
+        self.internal_calculator_weight = config.Simulation.get("internal_calculator_weight", 1.0)
         self.idx_start_from = config.Simulation.get("idx_start_from", 1)
         self.integrate_config = config.Simulation.get("integrate", None)
+        self.initialize_config = config.Simulation.get("initialize", None)
         self.constraint_config = config.Simulation.get("constraint", None)
         self.sampling_config = config.Simulation.get("sampling", None)
         self.optimize_config = config.Simulation.get("optimize", None)
@@ -140,23 +81,38 @@ class Simulation:
         self.model.eval()
         self.calculator = None
         self.out_dir = out_dir
-        # self.simulation_config = {k: (v.to_dict() if hasattr(v, "to_dict") else v) for k, v in config.Simulation.items() if not hasattr(self, k)}
-        # initialize
+        self.patch_module = patch_module
         getattr(self, f"_init_{self.environment}_env")()
 
     def _init_ase_env(self):
+        from .calculator import ASECalculator
         self.initial_structures = ase.io.read(self.structure_file, ":")
+        for atoms in self.initial_structures:
+            atoms.info.update({"spin": self.multiplicity, "charge": self.charge})
         self.systems = self.initial_structures.copy()
         self.system = self.systems[-1]
+        if self.patch_module is not None:
+            external_calculator_name = self.external_calculator_config.get("name", None)
+            if external_calculator_name is not None:
+                if hasattr(self.patch_module, external_calculator_name):
+                    self.external_calculator = getattr(self.patch_module, external_calculator_name)
+                else:
+                    raise ValueError(f"External calculator {external_calculator_name} not found in {self.patch_module}")
+            else:
+                raise ValueError(f"External calculator name not specified!")
+            logger.info(f"Initialized external calculator: {external_calculator_name}")
+        else:
+            self.external_calculator = None
         self.calculator = ASECalculator(
             model=self.model,
-            charge=self.charge,
-            magmom=self.multiplicity - 1,
             device=self.device,
             dtype=self.dtype,
             neighbor_list_type=self.neighbor_list_type,
             transform=self.transform,
-            #**self.simulation_config
+            internal_calculator_weight=self.internal_calculator_weight,
+            external_calculator=self.external_calculator,
+            external_calculator_config=self.external_calculator_config,
+            uncertainty_calculator_config=self.uncertainty_calculator_config
         )
         if self.constraint_config is not None:
             self.constraints = []
@@ -168,7 +124,6 @@ class Simulation:
         for system in self.systems:
             system.calc = copy(self.calculator)
             system.set_constraint(self.constraints)
-            
 
     def _run_sp(self):
         for system in self.systems:
@@ -188,7 +143,6 @@ class Simulation:
         ase.io.write(osp.join(self.out_dir, f"optim.xyz"), self.system, append=True)
         logger.info(f"Final energy: {self.system.get_potential_energy()}")
 
-                
     def _run_scan(self):
         if self.sampling_config.cv == "distance":
             i0 = self.sampling_config.params.i0 - self.idx_start_from
@@ -228,7 +182,13 @@ class Simulation:
             dyn.attach(write_xyz, interval=self.log_interval, atoms=self.system) 
         return dyn
 
+    def _md_initialize(self):
+        from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+        MaxwellBoltzmannDistribution(self.system, temperature_K=self.initialize_config.get("temperature_in_K", self.integrate_config.temperature_in_K))
+
     def _run_md(self) -> None:
+        if self.initialize_config is not None:
+            self._md_initialize()
         dyn = self._get_integrator(traj_file="md.traj.xyz")
         dyn.run(self.integrate_config.n_step)
 
@@ -332,7 +292,6 @@ class Simulation:
             logger.info(f"CI-NEB barrier: {barrier}, dE: {dE}")
             ase.io.write(osp.join(self.out_dir, f"ci-neb.xyz"), images, append=False)
 
-        
     def _run_plumed(self):
         plumed_setup = self.sampling_config.params.plumed_setup
         from ase.calculators.plumed import Plumed
@@ -343,6 +302,8 @@ class Simulation:
             log=osp.join(self.out_dir, "plumed.log"),
             restart=False
         )
+        if self.initialize_config is not None:
+            self._md_initialize()
         dyn = self._get_integrator(traj_file="plumed.traj.xyz")
         dyn.run(self.integrate_config.n_step)
 

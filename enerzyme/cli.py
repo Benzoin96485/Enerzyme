@@ -38,13 +38,15 @@ def get_parser():
         help="simulate molecules with machine learning force fields",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_simulate.add_argument('-c', '--config_path', type=str, default='', 
+    parser_simulate.add_argument('-c', '--config_path', type=str, required=True, 
         help='simulation config'
     )
     parser_simulate.add_argument('-m', '--model_dir', type=str,
-                    help='the directory of models')
-    parser_simulate.add_argument('-o', '--output_dir', type=str, default='../results',
-        help='the output directory for saving artifact')
+                    help='the directory of models', default=".")
+    parser_simulate.add_argument('-o', '--output_dir', type=str, default='.',
+        help='the output directory for saving artifacts')
+    parser_simulate.add_argument('-p', '--patch', type=str, default=None,
+        help='the external calculator patch path')
     
     parser_extract = subparsers.add_parser(
         "extract",
@@ -175,7 +177,8 @@ def simulate(args):
     molsimulate = FFSimulate(
         model_dir=args.model_dir,
         config_path=args.config_path,
-        out_dir=args.output_dir
+        out_dir=args.output_dir,
+        patch=args.patch
     )
     molsimulate.run()
 

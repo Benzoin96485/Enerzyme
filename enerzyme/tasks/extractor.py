@@ -262,7 +262,6 @@ class Extractor:
             submol_indices = []
             for i in range(0, len(sorted_atom_idx), self.n_centers):
                 submol, atom_map = extract_submol_with_center(reference_mol, sorted_atom_idx[i: i + self.n_centers], self.fragment_radius, dual_topology)
-                print(atom_map.keys())
                 dup_flag = False
                 for submol_index in submol_indices:
                     if atom_map.keys() == submol_index:

@@ -107,6 +107,7 @@ class SpookyNetCore(BaseFFCore):
         self.module_keep_prob = 1 - dropout_rate
         self.calculate_distance: DistanceLayer = None
         self.range_separation: RangeSeparationLayer = None
+        self.shallow_ensemble_size = shallow_ensemble_size
 
     def build(self, built_layers: List[Module]) -> None:
         # build necessary fixed pre-core layers
