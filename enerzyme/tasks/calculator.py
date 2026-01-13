@@ -53,7 +53,6 @@ class ASECalculator(Calculator):
 
     def _calculate_UDD(self, output: Dict[str, Any], A: float, B: float, NM: Optional[int]=None) -> Dict[str, Any]:
         results, biases = dict(), dict()
-        NA = output["Fa"][0].shape[0]
         
         if "E_var_grad" in output:
             E_var = output["E_var"][0]
@@ -70,7 +69,7 @@ class ASECalculator(Calculator):
             F_dev = output["Fa"][0] - F_mean # shape: (NA, 3, NM)
             E_var_grad = -np.sum(F_dev * E_dev, axis=-1) # shape: (NA, 3)
 
-        scale = 1 / (NA * NM * B)
+        scale = 1 / (2 * NM * B)
         neg_scaled_var = -E_var * scale
         exp_neg_scaled_var = np.exp(neg_scaled_var)
         E_bias = A * (exp_neg_scaled_var - 1)

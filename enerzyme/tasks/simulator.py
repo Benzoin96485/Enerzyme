@@ -7,8 +7,9 @@ import ase.io
 import torch
 from copy import copy
 from typing import Literal
+from itertools import combinations
 from functools import partial
-from ase.constraints import FixAtoms, FixBondLengths
+from ase.constraints import FixBondLengths
 from ase.units import Hartree, fs, kB, Bohr
 from ..data.transform import Transform
 from ..utils import logger
@@ -53,7 +54,7 @@ def get_optimizer(
 
 
 class Simulation:
-    def __init__(self, config: Dict, model: Module, model_path: str, out_dir: str, transform: Transform, patch_module: Optional[object]=None) -> None:
+    def __init__(self, config: Dict, model: Module, model_path: str, out_dir: str, transform: Transform, calculator_patch_module: Optional[object]=None, plumed_patch_module: Optional[object]=None) -> None:
         self.environment = config.Simulation.environment
         self.task = config.Simulation.task
         self.structure_file = config.System.structure_file
@@ -62,6 +63,7 @@ class Simulation:
         self.transform = transform
         self.external_calculator_config = config.Simulation.get("external_calculator", dict())
         self.uncertainty_calculator_config = config.Simulation.get("uncertainty_calculator", None)
+        self.plumed_config_generator_config = config.Simulation.get("plumed_config_generator", None)
         self.internal_calculator_weight = config.Simulation.get("internal_calculator_weight", 1.0)
         self.idx_start_from = config.Simulation.get("idx_start_from", 1)
         self.integrate_config = config.Simulation.get("integrate", None)
@@ -81,7 +83,8 @@ class Simulation:
         self.model.eval()
         self.calculator = None
         self.out_dir = out_dir
-        self.patch_module = patch_module
+        self.calculator_patch_module = calculator_patch_module
+        self.plumed_patch_module = plumed_patch_module
         getattr(self, f"_init_{self.environment}_env")()
 
     def _init_ase_env(self):
@@ -91,13 +94,13 @@ class Simulation:
             atoms.info.update({"spin": self.multiplicity, "charge": self.charge})
         self.systems = self.initial_structures.copy()
         self.system = self.systems[-1]
-        if self.patch_module is not None:
+        if self.calculator_patch_module is not None:
             external_calculator_name = self.external_calculator_config.get("name", None)
             if external_calculator_name is not None:
-                if hasattr(self.patch_module, external_calculator_name):
-                    self.external_calculator = getattr(self.patch_module, external_calculator_name)
+                if hasattr(self.calculator_patch_module, external_calculator_name):
+                    self.external_calculator = getattr(self.calculator_patch_module, external_calculator_name)
                 else:
-                    raise ValueError(f"External calculator {external_calculator_name} not found in {self.patch_module}")
+                    raise ValueError(f"External calculator {external_calculator_name} not found in {self.calculator_patch_module}")
             else:
                 raise ValueError(f"External calculator name not specified!")
             logger.info(f"Initialized external calculator: {external_calculator_name}")
@@ -118,8 +121,18 @@ class Simulation:
             self.constraints = []
             for k, v in self.constraint_config.items():
                 if k == "fix_atom":
+                    from ase.constraints import FixAtoms
                     c = FixAtoms(indices=[idx - self.idx_start_from for idx in v.indices])
                     self.constraints.append(c)
+                elif k == "Hookean_allpairs":
+                    from ase.constraints import Hookean
+                    c = [
+                        Hookean(i, j, 
+                            k=v.k * Hartree / self.calculator.Hartree_in_E,
+                            rt=self.system.get_distance(i - self.idx_start_from, j - self.idx_start_from)
+                        ) for i, j in combinations(v.indices, 2)
+                    ]
+                    self.constraints.extend(c)
 
         for system in self.systems:
             system.calc = copy(self.calculator)
@@ -178,7 +191,9 @@ class Simulation:
                 loginterval=self.log_interval
             )
             def write_xyz(atoms=None):
-                ase.io.write(osp.join(self.out_dir, traj_file), atoms, append=True)
+                write_atoms = atoms.copy()
+                write_atoms.constraints = []
+                ase.io.write(osp.join(self.out_dir, traj_file), write_atoms, append=True)
             dyn.attach(write_xyz, interval=self.log_interval, atoms=self.system) 
         return dyn
 
@@ -293,9 +308,28 @@ class Simulation:
             ase.io.write(osp.join(self.out_dir, f"ci-neb.xyz"), images, append=False)
 
     def _run_plumed(self):
-        plumed_setup = self.sampling_config.params.plumed_setup
+        if self.plumed_patch_module is not None:
+            plumed_config_generator_name = self.plumed_config_generator_config.get("name", None)
+            if plumed_config_generator_name is not None:
+                if hasattr(self.plumed_patch_module, plumed_config_generator_name):
+                    self.plumed_config_generator = getattr(self.plumed_patch_module, plumed_config_generator_name)
+                else:
+                    raise ValueError(f"Plumed config generator {plumed_config_generator_name} not found in {self.plumed_patch_module}")
+            else:
+                raise ValueError(f"Plumed config generator name not specified!")
+            logger.info(f"Initialized plumed config generator: {plumed_config_generator_name}")
+            plumed_config = self.plumed_config_generator(
+                self.system, 
+                integrate_config=self.integrate_config,
+                idx_start_from=self.idx_start_from,
+                **self.sampling_config.params.plumed_config
+            )
+            with open(osp.join(self.out_dir, "plumed.dat"), "w") as f:
+                f.writelines([line + "\n" for line in plumed_config])
+        else:
+            plumed_config = self.sampling_config.params.plumed_config
         from ase.calculators.plumed import Plumed
-        plumed_calc = Plumed(self.calculator, plumed_setup, 
+        plumed_calc = Plumed(self.calculator, plumed_config, 
             timestep=self.integrate_config.time_step * fs / self.fs_in_t,
             atoms=self.system,
             kT=self.integrate_config.temperature_in_K * kB,
