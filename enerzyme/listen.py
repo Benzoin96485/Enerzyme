@@ -1,5 +1,6 @@
 import os
 import time
+from typing import Optional
 from flask import Flask, request, jsonify
 import waitress
 import logging
@@ -13,12 +14,12 @@ app = Flask("enerzyme")
 _ff_listen_instance = None
 
 class FFListen:
-    def __init__(self, config_path=str, model_dir=str, out_dir=str, bind=str):
+    def __init__(self, config_path=str, model_dir=str, out_dir=str, bind=str, model_config_path: Optional[str] = None):
         self.model_dir = model_dir
         self.config = YamlHandler(config_path).read_yaml()
         self.out_dir = out_dir
         self.servers = dict()
-        model_config_path = os.path.join(self.model_dir, 'config.yaml')
+        model_config_path = os.path.join(self.model_dir, 'config.yaml') if model_config_path is None else model_config_path
         model_config = YamlHandler(model_config_path).read_yaml()
         logger.info('Model Config: {}'.format(model_config))
         self.transform = Transform(model_config.Datahub.get("global_transforms", model_config.Datahub.get("transforms", None)), simulation_mode=True)

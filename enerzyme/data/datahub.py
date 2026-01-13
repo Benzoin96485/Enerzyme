@@ -374,13 +374,13 @@ class DataHub:
         if datasets is None:
             if "global_transforms" not in params:
                 params["global_transforms"] = params.get("transforms", None)
-            self.datahubs = {"default": SingleDataHub(**params)}
+            self.datahubs = {"default": SingleDataHub(dump_dir=dump_dir, **params)}
         elif isinstance(datasets, list):
-            self.datahubs = {str(i): SingleDataHub(global_transforms=params.get("global_transforms", None), **dataset_params) for i, dataset_params in enumerate(datasets)}
+            self.datahubs = {str(i): SingleDataHub(dump_dir=dump_dir, global_transforms=params.get("global_transforms", None), **dataset_params) for i, dataset_params in enumerate(datasets)}
         elif isinstance(datasets, dict):
-            self.datahubs = {name: SingleDataHub(global_transforms=params.get("global_transforms", None), **dataset_params) for name, dataset_params in datasets.items()}
+            self.datahubs = {name: SingleDataHub(dump_dir=dump_dir, global_transforms=params.get("global_transforms", None), **dataset_params) for name, dataset_params in datasets.items()}
         else:
-            raise ValueError(f"Unknown type of datasets: {type(datasets)}")\
+            raise ValueError(f"Unknown type of datasets: {type(datasets)}")
             
     @property
     def features(self) -> Dict[str, FieldDataset]:

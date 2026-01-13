@@ -427,11 +427,10 @@ class Trainer:
                 )
             else:
                 valid_dataloader = None
-            if self.resume > 1:
+            if self.resume > 1 and pretrain_path is not None:
                 # if the world rank is 0, modify the state dict
                 if self.lightning_trainer.is_global_zero:
                     _modify_lightning_state_dict(pretrain_path, self.patience)
-            if self.resume > 1 and pretrain_path is not None:
                 logger.info(f"Resuming from {pretrain_path}...")
             self.lightning_trainer.fit(lightning_model, train_dataloader, valid_dataloader, ckpt_path=pretrain_path if self.resume > 1 else None)
             

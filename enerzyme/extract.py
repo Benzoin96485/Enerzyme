@@ -1,3 +1,4 @@
+from typing import Optional
 from .predict import FFPredict
 from .tasks.extractor import Extractor
 from .utils import YamlHandler

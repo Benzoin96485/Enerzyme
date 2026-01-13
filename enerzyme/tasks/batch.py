@@ -3,7 +3,7 @@ import torch
 from torch import Tensor
 from torch_geometric.data import Data, Batch
 import numpy as np
-from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, is_target_uq, get_tensor_rank
+from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, is_target_uq, get_tensor_rank, is_grad
 from ..data.neighbor_list import full_neighbor_list
 
 
@@ -138,6 +138,8 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
                 y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
             else:
                 y_pred[k] = v.detach().cpu().numpy()
+        elif is_grad(k):
+            y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
     for k in non_target_features:
         if k in y_pred:
             continue

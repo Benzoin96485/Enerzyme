@@ -8,20 +8,25 @@ from .models import ModelHub
 from .models import BaseFFLauncher
 
 class FFPredict:
-    def __init__(self, model_dir: str, output_dir: str, config_path: Optional[str] = None) -> None:
+    def __init__(self, model_dir: str, output_dir: str, config_path: Optional[str] = None, model_config_path: Optional[str] = None, simple_predict: bool=False) -> None:
         self.model_dir = model_dir
-        self.output_dir = model_dir if output_dir is None else model_dir
+        self.output_dir = model_dir if output_dir is None else output_dir
         self.new_data = True
+        self.simple_predict = simple_predict
 
-        model_config_path = os.path.join(model_dir, 'config.yaml')
+        model_config_path = os.path.join(model_dir, 'config.yaml') if model_config_path is None else model_config_path
         config = YamlHandler(model_config_path).read_yaml()
         new_config = YamlHandler(config_path).read_yaml()
         if config_path is not None:
             new_datahub_config = new_config.get("Datahub", dict())
             if new_datahub_config:
+                if "datasets" in config.Datahub and "datasets" not in new_datahub_config:
+                    config.Datahub.pop("datasets")
                 for k, v in new_datahub_config.items():
-                    if k not in ["transforms", "neighbor_list"]:
+                    if k not in ["transforms", "neighbor_list", "global_transforms"]:
                         config.Datahub[k] = v
+                if "targets" not in new_datahub_config:
+                    config.Datahub.pop("targets")
             else:
                 self.new_data = False
             new_metric_config = new_config.get("Metric", dict())
@@ -56,6 +61,9 @@ class FFPredict:
         self.metrics = self.trainer.metrics
 
     def predict(self) -> None:
+        if self.simple_predict:
+            return self._simple_predict(non_target_features=self.trainer.non_target_features, save=True)
+        
         FFs: Dict[str, BaseFFLauncher] = self.modelhub.models.get('FF', dict())
         metrics = []
         for ff_name, ff in FFs.items():

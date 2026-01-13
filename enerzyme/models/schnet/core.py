@@ -80,6 +80,7 @@ class SchNetCore(BaseFFCore):
         self.lin1 = Linear(hidden_channels, hidden_channels // 2)
         self.act = get_activation_fn(activation_fn, activation_params)
         self.lin2 = DenseLayer(hidden_channels // 2, 2, initial_weight="xavier_uniform", initial_bias="zero", shallow_ensemble_size=shallow_ensemble_size)
+        self.shallow_ensemble_size = shallow_ensemble_size
         self.reset_parameters()
 
     def __str__(self) -> str:

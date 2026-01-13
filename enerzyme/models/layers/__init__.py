@@ -8,7 +8,7 @@ from .rbf import (
 from .atom_embedding import BaseAtomEmbedding, RandomAtomEmbedding, NuclearEmbedding
 from .electron_embedding import BaseElectronEmbedding, ElectronicEmbedding
 from .electrostatics import ElectrostaticEnergyLayer, ChargeConservationLayer, AtomicCharge2DipoleLayer
-from .gradient import ForceLayer
+from .gradient import ForceLayer, EnergyVarianceGradientLayer
 from .reduce import EnergyReduceLayer, ShallowEnsembleReduceLayer
 from .denormalize import AtomicAffineLayer
 from .dispersion import GrimmeD3EnergyLayer, GrimmeD4EnergyLayer

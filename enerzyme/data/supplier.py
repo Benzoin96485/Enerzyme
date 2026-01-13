@@ -10,17 +10,35 @@ class Supplier(ABC):
     def __init__(self, supplying_fields: List[str]=["atom_type", "Ra", "Q", "mol"]):
         self.supplying_fields = set(supplying_fields)
         self.field_to_value = {
-            "atom_type": lambda mol: np.array([atom.GetSymbol() for atom in mol.GetAtoms()]),
-            "Ra": lambda mol: np.array(mol.GetConformer().GetPositions()),
-            "Q": lambda mol: Chem.GetFormalCharge(mol),
-            "mol": lambda mol: mol,
-            "Za": lambda mol: np.array([atom.GetAtomicNum() for atom in mol.GetAtoms()]),
-            "N": lambda mol: mol.GetNumAtoms(),
+            "atom_type": self._get_atom_type,
+            "Ra": self._get_coord,
+            "Q": self._get_charge,
+            "mol": self._get_mol,
+            "Za": self._get_nuclear_charge,
+            "N": self._get_num_atoms,
         }
 
     @abstractmethod
     def suppl(self) -> Iterator[Dict[str, Any]]:
         ...
+
+    def _get_atom_type(self, mol: Chem.Mol) -> np.ndarray:
+        return np.array([atom.GetSymbol() for atom in mol.GetAtoms()])
+
+    def _get_coord(self, mol: Chem.Mol) -> np.ndarray:
+        return np.array(mol.GetConformer().GetPositions())
+
+    def _get_charge(self, mol: Chem.Mol) -> int:
+        return Chem.GetFormalCharge(mol)
+    
+    def _get_num_atoms(self, mol: Chem.Mol) -> int:
+        return mol.GetNumAtoms()
+    
+    def _get_nuclear_charge(self, mol: Chem.Mol) -> np.ndarray:
+        return np.array([atom.GetAtomicNum() for atom in mol.GetAtoms()])
+    
+    def _get_mol(self, mol: Chem.Mol) -> Chem.Mol:
+        return mol
 
     def get_package(self, mol: Chem.Mol) -> Dict[str, Any]:
         package = {}
