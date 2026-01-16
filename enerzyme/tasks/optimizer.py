@@ -1,6 +1,7 @@
 from typing import Literal, Dict, Any, Tuple
 import torch
 import torch.distributed as dist
+from ..utils import logger
 
 HYPER_PARAM_KEYS = {
     "Adam": {"learning_rate", "betas", "eps", "weight_decay", "amsgrad"},
@@ -180,40 +181,61 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
     '''
     if name == "Adam":
         from torch.optim import Adam
+        lr = hyper_params.get("learning_rate", 1e-3)
+        weight_decay = hyper_params.get("weight_decay", 0.0)
+        betas = hyper_params.get("betas", (0.9, 0.999))
+        eps = hyper_params.get("eps", 1e-6)
+        amsgrad = hyper_params.get("amsgrad", True)
         optimizer = Adam(
             model.parameters(), 
-            lr=hyper_params.get("learning_rate", 1e-3), 
-            betas=hyper_params.get("betas", (0.9, 0.999)),
-            eps=hyper_params.get("eps", 1e-6), 
-            weight_decay=hyper_params.get("weight_decay", 0.0),
-            amsgrad=hyper_params.get("amsgrad", True)
+            lr=lr, 
+            betas=betas,
+            eps=eps, 
+            weight_decay=weight_decay,
+            amsgrad=amsgrad
         )
+        logger.info(f"Using Adam optimizer with learning rate {lr}, weight decay {weight_decay}, betas {betas}, eps {eps}, and amsgrad {amsgrad}")
     elif name == "AdamW":
         from torch.optim import AdamW
+        lr = hyper_params.get("learning_rate", 1e-3)
+        weight_decay = hyper_params.get("weight_decay", 0.0)
+        betas = hyper_params.get("betas", (0.9, 0.999))
+        eps = hyper_params.get("eps", 1e-6)
+        amsgrad = hyper_params.get("amsgrad", True)
         optimizer = AdamW(
             model.parameters(), 
-            lr=hyper_params.get("learning_rate", 1e-3), 
-            betas=hyper_params.get("betas", (0.9, 0.999)),
-            eps=hyper_params.get("eps", 1e-6), 
-            weight_decay=hyper_params.get("weight_decay", 0.0), 
-            amsgrad=hyper_params.get("amsgrad", True)
+            lr=lr, 
+            betas=betas,
+            eps=eps, 
+            weight_decay=weight_decay, 
+            amsgrad=amsgrad
         )
+        logger.info(f"Using AdamW optimizer with learning rate {lr}, weight decay {weight_decay}, betas {betas}, eps {eps}, and amsgrad {amsgrad}")
     elif name == "CoRe":
         try:
             from core_optimizer import CoRe
         except ImportError:
             raise ImportError("CoRe optimizer is not installed. Please install it with `pip install core-optimizer`.")
+        lr = hyper_params.get("learning_rate", 1e-3)
+        step_sizes = hyper_params.get("step_sizes", (1e-6, 1.0))
+        etas = hyper_params.get("etas", (0.5, 1.2))
+        betas = hyper_params.get("betas", (0.45, 0.725, 500, 0.999))
+        eps = hyper_params.get("eps", 1e-8)
+        weight_decay = hyper_params.get("weight_decay", 0.1)
+        score_history = hyper_params.get("score_history", 500)
+        frozen = hyper_params.get("frozen", 0.1)
         optimizer = CoRe(
             model.parameters(), 
-            lr=hyper_params.get("learning_rate", 1e-3), 
-            step_sizes=hyper_params.get("step_sizes", (1e-6, 1.0)),
-            etas=hyper_params.get("etas", (0.5, 1.2)),
-            betas=hyper_params.get("betas", (0.45, 0.725, 500, 0.999)),
-            eps=hyper_params.get("eps", 1e-8),
-            weight_decay=hyper_params.get("weight_decay", 0.1),
-            score_history=hyper_params.get("score_history", 500),
-            frozen=hyper_params.get("frozen", 0.1)
+            lr=lr, 
+            step_sizes=step_sizes,
+            etas=etas,
+            betas=betas,
+            eps=eps,
+            weight_decay=weight_decay,
+            score_history=score_history,
+            frozen=frozen
         )
+        logger.info(f"Using CoRe optimizer with learning rate {lr}, step sizes {step_sizes}, etas {etas}, betas {betas}, eps {eps}, weight decay {weight_decay}, score history {score_history}, and frozen {frozen}")
     elif name == "Muon":
         try:
             if dist.is_initialized():
@@ -244,29 +266,38 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
                     hidden_weights.append(param)
                 else:
                     hidden_gains_biases.append(param)
+        muon_lr = hyper_params.get("muon_learning_rate", 
+            hyper_params.get("learning_rate", 1e-2)
+        )
+        muon_weight_decay = hyper_params.get("muon_weight_decay", 
+            hyper_params.get("weight_decay", 0.01)
+        )
+        aux_lr = hyper_params.get("aux_learning_rate", 
+            hyper_params.get("learning_rate", 3e-4)
+        )
+        aux_weight_decay = hyper_params.get("aux_weight_decay", 
+            hyper_params.get("weight_decay", 0.)
+        )
+        momentum = hyper_params.get("momentum", 0.95)
+        betas = hyper_params.get("betas", (0.9, 0.95))
+        eps = hyper_params.get("eps", 1e-10)
         param_groups = [
             {
                 "params": hidden_weights, "use_muon": True,
-                "lr": hyper_params.get("muon_learning_rate", 
-                    hyper_params.get("learning_rate", 1e-2)
-                ),
-                "weight_decay": hyper_params.get("muon_weight_decay", 
-                    hyper_params.get("weight_decay", 0.01)
-                ),
-                "momentum": hyper_params.get("momentum", 0.95)
+                "lr": muon_lr,
+                "weight_decay": muon_weight_decay,
+                "momentum": momentum
             },
             {
                 "params": hidden_gains_biases + nonhidden_params, "use_muon": False,
-                "lr": hyper_params.get("aux_learning_rate", 
-                    hyper_params.get("learning_rate", 3e-4)
-                ),
-                "weight_decay": hyper_params.get("aux_weight_decay", 
-                    hyper_params.get("weight_decay", 0.)
-                ),
-                "betas": hyper_params.get("betas", (0.9, 0.95)),
-                "eps": hyper_params.get("eps", 1e-10)
+                "lr": aux_lr,
+                "weight_decay": aux_weight_decay,
+                "betas": betas,
+                "eps": eps
             }
         ]
-        
+        logger.info(f"Using Muon optimizer with muon learning rate {muon_lr}, muon weight decay {muon_weight_decay}, aux learning rate {aux_lr}, aux weight decay {aux_weight_decay}, momentum {momentum}, betas {betas}, eps {eps}")
         optimizer = Muon(param_groups)
+    else:
+        raise ValueError(f"Optimizer {name} not supported.")
     return optimizer

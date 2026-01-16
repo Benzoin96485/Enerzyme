@@ -41,7 +41,10 @@ def extract_submol(original_mol: Mol, subidx: List[int], dual_topology: List[Tup
         # elif original_bond.GetBondType() == Chem.BondType.SINGLE and bondtype != Chem.BondType.SINGLE:
         #     changing_bond.SetBondType(bondtype)
     
-    overlap_pair_set = original_pair_set & dual_topology_pair_set
+    if len(dual_topology_pair_set) > 0:
+        overlap_pair_set = original_pair_set & dual_topology_pair_set
+    else:
+        overlap_pair_set = original_pair_set
 
     for bond in mol.GetBonds():
         # completely internal
@@ -148,7 +151,7 @@ def extract_submol(original_mol: Mol, subidx: List[int], dual_topology: List[Tup
     return submol, atom_map
 
 
-def extract_submol_with_center(mol: Mol, center_atom_indices: List[int], radius: float=5, dual_topology: List[Tuple[int, int, Optional[int]]]=[]):
+def extract_submol_with_center(mol: Mol, center_atom_indices: List[int], radius: float=5, dual_topology: List[Tuple[int, int, Optional[int]]]=[], must_include_indices: List[int]=[]):
     '''
     Extract a fragment from a molecule with center atoms.
 
@@ -167,6 +170,7 @@ def extract_submol_with_center(mol: Mol, center_atom_indices: List[int], radius:
     subidx = set()
     for center_atom_index in center_atom_indices:
         subidx.update(tree.query_radius([mol.GetConformer().GetPositions()[center_atom_index]], r=radius)[0])
+    subidx.update(must_include_indices)
     return extract_submol(mol, subidx, dual_topology)
 
 
@@ -183,7 +187,8 @@ class Extractor:
         fragment_per_frame: int = 1,
         local_uncertainty_radius: float = 5,
         fragment_radius: float = 5,
-        n_centers: int = 1
+        n_centers: int = 1,
+        must_include_indices: List[int] = []
     ) -> None:
         '''
         Extractor class for extracting fragments from molecules.
@@ -209,6 +214,7 @@ class Extractor:
         self.local_uncertainty_radius = local_uncertainty_radius
         self.fragment_radius = fragment_radius
         self.n_centers = n_centers
+        self.must_include_indices = must_include_indices
 
     def build_fragment(self, y_pred: dict, xyzblocks: Optional[List[str]] = None, prefix: str = "") -> None:
         '''
@@ -261,7 +267,7 @@ class Extractor:
             
             submol_indices = []
             for i in range(0, len(sorted_atom_idx), self.n_centers):
-                submol, atom_map = extract_submol_with_center(reference_mol, sorted_atom_idx[i: i + self.n_centers], self.fragment_radius, dual_topology)
+                submol, atom_map = extract_submol_with_center(reference_mol, sorted_atom_idx[i: i + self.n_centers], self.fragment_radius, dual_topology, self.must_include_indices)
                 dup_flag = False
                 for submol_index in submol_indices:
                     if atom_map.keys() == submol_index:
