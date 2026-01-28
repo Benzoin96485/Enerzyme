@@ -4,8 +4,8 @@ from torch.nn import Module, Linear, init
 from ..functional import segment_sum_coo
 from ..activation import ACTIVATION_KEY_TYPE
 from ..layers.electron_embedding import ResidualMLP
-from ..layers.mlp import ResidualStack as _ResidualStack
-from ..layers.attention import Attention
+from ..blocks.mlp import ResidualStack as _ResidualStack
+from ..blocks.attention import Attention
 
 
 def ResidualStack(

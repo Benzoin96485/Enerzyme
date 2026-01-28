@@ -10,7 +10,7 @@ from torch_ema import ExponentialMovingAverage
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from .monitor import Monitor
-from ..data import Transform
+from ..data.transform import Transform
 from .metrics import Metrics
 from .batch import _decorate_batch_output
 
@@ -189,7 +189,8 @@ class LightningModel(L.LightningModule):
         metrics: Metrics,
         use_ema: bool,
         ema_decay: float,
-        ema_use_num_updates: int
+        ema_use_num_updates: int,
+        dump_interval: int
     ):
         super().__init__()
         self.model = model
@@ -206,6 +207,7 @@ class LightningModel(L.LightningModule):
         self.validation_step_outputs = []
         self.test_step_outputs = []
         self.test_result = None
+        self.dump_interval = dump_interval
 
     def training_step(self, batch, batch_idx):
         net_input, net_target = batch      
@@ -261,6 +263,15 @@ class LightningModel(L.LightningModule):
         last_checkpoint_callback.FILE_EXTENSION = ".pth"
         collect_output_callback = CollectOutputCallback()
         callbacks = [best_checkpoint_callback, last_checkpoint_callback, collect_output_callback]
+        if self.dump_interval > 0:
+            epoch_checkpoint_callback = ModelCheckpoint(
+                dirpath=self.dump_dir,
+                filename="model_{epoch}",
+                every_n_epochs=self.dump_interval,
+                save_top_k=-1
+            )
+            epoch_checkpoint_callback.FILE_EXTENSION = ".pth"
+            callbacks.append(epoch_checkpoint_callback)
         if self.monitor is not None:
             monitor_callback = MonitorCallback(self.monitor)
             callbacks.append(monitor_callback)

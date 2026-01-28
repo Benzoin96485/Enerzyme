@@ -5,7 +5,7 @@ import time, os, logging, contextlib
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader, Dataset
-from torch.optim import Adam, Optimizer
+from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.nn import Module
 from torch.nn.utils import clip_grad_norm_
@@ -18,9 +18,10 @@ except:
 from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
-from .batch import _decorate_batch_input, _decorate_batch_output, _to_device
+from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input, _pyg_to_device
 from .monitor import Monitor
-from ..data import Transform
+from .optimizer import get_optimizer, get_optimizer_config
+from ..data.transform import Transform
 from ..utils import logger
 from .metrics import Metrics
 
@@ -34,10 +35,52 @@ DTYPE_MAPPING = {
 }
 
 
+def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> None:
+    '''
+    Modify the patience of the EarlyStopping callback in the Lightning checkpoint.
+
+    .. danger::
+
+    This function should be only used in the world rank 0 during distributed training. Otherwise, the checkpoint will be corrupted.
+
+    Params:
+    ----------
+    lightning_ckpt_path: str
+        The path to the Lightning checkpoint.
+        
+    patience: int
+        The patience to set.
+
+    Returns:
+    ----------
+    None
+    '''
+    loaded_info = torch.load(lightning_ckpt_path, map_location="cpu")
+    if "callbacks" in loaded_info:
+        for k, v in loaded_info["callbacks"].items():
+            if k.startswith("EarlyStopping"):
+                if 'patience' in v and v['patience'] < patience:
+                    v['patience'] = patience
+                    logger.info(f"increase patience of EarlyStopping to {patience}")
+                else:
+                    return
+    torch.save(loaded_info, lightning_ckpt_path)
+
+
+def _convert_lightning_model_state_dict(lightning_model_state_dict: Dict) -> Dict:
+    model_state_dict = dict()
+    for k, v in lightning_model_state_dict.items():
+        if k.startswith("model."):
+            model_state_dict[k[6:]] = v
+        else:
+            model_state_dict[k] = v
+    return model_state_dict
+
+
 def _convert_lightning_state_dict(lightning_loaded_info: Dict) -> Dict:
     loaded_info = dict()
     if "state_dict" in lightning_loaded_info:
-        loaded_info["model_state_dict"] = lightning_loaded_info["state_dict"]
+        loaded_info["model_state_dict"] = _convert_lightning_model_state_dict(lightning_loaded_info["state_dict"])
     if "epoch" in lightning_loaded_info:
         loaded_info["epoch"] = lightning_loaded_info["epoch"]
     if "lr_schedulers" in lightning_loaded_info:
@@ -104,8 +147,24 @@ def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrai
 
 
 class Trainer:
-    def __init__(self, out_dir: str=None, metric_config: Metrics=dict(), **params) -> None:
+    def __init__(self, out_dir: str=None, metric_config: Dict=dict(), **params) -> None:
+        '''
+        The trainer class for training and evaluating the model.
+
+        Params:
+        ----------
+        out_dir: str
+            The directory to save the model.
+
+        metric_config: dict
+            The configuration for the :doc:`Metrics <enerzyme.tasks.metrics.Metrics>` class.
+
+        **params: dict
+            The configuration for the trainer.
+        
+        '''
         self.batch_size = params.get('batch_size', 8)
+        self.pyg = params.get("pyg", False)
         self.lightning = params.get("lightning", False)
         self.patience = params.get('patience', 50)
         self.max_norm = params.get('max_norm', -1)
@@ -113,26 +172,25 @@ class Trainer:
         self.out_dir = out_dir
         self.metric_config = metric_config
         self.metrics = Metrics(metric_config)
+        self.optimizer_name, self.optimizer_hyper_params = get_optimizer_config(**params)
         self.splitter = Splitter(**params["Splitter"])
         if "Monitor" in params:
             self.monitor = Monitor(**params["Monitor"])
         else:
             self.monitor = None
         self.seed = params.get('seed', 114514)
-        self.learning_rate = float(params.get('learning_rate', 1e-3))
         self.inference_batch_size = params.get('inference_batch_size', self.batch_size)
         self.max_epochs = params.get('max_epochs', 1000)
         self.warmup_ratio = params.get('warmup_ratio', 0.01)
         self.cuda = params.get('cuda', False)
         self.schedule = params.get('schedule', "linear")
-        self.weight_decay = float(params.get('weight_decay', 0))
-        self.amsgrad = params.get('amsgrad', True)
         self.data_in_memory = params.get("data_in_memory", True)
         self.use_ema = params.get("use_ema", True)
         self.ema_decay = params.get("ema_decay", 0.999)
         self.ema_use_num_updates = params.get("ema_use_num_updates", True)
         self.dtype = DTYPE_MAPPING[params.get('dtype', "float32")]
         self.committee_size = params.get("committee_size", 1)
+        self.dump_interval = params.get("dump_interval", -1)
         self.active_learning_params = params.get("active_learning_params", None)
         if self.active_learning_params is not None and self.active_learning_params.get("active", False):
             self.active_learning = True
@@ -151,6 +209,9 @@ class Trainer:
             else:
                 self.num_workers = max(1, os.cpu_count() // 2 - 1)
                 logger.info(f"using {self.num_workers} workers for dataloader given {os.cpu_count()} cpus")
+        else:
+            logger.info(f"using {self.num_workers} workers for dataloader")
+        
         if isinstance(non_target_features, list):
             self.non_target_features = non_target_features
         elif isinstance(non_target_features, str):
@@ -172,7 +233,7 @@ class Trainer:
                 accelerator="auto",
                 callbacks=[early_stopping_callback],
                 devices="auto",
-                num_nodes=os.environ.get("SLURM_NNODES", 1),
+                num_nodes=int(os.environ.get("SLURM_NNODES", 1)),
                 strategy="auto",
                 gradient_clip_val=self.max_norm if self.max_norm > 0 else None,
                 inference_mode=False,
@@ -187,7 +248,16 @@ class Trainer:
                 self.device = torch.device("cpu")
 
     def decorate_batch_input(self, batch):
-        return _decorate_batch_input(batch, self.dtype, self.device)
+        if self.pyg:
+            return _decorate_pyg_batch_input(batch, self.dtype, self.device)
+        else:
+            return _decorate_batch_input(batch, self.dtype, self.device)
+        
+    def to_device(self, batch):
+        if self.pyg:
+            return _pyg_to_device(batch, self.device)
+        else:
+            return _to_device(batch, self.device)
     
     def decorate_batch_output(self, output, features, targets):
         return _decorate_batch_output(output, features, targets, self.non_target_features)
@@ -242,11 +312,70 @@ class Trainer:
         test_dataset: Optional[Dataset]=None, model_rank: Optional[int]=None, max_epoch_per_iter: int=-1,
         meta_state_dict: Dict=dict(), refresh_patience: bool=False, refresh_best_score: bool=False
     ) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
+        '''
+        Train the model on the training set, validate it on the validation set, and test the model on the test set.
+
+        Params:
+        ----------
+        model: Module
+            The model to train
+
+        pretrain_path: Optional[str]
+            The path to the pretrained model or the checkpoint of the model
+
+        train_dataset: Dataset
+            The training dataset.
+
+        valid_dataset: Optional[Dataset]
+            The validation dataset. If not provided, the model will not be validated.
+
+        loss_terms: Iterable[Callable]
+            The loss functions with multiple terms to use.
+
+        dump_dir: str
+            The directory to save the model
+
+        transform: Transform
+            The data transform in preprocessing. The inverse transform will be applied to the prediction results when calculating the metrics during validation and testing.
+
+        test_dataset: Optional[Dataset]
+            The test dataset. If not provided, the model will not be tested.
+
+        model_rank: Optional[int]
+            Only used in deep ensemble training. The rank of the model.
+
+        max_epoch_per_iter: int
+            Only used in active learning. The maximum number of epochs per active learning iteration.
+
+        meta_state_dict: Dict
+            Only used in active learning checkpointing. The meta state dictionary.
+
+        refresh_patience: bool
+            Whether to refresh the patience when loading the checkpoint.
+
+        refresh_best_score: bool
+            Whether to refresh the best score when loading the checkpoint.
+
+        Returns:
+        ----------
+        The prediction results on the test set. A dictionary with the following keys:
+
+        y_pred
+            The predicted results.
+
+        y_truth
+            The true results.
+            
+        metric_score
+            The metrics score based on the predicted and true results.
+
+        '''
         if self.refresh_best_score is not None:
             refresh_best_score = self.refresh_best_score
         if self.refresh_patience is not None:
             refresh_patience = self.refresh_patience
         self._set_seed(self.seed + (model_rank if model_rank is not None else 0))
+        
         train_dataloader = DataLoader(
             dataset=train_dataset,
             batch_size=self.batch_size,
@@ -260,8 +389,10 @@ class Trainer:
         else:
             num_training_steps = len(train_dataloader) * self.max_epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
-        optimizer = Adam(model.parameters(), lr=self.learning_rate, eps=1e-6, weight_decay=self.weight_decay, amsgrad=self.amsgrad)
+
+        optimizer = get_optimizer(self.optimizer_name, model, self.optimizer_hyper_params)
         scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
+        
         if self.lightning:
             logger.info("Using Lightning Trainer")
             from .lightning_utils import LightningModel
@@ -273,7 +404,8 @@ class Trainer:
                 metrics=self.metrics,
                 use_ema=self.use_ema,
                 ema_decay=self.ema_decay,
-                ema_use_num_updates=self.ema_use_num_updates
+                ema_use_num_updates=self.ema_use_num_updates,
+                dump_interval=self.dump_interval
             )
             train_dataloader = DataLoader(
                 dataset=train_dataset,
@@ -295,6 +427,11 @@ class Trainer:
                 )
             else:
                 valid_dataloader = None
+            if self.resume > 1 and pretrain_path is not None:
+                # if the world rank is 0, modify the state dict
+                if self.lightning_trainer.is_global_zero:
+                    _modify_lightning_state_dict(pretrain_path, self.patience)
+                logger.info(f"Resuming from {pretrain_path}...")
             self.lightning_trainer.fit(lightning_model, train_dataloader, valid_dataloader, ckpt_path=pretrain_path if self.resume > 1 else None)
             
             if test_dataset is not None:
@@ -385,7 +522,7 @@ class Trainer:
                 trn_loss = []
                 
                 for i, batch in enumerate(train_dataloader):
-                    net_input, net_target = _to_device(batch, self.device)
+                    net_input, net_target = self.to_device(batch)
                     
                     loss = 0
                     with torch.set_grad_enabled(True):
@@ -457,6 +594,8 @@ class Trainer:
                 message += f', {(end_time - start_time):.1f}s'
                 logger.info(message)
                 self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, "last", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
+                if self.dump_interval > 0 and (epoch + 1) % self.dump_interval == 0:
+                    self.save_state_dict(model, optimizer, scheduler, dump_dir, ema, f"epoch={epoch}", model_rank, epoch=epoch, best_score=best_score, best_epoch=best_epoch)
                 if is_early_stop:
                     break
 
@@ -489,7 +628,7 @@ class Trainer:
     def _early_stop_choice(self, wait, min_loss, metric_score, save_handle, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, save_handle, patience, epoch)
     
-    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
+    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None, test_mode: bool=False) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         if load_model == True:
@@ -505,12 +644,13 @@ class Trainer:
             num_workers=self.num_workers,
         )
         model = model.eval()
+        model.test_mode = test_mode
         batch_bar = tqdm(total=len(dataloader), dynamic_ncols=True, position=0, leave=False, desc='val', ncols=5)
         val_loss = []
         y_preds = defaultdict(list)
         y_truths = defaultdict(list)
         for i, batch in enumerate(dataloader):
-            net_input, net_target = _to_device(batch, self.device)
+            net_input, net_target = self.to_device(batch)
             output = model(net_input)
             # Get model outputs
             if self.monitor is not None:
@@ -543,4 +683,5 @@ class Trainer:
         if load_model and "_judge_score" in metric_score:
             metric_score.pop("_judge_score")
         batch_bar.close()
+        model.test_mode = False
         return {"y_pred": y_preds, "y_truth": y_truths, "val_loss": val_loss, "metric_score": metric_score}

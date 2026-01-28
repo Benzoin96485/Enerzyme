@@ -13,7 +13,6 @@ from torch import nn
 from torch.nn import Embedding
 from torch_geometric.nn import radius_graph
 from torch_geometric.nn.conv import MessagePassing
-from torch_scatter import scatter
 from torch_scatter import scatter, segment_coo, segment_csr
 
 from ..layers import BaseFFCore, DistanceLayer, RangeSeparationLayer

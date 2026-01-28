@@ -6,7 +6,7 @@ from rdkit.Chem import MolFromMolFile, MolFromXYZBlock, Mol
 from rdkit.Chem.rdDetermineBonds import DetermineConnectivity
 from sklearn.neighbors import NearestNeighbors, BallTree
 from rdkit import Chem
-from ..data import REVERSED_PERIODIC_TABLE
+from ..data.transform import REVERSED_PERIODIC_TABLE
 
 
 def get_bond_lengths(conformer, begin_atom_idx, end_atom_idx):
@@ -41,7 +41,10 @@ def extract_submol(original_mol: Mol, subidx: List[int], dual_topology: List[Tup
         # elif original_bond.GetBondType() == Chem.BondType.SINGLE and bondtype != Chem.BondType.SINGLE:
         #     changing_bond.SetBondType(bondtype)
     
-    overlap_pair_set = original_pair_set & dual_topology_pair_set
+    if len(dual_topology_pair_set) > 0:
+        overlap_pair_set = original_pair_set & dual_topology_pair_set
+    else:
+        overlap_pair_set = original_pair_set
 
     for bond in mol.GetBonds():
         # completely internal
@@ -148,10 +151,26 @@ def extract_submol(original_mol: Mol, subidx: List[int], dual_topology: List[Tup
     return submol, atom_map
 
 
-def extract_submol_with_center(mol: Mol, center_atom_idx: int, radius: float=5, dual_topology: List[Tuple[int, int, Optional[int]]]=[]):
+def extract_submol_with_center(mol: Mol, center_atom_indices: List[int], radius: float=5, dual_topology: List[Tuple[int, int, Optional[int]]]=[], must_include_indices: List[int]=[]):
+    '''
+    Extract a fragment from a molecule with center atoms.
+
+    Params:
+    -------
+    mol: Mol
+        The molecule to be extracted.
+    center_atom_indices: List[int]
+        The indices of the center atoms.
+    radius: float
+        The radius of the fragmentation.
+    dual_topology: List[Tuple[int, int, Optional[int]]]
+        The dual topology of the molecule.
+    '''
     tree = BallTree(mol.GetConformer().GetPositions())
-    subidx = tree.query_radius([mol.GetConformer().GetPositions()[center_atom_idx]], r=radius)[0]
-    subidx = set(subidx)
+    subidx = set()
+    for center_atom_index in center_atom_indices:
+        subidx.update(tree.query_radius([mol.GetConformer().GetPositions()[center_atom_index]], r=radius)[0])
+    subidx.update(must_include_indices)
     return extract_submol(mol, subidx, dual_topology)
 
 
@@ -167,8 +186,26 @@ class Extractor:
         reference_mol_path: str,
         fragment_per_frame: int = 1,
         local_uncertainty_radius: float = 5,
-        fragment_radius: float = 5
+        fragment_radius: float = 5,
+        n_centers: int = 1,
+        must_include_indices: List[int] = []
     ) -> None:
+        '''
+        Extractor class for extracting fragments from molecules.
+
+        Params:
+        -------
+        reference_mol_path: str
+            The path to the reference molecule.
+        fragment_per_frame: int
+            The number of fragments to be extracted per frame.
+        local_uncertainty_radius: float
+            The radius of the local uncertainty quantification.
+        fragment_radius: float
+            The radius of the fragmentation.
+        n_centers: int
+            The number of centers to be used for extracting only one fragment.
+        '''
         if reference_mol_path.endswith(".sdf"):
             self.reference_mol = list(Chem.SDMolSupplier(reference_mol_path, removeHs=False))
         else:
@@ -176,8 +213,22 @@ class Extractor:
         self.fragment_per_frame = fragment_per_frame
         self.local_uncertainty_radius = local_uncertainty_radius
         self.fragment_radius = fragment_radius
+        self.n_centers = n_centers
+        self.must_include_indices = must_include_indices
 
     def build_fragment(self, y_pred: dict, xyzblocks: Optional[List[str]] = None, prefix: str = "") -> None:
+        '''
+        Build fragments from the prediction results.
+
+        Params:
+        -------
+        y_pred: dict
+            The prediction results with uncertainty quantification.
+        xyzblocks: Optional[List[str]]
+            The xyz blocks of the molecules.
+        prefix: str
+            The prefix of the output sdf file.
+        '''
         suppl = Chem.SDWriter(f"{prefix}_fragments.sdf")
         for frame_idx in tqdm(range(len(y_pred["Ra"]))):
             if len(self.reference_mol) == 1:
@@ -209,14 +260,14 @@ class Extractor:
             local_uncertainty = []
             for i in range(len(neighbors)):
                 local_uncertainty.append(np.mean(Fa_std[neighbors[i]]))
-            sorted_atom_idx = np.argsort(local_uncertainty)
+            sorted_atom_idx = np.argsort(local_uncertainty[::-1])
 
             coord = mol.GetConformer().GetPositions()
             reference_mol.GetConformer().SetPositions(coord)
             
             submol_indices = []
-            for i in range(-1, -len(sorted_atom_idx) + 1, -1):
-                submol, atom_map = extract_submol_with_center(reference_mol, sorted_atom_idx[i], self.fragment_radius, dual_topology)
+            for i in range(0, len(sorted_atom_idx), self.n_centers):
+                submol, atom_map = extract_submol_with_center(reference_mol, sorted_atom_idx[i: i + self.n_centers], self.fragment_radius, dual_topology, self.must_include_indices)
                 dup_flag = False
                 for submol_index in submol_indices:
                     if atom_map.keys() == submol_index:

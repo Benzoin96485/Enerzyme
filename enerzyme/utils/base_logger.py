@@ -1,9 +1,10 @@
-import logging, os, sys, datetime
+import logging, os, datetime, pathlib
 from logging.handlers import TimedRotatingFileHandler
+import enerzyme
 
 
 BASE_NAME = "Enerzyme"
-
+PACKAGE_PATH = str(pathlib.Path(enerzyme.__file__).parent.parent)
 
 class PackagePathFilter(logging.Filter):
     def filter(self, record):
@@ -11,13 +12,8 @@ class PackagePathFilter(logging.Filter):
         """
         pathname = record.pathname
         record.relativepath = None
-        abs_sys_paths = map(os.path.abspath, sys.path)
-        for path in sorted(abs_sys_paths, key=len, reverse=True):  # longer paths first
-            if not path.endswith(os.sep):
-                path += os.sep
-            if pathname.startswith(path):
-                record.relativepath = os.path.relpath(pathname, path)
-                break
+        if pathname.startswith(PACKAGE_PATH):
+            record.relativepath = os.path.relpath(pathname, PACKAGE_PATH)
         return True
 
 

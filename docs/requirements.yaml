@@ -1,0 +1,36 @@
+name: docs_Enerzyme
+channels:
+
+  - conda-forge
+
+  - defaults
+dependencies:
+    # Base depends
+  - python
+  - pip
+  
+  - pydata-sphinx-theme
+  - sphinx-design
+  - sphinx-copybutton
+
+    # Pip-only installs
+  - pip:
+    - numpy
+    - h5py
+    - tqdm
+    - ase
+    - joblib
+    - addict
+    - pandas
+    - torch
+    - scikit-learn
+    - transformers
+    - torch-ema
+    - pyyaml
+    - torch_geometric
+    - rdkit
+    - e3nn
+    - lightning
+    - https://data.pyg.org/whl/torch-2.8.0%2Bcpu/torch_scatter-2.1.2%2Bpt28cpu-cp313-cp313-linux_x86_64.whl
+    - -e ../
+

@@ -1,17 +1,19 @@
 from typing import Dict, Union, Literal
 import torch
 from torch import nn, Tensor
-from ...data import PERIODIC_TABLE
+from . import BaseFFLayer
+from ...data.transform import PERIODIC_TABLE
 
 
-class AtomicAffineLayer(nn.Module):
+class AtomicAffineLayer(BaseFFLayer):
     def __init__(
         self, 
         max_Za: int, 
-        shifts: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]],
-        scales: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]
+        shifts: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 0, "learnable": True}, "Qa": {"values": 0, "learnable": True}},
+        scales: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 1, "learnable": True}, "Qa": {"values": 1, "learnable": True}}
     ) -> None:
-        super().__init__()
+        atomic_properties = shifts.keys() | scales.keys()
+        super().__init__(input_fields={"Za"} | atomic_properties, output_fields=atomic_properties)
         self.max_Za = max_Za
         self.shifts = self.build_affine(shifts, 0)
         self.scales = self.build_affine(scales, 1)
@@ -35,14 +37,12 @@ class AtomicAffineLayer(nn.Module):
                 affine_param = torch.full((self.max_Za + 1,), float(values))
             affine_dict[name] = nn.Parameter(affine_param, requires_grad=param["learnable"])
         return nn.ParameterDict(affine_dict)
-
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        for name, shift in self.shifts.items():
-            output[name] = output[name] + shift.gather(0, output["Za"]).view((-1, ) if output[name].dim() == 1 else (-1, 1))
-        for name, scale in self.scales.items():
-            output[name] = output[name] * scale.gather(0, output["Za"]).view((-1, ) if output[name].dim() == 1 else (-1, 1))
-        return output
+    
+    def get_Ea(self, Ea: Tensor, Qa: Tensor, Za: Tensor) -> Tensor:
+        return (Ea + self.shifts.Ea.gather(0, Za).view((-1, ) if Ea.dim() == 1 else (-1, 1))) * self.scales.Ea.gather(0, Za).view((-1, ) if Ea.dim() == 1 else (-1, 1))
+    
+    def get_Qa(self, Ea: Tensor, Qa: Tensor, Za: Tensor) -> Tensor:
+        return (Qa + self.shifts.Qa.gather(0, Za).view((-1, ) if Qa.dim() == 1 else (-1, 1))) * self.scales.Qa.gather(0, Za).view((-1, ) if Qa.dim() == 1 else (-1, 1))
     
     def _load_from_state_dict(self, state_dict: Dict[str, Tensor], *args, **kwargs):
         for k, v in state_dict.items():

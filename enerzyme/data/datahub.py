@@ -6,7 +6,7 @@ import numpy as np
 from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from .datatype import is_atomic, is_rounded, is_int
+from .datatype import is_atomic, is_rounded, is_int, register_data_type
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
 
@@ -81,7 +81,7 @@ class FieldDataset(Dataset):
     def loc(self, idx) -> Dict[str, Iterable]:
         return {k: v[0 if k in self.compressed_keys else idx] for k, v in self.data.items()}
 
-    def load_subset(self, indices):
+    def load_subset(self, indices: Iterable[int]) -> "FieldDataset":
         data = dict()
         for k, v in self.data.items():
             if k in self.compressed_keys:
@@ -91,7 +91,7 @@ class FieldDataset(Dataset):
         return FieldDataset(data)
 
 
-class DataHub:
+class SingleDataHub:
     def __init__(self,  
         dump_dir=".",
         data_format: Optional[str]=None,
@@ -99,7 +99,8 @@ class DataHub:
         preload: bool=True,
         features: Dict[str, str]=dict(),
         targets: Dict[str, str]=dict(),
-        transforms: Optional[Dict[str, Union[str, bool]]]=None,
+        preprocessings: Optional[Dict[str, Union[str, bool]]]=None,
+        global_transforms: Optional[Dict[str, Union[str, bool]]]=None,
         neighbor_list: Optional[str]=None,
         hash_length: int=16,
         compressed: bool=True,
@@ -107,25 +108,30 @@ class DataHub:
         **params
     ):
         self.data_path = os.path.abspath(data_path)
-        self.dump_dir = dump_dir
         self.data_format = data_format
         self.preload = preload
         self.feature_types = _collect_types(features)
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
-        self.transforms = dict() if transforms is None else transforms
         self.compressed = compressed
         self.max_memory = max_memory
-        datahub_str = data_path + neighbor_list + str(sorted(self.transforms.items()))
+        datahub_str = data_path + neighbor_list + \
+            str(sorted(preprocessings.items()) if preprocessings is not None else '') + \
+            str(sorted(global_transforms.items()) if global_transforms is not None else '')
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
-        self.preload_path = os.path.join(self.dump_dir, f"processed_dataset_{self.hash}")
-        self.transform = Transform(self.transforms, self.preload_path)
+        self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
+        logger.info(f"Preload path {self.preload_path} is created")
+        self.preprocessing = Transform(preprocessings, self.preload_path)
+        self.global_transform = Transform(global_transforms, self.preload_path)
+        self.preprocessings = preprocessings
+        self.global_transforms = global_transforms
         if not self.preload or not self.preload_data():
             self.get_handle("w")
             self._init_data()
             self._init_neighbor_list()
-            self.transform.transform(self.data)
+            self.preprocessing.transform(self.data)
+            self.global_transform.transform(self.data)
             self._save_config()
             self.reset_handle()
 
@@ -141,7 +147,7 @@ class DataHub:
             else:
                 self._load_molecular_data(k, loaded_data)
         loaded_file.close()
-
+    
     def preload_data(self): 
         hdf5_path = os.path.join(self.preload_path, "pre_transformed.hdf5")
         config_path = os.path.join(self.preload_path, "datahub.yaml")
@@ -159,7 +165,7 @@ class DataHub:
                 logger.info(f"Data matched and preloaded from {self.preload_path}")
                 return True
         return False
-    
+
     def _expand(self, k: str, values: Iterable) -> np.ndarray:
         if isinstance(values, int) or isinstance(values, float):
             if is_int(k) and self.compressed:
@@ -226,11 +232,19 @@ class DataHub:
             raise ValueError(f"Data path {self.data_path} doesn't exist.")
         suffix = self.data_path.split(".")[-1]
         if self.data_format == "hdf5" or suffix == "hdf5":
+            self.data_format = "hdf5"
             raw_data = h5py.File(self.data_path, mode="r")["data"]
         elif self.data_format == "pickle" or suffix == "pkl" or suffix == "pickle":
+            self.data_format = "pickle"
             raw_data = load_from_pickle(self.data_path)
         elif self.data_format == "npz" or suffix == "npz":
+            self.data_format = "npz"
             raw_data = np.load(self.data_path, allow_pickle=True)
+        elif self.data_format == "sdf" or suffix == "sdf":
+            self.data_format = "sdf"
+            from .supplier import SDFSupplier
+            supplier = SDFSupplier(self.data_path, supplying_fields=self.data_types.keys())
+            raw_data = supplier.raw_data()
         else:
             raise ValueError(f"Data format of {self.data_path} is unknown")
 
@@ -286,7 +300,7 @@ class DataHub:
             else:
                 self._load_molecular_data(k, raw_data)
         
-        if not (self.data_format == "pickle" or suffix == "pkl" or suffix == "pickle"):
+        if self.data_format in ["hdf5", "npz"]:
             raw_data.close()
 
     def _init_neighbor_list(self) -> None:
@@ -311,7 +325,7 @@ class DataHub:
 
     def get_handle(self, mode: Literal["r", "w"]="r") -> None:
         if mode == "w" and os.path.exists(self.preload_path):
-            logger.warning(f"Preload path {self.preload_path} exists and will be covered")
+            logger.warning(f"Preload path {self.preload_path} exists and will be overwritten")
         else:
             os.makedirs(self.preload_path, exist_ok=True)
         self.file = h5py.File(os.path.join(self.preload_path, "pre_transformed.hdf5"), mode=mode, rdcc_nbytes=1024 ** 3 * self.max_memory)
@@ -330,7 +344,8 @@ class DataHub:
         datahub_config = Dict({
             "feature": self.feature_types,
             "target": self.target_types,
-            "transforms": self.transforms,
+            "preprocessings": self.preprocessings,
+            "global_transforms": self.global_transforms,
             "neighbor_list": self.neighbor_list_type
         })
         handler.write_yaml(datahub_config)
@@ -343,3 +358,42 @@ class DataHub:
     @property
     def targets(self) -> FieldDataset:
         return FieldDataset({k: v for k, v in self.data.items() if k in self.target_types})
+
+
+class DataHub:
+    def __init__(self,  
+        dump_dir=".",
+        datasets: Optional[Union[List, Dict]]=None,
+        fields: Optional[Dict[str, str]]=None,
+        **params
+    ):
+        self.dump_dir = dump_dir
+        if fields is not None:
+            for k, v in fields.items():
+                register_data_type(k, **v)
+        if datasets is None:
+            if "global_transforms" not in params:
+                params["global_transforms"] = params.get("transforms", None)
+            self.datahubs = {"default": SingleDataHub(dump_dir=dump_dir, **params)}
+        elif isinstance(datasets, list):
+            self.datahubs = {str(i): SingleDataHub(dump_dir=dump_dir, global_transforms=params.get("global_transforms", None), **dataset_params) for i, dataset_params in enumerate(datasets)}
+        elif isinstance(datasets, dict):
+            self.datahubs = {name: SingleDataHub(dump_dir=dump_dir, global_transforms=params.get("global_transforms", None), **dataset_params) for name, dataset_params in datasets.items()}
+        else:
+            raise ValueError(f"Unknown type of datasets: {type(datasets)}")
+            
+    @property
+    def features(self) -> Dict[str, FieldDataset]:
+        return {name: datahub.features for name, datahub in self.datahubs.items()}
+
+    @property
+    def targets(self) -> Dict[str, FieldDataset]:
+        return {name: datahub.targets for name, datahub in self.datahubs.items()}
+    
+    @property
+    def preload_path(self) -> Dict[str, str]:
+        return {name: datahub.preload_path for name, datahub in self.datahubs.items()}
+    
+    @property
+    def transform(self) -> Transform:
+        return list(self.datahubs.values())[0].global_transform

@@ -5,9 +5,9 @@ from torch import Tensor
 from torch.nn import Dropout, Parameter
 from ..functional import segment_sum_coo
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
-from ..layers.mlp import DenseLayer as _DenseLayer
-from ..layers.mlp import ResidualStack as _ResidualStack
-from ..layers.mlp import INITIAL_WEIGHT_TYPE, INITIAL_BIAS_TYPE, NeuronLayer, ResidualMLP
+from ..blocks.mlp import DenseLayer as _DenseLayer
+from ..blocks.mlp import ResidualStack as _ResidualStack
+from ..blocks.mlp import INITIAL_WEIGHT_TYPE, INITIAL_BIAS_TYPE, NeuronLayer, ResidualMLP
 
 
 DEFAULT_TYPE = Optional[Union[Tensor, np.ndarray, str]]

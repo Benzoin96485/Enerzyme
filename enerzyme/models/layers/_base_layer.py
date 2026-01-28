@@ -1,8 +1,9 @@
-from typing import Dict, Set, List, Optional
+from typing import Dict, Set, List, Optional, Union
 from inspect import signature
 from abc import ABC, abstractmethod
 from torch import Tensor
 from torch.nn import Module, Sequential
+from torch_geometric.data import Data
 
 
 def get_output_fields(func):
@@ -47,16 +48,40 @@ class BaseFFModule(ABC, Module):
         for field_name in self._relevant_fields:
             self._name_mapping[field_name] = field_name
 
+        self.adapted_relevant_fields = False
+
+    def _get_relevant_input_fields(self, net_input_fields: Optional[Set[str]]=None) -> Set[str]:
+        new_input_fields = self.get_relevant_input_fields(net_input_fields)
+        self._input_fields |= new_input_fields
+        self._relevant_fields |= new_input_fields
+        for field_name in new_input_fields:
+            if field_name not in self._name_mapping:
+                self._name_mapping[field_name] = field_name
+        self.adapted_relevant_fields = True
+
+    def get_relevant_input_fields(self, net_input_fields: Optional[Set[str]]=None) -> Set[str]:
+        return self._input_fields
+
     @abstractmethod
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         ...
 
-    def _forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        net_output = net_input.copy()
+    def _forward(self, net_input: Union[Dict[str, Tensor], Data]) -> Dict[str, Tensor]:
         relevant_input = dict()
-        for k in self._input_fields:
-            new_k = self._name_mapping[k]
-            relevant_input[k] = net_input.get(new_k, None)
+        if not self.adapted_relevant_fields:
+            self._get_relevant_input_fields(net_input.keys())
+        relevant_input_fields = self._input_fields
+        if isinstance(net_input, Data):
+            net_output = net_input
+            for k in relevant_input_fields:
+                if k == "batch_seg":
+                    relevant_input[k] = net_input["batch"]
+                else:
+                    relevant_input[k] = net_input.get(self._name_mapping[k], None)
+        else:
+            net_output = net_input.copy()
+            for k in relevant_input_fields:
+                relevant_input[k] = net_input.get(self._name_mapping[k], None)
         relevant_output = self.get_output(**relevant_input)
         for k in self._output_fields:
             new_k = self._name_mapping[k]
@@ -66,8 +91,19 @@ class BaseFFModule(ABC, Module):
 
 
 class BaseFFLayer(BaseFFModule):
-    def __init__(self, input_fields: Optional[Set[str]]=None, output_fields: Optional[Set[str]]=None) -> None:
+    def __init__(self, 
+        input_fields: Optional[Set[str]]=None, 
+        output_fields: Optional[Set[str]]=None,
+        train_only: bool=False,
+        eval_only: bool=False,
+        test_only: bool=False,
+        test_exclude: bool=False
+    ) -> None:
         super().__init__(input_fields, output_fields)
+        self.train_only = train_only
+        self.eval_only = eval_only
+        self.test_only = test_only
+        self.test_exclude = test_exclude
 
     def reset_field_name(self, **mapping: Dict[str, str]) -> None:
         self._relevant_fields = self._input_fields | self._output_fields
@@ -84,6 +120,10 @@ class BaseFFLayer(BaseFFModule):
         return relevant_output
 
     def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        if self.train_only and not self.training:
+            return net_input
+        if self.eval_only and self.training:
+            return net_input
         return self._forward(net_input)
 
 
@@ -92,9 +132,25 @@ class BaseFFCore(BaseFFModule):
         super().__init__(input_fields, output_fields)
         self.pre_sequence = Sequential()
         self.post_sequence = Sequential()
+        self.test_mode = False
 
     def forward(self, net_input):
-        return self.post_sequence(self._forward(self.pre_sequence(net_input)))
+        for layer in self.pre_sequence:
+            if layer.test_only and not self.test_mode:
+                continue
+            elif layer.test_exclude and self.test_mode:
+                continue
+            else:
+                net_input = layer(net_input)
+        net_output = self._forward(net_input)
+        for layer in self.post_sequence:
+            if layer.test_only and not self.test_mode:
+                continue
+            elif layer.test_exclude and self.test_mode:
+                continue
+            else:
+                net_output = layer(net_output)
+        return net_output
     
     @abstractmethod
     def build(self, built_layers: List[Module]) -> None:

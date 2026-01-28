@@ -1,4 +1,4 @@
-Datahub:
+Datahub:                                    # the following old-style datahub format is still supported, but not recommended
   data_path: "/my/dataset.pkl"              # path to dataset: pickle, npz or hdf5
   data_format: pickle                       # pickle, npz or hdf5
                                             # features and targets' key mappings which map standard data field name in enerzyme to the data field name in your dataset
@@ -142,6 +142,7 @@ Trainer:
     resume: true                             # if resume from the last active learning checkpoint
   Splitter:
     method: random                          # splitting method: random
+                                            # The following old-style splitting format is still supported, but not recommended
     parts:                                  # partition names, at least training and validation are needed
       - training
       - withheld

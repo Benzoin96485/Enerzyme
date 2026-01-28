@@ -1,16 +1,16 @@
 import math
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Dict
 import numpy as np
 import torch
 from torch import Tensor
-from torch.nn import Module, Embedding, Parameter, Linear, init
-from torch.nn.functional import pad
+from torch.nn import Embedding, Parameter, Linear, init
+from . import BaseFFLayer
 
 
-class BaseAtomEmbedding(ABC, Module):
+class BaseAtomEmbedding(BaseFFLayer):
     def __init__(self, max_Za, dim_embedding) -> None:
-        super().__init__()
+        super().__init__(input_fields={"Za"}, output_fields={"atom_embedding"})
         self.max_Za = max_Za
         self.dim_embedding = dim_embedding
 
@@ -18,12 +18,8 @@ class BaseAtomEmbedding(ABC, Module):
     def get_embedding(self, Za: Tensor) -> Tensor:
         ...
 
-    def forward(self, net_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        output = net_input.copy()
-        output["atom_embedding"] = self.get_embedding(
-            Za = net_input["Za"]
-        )
-        return output
+    def get_atom_embedding(self, Za: Tensor) -> Tensor:
+        return self.get_embedding(Za)
 
 
 class RandomAtomEmbedding(BaseAtomEmbedding):
