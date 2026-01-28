@@ -117,7 +117,7 @@ class FFDataset(Dataset):
         if indices is None:
             indices = {data_key: np.arange(0, len(data["Ra"])) for data_key, data in features.items()}
         elif isinstance(indices, list):
-            indices = {features.keys()[0]: indices}
+            indices = {list(features.keys())[0]: indices}
         self.key_order = {k: i for i, k in enumerate(features.keys())}
         self.data_in_memory = data_in_memory
         self.full_features = features
@@ -180,8 +180,12 @@ class FFDataset(Dataset):
             else:
                 self.raw_indices[k] = new_raw_indices[k]
         if self.data_in_memory:
-            self.features = self.full_features.load_subset(self.raw_indices)
-            self.targets = self.full_targets.load_subset(self.raw_indices)
+            self.features = {
+                k: self.full_features[k].load_subset(self.raw_indices[k]) for k in self.raw_indices.keys()
+            }
+            self.targets = {
+                k: self.full_targets[k].load_subset(self.raw_indices[k]) for k in self.raw_indices.keys()
+            }
             self.indices = OrderedDict((k, np.arange(0, len(self.raw_indices[k]))) for k in self.raw_indices.keys())
         else:
             self.indices = self.raw_indices.copy()
@@ -254,9 +258,9 @@ class BaseFFLauncher(ABC):
                 partitions[part_key] = FFDataset(X, y, part_info, False)
             else:
                 partitions[part_key] = FFDataset(X, y, part_info, True)
-        for k, partition in partitions.items():
-            if len(partition) == 0:
-                partitions.pop(k)
+        empty_keys = [k for k, p in partitions.items() if len(p) == 0]
+        for k in empty_keys:
+            partitions.pop(k)
         return partitions
     
     def _init_default_partition(self) -> Tuple[FFDataset, Optional[FFDataset], Optional[FFDataset]]:

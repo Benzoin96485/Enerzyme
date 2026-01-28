@@ -174,12 +174,12 @@ class Transform:
         for normalization in self.normalizations:
             normalization.transform(raw_input)
 
-    def inverse_transform(self, raw_output: Dict, data_key: Optional[str]=None):
+    def inverse_transform(self, raw_output: Dict, selected_indices: Optional[Iterable[int]]=None):
         for normalization in self.normalizations:
-            normalization.inverse_transform(raw_output, data_key)
+            normalization.inverse_transform(raw_output, selected_indices)
         for scale in self.scales:
-            scale.inverse_transform(raw_output, data_key)
+            scale.inverse_transform(raw_output, selected_indices)
         for shift in self.shifts:
-            shift.inverse_transform(raw_output, data_key)
+            shift.inverse_transform(raw_output, selected_indices)
 
 
