@@ -93,8 +93,8 @@ class NegativeGradientTransform(BaseTransform):
                 new_input["Fa"][i] = -new_input["Fa"][i]
     
     def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
-        new_output["Fa"][idx] = -new_output["Fa"][idx]
-
+        if "Fa" in new_output:
+            new_output["Fa"][idx] = -new_output["Fa"][idx]
 
 class TotalEnergyNormalization(BaseTransform):
     def __init__(self, preload_path=".", scale=None, shift=None):
