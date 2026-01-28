@@ -1,12 +1,12 @@
 import numpy as np
 from shutil import copy, rmtree
 import os
-from functools import partial
+import subprocess
 from typing import Any, Dict, Literal, Optional
 from pathlib import Path
 from abc import ABC, abstractmethod
 from tqdm import tqdm
-from pickle import dump
+from pickle import dump, load
 from rdkit import Chem
 from multiprocessing import Pool, cpu_count
 from ..utils import logger
@@ -99,6 +99,12 @@ class QMDriver(ABC):
             dump(result_package, f)
 
     def single_run(self, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any]):
+        single_run_path = self.output_dir / "single_run" / f"{package['index']}.pkl"
+        if single_run_path.exists():
+            with open(single_run_path, "rb") as f:
+                result_package = load(f)
+            logger.info(f"Single run results for {package['index']} already exist. Loading from {single_run_path}")
+            return result_package
         tmp_dir = Path(str(self.tmp_dir_base) + f".{package['index']}")
         os.makedirs(tmp_dir, exist_ok=True)
         input_file = self.make_input(package=package, tmp_dir=tmp_dir)
@@ -161,8 +167,12 @@ class TeraChemDriver(QMDriver):
         pcm: Optional[str] = None,
         epsilon: Optional[float] = None,
         pcm_radii_file: Optional[str] = None,
+        scf_method: Optional[str] = "diis+a",
+        scf_maxit: Optional[int] = 1000,
+        scf_guess: Optional[str] = "generate",
         n_processes: int = 1,
         dump_single_run: bool = True,
+        timeout: Optional[float] = None,
         *args, **kwargs
     ):
         super().__init__(supplier, tmp_dir, output_dir, pickle_name, bs, xc, keep_molden, keep_stdout, clean_tmp, n_processes, dump_single_run)
@@ -170,6 +180,10 @@ class TeraChemDriver(QMDriver):
         self.pcm = pcm
         self.epsilon = epsilon
         self.pcm_radii_file = pcm_radii_file
+        self.scf_method = scf_method
+        self.scf_maxit = scf_maxit
+        self.scf_guess = scf_guess
+        self.timeout = timeout
 
     def make_input(self, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any], tmp_dir: Path) -> str:
         Q = package["Q"]
@@ -182,8 +196,9 @@ basis {self.bs}
 method {self.xc}
 charge {Q}
 spinmult {S + 1}
-maxit 1000
-scf diis+a
+maxit {self.scf_maxit}
+scf {self.scf_method}
+guess {self.scf_guess}
 scrdir ./scr_{index}
 '''
         if self.dftd:
@@ -215,8 +230,19 @@ scrdir ./scr_{index}
         output_file = input_file.with_suffix(".out")
         current_dir = os.getcwd()
         os.chdir(tmp_dir)
-        os.system(f"terachem {input_file} > {output_file}")
-        os.chdir(current_dir)
+        try:
+            with open(output_file, 'w') as f:
+                subprocess.run(
+                    ["terachem", str(input_file)],
+                    stdout=f,
+                    stderr=subprocess.PIPE,
+                    timeout=self.timeout,
+                    check=False
+                )
+        except subprocess.TimeoutExpired:
+            logger.warning(f"TeraChem calculation for {input_file} timed out after {self.timeout} seconds")
+        finally:
+            os.chdir(current_dir)
         return output_file
 
     def collect_results(self, input_file: Path, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any], tmp_dir: Path):
@@ -227,8 +253,17 @@ scrdir ./scr_{index}
             raise FileNotFoundError(f"Gradients file {scr_dir / 'grad.xyz'} not found")
         with open(scr_dir / "results.dat", "r") as f:
             lines = f.readlines()
-            com = np.array(list(map(float, lines[2].split())))
-            dipole = np.array(list(map(float, lines[5].split()))) * 0.20819434 # Debye to e Angstrom
+            com_line_index = -1
+            dipole_line_index = -1
+            for i, line in enumerate(lines):
+                if line.startswith("Center of Mass (Angs):"):
+                    com_line_index = i + 2
+                if line.startswith("Ground state dipole moment (Debye):"):
+                    dipole_line_index = i + 2
+            if com_line_index == -1 or dipole_line_index == -1:
+                raise FileNotFoundError(f"Center of Mass or dipole moment line not found in {scr_dir / 'results.dat'}")
+            com = np.array(list(map(float, lines[com_line_index].split())))
+            dipole = np.array(list(map(float, lines[dipole_line_index].split()))) * 0.20819434 # Debye to e Angstrom
             dipole = dipole + com * package["Q"]
         with open(scr_dir / "grad.xyz", "r") as f:
             _ = f.readline()

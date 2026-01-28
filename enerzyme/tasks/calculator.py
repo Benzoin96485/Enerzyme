@@ -1,4 +1,5 @@
-from typing import Dict, Optional, List, Any
+import pathlib, importlib, sys, os
+from typing import Dict, Optional, Any
 from torch.nn import Module
 import numpy as np
 import ase
@@ -8,8 +9,24 @@ from ase.units import Hartree
 from ..data.transform import Transform
 from ..data.neighbor_list import full_neighbor_list
 from .trainer import _decorate_batch_output, _decorate_batch_input, _to_device
-import time
 
+
+def _init_patch_module(patch_path: str) -> None:
+    p = pathlib.Path(patch_path).expanduser().resolve()
+    if not p.exists():
+        raise FileNotFoundError(p)
+    if p.suffix != ".py":
+        raise ValueError(f"Plugin must be a .py file, got: {p}")
+
+    # Hash the patch file to get a unique module name
+    module_name = f"plugin_{p.stem}_{abs(hash(str(p)))}"
+    spec = importlib.util.spec_from_file_location(module_name, str(p))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot create module spec for {patch_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 class ASECalculator(Calculator):
     implemented_properties = ["energy", "forces", "dipole", "charges"]
@@ -47,8 +64,12 @@ class ASECalculator(Calculator):
         self.E_conversion_factor = Hartree / self.Hartree_in_E
         self.internal_calculator_weight = internal_calculator_weight
         self.external_calculator = external_calculator
-        self.external_calculator_weight = external_calculator_config.get("weight", 0.0)
-        self.use_external_calculator = self.external_calculator is not None and self.external_calculator_weight != 0
+        if self.external_calculator is None:
+            self.external_calculator_weight = None
+            self.use_external_calculator = False
+        else:
+            self.external_calculator_weight = external_calculator_config.get("weight", 0.0)
+            self.use_external_calculator = True
         self.uncertainty_calculator_config = uncertainty_calculator_config
 
     def _calculate_UDD(self, output: Dict[str, Any], A: float, B: float, NM: Optional[int]=None) -> Dict[str, Any]:
@@ -152,3 +173,55 @@ class ASECalculator(Calculator):
                 # if property == "forces":
                 #     print(np.max(np.abs(biases["forces"] / internal_results["forces"])))
                 self.results[property] += biases[property]
+
+
+def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", model_config_path: Optional[str] = None, calculator_patch: Optional[str] = None, neighbor_list_type: Optional[str]="full", Hartree_in_E: float=1, internal_calculator_weight: float=1.0, uncertainty_calculator_config: Optional[Dict[str, Any]]=None, external_calculator: Optional[Calculator]=None, external_calculator_config: Optional[Dict[str, Any]]=None):
+    from ..models import get_model_str, build_model, get_pretrain_path
+    from ..utils import YamlHandler, logger
+    from .trainer import DTYPE_MAPPING, _load_state_dict
+    device = torch.device(device)
+    dtype = DTYPE_MAPPING[dtype]
+    if model_config_path is None:
+        model_config_path = os.path.join(model_dir, 'config.yaml')
+    model_config = YamlHandler(model_config_path).read_yaml()
+    logger.info('Model Config: {}'.format(model_config))
+    transform = Transform(model_config.Datahub.transforms, simulation_mode=True)
+    if calculator_patch is not None:
+        calculator_patch_module = _init_patch_module(calculator_patch)
+        logger.info(f"Initialized calculator patch module: {calculator_patch}")
+    else:
+        calculator_patch_module = None
+    if calculator_patch_module is not None:
+        external_calculator_name = external_calculator_config.get("name", None)
+        if external_calculator_name is not None:
+            if hasattr(calculator_patch_module, external_calculator_name):
+                external_calculator = getattr(calculator_patch_module, external_calculator_name)
+            else:
+                raise ValueError(f"External calculator {external_calculator_name} not found in {calculator_patch_module}")
+        else:
+            raise ValueError(f"External calculator name not specified!")
+        logger.info(f"Initialized external calculator: {external_calculator_name}")
+    else:
+        external_calculator = None
+    for FF_key, FF_params in (model_config.Modelhub.internal_FFs | model_config.Modelhub.external_FFs).items():
+        if FF_params.get("active", False):
+            model_str = get_model_str(FF_key, FF_params)
+            model = build_model(FF_params.architecture, FF_params.layers, FF_params.build_params)
+            model_path = get_pretrain_path(os.path.join(model_dir, model_str), "best")
+            model = model.to(device).type(dtype)
+            _load_state_dict(model, device, model_path, inference=True)
+            model.eval()
+            calculator = ASECalculator(
+                model=model,
+                device=device,
+                dtype=dtype,
+                transform=transform,
+                neighbor_list_type=neighbor_list_type,
+                Hartree_in_E=Hartree_in_E,
+                internal_calculator_weight=internal_calculator_weight,
+                uncertainty_calculator_config=uncertainty_calculator_config,
+                external_calculator=external_calculator,
+                external_calculator_config=external_calculator_config
+            )
+            break
+    return calculator
