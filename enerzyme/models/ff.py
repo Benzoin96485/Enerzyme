@@ -355,7 +355,7 @@ class BaseFFLauncher(ABC):
             for k, v in withheld_set.raw_indices.items():
                 if k in training_set.raw_indices:
                     withheld_mask[k] &= ~np.isin(v, training_set.raw_indices[k])
-                if k in validation_set.raw_indices:
+                if validation_set is not None and k in validation_set.raw_indices:
                     withheld_mask[k] &= ~np.isin(v, validation_set.raw_indices[k])
 
             iter_count = al_state_dict.get("iter_count", 0)
