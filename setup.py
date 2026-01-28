@@ -2,11 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name='enerzyme',
-    version='0.5.0',
-    install_requires=['numpy', 'h5py', 'tqdm', 'ase', 'joblib', 'addict', 
+    version='0.6.0',
+    install_requires=['numpy<2.4.0', 'h5py', 'tqdm', 'ase', 'joblib', 'addict', 
                       'pandas', 'torch', 'scikit-learn', 'transformers',
                       'torch-ema', 'pyyaml', 'torch-geometric', 'rdkit', 'e3nn',
-                      'lightning'
+                      'lightning', "torch-scatter"
                       ],
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
     packages=find_packages(include=["enerzyme", "enerzyme.*"]),

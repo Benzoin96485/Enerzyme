@@ -1,4 +1,8 @@
-# Enerzyme
+<h1>
+<p align="center">
+    <img src="docs/_static/enerzyme.png" alt="Enerzyme logo" width="300"/>
+</p>
+</h1>
 
 Towards next-generation computational enzymatic catalysis with neural network potentials.
 
@@ -20,24 +24,24 @@ Currently supported model architectures:
 Recommended environment for internal force fields
 
 ```
-python==3.12.8
-pip==25.0
-setuptools==75.8.0
-h5py==3.12.1
-numpy==2.2.2
+python==3.13.5
+pip==25.2
+setuptools==80.9.0
+h5py==3.14.0
+numpy==2.3.5
 addict==2.4.0
 tqdm==4.67.1
-joblib==1.4.2
-pandas==2.2.3
-pytorch==2.5.1
-scikit-learn==1.6.1
-ase==3.24.0
-transformers==4.48.2
+joblib==1.5.1
+pandas==2.3.2
+torch==2.8.0
+scikit-learn==1.7.1
+ase==3.27.0
+transformers==4.55.4
 torch-ema==0.3
 pyyaml==6.0.2
 torch-scatter==2.1.2
-e3nn==0.5.5
-pytorch_geometric==2.6.1
+e3nn==0.5.6
+torch-geometric==2.6.1
 ```
 
 To test PhysNet, you also need
