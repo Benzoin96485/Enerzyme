@@ -42,6 +42,8 @@ pyyaml==6.0.2
 torch-scatter==2.1.2
 e3nn==0.5.6
 torch-geometric==2.6.1
+flask==3.1.2
+waitress==3.0.2
 ```
 
 To test PhysNet, you also need
@@ -94,7 +96,7 @@ Please see `enerzyme/config/active_learning_train.yaml` for details and recommen
 Energy (force) / Atomic Charge / Dipole moment prediction.
 
 ```bash
-enerzyme predict -c <configuration yaml file> -o <output directory> -m <model directory>
+enerzyme predict -c <prediction configuration yaml file> -o <output directory> -m <model directory> -mc <model configuration yaml file>
 ```
 
 Please see `enerzyme/config/predict.yaml` for details.
@@ -108,9 +110,11 @@ Supported simulation types:
 - Constrained optimization. See `enerzyme/config/opt.yaml`
 - Constrained flexible scan on the distance between two atoms. See `enerzyme/config/scan.yaml`
 - Constrained Langevin MD. See `enerzyme/config/nvt_md.yaml`
+- NEB. See `enerzyme/config/neb.yaml`
+- Enhanced sampling with plumed. See `enerzyme/config/plumed.yaml`. (Requires py-plumed)
 
 ```bash
-enerzyme simulate -c <configuration yaml file> -o <output directory> -m <model directory>
+enerzyme simulate -c <simulation configuration yaml file> -o <output directory> -m <model directory> -mc <model configuration yaml file>
 ```
 
 Enerzyme reads the `<model directory>` for the model configuration, load the models, do simulation, and report the results in the `<output directory>`.
@@ -120,7 +124,7 @@ Enerzyme reads the `<model directory>` for the model configuration, load the mod
 Extract fragments based on local uncertainty from the prediction
 
 ```bash
-enerzyme extract -c <configuration yaml file> -o <output directory> -m <model directory>
+enerzyme extract -c <extraction configuration yaml file> -o <output directory> -m <model directory> -mc <model configuration yaml file>
 ```
 
 Please see `enerzyme/config/extract.yaml` for details.
@@ -143,9 +147,25 @@ Guess bond orders from pdb file. Compatible with [QuantumPDB](https://github.com
 enerzyme bond -p <pdb file> -m <output mol file> -i <output image file> -t <template sdf file>
 ```
 
+### Server mode
+
+Open a server that respond to requests for prediction. It is more powerful to be combined with the [Enerzymette workflow manager](https://github.com/Benzoin96485/Enerzymette).
+
+```bash
+enerzyme listen -c <server configuration yaml file> -m <model directory> -o <output directory> -b <bind address> -mc <model configuration yaml file>
+```
+
+### Client mode
+
+Send requests to the server for prediction.
+
+```bash
+enerzyme request -u <server url> -f <input file format> -i <input file> -k <model key>
+```
+
 ### Copyright
 
-Copyright (c) 2025, Weiliang Luo
+Copyright (c) 2024-2026, Weiliang Luo
 
 
 #### Acknowledgements

@@ -170,8 +170,6 @@ class ASECalculator(Calculator):
                 self.results[property] = self.internal_calculator_weight * internal_results[property]
 
             if self.uncertainty_calculator_config is not None and property in ["energy", "forces"]:
-                # if property == "forces":
-                #     print(np.max(np.abs(biases["forces"] / internal_results["forces"])))
                 self.results[property] += biases[property]
 
 

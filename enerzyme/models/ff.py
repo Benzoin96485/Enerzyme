@@ -159,12 +159,17 @@ class FFDataset(Dataset):
         return {k: _indices[data_key_indices == self.key_order[k]] - self.prefix_sum[self.key_order[k]] for k in self.indices.keys()}
 
     def _key_indices_to_indices(self, key_indices: Dict[str, Iterable[int]]) -> np.ndarray[int]:
-        return np.concatenate([self.prefix_sum[self.key_order[k]] + np.array(v) for k, v in key_indices.items()])
+        if not key_indices:
+            return np.array([], dtype=np.int64)
+        extend_prefix_sum = np.concatenate([[0], self.prefix_sum])
+        return np.concatenate([extend_prefix_sum[self.key_order[k]] + np.array(v) for k, v in key_indices.items()])
 
     def __len__(self) -> int:
-        return self.prefix_sum[-1]
+        return 0 if len(self.prefix_sum) == 0 else int(self.prefix_sum[-1])
     
     def __getitem__(self, idx: int) -> Tuple[Dict[str, Iterable], Dict[str, Iterable]]:
+        if len(self) == 0:
+            raise IndexError("Cannot index into empty FFDataset")
         data_key, residue_idx = self._index_to_key_index(idx)
         return self.features[data_key].loc(residue_idx), self.targets[data_key].loc(residue_idx), data_key
 
