@@ -244,6 +244,7 @@ class EquivariantProductBasisBlock(nn.Module):
         super().__init__()
 
         self.use_sc = use_sc
+        self.target_irreps = target_irreps
         self.symmetric_contractions = SymmetricContraction(
             irreps_in=node_feats_irreps,
             irreps_out=target_irreps,

@@ -7,6 +7,7 @@ from e3nn.util.jit import compile_mode
 from e3nn.o3 import Irreps, SphericalHarmonics
 from .interaction import INTERACTION_CLASSES, EquivariantProductBasisBlock, LinearReadoutBlock, NonLinearReadoutBlock
 from ..layers import BaseFFCore, DistanceLayer, RangeSeparationLayer, BaseAtomEmbedding, BaseElectronEmbedding, BaseRBF, ChargeConservationLayer
+from ..activation import ACTIVATION_KEY_TYPE
 
 DEFAULT_BUILD_PARAMS = {
     'r_max': 5.0,
@@ -24,7 +25,7 @@ DEFAULT_LAYER_PARAMS = [{
         'num_interactions': 2,
         'MLP_irreps': "16x0e",
         'radial_MLP': [64, 64, 64],
-        'hidden_irreps': "128x0e + 128x1o",
+        'additional_hidden_irreps': "128x1o",
         'gate': "silu",
         'avg_num_neighbors': 8.0,
     }
@@ -289,6 +290,107 @@ class MACECore(BaseFFCore):
             node_feats = product(
                 node_feats=node_feats, sc=sc, node_attrs=node_attrs
             )
+            if self.shallow_ensemble_size > 1:
+                node_properties_list.append(readout(node_feats).reshape(-1, 2, self.shallow_ensemble_size))
+            else:
+                node_properties_list.append(readout(node_feats))
+        node_properties = torch.sum(
+            torch.stack(node_properties_list, dim=0), dim=0
+        )
+        return {"Ea": node_properties[:, 0], "Qa": node_properties[:, 1]}
+    
+
+class SpookyMACECore(MACECore):
+    def __init__(self, 
+        dim_embedding: int, 
+        additional_hidden_irreps: str,
+        num_interactions: int,
+        activation_fn: ACTIVATION_KEY_TYPE, 
+        num_residual_nonlocal_q: int, 
+        num_residual_nonlocal_k: int, 
+        num_residual_nonlocal_v: int,
+        max_Za: int, max_ell: int, num_rbf: int,
+        interaction_cls_first: Literal["RealAgnosticResidualInteractionBlock"],
+        interaction_cls: Literal["RealAgnosticResidualInteractionBlock"],
+        correlation: Union[int, List[int]],
+        avg_num_neighbors: float,
+        MLP_irreps: str, 
+        radial_MLP: List[int], 
+        gate: str,
+        shallow_ensemble_size: int=1
+    ):
+        super().__init__(
+            max_Za=max_Za, max_ell=max_ell, 
+            dim_embedding=dim_embedding, num_rbf=num_rbf, 
+            additional_hidden_irreps=additional_hidden_irreps, 
+            interaction_cls_first=interaction_cls_first, 
+            interaction_cls=interaction_cls, 
+            correlation=correlation, 
+            num_interactions=num_interactions, 
+            avg_num_neighbors=avg_num_neighbors, 
+            MLP_irreps=MLP_irreps, 
+            radial_MLP=radial_MLP, 
+            gate=gate, 
+            shallow_ensemble_size=shallow_ensemble_size
+        )
+        self._input_fields.add("batch_seg")
+        self.dim_embedding = dim_embedding
+        self.hidden_irreps = Irreps(f"{dim_embedding}x0e+" + additional_hidden_irreps)
+        from ..spookynet.interaction import NonlocalInteraction
+        self.nonlocal_interaction = torch.nn.ModuleList([NonlocalInteraction(
+            dim_embedding=dim_embedding,
+            num_residual_q=num_residual_nonlocal_q,
+            num_residual_k=num_residual_nonlocal_k,
+            num_residual_v=num_residual_nonlocal_v,
+            activation_fn=activation_fn,
+        ) for _ in range(num_interactions)])
+
+    def get_output(self, 
+            Za: Tensor, vij_sr: Tensor,
+            idx_i_sr: Tensor, idx_j_sr: Tensor, rbf: Tensor,
+            atom_embedding: Tensor, charge_embedding: Optional[Tensor]=None, spin_embedding: Optional[Tensor]=None,
+            batch_seg: Optional[Tensor]=None
+        ) -> Dict[str, Tensor]:
+        # prepare initial attributes and features
+        if charge_embedding is None:
+            charge_embedding = torch.zeros_like(atom_embedding)
+        if spin_embedding is None:
+            spin_embedding = torch.zeros_like(atom_embedding)
+        node_feats = atom_embedding + charge_embedding + spin_embedding
+        node_attrs = F.one_hot(Za, num_classes=self.max_Za + 1).to(node_feats.dtype)
+        edge_attrs = self.spherical_harmonics(vij_sr)
+        edge_feats = rbf
+        node_properties_list = []
+        if batch_seg is None:
+            num_batch = 1
+        else:
+            num_batch = batch_seg[-1] + 1
+        for interaction, product, readout, nonlocal_interaction in zip(
+            self.interactions, self.products, self.readouts, self.nonlocal_interaction
+        ):
+            node_feats, sc = interaction(
+                node_attrs=node_attrs,
+                node_feats=node_feats,
+                edge_attrs=edge_attrs,
+                edge_feats=edge_feats,
+                idx_i_sr=idx_i_sr,
+                idx_j_sr=idx_j_sr,
+            )
+            node_feats = product(
+                node_feats=node_feats, sc=sc, node_attrs=node_attrs
+            )
+            target_irreps = Irreps(product.target_irreps)
+            slice_0e = target_irreps.slices()[0]
+            nl_result = nonlocal_interaction(
+                x=node_feats[:, slice_0e],
+                num_batch=num_batch,
+                batch_seg=batch_seg,
+            )
+            # Out-of-place update to avoid breaking autograd (in-place += would
+            # modify a tensor needed for gradient computation).
+            update = torch.zeros_like(node_feats)
+            update[:, slice_0e] = nl_result
+            node_feats = node_feats + update
             if self.shallow_ensemble_size > 1:
                 node_properties_list.append(readout(node_feats).reshape(-1, 2, self.shallow_ensemble_size))
             else:

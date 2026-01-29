@@ -23,34 +23,33 @@ SEP = "-"
 
 def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], List[Dict[str, Any]]]:
     global LOSS_REGISTER
+    special_loss = {}
     if architecture.lower() == "schnet":
         from .schnet import SchNetCore as Core
         from .schnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
     elif architecture.lower() == "physnet":
         from .physnet import PhysNetCore as Core
-        from .physnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        from .physnet import LOSS_REGISTER as special_loss
+        from .physnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS 
+        from .physnet import LOSS_REGISTER as physnet_special_loss
+        special_loss.update(physnet_special_loss)
     elif architecture.lower() == "spookynet":
         from .spookynet import SpookyNetCore as Core
         from .spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
     elif architecture.lower() == "leftnet":
         from .leftnet import LEFTNet as Core
         from .leftnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
     elif architecture.lower() == "mace":
         from .mace import MACECore as Core
         from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
+    elif architecture.lower() == "spookymace":
+        from .mace import SpookyMACECore as Core
+        from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS  
     elif architecture.lower() == "nequip":
         from .nequip import NequIPWrapper as Core
         from .nequip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
     elif architecture.lower() == "xpainn":
         from .xpainn import XPaiNNWrapper as Core
         from .xpainn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
     LOSS_REGISTER.update(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
