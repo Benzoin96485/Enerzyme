@@ -1,6 +1,9 @@
 # Minimal makefile for Sphinx documentation
 #
 
+# Ensure a valid locale for sphinx-build (fixes locale.Error on Read the Docs and minimal envs)
+export LC_ALL ?= C
+
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
