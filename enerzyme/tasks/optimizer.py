@@ -18,7 +18,8 @@ MODEL_HEAD_NAMES = {
     "SchNetCore": {"lin1", "lin2"},
     "SpookyNetCore": {"output"},
     "LEFTNet": {"last_layer", "last_layer_quantum"},
-    "MACECore": {"readouts"}
+    "MACECore": {"readouts"},
+    "SpookyMACECore": {"readouts"}
 }
 
 
