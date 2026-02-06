@@ -186,6 +186,8 @@ def pdb2mol(pdb_path: str, mol_path: str, img_path: str='', template_path: str='
     
     broken_HX = []
     for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() == 12:
+            atom.SetFormalCharge(2)
         if atom.GetAtomicNum() == 6 and atom.GetExplicitValence() == 3:
             for C_bond in atom.GetBonds():
                 C_bond_begin_atom = C_bond.GetBeginAtom()
