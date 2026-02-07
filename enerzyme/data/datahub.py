@@ -1,14 +1,26 @@
 import pickle, os
+from bisect import bisect
+from glob import glob
 from hashlib import md5
-from typing import Union, List, Dict, Optional, Iterable, Literal
+from typing import Union, List, Optional, Iterable, Literal, Any, Callable
 import h5py
 import numpy as np
+from ase import Atoms
+from ase.db import connect
 from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from .datatype import is_atomic, is_rounded, is_int, register_data_type
 from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
+
+
+ASE_PROPERTY_METHODS: Dict[str, Callable[[Atoms], Any]] = {
+    "E": lambda atoms: atoms.get_potential_energy(),
+    "Fa": lambda atoms: atoms.get_forces(),
+    "Qa": lambda atoms: atoms.get_charges(),
+    "Sa": lambda atoms: atoms.get_magnetic_moments(),
+}
 
 
 def load_from_pickle(data_path=str):
@@ -25,6 +37,138 @@ def load_from_pickle(data_path=str):
         return data
     else:
         raise TypeError(f"Unknown data type in {data_path}!")
+
+
+def _get_single_aselmdb_data_path(data_path=str) -> List[str]:
+    if os.path.isfile(data_path):
+        return [data_path]
+    elif os.path.isdir(data_path):
+        return glob(os.path.join(data_path, "*"))
+    else:
+        return glob(data_path)
+
+
+class ASELMDBSingleProperty:
+    def __init__(self, aselmdb_dataset: "ASELMDBDataset", get_property_method: Callable[[Atoms], Any]):
+        self.aselmdb_dataset = aselmdb_dataset
+        self.get_property_method = get_property_method
+    
+    def __len__(self) -> int:
+        return len(self.aselmdb_dataset)
+
+    def __getitem__(self, idx: int) -> Union[int, float, np.ndarray]:
+        db_idx = bisect(self.aselmdb_dataset._id_len_segments, idx)
+
+        el_idx = idx
+        if db_idx != 0:
+            el_idx = idx - self.aselmdb_dataset._id_len_segments[db_idx - 1]
+        assert el_idx >= 0
+
+        atoms_row = self.aselmdb_dataset.dbs[db_idx]._get_row(self.aselmdb_dataset.db_ids[db_idx][el_idx])
+        atoms = atoms_row.toatoms()
+
+        if isinstance(atoms_row.data, dict):
+            atoms.info.update(atoms_row.data)
+
+        if "sid" not in atoms.info:
+            atoms.info["sid"] = idx
+
+        return self.get_property_method(atoms)
+
+
+class ASELMDBDataset:
+    def __init__(self, data_path, connect_args: Dict[str, Any]=dict(), select_args: Dict[str, Any]=dict()):
+        self.data_paths = []
+        self.dbs = []
+        self.db_ids = []
+        default_connect_args = {
+            "readonly": True,
+            "use_lock_file": False
+        }
+        default_connect_args.update(connect_args)
+        if isinstance(data_path, list):
+            for single_data_path in data_path:
+                self.data_paths.extend(_get_single_aselmdb_data_path(single_data_path))
+        else:
+            self.data_paths.extend(_get_single_aselmdb_data_path(data_path))
+        if not self.data_paths:
+            raise ValueError(f"No data paths found in {data_path}")
+        
+        for single_data_path in self.data_paths:
+            try:
+                self.dbs.append(connect(single_data_path, **default_connect_args))
+            except Exception as e:
+                logger.warning(f"Failed to connect to {single_data_path}: {e}")
+                continue
+        if not self.dbs:
+            raise ValueError(f"Failed to connect to any of the data paths in {data_path}")
+        
+        for db in self.dbs:
+            if hasattr(db, "ids") and not select_args:
+                self.db_ids.append(db.ids)
+            else:
+                self.db_ids.append([row.id for row in db.select(**select_args)])
+        self.id_lens = [len(ids) for ids in self.db_ids]
+        self._id_len_segments = np.cumsum(self.id_lens).tolist()
+
+        first_db = self.dbs[0]
+        try:
+            first_row = first_db._get_row(self.db_ids[0][0])
+            first_atoms = first_row.toatoms()
+        except Exception as e:
+            raise ValueError(f"Failed to get atoms from {first_db}: {e}")
+        
+        properties_from_calculator = set()
+        if first_atoms.calc is not None:
+            for prop, method in ASE_PROPERTY_METHODS.items():
+                try:
+                    method(first_atoms)
+                except Exception as e:
+                    logger.warning(f"Failed to get {prop} directly from calculator: {e}")
+                else:
+                    properties_from_calculator.add(prop)
+        
+        self.properties_from_info = set()
+        print(first_row.data.keys())
+        for k, v in first_row.data.items():
+            if isinstance(v, float) or isinstance(v, int) or isinstance(v, np.ndarray):
+                self.properties_from_info.add(k)
+
+        self.unique_properties_from_calculator = properties_from_calculator - self.properties_from_info
+        overlapped_properties = properties_from_calculator & self.properties_from_info
+        self._all_properties = self.unique_properties_from_calculator | self.properties_from_info | {"Ra", "Za", "N"}
+        if overlapped_properties:
+            logger.warning(f"Property {overlapped_properties} found in calculator will be overwritten by info")
+        logger.info(f"Properties from calculator: {self.unique_properties_from_calculator}")
+        logger.info(f"Properties from info: {self.properties_from_info}")
+
+    def __len__(self) -> int:
+        return sum(self.id_lens)
+
+    def __getitem__(self, k) -> np.ndarray:
+        if k == "Ra":
+            get_property_method = lambda atoms: atoms.get_positions()
+        elif k == "Za":
+            get_property_method = lambda atoms: atoms.get_atomic_numbers()
+        elif k == "N":
+            get_property_method = lambda atoms: len(atoms)
+        elif k in ASE_PROPERTY_METHODS.keys() and k in self.unique_properties_from_calculator:
+            get_property_method = ASE_PROPERTY_METHODS[k]
+        else:
+            get_property_method = lambda atoms: atoms.info.get(k, None)
+        return ASELMDBSingleProperty(self, get_property_method=get_property_method)
+    
+    def __contains__(self, k) -> bool:
+        return k in self._all_properties
+
+    def items(self):
+        return {k: self[k] for k in self._all_properties}
+
+    def keys(self):
+        return self._all_properties
+
+    def values(self):
+        return [self[k] for k in self._all_properties]
 
 
 def _collect_types(types: Optional[Union[List, Dict]]) -> Dict:
@@ -105,6 +249,8 @@ class SingleDataHub:
         hash_length: int=16,
         compressed: bool=True,
         max_memory: int=10,
+        connect_args: Dict[str, Any]=dict(),
+        select_args: Dict[str, Any]=dict(),
         **params
     ):
         self.data_path = os.path.abspath(data_path)
@@ -116,7 +262,7 @@ class SingleDataHub:
         self.neighbor_list_type = neighbor_list
         self.compressed = compressed
         self.max_memory = max_memory
-        datahub_str = data_path + neighbor_list + \
+        datahub_str = data_path + str(neighbor_list) + \
             str(sorted(preprocessings.items()) if preprocessings is not None else '') + \
             str(sorted(global_transforms.items()) if global_transforms is not None else '')
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
@@ -126,6 +272,8 @@ class SingleDataHub:
         self.global_transform = Transform(global_transforms, self.preload_path)
         self.preprocessings = preprocessings
         self.global_transforms = global_transforms
+        self.connect_args = connect_args
+        self.select_args = select_args
         if not self.preload or not self.preload_data():
             self.get_handle("w")
             self._init_data()
@@ -245,6 +393,8 @@ class SingleDataHub:
             from .supplier import SDFSupplier
             supplier = SDFSupplier(self.data_path, supplying_fields=self.data_types.keys())
             raw_data = supplier.raw_data()
+        elif self.data_format == "aselmdb" or suffix == "aselmdb":
+            raw_data = ASELMDBDataset(self.data_path, connect_args=self.connect_args, select_args=self.select_args)
         else:
             raise ValueError(f"Data format of {self.data_path} is unknown")
 
