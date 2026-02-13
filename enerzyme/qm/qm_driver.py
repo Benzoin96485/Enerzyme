@@ -2,26 +2,39 @@ import numpy as np
 from shutil import copy, rmtree
 import os
 import subprocess
-from typing import Any, Dict, Literal, Optional
+import queue # TODO: 
+from typing import Any, Dict, Literal, Optional, Union
 from pathlib import Path
 from abc import ABC, abstractmethod
+import ase.io
+from ase.units import Bohr, Ha, Debye
+from ase import Atoms
+from ase.db import connect
+from ase.calculators.singlepoint import SinglePointCalculator
 from tqdm import tqdm
-from pickle import dump, load
-from rdkit import Chem
 from multiprocessing import Pool, cpu_count
 from ..utils import logger
 from ..data.supplier import Supplier
 
 
+QM_CALCULATED_TO_ASE_PROPERTY = {
+    "E": "energy",
+    "Fa": "forces",
+    "M2": "dipole",
+    "Qa": "charges",
+    "Sa": "magmoms",
+}
+
 class QMDriver(ABC):
     def __init__(self, 
-        supplier: Supplier, tmp_dir: str, output_dir: str, pickle_name: str,
-        bs: str, xc: str,  
+        supplier: Supplier, tmp_dir: str, output_dir: str, output_file: str, 
+        template_input_file: str,
         keep_molden: bool = False,
         keep_stdout: bool = False,
         clean_tmp: bool = True,
         n_processes: int = 1,
-        dump_single_run: bool = True
+        timeout: Optional[float] = None,
+        **kwargs
     ):
         '''
         Base class for QM drivers.
@@ -34,12 +47,8 @@ class QMDriver(ABC):
             The directory to store temporary files.
         output_dir: str
             The directory to store output files.
-        pickle_name: str
-            The name of the pickle file to store the results.
-        bs: str
-            The basis set to use.
-        xc: str
-            The exchange-correlation functional to use.
+        output_file: str
+            The name of the output file to store the results.
         keep_molden: bool
             Whether to keep the Molden files.
         keep_stdout: bool
@@ -48,38 +57,36 @@ class QMDriver(ABC):
             Whether to clean the temporary files.
         n_processes: int
             The number of processes to use.
-        dump_single_run: bool
-            Whether to dump the single run results.
         '''
         self.supplier = supplier
         self.tmp_dir_base = Path(tmp_dir).absolute() / self.supplier.name / "tmp"
         self.output_dir = Path(output_dir).absolute() / self.supplier.name
-        self.output_path = (self.output_dir / pickle_name).with_suffix(".pkl")
+        self.output_path = (self.output_dir / output_file)
+        self.default_connect_args = {
+            "use_lock_file": False
+        }
+        os.makedirs(self.output_dir, exist_ok=True)
+        self.template_input_file = template_input_file
         self.keep_molden = keep_molden
         if keep_molden:
             os.makedirs(self.output_dir / "moldens", exist_ok=True)
         self.keep_stdout = keep_stdout
         if keep_stdout:
             os.makedirs(self.output_dir / "stdout", exist_ok=True)
-        self.bs = bs
-        self.xc = xc
-        os.makedirs(self.output_dir, exist_ok=True)
         self.clean_tmp = clean_tmp
-        self.dump_single_run = dump_single_run
-        if self.dump_single_run:
-            os.makedirs(self.output_dir / "single_run", exist_ok=True)
         self.n_processes = n_processes if n_processes > 0 else cpu_count()
+        self.timeout = timeout
 
     @abstractmethod
-    def make_input(self, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any], tmp_dir: Path) -> None:
+    def make_input(self, atoms: Atoms, tmp_dir: Path) -> None:
         ...
 
     @abstractmethod
-    def invoke_qm(self, input_file: str, tmp_dir: Path) -> str:
+    def invoke_qm(self, input_file: str, atoms: Atoms, tmp_dir: Path) -> str:
         ...
 
     @abstractmethod
-    def collect_results(self, input_file: Path, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any], tmp_dir: Path) -> Dict[str, Any]:
+    def collect_results(self, input_file: Path, atoms: Atoms, tmp_dir: Path) -> Dict[str, Any]:
         ...
 
     def copy_files(self, output_file: Path, molden_file: Optional[Path]) -> None:
@@ -94,148 +101,132 @@ class QMDriver(ABC):
             else:
                 raise FileNotFoundError(f"Molden file {molden_file} not found")
 
-    def dump_results(self, result_package: Dict[str, Any]) -> None:
-        with open(self.output_dir / "single_run" / f"{result_package['index']}.pkl", "wb") as f:
-            dump(result_package, f)
-
-    def single_run(self, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any]):
-        single_run_path = self.output_dir / "single_run" / f"{package['index']}.pkl"
-        if single_run_path.exists():
-            with open(single_run_path, "rb") as f:
-                result_package = load(f)
-            logger.info(f"Single run results for {package['index']} already exist. Loading from {single_run_path}")
-            return result_package
-        tmp_dir = Path(str(self.tmp_dir_base) + f".{package['index']}")
-        os.makedirs(tmp_dir, exist_ok=True)
-        input_file = self.make_input(package=package, tmp_dir=tmp_dir)
-        output_file = self.invoke_qm(input_file, tmp_dir)
+    def single_run(self, atoms: Atoms) -> None:
+        db = connect(self.output_path, **self.default_connect_args)
+        index = atoms.info["index"]
         try:
-            result_package = self.collect_results(input_file, package, tmp_dir)
+            db.get(index=index)
+        except KeyError:
+            system_id = db.reserve()
+        else:
+            logger.warning(f"System {index} already exists in {self.output_path}. Skipping...")
+            return
+        
+        tmp_dir = Path(str(self.tmp_dir_base) + f".{index}")
+        os.makedirs(tmp_dir, exist_ok=True)
+
+        atom_info = {
+            "charge": atoms.info.get("charge", 0),
+            "spin": atoms.info.get("spin", 1),
+            "index": index,
+        }
+
+        input_file = self.make_input(atoms, tmp_dir)
+        output_file = self.invoke_qm(input_file, atoms, tmp_dir)
+        try:
+            result_package = self.collect_results(input_file, atoms, tmp_dir)
         except FileNotFoundError as e:
             logger.warning(f"Calculation of {input_file} failed: {e}")
-            result_package = {}
-            return result_package
+            db.delete(system_id)
+            return
         
         self.copy_files(output_file, result_package.get("molden_file", None))
         if self.clean_tmp:
             rmtree(tmp_dir)
-        result_package["atom_type"] = package["atom_type"]
-        result_package["coord"] = package["Ra"]
-        result_package["total_spin"] = package.get("spin", 0)
-        result_package["total_chrg"] = package["Q"]
-        result_package["index"] = package["index"]
-        if self.dump_single_run:
-            self.dump_results(result_package)
-        return result_package
+
+        results = {}
+        for qm_property, ase_property in QM_CALCULATED_TO_ASE_PROPERTY.items():
+            if qm_property in result_package:
+                results[ase_property] = result_package[qm_property]
+        atoms.calc = SinglePointCalculator(
+            atoms=atoms,
+            **results
+        )
+        db.write(atoms, id=system_id, data=atom_info, index=index)
 
     def run(self):
-        datapoints = []
         if self.n_processes == 1:
-            result_packages = []
-            for package in tqdm(self.supplier.suppl(), desc="Running QM", dynamic_ncols=True, leave=False, position=0):
-                result_package = self.single_run(package)
-                result_packages.append(result_package)
+            for atoms in tqdm(self.supplier.suppl(), desc="Running QM", dynamic_ncols=True, leave=False, position=0):
+                self.single_run(atoms)
         else:
             logger.info(f"Running QM calculations with {self.n_processes} processes")
             with Pool(self.n_processes) as p:
-                result_packages = list(tqdm(
+                list(tqdm(
                     p.imap(self.single_run, self.supplier.suppl()),
                     desc="Running QM",
                     dynamic_ncols=True,
                     leave=False,
                     position=0
                 ))
-        for result_package in result_packages:
-            if not result_package:
-                continue
-            datapoint = {k: result_package[k] for k in [
-                "energy", "grad", "dipole", "index", "atom_type", "coord", "total_spin", "total_chrg"
-            ]}
-            datapoints.append(datapoint)
-        dump(datapoints, open(self.output_path, "wb"))
-        logger.info(f"QM calculations finished. Pickle saved to {self.output_path}")
+        logger.info(f"QM calculations finished. ASE LMDB saved to {self.output_path}")
 
 
 class TeraChemDriver(QMDriver):
     def __init__(self, 
-        supplier: Supplier, tmp_dir: str, output_dir: str, pickle_name: str,
-        bs: str, xc: str,  
-        keep_molden: bool = False,
-        keep_stdout: bool = False,
-        clean_tmp: bool = True,
-        dftd: Optional[str] = None, 
-        pcm: Optional[str] = None,
-        epsilon: Optional[float] = None,
-        pcm_radii_file: Optional[str] = None,
-        scf_method: Optional[str] = "diis+a",
-        scf_maxit: Optional[int] = 1000,
-        scf_guess: Optional[str] = "generate",
-        n_processes: int = 1,
-        dump_single_run: bool = True,
-        timeout: Optional[float] = None,
-        *args, **kwargs
+        terachem_args: list[str]=["terachem"],
+        n_gpus: int=1,
+        **kwargs
     ):
-        super().__init__(supplier, tmp_dir, output_dir, pickle_name, bs, xc, keep_molden, keep_stdout, clean_tmp, n_processes, dump_single_run)
-        self.dftd = dftd
-        self.pcm = pcm
-        self.epsilon = epsilon
-        self.pcm_radii_file = pcm_radii_file
-        self.scf_method = scf_method
-        self.scf_maxit = scf_maxit
-        self.scf_guess = scf_guess
-        self.timeout = timeout
-
-    def make_input(self, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any], tmp_dir: Path) -> str:
-        Q = package["Q"]
-        S = package.get("S", 0)
-        index = package["index"]
-        base_input = f'''
-run gradient
-coordinates {tmp_dir / f"{index}.xyz"}
-basis {self.bs}
-method {self.xc}
-charge {Q}
-spinmult {S + 1}
-maxit {self.scf_maxit}
-scf {self.scf_method}
-guess {self.scf_guess}
-scrdir ./scr_{index}
-'''
-        if self.dftd:
-            base_input += f"dftd {self.dftd}\n"
-        if self.pcm:
-            assert self.epsilon is not None
-            assert self.pcm_radii_file is not None
-            base_input += f"pcm {self.pcm}\n"
-            base_input += f"epsilon {self.epsilon}\n"
-            base_input += f"pcm_radii read\n"
-            base_input += f"pcm_radii_file {self.pcm_radii_file}\n"
-        base_input += "end\n"
-        input_file = tmp_dir / f"{index}.in"
-        with open(input_file, "w") as f:
-            f.write(base_input)
-        if "mol" in package:
-            Chem.MolToXYZFile(package["mol"], tmp_dir / f"{index}.xyz")
-        elif "Ra" in package:
-            with open(tmp_dir / f"{index}.xyz", "w") as f:
-                f.write(f"{len(package['Ra'])}\n")
-                f.write("\n")
-                for i, (x, y, z) in enumerate(package["Ra"]):
-                    f.write(f"{package['atom_type'][i]} {x} {y} {z}\n")
+        self.terachem_args = terachem_args
+        if n_gpus < 1:
+            import torch
+            self.n_gpus = torch.cuda.device_count()
+            logger.info(f"Using all {self.n_gpus} GPUs")
         else:
-            raise ValueError(f"Invalid package: {package}")
+            self.n_gpus = n_gpus
+        super().__init__(**kwargs)
+
+    def make_input(self, atoms: Atoms, tmp_dir: Path) -> str:
+        index = atoms.info["index"]
+        input_file = tmp_dir / f"{index}.in"
+        Q = atoms.info.get("charge", 0)
+        spinmult = atoms.info.get("spin", 1)
+        
+        input_lines = [
+            "run gradient\n"
+            f"coordinates {tmp_dir / f"{index}.xyz"}\n"
+            f"charge {Q}\n"
+            f"spinmult {spinmult}\n"
+            f"scrdir ./scr_{index}\n"
+        ]
+        with open(self.template_input_file, "r") as f:
+            for line in f:
+                if line.startswith("run"):
+                    continue
+                elif line.startswith("coordinates"):
+                    continue
+                elif line.startswith("charge"):
+                    continue
+                elif line.startswith("spinmult"):
+                    continue
+                elif line.startswith("scrdir"):
+                    continue
+                elif line.strip() == "end":
+                    break
+                input_lines.append(line)
+
+        input_lines.append("end\n")
+        
+        with open(input_file, "w") as f:
+            f.writelines(input_lines)
+
+        ase.io.write(tmp_dir / f"{index}.xyz", atoms, format="xyz")
         return input_file
     
-    def invoke_qm(self, input_file: Path, tmp_dir: Path):
+    def invoke_qm(self, input_file: Path, atoms: Atoms, tmp_dir: Path):
         output_file = input_file.with_suffix(".out")
         current_dir = os.getcwd()
         os.chdir(tmp_dir)
+        if self.n_gpus > 1:
+            gpu_binding_flag = [f"-g{atoms.info['index'] % self.n_gpus}"]
+        else:
+            gpu_binding_flag = []
         try:
             with open(output_file, 'w') as f:
                 subprocess.run(
-                    ["terachem", str(input_file)],
+                    self.terachem_args + gpu_binding_flag + [str(input_file)],
                     stdout=f,
-                    stderr=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
                     timeout=self.timeout,
                     check=False
                 )
@@ -245,7 +236,9 @@ scrdir ./scr_{index}
             os.chdir(current_dir)
         return output_file
 
-    def collect_results(self, input_file: Path, package: Dict[Literal["index", "atom_type", "Ra", "Q", "mol"], Any], tmp_dir: Path):
+    def collect_results(self, input_file: Path, atoms: Atoms, tmp_dir: Path) -> Dict[
+        Literal["M2", "Fa", "E", "molden_file"], Any
+    ]:
         scr_dir = tmp_dir / f"scr_{input_file.stem}"
         if not (scr_dir / "results.dat").exists():
             raise FileNotFoundError(f"Results file {scr_dir / 'results.dat'} not found")
@@ -263,14 +256,14 @@ scrdir ./scr_{index}
             if com_line_index == -1 or dipole_line_index == -1:
                 raise FileNotFoundError(f"Center of Mass or dipole moment line not found in {scr_dir / 'results.dat'}")
             com = np.array(list(map(float, lines[com_line_index].split())))
-            dipole = np.array(list(map(float, lines[dipole_line_index].split()))) * 0.20819434 # Debye to e Angstrom
-            dipole = dipole + com * package["Q"]
+            dipole = np.array(list(map(float, lines[dipole_line_index].split()))) * ase.units.Debye # Debye to e Angstrom
+            dipole = dipole + com * atoms.info["charge"]
         with open(scr_dir / "grad.xyz", "r") as f:
             _ = f.readline()
             title = f.readline()
-            energy = float(title.split()[6])
-        grad = np.loadtxt(scr_dir / "grad.xyz", skiprows=2, usecols=(1,2,3)) / 0.5291772108 # Bohr to Angstrom
-        return {"dipole": dipole, "grad": grad, "energy": energy, "molden_file": scr_dir / (input_file.stem + ".molden")}
+            energy = float(title.split()[6]) * ase.units.Ha # Ha to eV
+        grad = np.loadtxt(scr_dir / "grad.xyz", skiprows=2, usecols=(1,2,3)) / ase.units.Bohr # Bohr to Angstrom
+        return {"M2": dipole, "Fa": grad, "E": energy, "molden_file": scr_dir / (input_file.stem + ".molden")}
 
 class ORCADriver(QMDriver):
     pass

@@ -9,7 +9,7 @@ class QMAnnotate:
         supplier = get_supplier(**self.supplier_config, start=start, end=end)
         if self.driver_config["engine"].lower() == "terachem":
             from .qm.qm_driver import TeraChemDriver
-            self.driver = TeraChemDriver(supplier, tmp_dir, out_dir, **self.driver_config)
+            self.driver = TeraChemDriver(supplier=supplier, tmp_dir=tmp_dir, output_dir=out_dir, **self.driver_config)
 
     def drive(self):
         self.driver.run()

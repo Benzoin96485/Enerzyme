@@ -6,6 +6,7 @@ from typing import Union, List, Optional, Iterable, Literal, Any, Callable
 import h5py
 import numpy as np
 from ase import Atoms
+import ase.units
 from ase.db import connect
 from addict import Dict
 from tqdm import tqdm
@@ -77,7 +78,10 @@ class ASELMDBSingleProperty:
 
 
 class ASELMDBDataset:
-    def __init__(self, data_path, connect_args: Dict[str, Any]=dict(), select_args: Dict[str, Any]=dict()):
+    def __init__(self, data_path, new_energy_unit: str="Ha", connect_args: Dict[str, Any]=dict(), select_args: Dict[str, Any]=dict()):
+        if new_energy_unit != "eV":
+            logger.info(f"Loading ASE energy in {new_energy_unit}")
+        self.energy_unit_conversion_factor = 1 / getattr(ase.units, new_energy_unit)
         self.data_paths = []
         self.dbs = []
         self.db_ids = []
@@ -152,8 +156,15 @@ class ASELMDBDataset:
             get_property_method = lambda atoms: atoms.get_atomic_numbers()
         elif k == "N":
             get_property_method = lambda atoms: len(atoms)
+        elif k == "Q":
+            get_property_method = lambda atoms: atoms.info.get("charge", 0)
+        elif k == "S":
+            get_property_method = lambda atoms: atoms.info.get("spin", 1) - 1
         elif k in ASE_PROPERTY_METHODS.keys() and k in self.unique_properties_from_calculator:
-            get_property_method = ASE_PROPERTY_METHODS[k]
+            if k in {"E", "Fa"}:
+                get_property_method = lambda atoms: ASE_PROPERTY_METHODS[k](atoms) * self.energy_unit_conversion_factor
+            else:
+                get_property_method = lambda atoms: ASE_PROPERTY_METHODS[k](atoms)
         else:
             get_property_method = lambda atoms: atoms.info.get(k, None)
         return ASELMDBSingleProperty(self, get_property_method=get_property_method)
