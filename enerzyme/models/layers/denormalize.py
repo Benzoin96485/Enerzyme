@@ -1,4 +1,4 @@
-from typing import Dict, Union, Literal
+from typing import Dict, Union, Literal, Optional
 import torch
 from torch import nn, Tensor
 from . import BaseFFLayer
@@ -9,8 +9,8 @@ class AtomicAffineLayer(BaseFFLayer):
     def __init__(
         self, 
         max_Za: int, 
-        shifts: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 0, "learnable": True}, "Qa": {"values": 0, "learnable": True}},
-        scales: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 1, "learnable": True}, "Qa": {"values": 1, "learnable": True}}
+        shifts: Dict[Literal["Ea", "Qa", "Sa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 0, "learnable": True}, "Qa": {"values": 0, "learnable": True}, "Sa": {"values": 0, "learnable": True}},
+        scales: Dict[Literal["Ea", "Qa", "Sa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 1, "learnable": True}, "Qa": {"values": 1, "learnable": True}, "Sa": {"values": 1, "learnable": True}}
     ) -> None:
         atomic_properties = shifts.keys() | scales.keys()
         super().__init__(input_fields={"Za"} | atomic_properties, output_fields=atomic_properties)
@@ -20,7 +20,7 @@ class AtomicAffineLayer(BaseFFLayer):
 
     def build_affine(
         self, 
-        params: Dict[Literal["Ea", "Qa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]],
+        params: Dict[Literal["Ea", "Qa", "Sa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]],
         default_value: float
     ) -> nn.ParameterDict:
         affine_dict = dict()
@@ -38,11 +38,14 @@ class AtomicAffineLayer(BaseFFLayer):
             affine_dict[name] = nn.Parameter(affine_param, requires_grad=param["learnable"])
         return nn.ParameterDict(affine_dict)
     
-    def get_Ea(self, Ea: Tensor, Qa: Tensor, Za: Tensor) -> Tensor:
+    def get_Ea(self, Ea: Tensor, Za: Tensor, **kwargs) -> Tensor:
         return (Ea + self.shifts.Ea.gather(0, Za).view((-1, ) if Ea.dim() == 1 else (-1, 1))) * self.scales.Ea.gather(0, Za).view((-1, ) if Ea.dim() == 1 else (-1, 1))
     
-    def get_Qa(self, Ea: Tensor, Qa: Tensor, Za: Tensor) -> Tensor:
+    def get_Qa(self, Qa: Tensor, Za: Tensor, **kwargs) -> Tensor:
         return (Qa + self.shifts.Qa.gather(0, Za).view((-1, ) if Qa.dim() == 1 else (-1, 1))) * self.scales.Qa.gather(0, Za).view((-1, ) if Qa.dim() == 1 else (-1, 1))
+
+    def get_Sa(self, Sa: Tensor, Za: Tensor, **kwargs) -> Tensor:
+        return (Sa + self.shifts.Sa.gather(0, Za).view((-1, ) if Sa.dim() == 1 else (-1, 1))) * self.scales.Sa.gather(0, Za).view((-1, ) if Sa.dim() == 1 else (-1, 1))
     
     def _load_from_state_dict(self, state_dict: Dict[str, Tensor], *args, **kwargs):
         for k, v in state_dict.items():
@@ -54,9 +57,13 @@ class AtomicAffineLayer(BaseFFLayer):
                         state_dict[k] = torch.concat([v, self.shifts.Ea[len(v):]], dim=0)
                     if k.endswith("shifts.Qa"):
                         state_dict[k] = torch.concat([v, self.shifts.Qa[len(v):]], dim=0)
+                    if k.endswith("shifts.Sa"):
+                        state_dict[k] = torch.concat([v, self.shifts.Sa[len(v):]], dim=0)
                     if k.endswith("scales.Ea"):
                         state_dict[k] = torch.concat([v, self.scales.Ea[len(v):]], dim=0)
                     if k.endswith("scales.Qa"):
                         state_dict[k] = torch.concat([v, self.scales.Qa[len(v):]], dim=0)
+                    if k.endswith("scales.Sa"):
+                        state_dict[k] = torch.concat([v, self.scales.Sa[len(v):]], dim=0)
         super()._load_from_state_dict(state_dict, *args, **kwargs)
         

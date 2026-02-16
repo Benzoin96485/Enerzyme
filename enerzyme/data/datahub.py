@@ -20,6 +20,8 @@ ASE_PROPERTY_METHODS: Dict[str, Callable[[Atoms], Any]] = {
     "Fa": lambda atoms: atoms.get_forces(),
     "Qa": lambda atoms: atoms.get_charges(),
     "Sa": lambda atoms: atoms.get_magnetic_moments(),
+    "Q": lambda atoms: atoms.info.get("charge", 0),
+    "S": lambda atoms: atoms.info.get("spin", 1) - 1,
 }
 
 
@@ -75,6 +77,10 @@ class ASELMDBSingleProperty:
 
         return self.get_property_method(atoms)
 
+    def __iter__(self):
+        for idx in range(len(self)):
+            yield self[idx]
+
 
 class ASELMDBDataset:
     def __init__(self, data_path, connect_args: Dict[str, Any]=dict(), select_args: Dict[str, Any]=dict()):
@@ -129,14 +135,19 @@ class ASELMDBDataset:
                     properties_from_calculator.add(prop)
         
         self.properties_from_info = set()
+        self.quantum_numbers = set()
         print(first_row.data.keys())
         for k, v in first_row.data.items():
-            if isinstance(v, float) or isinstance(v, int) or isinstance(v, np.ndarray):
+            if k == "charge":
+                self.quantum_numbers.add("Q")
+            elif k == "spin":
+                self.quantum_numbers.add("S")
+            elif isinstance(v, float) or isinstance(v, int) or isinstance(v, np.ndarray):
                 self.properties_from_info.add(k)
 
         self.unique_properties_from_calculator = properties_from_calculator - self.properties_from_info
         overlapped_properties = properties_from_calculator & self.properties_from_info
-        self._all_properties = self.unique_properties_from_calculator | self.properties_from_info | {"Ra", "Za", "N"}
+        self._all_properties = self.unique_properties_from_calculator | self.properties_from_info | {"Ra", "Za", "N"} | self.quantum_numbers
         if overlapped_properties:
             logger.warning(f"Property {overlapped_properties} found in calculator will be overwritten by info")
         logger.info(f"Properties from calculator: {self.unique_properties_from_calculator}")
@@ -152,7 +163,7 @@ class ASELMDBDataset:
             get_property_method = lambda atoms: atoms.get_atomic_numbers()
         elif k == "N":
             get_property_method = lambda atoms: len(atoms)
-        elif k in ASE_PROPERTY_METHODS.keys() and k in self.unique_properties_from_calculator:
+        elif k in self.quantum_numbers or k in self.unique_properties_from_calculator:
             get_property_method = ASE_PROPERTY_METHODS[k]
         else:
             get_property_method = lambda atoms: atoms.info.get(k, None)
@@ -330,6 +341,8 @@ class SingleDataHub:
     
     def _compress(self, k: str, values: Iterable) -> np.ndarray:
         # only works for equal length data
+        if not (isinstance(values, list) or isinstance(values, np.ndarray)):
+            values = list(tqdm(values, total=len(values), desc=f"Enumerating {k} (data type {self.data_types[k]})"))
         value_array = np.array(values)
         if is_int(k) and self.compressed and (value_array == value_array[0]).all():
             logger.info(f"Values of {k} (data type {self.data_types[k]}) are all the same and compressed into a single value")
@@ -376,7 +389,7 @@ class SingleDataHub:
             raise IndexError(f"Length of {k} ({self.data_types[k]}) should be n_datapoint")
 
     def _init_data(self) -> None:
-        if not os.path.isfile(self.data_path):
+        if not os.path.exists(self.data_path):
             raise ValueError(f"Data path {self.data_path} doesn't exist.")
         suffix = self.data_path.split(".")[-1]
         if self.data_format == "hdf5" or suffix == "hdf5":
@@ -410,7 +423,10 @@ class SingleDataHub:
             raise KeyError(f"Dataset must contain 'Za' key (Atomic numbers)")
         
         n_Za = len(raw_data[self.data_types["Za"]])
-        Zas = parse_Za(raw_data[self.data_types["Za"]])
+        if self.data_format == "pickle":
+            Zas = parse_Za(raw_data[self.data_types["Za"]])
+        else:
+            Zas = raw_data[self.data_types["Za"]]
         if n_Za == 1:
             if self.data_types["N"] not in raw_data.keys():
                 # atom count determined by length of atomic numbers
