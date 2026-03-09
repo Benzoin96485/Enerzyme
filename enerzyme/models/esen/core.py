@@ -142,7 +142,7 @@ def _extract_backbone_state_dict(checkpoint_state_dict: Dict[str, Tensor]) -> Di
 
 
 class UMAWrapperQS(BaseFFCore):
-    def __init__(self, checkpoint_path: str, shallow_ensemble_size: int = 1):
+    def __init__(self, checkpoint_path: str, shallow_ensemble_size: int = 1, frozen_backbone: bool = False):
         super().__init__(
             input_fields={"Ra", "Za", "batch_seg", "Q", "S"},
             output_fields={"Qa", "Sa"},
@@ -161,6 +161,9 @@ class UMAWrapperQS(BaseFFCore):
         if backbone_state:
             matched = match_state_dict(self.backbone.state_dict(), backbone_state)
             load_state_dict(self.backbone, matched, strict=False)
+        if frozen_backbone:
+            for param in self.backbone.parameters():
+                param.requires_grad = False
 
         # Backbone node_embedding l=0 scalar has dimension sphere_channels
         dim_embedding = self.backbone.sphere_channels

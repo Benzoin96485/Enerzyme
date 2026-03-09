@@ -35,13 +35,14 @@ DTYPE_MAPPING = {
 }
 
 
-def _to_device_and_dtype(module: Module, device: torch.device, dtype: torch.dtype) -> Module:
+def _to_device_and_dtype(module: Module, device: Optional[torch.device], dtype: torch.dtype) -> Module:
     """Move module to device and convert floating-point params/buffers to dtype.
 
     Preserves integer buffers (e.g. index tensors like expand_index) as-is.
     model.type(dtype) would incorrectly convert them to float and break index_select.
     """
-    module = module.to(device)
+    if device is not None:
+        module = module.to(device)
     for param in module.parameters():
         if param.is_floating_point():
             param.data = param.data.to(dtype)
@@ -219,6 +220,7 @@ class Trainer:
         self.otf_graph = params.get("otf_graph", True)
         non_target_features = params.get("non_target_features", [])
         self.num_workers = params.get("num_workers", 0)
+        self.reset_parameters = params.get("reset_parameters", False)
         if self.num_workers <= 0:
             if "SLURM_NTASKS" in os.environ:
                 self.num_workers = max(1, int(os.environ["SLURM_NTASKS"]) // 2 - 1)
@@ -409,12 +411,18 @@ class Trainer:
 
         optimizer = get_optimizer(self.optimizer_name, model, self.optimizer_hyper_params)
         scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
+
+        if self.reset_parameters:
+            for m in model.modules():
+                if hasattr(m, "reset_parameters"):
+                    logger.info(f"Resetting parameters for {m.__class__.__name__}")
+                    m.reset_parameters()
         
         if self.lightning:
             logger.info("Using Lightning Trainer")
             from .lightning_utils import LightningModel
             lightning_model = LightningModel(
-                model.type(self.dtype), loss_terms, dump_dir,
+                _to_device_and_dtype(model, None, self.dtype), loss_terms, dump_dir,
                 optimizer, scheduler,
                 monitor=self.monitor,
                 transform=transform,
