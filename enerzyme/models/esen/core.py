@@ -145,7 +145,7 @@ class UMAWrapperQS(BaseFFCore):
     def __init__(self, checkpoint_path: str, shallow_ensemble_size: int = 1, frozen_backbone: bool = False):
         super().__init__(
             input_fields={"Ra", "Za", "batch_seg", "Q", "S"},
-            output_fields={"Qa", "Sa"},
+            output_fields={"atom_feature"},
         )
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
 
@@ -166,10 +166,7 @@ class UMAWrapperQS(BaseFFCore):
                 param.requires_grad = False
 
         # Backbone node_embedding l=0 scalar has dimension sphere_channels
-        dim_embedding = self.backbone.sphere_channels
-        self.output_head = DenseLayer(
-            dim_embedding, 2, use_bias=False, shallow_ensemble_size=shallow_ensemble_size
-        )
+        self.dim_feature_out = self.backbone.sphere_channels
 
     def __str__(self) -> str:
         return """
@@ -203,8 +200,4 @@ class UMAWrapperQS(BaseFFCore):
 
         emb = self.backbone(input_data)
         # Use scalar (l=0) component of node_embedding: shape (N, sphere_channels)
-        node_scalar = emb["node_embedding"][:, 0, :]
-        output = self.output_head(node_scalar)
-        if output.dim() == 3:
-            output = output.mean(dim=-1)
-        return {"Qa": output[:, 0], "Sa": output[:, 1]}
+        return {"atom_feature": emb["node_embedding"][:, 0, :]}
