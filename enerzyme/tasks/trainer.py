@@ -103,7 +103,7 @@ def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrai
     other_info = dict()
     if pretrain_path is None:
         return other_info
-    loaded_info = torch.load(pretrain_path, map_location=device)
+    loaded_info = torch.load(pretrain_path, map_location=device, weights_only=False)
     if 'pytorch-lightning_version' in loaded_info:
         loaded_info = _convert_lightning_state_dict(loaded_info)
     if ema is not None and "ema_state_dict" in loaded_info:
