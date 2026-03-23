@@ -40,9 +40,10 @@ class RMSELoss(WeightedLoss):
     def __init__(self, **weights: Dict[str, float]) -> None:
         super().__init__(**weights)
         self.mseloss = MSELoss_()
+        self.eps = 1e-10
 
     def loss_fn(self, output: Dict[str, torch.Tensor], target: Dict[str, torch.Tensor], k: str) -> torch.Tensor:
-        return torch.sqrt(self.mseloss(output[k], target[k]))
+        return torch.sqrt(self.mseloss(output[k], target[k]) + self.eps)
 
 
 class MAELoss(WeightedLoss):

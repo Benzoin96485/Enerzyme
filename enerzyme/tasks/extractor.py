@@ -1,5 +1,6 @@
 from queue import Queue
 from typing import List, Optional, Tuple
+import random
 from tqdm import tqdm
 import numpy as np
 from rdkit.Chem import MolFromMolFile, MolFromXYZBlock, Mol
@@ -188,7 +189,8 @@ class Extractor:
         local_uncertainty_radius: float = 5,
         fragment_radius: float = 5,
         n_centers: int = 1,
-        must_include_indices: List[int] = []
+        must_include_indices: List[int] = [],
+        extract_method: str = "local_uncertainty"
     ) -> None:
         '''
         Extractor class for extracting fragments from molecules.
@@ -215,6 +217,7 @@ class Extractor:
         self.fragment_radius = fragment_radius
         self.n_centers = n_centers
         self.must_include_indices = must_include_indices
+        self.extract_method = extract_method
 
     def build_fragment(self, y_pred: dict, xyzblocks: Optional[List[str]] = None, prefix: str = "") -> None:
         '''
@@ -247,23 +250,27 @@ class Extractor:
                 end_atom_idx = bond.GetEndAtomIdx()
                 bond = reference_mol.GetBondBetweenAtoms(begin_atom_idx, end_atom_idx)
                 dual_topology.append((begin_atom_idx, end_atom_idx, bond.GetBondType() if bond is not None else None))
-            
-            if "Fa_std" in y_pred:
-                Fa_std = np.array(y_pred["Fa_std"][frame_idx])
-            elif "Fa_var" in y_pred:
-                Fa_std = np.sqrt(np.array(y_pred["Fa_var"][frame_idx]))
-            else:
-                raise ValueError("Fa_std or Fa_var is not in the prediction result")
-            nbs = NearestNeighbors(radius=self.local_uncertainty_radius)
-            nbs.fit(Ra)
-            neighbors = nbs.radius_neighbors(Ra, return_distance=False)
-            local_uncertainty = []
-            for i in range(len(neighbors)):
-                local_uncertainty.append(np.mean(Fa_std[neighbors[i]]))
-            sorted_atom_idx = np.argsort(local_uncertainty[::-1])
 
-            coord = mol.GetConformer().GetPositions()
-            reference_mol.GetConformer().SetPositions(coord)
+            if self.extract_method == "local_uncertainty":
+                if "Fa_std" in y_pred:
+                    Fa_std = np.array(y_pred["Fa_std"][frame_idx])
+                elif "Fa_var" in y_pred:
+                    Fa_std = np.sqrt(np.array(y_pred["Fa_var"][frame_idx]))
+                else:
+                    raise ValueError("Fa_std or Fa_var is not in the prediction result")
+                nbs = NearestNeighbors(radius=self.local_uncertainty_radius)
+                nbs.fit(Ra)
+                neighbors = nbs.radius_neighbors(Ra, return_distance=False)
+                local_uncertainty = []
+                for i in range(len(neighbors)):
+                    local_uncertainty.append(np.mean(Fa_std[neighbors[i]]))
+                sorted_atom_idx = np.argsort(local_uncertainty[::-1])
+
+                coord = mol.GetConformer().GetPositions()
+                reference_mol.GetConformer().SetPositions(coord)
+            elif self.extract_method == "random":
+                sorted_atom_idx = list(range(len(Ra)))
+                random.shuffle(sorted_atom_idx)
             
             submol_indices = []
             for i in range(0, len(sorted_atom_idx), self.n_centers):
