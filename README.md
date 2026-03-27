@@ -21,6 +21,11 @@ Currently supported model architectures:
 
 ### Installation
 
+For my installation:
+
+1.) https://github.com/mane292/Enerzyme.git
+2.) cd Enerzyme (go to directory)
+3.) 
 Recommended environment for internal force fields
 
 ```
