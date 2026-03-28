@@ -7,23 +7,40 @@ from ...data.transform import PERIODIC_TABLE
 
 class AtomicAffineLayer(BaseFFLayer):
     def __init__(
-        self, 
-        max_Za: int, 
-        shifts: Dict[Literal["Ea", "Qa", "Sa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 0, "learnable": True}, "Qa": {"values": 0, "learnable": True}, "Sa": {"values": 0, "learnable": True}},
-        scales: Dict[Literal["Ea", "Qa", "Sa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]={"Ea": {"values": 1, "learnable": True}, "Qa": {"values": 1, "learnable": True}, "Sa": {"values": 1, "learnable": True}}
+        self,
+        max_Za: int,
+        shifts: Optional[
+            Dict[str, Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]
+        ] = None,
+        scales: Optional[
+            Dict[str, Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]
+        ] = None,
     ) -> None:
-        atomic_properties = shifts.keys() | scales.keys()
+        if shifts is None:
+            shifts = {
+                "Ea": {"values": 0.0, "learnable": True},
+                "Qa": {"values": 0.0, "learnable": True},
+                "Sa": {"values": 0.0, "learnable": True},
+            }
+        if scales is None:
+            scales = {
+                "Ea": {"values": 1.0, "learnable": True},
+                "Qa": {"values": 1.0, "learnable": True},
+                "Sa": {"values": 1.0, "learnable": True},
+            }
+
+        atomic_properties = set(shifts.keys()) | set(scales.keys())
         super().__init__(input_fields={"Za"} | atomic_properties, output_fields=atomic_properties)
         self.max_Za = max_Za
-        self.shifts = self.build_affine(shifts, 0)
-        self.scales = self.build_affine(scales, 1)
+        self.shifts = self.build_affine(shifts, 0.0)
+        self.scales = self.build_affine(scales, 1.0)
 
     def build_affine(
-        self, 
-        params: Dict[Literal["Ea", "Qa", "Sa"], Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]],
-        default_value: float
+        self,
+        params: Dict[str, Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]],
+        default_value: float,
     ) -> nn.ParameterDict:
-        affine_dict = dict()
+        affine_dict: Dict[str, nn.Parameter] = {}
         for name, param in params.items():
             values = param["values"]
             if isinstance(values, dict):
@@ -35,35 +52,40 @@ class AtomicAffineLayer(BaseFFLayer):
                         affine_param[idx] = value
             else:
                 affine_param = torch.full((self.max_Za + 1,), float(values))
-            affine_dict[name] = nn.Parameter(affine_param, requires_grad=param["learnable"])
+            affine_dict[name] = nn.Parameter(affine_param, requires_grad=bool(param["learnable"]))
         return nn.ParameterDict(affine_dict)
-    
-    def get_Ea(self, Ea: Tensor, Za: Tensor, **kwargs) -> Tensor:
-        return (Ea + self.shifts.Ea.gather(0, Za).view((-1, ) if Ea.dim() == 1 else (-1, 1))) * self.scales.Ea.gather(0, Za).view((-1, ) if Ea.dim() == 1 else (-1, 1))
-    
-    def get_Qa(self, Qa: Tensor, Za: Tensor, **kwargs) -> Tensor:
-        return (Qa + self.shifts.Qa.gather(0, Za).view((-1, ) if Qa.dim() == 1 else (-1, 1))) * self.scales.Qa.gather(0, Za).view((-1, ) if Qa.dim() == 1 else (-1, 1))
 
-    def get_Sa(self, Sa: Tensor, Za: Tensor, **kwargs) -> Tensor:
-        return (Sa + self.shifts.Sa.gather(0, Za).view((-1, ) if Sa.dim() == 1 else (-1, 1))) * self.scales.Sa.gather(0, Za).view((-1, ) if Sa.dim() == 1 else (-1, 1))
-    
+    def get_output(self, Za: Tensor, **kwargs) -> Dict[str, Tensor]:
+        output: Dict[str, Tensor] = {}
+        for name in self._output_fields:
+            if name not in kwargs:
+                continue
+            values = kwargs[name]
+            if values is None:
+                continue
+
+            shift = self.shifts[name].gather(0, Za)
+            scale = self.scales[name].gather(0, Za)
+
+            if values.dim() == 1:
+                shift = shift.view(-1)
+                scale = scale.view(-1)
+            else:
+                shift = shift.view(-1, 1)
+                scale = scale.view(-1, 1)
+
+            output[name] = (values + shift) * scale
+        return output
+
     def _load_from_state_dict(self, state_dict: Dict[str, Tensor], *args, **kwargs):
-        for k, v in state_dict.items():
-            if k.endswith("shifts.Ea") or k.endswith("shifts.Qa") or k.endswith("scales.Ea") or k.endswith("scales.Qa"):
+        for k, v in list(state_dict.items()):
+            if k.startswith("shifts.") or k.startswith("scales."):
+                # k format: "shifts.<prop_name>" or "scales.<prop_name>"
+                prefix, prop_name = k.split(".", 1)
                 if len(v) > self.max_Za + 1:
-                    state_dict[k] = v[:self.max_Za + 1]
+                    state_dict[k] = v[: self.max_Za + 1]
                 elif len(v) < self.max_Za + 1:
-                    if k.endswith("shifts.Ea"):
-                        state_dict[k] = torch.concat([v, self.shifts.Ea[len(v):]], dim=0)
-                    if k.endswith("shifts.Qa"):
-                        state_dict[k] = torch.concat([v, self.shifts.Qa[len(v):]], dim=0)
-                    if k.endswith("shifts.Sa"):
-                        state_dict[k] = torch.concat([v, self.shifts.Sa[len(v):]], dim=0)
-                    if k.endswith("scales.Ea"):
-                        state_dict[k] = torch.concat([v, self.scales.Ea[len(v):]], dim=0)
-                    if k.endswith("scales.Qa"):
-                        state_dict[k] = torch.concat([v, self.scales.Qa[len(v):]], dim=0)
-                    if k.endswith("scales.Sa"):
-                        state_dict[k] = torch.concat([v, self.scales.Sa[len(v):]], dim=0)
+                    ref = (self.shifts if prefix == "shifts" else self.scales)[prop_name]
+                    state_dict[k] = torch.concat([v, ref[len(v) :]], dim=0)
         super()._load_from_state_dict(state_dict, *args, **kwargs)
         

@@ -16,4 +16,5 @@ from .zbl import ZBLRepulsionEnergyLayer
 from .gather_embedding import GatherAtomEmbedding
 from .scalar_embedding import ScalarDenseEmbedding, ScalarResidualMLPEmbedding
 from .spin import SpinConservationLayer
-from .readout import SimpleReadout, HierachicalReadout
+from .nse import NeuralSpinChargeEquilibrationLayer
+from .readout import SimpleReadout, HierachicalReadout, NSEReadout
