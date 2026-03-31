@@ -150,9 +150,15 @@ class NuclearEmbedding(BaseAtomEmbedding):
         )
         self.use_electron_config = use_electron_config
         if use_electron_config:
-            self.register_buffer("electron_config", torch.tensor(ELECTRON_CONFIG))
+            # Match Parameter / Linear dtype (default float32). Numpy ELECTRON_CONFIG is float64;
+            # a float64 buffer here caused matmul errors before any model.to(dtype).
+            _dt = torch.get_default_dtype()
+            self.register_buffer(
+                "electron_config", torch.tensor(ELECTRON_CONFIG, dtype=_dt)
+            )
             self.config_linear = Linear(
-                self.electron_config.size(1), dim_embedding, bias=False)
+                self.electron_config.size(1), dim_embedding, bias=False
+            )
         self.reset_parameters(zero_init)
 
     def reset_parameters(self, zero_init: bool=True) -> None:
