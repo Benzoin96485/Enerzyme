@@ -25,12 +25,12 @@ class BaseReadout(BaseFFLayer):
             input_fields=["atom_feature"], 
             output_fields=output_fields | {"atom_feature"} if keep_feature else output_fields
         )
+        self.num_blocks = num_blocks
         self.shallow_ensemble_size = shallow_ensemble_size
         self.ordered_output_fields = sorted(list(output_fields))
         self.head_type = head_type
-        last_built_layer = built_layers[-1]
-        if hasattr(last_built_layer, "dim_feature_out"):
-            self.dim_feature_in = last_built_layer.dim_feature_out
+        if len(built_layers) > 0 and hasattr(built_layers[-1], "dim_feature_out"):
+            self.dim_feature_in = built_layers[-1].dim_feature_out
         elif dim_embedding is not None:
             self.dim_feature_in = dim_embedding
         else:
@@ -178,7 +178,7 @@ class NSEReadout(BaseReadout):
 class HierachicalReadout(BaseReadout):
     def __init__(self, use_nhloss: bool=False, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.heads = ModuleList(self._get_head())
+        self.heads = ModuleList([self._get_head() for _ in range(self.num_blocks)])
         self.use_nhloss = use_nhloss
 
     def get_output(self, atom_feature: Tensor) -> Dict[str, Tensor]:
@@ -199,4 +199,71 @@ class HierachicalReadout(BaseReadout):
         if self.use_nhloss:
             output["nh_loss"] = nhloss
         return output
+
+
+class HierachicalNSEReadout(BaseReadout):
+    """Hierachical readout head specialized for NSE intermediate variables.
+
+    This readout supports 3D `atom_feature` of shape (N, dim, num_blocks),
+    accumulating predictions across blocks (PhysNet-style), and enforces
+    non-negativity on `fa_*` outputs via a configurable positive activation.
+    """
+
+    def __init__(
+        self,
+        num_blocks: int,
+        output_fields: Optional[Set[str]] = None,
+        built_layers: List[Module] = [],
+        head_type: Literal["dense", "residual_layer", "residual_mlp"] = "residual_mlp",
+        dim_embedding: Optional[int] = None,
+        shallow_ensemble_size: int = 1,
+        keep_feature: bool = False,
+        activation_fn: Optional[ACTIVATION_KEY_TYPE] = None,
+        activation_params: ACTIVATION_PARAM_TYPE = dict(),
+        positive_activation_fn: POSITIVE_ACTIVATION_KEY_TYPE = "softplus",
+        **head_params,
+    ) -> None:
+        if output_fields is None:
+            output_fields = {
+                "Qa_alpha_tilde",
+                "Qa_beta_tilde",
+                "fa_alpha",
+                "fa_beta",
+            }
+        super().__init__(
+            num_blocks=num_blocks,
+            output_fields=output_fields,
+            built_layers=built_layers,
+            head_type=head_type,
+            dim_embedding=dim_embedding,
+            shallow_ensemble_size=shallow_ensemble_size,
+            keep_feature=keep_feature,
+            activation_fn=activation_fn,
+            activation_params=activation_params,
+            **head_params,
+        )
+        self.heads = ModuleList([self._get_head() for _ in range(self.num_blocks)])
+        self.positive_activation_fn = get_positive_activation_fn(positive_activation_fn)
+
+    def get_output(self, atom_feature: Tensor) -> Dict[str, Tensor]:
+        if atom_feature.ndim != 3:
+            raise ValueError(
+                f"HierachicalNSEReadout expects 3D atom_feature (N, dim, num_blocks), got ndim={atom_feature.ndim}"
+            )
+        if atom_feature.shape[-1] != self.num_blocks:
+            raise ValueError(
+                f"atom_feature last dim (num_blocks) mismatch: got {atom_feature.shape[-1]}, expected {self.num_blocks}"
+            )
+
+        raw_output = 0.0
+        for i in range(self.num_blocks):
+            raw_output = raw_output + self.heads[i](atom_feature[:, :, i])
+
+        results: Dict[str, Tensor] = {}
+        for i, output_field in enumerate(self.ordered_output_fields):
+            if output_field.startswith("fa"):
+                results[output_field] = self.positive_activation_fn(raw_output[:, i])
+            else:
+                results[output_field] = raw_output[:, i]
+        return results
 

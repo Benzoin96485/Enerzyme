@@ -17,4 +17,4 @@ from .gather_embedding import GatherAtomEmbedding
 from .scalar_embedding import ScalarDenseEmbedding, ScalarResidualMLPEmbedding
 from .spin import SpinConservationLayer
 from .nse import NeuralSpinChargeEquilibrationLayer
-from .readout import SimpleReadout, HierachicalReadout, NSEReadout
+from .readout import SimpleReadout, HierachicalReadout, NSEReadout, HierachicalNSEReadout

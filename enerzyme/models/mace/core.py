@@ -142,9 +142,15 @@ class MACECore(BaseFFCore):
         MLP_irreps: str, 
         radial_MLP: List[int], 
         gate: str,
-        shallow_ensemble_size: int=1
+        shallow_ensemble_size: int=1,
+        output_mode: Literal["direct", "feature"]="direct",
     ):
-        super().__init__(input_fields={"Za", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf", "atom_embedding", "charge_embedding", "spin_embedding"}, output_fields={"Ea", "Qa"})
+        self.output_mode: Literal["direct", "feature"] = output_mode
+        output_fields = {"Ea", "Qa"} if output_mode == "direct" else {"atom_feature"}
+        super().__init__(
+            input_fields={"Za", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf", "atom_embedding", "charge_embedding", "spin_embedding"},
+            output_fields=output_fields,
+        )
         self.max_Za = max_Za
         if isinstance(correlation, int):
             correlation = [correlation] * num_interactions
@@ -183,7 +189,8 @@ class MACECore(BaseFFCore):
             use_sc=use_sc_first,
         )
         self.products = torch.nn.ModuleList([prod])
-        self.readouts = torch.nn.ModuleList([LinearReadoutBlock(hidden_irreps, shallow_ensemble_size)])
+        if self.output_mode == "direct":
+            self.readouts = torch.nn.ModuleList([LinearReadoutBlock(hidden_irreps, shallow_ensemble_size)])
 
         for i in range(num_interactions - 1):
             if i == num_interactions - 2:
@@ -211,12 +218,13 @@ class MACECore(BaseFFCore):
                 use_sc=True,
             )
             self.products.append(prod)
-            if i == num_interactions - 2:
-                self.readouts.append(
-                    NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, GATE_FUNCTIONS[gate], shallow_ensemble_size)
-                )
-            else:
-                self.readouts.append(LinearReadoutBlock(hidden_irreps, shallow_ensemble_size))
+            if self.output_mode == "direct":
+                if i == num_interactions - 2:
+                    self.readouts.append(
+                        NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, GATE_FUNCTIONS[gate], shallow_ensemble_size)
+                    )
+                else:
+                    self.readouts.append(LinearReadoutBlock(hidden_irreps, shallow_ensemble_size))
         
 
     def __str__(self) -> str:
@@ -274,6 +282,21 @@ class MACECore(BaseFFCore):
         node_attrs = F.one_hot(Za, num_classes=self.max_Za + 1).to(node_feats.dtype)
         edge_attrs = self.spherical_harmonics(vij_sr)
         edge_feats = rbf
+        if self.output_mode == "feature":
+            for interaction, product in zip(self.interactions, self.products):
+                node_feats, sc = interaction(
+                    node_attrs=node_attrs,
+                    node_feats=node_feats,
+                    edge_attrs=edge_attrs,
+                    edge_feats=edge_feats,
+                    idx_i_sr=idx_i_sr,
+                    idx_j_sr=idx_j_sr,
+                )
+                node_feats = product(
+                    node_feats=node_feats, sc=sc, node_attrs=node_attrs
+                )
+            return {"atom_feature": node_feats}
+
         node_properties_list = []
         for interaction, product, readout in zip(
             self.interactions, self.products, self.readouts

@@ -108,6 +108,15 @@ DEFAULT_LAYER_PARAMS = [
         "params": {},
     },
     {
+        "name": "SimpleReadout",
+        "params": {
+            "output_fields": {"Ea", "Qa"},
+            "head_type": "residual_mlp",
+            "num_residual": 2,
+            "dim_embedding": 128,
+        },
+    },
+    {
         "name": "AtomicAffine",
         "params": {
             "shifts": {
@@ -188,7 +197,7 @@ class AllScAIPCore(BaseFFCore):
                 "charge_embedding",
                 "spin_embedding",
             },
-            output_fields={"Ea", "Qa"},
+            output_fields={"atom_feature"},
         )
         self.dim_embedding = dim_embedding
         self.num_layers = num_layers
@@ -276,7 +285,6 @@ class AllScAIPCore(BaseFFCore):
                 for _ in range(num_layers)
             ]
         )
-        self.readout = torch.nn.Linear(dim_embedding, 2)
 
     def _graph_hparams(self) -> AllScAIPGraphHParams:
         return AllScAIPGraphHParams(
@@ -366,7 +374,6 @@ class AllScAIPCore(BaseFFCore):
             neighbor_reps = block(graph_data, neighbor_reps, layer_idx=layer_idx)
 
         node_h = neighbor_reps[:, 0]
-        out = self.readout(node_h)
-        mask = graph_data.node_padding_mask.to(out.dtype).unsqueeze(-1)
-        out = out * mask
-        return {"Ea": out[:, 0], "Qa": out[:, 1]}
+        mask = graph_data.node_padding_mask.to(node_h.dtype).unsqueeze(-1)
+        node_h = node_h * mask
+        return {"atom_feature": node_h}

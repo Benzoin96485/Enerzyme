@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Literal
 import torch
 from torch import Tensor
 from torch.nn import Module, Sequential
@@ -68,9 +68,12 @@ class PhysNetCore(BaseFFCore):
         activation_fn: ACTIVATION_KEY_TYPE="shifted_softplus",   # activation function
         activation_params: ACTIVATION_PARAM_TYPE=dict(),
         dropout_rate: float=0.0,
-        shallow_ensemble_size: int=1
+        shallow_ensemble_size: int=1,
+        output_mode: Literal["direct", "feature"]="direct",
     ) -> None:
-        super().__init__(input_fields={"rbf", "atom_embedding", "idx_i_sr", "idx_j_sr"}, output_fields={"Ea", "Qa", "nh_loss"})
+        self.output_mode: Literal["direct", "feature"] = output_mode
+        output_fields = {"Ea", "Qa", "nh_loss"} if output_mode == "direct" else {"atom_feature"}
+        super().__init__(input_fields={"rbf", "atom_embedding", "idx_i_sr", "idx_j_sr"}, output_fields=output_fields)
         self.num_blocks = num_blocks
         self.drop_out = dropout_rate
         self.shallow_ensemble_size = shallow_ensemble_size
@@ -80,12 +83,13 @@ class PhysNetCore(BaseFFCore):
                 activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate
             ) for _ in range(num_blocks)
         ])
-        self.output_block = Sequential(*[
-            OutputBlock(
-                dim_embedding, num_residual_output, 
-                activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate, shallow_ensemble_size=shallow_ensemble_size
-            ) for _ in range(num_blocks)
-        ])
+        if self.output_mode == "direct":
+            self.output_block = Sequential(*[
+                OutputBlock(
+                    dim_embedding, num_residual_output, 
+                    activation_fn=activation_fn, activation_params=activation_params, dropout_rate=dropout_rate, shallow_ensemble_size=shallow_ensemble_size
+                ) for _ in range(num_blocks)
+            ])
 
     def build(self, built_layers: List[Module]) -> None:
         # build necessary fixed pre-core layers
@@ -118,6 +122,14 @@ class PhysNetCore(BaseFFCore):
         '''
         Compute raw atomic properties
         '''
+        if self.output_mode == "feature":
+            features: List[Tensor] = []
+            for i in range(self.num_blocks):
+                atom_embedding = self.interaction_block[i](atom_embedding, rbf, idx_i_sr, idx_j_sr)
+                features.append(atom_embedding)
+            atom_feature = torch.stack(features, dim=-1)  # (N, dim_embedding, num_blocks)
+            return {"atom_feature": atom_feature}
+
         Ea = 0 # atomic energy 
         Qa = 0 # atomic charge
         nhloss = 0 #non-hierarchicality loss
