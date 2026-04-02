@@ -29,6 +29,7 @@ Datahub:                                    # the following old-style datahub fo
                                             # summation of atomic reference energies in each frame will be deducted from the total energy
     negative_gradient: true                 # flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
     total_energy_normalization: false       # normalize the total energy globally by substract the mean and divide the standard deviation
+    # uniform_qs_init: true                 # optional: Q_init_a=Q/N, S_init_a=S/N per molecule for flow init; needs Q (and S) in data
 Modelhub:
   internal_FFs:                             # force fields built in enerzyme
     FF01:                                   # force field ID

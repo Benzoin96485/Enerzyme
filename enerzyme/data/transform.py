@@ -1,6 +1,6 @@
 import os, pathlib
 from abc import ABC, abstractmethod
-from typing import Dict, Iterable, Union, List, Optional
+from typing import Dict, Iterable, List, Optional, Union
 import joblib
 import pandas as pd
 import numpy as np
@@ -96,6 +96,89 @@ class NegativeGradientTransform(BaseTransform):
         if "Fa" in new_output:
             new_output["Fa"][idx] = -new_output["Fa"][idx]
 
+def wants_uniform_qs_init(global_transforms: Optional[Dict]) -> bool:
+    """True when `uniform_qs_init` is enabled in global_transforms (YAML hooks)."""
+    if not global_transforms or "uniform_qs_init" not in global_transforms:
+        return False
+    v = global_transforms["uniform_qs_init"]
+    if v is False or v is None:
+        return False
+    if isinstance(v, dict) and v.get("enabled") is False:
+        return False
+    return True
+
+
+class UniformSplitQSTransform(BaseTransform):
+    """Per-frame uniform split of total charge Q and spin S onto atoms: Q_init_a = Q/N, S_init_a = S/N.
+
+    S uses the same convention as elsewhere (multiplicity minus one). Missing Q or S default to 0.
+    """
+
+    POPULATED_KEYS = frozenset({"Q_init_a", "S_init_a"})
+
+    def __init__(
+        self,
+        q_key: str = "Q",
+        s_key: str = "S",
+        n_key: str = "N",
+        out_q: str = "Q_init_a",
+        out_s: str = "S_init_a",
+        *args,
+        **kwargs,
+    ) -> None:
+        super().__init__(major_key=out_q)
+        self.q_key = q_key
+        self.s_key = s_key
+        self.n_key = n_key
+        self.out_q = out_q
+        self.out_s = out_s
+        self.transform_type = "feature"
+
+    def transform(self, new_input: Dict[str, Iterable]) -> None:
+        if self.n_key not in new_input:
+            logger.warning("uniform_qs_init: missing N; skip Q_init_a / S_init_a")
+            return
+        n_frames = len(new_input[self.n_key])
+        n_len = len(new_input[self.n_key])
+        za = new_input["Za"]
+        if len(za.shape) < 2:
+            logger.warning("uniform_qs_init: unexpected Za shape; skip")
+            return
+        max_n = int(za.shape[1])
+        if self.q_key in new_input:
+            q_flat = np.asarray(new_input[self.q_key][:], dtype=np.float64).ravel()
+        else:
+            q_flat = np.zeros(1, dtype=np.float64)
+        if self.s_key in new_input:
+            s_flat = np.asarray(new_input[self.s_key][:], dtype=np.float64).ravel()
+        else:
+            s_flat = np.zeros(1, dtype=np.float64)
+        q_len = max(len(q_flat), 1)
+        s_len = max(len(s_flat), 1)
+        q_block = np.zeros((n_frames, max_n), dtype=np.float64)
+        s_block = np.zeros((n_frames, max_n), dtype=np.float64)
+        n_arr = np.asarray(new_input[self.n_key][:], dtype=np.int64).ravel()
+        for i in range(n_frames):
+            n_atoms = int(n_arr[i % len(n_arr)])
+            q_val = float(q_flat[i % q_len])
+            s_val = float(s_flat[i % s_len])
+            if n_atoms <= 0:
+                continue
+            inv = 1.0 / n_atoms
+            q_block[i, :n_atoms] = q_val * inv
+            s_block[i, :n_atoms] = s_val * inv
+        if self.out_q in new_input:
+            del new_input[self.out_q]
+        if self.out_s in new_input:
+            del new_input[self.out_s]
+        new_input.create_dataset(self.out_q, data=q_block)
+        new_input.create_dataset(self.out_s, data=s_block)
+        logger.info("uniform_qs_init: wrote Q_init_a and S_init_a (uniform Q/N, S/N per frame)")
+
+    def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
+        pass
+
+
 class TotalEnergyNormalization(BaseTransform):
     def __init__(self, preload_path=".", scale=None, shift=None):
         super().__init__(major_key="E")
@@ -146,6 +229,7 @@ class Transform:
         self.shifts = []
         self.scales = []
         self.normalizations = []
+        self.uniform_qs_inits: List[UniformSplitQSTransform] = []
         if transform_args is None:
             return
         for k, v in transform_args.items():
@@ -165,6 +249,14 @@ class Transform:
                 else:
                     raise ValueError(f"Invalid total energy normalization: {v}")
                 self.backup_keys.add("E")
+            if k == "uniform_qs_init":
+                if v is False or v is None:
+                    continue
+                if isinstance(v, dict) and v.get("enabled") is False:
+                    continue
+                kwargs = {k2: v2 for k2, v2 in v.items()} if isinstance(v, dict) else {}
+                kwargs.pop("enabled", None)
+                self.uniform_qs_inits.append(UniformSplitQSTransform(**kwargs))
 
     def transform(self, raw_input: Dict):
         for shift in self.shifts:
@@ -173,6 +265,8 @@ class Transform:
             scale.transform(raw_input)
         for normalization in self.normalizations:
             normalization.transform(raw_input)
+        for u in self.uniform_qs_inits:
+            u.transform(raw_input)
 
     def inverse_transform(self, raw_output: Dict, selected_indices: Optional[Iterable[int]]=None):
         for normalization in self.normalizations:

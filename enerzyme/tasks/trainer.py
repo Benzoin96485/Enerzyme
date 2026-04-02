@@ -19,6 +19,7 @@ from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
 from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input, _pyg_to_device
+from .generator_ode import generator_ode_predict_enabled, generator_predict_forward
 from .monitor import Monitor
 from .optimizer import get_optimizer, get_optimizer_config
 from ..data.transform import Transform
@@ -218,6 +219,7 @@ class Trainer:
         self.refresh_patience = params.get("refresh_patience", None)
         self.freeze_pretrain_weights = params.get("freeze_pretrain_weights", False)
         self.otf_graph = params.get("otf_graph", True)
+        self.generator_config = params.get("Generator")
         non_target_features = params.get("non_target_features", [])
         self.num_workers = params.get("num_workers", 0)
         self.reset_parameters = params.get("reset_parameters", False)
@@ -266,11 +268,32 @@ class Trainer:
                 logger.info("GPU not found, turn to CPU!")
                 self.device = torch.device("cpu")
 
-    def decorate_batch_input(self, batch):
+    def _decorate_batch_input_impl(self, batch, generator_training: bool):
         if self.pyg:
-            return _decorate_pyg_batch_input(batch, self.dtype, self.device, self.otf_graph)
-        else:
-            return _decorate_batch_input(batch, self.dtype, self.device, self.otf_graph)
+            return _decorate_pyg_batch_input(
+                batch,
+                self.dtype,
+                self.device,
+                self.otf_graph,
+                self.generator_config,
+                generator_training,
+            )
+        return _decorate_batch_input(
+            batch,
+            self.dtype,
+            self.device,
+            self.otf_graph,
+            self.generator_config,
+            generator_training,
+        )
+
+    def decorate_batch_input(self, batch):
+        """Training collate: random ``flow_t`` and linear interpolation for CFM."""
+        return self._decorate_batch_input_impl(batch, generator_training=True)
+
+    def decorate_eval_batch_input(self, batch):
+        """Eval / predict collate: ``flow_t=0``, flow state at init (ODE start)."""
+        return self._decorate_batch_input_impl(batch, generator_training=False)
         
     def to_device(self, batch):
         if self.pyg:
@@ -430,7 +453,8 @@ class Trainer:
                 use_ema=self.use_ema,
                 ema_decay=self.ema_decay,
                 ema_use_num_updates=self.ema_use_num_updates,
-                dump_interval=self.dump_interval
+                dump_interval=self.dump_interval,
+                generator_config=self.generator_config,
             )
             train_dataloader = DataLoader(
                 dataset=train_dataset,
@@ -446,7 +470,7 @@ class Trainer:
                     dataset=valid_dataset,
                     batch_size=self.inference_batch_size,
                     shuffle=False,
-                    collate_fn=self.decorate_batch_input,
+                    collate_fn=self.decorate_eval_batch_input,
                     pin_memory=True,
                     num_workers=max(1, self.num_workers)
                 )
@@ -464,7 +488,7 @@ class Trainer:
                     dataset=test_dataset,
                     batch_size=self.inference_batch_size,
                     shuffle=False,
-                    collate_fn=self.decorate_batch_input,
+                    collate_fn=self.decorate_eval_batch_input,
                     pin_memory=True,
                     num_workers=max(1, self.num_workers)
                 )
@@ -665,7 +689,7 @@ class Trainer:
             dataset=dataset,
             batch_size=self.inference_batch_size,
             shuffle=False,
-            collate_fn=self.decorate_batch_input,
+            collate_fn=self.decorate_eval_batch_input,
             num_workers=self.num_workers,
         )
         model = model.eval()
@@ -676,7 +700,13 @@ class Trainer:
         y_truths = defaultdict(list)
         for i, batch in enumerate(dataloader):
             net_input, net_target = self.to_device(batch)
-            output = model(net_input)
+            if generator_ode_predict_enabled(self.generator_config):
+                with torch.no_grad():
+                    output = generator_predict_forward(
+                        model, net_input, self.generator_config
+                    )
+            else:
+                output = model(net_input)
             # Get model outputs
             if self.monitor is not None:
                 self.monitor.collect(output)

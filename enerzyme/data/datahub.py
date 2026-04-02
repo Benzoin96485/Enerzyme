@@ -11,7 +11,7 @@ from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from .datatype import is_atomic, is_rounded, is_int, register_data_type
-from .transform import parse_Za, Transform
+from .transform import UniformSplitQSTransform, parse_Za, Transform, wants_uniform_qs_init
 from ..utils import YamlHandler, logger
 
 
@@ -270,6 +270,12 @@ class SingleDataHub:
         self.feature_types = _collect_types(features)
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
+        self._populate_uniform_qs_init = wants_uniform_qs_init(global_transforms)
+        if self._populate_uniform_qs_init:
+            self.feature_types = dict(self.feature_types)
+            for _k in UniformSplitQSTransform.POPULATED_KEYS:
+                self.feature_types.setdefault(_k, _k)
+            self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
         self.compressed = compressed
         self.max_memory = max_memory
@@ -460,6 +466,12 @@ class SingleDataHub:
         
         for k in self.data_types:
             if k in ["Za", "N"]:
+                continue
+            elif (
+                is_atomic(k)
+                and k in UniformSplitQSTransform.POPULATED_KEYS
+                and self._populate_uniform_qs_init
+            ):
                 continue
             elif is_atomic(k):
                 self._load_atomic_data(k, raw_data)

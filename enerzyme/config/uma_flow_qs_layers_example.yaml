@@ -1,0 +1,59 @@
+# Example ``layers`` (and related keys) for ``architecture: uma_flow_qs``.
+# Set ``dim_embedding`` in ``build_params`` to the UMA checkpoint's ``sphere_channels``.
+# Replace ``checkpoint_path`` with your fairchem UMA ``.pt`` checkpoint.
+#
+# Raw flow scalars (``Q_flow_a``, ``S_flow_a``, graph ``flow_t``) live in batch features;
+# embedding layers produce ``*_embedding`` keys; ``GatherAtomEmbedding`` sums them into
+# ``atom_embedding`` for :class:`UMAFlowWrapperQS` / :class:`ESCNMDBackboneFlow`.
+#
+# Under Modelhub.FFxx, use ``cfm`` loss with charge vs spin weights, for example:
+#
+#   loss:
+#     cfm:
+#       weight_q: 1.0
+#       weight_s: 0.5    # relative weight for spin velocity MSE vs charge
+#
+# Optional overrides: ``vel_q_key``, ``vel_s_key``, ``target_q_key``, ``target_s_key``,
+# ``init_q_key``, ``init_s_key`` (defaults match flow batch / dataset names).
+
+build_params:
+  dim_embedding: 128
+  Bohr_in_R: 0.5291772108
+  Hartree_in_E: 1
+
+layers:
+  - name: ScalarDenseEmbedding
+    params:
+      embed_field: Q_flow_a
+      dim_embedding: 128
+      initial_weight: zero
+      initial_bias: zero
+      activation_fn: null
+  - name: ScalarDenseEmbedding
+    params:
+      embed_field: S_flow_a
+      dim_embedding: 128
+      initial_weight: zero
+      initial_bias: zero
+      activation_fn: null
+  - name: GraphScalarBroadcastEmbedding
+    params:
+      embed_field: flow_t
+      dim_embedding: 128
+  - name: GatherAtomEmbedding
+  - name: Core
+    params:
+      checkpoint_path: /path/to/uma_checkpoint.pt
+      frozen_backbone: false
+  - name: VelocityReadout
+    params:
+      head_type: dense
+      dim_embedding: 128
+      output_fields:
+        - Q_vel_a
+        - S_vel_a
+      keep_feature: false
+  - name: VelocityConservation
+
+# Trainer ``Generator``: ``enabled``, ``ode_predict`` (default true), ``ode_method`` (e.g. dopri5),
+# ``ode_rtol`` / ``ode_atol``, optional ``ode_adjoint``, ``ode_options`` — see ``enerzyme.tasks.generator_ode``.

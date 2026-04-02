@@ -1,0 +1,25 @@
+# Example ``layers`` for ``architecture: uma_qs`` (UMA backbone + NSE-style readout).
+# Replace ``checkpoint_path`` with your fairchem UMA checkpoint. ``dim_embedding`` must match
+# the checkpoint's ``sphere_channels``.
+
+build_params:
+  dim_embedding: 128
+
+layers:
+  - name: Core
+    params:
+      checkpoint_path: /path/to/uma_checkpoint.pt
+      frozen_backbone: false
+  - name: NSEReadout
+    params:
+      head_type: residual_mlp
+      dim_embedding: 128
+      num_residual: 2
+      activation_fn: swish
+      activation_params:
+        dim_feature: 1
+        initial_alpha: 1
+        initial_beta: 1
+        learnable: false
+      keep_feature: false
+  - name: NeuralSpinChargeEquilibration

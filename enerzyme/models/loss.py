@@ -101,6 +101,60 @@ class L2Penalty:
         return output.get("l2_penalty", 0) * self.weight
 
 
+class CFMLoss:
+    """Conditional flow matching loss: match per-atom velocities to label minus init.
+
+    Minimizes ``weight_q * mean((v_q - (Qa - Q_init))^2) + weight_s * mean((v_s - (Sa - S_init))^2)``.
+    With Generator batch decoration, ``Q_init_a`` / ``S_init_a`` are also present on ``target``.
+    """
+
+    def __init__(
+        self,
+        weight_q: float = 1.0,
+        weight_s: float = 1.0,
+        vel_q_key: str = "Q_vel_a",
+        vel_s_key: str = "S_vel_a",
+        target_q_key: str = "Qa",
+        target_s_key: str = "Sa",
+        init_q_key: str = "Q_init_a",
+        init_s_key: str = "S_init_a",
+    ) -> None:
+        self.weight_q = float(weight_q)
+        self.weight_s = float(weight_s)
+        self.vel_q_key = vel_q_key
+        self.vel_s_key = vel_s_key
+        self.target_q_key = target_q_key
+        self.target_s_key = target_s_key
+        self.init_q_key = init_q_key
+        self.init_s_key = init_s_key
+
+    def __call__(self, output: Dict[str, torch.Tensor], target: Dict[str, torch.Tensor]) -> torch.Tensor:
+        if self.vel_q_key in output and self.vel_s_key in output:
+            loss = output[self.vel_q_key].new_zeros(())
+            if self.weight_q != 0.0:
+                dq = target[self.target_q_key] - target[self.init_q_key]
+                loss = loss + self.weight_q * (output[self.vel_q_key] - dq).pow(2).mean()
+            if self.weight_s != 0.0:
+                ds = target[self.target_s_key] - target[self.init_s_key]
+                loss = loss + self.weight_s * (output[self.vel_s_key] - ds).pow(2).mean()
+            return loss
+        if self.target_q_key in output and self.target_s_key in output:
+            loss = output[self.target_q_key].new_zeros(())
+            if self.weight_q != 0.0:
+                loss = loss + self.weight_q * (
+                    output[self.target_q_key] - target[self.target_q_key]
+                ).pow(2).mean()
+            if self.weight_s != 0.0:
+                loss = loss + self.weight_s * (
+                    output[self.target_s_key] - target[self.target_s_key]
+                ).pow(2).mean()
+            return loss
+        raise KeyError(
+            f"CFMLoss expected ({self.vel_q_key}, {self.vel_s_key}) or "
+            f"({self.target_q_key}, {self.target_s_key}) in output, got keys {set(output.keys())}"
+        )
+
+
 LOSS_REGISTER = {
     "mae": MAELoss,
     "mse": MSELoss,
@@ -108,5 +162,6 @@ LOSS_REGISTER = {
     "nll": NLLLoss,
     "nll_var_only": NLLLossVarOnly,
     "l2_penalty": L2Penalty,
-    "crps": CRPSLoss
+    "crps": CRPSLoss,
+    "cfm": CFMLoss,
 }

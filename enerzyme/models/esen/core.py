@@ -7,9 +7,9 @@ import fairchem.core.models.uma.escn_md
 import fairchem.core.models.uma.escn_moe
 from fairchem.core.common.registry import registry as fairchem_registry
 from fairchem.core.datasets.atomic_data import AtomicData
+from .flow_umabackbone import ESCNMDBackboneFlow
 from .utils import load_state_dict, match_state_dict
 from ..layers import BaseFFCore
-from ..blocks.mlp import DenseLayer
 
 # Default vacuum padding (Angstrom) for aperiodic molecules when creating cell
 _DEFAULT_VACUUM = 50.0
@@ -42,6 +42,10 @@ def _fields_to_atomic_data(
 
     Returns:
         AtomicData with empty edge_index; backbone builds graph internally via otf_graph.
+
+    Flow-matching inputs (e.g. ``Q_flow_a``, ``S_flow_a``, ``flow_t``) are embedded in
+    pre-core layers and summed by :class:`enerzyme.models.layers.GatherAtomEmbedding` into
+    ``atom_embedding`` before :class:`UMAFlowWrapperQS`; they are not stored on AtomicData.
     """
     if device is None:
         device = Ra.device
@@ -200,4 +204,73 @@ class UMAWrapperQS(BaseFFCore):
 
         emb = self.backbone(input_data)
         # Use scalar (l=0) component of node_embedding: shape (N, sphere_channels)
+        return {"atom_feature": emb["node_embedding"][:, 0, :]}
+
+
+class UMAFlowWrapperQS(BaseFFCore):
+    """UMA backbone with early fusion of pre-core ``atom_embedding`` (see references/flow_matching.md §3.1).
+
+    Place :class:`enerzyme.models.layers.ScalarDenseEmbedding` (e.g. ``initial_weight: zero``) and
+    :class:`enerzyme.models.layers.GraphScalarBroadcastEmbedding` before ``GatherAtomEmbedding`` so flow scalars become
+    ``*_embedding`` fields summed into ``atom_embedding``, then added to ``x_message[:, 0, :]``
+    before ``edge_degree_embedding``. Omit ``atom_embedding`` or pass zeros for standard UMA behavior.
+    """
+
+    def __init__(self, checkpoint_path: str, shallow_ensemble_size: int = 1, frozen_backbone: bool = False):
+        super().__init__(
+            input_fields={"Ra", "Za", "batch_seg", "Q", "S", "atom_embedding"},
+            output_fields={"atom_feature"},
+        )
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+
+        cfg = checkpoint.model_config
+        backbone_cfg = copy.deepcopy(cfg["backbone"])
+        model_name = backbone_cfg.pop("model")
+        if model_name != "escnmd_backbone":
+            raise ValueError(
+                f"UMAFlowWrapperQS only supports fairchem escnmd_backbone, got {model_name!r}"
+            )
+        self.backbone = ESCNMDBackboneFlow(**backbone_cfg)
+        self.backbone.otf_graph = True
+
+        state_dict = getattr(checkpoint, "ema_state_dict", None) or checkpoint.model_state_dict
+        backbone_state = _extract_backbone_state_dict(state_dict)
+        if backbone_state:
+            matched = match_state_dict(self.backbone.state_dict(), backbone_state)
+            load_state_dict(self.backbone, matched, strict=False)
+        if frozen_backbone:
+            for param in self.backbone.parameters():
+                param.requires_grad = False
+
+        self.dim_feature_out = self.backbone.sphere_channels
+
+    def __str__(self) -> str:
+        return """
+#####################################################################
+# UMA flow wrapper: q/s/t fused before equivariant interaction stack #
+#####################################################################
+"""
+
+    def build(self, built_layers) -> None:
+        pre_core = True
+        for layer in built_layers:
+            if layer is self:
+                pre_core = False
+                continue
+            if pre_core:
+                self.pre_sequence.append(layer)
+            else:
+                self.post_sequence.append(layer)
+
+    def get_output(
+        self,
+        Ra: Tensor,
+        Za: Tensor,
+        Q: Tensor,
+        S: Tensor,
+        batch_seg: Tensor,
+        atom_embedding: Tensor | None = None,
+    ) -> Dict[str, Tensor]:
+        input_data = _fields_to_atomic_data(Ra, Za, batch_seg, charge=Q, spin=S)
+        emb = self.backbone(input_data, atom_embedding=atom_embedding)
         return {"atom_feature": emb["node_embedding"][:, 0, :]}

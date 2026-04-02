@@ -267,3 +267,46 @@ class HierachicalNSEReadout(BaseReadout):
                 results[output_field] = raw_output[:, i]
         return results
 
+
+class VelocityReadout(BaseReadout):
+    """Per-atom velocity head for flow matching (e.g. charge and spin channel velocities)."""
+
+    def __init__(
+        self,
+        output_fields: Optional[Set[str]] = None,
+        built_layers: List[Module] = [],
+        head_type: Literal["dense", "residual_layer", "residual_mlp"] = "dense",
+        dim_embedding: Optional[int] = None,
+        shallow_ensemble_size: int = 1,
+        keep_feature: bool = False,
+        activation_fn: Optional[ACTIVATION_KEY_TYPE] = None,
+        activation_params: ACTIVATION_PARAM_TYPE = dict(),
+        **head_params,
+    ) -> None:
+        if output_fields is None:
+            output_fields = {"Q_vel_a", "S_vel_a"}
+        elif not isinstance(output_fields, set):
+            output_fields = set(output_fields)
+        super().__init__(
+            num_blocks=1,
+            output_fields=output_fields,
+            built_layers=built_layers,
+            head_type=head_type,
+            dim_embedding=dim_embedding,
+            shallow_ensemble_size=shallow_ensemble_size,
+            keep_feature=keep_feature,
+            activation_fn=activation_fn,
+            activation_params=activation_params,
+            **head_params,
+        )
+        self.head = self._get_head()
+
+    def get_output(self, atom_feature: Tensor) -> Dict[str, Tensor]:
+        if atom_feature.ndim == 2:
+            output = self.head(atom_feature)
+        elif atom_feature.ndim == 3:
+            output = self.head(atom_feature[:, :, -1])
+        return {
+            self.ordered_output_fields[i]: output[:, i] for i in range(self.dim_feature_out)
+        }
+

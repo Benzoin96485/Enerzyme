@@ -60,6 +60,15 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         DEFAULT_BUILD_PARAMS = {}
         DEFAULT_LAYER_PARAMS = []
         special_loss = {}
+    elif architecture.lower() == "uma_flow_qs":
+        from .esen import UMAFlowWrapperQS as Core
+
+        DEFAULT_BUILD_PARAMS = {
+            # Must match ``sphere_channels`` of the UMA checkpoint used in Core.
+            "dim_embedding": 128,
+        }
+        DEFAULT_LAYER_PARAMS = []
+        special_loss = {}
     LOSS_REGISTER.update(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
