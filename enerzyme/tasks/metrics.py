@@ -35,7 +35,7 @@ def build_single_metric(metric_str: str) -> Callable[[Dict[str, Union[List, np.n
             if y_preds.ndim == y_trues.ndim + 1:
                 score = metric_func(y_trues, np.mean(y_preds, axis=-1))
             else:
-                score = metric_func(y_true, y_pred)
+                score = metric_func(y_trues, y_preds)
         return score
     return metric
 

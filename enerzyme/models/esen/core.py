@@ -7,7 +7,7 @@ import fairchem.core.models.uma.escn_md
 import fairchem.core.models.uma.escn_moe
 from fairchem.core.common.registry import registry as fairchem_registry
 from fairchem.core.datasets.atomic_data import AtomicData
-from .flow_umabackbone import ESCNMDBackboneFlow
+from .flow_umabackbone import build_flow_backbone
 from .utils import load_state_dict, match_state_dict
 from ..layers import BaseFFCore
 
@@ -226,11 +226,7 @@ class UMAFlowWrapperQS(BaseFFCore):
         cfg = checkpoint.model_config
         backbone_cfg = copy.deepcopy(cfg["backbone"])
         model_name = backbone_cfg.pop("model")
-        if model_name != "escnmd_backbone":
-            raise ValueError(
-                f"UMAFlowWrapperQS only supports fairchem escnmd_backbone, got {model_name!r}"
-            )
-        self.backbone = ESCNMDBackboneFlow(**backbone_cfg)
+        self.backbone = build_flow_backbone(model_name, backbone_cfg)
         self.backbone.otf_graph = True
 
         state_dict = getattr(checkpoint, "ema_state_dict", None) or checkpoint.model_state_dict

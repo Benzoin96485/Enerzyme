@@ -307,6 +307,23 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
         y_truth["data_key"] = targets["data_key"]
     y_truth["Za"] = y_pred["Za"]
 
+    # Graph-level Q / S targets with atomic-only model output (e.g. ODE flow returns Qa, Sa only).
+    if targets is not None:
+        if (
+            is_target("Q")
+            and "Q" not in y_pred
+            and "Qa" in y_pred
+            and y_pred["Qa"]
+        ):
+            y_pred["Q"] = np.array([float(np.sum(x)) for x in y_pred["Qa"]], dtype=np.float64)
+        if (
+            is_target("S")
+            and "S" not in y_pred
+            and "Sa" in y_pred
+            and y_pred["Sa"]
+        ):
+            y_pred["S"] = np.array([float(np.sum(x)) for x in y_pred["Sa"]], dtype=np.float64)
+
     return y_pred, (y_truth if y_truth else None)
 
 
