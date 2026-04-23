@@ -262,8 +262,8 @@ class TeraChemDriver(QMDriver):
             _ = f.readline()
             title = f.readline()
             energy = float(title.split()[6]) * ase.units.Ha # Ha to eV
-        grad = np.loadtxt(scr_dir / "grad.xyz", skiprows=2, usecols=(1,2,3)) / ase.units.Bohr # Bohr to Angstrom
-        return {"M2": dipole, "Fa": grad, "E": energy, "molden_file": scr_dir / (input_file.stem + ".molden")}
+        grad = np.loadtxt(scr_dir / "grad.xyz", skiprows=2, usecols=(1,2,3)) * ase.units.Ha / ase.units.Bohr # Ha/Bohr to eV/Angstrom
+        return {"M2": dipole, "Fa": -grad, "E": energy, "molden_file": scr_dir / (input_file.stem + ".molden")}
 
 class ORCADriver(QMDriver):
     pass
