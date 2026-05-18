@@ -95,15 +95,8 @@ class Simulation:
         self.systems = self.initial_structures.copy()
         self.system = self.systems[-1]
         if self.calculator_patch_module is not None:
-            external_calculator_name = self.external_calculator_config.get("name", None)
-            if external_calculator_name is not None:
-                if hasattr(self.calculator_patch_module, external_calculator_name):
-                    self.external_calculator = getattr(self.calculator_patch_module, external_calculator_name)
-                else:
-                    raise ValueError(f"External calculator {external_calculator_name} not found in {self.calculator_patch_module}")
-            else:
-                raise ValueError(f"External calculator name not specified!")
-            logger.info(f"Initialized external calculator: {external_calculator_name}")
+            from .calculator import get_patched_calculator
+            self.external_calculator = get_patched_calculator(self.calculator_patch_module, self.external_calculator_config)
         else:
             self.external_calculator = None
         self.calculator = ASECalculator(
@@ -152,7 +145,7 @@ class Simulation:
         def write_xyz(atoms=None):
             ase.io.write(osp.join(self.out_dir, f"traj-opt.xyz"), atoms, append=True)
         optimizer.attach(write_xyz, interval=1, atoms=self.system) 
-        optimizer.run(fmax=self.optimize_config.get("fmax", 4.5e-4) / self.system.calc.Hartree_in_E * Hartree / Bohr)
+        optimizer.run(fmax=self.optimize_config.get("fmax", 4.5e-4) / self.system.calc.Hartree_in_E * Hartree / Bohr, steps=self.optimize_config.get("max_steps", 1000))
         ase.io.write(osp.join(self.out_dir, f"optim.xyz"), self.system, append=True)
         logger.info(f"Final energy: {self.system.get_potential_energy()}")
 
@@ -175,7 +168,7 @@ class Simulation:
                 def write_xyz(atoms=None):
                     ase.io.write(osp.join(self.out_dir, f"traj-{i}.xyz"), atoms, append=True)
                 optimizer.attach(write_xyz, interval=1, atoms=self.system) 
-                optimizer.run(fmax=4.5e-4 / self.system.calc.Hartree_in_E * Hartree / Bohr)
+                optimizer.run(fmax=4.5e-4 / self.system.calc.Hartree_in_E * Hartree / Bohr, steps=self.optimize_config.get("max_steps", 1000))
                 ase.io.write(osp.join(self.out_dir, f"scan_optim.xyz"), self.system, append=True)
                 logger.info(f"Final energy: {self.system.get_potential_energy()}")
                 logger.info(f"Final distance: {self.system.get_distance(i0, i1)}")
