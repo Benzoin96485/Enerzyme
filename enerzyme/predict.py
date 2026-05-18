@@ -121,6 +121,6 @@ class FFPredict:
         predict_results = dict()
         for ff_name, ff in FFs.items():
             predict_result = dict()
-            predict_result["y_pred"] = pd.read_pickle(os.path.join(self.datahub.preload_path, f"{ff_name}-prediction.pkl"))
+            predict_result["y_pred"] = pd.concat([pd.read_pickle(os.path.join(datahub.preload_path, f"{ff_name}-prediction.pkl")) for data_key, datahub in self.datahub.datahubs.items()])
             predict_results[ff_name] = predict_result
         return predict_results
