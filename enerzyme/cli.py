@@ -113,16 +113,16 @@ def get_parser():
         help="Give bonds to molecules",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_bond.add_argument('-p', '--pdb_path', type=str, default='', 
+    parser_bond.add_argument('-p', '--pdb_path', type=str, required=True, 
         help='input pdb file path'
     )
-    parser_bond.add_argument('-m', '--mol_path', type=str, default='', 
+    parser_bond.add_argument('-m', '--mol_path', type=str, required=True, 
         help='output mol file path'
     )
-    parser_bond.add_argument('-i', '--img_path', type=str, default='', 
+    parser_bond.add_argument('-i', '--img_path', type=str, required=False, 
         help='output img file path'
     )
-    parser_bond.add_argument('-t', '--template_path', type=str, default='', 
+    parser_bond.add_argument('-t', '--template_path', type=str, required=False, 
         help='template sdf file path'
     )
 
