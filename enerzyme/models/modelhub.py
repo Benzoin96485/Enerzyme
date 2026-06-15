@@ -99,7 +99,7 @@ def get_pretrain_path(pretrain_path: Optional[str]=None, preference: Literal["be
                 raise FileNotFoundError(f"Pretrained model{' ' if model_rank is None else 'ranked ' + str(model_rank)} not found in {pretrain_path}")
             return all_possible_paths[0]
         else:
-            raise FileNotFoundError(f"Pretrained model not found at {pretrain_path}")
+            return None
     else:
         return None
 

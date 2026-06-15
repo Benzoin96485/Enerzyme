@@ -14,7 +14,11 @@ def get_bond_lengths(conformer, begin_atom_idx, end_atom_idx):
     return np.linalg.norm(conformer.GetAtomPosition(begin_atom_idx) - conformer.GetAtomPosition(end_atom_idx))
 
 
-def extract_submol(original_mol: Mol, subidx: List[int], dual_topology: List[Tuple[int, int, Optional[int]]]=[]):
+def extract_submol(
+    original_mol: Mol, 
+    subidx: List[int], 
+    dual_topology: List[Tuple[int, int, Optional[int]]]=[]
+):
     # collect internal bonds and linkings
     subidx_set = set(subidx)
     cappings = dict()
@@ -190,6 +194,7 @@ class Extractor:
         fragment_radius: float = 5,
         n_centers: int = 1,
         must_include_indices: List[int] = [],
+        coordination_radius: float=3.5,
         extract_method: str = "local_uncertainty"
     ) -> None:
         '''
@@ -238,6 +243,7 @@ class Extractor:
                 reference_mol = self.reference_mol[0]
             else:
                 reference_mol = self.reference_mol[frame_idx]
+            # process dative bond
             Ra = y_pred["Ra"][frame_idx]
             Za = y_pred["Za"][frame_idx]
             # gen dual topology
