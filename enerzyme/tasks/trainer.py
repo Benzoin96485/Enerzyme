@@ -641,7 +641,10 @@ class Trainer:
         if load_model == True:
             from ..models import get_pretrain_path
             pretrain_path = get_pretrain_path(dump_dir, "best", model_rank)
-            self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
+            if pretrain_path is not None:
+                self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
+            else:
+                logger.warning(f"Pretrained model not found at {dump_dir}, using random weights")
             
         dataloader = DataLoader(
             dataset=dataset,
