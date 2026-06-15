@@ -1,41 +1,121 @@
 Preparing a Neural Network Potential Dataset
-===========================================
+============================================
 
-To train a neural network potential (NNP), you need to prepare a dataset of atomic systems and their corresponding attributes. Enerzyme now supports the :code:`pickle`, :code:`npz`, and :code:`hdf5` formats. As a quick start, we introduce the :code:`pickle` format here as it is the most intuitive one.
+To train a neural network potential (NNP), you need a dataset of atomic systems and their labels. Enerzyme supports :code:`pickle`, :code:`npz`, and :code:`hdf5` formats.
 
-Pickle file is a binary file that can store Python objects. In Enerzyme, the `dataset`, as a Python object stored in a pickle file, is a list of `datapoints`, each of which is a dictionary of attribute name-value pairs.
++----------------+----------------------------------------------------------+
+| Format         | When to use                                              |
++================+==========================================================+
+| :code:`pickle` | Quick start; list of Python dicts (most intuitive)       |
++----------------+----------------------------------------------------------+
+| :code:`npz`    | NumPy-native storage; good for large numeric arrays      |
++----------------+----------------------------------------------------------+
+| :code:`hdf5`   | Efficient random access; used internally after preprocess|
++----------------+----------------------------------------------------------+
 
-In the following example, we consider the following attributes of a datapoint:
+This page focuses on :code:`pickle` as the entry point. The same field naming and Datahub mappings apply to all formats.
 
-- `number_of_atoms`: the number of atoms in the system, an integer. Let :code:`N` be its value in the following.
-- `coordinates`: the atomic Cartesian coordinates of the system, a float array of shape :code:`(N, 3)`.
-- `atomic_numbers`: the atomic numbers of the atoms, a integer array of shape :code:`(N,)`.
-- `energy`: the total energy of the system, a float.
-- `forces`: the forces on the atoms, a float array of shape :code:`(N, 3)`.
-- `atomic_charges`: the partial charges of the atoms, a float array of shape :code:`(N,)`.
-- `total_charge`: the total charge of the system, an integer.
-- `dipole`: the dipole moment of the system, a float array of shape :code:`(3,)`.
+Datapoint schema
+----------------
+
+A pickle dataset is a list of datapoints. Each datapoint is a dictionary of attribute name–value pairs. A typical QM-labeled entry includes:
+
+- :code:`number_of_atoms` — integer :math:`N`
+- :code:`coordinates` — float array of shape :code:`(N, 3)` in Å (or your chosen length unit)
+- :code:`atomic_numbers` — integer array of shape :code:`(N,)`
+- :code:`energy` — scalar total energy
+- :code:`forces` — float array of shape :code:`(N, 3)` (or raw QC gradients; see below)
+- :code:`atomic_charges` — float array of shape :code:`(N,)`
+- :code:`total_charge` — integer (defaults to 0 if omitted)
+- :code:`dipole` — float array of shape :code:`(3,)`
 
 .. note::
-    `number_of_atoms`, `coordinates`, `atomic_numbers`, `total_charge` can be easily obtained from the quantum chemistry input files, while `energy`, `forces`, `atomic_charges`, and `dipole` should be parsed from the quantum chemistry output files.
+    :code:`coordinates` and :code:`atomic_numbers` define the system. :code:`number_of_atoms` can be inferred from :code:`atomic_numbers`. For PES learning, :code:`energy` and/or :code:`forces` are required targets. Additional fields depend on your task and model architecture.
 
-    For NNP training, the `coordinates`, `atomic_numbers` are necessary to define the system, while `number_of_atoms` can be counted from those, and `total_charge` can be assumed to be zero. For a potential energy surface learning task, `energy` and/or `forces` are necessary for the training objective.
+Standard field mapping
+----------------------
 
-    The attributes are not limited to the ones listed above and also depend on the task you are training for, the available data from quantum chemistry,  and the architecture of the neural network potential. You can add any attributes you want to the datapoint.
+Enerzyme maps your attribute names to internal standard names in the training YAML (see :doc:`training`). Common mappings:
 
-Assume that we wrote a script :code:`my_script.py` in the current working directory, which has a function :code:`parse_qm_output` that parses the output of a quantum chemistry calculation and returns a dictionary of such information, and a function :code:`find_qm_outputs` that finds all the relevant quantum chemistry output files. Then the dataset :code:`dataset.pkl` can be prepared as follows:
++---------------------+---------------+
+| Your attribute      | Standard name |
++=====================+===============+
+| coordinates         | :code:`Ra`    |
++---------------------+---------------+
+| atomic_numbers      | :code:`Za`    |
++---------------------+---------------+
+| number_of_atoms     | :code:`N`     |
++---------------------+---------------+
+| energy              | :code:`E`     |
++---------------------+---------------+
+| forces              | :code:`Fa`    |
++---------------------+---------------+
+| atomic_charges      | :code:`Qa`    |
++---------------------+---------------+
+| total_charge        | :code:`Q`     |
++---------------------+---------------+
+| dipole              | :code:`M2`    |
++---------------------+---------------+
+
+Units and gradients
+-------------------
+
+.. caution::
+    **Forces vs. gradients.** Quantum chemistry packages often output energy *gradients* :math:`\nabla E`, not forces. Forces are :math:`F = -\nabla E`. Set :code:`negative_gradient: true` in Datahub transforms when your :code:`Fa` targets are raw gradients.
+
+.. note::
+    **TeraChem gradients.** The helper script :code:`scripts/picklizer.py` converts TeraChem gradient files from Ha/Bohr to Ha/Å by dividing by 0.5291772108. Keep units consistent with :code:`Hartree_in_E` and :code:`Bohr_in_R` in your model config.
+
+Building a dataset from TeraChem outputs
+----------------------------------------
+
+The repository includes :code:`scripts/picklizer.py` for grouping TeraChem output files into a pickle. Each entry in :code:`file_lists` is a dict pointing to per-structure files:
+
+.. code-block:: python
+
+    from scripts.picklizer import picklizer
+
+    file_lists = [
+        {
+            "coord": "run001/structure.xyz",
+            "grad": "run001/grad.xyz",
+            "chrg": "run001/mulliken.chrg",
+            "dipole": "run001/dipole.txt",
+        },
+        # ...
+    ]
+    picklizer(file_lists, output="dataset.pkl", flavor="terachem", provide_Q=-1)
+
+The resulting datapoints use keys :code:`coord`, :code:`grad`, :code:`chrg`, :code:`dipole`, :code:`total_chrg`. Map them in your YAML, for example:
+
+.. code-block:: yaml
+
+    features:
+        Ra: coord
+        Za: atom_type
+        Q: total_chrg
+    targets:
+        E: energy
+        Fa: grad
+        Qa: chrg
+        M2: dipole
+    transforms:
+        negative_gradient: true
+
+Generic pickle builder
+----------------------
+
+If you already have a parser for your QM package:
 
 .. code-block:: python
 
     import pickle
     from my_script import parse_qm_output, find_qm_outputs
-    
-    qm_outputs = find_qm_outputs() # all qm output files
-    
+
     datapoints = []
-    for qm_output in qm_outputs:
+    for qm_output in find_qm_outputs():
         parsed_data = parse_qm_output(qm_output)
-        datapoint = {
+        datapoints.append({
             'number_of_atoms': parsed_data['number_of_atoms'],
             'coordinates': parsed_data['coordinates'],
             'atomic_numbers': parsed_data['atomic_numbers'],
@@ -43,14 +123,28 @@ Assume that we wrote a script :code:`my_script.py` in the current working direct
             'forces': parsed_data['forces'],
             'atomic_charges': parsed_data['atomic_charges'],
             'total_charge': parsed_data['total_charge'],
-            'dipole': parsed_data['dipole']
-        }
+            'dipole': parsed_data['dipole'],
+        })
 
     with open('dataset.pkl', 'wb') as f:
         pickle.dump(datapoints, f)
 
+Preprocess without training
+---------------------------
+
+To only preprocess and split a dataset (write HDF5 cache and partition indices) without starting training:
+
+.. code-block:: bash
+
+    enerzyme collect -c train.yaml -o .
+
+Use the same :code:`Datahub` and :code:`Trainer.Splitter` sections as in a training config. This is useful to validate mappings and inspect :code:`processed_dataset_<hash>/` before a long run.
+
+Security and compatibility
+--------------------------
+
 .. danger::
-    Pickle files are not secure. You should not trust the data in a pickle file from an untrusted source.
+    Pickle files are not secure. Do not load pickles from untrusted sources.
 
 .. caution::
-    Pickle files don't guarantee the version compatibility. When loading the pickle file, you should use the same version of Python and relevant libraries as the one used to dump the pickle file. For example, if you used Numpy 2.x to store the arrays in the dataset, but now are using Numpy 1.x to load it, it will raise an error like :code:`ModuleNotFoundError: No module named numpy._core`.
+    Pickle compatibility depends on Python and library versions. Loading a file created with NumPy 2.x under NumPy 1.x may raise :code:`ModuleNotFoundError: No module named numpy._core`.
