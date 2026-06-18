@@ -1,7 +1,7 @@
 Installation
 ============
 
-This guide covers installing Enerzyme from source on the :code:`devel` branch. For a pinned release-style environment (Python 3.13, PyTorch 2.8, and related packages), see the version table in the repository :code:`README.md`. The conda workflow below is the recommended development setup.
+This guide covers installing Enerzyme from source on the :code:`main` branch.
 
 Clone the repository
 --------------------
@@ -10,7 +10,6 @@ Clone the repository
 
     git clone https://github.com/Benzoin96485/Enerzyme.git
     cd Enerzyme
-    git checkout devel
 
 Create a conda environment
 --------------------------
@@ -22,7 +21,7 @@ We recommend creating a conda environment from :code:`requirements.yaml`:
     conda env create -f requirements.yaml
     conda activate enerzyme
 
-The file installs core dependencies including NumPy, PyTorch, ASE, RDKit, :code:`torch_geometric`, and Lightning.
+The file installs core dependencies. For a pinned release for reproducibility of paper results, install from the :code:`requirements.yaml` in the corresponding subdirectory of :code:`examples/`. The environment may have a different name from :code:`enerzyme`.
 
 Install torch-scatter
 ---------------------
@@ -32,6 +31,8 @@ Install torch-scatter
 .. code-block:: bash
 
     pip install https://data.pyg.org/whl/torch-2.5.0%2Bcu124/torch_scatter-2.1.2%2Bpt25cu124-cp312-cp312-linux_x86_64.whl
+
+If the wheel for your stack is not found, you can build it from source.
 
 Install Enerzyme
 ----------------
@@ -50,10 +51,10 @@ Some workflows need extra packages or external programs that are **not** install
 - **NequIP models** — :code:`nequip`
 - **XPaiNN models** — :code:`XequiNet`, SciPy, PySCF, pydantic
 - **PLUMED enhanced sampling** — :code:`py-plumed` and a PLUMED-enabled build
-- **Prediction server** — Flask and Waitress (included in README version pins)
-- **QM annotation** — TeraChem (licensed), RDKit
-- **Bond assignment** — RDKit, QuantumPDB cluster PDB and template SDF
-- **Enerzymette launchers** — install from the `Enerzymette repository <https://github.com/Benzoin96485/Enerzymette>`_ with :code:`pip install -e .`
+- **QM annotation with TeraChem** — TeraChem (licensed)
+- **Bond assignment** — QuantumPDB https://github.com/hjkgrp/quantumPDB (optional but recommended)
+- **Enerzymette launchers** — install from the Enerzymette repository https://github.com/Benzoin96485/Enerzymette with :code:`pip install -e .`
+- **fairchem** — install from the fairchem repository https://github.com/Benzoin96485/fairchem 
 
 Verify the installation
 -----------------------
