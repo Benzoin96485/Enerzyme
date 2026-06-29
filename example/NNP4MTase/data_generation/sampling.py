@@ -57,6 +57,7 @@ def resolve_master_list_row(master_list: str, enzyme: str, pdb_id: str | None):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
+    parser.add_argument("-o", "--output_dir", required=True, help="Path to the output directory", type=str)
     parser.add_argument("-m", "--master_list", required=True, help="Path to master_list.csv", type=str)
     parser.add_argument("-e", "--enzyme", required=True, help="enzyme field in master_list", type=str)
     parser.add_argument("-p", "--pdb_id", help="pdb_id field in master_list", type=str, default=None)
@@ -74,10 +75,11 @@ if __name__ == "__main__":
     )
     system.calc = xtb_calculator
 
-    charge = GetFormalCharge(pdb2mol(pdb_file, "cluster.mol", template_path=sdf_file))
+    charge = GetFormalCharge(pdb2mol(pdb_file, os.path.join(args.output_dir, "cluster.mol"), template_path=sdf_file))
     print("charge: ", charge)
     multiplicity = 1
 
+    system.info.update({"charge": charge, "spin": multiplicity - 1})
     system.set_initial_charges([charge] + [0] * (len(system) - 1))
     system.set_initial_magnetic_moments([multiplicity - 1] + [0] * (len(system) - 1))
 
@@ -112,7 +114,7 @@ if __name__ == "__main__":
         input=setup,
         timestep=TIME_STEP,
         atoms=system,
-        log="plumed.log",
+        log=os.path.join(args.output_dir, "plumed.log"),
         kT=5000 * units.kB,
     )
 
@@ -121,8 +123,8 @@ if __name__ == "__main__":
         timestep=TIME_STEP,
         temperature_K=500,
         friction=0.01 / units.fs,
-        logfile="metad.log",
+        logfile=os.path.join(args.output_dir, "metad.log"),
         loginterval=LOG_INTERVAL,
     )
-    integrator2.attach(write_xyz, interval=LOG_INTERVAL, atoms=system, path="metad-traj.xyz")
+    integrator2.attach(write_xyz, interval=LOG_INTERVAL, atoms=system, path=os.path.join(args.output_dir, "metad-traj.xyz"))
     integrator2.run(steps=N_STEP)
