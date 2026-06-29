@@ -1,84 +1,69 @@
-Installation (development version)
-==================================
+Installation
+============
 
-This is the installation guide for the development version of the Enerzyme package. You can get the package from the `GitHub repository <https://github.com/Benzoin96485/Enerzyme>`_:
+This guide covers installing Enerzyme from source on the :code:`main` branch.
+
+Clone the repository
+--------------------
 
 .. code-block:: bash
 
     git clone https://github.com/Benzoin96485/Enerzyme.git
     cd Enerzyme
 
-Checkout the development branch:
+Create a conda environment
+--------------------------
 
-.. code-block:: bash
-
-    git checkout devel
-
-We recommend creating a conda environment with a yaml file :code:`requirements.yaml` for the dependencies:
+We recommend creating a conda environment from :code:`requirements.yaml`:
 
 .. code-block:: bash
 
     conda env create -f requirements.yaml
-
-which includes the following contents:
-
-.. code-block:: yaml
-
-    name: enerzyme
-    channels:
-    - conda-forge
-    - defaults
-    dependencies:
-        # Base depends
-    - python
-    - pip
-        # Pip-only installs
-    - pip:
-        - numpy             # for numerical computing
-        - h5py              # for HDF5 file support
-        - tqdm              # for progress bars
-        - ase               # for simmulation environment
-        - joblib            # for checkpointing
-        - addict            # for passing parameters to submodules
-        - pandas            # for saving prediction results
-        - torch             # for deep neural networks
-        - scikit-learn      # for data splitting
-        - transformers      # for training schedulers
-        - torch-ema         # for EMA training
-        - pyyaml            # for parsing configuration files
-        - torch_geometric   # for graph neural networks
-        - rdkit             # for chemoinformatics
-        - e3nn              # for equivariant neural networks
-        - lightning         # for multi-GPU training
-
-Then activate the environment:
-
-.. code-block:: bash
-
     conda activate enerzyme
 
-and go to https://data.pyg.org/whl/ and find the latest wheel file for :code:`torch-scatter` that matches your PyTorch version, CUDA version, Python version, and platform. For example, if you are using PyTorch 2.5.1, CUDA 12.4, Python 3.12, and Linux x86_64 platform, you can click on the `torch-2.5.1+cu124 <https://data.pyg.org/whl/torch-2.5.1%2Bcu124.html>`_ link and find the link to the wheel file `torch_scatter-2.1.2+pt25cu124-cp312-cp312-linux_x86_64.whl <https://data.pyg.org/whl/torch-2.5.0%2Bcu124/torch_scatter-2.1.2%2Bpt25cu124-cp312-cp312-linux_x86_64.whl>`_.
+The file installs core dependencies. For a pinned release for reproducibility of paper results, install from the :code:`requirements.yaml` in the corresponding subdirectory of :code:`examples/`. The environment may have a different name from :code:`enerzyme`.
 
-Then install the wheel file:
+Install torch-scatter
+---------------------
+
+:code:`torch-scatter` must match your PyTorch, CUDA, Python, and platform. Go to https://data.pyg.org/whl/ and pick the wheel that matches your stack. For example, with PyTorch 2.5.1, CUDA 12.4, Python 3.12, and Linux x86_64:
 
 .. code-block:: bash
 
     pip install https://data.pyg.org/whl/torch-2.5.0%2Bcu124/torch_scatter-2.1.2%2Bpt25cu124-cp312-cp312-linux_x86_64.whl
 
-Finally, install the package in the repository root directory:
+If the wheel for your stack is not found, you can build it from source.
+
+Install Enerzyme
+----------------
+
+From the repository root:
 
 .. code-block:: bash
 
     pip install -e .
 
-Check the library installation:
+Optional dependencies
+---------------------
+
+Some workflows need extra packages or external programs that are **not** installed by default:
+
+- **NequIP models** — :code:`nequip`
+- **XPaiNN models** — :code:`XequiNet`, SciPy, PySCF, pydantic
+- **PLUMED enhanced sampling** — :code:`py-plumed` and a PLUMED-enabled build
+- **QM annotation with TeraChem** — TeraChem (licensed)
+- **Bond assignment** — QuantumPDB https://github.com/hjkgrp/quantumPDB (optional but recommended)
+- **Enerzymette launchers** — install from the Enerzymette repository https://github.com/Benzoin96485/Enerzymette with :code:`pip install -e .`
+- **fairchem** — install from the fairchem repository https://github.com/Benzoin96485/fairchem 
+
+Verify the installation
+-----------------------
 
 .. code-block:: bash
 
     python -c "import enerzyme"
-
-and the command line interface:
-
-.. code-block:: bash
-
     enerzyme -h
+    enerzyme predict -h
+    enerzyme simulate -h
+
+If all commands print help text without import errors, the core install is ready.

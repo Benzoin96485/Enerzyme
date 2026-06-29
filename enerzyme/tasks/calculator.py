@@ -173,6 +173,20 @@ class ASECalculator(Calculator):
                 self.results[property] += biases[property]
 
 
+def get_patched_calculator(calculator_patch_module: object, external_calculator_config: Optional[Dict[str, Any]]=None) -> Calculator:
+    external_calculator_name = external_calculator_config.get("name", None)
+    if external_calculator_name is not None:
+        if hasattr(calculator_patch_module, f"get_{external_calculator_name}"):
+            external_calculator = getattr(calculator_patch_module, f"get_{external_calculator_name}")(
+                **external_calculator_config.get("params", dict())
+            )
+        elif hasattr(calculator_patch_module, external_calculator_name):
+            external_calculator = getattr(calculator_patch_module, external_calculator_name)
+    else:
+        raise ValueError(f"External calculator name not specified!")
+    return external_calculator
+
+
 def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", model_config_path: Optional[str] = None, calculator_patch: Optional[str] = None, neighbor_list_type: Optional[str]="full", Hartree_in_E: float=1, internal_calculator_weight: float=1.0, uncertainty_calculator_config: Optional[Dict[str, Any]]=None, external_calculator: Optional[Calculator]=None, external_calculator_config: Optional[Dict[str, Any]]=None):
     from ..models import get_model_str, build_model, get_pretrain_path
     from ..utils import YamlHandler, logger
@@ -191,13 +205,7 @@ def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", mod
         calculator_patch_module = None
     if calculator_patch_module is not None:
         external_calculator_name = external_calculator_config.get("name", None)
-        if external_calculator_name is not None:
-            if hasattr(calculator_patch_module, external_calculator_name):
-                external_calculator = getattr(calculator_patch_module, external_calculator_name)
-            else:
-                raise ValueError(f"External calculator {external_calculator_name} not found in {calculator_patch_module}")
-        else:
-            raise ValueError(f"External calculator name not specified!")
+        external_calculator = get_patched_calculator(calculator_patch_module, external_calculator_config)
         logger.info(f"Initialized external calculator: {external_calculator_name}")
     else:
         external_calculator = None

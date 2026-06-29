@@ -95,15 +95,8 @@ class Simulation:
         self.systems = self.initial_structures.copy()
         self.system = self.systems[-1]
         if self.calculator_patch_module is not None:
-            external_calculator_name = self.external_calculator_config.get("name", None)
-            if external_calculator_name is not None:
-                if hasattr(self.calculator_patch_module, external_calculator_name):
-                    self.external_calculator = getattr(self.calculator_patch_module, external_calculator_name)
-                else:
-                    raise ValueError(f"External calculator {external_calculator_name} not found in {self.calculator_patch_module}")
-            else:
-                raise ValueError(f"External calculator name not specified!")
-            logger.info(f"Initialized external calculator: {external_calculator_name}")
+            from .calculator import get_patched_calculator
+            self.external_calculator = get_patched_calculator(self.calculator_patch_module, self.external_calculator_config)
         else:
             self.external_calculator = None
         self.calculator = ASECalculator(
@@ -152,18 +145,21 @@ class Simulation:
         def write_xyz(atoms=None):
             ase.io.write(osp.join(self.out_dir, f"traj-opt.xyz"), atoms, append=True)
         optimizer.attach(write_xyz, interval=1, atoms=self.system) 
-        optimizer.run(fmax=self.optimize_config.get("fmax", 4.5e-4) / self.system.calc.Hartree_in_E * Hartree / Bohr)
+        optimizer.run(fmax=self.optimize_config.get("fmax", 4.5e-4) / self.system.calc.Hartree_in_E * Hartree / Bohr, steps=self.optimize_config.get("max_steps", 1000))
         ase.io.write(osp.join(self.out_dir, f"optim.xyz"), self.system, append=True)
         logger.info(f"Final energy: {self.system.get_potential_energy()}")
 
+    def _get_x_scan(self):
+        x0 = self.sampling_config.params.x0
+        x1 = self.sampling_config.params.x1
+        num = self.sampling_config.params.num
+        return np.linspace(x0, x1, num)
+    
     def _run_scan(self):
         if self.sampling_config.cv == "distance":
+            x_scan = self._get_x_scan()
             i0 = self.sampling_config.params.i0 - self.idx_start_from
             i1 = self.sampling_config.params.i1 - self.idx_start_from
-            x0 = self.sampling_config.params.x0
-            x1 = self.sampling_config.params.x1
-            num = self.sampling_config.params.num
-            x_scan = np.linspace(x0, x1, num)
             for i, x in enumerate(x_scan):
                 # reset constraint
                 del self.system.constraints
@@ -175,7 +171,7 @@ class Simulation:
                 def write_xyz(atoms=None):
                     ase.io.write(osp.join(self.out_dir, f"traj-{i}.xyz"), atoms, append=True)
                 optimizer.attach(write_xyz, interval=1, atoms=self.system) 
-                optimizer.run(fmax=4.5e-4 / self.system.calc.Hartree_in_E * Hartree / Bohr)
+                optimizer.run(fmax=4.5e-4 / self.system.calc.Hartree_in_E * Hartree / Bohr, steps=self.optimize_config.get("max_steps", 1000))
                 ase.io.write(osp.join(self.out_dir, f"scan_optim.xyz"), self.system, append=True)
                 logger.info(f"Final energy: {self.system.get_potential_energy()}")
                 logger.info(f"Final distance: {self.system.get_distance(i0, i1)}")
@@ -306,8 +302,8 @@ class Simulation:
             barrier, dE = neb_tools.get_barrier()
             logger.info(f"CI-NEB barrier: {barrier}, dE: {dE}")
             ase.io.write(osp.join(self.out_dir, f"ci-neb.xyz"), images, append=False)
-
-    def _run_plumed(self):
+    
+    def _get_plumed_config(self, target_value: Optional[float] = None):
         if self.plumed_patch_module is not None:
             plumed_config_generator_name = self.plumed_config_generator_config.get("name", None)
             if plumed_config_generator_name is not None:
@@ -318,16 +314,24 @@ class Simulation:
             else:
                 raise ValueError(f"Plumed config generator name not specified!")
             logger.info(f"Initialized plumed config generator: {plumed_config_generator_name}")
-            plumed_config = self.plumed_config_generator(
-                self.system, 
+            generator_kwargs = dict(
                 integrate_config=self.integrate_config,
                 idx_start_from=self.idx_start_from,
-                **self.sampling_config.params.plumed_config
+                **self.sampling_config.params.plumed_config,
             )
-            with open(osp.join(self.out_dir, "plumed.dat"), "w") as f:
-                f.writelines([line + "\n" for line in plumed_config])
+            if target_value is not None:
+                generator_kwargs["target_value"] = target_value
+            plumed_config = self.plumed_config_generator(self.system, **generator_kwargs)
         else:
             plumed_config = self.sampling_config.params.plumed_config
+
+        with open(osp.join(self.out_dir, "plumed.dat"), "w") as f:
+            f.writelines([line + "\n" for line in plumed_config])
+
+        return plumed_config
+
+    def _run_plumed(self):
+        plumed_config = self._get_plumed_config()
         from ase.calculators.plumed import Plumed
         plumed_calc = Plumed(self.calculator, plumed_config, 
             timestep=self.integrate_config.time_step * fs / self.fs_in_t,
@@ -340,6 +344,38 @@ class Simulation:
             self._md_initialize()
         dyn = self._get_integrator(traj_file="plumed.traj.xyz")
         dyn.run(self.integrate_config.n_step)
+
+    def _run_plumed_scan(self):
+        from ase.calculators.plumed import Plumed
+
+        x_scan = self._get_x_scan()
+        for i, x in enumerate(x_scan):
+            plumed_config = self._get_plumed_config(target_value=x)
+            plumed_calc = Plumed(
+                self.calculator,
+                plumed_config,
+                timestep=1,
+                atoms=self.system,
+                log=osp.join(self.out_dir, f"plumed-{i}.log"),
+                restart=False,
+            )
+            self.system.calc = plumed_calc
+            optimizer = get_optimizer(self.optimize_config.optimizer)(self.system)
+
+            def write_xyz(atoms=None):
+                ase.io.write(osp.join(self.out_dir, f"traj-{i}.xyz"), atoms, append=True)
+
+            optimizer.attach(write_xyz, interval=1, atoms=self.system)
+            optimizer.run(
+                fmax=self.optimize_config.get("fmax", 4.5e-4)
+                / self.calculator.Hartree_in_E
+                * Hartree
+                / Bohr,
+                steps=self.optimize_config.get("max_steps", 1000),
+            )
+            ase.io.write(osp.join(self.out_dir, "scan_optim.xyz"), self.system, append=True)
+            logger.info(f"Final energy: {self.system.get_potential_energy()}")
+            logger.info(f"Target CV value: {x}")
 
     def run(self):
         getattr(self, f"_run_{self.task}")()

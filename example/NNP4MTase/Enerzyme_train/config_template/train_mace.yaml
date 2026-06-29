@@ -1,0 +1,131 @@
+Datahub:
+  data_path: "__DATA_PATH__"
+  data_format: pickle
+  features:
+    Ra: coord
+    Za: atom_type
+    Q:
+    N: 
+  targets:
+    E: energy
+    Fa: grad
+    Qa: chrg
+    Q:
+    M2: dipole
+  preload: true
+  neighbor_list: full
+  transforms:
+    atomic_energy: "__ATOMIC_ENERGY_PATH__"
+    negative_gradient: true
+Metric:
+  E:
+    rmse: 1
+  Fa:
+    rmse: 529.17721
+  M2:
+    rmse: 1.8897261
+  Q:
+    rmse: 1
+  Qa:
+    rmse: __QA_WEIGHT__
+Modelhub:
+  internal_FFs:
+    FF04:
+      active: true
+      architecture: MACE
+      build_params:
+        Bohr_in_R: 0.5291772108
+        Hartree_in_E: 1
+        cutoff_sr: 5.0
+        dim_embedding: 128
+        num_rbf: 8
+        max_Za: 86
+        cutoff_fn: polynomial
+      layers:
+      - name: RangeSeparation
+      - name: BesselRBF
+        params: 
+          trainable: false
+      - name: NuclearEmbedding
+        params:
+          zero_init: false
+          use_electron_config: true
+      - name: ElectronicEmbedding
+        params:
+          num_residual: 1
+          attribute: charge
+      - name: ElectronicEmbedding
+        params:
+          num_residual: 1
+          attribute: spin
+      - name: Core
+        params: 
+          max_ell: 3
+          additional_hidden_irreps: 128x1o
+          interaction_cls_first: RealAgnosticInteractionBlock
+          interaction_cls: RealAgnosticResidualInteractionBlock
+          correlation: 3
+          num_interactions: 2
+          avg_num_neighbors: 23.330124060312908
+          MLP_irreps: 16x0e
+          radial_MLP: [64, 64, 64]
+          gate: silu
+      - name: AtomicAffine
+        params:
+          scales:
+            Ea:
+              learnable: true
+              values: 1
+            Qa:
+              learnable: true
+              values: 1
+          shifts:
+            Ea:
+              learnable: true
+              values: 0
+            Qa:
+              learnable: true
+              values: 0
+      - name: ChargeConservation
+      - name: ElectrostaticEnergy
+        params:
+          flavor: PhysNet
+          dielectric_constant: __DIELECTRIC_CONSTANT__
+      - name: AtomicCharge2Dipole
+      - name: EnergyReduce
+      - name: Force
+      loss:
+        mae:
+          Fa: 529.17721
+          M2: 1.8897261
+          Qa: __QA_WEIGHT__
+          Q: 1
+          E: 1
+      suffix: null
+Trainer:
+  Splitter:
+    method: random
+    parts:
+    - training
+    - validation
+    - test
+    preload: true
+    ratios:
+    - 875
+    - 125
+    - 250
+    save: true
+    seed: 114514
+  batch_size: 10
+  cuda: true
+  dtype: float32
+  learning_rate: 0.001
+  max_epochs: 10000
+  max_norm: -1
+  patience: 200
+  seed: 114514
+  warmup_ratio: 0.001
+  use_ema: true
+  ema_decay: 0.999
+  num_workers: 4
+  resume: 2

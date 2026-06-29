@@ -1,0 +1,1 @@
+python ../../utils/gen_scan.py -m ../../master_list.csv -e HcgC

@@ -165,7 +165,7 @@ enerzyme request -u <server url> -f <input file format> -i <input file> -k <mode
 
 ### Copyright
 
-Copyright (c) 2024-2026, Weiliang Luo
+Copyright (c) 2024-2026, Weiliang Luo, Kulik Group, MIT
 
 
 #### Acknowledgements

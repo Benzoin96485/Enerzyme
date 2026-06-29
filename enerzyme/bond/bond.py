@@ -1,8 +1,18 @@
 from collections import defaultdict
 import numpy as np
+from typing import Optional
 from rdkit import Chem
 from rdkit.Chem import SDMolSupplier
 from rdkit.Chem.Draw import MolsToGridImage
+from rdkit.Chem.rdDetermineBonds import DetermineConnectivity
+
+
+METAL_ATOMIC_NUMBERS = [
+    12, #Mg
+]
+LIGAND_ATOMIC_NUMBERS = [
+    8, #O
+]
 
 
 def get_atom_map(pdb_coords: list, mol_coords: list, tol: float=0.01):
@@ -86,10 +96,10 @@ def bond_with_template(mol: Chem.Mol, pdb_path: str, template_path: str) -> None
     return mol
 
 
-def pdb2mol(pdb_path: str, mol_path: str, img_path: str='', template_path: str='') -> None:
+def pdb2mol(pdb_path: str, mol_path: str, img_path: Optional[str]=None, template_path: Optional[str]=None) -> None:
     mol = Chem.MolFromPDBFile(pdb_path, removeHs=False, sanitize=False)
 
-    if template_path:
+    if template_path is not None:
         mol = bond_with_template(mol, pdb_path, template_path)
 
     # general bond fix
@@ -186,7 +196,9 @@ def pdb2mol(pdb_path: str, mol_path: str, img_path: str='', template_path: str='
     
     broken_HX = []
     for atom in mol.GetAtoms():
-        if atom.GetAtomicNum() == 6 and atom.GetExplicitValence() == 3:
+        if atom.GetAtomicNum() == 12:
+            atom.SetFormalCharge(2)
+        if atom.GetAtomicNum() == 6 and atom.GetValence(Chem.ValenceType.EXPLICIT) == 3:
             for C_bond in atom.GetBonds():
                 C_bond_begin_atom = C_bond.GetBeginAtom()
                 C_bond_end_atom = C_bond.GetEndAtom()
@@ -231,9 +243,9 @@ def pdb2mol(pdb_path: str, mol_path: str, img_path: str='', template_path: str='
                         N.UpdatePropertyCache(strict=False)
                         break
             if atom.GetAtomicNum() == 16:
-                if old_charge == 0 and atom.GetExplicitValence() == 3:
+                if old_charge == 0 and atom.GetValence(Chem.ValenceType.EXPLICIT) == 3:
                     atom.SetFormalCharge(1)
-                if old_charge == 0 and atom.GetExplicitValence() == 1:
+                if old_charge == 0 and atom.GetValence(Chem.ValenceType.EXPLICIT) == 1:
                     atom.SetFormalCharge(-1)
             if atom.GetAtomicNum() == 1:
                 begin_atom_name = atom.GetPDBResidueInfo().GetName().strip()
@@ -243,13 +255,75 @@ def pdb2mol(pdb_path: str, mol_path: str, img_path: str='', template_path: str='
                         atom_X.SetFormalCharge(0)
                         broken_HX.append((atom.GetIdx(), atom_X.GetIdx()))
 
-    edit_mol = Chem.EditableMol(mol)
+    edit_mol = Chem.RWMol(mol)
     for start_idx, end_idx in broken_HX:
         edit_mol.AddBond(start_idx, end_idx, Chem.BondType.SINGLE)
     mol = edit_mol.GetMol()
     mol.UpdatePropertyCache(strict=False)
 
-    if img_path:
+    # Fix diphosphate
+    edit_mol = Chem.RWMol(mol)
+    diphosphate_atoms = {
+        "PA": None,
+        "PB": None,
+        "O1A": None,
+        "O1B": None,
+        "O2A": None,
+        "O2B": None,
+        "O3A": None,
+        "O3B": None,
+    }
+    for atom in mol.GetAtoms():
+        atom_name = atom.GetPDBResidueInfo().GetName().strip()
+        if atom_name in diphosphate_atoms:
+            diphosphate_atoms[atom_name] = atom
+    if None not in diphosphate_atoms.values():
+        PA_idx = diphosphate_atoms["PA"].GetIdx()
+        PB_idx = diphosphate_atoms["PB"].GetIdx()
+        PA_PB_bond = mol.GetBondBetweenAtoms(PA_idx, PB_idx)
+        if PA_PB_bond is not None:
+            edit_mol.RemoveBond(PA_idx, PB_idx)
+        for P_order in ["A", "B"]:
+            P_idx = diphosphate_atoms[f"P{P_order}"].GetIdx()
+            for O_name in [f"O1{P_order}", f"O2{P_order}"]:
+                O_atom = diphosphate_atoms[O_name]
+                O_idx = O_atom.GetIdx()
+                OR_bond_flag = False
+                for O_bond in O_atom.GetBonds():
+                    if O_bond.GetBeginAtomIdx() == O_idx and O_bond.GetEndAtomIdx() != P_idx:
+                        OR_bond_flag = True
+                        break
+                if not OR_bond_flag:
+                    edit_mol.GetBondBetweenAtoms(O_idx, P_idx).SetBondType(Chem.BondType.DOUBLE)
+                    edit_mol.GetAtomWithIdx(O_idx).SetFormalCharge(0)
+                    break
+    mol = edit_mol.GetMol()
+    mol.UpdatePropertyCache(strict=False)
+    
+    # dative bond
+    connectivity_mol = mol.__copy__()
+    DetermineConnectivity(connectivity_mol, charge=Chem.GetFormalCharge(mol), useVdw=True)
+    edit_mol = Chem.RWMol(mol)
+    for connectivity_bond in connectivity_mol.GetBonds():
+        begin_atom_idx = connectivity_bond.GetBeginAtomIdx()
+        end_atom_idx = connectivity_bond.GetEndAtomIdx()
+        bond = mol.GetBondBetweenAtoms(begin_atom_idx, end_atom_idx)
+        if bond is None:
+            if (
+                mol.GetAtomWithIdx(begin_atom_idx).GetAtomicNum() in METAL_ATOMIC_NUMBERS and
+                mol.GetAtomWithIdx(end_atom_idx).GetAtomicNum() in LIGAND_ATOMIC_NUMBERS
+            ):
+                edit_mol.AddBond(end_atom_idx, begin_atom_idx, Chem.BondType.DATIVE)
+            elif (
+                mol.GetAtomWithIdx(begin_atom_idx).GetAtomicNum() in LIGAND_ATOMIC_NUMBERS and
+                mol.GetAtomWithIdx(end_atom_idx).GetAtomicNum() in METAL_ATOMIC_NUMBERS
+            ):
+                edit_mol.AddBond(begin_atom_idx, end_atom_idx, Chem.BondType.DATIVE)
+            
+    mol = edit_mol.GetMol()
+    mol.UpdatePropertyCache(strict=False)
+
+    if img_path is not None:
         # save img as a png file
         frag_assign = []
         raw_frags = Chem.GetMolFrags(mol, asMols=True, fragsMolAtomMapping=frag_assign, sanitizeFrags=True)

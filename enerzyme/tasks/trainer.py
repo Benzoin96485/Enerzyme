@@ -103,7 +103,7 @@ def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrai
     other_info = dict()
     if pretrain_path is None:
         return other_info
-    loaded_info = torch.load(pretrain_path, map_location=device)
+    loaded_info = torch.load(pretrain_path, map_location=device, weights_only=False)
     if 'pytorch-lightning_version' in loaded_info:
         loaded_info = _convert_lightning_state_dict(loaded_info)
     if ema is not None and "ema_state_dict" in loaded_info:
@@ -202,6 +202,7 @@ class Trainer:
         self.freeze_pretrain_weights = params.get("freeze_pretrain_weights", False)
         non_target_features = params.get("non_target_features", [])
         self.num_workers = params.get("num_workers", 0)
+        self.reset_parameters = params.get("reset_parameters", False)
         if self.num_workers <= 0:
             if "SLURM_NTASKS" in os.environ:
                 self.num_workers = max(1, int(os.environ["SLURM_NTASKS"]) // 2 - 1)
@@ -392,6 +393,12 @@ class Trainer:
 
         optimizer = get_optimizer(self.optimizer_name, model, self.optimizer_hyper_params)
         scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
+
+        if self.reset_parameters:
+            for m in model.modules():
+                if hasattr(m, "reset_parameters"):
+                    logger.info(f"Resetting parameters for {m.__class__.__name__}")
+                    m.reset_parameters()
         
         if self.lightning:
             logger.info("Using Lightning Trainer")
@@ -634,7 +641,10 @@ class Trainer:
         if load_model == True:
             from ..models import get_pretrain_path
             pretrain_path = get_pretrain_path(dump_dir, "best", model_rank)
-            self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
+            if pretrain_path is not None:
+                self.load_state_dict(model, pretrain_path=pretrain_path, inference=True)
+            else:
+                logger.warning(f"Pretrained model not found at {dump_dir}, using random weights")
             
         dataloader = DataLoader(
             dataset=dataset,

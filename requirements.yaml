@@ -1,0 +1,28 @@
+name: enerzyme
+channels:
+  - conda-forge
+  - pyg
+  - defaults
+dependencies:
+    # Base depends
+  - python<3.14
+  - pip
+    # Pip-only installs
+  - pip:
+    - numpy<2.4.0
+    - h5py
+    - tqdm
+    - ase
+    - joblib
+    - addict
+    - pandas
+    - torch
+    - scikit-learn
+    - transformers
+    - torch-ema
+    - pyyaml
+    - torch_geometric
+    - rdkit
+    - e3nn
+    - lightning
+    - .
