@@ -1,0 +1,142 @@
+Datahub:
+  data_path: "__DATA_PATH__"
+  data_format: pickle
+  features:
+    Ra: coord
+    Za: atom_type
+    Q:
+    N: 
+  targets:
+    E: energy
+    Fa: grad
+    Qa: chrg
+    Q:
+    M2: dipole
+  preload: true
+  neighbor_list: full
+  transforms:
+    atomic_energy: "__ATOMIC_ENERGY_PATH__"
+    negative_gradient: true
+Metric:
+  E:
+    rmse: 1
+  Fa:
+    rmse: 916.56181
+  M2:
+    rmse: 3.2731016
+  Q:
+    rmse: 1
+  Qa:
+    rmse: __QA_WEIGHT__
+Modelhub:
+  internal_FFs:
+    FF01:
+      active: true
+      architecture: SpookyNet
+      build_params:
+        Bohr_in_R: 0.5291772108
+        Hartree_in_E: 1
+        cutoff_sr: 5.291772108
+        dim_embedding: 128
+        max_Za: 86
+        num_rbf: 16
+        activation_fn: swish
+        activation_params:
+          learnable: true
+      layers:
+      - name: RangeSeparation # cutoff_sr in build_params
+        params:
+          cutoff_fn: bump
+      - name: ExponentialBernsteinRBF
+        params: # num_rbf, cutoff_sr, cutoff_fn in build_params
+          no_basis_at_infinity: false
+          init_alpha: 0.9448630629184640
+          exp_weighting: false
+          learnable_shape: true
+      - name: NuclearEmbedding
+        params: # max_Za, dim_embedding in build_params
+          zero_init: false
+          use_electron_config: true
+      - name: ElectronicEmbedding
+        params: # dim_embedding, activation_fn in build_params
+          num_residual: 1
+          attribute: charge
+      - name: ElectronicEmbedding
+        params:
+          num_residual: 1
+          attribute: spin
+      - name: Core
+        params: # dim_embedding, num_rbf, activation_fn in build_params
+          num_modules: 6
+          num_residual_pre: 1
+          num_residual_local_x: 1
+          num_residual_local_s: 1
+          num_residual_local_p: 1
+          num_residual_local_d: 1
+          num_residual_local: 1
+          num_residual_nonlocal_q: 1
+          num_residual_nonlocal_k: 1
+          num_residual_nonlocal_v: 1
+          num_residual_post: 1
+          num_residual_output: 1
+          use_irreps: true
+          dropout_rate: 0.0
+      - name: AtomicAffine
+        params:
+          scales:
+            Ea:
+              learnable: true
+              values: 1
+            Qa:
+              learnable: true
+              values: 1
+          shifts:
+            Ea:
+              learnable: true
+              values: 0
+            Qa:
+              learnable: true
+              values: 0
+      - name: ChargeConservation
+      - name: ElectrostaticEnergy
+        params:
+          flavor: SpookyNet
+          dielectric_constant: __DIELECTRIC_CONSTANT__
+      - name: AtomicCharge2Dipole
+      - name: EnergyReduce
+      - name: Force
+      loss:
+        rmse:
+          M2: 3.2731016
+          Fa: 916.56181
+          Q: 1
+          E: 1
+          Qa: __QA_WEIGHT__
+      suffix: null
+Trainer:
+  Splitter:
+    method: random
+    parts:
+    - training
+    - validation
+    - test
+    preload: true
+    ratios:
+    - 875
+    - 125
+    - 250
+    save: true
+    seed: 114514
+  batch_size: 8
+  cuda: true
+  dtype: float32
+  learning_rate: 0.001
+  max_epochs: 10000
+  max_norm: -1
+  patience: 200
+  seed: 114514
+  warmup_ratio: 0.001
+  use_ema: true
+  ema_decay: 0.999
+  num_workers: 10
+  resume: 0

@@ -1,0 +1,4 @@
+Server:
+  cuda: true
+  dtype: float64
+  neighbor_list: full

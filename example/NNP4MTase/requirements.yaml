@@ -1,0 +1,33 @@
+name: nnp4mtase
+channels:
+  - conda-forge
+  - pyg
+  - defaults
+dependencies:
+    # Base depends
+  - python==3.13.5
+  - pip==25.2
+    # Pip-only installs
+  - pip:
+    - numpy==2.3.5
+    - h5py==3.14.0
+    - tqdm==4.67.1
+    - ase==3.27.0
+    - joblib==1.5.1
+    - addict==2.4.0
+    - pandas==2.3.2
+    - torch==2.8.0
+    - scikit-learn==1.7.1
+    - transformers==4.55.4
+    - torch-ema==0.3
+    - pyyaml==6.0.2
+    - torch_geometric==2.6.1
+    - rdkit==2025.3.5
+    - e3nn==0.5.6
+    - lightning==2.5.3
+    - xtb==6.7.1
+    - xtb-python==22.1
+    - plumed==2.9.2
+    - py-plumed==2.9.2
+    - fairchem-core==2.20.1
+    - .
