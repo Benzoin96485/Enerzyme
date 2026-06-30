@@ -1,8 +1,12 @@
+# Enerzyme
+
 <h1>
 <p align="center">
     <img src="docs/_static/enerzyme.png" alt="Enerzyme logo" width="300"/>
 </p>
 </h1>
+
+<a href="https://doi.org/10.5281/zenodo.21018798"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.21018798.svg" alt="DOI"></a>
 
 Towards next-generation computational enzymatic catalysis with neural network potentials.
 
@@ -17,7 +21,10 @@ Currently supported model architectures:
 |  NequIP  | external |             ✅             |              ❌              |       ❌       |        ❌        |          [Nat. Commun. 2022, 13(1), 2453](https://www.nature.com/articles/s41467-022-29939-5)          | [Github](https://github.com/mir-group/nequip) |
 |  XPaiNN  | external |             ✅             |              ❌              |       ❌       |        ❌        | [J. Chem. Theory Comput. 2024, 20, 21, 9500–9511](https://pubs.acs.org/doi/10.1021/acs.jctc.4c01151) | [Github](https://github.com/X1X1010/XequiNet) |
 |  SchNet  | internal |             ✅             |              ✅              |       ❌       |  ✅       |  [NeurIPS 2017, arXiv: 1706.08566](https://arxiv.org/abs/1706.08566) | [Github](https://github.com/pyg-team/pytorch_geometric/blob/master/torch_geometric/nn/models/schnet.py) |
+
 ## Usage
+
+See the Documentation at [ReadTheDocs](https://enerzyme.readthedocs.io/en/latest/) for getting started, user guide, API reference, and developer guide!
 
 ### Installation
 

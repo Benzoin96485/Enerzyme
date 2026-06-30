@@ -36,16 +36,19 @@ For reaction-specific CVs, set:
 
 .. code-block:: yaml
 
-    plumed_config_generator:
-        name: get_sammt_config
-    sampling:
-        params:
-            plumed_config:
-                lower_bound: -2
-                upper_bound: 2
-                reference_pdb_file: ref.pdb
-                substrate: KOM
-                nucleophile: O9
+    Simulation:
+        task: plumed
+        plumed_config_generator:
+            name: SAMMTConfigGenerator
+            method: standard_steered_md
+        sampling:
+            params:
+                plumed_config:
+                    lower_bound: -2
+                    upper_bound: 2
+                    reference_pdb_file: ref.pdb
+                    substrate: KOM
+                    nucleophile: O9
 
 Pass the plugin module:
 
@@ -55,11 +58,17 @@ Pass the plugin module:
 
 Enerzymette registers keys such as :code:`sammt` and resolves them via :code:`get_plumed_patch(key)`.
 
+Supported generator methods:
+
+- :code:`standard_steered_md` — one round trip across :code:`[lower_bound, upper_bound]`
+- :code:`naive_steered_md` — warmup pull to nearest bound, then pull to opposite bound
+- :code:`scan` — static PLUMED :code:`RESTRAINT` at :code:`target_value` (used by :code:`task: plumed_scan`)
+
 :code:`plumed` vs :code:`plumed_scan`
 -------------------------------------
 
 - :code:`plumed` — Biased Langevin MD
-- :code:`plumed_scan` — Restrained optimization per CV point
+- :code:`plumed_scan` — Restrained optimization per CV point; **does not** insert proton-transfer plugins even if configured
 
 Legacy ASE :code:`task: scan` with :code:`cv: distance` does not use PLUMED.
 
@@ -85,4 +94,29 @@ Supply :code:`-cp` pointing to a module that implements the external calculator 
 OPES / proton transfer
 ----------------------
 
-Enerzymette SAM-MT plugins may append OPES biases when :code:`proton_transfer: true` in :code:`plumed_config`. Requires a PLUMED build with OPES enabled. Documented in the `Enerzymette PLUMED plugin README <https://github.com/Benzoin96485/Enerzymette/blob/main/enerzymette/plumed_config_generator/README.md>`_.
+Enerzymette can append OPES biases for proton-transfer enhanced sampling. Enable with a nested mapping under :code:`plumed_config`:
+
+.. code-block:: yaml
+
+    plumed_config:
+        lower_bound: -2
+        upper_bound: 2
+        reference_pdb_file: ref.pdb
+        substrate: G
+        nucleophile: "O2'"
+        proton_transfer:
+            enabled: true
+            plugin: local_opes
+            donor: nucleophile
+            flavor: nearest_distance
+            scope_file: structure_pool/000.pt_scope.json
+            state_file: opes_state.data
+            restart: false
+            topology_mol_file: cluster.mol
+            opes_barrier: 20
+
+Requires a PLUMED build with OPES enabled. If required atoms cannot be resolved, the generator falls back to the main reaction-coordinate bias only.
+
+When :code:`enerzymette enerzyme_active_learning` runs with proton transfer in the simulation template, it injects per-pool-entry :code:`scope_file`, :code:`state_file`, :code:`restart`, and :code:`topology_mol_file` each iteration and persists OPES state under :code:`structure_pool/`.
+
+Field reference and plugin developer interface: `Enerzymette PLUMED plugin README <https://github.com/Benzoin96485/Enerzymette/blob/main/enerzymette/plumed_config_generator/README.md>`_.

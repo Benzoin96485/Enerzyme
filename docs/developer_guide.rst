@@ -238,7 +238,12 @@ Task modules
 Plugin patches
 ^^^^^^^^^^^^^^
 
-:code:`FFSimulate` loads :code:`-cp` (calculator) and :code:`-pp` (PLUMED generator) via :code:`importlib` from user-supplied :code:`.py` files. Plugin modules must expose the factory functions expected by :code:`simulator.py` / Enerzymette — see :doc:`/user_guide/workflows/enhanced_sampling_plumed`.
+:code:`FFSimulate` loads :code:`-cp` (calculator) and :code:`-pp` (PLUMED generator) via :code:`importlib` from user-supplied :code:`.py` files.
+
+- **Calculator patches** — expose a factory function (e.g. :code:`get_uma_calculator`) referenced by :code:`external_calculator.name`.
+- **PLUMED patches** — expose a :code:`PlumedConfigGenerator` subclass; YAML sets :code:`plumed_config_generator.name` and :code:`method`. Enerzyme also accepts legacy callables, but new Enerzymette plugins follow the class-based contract.
+
+See :doc:`/user_guide/workflows/enhanced_sampling_plumed` and :doc:`/user_guide/integrations/enerzymette`.
 
 Stable artifact paths
 ^^^^^^^^^^^^^^^^^^^^^

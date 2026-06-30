@@ -75,15 +75,17 @@ Install Enerzymette separately:
 
 Relevant launchers:
 
-+-------------------------------+-----------------------------------------------+
-| Command                       | Role                                          |
-+===============================+===============================================+
-| :code:`launch_enerzyme_scan`  | Batch flexible scans with optional PLUMED CVs |
-+-------------------------------+-----------------------------------------------+
-| :code:`enerzyme_active_learning` | PLUMED steered MD AL iterations            |
-+-------------------------------+-----------------------------------------------+
++-----------------------------------+-----------------------------------------------+
+| Command                           | Role                                          |
++===================================+===============================================+
+| :code:`enerzymette enerzyme_scan` | Batch flexible scans (bond or PLUMED CV)      |
++-----------------------------------+-----------------------------------------------+
+| :code:`enerzymette enerzyme_neb`  | NEB via ORCA ExtOpt + :code:`enerzyme listen` |
++-----------------------------------+-----------------------------------------------+
+| :code:`enerzymette enerzyme_active_learning` | PLUMED steered MD AL iterations    |
++-----------------------------------+-----------------------------------------------+
 
-Both can target a running :code:`enerzyme listen` instance or invoke :code:`enerzyme simulate` directly. See :doc:`enhanced_sampling` for PLUMED plugin details.
+:code:`enerzyme_neb` and :code:`enerzyme_scan` start :code:`enerzyme listen` when needed; :code:`enerzyme_active_learning` invokes :code:`enerzyme simulate` directly. See :doc:`enhanced_sampling` for PLUMED plugin details. End-to-end example: :code:`example/NNP4MTase`.
 
 Architecture sketch
 -------------------

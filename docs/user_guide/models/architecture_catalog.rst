@@ -20,7 +20,7 @@ Internal architectures
 | MACE           | yes      | yes    | partial| yes         | Equivariant,     |
 |                |          |        |        |             | higher cost      |
 +----------------+----------+--------+--------+-------------+------------------+
-| LEFTNet        | varies   | varies | partial| varies      | See config TODOs |
+| AlphaNet       | varies   | varies | partial| varies      | See config TODOs |
 +----------------+----------+--------+--------+-------------+------------------+
 
 External wrappers

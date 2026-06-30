@@ -797,7 +797,7 @@ class GatedEquivariantBlock(nn.Module):
         return x, v
 
 
-class LEFTNet(BaseFFCore):
+class AlphaNet(BaseFFCore):
     def __init__(
             self,
             cutoff_sr: float = 5.0, num_layers: int = 4,
@@ -812,7 +812,7 @@ class LEFTNet(BaseFFCore):
             has_norm_after_flag=False,
             reduce_mode='sum'
     ):
-        super(LEFTNet, self).__init__(input_fields={"Ra", "Za", "batch_seg", "idx_i_sr", "idx_j_sr", "Dij_sr", "vij_sr"}, output_fields={"Ea", "Qa"})
+        super(AlphaNet, self).__init__(input_fields={"Ra", "Za", "batch_seg", "idx_i_sr", "idx_j_sr", "Dij_sr", "vij_sr"}, output_fields={"Ea", "Qa"})
 
         self.eps = float(eps)
         self.num_layers = num_layers
@@ -880,7 +880,7 @@ class LEFTNet(BaseFFCore):
     def __str__(self) -> str:
         return """
 ############################################
-# LEFTNet (NeurIPS 2023, arXiv:2304.04757) #
+# AlphaNet (arXiv:2501.07155) #
 ############################################
 """
 

@@ -51,6 +51,8 @@ Managed by:
         -cp <calc_patch> -pp <plumed_plugin> \
         -rp <reference.pdb> -ts <template.sdf>
 
+Additional flags: :code:`--initial-scan`, :code:`-nis`, :code:`--initial-structures-config`, :code:`-ix`, :code:`-mc`, :code:`-cl`, :code:`--reset_parameters`, :code:`-rm`. See :doc:`/getting_started/active_learning` for descriptions.
+
 Per-iteration stages
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -61,6 +63,18 @@ Per-iteration stages
 5. **Training** — merge data, :code:`pretrain_path` from previous model, new :code:`suffix`
 6. **Model** — :code:`FFxx/` checkpoints for next round
 
+Structure pool
+^^^^^^^^^^^^^^
+
+The launcher rotates starting geometries through :code:`structure_pool.json` and :code:`structure_pool/*.xyz`. Pool initialization:
+
+- Default — :code:`System.structure_file` from :code:`-sc` template
+- :code:`-ix` — custom initial XYZ
+- :code:`--initial-scan` — :code:`initial_scan/local_minima/` after chained :code:`plumed_scan`
+- :code:`--initial-structures-config` — one entry per system from a manifest YAML
+
+Multi-system manifest entries require :code:`name`, :code:`reference_pdb`, and :code:`simulation_config` per system; optional :code:`reference_sdf` and :code:`reference_xyz`. Topology is written to :code:`topology/<name>/`. Multi-system mode excludes :code:`--initial-scan`, :code:`-rp`, :code:`-ts`, :code:`-ix`, and :code:`proton_transfer` in templates.
+
 Task folder template
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -70,6 +84,8 @@ Task folder template
     |-- al.sh
     |-- cluster.xyz
     |-- cluster.mol
+    |-- structure_pool.json
+    |-- structure_pool/
     |-- config/
     |   |-- simulate.yaml    # sampling policy; paths filled per round
     |   |-- extract.yaml     # data_path null in template
@@ -87,20 +103,21 @@ Template rewrite rules
 ^^^^^^^^^^^^^^^^^^^^^^
 
 - :code:`simulate.yaml` — :code:`System.structure_file` → :code:`FFxx_md/initial_structure.xyz`
-- :code:`extract.yaml` — :code:`Datahub.data_path` → trajectory pickle
+- :code:`extract.yaml` — :code:`Datahub.data_path` → trajectory pickle; :code:`reference_mol_path` → per-system :code:`topology/<name>/cluster.mol` in multi-system mode
 - :code:`annotate.yaml` — :code:`Supplier.path` → fragment SDF
 - :code:`train.yaml` — :code:`pretrain_path`, :code:`suffix`, dataset paths, UDD :code:`B` may update from validation error
 
 Initial scans
 ^^^^^^^^^^^^^
 
-Optional :code:`scan-*` directories from :code:`enerzymette enerzyme_scan` seed reaction coordinates before AL. Separate from both AL modes.
+- **Integrated** — :code:`--initial-scan` on :code:`enerzymette enerzyme_active_learning` populates :code:`structure_pool/` before iteration 0
+- **Standalone** — :code:`enerzymette enerzyme_scan` in separate :code:`scan-*` folders for manual exploration or input preparation
 
 Failure recovery
 ^^^^^^^^^^^^^^^^
 
 - Archive :code:`config.yaml` and checkpoints each iteration
-- Resume training with :code:`Trainer.resume: 2` inside a round if needed
-- Enerzymette :code:`-rm` policy controls cleanup of intermediate files
+- Resume training with :code:`Trainer.resume: 2` inside a round if needed; :code:`-cl` sets this automatically on later AL iterations
+- Enerzymette :code:`-rm` restraint mode and structure-pool state files support resuming mid-campaign
 
-See also :doc:`/getting_started/active_learning` for a tutorial-style walkthrough.
+See also :doc:`/getting_started/active_learning` for a tutorial-style walkthrough and :doc:`/user_guide/integrations/enerzymette`.
