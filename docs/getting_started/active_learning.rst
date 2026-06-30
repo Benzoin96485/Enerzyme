@@ -190,7 +190,8 @@ The simulation template describes the **sampling policy**. Enerzymette rewrites 
                 A: 0.08
                 B: 0.0001
         plumed_config_generator:
-            name: get_sammt_config
+            name: SAMMTConfigGenerator
+            method: standard_steered_md
         sampling:
             params:
                 plumed_config:

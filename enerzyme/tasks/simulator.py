@@ -1,5 +1,6 @@
 import os.path as osp
 from typing import Dict, Optional
+import inspect
 from torch.nn import Module
 import numpy as np
 import ase
@@ -308,7 +309,9 @@ class Simulation:
             plumed_config_generator_name = self.plumed_config_generator_config.get("name", None)
             if plumed_config_generator_name is not None:
                 if hasattr(self.plumed_patch_module, plumed_config_generator_name):
-                    self.plumed_config_generator = getattr(self.plumed_patch_module, plumed_config_generator_name)
+                    self.plumed_config_generator = getattr(
+                        self.plumed_patch_module, plumed_config_generator_name
+                    )
                 else:
                     raise ValueError(f"Plumed config generator {plumed_config_generator_name} not found in {self.plumed_patch_module}")
             else:
@@ -321,7 +324,19 @@ class Simulation:
             )
             if target_value is not None:
                 generator_kwargs["target_value"] = target_value
-            plumed_config = self.plumed_config_generator(self.system, **generator_kwargs)
+            if inspect.isclass(self.plumed_config_generator):
+                generator = self.plumed_config_generator(self.system, **generator_kwargs)
+                method_name = self.plumed_config_generator_config.get("method", None)
+                if method_name is None:
+                    method_name = "scan" if target_value is not None else "standard_steered_md"
+                if not hasattr(generator, method_name):
+                    raise ValueError(
+                        f"Plumed config generator {plumed_config_generator_name} "
+                        f"has no method {method_name}"
+                    )
+                plumed_config = getattr(generator, method_name)(**generator_kwargs)
+            else:
+                plumed_config = self.plumed_config_generator(self.system, **generator_kwargs)
         else:
             plumed_config = self.sampling_config.params.plumed_config
 

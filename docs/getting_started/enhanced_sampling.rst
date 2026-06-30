@@ -49,7 +49,8 @@ When :code:`plumed_config_generator` is set, Enerzyme calls a named generator in
     Simulation:
         task: plumed
         plumed_config_generator:
-            name: get_sammt_config
+            name: SAMMTConfigGenerator
+            method: standard_steered_md
         sampling:
             params:
                 plumed_config:
@@ -70,7 +71,8 @@ Unlike legacy :code:`task: scan` (ASE distance + :code:`FixBondLengths`), :code:
     Simulation:
         task: plumed_scan
         plumed_config_generator:
-            name: get_sammt_scan_config
+            name: SAMMTConfigGenerator
+            method: scan
         optimize:
             optimizer: LBFGS
         sampling:

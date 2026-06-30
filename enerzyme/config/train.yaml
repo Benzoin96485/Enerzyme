@@ -247,7 +247,7 @@ Modelhub:
         - name: Force
     FF03:
       suffix:
-      architecture: LEFTNet
+      architecture: AlphaNet
       active: true
       loss:
         rmse:

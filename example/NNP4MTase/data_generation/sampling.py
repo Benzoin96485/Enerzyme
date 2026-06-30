@@ -11,7 +11,7 @@ from ase.constraints import Hookean
 from ase.md.langevin import Langevin
 from enerzyme.bond.bond import pdb2mol
 from enerzymette.altoolkit.get_index import get_indices
-from enerzymette.plumed_config_generator.sammt import get_naive_sammt_config
+from enerzymette.plumed_config_generator.sammt import SAMMTConfigGenerator
 from rdkit.Chem import GetFormalCharge
 from xtb.ase.calculator import XTB
 
@@ -95,17 +95,19 @@ if __name__ == "__main__":
             )
         )
 
-    setup = get_naive_sammt_config(
+    setup = SAMMTConfigGenerator(
         system,
         integrate_config={"n_step": N_STEP},
         idx_start_from=1,
+        reference_pdb_file=pdb_file,
+        substrate=substrate,
+        nucleophile=nucleophile,
+    ).naive_steered_md(
+        integrate_config={"n_step": N_STEP},
         dump_interval=LOG_INTERVAL,
         upper_bound=2,
         lower_bound=-2,
         warmup_steps=1000,
-        reference_pdb_file=pdb_file,
-        substrate=substrate,
-        nucleophile=nucleophile,
     )
     print("setup: ", setup)
 

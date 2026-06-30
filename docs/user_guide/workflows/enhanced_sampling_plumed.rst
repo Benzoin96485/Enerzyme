@@ -37,7 +37,8 @@ For reaction-specific CVs, set:
 .. code-block:: yaml
 
     plumed_config_generator:
-        name: get_sammt_config
+        name: SAMMTConfigGenerator
+            method: standard_steered_md
     sampling:
         params:
             plumed_config:

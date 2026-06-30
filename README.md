@@ -1,3 +1,5 @@
+# Enerzyme
+
 <h1>
 <p align="center">
     <img src="docs/_static/enerzyme.png" alt="Enerzyme logo" width="300"/>

@@ -17,7 +17,7 @@ MODEL_HEAD_NAMES = {
     "PhysNetCore": {"output_block"},
     "SchNetCore": {"lin1", "lin2"},
     "SpookyNetCore": {"output"},
-    "LEFTNet": {"last_layer", "last_layer_quantum"},
+    "AlphaNet": {"last_layer", "last_layer_quantum"},
     "MACECore": {"readouts"}
 }
 
@@ -77,7 +77,7 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
     model: torch.nn.Module
         The model to optimize.
 
-        Now Muon optimizer only supports the following internal models: PhysNet, SpookyNet, LEFTNet, MACE, and SchNet.
+        Now Muon optimizer only supports the following internal models: PhysNet, SpookyNet, AlphaNet, MACE, and SchNet.
         
     hyper_params: dict
         The hyperparameters for the optimizer, depending on the optimizer `name`.
