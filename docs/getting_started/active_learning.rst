@@ -130,7 +130,67 @@ Important inputs:
 - :code:`-np` — presimulation MD steps before the steered / biased production segment.
 - :code:`-rp` — reference PDB used by the PLUMED CV plugin and chemistry-specific atom selection.
 - :code:`-ts` — template SDF used for bond orders / ligand connectivity.
-- :code:`-rm` — cleanup or run-management policy.
+- :code:`-rm` — restraint mode for steered MD (:code:`hard` or :code:`soft`).
+- :code:`-mc` — model config path for :code:`enerzyme simulate` and :code:`train`.
+- :code:`-ix` — custom initial XYZ for single-system structure-pool seeding.
+- :code:`--initial-scan` / :code:`-nis` — run :code:`plumed_scan` before iteration 0 to populate the structure pool from scan local minima.
+- :code:`--initial-structures-config` — YAML manifest for a **multi-system** structure pool (see below).
+- :code:`-cl` / :code:`--continual_learning` — on later iterations, resume in-round training with :code:`Trainer.resume: 2`.
+- :code:`--reset_parameters` — reinitialize pretrained weights at iteration 0 and use random fragment extraction for that round.
+
+Structure pool
+^^^^^^^^^^^^^^
+
+The AL launcher maintains a **structure pool** at the task root. Each AL iteration picks or updates one pool entry as the starting geometry for steered MD (and optional presimulation).
+
+.. code-block:: text
+
+    my_al_task/
+    |-- structure_pool.json
+    |-- structure_pool/
+    |   |-- 000.xyz
+    |   |-- 001.xyz
+    |   `-- ...
+    |-- initial_scan/          # only with --initial-scan
+    |   |-- scan.csv
+    |   |-- local_minima/
+    |   `-- initial_scan_completed
+    `-- topology/              # multi-system mode only
+        |-- system_a/
+        |   |-- cluster.xyz
+        |   `-- cluster.mol
+        `-- system_b/
+            ...
+
+Initialization modes:
+
+- **Default** — copy :code:`System.structure_file` from the simulation template into :code:`structure_pool/000.xyz`.
+- :code:`-ix` — seed the pool from a custom XYZ instead.
+- :code:`--initial-scan` — run :code:`initial_scan/` (:code:`plumed_scan` per elementary reaction in :code:`scan.csv`), then copy :code:`local_minima/` structures into the pool.
+- :code:`--initial-structures-config` — load one entry per system from a manifest (see Multi-system manifest).
+
+During the loop, presimulation MD can update the active pool entry in place. With proton transfer enabled, OPES scope and state files are stored per pool index under :code:`structure_pool/`.
+
+Multi-system manifest
+^^^^^^^^^^^^^^^^^^^^^
+
+For campaigns spanning several enzymes or ligand setups, pass :code:`--initial-structures-config` instead of :code:`-rp`, :code:`-ts`, and :code:`-ix`. The manifest lists per-system simulation templates and reference files:
+
+.. code-block:: yaml
+
+    systems:
+    - name: COMT_G
+      reference_pdb: structures/COMT_G.pdb
+      reference_sdf: structures/ligands.sdf
+      simulation_config: config/simulate_COMT_G.yaml
+    - name: COMT_A
+      reference_pdb: structures/COMT_A.pdb
+      simulation_config: config/simulate_COMT_A.yaml
+      reference_xyz: structures/COMT_A_initial.xyz
+
+Each :code:`simulation_config` must include :code:`System`, :code:`Simulation`, and :code:`Simulation.sampling.params.plumed_config`. Paths in the manifest are resolved relative to the manifest file.
+
+Enerzymette runs :code:`enerzyme bond` per system into :code:`topology/<name>/` and writes one pool entry per system. **Limitations:** multi-system mode does not support :code:`--initial-scan` or :code:`proton_transfer` in the simulation templates.
 
 Task folder layout
 ^^^^^^^^^^^^^^^^^^
@@ -323,15 +383,20 @@ In generated configs, round :code:`i` sets :code:`pretrain_path` to round :code:
 Optional initial scans
 ^^^^^^^^^^^^^^^^^^^^^^
 
-Enerzymette scan launchers can prepare reaction-coordinate structures before the MD loop. In the reference task, :code:`scan-10/`, :code:`scan-15/`, and :code:`scan-20/` are separate scan folders. Each contains:
+Two patterns seed structures before or alongside AL:
 
-- :code:`launch.sh` for :code:`enerzymette enerzyme_scan`
-- :code:`scan.csv` with elementary reaction labels such as :code:`1a -> 2a`, :code:`1b -> 2b`
-- One directory per elementary reaction, e.g. :code:`1a-2a/`
-- Generated :code:`reactant_opt.yaml`, :code:`scan.yaml`, :code:`product_opt.yaml`
+**Integrated (recommended).** Pass :code:`--initial-scan` to :code:`enerzymette enerzyme_active_learning`. The launcher creates :code:`initial_scan/` with :code:`scan.csv`, runs :code:`plumed_scan` per elementary reaction, and fills :code:`structure_pool/` from :code:`local_minima/`.
+
+**Standalone.** Run :code:`enerzymette enerzyme_scan` in separate folders (for example :code:`scan-10/`, :code:`scan-15/`) to explore reaction coordinates or prepare inputs manually. Each folder typically contains:
+
+- :code:`launch.sh` calling :code:`enerzymette enerzyme_scan`
+- :code:`scan.csv` with labels such as :code:`1a -> 2a`
+- Per-reaction subdirectories with :code:`reactant_opt.yaml`, :code:`scan.yaml`, :code:`product_opt.yaml`
 - :code:`local_minima/` and :code:`rate_determining_ts/` summaries
 
-These scans are useful for seeding structures or checking reaction coordinates, but they are separate from Enerzyme's internal :code:`Trainer.active_learning_params`.
+For PLUMED CV scans, :code:`-pp` (plugin key) and :code:`-psc` (CV parameter YAML) are both required. For bond-distance scans, :code:`-q` accepts either a TeraChem input or a YAML scan config (see :doc:`enhanced_sampling`).
+
+Neither pattern replaces Enerzyme's internal :code:`Trainer.active_learning_params` dataset AL.
 
 When to use which mode
 ----------------------

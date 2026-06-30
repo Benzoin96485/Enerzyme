@@ -65,15 +65,55 @@ Enerzymette: ORCA ↔ TeraChem bridge
 
 Combines ORCA ExtOpt with TeraChem gradients. Full setup is documented in :doc:`qm_annotation`.
 
+Enerzymette: flexible scan launcher
+-----------------------------------
+
+Automated opt → scan → opt loops for reaction-coordinate exploration:
+
+.. code-block:: bash
+
+    enerzymette enerzyme_scan \
+        -r reactant.xyz \
+        -o scan_out/ \
+        -m model_dir/ \
+        -q scan_config.yaml \
+        -pp sammt \
+        -psc cv_params.yaml \
+        -n 25
+
+- :code:`-q` — TeraChem input with :code:`constraint_freeze` / :code:`constraint_scan`, **or** a YAML scan config (see :doc:`enhanced_sampling`)
+- :code:`-pp` / :code:`-psc` — PLUMED CV scan; both flags required together
+- :code:`enerzymette update_terachem_scan` — refresh bond-scan coordinates in a TeraChem input after geometry update
+
+Enerzymette: NEB launcher
+-------------------------
+
+NNP-driven NEB via ORCA and :code:`enerzyme listen`:
+
+.. code-block:: bash
+
+    enerzymette enerzyme_neb \
+        -r reactant.xyz \
+        -p product.xyz \
+        -o neb_out/ \
+        -m model_dir/ \
+        -q reference.in \
+        -c server.yaml \
+        -n 25 -b 5000
+
+See :doc:`server_and_enerzymette` for server setup.
+
 Quick reference
 ---------------
 
 - :code:`enerzyme bond` (Enerzyme) — PDB to MOL connectivity
 - :code:`enerzyme collect` (Enerzyme) — preprocess and split only
 - :code:`enerzymette idpp` (Enerzymette) — NEB initial path
-- :code:`terachem_timing` (Enerzymette) — QC job monitoring
-- :code:`orca_terachem_request` (Enerzymette) — ORCA optimizer with TeraChem QC
-- :code:`launch_enerzyme_scan` (Enerzymette) — batch PLUMED or distance scans
-- :code:`enerzyme_active_learning` (Enerzymette) — active-learning campaign launcher
+- :code:`enerzymette terachem_timing` (Enerzymette) — QC job monitoring
+- :code:`enerzymette orca_terachem_request` (Enerzymette) — ORCA optimizer with TeraChem QC
+- :code:`enerzymette enerzyme_scan` (Enerzymette) — batch PLUMED or bond-distance scans
+- :code:`enerzymette enerzyme_neb` (Enerzymette) — NNP-driven NEB via ORCA ExtOpt
+- :code:`enerzymette update_terachem_scan` (Enerzymette) — refresh TeraChem scan coordinates
+- :code:`enerzymette enerzyme_active_learning` (Enerzymette) — active-learning campaign launcher
 
 Install Enerzymette with :code:`pip install -e .` in its repository; it is not bundled with Enerzyme.

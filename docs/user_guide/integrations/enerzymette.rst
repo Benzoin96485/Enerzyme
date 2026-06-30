@@ -3,6 +3,8 @@ Enerzymette Integration
 
 `Enerzymette <https://github.com/Benzoin96485/Enerzymette>`_ is a separate package of workflow scripts and launchers around Enerzyme. It is **not** installed with core Enerzyme.
 
+Application: :code:`example/NNP4MTase` in the Enerzyme repository (methyltransferase active learning, scan, and NEB).
+
 Install
 -------
 
@@ -16,21 +18,36 @@ Main launchers
 --------------
 
 :code:`enerzymette enerzyme_active_learning`
-    Outer AL loop: simulate → predict/extract → annotate → train. See :doc:`/user_guide/workflows/active_learning`.
+    Outer AL loop: simulate → predict/extract → annotate → train. Manages a per-task **structure pool** and rewrites YAML each round. See :doc:`/user_guide/workflows/active_learning`.
 
-:code:`enerzymette enerzyme_scan` / :code:`launch_enerzyme_scan`
-  Chained reaction-coordinate scans with optional PLUMED CV plugins (:code:`-pp`, :code:`-psc`).
+:code:`enerzymette enerzyme_scan`
+    Chained reaction-coordinate scans (bond-distance or PLUMED CV). Reads system settings from a TeraChem input or a YAML **scan config** (:code:`-q`). PLUMED mode requires :code:`-pp` and :code:`-psc`.
+
+:code:`enerzymette enerzyme_neb`
+    NNP-driven NEB via ORCA ExtOpt and :code:`enerzyme listen`. See :doc:`/getting_started/server_and_enerzymette`.
 
 PLUMED CV plugins
 -----------------
 
-Plugins live under :code:`enerzymette/plumed_config_generator/`. Register keys (e.g. :code:`sammt`) and pass to Enerzyme:
+Plugins live under :code:`enerzymette/plumed_config_generator/`. Enerzymette registers built-in keys (e.g. :code:`sammt`) and resolves module paths with :code:`get_plumed_patch(key)`. Pass the resolved module to Enerzyme:
 
 .. code-block:: bash
 
-    enerzyme simulate ... -pp <plugin_key_or_module>
+    enerzyme simulate ... -pp <plugin_key_or_module.py>
 
-Contract: three functions :code:`get_<key>_reaction_coordinate`, :code:`get_<key>_config`, :code:`get_<key>_scan_config`. See the `plugin README <https://github.com/Benzoin96485/Enerzymette/blob/main/enerzymette/plumed_config_generator/README.md>`_.
+**Contract (current).** A plugin module exposes a :code:`PlumedConfigGenerator` subclass (for example :code:`SAMMTConfigGenerator`). The simulation YAML selects the class and method:
+
+.. code-block:: yaml
+
+    plumed_config_generator:
+        name: SAMMTConfigGenerator
+        method: standard_steered_md   # or naive_steered_md, scan
+
+Enerzyme instantiates the class with the current :code:`ase.Atoms` object and YAML parameters under :code:`sampling.params.plumed_config`, then calls the named method to produce :code:`plumed.dat`.
+
+To register a new built-in key, use :code:`register_plumed_cv_plugin()` in the plugin package. Optional **proton-transfer** strategies are separate plugins under :code:`proton_transfer.py` (for example :code:`local_opes`).
+
+Full developer and user reference: `Enerzymette PLUMED plugin README <https://github.com/Benzoin96485/Enerzymette/blob/main/enerzymette/plumed_config_generator/README.md>`_.
 
 Utility commands
 ----------------
@@ -43,6 +60,23 @@ Utility commands
 
 :code:`enerzymette orca_terachem_request`
     ORCA ExtOpt → TeraChem gradient bridge. See :doc:`/user_guide/integrations/orca_terachem`.
+
+:code:`enerzymette update_terachem_scan`
+    Refresh bond-scan coordinates in a TeraChem input after a structure update (:code:`-i`, :code:`-s`, :code:`-o`).
+
+Active-learning launcher flags (summary)
+----------------------------------------
+
+In addition to template paths (:code:`-sc`, :code:`-ec`, :code:`-ac`, :code:`-tc`) and plugin keys (:code:`-cp`, :code:`-pp`):
+
+- :code:`--initial-scan` / :code:`-nis` — run :code:`plumed_scan` jobs before iteration 0 and seed :code:`structure_pool/` from local minima
+- :code:`--initial-structures-config` — multi-system manifest YAML (mutually exclusive with :code:`-rp`, :code:`-ts`, :code:`-ix`, and :code:`--initial-scan`)
+- :code:`-ix` — single-system custom initial XYZ (overrides :code:`System.structure_file` in the simulation template for pool initialization)
+- :code:`-cl` / :code:`--continual_learning` — resume in-round training with :code:`Trainer.resume: 2` on later iterations
+- :code:`--reset_parameters` — reinitialize weights at iteration 0; switch extraction to random picking for that round
+- :code:`-mc` — override model config path passed to :code:`enerzyme simulate` / :code:`train`
+
+See :doc:`/getting_started/active_learning` for structure-pool layout and manifest format.
 
 Boundary with Enerzyme
 ----------------------
@@ -62,4 +96,4 @@ Boundary with Enerzyme
 Recommended task directory
 --------------------------
 
-Stable inputs at task root: :code:`al.sh`, :code:`cluster.xyz`, :code:`cluster.mol`, :code:`config/*.yaml`. Generated iteration folders :code:`FFxx_*` under the same root.
+Stable inputs at task root: :code:`al.sh`, :code:`cluster.xyz`, :code:`cluster.mol`, :code:`config/*.yaml`. Generated iteration folders :code:`FFxx_*`, plus :code:`structure_pool/` and :code:`structure_pool.json` when using the AL launcher.

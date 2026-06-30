@@ -15,7 +15,7 @@ Workflow map
         -> predict / simulate
         -> (optional) extract -> annotate -> merge -> retrain
 
-For enzymatic exploration, the outer loop is often managed by `Enerzymette <https://github.com/Benzoin96485/Enerzymette>`_ rather than a single :code:`enerzyme train` job. See :doc:`/user_guide/workflows/active_learning`.
+For enzymatic exploration, the outer loop is often managed by `Enerzymette <https://github.com/Benzoin96485/Enerzymette>`_ rather than a single :code:`enerzyme train` job. See :doc:`/user_guide/workflows/active_learning`. A full methyltransferase workflow is documented in :code:`example/NNP4MTase`.
 
 CLI command map
 -----------------

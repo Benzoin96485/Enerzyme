@@ -103,8 +103,31 @@ Enerzymette launchers
 
 `Enerzymette <https://github.com/Benzoin96485/Enerzymette>`_ automates scan and AL workflows:
 
-:code:`enerzymette launch_enerzyme_scan`
-    Generates :code:`plumed_scan` configs and passes :code:`-pp` to :code:`enerzyme simulate`. Flags: :code:`-pp` (plugin key), :code:`-psc` (CV parameter YAML).
+:code:`enerzymette enerzyme_scan`
+    Flexible bond or PLUMED CV scans. For each elementary reaction: optimize reactant → scan → optimize product → analyze path. Key flags:
+
+    - :code:`-q` — TeraChem input **or** YAML **scan config** (charge, frozen atoms, scan bond)
+    - :code:`-pp` — PLUMED plugin key (e.g. :code:`sammt`); switches to :code:`plumed_scan`
+    - :code:`-psc` — YAML with CV parameters (:code:`lower_bound`, :code:`reference_pdb_file`, etc.); **required** when :code:`-pp` is set
+
+    Example scan config for bond-distance mode (:code:`-q scan_config.yaml`):
+
+    .. code-block:: yaml
+
+        reference_pdb: cluster.pdb
+        reference_sdf: ligands.sdf
+        multiplicity: 1
+        freeze_index_types: [backbone, Calpha]
+        constraint_scan:
+            bond:
+                plugin: sammt
+                substrate: G
+                nucleophile: "O2'"
+
+    Supporting utility: :code:`enerzymette update_terachem_scan` refreshes coordinates in a TeraChem scan input after a structure update.
+
+:code:`enerzymette enerzyme_neb`
+    NNP-driven NEB through ORCA ExtOpt and a running :code:`enerzyme listen` server. Requires :code:`-r`, :code:`-p`, :code:`-q` (reference TeraChem input), :code:`-c` (server config), and :code:`-m` (model directory). See :doc:`server_and_enerzymette`.
 
 :code:`enerzymette enerzyme_active_learning`
     Runs the external active-learning loop around Enerzyme simulation, extraction, QM annotation, and retraining. :code:`--initial-scan` runs chained :code:`plumed_scan` jobs before iteration 0 to populate a structure pool. See :doc:`active_learning` for the expected task-folder layout and template input files.
