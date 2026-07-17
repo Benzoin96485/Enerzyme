@@ -33,7 +33,7 @@ class ASECalculator(Calculator):
 
     def __init__(
         self,
-        model: Module,
+        model: Optional[Module]=None,
         restart: Optional[str]=None,
         label: Optional[str]=None,
         atoms: Optional[ase.Atoms]=None,
@@ -71,6 +71,19 @@ class ASECalculator(Calculator):
             self.external_calculator_weight = external_calculator_config.get("weight", 0.0)
             self.use_external_calculator = True
         self.uncertainty_calculator_config = uncertainty_calculator_config
+        self.use_internal_calculator = (
+            self.internal_calculator_weight != 0 or self.uncertainty_calculator_config is not None
+        )
+        if self.use_internal_calculator and self.model is None:
+            raise ValueError(
+                "Internal calculator is required (non-zero internal_calculator_weight "
+                "or uncertainty_calculator) but model is None"
+            )
+        if not self.use_internal_calculator and not self.use_external_calculator:
+            raise ValueError(
+                "No calculator is active: set a non-zero internal_calculator_weight "
+                "and/or provide an external_calculator"
+            )
 
     def _calculate_UDD(self, output: Dict[str, Any], A: float, B: float, NM: Optional[int]=None) -> Dict[str, Any]:
         results, biases = dict(), dict()
@@ -151,23 +164,27 @@ class ASECalculator(Calculator):
 
     def calculate(self, atoms=None, properties=["energy", "forces", "dipole", "charges"], system_changes=all_changes) -> None:
         Calculator.calculate(self, atoms, properties, system_changes)
-        if self.internal_calculator_weight != 0 or self.uncertainty_calculator_config is not None:
+        internal_results, biases = dict(), dict()
+        if self.use_internal_calculator:
             internal_results, biases = self._calculate_internal(atoms)
+        external_calculator_properties = ['energy', 'forces']
+        external_results = dict()
         if self.use_external_calculator:
-            external_calculator_properties = ['energy', 'forces']  
             self.external_calculator.calculate(atoms, properties=properties, system_changes=system_changes)
-            external_results = dict()
             for property in external_calculator_properties:
                 external_results[property] = self.external_calculator.results[property]
-        
+
         for property in properties:
             if self.use_external_calculator and property in external_calculator_properties:
                 if self.internal_calculator_weight == 0:
                     self.results[property] = self.external_calculator_weight * external_results[property]
                 else:
                     self.results[property] = self.internal_calculator_weight * internal_results[property] + self.external_calculator_weight * external_results[property]
-            else:
+            elif property in internal_results:
                 self.results[property] = self.internal_calculator_weight * internal_results[property]
+            else:
+                # Fully external shell: skip properties the external calc does not provide
+                continue
 
             if self.uncertainty_calculator_config is not None and property in ["energy", "forces"]:
                 self.results[property] += biases[property]

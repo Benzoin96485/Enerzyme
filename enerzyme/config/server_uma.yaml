@@ -1,0 +1,16 @@
+Server:
+  cuda: true
+  dtype: float64
+  neighbor_list: full
+  Hartree_in_E: 1.0
+  # Pure external-calculator shell: no trained Enerzyme model required.
+  # Start with:
+  #   enerzyme listen -c server_uma.yaml -o out/ -b 0.0.0.0:5000 -cp /path/to/uma.py
+  external_calculator:
+    name: uma_calculator
+    weight: 1.0
+    params:
+      model: uma-s-1p2
+      task: omol
+      device: cuda
+  internal_calculator_weight: 0.0

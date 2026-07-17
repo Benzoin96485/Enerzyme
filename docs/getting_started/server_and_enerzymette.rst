@@ -13,12 +13,19 @@ Starting the server
 Arguments:
 
 - :code:`-c` — server config (minimal YAML; see below)
-- :code:`-m` — trained model directory
+- :code:`-m` — trained model directory (optional in external-calculator shell mode)
 - :code:`-mc` — model config (defaults to :code:`model_dir/config.yaml`)
 - :code:`-b` — bind address (host:port)
 - :code:`-o` — output directory for server logs and artifacts
+- :code:`-cp` — optional external calculator patch (:code:`.py`), same as :code:`simulate`
 
-There is no separate :code:`listen.yaml` in the repository. Reuse a lightweight config derived from :code:`predict.yaml` or an empty :code:`Datahub`-only stub—the server loads active models from :code:`-mc`.
+External-calculator shell (no trained Enerzyme model):
+
+.. code-block:: bash
+
+    enerzyme listen -c enerzyme/config/server_uma.yaml -o server_out/ -b 0.0.0.0:5000 -cp /path/to/uma.py
+
+Set :code:`Server.internal_calculator_weight: 0` and omit :code:`uncertainty_calculator`. The server loads only the :code:`-cp` factory named by :code:`Server.external_calculator`.
 
 Minimal server config
 ---------------------
@@ -28,7 +35,7 @@ Minimal server config
     Datahub:
         preload: true
 
-The listen process reads :code:`Modelhub` from the model config, loads all :code:`active: true` models, and exposes them via Flask/Waitress.
+With an internal model, the listen process reads :code:`Modelhub` from the model config, loads all :code:`active: true` models, and exposes them via Flask/Waitress. Hybrid / shell keys live under :code:`Server:` — see :doc:`/user_guide/integrations/server_mode`.
 
 Sending a request (client)
 --------------------------
@@ -95,7 +102,8 @@ Architecture sketch
     Client / Enerzymette  --POST /calculate-->  enerzyme listen
                                                       |
                                                       v
-                                              ASECalculator + model
+                                              ASECalculator
+                                           (internal and/or -cp)
 
 Related pages
 -------------
