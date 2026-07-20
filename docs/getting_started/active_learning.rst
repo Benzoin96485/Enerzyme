@@ -394,7 +394,7 @@ Two patterns seed structures before or alongside AL:
 - Per-reaction subdirectories with :code:`reactant_opt.yaml`, :code:`scan.yaml`, :code:`product_opt.yaml`
 - :code:`local_minima/` and :code:`rate_determining_ts/` summaries
 
-For PLUMED CV scans, :code:`-pp` (plugin key) and :code:`-psc` (CV parameter YAML) are both required. For bond-distance scans, :code:`-q` accepts either a TeraChem input or a YAML scan config (see :doc:`enhanced_sampling`).
+For PLUMED CV scans, :code:`-pp` (plugin key) and :code:`-psc` (CV parameter YAML) are both required. For bond-distance scans, :code:`-q` accepts either a TeraChem input or a YAML scan config (optional :code:`charge` skips PDB charge derivation; see :doc:`enhanced_sampling`).
 
 Neither pattern replaces Enerzyme's internal :code:`Trainer.active_learning_params` dataset AL.
 

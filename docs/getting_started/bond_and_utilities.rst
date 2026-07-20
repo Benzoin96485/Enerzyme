@@ -81,7 +81,7 @@ Automated opt → scan → opt loops for reaction-coordinate exploration:
         -psc cv_params.yaml \
         -n 25
 
-- :code:`-q` — TeraChem input with :code:`constraint_freeze` / :code:`constraint_scan`, **or** a YAML scan config (see :doc:`enhanced_sampling`)
+- :code:`-q` — TeraChem input with :code:`constraint_freeze` / :code:`constraint_scan`, **or** a YAML scan config (:code:`reference_pdb`, :code:`freeze_index_types`, optional :code:`charge`; see :doc:`enhanced_sampling`)
 - :code:`-pp` / :code:`-psc` — PLUMED CV scan; both flags required together
 - :code:`enerzymette update_terachem_scan` — refresh bond-scan coordinates in a TeraChem input after geometry update
 
@@ -96,12 +96,18 @@ NNP-driven NEB via ORCA and :code:`enerzyme listen`:
         -r reactant.xyz \
         -p product.xyz \
         -o neb_out/ \
-        -m model_dir/ \
-        -q reference.in \
-        -c server.yaml \
-        -n 25 -b 5000
+        -q neb_config.yaml \
+        -c server_uma.yaml \
+        -cp uma \
+        -t ts_guess.xyz \
+        -n 8 -b 5001
 
-See :doc:`server_and_enerzymette` for server setup.
+- :code:`-q` — TeraChem reference input **or** YAML neb config (:code:`reference_pdb`, :code:`freeze_index_types`; optional :code:`charge` / :code:`reference_sdf` / :code:`multiplicity`)
+- :code:`-cp` — external calculator patch (path or key such as :code:`uma`); needed for shell-mode listen
+- :code:`-t` — optional TS guess structure for ORCA :code:`%neb TS`
+- :code:`-m` — model directory (optional when the server runs with :code:`internal_calculator_weight: 0`)
+
+See :doc:`enhanced_sampling` for a sample :code:`neb_config.yaml` and :doc:`server_and_enerzymette` for server setup.
 
 Quick reference
 ---------------
