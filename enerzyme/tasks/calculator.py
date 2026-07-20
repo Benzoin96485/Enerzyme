@@ -167,10 +167,18 @@ class ASECalculator(Calculator):
         internal_results, biases = dict(), dict()
         if self.use_internal_calculator:
             internal_results, biases = self._calculate_internal(atoms)
-        external_calculator_properties = ['energy', 'forces']
+        # External ASE calculators often only implement energy/forces; do not
+        # pass dipole/charges even if the caller requested them.
+        external_calculator_properties = [
+            p for p in properties if p in ("energy", "forces")
+        ]
         external_results = dict()
-        if self.use_external_calculator:
-            self.external_calculator.calculate(atoms, properties=properties, system_changes=system_changes)
+        if self.use_external_calculator and external_calculator_properties:
+            self.external_calculator.calculate(
+                atoms,
+                properties=external_calculator_properties,
+                system_changes=system_changes,
+            )
             for property in external_calculator_properties:
                 external_results[property] = self.external_calculator.results[property]
 
