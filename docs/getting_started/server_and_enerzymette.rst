@@ -92,7 +92,9 @@ Relevant launchers:
 | :code:`enerzymette enerzyme_active_learning` | PLUMED steered MD AL iterations    |
 +-----------------------------------+-----------------------------------------------+
 
-:code:`enerzyme_neb` and :code:`enerzyme_scan` start :code:`enerzyme listen` when needed; :code:`enerzyme_active_learning` invokes :code:`enerzyme simulate` directly. See :doc:`enhanced_sampling` for PLUMED plugin details. End-to-end example: :code:`example/NNP4MTase`.
+:code:`enerzyme_neb` and :code:`enerzyme_scan` start :code:`enerzyme listen` when needed; :code:`enerzyme_active_learning` invokes :code:`enerzyme simulate` directly.
+
+For NEB, :code:`-q` may be a TeraChem input or a YAML :code:`neb_config` (:code:`reference_pdb`, :code:`freeze_index_types`; optional :code:`charge`). In external-calculator shell mode, pass the same :code:`-cp` the launcher should forward to :code:`enerzyme listen` (and omit :code:`-m` when :code:`internal_calculator_weight` is 0). Optional :code:`-t` supplies an initial TS guess. See :doc:`enhanced_sampling` for PLUMED plugins, scan/neb YAML examples, and CLI details. End-to-end example: :code:`example/NNP4MTase`.
 
 Architecture sketch
 -------------------
