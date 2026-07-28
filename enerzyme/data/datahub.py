@@ -415,23 +415,25 @@ class SingleDataHub:
             raise IndexError(f"Length of {k} ({self.data_types[k]}) should be n_datapoint")
 
     def _init_data(self) -> None:
-        if not os.path.isfile(self.data_path):
-            raise ValueError(f"Data path {self.data_path} doesn't exist.")
         suffix = self.data_path.split(".")[-1]
-        if self.data_format == "hdf5" or suffix == "hdf5":
+        # aselmdb accepts a file, directory of DB files, or glob; ASELMDBDataset validates the path
+        if self.data_format == "aselmdb" or suffix == "aselmdb":
+            self.data_format = "aselmdb"
+            raw_data = ASELMDBDataset(self.data_path, connect_args=self.connect_args, select_args=self.select_args)
+        elif not os.path.isfile(self.data_path):
+            raise ValueError(f"Data path {self.data_path} doesn't exist.")
+        elif self.data_format == "hdf5" or suffix == "hdf5":
             self.data_format = "hdf5"
             raw_data = h5py.File(self.data_path, mode="r")["data"]
         elif self.data_format == "pickle" or suffix == "pkl" or suffix == "pickle":
             self.data_format = "pickle"
             raw_data = load_from_pickle(self.data_path)
-        elif self.data_format == "npz" or suffix == "npz":
-            self.data_format = "npz"
+        elif self.data_format == "Tensorflow" or suffix == "Tensorflow":
+            self.data_format = "Tensorflow"
             raw_data = np.load(self.data_path, allow_pickle=True)
         elif self.data_format == "sdf" or suffix == "sdf":
             self.data_format = "sdf"
             raw_data = load_from_sdf(self.data_path)
-        elif self.data_format == "aselmdb" or suffix == "aselmdb":
-            raw_data = ASELMDBDataset(self.data_path, connect_args=self.connect_args, select_args=self.select_args)
         else:
             raise ValueError(f"Data format of {self.data_path} is unknown")
 
