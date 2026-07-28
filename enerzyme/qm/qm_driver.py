@@ -253,6 +253,8 @@ class TeraChemDriver(QMDriver):
         input_file = tmp_dir / f"{index}.in"
         Q = atoms.info.get("charge", 0)
         spinmult = atoms.info.get("spin", 1)
+        template_path = Path(self.template_input_file).resolve()
+        template_dir = template_path.parent
 
         input_lines = [
             "run gradient\n"
@@ -261,7 +263,7 @@ class TeraChemDriver(QMDriver):
             f"spinmult {spinmult}\n"
             f"scrdir ./scr_{index}\n"
         ]
-        with open(self.template_input_file, "r") as f:
+        with open(template_path, "r") as f:
             for line in f:
                 if line.startswith("run"):
                     continue
@@ -275,6 +277,22 @@ class TeraChemDriver(QMDriver):
                     continue
                 elif line.strip() == "end":
                     break
+                elif line.startswith("pcm_radii_file"):
+                    # Resolve relative to the template; copy into tmp so TeraChem
+                    # can use a basename path (no host absolute paths required).
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        radii_src = Path(parts[1])
+                        if not radii_src.is_absolute():
+                            radii_src = template_dir / radii_src
+                        radii_src = radii_src.resolve()
+                        radii_dst = tmp_dir / radii_src.name
+                        if not radii_dst.exists():
+                            copy(radii_src, radii_dst)
+                        input_lines.append(f"pcm_radii_file {radii_src.name}\n")
+                    else:
+                        input_lines.append(line)
+                    continue
                 input_lines.append(line)
 
         input_lines.append("end\n")

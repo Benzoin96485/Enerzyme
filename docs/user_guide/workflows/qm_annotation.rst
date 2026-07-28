@@ -50,6 +50,8 @@ QMDriver options
 - :code:`keep_stdout` / :code:`keep_molden` — retain QC logs
 - :code:`clean_tmp` — remove scratch after success
 
+For PCM, put :code:`pcm_radii_file <name>` in the template (path relative to the template file is fine). :code:`TeraChemDriver` copies that file into the per-job tmp directory so host absolute paths are not required in committed configs.
+
 Output schema
 -------------
 
@@ -68,8 +70,13 @@ Environment
 -----------
 
 - :code:`terachem` on :code:`PATH` with valid license
-- PCM radius file when using :code:`pcm: cosmo` or similar
+- PCM radius file when the template uses :code:`pcm_radii read` (prefer a file next to the template; see above)
 - RDKit for SDF parsing
+
+Smoke / AL fixtures
+-------------------
+
+:code:`example/L3-COMT-aselmdb-smoke/` vendors a tiny COMT topology, PCM radii, annotate/train YAMLs, and an :code:`enerzymette_al/` config set for one minimal Enerzymette iteration (run from the repo root; load modules and caches on the CLI).
 
 Related integrations
 --------------------

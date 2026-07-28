@@ -45,7 +45,7 @@ The reference driver targets **TeraChem**. Basis, functional, and solvent live i
 
 - :code:`terachem` executable on :code:`PATH` (or via :code:`terachem_args`)
 - Valid license and scratch space
-- Template input covering basis / XC / PCM as needed
+- Template input covering basis / XC / PCM as needed (:code:`pcm_radii_file` may be relative to the template; the driver copies it into job scratch)
 
 Results are stored with ASE :code:`SinglePointCalculator` plus :code:`charge` / :code:`spin` / :code:`index` in row data so Datahub can reload them as :code:`aselmdb`.
 

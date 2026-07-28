@@ -1,0 +1,21 @@
+# Minimal extraction: 2 fragments from the MD collection (enough for train/val).
+Datahub:
+  data_format: pickle
+  data_path: null
+  features:
+    N: null
+    Q: Q
+    Ra: Ra
+    Za: Za
+  neighbor_list: full
+  preload: true
+  targets: null
+Extractor:
+  fragment_per_frame: 1
+  fragment_radius: 3.0
+  local_uncertainty_radius: 4.0
+  n_centers: 1
+  reference_mol_path: null
+Metric: null
+Trainer:
+  inference_batch_size: 1

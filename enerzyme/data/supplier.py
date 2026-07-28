@@ -31,11 +31,10 @@ class SDFSupplier(Supplier):
         self.supplier = Chem.SDMolSupplier(input_file, removeHs=False)
 
     def suppl(self):
-        i = self.start
         for i, mol in enumerate(self.supplier):
             if i < self.start:
                 continue
-            if i >= self.end:
+            if self.end is not None and i >= self.end:
                 break
             atoms = Atoms(
                 symbols=np.array([atom.GetSymbol() for atom in mol.GetAtoms()]),
@@ -48,7 +47,6 @@ class SDFSupplier(Supplier):
                 }
             )
             yield atoms
-            i += 1
 
 
 class PickleSupplier(Supplier):

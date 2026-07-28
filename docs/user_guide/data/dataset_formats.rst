@@ -46,7 +46,7 @@ Lazy property accessors map ASE calculator results and :code:`atoms.info` / row 
 - :code:`Qa`, :code:`Sa` — charges / magnetic moments when present on the calculator
 - :code:`Q`, :code:`S` — total charge and :code:`spin - 1` from :code:`atoms.info` when stored by annotate
 
-:code:`enerzyme annotate` writes this format by default via :code:`QMDriver.output_file` (see :doc:`/user_guide/workflows/qm_annotation`). Enerzymette campaigns can point :code:`Datahub.data_path` at the resulting :code:`.aselmdb` the same way as pickle paths.
+:code:`enerzyme annotate` writes this format by default via :code:`QMDriver.output_file` (see :doc:`/user_guide/workflows/qm_annotation`). Enerzymette's outer AL loop still merges :code:`fragments.pkl` today — keep :code:`pickle_name: fragments.pkl` for those campaigns, or train directly from :code:`.aselmdb` outside Enerzymette.
 
 TeraChem to pickle
 ------------------

@@ -333,13 +333,19 @@ class SingleDataHub:
                 return np.array([values])
             else:
                 logger.info(f"Values of {k} (data type {self.data_types[k]}) are single and repeated")
-                return np.full(values, self.n_datapoint)
+                return np.full(self.n_datapoint, values)
         else:
+            arr = np.asarray(values)
             if is_int(k) and self.compressed:
-                return values
-            else:
-                logger.info(f"Values of {k} (data type {self.data_types[k]}) are single and repeated")
-                return np.repeat(values, self.n_datapoint, axis=0)
+                return arr
+            logger.info(f"Values of {k} (data type {self.data_types[k]}) are single and repeated")
+            # Length-1 sequence holding one datapoint payload (scalar or vector)
+            if arr.shape[0] == 1:
+                arr = arr[0]
+            arr = np.asarray(arr)
+            if arr.ndim == 0:
+                return np.full(self.n_datapoint, arr.item())
+            return np.repeat(arr[None, ...], self.n_datapoint, axis=0)
     
     def _compress(self, k: str, values: Iterable) -> np.ndarray:
         # only works for equal length data
@@ -425,13 +431,16 @@ class SingleDataHub:
         n_Za = len(raw_data[self.data_types["Za"]])
         Zas = parse_Za(raw_data[self.data_types["Za"]])
         if n_Za == 1:
+            # list-of-dicts pickle yields Za as [Za_array]; unwrap to the shared topology
+            Za_ref = Zas[0] if isinstance(Zas, list) else Zas
+            Za_ref = np.asarray(Za_ref)
             if self.data_types["N"] not in raw_data.keys():
                 # atom count determined by length of atomic numbers
-                self.data.create_dataset("N", data=self._expand("N", len(Zas)))
+                self.data.create_dataset("N", data=self._expand("N", int(len(Za_ref))))
             else:
                 self._load_molecular_data("N", raw_data)
-            self.data.create_dataset("Za", data=self._expand("Za", Zas))
-            self.max_N = max(self.data["N"])
+            self.data.create_dataset("Za", data=self._expand("Za", Za_ref))
+            self.max_N = int(max(self.data["N"]))
         elif n_Za == n_datapoint:
             if self.data_types["N"] not in raw_data.keys():
                 self.data.create_dataset("N", data=self._compress("N", [len(Za) for Za in Zas]))
