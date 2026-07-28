@@ -1,0 +1,15 @@
+# Updated for Enerzyme datahub/aselmdb annotate API (PR #80).
+# Enerzymette currently still rewrites Supplier.path and expects fragments.pkl —
+# keep this template for Enerzyme-native / future Enerzymette campaigns.
+Supplier:
+  path: fixtures/fragments_tiny.sdf
+QMDriver:
+  engine: TeraChem
+  template_input_file: fixtures/terachem_template.in
+  output_file: fragments.aselmdb
+  keep_molden: false
+  keep_stdout: false
+  clean_tmp: true
+  n_processes: 1
+  n_gpus: 1
+  terachem_args: [terachem]

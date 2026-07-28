@@ -1,0 +1,16 @@
+Supplier:
+  path: 
+QMDriver:
+  engine: TeraChem
+  bs: 6-31gs
+  xc: b3lyp
+  pcm: cosmo
+  dftd: d3
+  pcm_radii_file: /home/gridsan/wlluo/env/pcm_radii
+  epsilon: 10
+  keep_molden: false
+  keep_output: false
+  clean_tmp: true
+  pickle_name: fragments.pkl
+  dump_single_run: false
+  n_processes: 8
