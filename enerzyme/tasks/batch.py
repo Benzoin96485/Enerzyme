@@ -7,7 +7,7 @@ from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, is_targe
 from ..data.neighbor_list import full_neighbor_list
 
 
-def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
+def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device, otf_graph: bool=True) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
     features, targets, data_keys = zip(*batch)
     feature_list = []
     for feature in features:
@@ -27,11 +27,12 @@ def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str,
         if "idx_i" in feature and "idx_j" in feature:
             data_dict["idx_i"] = torch.tensor(feature["idx_i"], dtype=torch.long)
             data_dict["idx_j"] = torch.tensor(feature["idx_j"], dtype=torch.long)
-        else:
+            feature_list.append(Data(edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), num_nodes=feature["N"], **data_dict))
+        elif otf_graph:
             idx_i, idx_j = full_neighbor_list(feature["N"])
             data_dict["idx_i"] = torch.tensor(idx_i, dtype=torch.long)
             data_dict["idx_j"] = torch.tensor(idx_j, dtype=torch.long)
-        feature_list.append(Data(edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), num_nodes=feature["N"], **data_dict))
+            feature_list.append(Data(edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), num_nodes=feature["N"], **data_dict))
     batch_features = Batch.from_data_list(feature_list)
     for k, v in batch_features.items():
         if requires_grad(k):
@@ -65,7 +66,7 @@ def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str,
     return batch_features, batch_targets
 
 
-def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
+def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device, otf_graph: bool=True) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
     if len(batch[0]) == 3:
         features, targets, data_keys = zip(*batch)
     else:
@@ -92,20 +93,24 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
     batch_seg = []
     count = 0
 
+    built_graph = False
     for i, feature in enumerate(features):
         if "idx_i" in feature:
             batch_idx_i.append(feature["idx_i"][:feature["N_pair"]] + count)
             batch_idx_j.append(feature["idx_j"][:feature["N_pair"]] + count)
-        else:
+            built_graph = True
+        elif otf_graph and not built_graph:
             idx_i, idx_j = full_neighbor_list(feature["N"])
             batch_idx_i.append(idx_i + count)
             batch_idx_j.append(idx_j + count)
+            built_graph = True
         batch_seg.append(np.full(feature["N"], i, dtype=int))
         count += feature["N"]
     batch_features["N"] = [feature["N"] for feature in features]
     batch_features["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
-    batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long)
-    batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long)
+    if built_graph:
+        batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long)
+        batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long)
 
     if targets[0] is not None:
         for k in targets[0]:
