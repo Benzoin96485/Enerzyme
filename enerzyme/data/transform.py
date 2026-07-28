@@ -5,6 +5,7 @@ import joblib
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+import ase.units
 from ..utils import logger
 from . import PERIODIC_TABLE_PATH
 
@@ -95,6 +96,30 @@ class NegativeGradientTransform(BaseTransform):
     def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
         if "Fa" in new_output:
             new_output["Fa"][idx] = -new_output["Fa"][idx]
+
+
+class EnergyUnitConversionTransform(BaseTransform):
+    def __init__(self, old_unit: str, new_unit: str):
+        super().__init__(major_key="E")
+        self.transform_type = "scale"
+        self.conversion_factor = getattr(ase.units, old_unit) / getattr(ase.units, new_unit)
+
+    def transform(self, new_input):
+        if "E" in new_input:
+            for i in range(len(new_input["E"])):
+                new_input["E"][i] *= self.conversion_factor
+        
+        if "Fa" in new_input:
+            for i in range(len(new_input["Fa"])):
+                new_input["Fa"][i] *= self.conversion_factor
+
+    def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
+        if "E" in new_output:
+            new_output["E"][idx] /= self.conversion_factor
+
+        if "Fa" in new_output:
+            new_output["Fa"][idx] /= self.conversion_factor
+
 
 class TotalEnergyNormalization(BaseTransform):
     def __init__(self, preload_path=".", scale=None, shift=None):
