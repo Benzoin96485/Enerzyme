@@ -242,6 +242,51 @@ def test_aselmdb_failed_qm_deletes_reservation(tmp_path: Path):
         assert sorted(row.get("index") for row in rows) == [0, 2]
 
 
+def test_aselmdb_non_filenotfound_failure_clears_reservation(tmp_path: Path):
+    """Non-FileNotFoundError QM failures must not leave orphaned reserved rows."""
+    from enerzyme.data.supplier import get_supplier
+
+    class BoomQMDriver(QMDriver):
+        def make_input(self, atoms: Atoms, tmp_dir: Path):
+            path = tmp_dir / f"{atoms.info['index']}.in"
+            path.write_text("run gradient\nend\n")
+            return path
+
+        def invoke_qm(self, input_file, atoms: Atoms, tmp_dir: Path):
+            out = Path(input_file).with_suffix(".out")
+            out.write_text("ok\n")
+            return out
+
+        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+            if int(atoms.info["index"]) == 1:
+                raise ValueError("simulated parse failure")
+            n = len(atoms)
+            return {"E": -1.0 * ase.units.Ha, "Fa": np.zeros((n, 3)), "M2": np.zeros(3)}
+
+    supplier = get_supplier(str(FIXTURES / "fragments_tiny.sdf"), start=0, end=3)
+    out_dir = tmp_path / "annot_out"
+    driver = BoomQMDriver(
+        supplier=supplier,
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(out_dir),
+        output_file="fragments.aselmdb",
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        n_processes=1,
+        clean_tmp=True,
+    )
+    driver.run()
+    db_files = list(out_dir.rglob("*.aselmdb"))
+    assert db_files
+    db_path = str(db_files[0])
+    with connect(db_path) as db:
+        assert db.count() == 2
+        assert sorted(row.get("index") for row in db.select()) == [0, 2]
+        # Orphaned reserved rows would make this return None.
+        system_id = db.reserve(index=1)
+        assert system_id is not None
+        db.delete([system_id])
+
+
 def test_sdf_supplier_reads_fixture():
     from enerzyme.data.supplier import get_supplier
 

@@ -193,16 +193,16 @@ class QMDriver(ABC):
         index = atoms.info["index"]
         tmp_dir = Path(str(self.tmp_dir_base) + f".{index}")
         os.makedirs(tmp_dir, exist_ok=True)
-        input_file = self.make_input(atoms, tmp_dir)
-        output_file = self.invoke_qm(input_file, atoms, tmp_dir)
         try:
+            input_file = self.make_input(atoms, tmp_dir)
+            output_file = self.invoke_qm(input_file, atoms, tmp_dir)
             result_package = self.collect_results(input_file, atoms, tmp_dir)
-        except FileNotFoundError as e:
-            logger.warning(f"Calculation of {input_file} failed: {e}")
+            self.copy_files(output_file, result_package.get("molden_file", None))
+        except Exception as e:
+            logger.warning(f"Calculation of structure {index} failed: {e}")
             if self.clean_tmp and tmp_dir.exists():
                 rmtree(tmp_dir)
             return None
-        self.copy_files(output_file, result_package.get("molden_file", None))
         if self.clean_tmp:
             rmtree(tmp_dir)
         return result_package
@@ -225,22 +225,39 @@ class QMDriver(ABC):
                 )
                 return
 
-        result_package = self._run_qm(atoms)
-        if result_package is None:
-            db.delete([system_id])
-            return
+        # Always release the reservation unless the row is successfully written;
+        # otherwise orphaned reserved rows block later runs of the same index.
+        wrote = False
+        try:
+            result_package = self._run_qm(atoms)
+            if result_package is None:
+                return
 
-        atom_info = {
-            "charge": atoms.info.get("charge", 0),
-            "spin": atoms.info.get("spin", 1),
-            "index": index,
-        }
-        results = {}
-        for qm_property, ase_property in QM_CALCULATED_TO_ASE_PROPERTY.items():
-            if qm_property in result_package:
-                results[ase_property] = result_package[qm_property]
-        atoms.calc = SinglePointCalculator(atoms=atoms, **results)
-        db.write(atoms, id=system_id, data=atom_info, index=index)
+            atom_info = {
+                "charge": atoms.info.get("charge", 0),
+                "spin": atoms.info.get("spin", 1),
+                "index": index,
+            }
+            results = {}
+            for qm_property, ase_property in QM_CALCULATED_TO_ASE_PROPERTY.items():
+                if qm_property in result_package:
+                    results[ase_property] = result_package[qm_property]
+            atoms.calc = SinglePointCalculator(atoms=atoms, **results)
+            db.write(atoms, id=system_id, data=atom_info, index=index)
+            wrote = True
+        except Exception as e:
+            logger.warning(
+                f"Failed to store ASE LMDB row for structure {index} (id={system_id}): {e}"
+            )
+        finally:
+            if not wrote:
+                try:
+                    db.delete([system_id])
+                except Exception as e:
+                    logger.warning(
+                        f"Could not delete reserved ASE LMDB id {system_id} "
+                        f"for structure {index}: {e}"
+                    )
 
     def single_run_pickle(self, atoms: Atoms) -> Optional[Dict[str, Any]]:
         result_package = self._run_qm(atoms)
