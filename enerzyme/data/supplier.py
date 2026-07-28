@@ -1,10 +1,20 @@
 from rdkit import Chem
-from typing import Iterator, Dict, Any, List
+from typing import Iterator, Dict, Any, List, Optional
 from abc import ABC, abstractmethod
 import numpy as np
 from ase import Atoms
 import pickle
 import ase.io
+
+
+# Identity mapping for unlabeled annotate pickles (e.g. xyz2pkl: Ra/Za/Q).
+# Override via Supplier.features in YAML for remapped keys (coord/atom_type/…).
+_DEFAULT_PICKLE_FEATURES: Dict[str, str] = {
+    "Ra": "Ra",
+    "Za": "Za",
+    "Q": "Q",
+    "S": "S",
+}
 
 
 class Supplier(ABC):
@@ -50,11 +60,16 @@ class SDFSupplier(Supplier):
 
 
 class PickleSupplier(Supplier):
-    def __init__(self, input_file, features: Dict[str, str], **kwargs):
+    def __init__(
+        self,
+        input_file,
+        features: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ):
         super().__init__(input_file, **kwargs)
         with open(input_file, "rb") as f:
             self.supplier = pickle.load(f)
-        self.features = features
+        self.features = features if features is not None else dict(_DEFAULT_PICKLE_FEATURES)
 
     def suppl(self):
         for i, data in enumerate(self.supplier[self.start:self.end]):

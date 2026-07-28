@@ -148,6 +148,50 @@ def test_sdf_supplier_reads_fixture():
     assert all("charge" in a.info for a in atoms_list)
 
 
+def test_pickle_supplier_default_features(tmp_path: Path):
+    """get_supplier(.pkl) must not require features (identity Ra/Za/Q/S default)."""
+    import pickle
+
+    from enerzyme.data.supplier import get_supplier
+
+    pkl = tmp_path / "unlabeled.pkl"
+    frames = [
+        {
+            "Ra": np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=float),
+            "Za": np.array([1, 1], dtype=int),
+            "Q": 0,
+            "S": 0,
+        }
+    ]
+    with open(pkl, "wb") as f:
+        pickle.dump(frames, f)
+
+    supplier = get_supplier(str(pkl))
+    atoms_list = list(supplier.suppl())
+    assert len(atoms_list) == 1
+    assert len(atoms_list[0]) == 2
+    assert atoms_list[0].info["charge"] == 0
+    assert atoms_list[0].info["spin"] == 1
+
+
+def test_pickle_supplier_custom_features():
+    """Remapped keys (annotate/training pickle schema) via features=."""
+    from enerzyme.data.supplier import get_supplier
+
+    supplier = get_supplier(
+        str(FIXTURES / "fragments_tiny.pkl"),
+        features={
+            "Ra": "coord",
+            "Za": "atom_type",
+            "Q": "total_chrg",
+            "S": "total_spin",
+        },
+    )
+    atoms_list = list(supplier.suppl())
+    assert len(atoms_list) == 3
+    assert all("charge" in a.info for a in atoms_list)
+
+
 def test_load_from_sdf_and_datahub(tmp_path: Path):
     from enerzyme.data.datahub import DataHub, load_from_sdf
 
