@@ -26,6 +26,19 @@ QM_CALCULATED_TO_ASE_PROPERTY = {
     "Sa": "magmoms",
 }
 
+# Optional annotate pickle rename: standard Enerzyme name → custom key in the .pkl dict.
+# Values stay standard (E/Fa in Ha / Ha·Å⁻¹, M2 in e·Å, Za atomic numbers, Q, S=2S+1−1).
+# Enerzymette AL historically expects the names below (and Fa stored as ∇E under ``grad``).
+ENERZYMETTE_PICKLE_FIELDS: Dict[str, str] = {
+    "E": "energy",
+    "Fa": "grad",
+    "M2": "dipole",
+    "Ra": "coord",
+    "Za": "atom_type",
+    "Q": "total_chrg",
+    "S": "total_spin",
+}
+
 _PICKLE_SUFFIXES = {".pkl", ".pickle"}
 
 
@@ -44,24 +57,61 @@ def _resolve_annotate_output(
     return "aselmdb", (output_file or "dataset.aselmdb")
 
 
-def _result_package_to_pickle_datapoint(
+def _build_standard_pickle_datapoint(
     atoms: Atoms,
     result_package: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Map driver results (E/Fa in eV) to legacy Enerzymette pickle fields (energy/grad in Ha)."""
+    """Driver results (E/Fa in eV) → standard Enerzyme pickle fields (E/Fa in Ha / Ha·Å⁻¹)."""
     energy_ev = float(result_package["E"])
     forces_ev = np.asarray(result_package["Fa"], dtype=float)
-    # Campaign / devel pickle: energy [Ha], grad [Ha/Å] with train ``negative_gradient: true``
     return {
-        "energy": energy_ev / Ha,
-        "grad": (-forces_ev) / Ha,
-        "dipole": np.asarray(result_package.get("M2", np.zeros(3)), dtype=float),
+        "E": energy_ev / Ha,
+        "Fa": forces_ev / Ha,
+        "M2": np.asarray(result_package.get("M2", np.zeros(3)), dtype=float),
+        "Ra": np.asarray(atoms.get_positions(), dtype=float),
+        "Za": np.asarray(atoms.get_atomic_numbers(), dtype=int),
+        "N": len(atoms),
+        "Q": int(atoms.info.get("charge", 0)),
+        "S": int(atoms.info.get("spin", 1)) - 1,
         "index": int(atoms.info["index"]),
-        "atom_type": np.asarray(atoms.get_chemical_symbols()),
-        "coord": np.asarray(atoms.get_positions(), dtype=float),
-        "total_spin": int(atoms.info.get("spin", 1)) - 1,
-        "total_chrg": int(atoms.info.get("charge", 0)),
     }
+
+
+def _apply_pickle_fields(
+    datapoint: Dict[str, Any],
+    pickle_fields: Optional[Dict[str, Optional[str]]],
+) -> Dict[str, Any]:
+    """Rename standard keys to custom names. ``None`` / missing map → identity (all standard keys).
+
+    Special case for Enerzymette: when ``Fa`` is renamed to ``grad``, store ``−Fa`` (∇E) so
+    existing ``negative_gradient: true`` train YAMLs keep working.
+    """
+    if not pickle_fields:
+        return datapoint
+    out: Dict[str, Any] = {}
+    for std_key, value in datapoint.items():
+        if std_key == "index":
+            out["index"] = value
+            continue
+        if std_key not in pickle_fields:
+            continue
+        custom = pickle_fields[std_key]
+        name = std_key if custom is None else str(custom)
+        if std_key == "Fa" and name == "grad":
+            value = -np.asarray(value, dtype=float)
+        out[name] = value
+    return out
+
+
+def _result_package_to_pickle_datapoint(
+    atoms: Atoms,
+    result_package: Dict[str, Any],
+    pickle_fields: Optional[Dict[str, Optional[str]]] = None,
+) -> Dict[str, Any]:
+    return _apply_pickle_fields(
+        _build_standard_pickle_datapoint(atoms, result_package),
+        pickle_fields,
+    )
 
 
 class QMDriver(ABC):
@@ -73,6 +123,7 @@ class QMDriver(ABC):
         template_input_file: str,
         output_file: Optional[str] = None,
         pickle_name: Optional[str] = None,
+        pickle_fields: Optional[Dict[str, Optional[str]]] = None,
         keep_molden: bool = False,
         keep_stdout: bool = False,
         clean_tmp: bool = True,
@@ -86,12 +137,16 @@ class QMDriver(ABC):
         Output format (mutually exclusive):
         - pickle when ``pickle_name`` is set, or ``output_file`` ends with ``.pkl`` / ``.pickle``
         - ASE DB (default) otherwise (``output_file`` defaults to ``dataset.aselmdb``)
+
+        Pickle records use standard Enerzyme names (``E``, ``Fa``, ``M2``, ``Ra``, ``Za``, …)
+        unless ``pickle_fields`` renames them (e.g. :data:`ENERZYMETTE_PICKLE_FIELDS`).
         '''
         self.supplier = supplier
         self.tmp_dir_base = Path(tmp_dir).absolute() / self.supplier.name / "tmp"
         self.output_dir = Path(output_dir).absolute() / self.supplier.name
         self.output_format, out_name = _resolve_annotate_output(output_file, pickle_name)
         self.output_path = self.output_dir / out_name
+        self.pickle_fields = pickle_fields
         self.default_connect_args = {
             "use_lock_file": False
         }
@@ -107,6 +162,8 @@ class QMDriver(ABC):
         self.n_processes = n_processes if n_processes > 0 else cpu_count()
         self.timeout = timeout
         logger.info(f"Annotate output format={self.output_format}, path={self.output_path}")
+        if self.output_format == "pickle" and self.pickle_fields:
+            logger.info(f"Pickle field map: {self.pickle_fields}")
 
     @abstractmethod
     def make_input(self, atoms: Atoms, tmp_dir: Path) -> None:
@@ -189,7 +246,9 @@ class QMDriver(ABC):
         result_package = self._run_qm(atoms)
         if result_package is None:
             return None
-        return _result_package_to_pickle_datapoint(atoms, result_package)
+        return _result_package_to_pickle_datapoint(
+            atoms, result_package, pickle_fields=self.pickle_fields
+        )
 
     def single_run(self, atoms: Atoms):
         if self.output_format == "pickle":

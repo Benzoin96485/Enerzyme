@@ -309,7 +309,7 @@ Annotation template
 
 The annotation template should define the QM method. Leave :code:`Supplier.path` empty; Enerzymette fills it with the fragment SDF for the current round.
 
-Current Enerzyme annotate API (template-driven TeraChem). Keep :code:`pickle_name: fragments.pkl` until Enerzymette reads ASE LMDB:
+Current Enerzyme annotate API (template-driven TeraChem). Keep :code:`pickle_name: fragments.pkl` and an Enerzymette :code:`pickle_fields` map until Enerzymette reads ASE LMDB:
 
 .. code-block:: yaml
 
@@ -319,6 +319,14 @@ Current Enerzyme annotate API (template-driven TeraChem). Keep :code:`pickle_nam
         engine: TeraChem
         template_input_file: terachem_template.in
         pickle_name: fragments.pkl
+        pickle_fields:
+            E: energy
+            Fa: grad
+            M2: dipole
+            Ra: coord
+            Za: atom_type
+            Q: total_chrg
+            S: total_spin
         keep_molden: false
         keep_stdout: false
         clean_tmp: true

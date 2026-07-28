@@ -38,13 +38,21 @@ def test_pickle_to_aselmdb_roundtrip_fields(tiny_aselmdb: Path):
     ds = ASELMDBDataset(str(tiny_aselmdb), new_energy_unit="Ha")
     assert len(ds) == 3
     assert "E" in ds and "Fa" in ds and "Q" in ds and "S" in ds
+    assert "M2" in ds, "converter must write ASE dipole so Datahub exposes M2"
     e0 = float(ds["E"][0])
     fa0 = np.asarray(ds["Fa"][0])
+    m2_0 = np.asarray(ds["M2"][0])
     assert np.isfinite(e0)
     assert fa0.shape[1] == 3
+    assert m2_0.shape == (3,)
+    assert np.isfinite(m2_0).all()
     # Energy should be back in Ha (ASE stored eV)
     assert abs(e0) > 1.0  # Hartree-scale fragment energy
-
+    # Match fixture pickle dipole for index 0
+    with open(FIXTURES / "fragments_tiny.pkl", "rb") as f:
+        import pickle
+        rec0 = pickle.load(f)[0]
+    np.testing.assert_allclose(m2_0, rec0["dipole"])
 
 def test_datahub_yaml_loads_aselmdb(tiny_aselmdb: Path, tmp_path: Path):
     from enerzyme.data.datahub import DataHub
@@ -82,6 +90,8 @@ def test_annotate_pickle_config_selects_pickle_name():
     with open(EXAMPLE / "config" / "annotate_pickle.yaml") as f:
         cfg = yaml.safe_load(f)
     assert cfg["QMDriver"]["pickle_name"] == "fragments.pkl"
+    assert cfg["QMDriver"]["pickle_fields"]["M2"] == "dipole"
+    assert cfg["QMDriver"]["pickle_fields"]["Fa"] == "grad"
 
 
 def test_legacy_campaign_annotate_still_pickle_shaped():
@@ -111,12 +121,13 @@ class FakeQMDriver(QMDriver):
         return {
             "E": -1.0 * ase.units.Ha,
             "Fa": np.zeros((n, 3)),
-            "M2": np.zeros(3),
+            "M2": np.array([0.1, 0.2, 0.3]),
         }
 
 
 def test_mock_qm_driver_writes_aselmdb(tmp_path: Path):
     """Exercise QMDriver.single_run / ASE DB write without calling TeraChem."""
+    from enerzyme.data.datahub import ASELMDBDataset
     from enerzyme.data.supplier import get_supplier
 
     supplier = get_supplier(str(FIXTURES / "fragments_tiny.sdf"), start=0, end=2)
@@ -143,6 +154,14 @@ def test_mock_qm_driver_writes_aselmdb(tmp_path: Path):
         assert db.count() == 2
         indices = sorted(row.get("index") for row in db.select())
         assert indices == [0, 1]
+        row = next(db.select())
+        atoms = row.toatoms()
+        assert "dipole" in atoms.calc.results
+        np.testing.assert_allclose(atoms.get_dipole_moment(), [0.1, 0.2, 0.3])
+
+    ds = ASELMDBDataset(str(db_files[0]), new_energy_unit="Ha")
+    assert "M2" in ds
+    np.testing.assert_allclose(ds["M2"][0], [0.1, 0.2, 0.3])
 
 
 def test_mock_qm_driver_multiprocess_unique_ids(tmp_path: Path):
@@ -312,7 +331,7 @@ def test_resolve_annotate_output_modes():
 
 def test_mock_qm_driver_writes_pickle(tmp_path: Path):
     from enerzyme.data.supplier import SDFSupplier
-    from enerzyme.qm.qm_driver import QMDriver
+    from enerzyme.qm.qm_driver import ENERZYMETTE_PICKLE_FIELDS, QMDriver
     import pickle
 
     class FakeQMDriver(QMDriver):
@@ -330,16 +349,18 @@ def test_mock_qm_driver_writes_pickle(tmp_path: Path):
             n = len(atoms)
             return {
                 "E": -1.0 * ase.units.Ha,
-                "Fa": np.zeros((n, 3)),
-                "M2": np.zeros(3),
+                "Fa": np.ones((n, 3)),
+                "M2": np.array([0.1, 0.2, 0.3]),
             }
 
     sdf = FIXTURES / "fragments_tiny.sdf"
     supplier = SDFSupplier(input_file=str(sdf), start=0, end=2)
+
+    # Default: standard Enerzyme names (Fa = forces in Ha/Å)
     driver = FakeQMDriver(
         supplier=supplier,
         tmp_dir=str(tmp_path / "annot_tmp"),
-        output_dir=str(tmp_path / "annot_out"),
+        output_dir=str(tmp_path / "annot_out_std"),
         template_input_file=str(FIXTURES / "terachem_template.in"),
         pickle_name="fragments.pkl",
         n_processes=1,
@@ -347,10 +368,34 @@ def test_mock_qm_driver_writes_pickle(tmp_path: Path):
     )
     assert driver.output_format == "pickle"
     driver.run()
-    pkl = list((tmp_path / "annot_out").rglob("fragments.pkl"))
+    pkl = list((tmp_path / "annot_out_std").rglob("fragments.pkl"))
     assert len(pkl) == 1
     with open(pkl[0], "rb") as f:
         data = pickle.load(f)
     assert len(data) == 2
-    assert set(data[0]) >= {"energy", "grad", "dipole", "coord", "atom_type", "total_chrg", "total_spin", "index"}
-    assert abs(data[0]["energy"] - (-1.0)) < 1e-8  # Ha
+    assert set(data[0]) >= {"E", "Fa", "M2", "Ra", "Za", "Q", "S", "N", "index"}
+    assert abs(data[0]["E"] - (-1.0)) < 1e-8
+    np.testing.assert_allclose(data[0]["Fa"], np.ones_like(data[0]["Fa"]) / ase.units.Ha)
+    np.testing.assert_allclose(data[0]["M2"], [0.1, 0.2, 0.3])
+
+    # Enerzymette rename map (Fa → grad stores −Fa)
+    supplier = SDFSupplier(input_file=str(sdf), start=0, end=2)
+    driver_legacy = FakeQMDriver(
+        supplier=supplier,
+        tmp_dir=str(tmp_path / "annot_tmp2"),
+        output_dir=str(tmp_path / "annot_out_legacy"),
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        pickle_name="fragments.pkl",
+        pickle_fields=ENERZYMETTE_PICKLE_FIELDS,
+        n_processes=1,
+        clean_tmp=True,
+    )
+    driver_legacy.run()
+    pkl_l = list((tmp_path / "annot_out_legacy").rglob("fragments.pkl"))
+    with open(pkl_l[0], "rb") as f:
+        legacy = pickle.load(f)
+    assert set(legacy[0]) >= {
+        "energy", "grad", "dipole", "coord", "atom_type", "total_chrg", "total_spin", "index"
+    }
+    assert abs(legacy[0]["energy"] - (-1.0)) < 1e-8
+    np.testing.assert_allclose(legacy[0]["grad"], -np.ones_like(legacy[0]["grad"]) / ase.units.Ha)

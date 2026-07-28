@@ -45,7 +45,8 @@ QMDriver options
 
 - :code:`template_input_file` — TeraChem settings (basis, XC, solvent); run/charge/spin/coords are injected per structure
 - :code:`output_file` — under the supplier output directory; :code:`.aselmdb` (default) or :code:`.pkl` / :code:`.pickle`
-- :code:`pickle_name` — if set, write legacy pickle only (Enerzymette AL); mutually exclusive with ASE DB output
+- :code:`pickle_name` — if set, write pickle only (Enerzymette AL); mutually exclusive with ASE DB output
+- :code:`pickle_fields` — optional map from **standard** names (:code:`E`, :code:`Fa`, :code:`M2`, …) to custom pickle keys; omit for identity. Enerzymette smoke uses :code:`E→energy`, :code:`Fa→grad` (stores :math:`-\mathbf{F}`), :code:`M2→dipole`, …
 - :code:`n_processes` — parallel QM submissions
 - :code:`keep_stdout` / :code:`keep_molden` — retain QC logs
 - :code:`clean_tmp` — remove scratch after success
@@ -55,9 +56,9 @@ For PCM, put :code:`pcm_radii_file <name>` in the template (path relative to the
 Output schema
 -------------
 
-**ASE LMDB (default):** each structure is an ASE :code:`Atoms` row with calculator energy/forces/(charges/dipole) and :code:`data` fields :code:`charge`, :code:`spin`, :code:`index`. Load with :code:`Datahub.data_format: aselmdb` (:doc:`/user_guide/data/dataset_formats`).
+**ASE LMDB (default):** each structure is an ASE :code:`Atoms` row with calculator energy/forces/(charges/dipole) and :code:`data` fields :code:`charge`, :code:`spin`, :code:`index`. Load with :code:`Datahub.data_format: aselmdb` and **identity** maps (:code:`E`, :code:`Fa`, :code:`M2`, …); see :doc:`/user_guide/data/dataset_formats`.
 
-**Pickle (compat):** list of dicts with :code:`energy` / :code:`grad` (Hartree), :code:`dipole`, :code:`coord`, :code:`atom_type`, :code:`total_chrg`, :code:`total_spin`, :code:`index` — same contract Enerzymette merges into training pickles.
+**Pickle (default):** list of dicts with standard names :code:`E` / :code:`Fa` (Hartree), :code:`M2`, :code:`Ra`, :code:`Za`, :code:`Q`, :code:`S`, :code:`N`, :code:`index`. With :code:`pickle_fields`, keys are renamed for Enerzymette (:code:`energy` / :code:`grad` / :code:`dipole` / …).
 
 Merging into training
 ---------------------

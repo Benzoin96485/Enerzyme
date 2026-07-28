@@ -16,12 +16,19 @@ from .transform import parse_Za, Transform
 from ..utils import YamlHandler, logger
 
 
+# Standard Enerzyme names → ASE Atoms accessors (calculator results / geometry).
+# ASE itself still stores calculator keys as energy/forces/dipole/charges/magmoms
+# and fairchem-style info keys charge/spin; this adapter only exposes standard names.
 ASE_PROPERTY_METHODS: Dict[str, Callable[[Atoms], Any]] = {
     "E": lambda atoms: atoms.get_potential_energy(),
     "Fa": lambda atoms: atoms.get_forces(),
     "Qa": lambda atoms: atoms.get_charges(),
     "Sa": lambda atoms: atoms.get_magnetic_moments(),
+    "M2": lambda atoms: atoms.get_dipole_moment(),
 }
+
+# ASE info keys that are remapped to standard names (not exposed as Datahub keys).
+_ASE_INFO_STANDARD_KEYS = frozenset({"charge", "spin"})
 
 
 def load_from_pickle(data_path=str):
@@ -154,6 +161,8 @@ class ASELMDBDataset:
         
         self.properties_from_info = set()
         for k, v in first_row.data.items():
+            if k in _ASE_INFO_STANDARD_KEYS:
+                continue
             if isinstance(v, float) or isinstance(v, int) or isinstance(v, np.ndarray):
                 self.properties_from_info.add(k)
 
@@ -184,11 +193,11 @@ class ASELMDBDataset:
             get_property_method = lambda atoms: atoms.info.get("spin", 1) - 1
         elif k in ASE_PROPERTY_METHODS.keys() and k in self.unique_properties_from_calculator:
             if k in {"E", "Fa"}:
-                get_property_method = lambda atoms: ASE_PROPERTY_METHODS[k](atoms) * self.energy_unit_conversion_factor
+                get_property_method = lambda atoms, p=k: ASE_PROPERTY_METHODS[p](atoms) * self.energy_unit_conversion_factor
             else:
-                get_property_method = lambda atoms: ASE_PROPERTY_METHODS[k](atoms)
+                get_property_method = lambda atoms, p=k: ASE_PROPERTY_METHODS[p](atoms)
         else:
-            get_property_method = lambda atoms: atoms.info.get(k, None)
+            get_property_method = lambda atoms, key=k: atoms.info.get(key, None)
         return ASELMDBSingleProperty(self, get_property_method=get_property_method)
     
     def __contains__(self, k) -> bool:

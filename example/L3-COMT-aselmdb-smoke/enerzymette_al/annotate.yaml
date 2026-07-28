@@ -1,4 +1,4 @@
-# Enerzymette AL expects fragments.pkl.
+# Enerzymette AL expects fragments.pkl with legacy field names.
 # Repo-relative paths: run from the Enerzyme repository root.
 Supplier:
   path: null
@@ -6,6 +6,14 @@ QMDriver:
   engine: TeraChem
   template_input_file: example/L3-COMT-aselmdb-smoke/fixtures/terachem_template.in
   pickle_name: fragments.pkl
+  pickle_fields:
+    E: energy
+    Fa: grad
+    M2: dipole
+    Ra: coord
+    Za: atom_type
+    Q: total_chrg
+    S: total_spin
   keep_molden: false
   keep_stdout: false
   clean_tmp: true

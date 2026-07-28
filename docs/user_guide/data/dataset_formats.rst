@@ -43,8 +43,11 @@ Lazy property accessors map ASE calculator results and :code:`atoms.info` / row 
 
 - :code:`Ra`, :code:`Za`, :code:`N` — geometry
 - :code:`E`, :code:`Fa` — energy and forces (converted from ASE eV units toward Hartree / Ha·Å⁻¹ when :code:`new_energy_unit` is not :code:`eV`)
+- :code:`M2` — dipole moment via :code:`atoms.get_dipole_moment()` when the calculator has ASE ``dipole`` (e·Å)
 - :code:`Qa`, :code:`Sa` — charges / magnetic moments when present on the calculator
-- :code:`Q`, :code:`S` — total charge and :code:`spin - 1` from :code:`atoms.info` when stored by annotate
+- :code:`Q`, :code:`S` — from ASE info ``charge`` / ``spin`` (fairchem-style; :code:`S = spin - 1`)
+
+ASE calculator / info key names (:code:`energy`, :code:`dipole`, :code:`charge`, …) stay on the :code:`Atoms` object; Datahub only exposes the standard Enerzyme names above.
 
 :code:`enerzyme annotate` writes this format by default via :code:`QMDriver.output_file` (see :doc:`/user_guide/workflows/qm_annotation`). Enerzymette's outer AL loop still merges :code:`fragments.pkl` today — keep :code:`pickle_name: fragments.pkl` for those campaigns, or train directly from :code:`.aselmdb` outside Enerzymette.
 

@@ -5,8 +5,16 @@ QMDriver:
   template_input_file: /your/terachem_template.in   # TeraChem template (basis, xc, solvent, …)
   # Output (mutually exclusive): default ASE DB; pickle if output_file ends with .pkl/.pickle
   # or if pickle_name is set (Enerzymette AL still uses pickle_name: fragments.pkl).
-  output_file: dataset.aselmdb                      # .aselmdb → ASE DB; .pkl → legacy pickle
+  output_file: dataset.aselmdb                      # .aselmdb → ASE DB; .pkl → pickle
   # pickle_name: fragments.pkl                      # alternative to select pickle output
+  # pickle_fields:                                  # optional: rename standard → custom keys
+  #   E: energy                                     # default pickle uses E, Fa, M2, Ra, Za, Q, S
+  #   Fa: grad                                      # Fa→grad also stores −Fa (∇E) for Enerzymette
+  #   M2: dipole
+  #   Ra: coord
+  #   Za: atom_type
+  #   Q: total_chrg
+  #   S: total_spin
   keep_molden: false                                # if molden file is saved
   keep_stdout: false                                # if output log is saved
   clean_tmp: true                                   # if temporary files are cleaned

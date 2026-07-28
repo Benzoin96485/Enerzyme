@@ -9,11 +9,14 @@ from ase.db import connect
 from enerzyme.data.datahub import ASELMDBDataset, SingleDataHub, _get_single_aselmdb_data_path
 
 
-def _write_toy_aselmdb(db_path, energy_ev=-1.0, forces_ev=None, charge=0, spin=1, index=0):
+def _write_toy_aselmdb(db_path, energy_ev=-1.0, forces_ev=None, dipole=None, charge=0, spin=1, index=0):
     atoms = Atoms("H2", positions=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
     if forces_ev is None:
         forces_ev = np.array([[0.1, 0.0, 0.0], [-0.1, 0.0, 0.0]])
-    atoms.calc = SinglePointCalculator(atoms, energy=energy_ev, forces=forces_ev)
+    calc_kwargs = {"energy": energy_ev, "forces": forces_ev}
+    if dipole is not None:
+        calc_kwargs["dipole"] = np.asarray(dipole, dtype=float)
+    atoms.calc = SinglePointCalculator(atoms, **calc_kwargs)
     with connect(str(db_path)) as db:
         db.write(atoms, data={"charge": charge, "spin": spin, "index": index}, index=index)
     return energy_ev, forces_ev
@@ -43,6 +46,39 @@ def test_aselmdb_dataset_loads_energy_forces_and_qs(tmp_path):
     assert ds["Q"][0] == 0
     assert ds["S"][0] == 0
     assert ds["N"][0] == 2
+
+
+def test_aselmdb_dataset_loads_dipole_as_m2(tmp_path):
+    """Annotate stores ASE ``dipole``; Datahub exposes standard ``M2`` only."""
+    db_path = tmp_path / "dipole.aselmdb"
+    dipole = np.array([0.11, -0.22, 0.33])
+    _write_toy_aselmdb(db_path, dipole=dipole)
+
+    ds = ASELMDBDataset(str(db_path), new_energy_unit="Ha")
+    assert "M2" in ds
+    assert "dipole" not in ds
+    assert "charge" not in ds and "spin" not in ds
+    np.testing.assert_allclose(ds["M2"][0], dipole)
+
+
+def test_singledatahub_loads_m2_from_aselmdb(tmp_path):
+    """HDF5 build must include M2 via identity mapping (standard names)."""
+    db_path = tmp_path / "dipole.aselmdb"
+    dipole = np.array([1.0, 2.0, 3.0])
+    _write_toy_aselmdb(db_path, dipole=dipole)
+
+    hub = SingleDataHub(
+        dump_dir=str(tmp_path / "out"),
+        data_path=str(db_path),
+        data_format="aselmdb",
+        preload=False,
+        features={"Ra": "Ra", "Za": "Za", "N": "N", "Q": "Q"},
+        targets={"E": "E", "Fa": "Fa", "M2": "M2"},
+        neighbor_list="",
+        compressed=False,
+    )
+    assert "M2" in hub.data
+    np.testing.assert_allclose(hub.data["M2"][0], dipole)
 
 
 @pytest.mark.parametrize(
