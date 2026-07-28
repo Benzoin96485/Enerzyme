@@ -277,6 +277,28 @@ def test_pickle_supplier_default_features(tmp_path: Path):
     assert atoms_list[0].info["spin"] == 1
 
 
+def test_pickle_supplier_defaults_missing_spin(tmp_path: Path):
+    """xyz2pkl-style frames (Ra/Za/Q only) must default spin=1 (S=0), not KeyError."""
+    import pickle
+
+    from enerzyme.data.supplier import get_supplier
+
+    pkl = tmp_path / "no_spin.pkl"
+    frames = [
+        {
+            "Ra": np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=float),
+            "Za": np.array([1, 1], dtype=int),
+            "Q": -1,
+        }
+    ]
+    with open(pkl, "wb") as f:
+        pickle.dump(frames, f)
+
+    atoms = next(get_supplier(str(pkl)).suppl())
+    assert atoms.info["charge"] == -1
+    assert atoms.info["spin"] == 1
+
+
 def test_pickle_supplier_custom_features():
     """Remapped keys (annotate/training pickle schema) via features=."""
     from enerzyme.data.supplier import get_supplier

@@ -73,14 +73,18 @@ class PickleSupplier(Supplier):
 
     def suppl(self):
         for i, data in enumerate(self.supplier[self.start:self.end]):
+            q_key = self.features.get("Q")
+            s_key = self.features.get("S")
             atoms = Atoms(
                 symbols=data[self.features["Za"]],
                 positions=data[self.features["Ra"]],
                 pbc=False,
                 info={
                     "index": i + self.start,
-                    "charge": data[self.features["Q"]] if "Q" in self.features else 0,
-                    "spin": data[self.features["S"]] + 1 if "S" in self.features else 1,
+                    # Defaults when the mapped key is absent from the frame
+                    # (e.g. xyz2pkl unlabeled pickles omit S): charge=0, spin=1 (S=0).
+                    "charge": data[q_key] if q_key is not None and q_key in data else 0,
+                    "spin": data[s_key] + 1 if s_key is not None and s_key in data else 1,
                 }
             )
             yield atoms
