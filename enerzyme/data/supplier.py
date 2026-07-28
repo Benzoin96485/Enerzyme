@@ -91,7 +91,9 @@ class XYZSupplier(Supplier):
         super().__init__(input_file, **kwargs)
         self.Q = Q
         self.S = S
-        self.supplier = ase.io.read(input_file, index=slice(self.start, self.end))
+        # ase.io.read returns Atoms for an int index / single image, list for a slice.
+        frames = ase.io.read(input_file, index=slice(self.start, self.end))
+        self.supplier = [frames] if isinstance(frames, Atoms) else list(frames)
 
     def suppl(self):
         for i, atoms in enumerate(self.supplier):

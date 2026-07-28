@@ -295,6 +295,43 @@ def test_pickle_supplier_custom_features():
     assert all("charge" in a.info for a in atoms_list)
 
 
+def test_xyz_supplier_single_frame(tmp_path: Path, monkeypatch):
+    """One-structure XYZ must yield Atoms, including when ase.io.read returns bare Atoms."""
+    import ase.io
+    from ase import Atoms
+
+    from enerzyme.data.supplier import XYZSupplier, get_supplier
+
+    xyz = tmp_path / "one.xyz"
+    frame = Atoms("H2", positions=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
+    ase.io.write(str(xyz), frame)
+
+    supplier = get_supplier(str(xyz), Q=-1, S=1)
+    atoms_list = list(supplier.suppl())
+    assert len(atoms_list) == 1
+    assert isinstance(atoms_list[0], Atoms)
+    assert len(atoms_list[0]) == 2
+    assert atoms_list[0].info["charge"] == -1
+    assert atoms_list[0].info["spin"] == 2
+
+    # Guard the Atoms (not list) return path that iterating would otherwise break.
+    real_read = ase.io.read
+
+    def _read_single(*args, **kwargs):
+        result = real_read(*args, **kwargs)
+        if isinstance(result, list):
+            assert len(result) == 1
+            return result[0]
+        return result
+
+    monkeypatch.setattr(ase.io, "read", _read_single)
+    supplier = XYZSupplier(str(xyz), Q=0, S=0)
+    atoms_list = list(supplier.suppl())
+    assert len(atoms_list) == 1
+    assert isinstance(atoms_list[0], Atoms)
+    assert "charge" in atoms_list[0].info
+
+
 def test_load_from_sdf_and_datahub(tmp_path: Path):
     from enerzyme.data.datahub import DataHub, load_from_sdf
 
