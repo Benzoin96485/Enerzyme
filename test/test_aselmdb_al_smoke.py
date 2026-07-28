@@ -90,32 +90,36 @@ def test_legacy_campaign_annotate_still_pickle_shaped():
     assert "pickle_name" in cfg["QMDriver"]
 
 
+from enerzyme.qm.qm_driver import QMDriver
+
+
+class FakeQMDriver(QMDriver):
+    """Module-level fake so multiprocessing Pool can pickle the worker."""
+
+    def make_input(self, atoms: Atoms, tmp_dir: Path):
+        path = tmp_dir / f"{atoms.info['index']}.in"
+        path.write_text("run gradient\nend\n")
+        return path
+
+    def invoke_qm(self, input_file, atoms: Atoms, tmp_dir: Path):
+        out = Path(input_file).with_suffix(".out")
+        out.write_text("ok\n")
+        return out
+
+    def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+        n = len(atoms)
+        return {
+            "E": -1.0 * ase.units.Ha,
+            "Fa": np.zeros((n, 3)),
+            "M2": np.zeros(3),
+        }
+
+
 def test_mock_qm_driver_writes_aselmdb(tmp_path: Path):
     """Exercise QMDriver.single_run / ASE DB write without calling TeraChem."""
-    from enerzyme.data.supplier import SDFSupplier
-    from enerzyme.qm.qm_driver import QMDriver
+    from enerzyme.data.supplier import get_supplier
 
-    class FakeQMDriver(QMDriver):
-        def make_input(self, atoms: Atoms, tmp_dir: Path):
-            path = tmp_dir / f"{atoms.info['index']}.in"
-            path.write_text("run gradient\nend\n")
-            return path
-
-        def invoke_qm(self, input_file, atoms: Atoms, tmp_dir: Path):
-            out = Path(input_file).with_suffix(".out")
-            out.write_text("ok\n")
-            return out
-
-        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
-            n = len(atoms)
-            return {
-                "E": -1.0 * ase.units.Ha,  # Ha; driver stores via SPC as given
-                "Fa": np.zeros((n, 3)),
-                "M2": np.zeros(3),
-            }
-
-    sdf = FIXTURES / "fragments_tiny.sdf"
-    supplier = SDFSupplier(input_file=str(sdf), start=0, end=2)
+    supplier = get_supplier(str(FIXTURES / "fragments_tiny.sdf"), start=0, end=2)
     out_dir = tmp_path / "annot_out"
     tmp_dir = tmp_path / "annot_tmp"
     template = FIXTURES / "terachem_template.in"
@@ -137,6 +141,86 @@ def test_mock_qm_driver_writes_aselmdb(tmp_path: Path):
     assert not list(out_dir.rglob("*.pkl")), "aselmdb mode must not write pickle"
     with connect(str(db_files[0])) as db:
         assert db.count() == 2
+        indices = sorted(row.get("index") for row in db.select())
+        assert indices == [0, 1]
+
+
+def test_mock_qm_driver_multiprocess_unique_ids(tmp_path: Path):
+    """n_processes>1 must pre-reserve distinct primary keys (no lost/duplicate rows)."""
+    from enerzyme.data.supplier import get_supplier
+
+    # Use pickle supplier: Pool pickles the bound method (driver), and RDKit
+    # SDMolSupplier is not picklable.
+    supplier = get_supplier(
+        str(FIXTURES / "fragments_tiny.pkl"),
+        start=0,
+        end=3,
+        features={
+            "Ra": "coord",
+            "Za": "atom_type",
+            "Q": "total_chrg",
+            "S": "total_spin",
+        },
+    )
+    driver = FakeQMDriver(
+        supplier=supplier,
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(tmp_path / "annot_out"),
+        output_file="fragments.aselmdb",
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        n_processes=2,
+        clean_tmp=True,
+    )
+    driver.run()
+    db_files = list((tmp_path / "annot_out").rglob("*.aselmdb"))
+    assert db_files
+    with connect(str(db_files[0])) as db:
+        rows = list(db.select())
+        assert db.count() == 3
+        ids = [row.id for row in rows]
+        indices = [row.get("index") for row in rows]
+        assert len(set(ids)) == 3
+        assert sorted(indices) == [0, 1, 2]
+
+
+def test_aselmdb_failed_qm_deletes_reservation(tmp_path: Path):
+    """Failed QM after a successful write must not crash on delete (bare reserve bug)."""
+    from enerzyme.data.supplier import get_supplier
+
+    class FlakyQMDriver(QMDriver):
+        def make_input(self, atoms: Atoms, tmp_dir: Path):
+            path = tmp_dir / f"{atoms.info['index']}.in"
+            path.write_text("run gradient\nend\n")
+            return path
+
+        def invoke_qm(self, input_file, atoms: Atoms, tmp_dir: Path):
+            out = Path(input_file).with_suffix(".out")
+            out.write_text("ok\n")
+            return out
+
+        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+            if int(atoms.info["index"]) == 1:
+                raise FileNotFoundError("simulated QM failure")
+            n = len(atoms)
+            return {"E": -1.0 * ase.units.Ha, "Fa": np.zeros((n, 3)), "M2": np.zeros(3)}
+
+    supplier = get_supplier(str(FIXTURES / "fragments_tiny.sdf"), start=0, end=3)
+    driver = FlakyQMDriver(
+        supplier=supplier,
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(tmp_path / "annot_out"),
+        output_file="fragments.aselmdb",
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        n_processes=1,
+        clean_tmp=True,
+    )
+    driver.run()
+    db_files = list((tmp_path / "annot_out").rglob("*.aselmdb"))
+    assert db_files
+    with connect(str(db_files[0])) as db:
+        rows = list(db.select())
+        assert db.count() == 2
+        assert sorted(row.get("index") for row in rows) == [0, 2]
 
 
 def test_sdf_supplier_reads_fixture():

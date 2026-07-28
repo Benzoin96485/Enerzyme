@@ -152,18 +152,25 @@ class QMDriver(ABC):
 
     def single_run_aselmdb(self, atoms: Atoms) -> None:
         db = connect(self.output_path, **self.default_connect_args)
-        index = atoms.info["index"]
-        try:
-            db.get(index=index)
-        except KeyError:
-            system_id = db.reserve()
+        index = int(atoms.info["index"])
+        # Prefer a parent-assigned id (multiprocess); otherwise claim by structure index.
+        # Bare reserve() is wrong: with no key-value pairs ASE treats any existing row as a
+        # hit and returns None after the first insert.
+        if "aselmdb_row_id" in atoms.info:
+            system_id = atoms.info["aselmdb_row_id"]
+            if system_id is None:
+                return
         else:
-            logger.warning(f"System {index} already exists in {self.output_path}. Skipping...")
-            return
+            system_id = db.reserve(index=index)
+            if system_id is None:
+                logger.warning(
+                    f"System {index} already exists in {self.output_path}. Skipping..."
+                )
+                return
 
         result_package = self._run_qm(atoms)
         if result_package is None:
-            db.delete(system_id)
+            db.delete([system_id])
             return
 
         atom_info = {
@@ -195,19 +202,43 @@ class QMDriver(ABC):
         else:
             self._run_aselmdb()
 
+    def _reserve_aselmdb_ids(self, atoms_list: List[Atoms]) -> List[Atoms]:
+        """Serially claim unique ASE row ids keyed by structure ``index``.
+
+        ASE LMDB only inserts with auto-increment ids; concurrent ``reserve()`` /
+        ``nextid`` updates are unsafe without a working lock file (aselmdb passes
+        a ``Path`` so ASE's lock is never enabled). Parent-side reservation gives
+        each structure a distinct primary key; workers only overwrite that row.
+        """
+        db = connect(self.output_path, **self.default_connect_args)
+        to_run: List[Atoms] = []
+        for atoms in atoms_list:
+            index = int(atoms.info["index"])
+            system_id = db.reserve(index=index)
+            if system_id is None:
+                logger.warning(
+                    f"System {index} already exists in {self.output_path}. Skipping..."
+                )
+                continue
+            atoms.info["aselmdb_row_id"] = system_id
+            to_run.append(atoms)
+        return to_run
+
     def _run_aselmdb(self) -> None:
         if self.n_processes == 1:
             for atoms in tqdm(self.supplier.suppl(), desc="Running QM", dynamic_ncols=True, leave=False, position=0):
                 self.single_run_aselmdb(atoms)
         else:
             logger.info(f"Running QM calculations with {self.n_processes} processes")
+            atoms_list = self._reserve_aselmdb_ids(list(self.supplier.suppl()))
             with Pool(self.n_processes) as p:
                 list(tqdm(
-                    p.imap(self.single_run_aselmdb, self.supplier.suppl()),
+                    p.imap(self.single_run_aselmdb, atoms_list),
                     desc="Running QM",
                     dynamic_ncols=True,
                     leave=False,
-                    position=0
+                    position=0,
+                    total=len(atoms_list),
                 ))
         logger.info(f"QM calculations finished. ASE LMDB saved to {self.output_path}")
 
