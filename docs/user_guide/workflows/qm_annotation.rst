@@ -1,7 +1,7 @@
 QM Annotation
 =============
 
-:code:`enerzyme annotate` drives batch quantum chemistry on structures from a **Supplier** and writes labeled pickles for training. Entry: :code:`enerzyme/annotate.py`.
+:code:`enerzyme annotate` drives batch quantum chemistry on structures from a **Supplier** and writes an **ASE LMDB** (:code:`.aselmdb`) for training. Entry: :code:`enerzyme/annotate.py`.
 
 Command
 -------
@@ -22,17 +22,11 @@ Configuration
         path: fragments.sdf
     QMDriver:
         engine: TeraChem
-        bs: 6-31gs
-        xc: b3lyp
-        pcm: cosmo
-        dftd: d3
-        pcm_radii_file: /path/to/pcm_radii
-        epsilon: 10
+        template_input_file: terachem_template.in
+        output_file: fragments.aselmdb
         keep_molden: false
-        keep_output: false
+        keep_stdout: false
         clean_tmp: true
-        pickle_name: fragments.pkl
-        dump_single_run: false
         n_processes: 8
 
 Suppliers
@@ -42,28 +36,30 @@ Implemented in :code:`enerzyme/data/supplier.py`:
 
 - :code:`SDFSupplier` — SDF with formal charges (RDKit)
 - :code:`PickleSupplier` — pre-built datapoint lists
+- :code:`XYZSupplier` — XYZ trajectories with optional default :code:`Q` / :code:`S`
 
 :code:`annotate.py` currently wires **TeraChem** only (:code:`enerzyme/qm/qm_driver.py`). Other engines (ORCA, PySCF, Psi4) may exist as stubs — verify before use.
 
 QMDriver options
 ----------------
 
+- :code:`template_input_file` — TeraChem settings (basis, XC, solvent); run/charge/spin/coords are injected per structure
+- :code:`output_file` — ASE DB path under the supplier output directory (typically :code:`.aselmdb`)
 - :code:`n_processes` — parallel QM submissions
-- :code:`dump_single_run` — cache per-structure outputs
-- :code:`keep_output` / :code:`keep_molden` — retain QC logs
+- :code:`keep_stdout` / :code:`keep_molden` — retain QC logs
 - :code:`clean_tmp` — remove scratch after success
 
 Output schema
 -------------
 
-Labeled pickle fields should map to Datahub the same way as raw training data (:code:`coord` → :code:`Ra`, :code:`grad` → :code:`Fa` with :code:`negative_gradient`, etc.).
+Each structure is an ASE :code:`Atoms` row with calculator energy/forces/(charges/dipole) and :code:`data` fields :code:`charge`, :code:`spin`, :code:`index`. Load with :code:`Datahub.data_format: aselmdb` (:doc:`/user_guide/data/dataset_formats`).
 
 Merging into training
 ---------------------
 
 1. Run annotate on extracted fragments
-2. Merge :code:`fragments.pkl` into :code:`training_set.pkl` / :code:`validation_set.pkl`
-3. Update :code:`Datahub.datasets` paths in the next :code:`train.yaml`
+2. Point :code:`Datahub.datasets` at the :code:`.aselmdb` path (or combine multiple DB files via a directory / glob)
+3. Update paths in the next :code:`train.yaml`
 
 Environment
 -----------

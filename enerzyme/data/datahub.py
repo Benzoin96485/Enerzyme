@@ -133,14 +133,16 @@ class ASELMDBDataset:
                     properties_from_calculator.add(prop)
         
         self.properties_from_info = set()
-        print(first_row.data.keys())
         for k, v in first_row.data.items():
             if isinstance(v, float) or isinstance(v, int) or isinstance(v, np.ndarray):
                 self.properties_from_info.add(k)
 
         self.unique_properties_from_calculator = properties_from_calculator - self.properties_from_info
         overlapped_properties = properties_from_calculator & self.properties_from_info
-        self._all_properties = self.unique_properties_from_calculator | self.properties_from_info | {"Ra", "Za", "N"}
+        # Q / S always available via atoms.info defaults (charge=0, spin multiplicity=1 → S=0)
+        self._all_properties = self.unique_properties_from_calculator | self.properties_from_info | {
+            "Ra", "Za", "N", "Q", "S"
+        }
         if overlapped_properties:
             logger.warning(f"Property {overlapped_properties} found in calculator will be overwritten by info")
         logger.info(f"Properties from calculator: {self.unique_properties_from_calculator}")

@@ -1,7 +1,7 @@
 QM Data Annotation
 ==================
 
-Enerzyme can drive batch quantum chemistry calculations to label structures with energies, forces, charges, and dipoles. Labeled data is written to pickle format for training. The reference config is :code:`enerzyme/config/annotate.yaml`.
+Enerzyme can drive batch quantum chemistry calculations to label structures with energies, forces, charges, and dipoles. Labeled data is written to an **ASE LMDB** (:code:`.aselmdb`) for training (:code:`Datahub.data_format: aselmdb`). The reference config is :code:`enerzyme/config/annotate.yaml`.
 
 Basic command
 -------------
@@ -26,32 +26,28 @@ Configuration
         path: molecules.sdf
     QMDriver:
         engine: TeraChem
-        bs: 6-31gs
-        xc: b3lyp
-        pcm: cosmo
-        dftd: d3
-        pcm_radii_file: /path/to/pcm_radii
-        epsilon: 10
+        template_input_file: terachem_template.in
+        output_file: dataset.aselmdb
         keep_molden: false
-        keep_output: false
+        keep_stdout: false
         clean_tmp: true
-        pickle_name: labeled/dataset.pkl
+        n_processes: 1
 
 Supplier
 ^^^^^^^^
 
-:code:`Supplier.path` points to an SDF file. Each record must include **total charge** (RDKit formal charge). Enerzyme iterates structures and submits QM jobs.
+:code:`Supplier.path` may be SDF, XYZ, or pickle. SDF records must include **total charge** (RDKit formal charge). Enerzyme iterates structures and submits QM jobs.
 
 QMDriver (TeraChem)
 ^^^^^^^^^^^^^^^^^^^
 
-The reference driver targets **TeraChem**. Required environment:
+The reference driver targets **TeraChem**. Basis, functional, and solvent live in :code:`template_input_file` (not in the YAML keys). Required environment:
 
-- :code:`terachem` executable on :code:`PATH`
+- :code:`terachem` executable on :code:`PATH` (or via :code:`terachem_args`)
 - Valid license and scratch space
-- PCM radius file when :code:`pcm_radii` mode needs it
+- Template input covering basis / XC / PCM as needed
 
-Output pickle schema matches Datahub expectations—map fields in your training YAML the same way as in :doc:`preparing_dataset`.
+Results are stored with ASE :code:`SinglePointCalculator` plus :code:`charge` / :code:`spin` / :code:`index` in row data so Datahub can reload them as :code:`aselmdb`.
 
 .. caution::
     Prepare TeraChem and RDKit before running :code:`annotate`. These are not part of the core Enerzyme install.
@@ -59,8 +55,8 @@ Output pickle schema matches Datahub expectations—map fields in your training 
 Integrating labeled data into training
 --------------------------------------
 
-1. Run :code:`annotate` to produce :code:`dataset.pkl`
-2. Append or merge with existing training data
+1. Run :code:`annotate` to produce :code:`dataset.aselmdb`
+2. Point training :code:`Datahub` at that path with :code:`data_format: aselmdb` (or :code:`.aselmdb` suffix)
 3. Update :code:`train.yaml` :code:`data_path` or multi-dataset :code:`Datahub.datasets`
 4. Retrain or resume active learning (:doc:`active_learning`)
 

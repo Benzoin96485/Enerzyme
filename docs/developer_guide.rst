@@ -170,7 +170,7 @@ Checklist: new data field or transform
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 1. Register type in :code:`datatype.py` if it is a new standard name
-2. Ensure loader supports the source format (:code:`pickle`, :code:`npz`, or HDF5 cache)
+2. Ensure loader supports the source format (:code:`pickle`, :code:`Tensorflow`, :code:`aselmdb`, or HDF5 cache)
 3. Add transform logic in :code:`transform.py` if preprocessing is required
 4. Update :code:`train.yaml` example and :doc:`/user_guide/data/datahub_reference`
 5. Run :code:`enerzyme collect -c <yaml> -o <out>` to validate mapping without training
