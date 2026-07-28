@@ -304,9 +304,19 @@ class SingleDataHub:
         self.neighbor_list_type = neighbor_list
         self.compressed = compressed
         self.max_memory = max_memory
+        self.connect_args = connect_args or {}
+        self.select_args = select_args or {}
+        # Empty connect/select args and unset data_format are omitted so existing
+        # processed_dataset_<hash>/ caches stay valid.
         datahub_str = data_path + str(neighbor_list) + \
             str(sorted(preprocessings.items()) if preprocessings is not None else '') + \
             str(sorted(global_transforms.items()) if global_transforms is not None else '')
+        if data_format:
+            datahub_str += str(data_format)
+        if self.connect_args:
+            datahub_str += str(sorted(self.connect_args.items()))
+        if self.select_args:
+            datahub_str += str(sorted(self.select_args.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
         logger.info(f"Preload path {self.preload_path} is created")
@@ -314,8 +324,6 @@ class SingleDataHub:
         self.global_transform = Transform(global_transforms, self.preload_path)
         self.preprocessings = preprocessings
         self.global_transforms = global_transforms
-        self.connect_args = connect_args
-        self.select_args = select_args
         if not self.preload or not self.preload_data():
             self.get_handle("w")
             self._init_data()

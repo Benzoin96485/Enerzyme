@@ -113,4 +113,4 @@ Defined under :code:`transforms` or :code:`global_transforms`:
 Cache invalidation
 ------------------
 
-The preprocessing hash depends on :code:`data_path`, :code:`data_format`, neighbor list settings, and transforms. Changing any of these creates a new :code:`processed_dataset_<hash>/` directory.
+The preprocessing hash depends on :code:`data_path`, neighbor list settings, and transforms. Non-empty :code:`data_format`, :code:`connect_args`, and :code:`select_args` are included as well (empty / unset values are omitted for cache compatibility). Changing any of these creates a new :code:`processed_dataset_<hash>/` directory.

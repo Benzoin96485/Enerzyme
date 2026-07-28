@@ -109,3 +109,38 @@ def test_singledatahub_loads_aselmdb_directory_or_glob(tmp_path, path_kind):
     )
     assert hub.n_datapoint == 2
     assert hub.data["E"].shape[0] == 2
+
+
+def test_singledatahub_preload_hash_includes_aselmdb_args_when_set(tmp_path):
+    """Empty connect/select args and unset data_format must not change the hash;
+    non-empty values must, so stale pre_transformed.hdf5 is not reused."""
+    db_path = tmp_path / "toy.aselmdb"
+    _write_toy_aselmdb(db_path)
+    common = dict(
+        data_path=str(db_path),
+        preload=False,
+        features={"Ra": "Ra", "Za": "Za", "N": "N", "Q": "Q"},
+        targets={"E": "E", "Fa": "Fa"},
+        neighbor_list="",
+        compressed=False,
+    )
+    n_hubs = 0
+
+    def _hash(**kwargs):
+        nonlocal n_hubs
+        n_hubs += 1
+        hub = SingleDataHub(dump_dir=str(tmp_path / f"out_{n_hubs}"), **common, **kwargs)
+        h = hub.hash
+        hub.file.close()
+        return h
+
+    baseline = _hash()
+    assert _hash(data_format=None, connect_args={}, select_args={}) == baseline
+
+    with_format = _hash(data_format="aselmdb")
+    with_select = _hash(select_args={"limit": 1})
+    with_connect = _hash(connect_args={"readonly": False})
+    assert with_format != baseline
+    assert with_select != baseline
+    assert with_connect != baseline
+    assert len({with_format, with_select, with_connect}) == 3

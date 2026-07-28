@@ -29,7 +29,7 @@ Preprocessing pipeline
 Hash directory
 --------------
 
-The hash string encodes data path, format, neighbor list mode, compression, and transforms. Reusing :code:`preload: true` skips recomputation when nothing relevant changed.
+The hash string encodes data path, neighbor list mode, and transforms. Non-empty :code:`data_format`, :code:`connect_args`, and :code:`select_args` are included when set (empty values are omitted so older caches remain valid). Reusing :code:`preload: true` skips recomputation when nothing relevant changed.
 
 Neighbor list cost
 ------------------
