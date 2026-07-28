@@ -477,8 +477,8 @@ class SingleDataHub:
         elif self.data_format == "pickle" or suffix == "pkl" or suffix == "pickle":
             self.data_format = "pickle"
             raw_data = load_from_pickle(self.data_path)
-        elif self.data_format == "Tensorflow" or suffix == "Tensorflow":
-            self.data_format = "Tensorflow"
+        elif self.data_format == "npz" or suffix == "npz":
+            self.data_format = "npz"
             raw_data = np.load(self.data_path, allow_pickle=True)
         elif self.data_format == "sdf" or suffix == "sdf":
             self.data_format = "sdf"

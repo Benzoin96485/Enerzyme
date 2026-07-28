@@ -1,7 +1,7 @@
 Dataset Formats
 ===============
 
-Enerzyme accepts :code:`pickle`, :code:`Tensorflow`, :code:`hdf5`, and :code:`aselmdb` via :code:`Datahub.data_format` (or by file suffix). Internally, preprocessed training data is stored as HDF5 under :code:`processed_dataset_<hash>/`.
+Enerzyme accepts :code:`pickle`, :code:`npz`, :code:`hdf5`, and :code:`aselmdb` via :code:`Datahub.data_format` (or by file suffix). Internally, preprocessed training data is stored as HDF5 under :code:`processed_dataset_<hash>/`.
 
 Pickle
 ------
