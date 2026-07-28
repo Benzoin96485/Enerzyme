@@ -300,6 +300,27 @@ class QMDriver(ABC):
             to_run.append(atoms)
         return to_run
 
+    def _pool_imap(self, worker, items, *, total: Optional[int] = None):
+        """``Pool.imap`` on a bound method pickles ``self``; drop Supplier first.
+
+        Workers only need QM I/O state. Keeping ``supplier`` (esp. RDKit
+        ``SDMolSupplier``) in the pickled driver fails for SDF inputs.
+        """
+        supplier = self.supplier
+        self.supplier = None
+        try:
+            with Pool(self.n_processes) as p:
+                return list(tqdm(
+                    p.imap(worker, items),
+                    desc="Running QM",
+                    dynamic_ncols=True,
+                    leave=False,
+                    position=0,
+                    total=total,
+                ))
+        finally:
+            self.supplier = supplier
+
     def _run_aselmdb(self) -> None:
         if self.n_processes == 1:
             for atoms in tqdm(self.supplier.suppl(), desc="Running QM", dynamic_ncols=True, leave=False, position=0):
@@ -307,15 +328,11 @@ class QMDriver(ABC):
         else:
             logger.info(f"Running QM calculations with {self.n_processes} processes")
             atoms_list = self._reserve_aselmdb_ids(list(self.supplier.suppl()))
-            with Pool(self.n_processes) as p:
-                list(tqdm(
-                    p.imap(self.single_run_aselmdb, atoms_list),
-                    desc="Running QM",
-                    dynamic_ncols=True,
-                    leave=False,
-                    position=0,
-                    total=len(atoms_list),
-                ))
+            self._pool_imap(
+                self.single_run_aselmdb,
+                atoms_list,
+                total=len(atoms_list),
+            )
         logger.info(f"QM calculations finished. ASE LMDB saved to {self.output_path}")
 
     def _run_pickle(self) -> None:
@@ -325,14 +342,13 @@ class QMDriver(ABC):
                 result_packages.append(self.single_run_pickle(atoms))
         else:
             logger.info(f"Running QM calculations with {self.n_processes} processes")
-            with Pool(self.n_processes) as p:
-                result_packages = list(tqdm(
-                    p.imap(self.single_run_pickle, self.supplier.suppl()),
-                    desc="Running QM",
-                    dynamic_ncols=True,
-                    leave=False,
-                    position=0
-                ))
+            # Materialize before Pool: generator + detached supplier would be empty.
+            atoms_list = list(self.supplier.suppl())
+            result_packages = self._pool_imap(
+                self.single_run_pickle,
+                atoms_list,
+                total=len(atoms_list),
+            )
         datapoints = [r for r in result_packages if r]
         with open(self.output_path, "wb") as f:
             dump(datapoints, f)

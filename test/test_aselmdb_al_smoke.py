@@ -164,23 +164,27 @@ def test_mock_qm_driver_writes_aselmdb(tmp_path: Path):
     np.testing.assert_allclose(ds["M2"][0], [0.1, 0.2, 0.3])
 
 
+def test_sdf_supplier_is_picklable():
+    """Pool.imap pickles the driver (and thus its Supplier); RDKit handle must not block that."""
+    import pickle
+
+    from enerzyme.data.supplier import SDFSupplier
+
+    supplier = SDFSupplier(str(FIXTURES / "fragments_tiny.sdf"), start=0, end=2)
+    restored = pickle.loads(pickle.dumps(supplier))
+    atoms = list(restored.suppl())
+    assert len(atoms) == 2
+    assert atoms[0].info["index"] == 0
+
+
 def test_mock_qm_driver_multiprocess_unique_ids(tmp_path: Path):
-    """n_processes>1 must pre-reserve distinct primary keys (no lost/duplicate rows)."""
+    """n_processes>1 must pre-reserve distinct primary keys (no lost/duplicate rows).
+
+    Uses SDF supplier — the common annotate input — to catch unpicklable RDKit handles.
+    """
     from enerzyme.data.supplier import get_supplier
 
-    # Use pickle supplier: Pool pickles the bound method (driver), and RDKit
-    # SDMolSupplier is not picklable.
-    supplier = get_supplier(
-        str(FIXTURES / "fragments_tiny.pkl"),
-        start=0,
-        end=3,
-        features={
-            "Ra": "coord",
-            "Za": "atom_type",
-            "Q": "total_chrg",
-            "S": "total_spin",
-        },
-    )
+    supplier = get_supplier(str(FIXTURES / "fragments_tiny.sdf"), start=0, end=3)
     driver = FakeQMDriver(
         supplier=supplier,
         tmp_dir=str(tmp_path / "annot_tmp"),
@@ -191,6 +195,7 @@ def test_mock_qm_driver_multiprocess_unique_ids(tmp_path: Path):
         clean_tmp=True,
     )
     driver.run()
+    assert driver.supplier is not None, "supplier must be restored after Pool"
     db_files = list((tmp_path / "annot_out").rglob("*.aselmdb"))
     assert db_files
     with connect(str(db_files[0])) as db:

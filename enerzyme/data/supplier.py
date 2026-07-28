@@ -19,6 +19,7 @@ _DEFAULT_PICKLE_FEATURES: Dict[str, str] = {
 
 class Supplier(ABC):
     def __init__(self, input_file, start: int = 0, end: int = -1):
+        self.input_file = input_file
         self.start = start
         to_end = True
         if end >= 0:
@@ -38,7 +39,20 @@ class Supplier(ABC):
 class SDFSupplier(Supplier):
     def __init__(self, input_file, **kwargs):
         super().__init__(input_file, **kwargs)
-        self.supplier = Chem.SDMolSupplier(input_file, removeHs=False)
+        self._open_supplier()
+
+    def _open_supplier(self) -> None:
+        # RDKit SDMolSupplier is not picklable; recreate from path after unpickle.
+        self.supplier = Chem.SDMolSupplier(self.input_file, removeHs=False)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("supplier", None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._open_supplier()
 
     def suppl(self):
         for i, mol in enumerate(self.supplier):
