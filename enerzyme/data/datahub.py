@@ -172,11 +172,18 @@ class ASELMDBDataset:
                     properties_from_calculator.add(prop)
         
         self.properties_from_info = set()
-        for k, v in first_row.data.items():
-            if k in _ASE_INFO_STANDARD_KEYS:
-                continue
-            if isinstance(v, float) or isinstance(v, int) or isinstance(v, np.ndarray):
-                self.properties_from_info.add(k)
+        # ASE may store data as null / omit it; AtomsRow.data then returns None
+        # or raises when wrapping None in FancyDict.
+        try:
+            row_data = first_row.data
+        except TypeError:
+            row_data = None
+        if row_data:
+            for k, v in row_data.items():
+                if k in _ASE_INFO_STANDARD_KEYS:
+                    continue
+                if isinstance(v, float) or isinstance(v, int) or isinstance(v, np.ndarray):
+                    self.properties_from_info.add(k)
 
         self.unique_properties_from_calculator = properties_from_calculator - self.properties_from_info
         overlapped_properties = properties_from_calculator & self.properties_from_info

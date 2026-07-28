@@ -61,6 +61,32 @@ def test_aselmdb_dataset_loads_dipole_as_m2(tmp_path):
     np.testing.assert_allclose(ds["M2"][0], dipole)
 
 
+def test_aselmdb_dataset_handles_none_row_data(tmp_path, monkeypatch):
+    """Rows with data=None / null must still expose calculator-backed E/Fa."""
+    from ase_db_backends.aselmdb import LMDBDatabase
+
+    db_path = tmp_path / "none_data.aselmdb"
+    energy_ev, forces_ev = _write_toy_aselmdb(db_path)
+
+    orig_get_row = LMDBDatabase._get_row
+    probed = {"done": False}
+
+    def _patched_get_row(self, id, *args, **kwargs):
+        row = orig_get_row(self, id, *args, **kwargs)
+        if not probed["done"]:
+            row._data = None  # ASE AtomsRow.data then raises TypeError
+            probed["done"] = True
+        return row
+
+    monkeypatch.setattr(LMDBDatabase, "_get_row", _patched_get_row)
+    ds = ASELMDBDataset(str(db_path), new_energy_unit="Ha")
+
+    assert "E" in ds and "Fa" in ds
+    assert ds.properties_from_info == set()
+    assert ds["E"][0] == pytest.approx(energy_ev / ase.units.Ha)
+    np.testing.assert_allclose(ds["Fa"][0], forces_ev / ase.units.Ha)
+
+
 def test_singledatahub_loads_m2_from_aselmdb(tmp_path):
     """HDF5 build must include M2 via identity mapping (standard names)."""
     db_path = tmp_path / "dipole.aselmdb"
