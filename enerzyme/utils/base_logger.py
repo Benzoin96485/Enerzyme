@@ -48,8 +48,11 @@ class Logger(object):
             file_handler.setFormatter(self.formatter)
             file_handler.setLevel(self.file_output_level)
             self.logger.addHandler(file_handler)
+            # Avoid duplicate lines on stdout when root (e.g. Lightning) also has a StreamHandler.
+            self.logger.propagate = False
         return self.logger
 
 
 logger = Logger(BASE_NAME).get_logger()
 logger.setLevel(logging.INFO)
+logger.propagate = False

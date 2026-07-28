@@ -378,3 +378,8 @@ External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Register in :code:`get_ff_core` like other architectures. Keep fairchem imports inside :code:`enerzyme/models/esen/` so non-UMA installs do not import it until selected. Prefer shared :code:`layers/readout.py` and :code:`layers/spin.py` for Q/S heads.
+
+Flow matching (:code:`uma_flow_qs`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Requires :code:`torchdiffeq` for ODE integration in :code:`enerzyme/tasks/generator_ode.py`. Keep ODE utilities in tasks/, not inside Core modules.

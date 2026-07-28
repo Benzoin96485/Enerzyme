@@ -97,11 +97,8 @@ class ResidualLayer(NeuronLayer):
         dropout_rate: float=0,
         use_bias: bool=True,
         use_residual: bool=True,
-        shallow_ensemble_size: int=1
     ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
-        if shallow_ensemble_size > 1 and use_residual:
-            raise ValueError("shallow_ensemble_size > 1 is not supported for residual layers with residual connection")
         self.use_residual = use_residual
         dropout = Dropout(dropout_rate)
         dense1 = DenseLayer(
@@ -119,8 +116,7 @@ class ResidualLayer(NeuronLayer):
             activation_fn=None,
             initial_weight=initial_weight2, 
             initial_bias=initial_bias, 
-            use_bias=use_bias,
-            shallow_ensemble_size=shallow_ensemble_size
+            use_bias=use_bias
         )
         if activation_fn is not None:
             self.residual = Sequential(self.activation_fn, dropout, dense1, dense2)
@@ -148,7 +144,6 @@ class ResidualStack(NeuronLayer):
         dropout_rate: float=0,
         use_bias: bool=True,
         use_residual: bool=True,
-        shallow_ensemble_size: int=1
     ) -> None:
         super().__init__(dim_feature, dim_feature)
         self.num_residual = num_residual

@@ -72,9 +72,15 @@ class SpookyNetCore(BaseFFCore):
         num_residual_local_d: int, num_residual_local: int,
         num_residual_nonlocal_q: int, num_residual_nonlocal_k: int, num_residual_nonlocal_v: int,
         num_residual_post: int, num_residual_output: int, activation_fn: ACTIVATION_KEY_TYPE, use_irreps: bool, dropout_rate: float=0.0,
-        shallow_ensemble_size: int=1
+        shallow_ensemble_size: int=1,
+        output_mode: Literal["direct", "feature"]="direct",
     ) -> None:
-        super().__init__()
+        self.output_mode: Literal["direct", "feature"] = output_mode
+        output_fields = {"Ea", "Qa"} if output_mode == "direct" else {"atom_feature"}
+        super().__init__(
+            input_fields={"Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf", "atom_embedding", "batch_seg"},
+            output_fields=output_fields,
+        )
         self.interaction = ModuleList(
             [
                 InteractionModule(
@@ -96,10 +102,11 @@ class SpookyNetCore(BaseFFCore):
                 for _ in range(num_modules)
             ]
         )
-        if shallow_ensemble_size > 1:
-            self.output = DenseLayer(dim_embedding, 2, use_bias=False, shallow_ensemble_size=shallow_ensemble_size)
-        else:
-            self.output = Linear(dim_embedding, 2, bias=False)
+        if self.output_mode == "direct":
+            if shallow_ensemble_size > 1:
+                self.output = DenseLayer(dim_embedding, 2, use_bias=False, shallow_ensemble_size=shallow_ensemble_size)
+            else:
+                self.output = Linear(dim_embedding, 2, bias=False)
         self.use_irreps = use_irreps
         self._sqrt2 = math.sqrt(2.0)
         self._sqrt3 = math.sqrt(3.0)
@@ -145,7 +152,7 @@ class SpookyNetCore(BaseFFCore):
         self.gather_embedding = GatherAtomEmbedding()
         self.pre_sequence.append(self.gather_embedding)
 
-    def _atomic_properties_static(self, Dij_sr: Tensor, vij_sr: Tensor, batch_seg: Optional[Tensor]=None) -> Tuple[Tensor, Tensor, Tensor, int]:
+    def _atomic_properties_static(self, Dij_sr: Tensor, vij_sr: Tensor, batch_seg: Optional[Tensor]=None) -> Tuple[Tensor, Tensor, Optional[Tensor], int]:
         pij = vij_sr / Dij_sr.unsqueeze(-1)
         if self.use_irreps:  # irreducible representation
             try:
@@ -204,6 +211,8 @@ class SpookyNetCore(BaseFFCore):
                 y = y * dropout_mask[batch_seg]
                 dropout_mask = dropout_mask * torch.bernoulli(self.keep_prob * torch.ones_like(dropout_mask))
             f = f + y
+        if self.output_mode == "feature":
+            return f
         out = self.output(f)
         ea = out.narrow(1, 0, 1).squeeze(1)  # atomic energy
         qa = out.narrow(1, 1, 1).squeeze(1)  # partial charge
@@ -212,8 +221,13 @@ class SpookyNetCore(BaseFFCore):
     def get_output(
         self, Dij_sr: Tensor, vij_sr: Tensor, idx_i_sr: Tensor, idx_j_sr: Tensor, 
         rbf: Tensor, atom_embedding: Tensor, batch_seg: Optional[Tensor]=None
-    ) -> Dict[Literal["Ea", "Qa"], Tensor]:
+    ) -> Dict[str, Tensor]:
         pij, dij, mask, num_batch = self._atomic_properties_static(Dij_sr, vij_sr, batch_seg)
+        if self.output_mode == "feature":
+            f = self._atomic_properties_dynamic(
+                atom_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg
+            )
+            return {"atom_feature": f}
         ea, qa = self._atomic_properties_dynamic(
             atom_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg
         )

@@ -129,3 +129,4 @@ legacy/
 .vscode/
 requirements-dev.yaml
 experiments/
+references/

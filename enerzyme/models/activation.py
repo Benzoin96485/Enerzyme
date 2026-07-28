@@ -1,6 +1,6 @@
 import math
 from abc import ABC, abstractmethod
-from typing import Literal, Dict, Union
+from typing import Literal, Dict, Union, Callable
 import torch
 import torch.nn.functional as F
 from torch import Tensor
@@ -123,3 +123,17 @@ def get_activation_fn(
     activation_params: ACTIVATION_PARAM_TYPE=dict()
 ) -> BaseScaledTemperedActivation:
     return ACTIVATION_REGISTER[key](**activation_params)
+
+
+POSITIVE_ACTIVATION_REGISTER = {
+    "softplus": F.softplus,
+    "square": torch.square,
+    "exp": torch.exp,
+}
+POSITIVE_ACTIVATION_KEY_TYPE = Literal["softplus", "square", "exp"]
+
+
+def get_positive_activation_fn(
+    key: POSITIVE_ACTIVATION_KEY_TYPE,
+) -> Callable[[Tensor], Tensor]:
+    return POSITIVE_ACTIVATION_REGISTER[key]

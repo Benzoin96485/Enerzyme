@@ -22,6 +22,9 @@ Internal architectures
 +----------------+----------+--------+--------+-------------+------------------+
 | AlphaNet       | varies   | varies | partial| varies      | See config TODOs |
 +----------------+----------+--------+--------+-------------+------------------+
+| AllScAIP       | yes      | yes    | yes    | yes         | Attention Core + |
+|                |          |        |        |             | shared readouts  |
++----------------+----------+--------+--------+-------------+------------------+
 
 External wrappers
 -----------------
@@ -62,3 +65,11 @@ Reference configs
 -----------------
 
 Full multi-architecture examples: :code:`enerzyme/config/train.yaml`. Enable one :code:`FF` entry at a time when starting (:code:`active: true`).
+
+NSE and flow matching
+---------------------
+
+Neural Spin Equilibration (:code:`NSEReadout` / :code:`NeuralSpinChargeEquilibration`) lives in shared layers outside Core. Existing architectures expose :code:`output_mode: feature` so Core emits :code:`atom_feature` for modular Q/S heads.
+
+:code:`architecture: uma_flow_qs` uses continuous-flow charge/spin generation (:code:`torchdiffeq`) on top of the UMA Core. Example layer stacks: :code:`enerzyme/config/uma_qs_layers_example.yaml` and :code:`enerzyme/config/uma_flow_qs_layers_example.yaml`. Optional deps: :code:`fairchem`, :code:`torch-scatter`, :code:`torchdiffeq`.
+
