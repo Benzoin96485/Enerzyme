@@ -12,7 +12,7 @@ from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from .datatype import is_atomic, is_rounded, is_int, register_data_type
-from .transform import parse_Za, Transform
+from .transform import parse_Za, Transform, EnergyUnitConversionTransform
 from ..utils import YamlHandler, logger
 
 
@@ -105,7 +105,19 @@ class ASELMDBSingleProperty:
 
 
 class ASELMDBDataset:
-    def __init__(self, data_path, new_energy_unit: str="Ha", connect_args: Dict[str, Any]=dict(), select_args: Dict[str, Any]=dict()):
+    def __init__(
+        self,
+        data_path,
+        new_energy_unit: str="Ha",
+        connect_args: Dict[str, Any]=dict(),
+        select_args: Dict[str, Any]=dict(),
+        transforms: Optional[Dict[str, Any]]=None,
+    ):
+        if transforms and transforms.get("energy_unit_conversion"):
+            logger.warning(
+                "energy_unit_conversion transform is disabled for ASELMDB; "
+                f"energies/forces are already converted via new_energy_unit={new_energy_unit}"
+            )
         if new_energy_unit != "eV":
             logger.info(f"Loading ASE energy in {new_energy_unit}")
         self.energy_unit_conversion_factor = 1 / getattr(ase.units, new_energy_unit)
@@ -436,7 +448,27 @@ class SingleDataHub:
         # aselmdb accepts a file, directory of DB files, or glob; ASELMDBDataset validates the path
         if self.data_format == "aselmdb" or suffix == "aselmdb":
             self.data_format = "aselmdb"
-            raw_data = ASELMDBDataset(self.data_path, connect_args=self.connect_args, select_args=self.select_args)
+            aselmdb_transforms = {}
+            if self.preprocessings:
+                aselmdb_transforms.update(self.preprocessings)
+            if self.global_transforms:
+                aselmdb_transforms.update(self.global_transforms)
+            raw_data = ASELMDBDataset(
+                self.data_path,
+                connect_args=self.connect_args,
+                select_args=self.select_args,
+                transforms=aselmdb_transforms or None,
+            )
+            # Unit conversion is already applied in ASELMDBDataset; drop the transform so it is not applied twice.
+            if aselmdb_transforms.get("energy_unit_conversion"):
+                self.preprocessing.scales = [
+                    s for s in self.preprocessing.scales
+                    if not isinstance(s, EnergyUnitConversionTransform)
+                ]
+                self.global_transform.scales = [
+                    s for s in self.global_transform.scales
+                    if not isinstance(s, EnergyUnitConversionTransform)
+                ]
         elif not os.path.isfile(self.data_path):
             raise ValueError(f"Data path {self.data_path} doesn't exist.")
         elif self.data_format == "hdf5" or suffix == "hdf5":

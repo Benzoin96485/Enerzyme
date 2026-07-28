@@ -190,6 +190,13 @@ class Transform:
                 else:
                     raise ValueError(f"Invalid total energy normalization: {v}")
                 self.backup_keys.add("E")
+            if k == "energy_unit_conversion" and v:
+                if isinstance(v, dict):
+                    self.scales.append(EnergyUnitConversionTransform(**v))
+                else:
+                    raise ValueError(f"Invalid energy unit conversion: {v}")
+                self.backup_keys.add("E")
+                self.backup_keys.add("Fa")
 
     def transform(self, raw_input: Dict):
         for shift in self.shifts:
