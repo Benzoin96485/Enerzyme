@@ -40,6 +40,26 @@ def load_from_pickle(data_path=str):
         raise TypeError(f"Unknown data type in {data_path}!")
 
 
+def load_from_sdf(data_path: str) -> Dict[str, list]:
+    """Load an SDF into a column-oriented dict for Datahub.
+
+    Uses the Atoms-based :class:`SDFSupplier` and exposes standard Enerzyme
+    geometry / charge fields (``Ra``, ``Za``, ``N``, ``Q``, ``S``). Feature
+    maps should use those names as source attributes (identity mapping).
+    """
+    from .supplier import SDFSupplier
+
+    raw_data: Dict[str, list] = {"Ra": [], "Za": [], "N": [], "Q": [], "S": []}
+    for atoms in SDFSupplier(input_file=data_path).suppl():
+        raw_data["Ra"].append(np.asarray(atoms.get_positions()))
+        raw_data["Za"].append(np.asarray(atoms.get_atomic_numbers()))
+        raw_data["N"].append(len(atoms))
+        raw_data["Q"].append(int(atoms.info.get("charge", 0)))
+        raw_data["S"].append(int(atoms.info.get("spin", 1)) - 1)
+    logger.info(f"Collected keys from SDF: {set(raw_data)}")
+    return raw_data
+
+
 def _get_single_aselmdb_data_path(data_path=str) -> List[str]:
     if os.path.isfile(data_path):
         return [data_path]
@@ -409,9 +429,7 @@ class SingleDataHub:
             raw_data = np.load(self.data_path, allow_pickle=True)
         elif self.data_format == "sdf" or suffix == "sdf":
             self.data_format = "sdf"
-            from .supplier import SDFSupplier
-            supplier = SDFSupplier(self.data_path, supplying_fields=self.data_types.keys())
-            raw_data = supplier.raw_data()
+            raw_data = load_from_sdf(self.data_path)
         elif self.data_format == "aselmdb" or suffix == "aselmdb":
             raw_data = ASELMDBDataset(self.data_path, connect_args=self.connect_args, select_args=self.select_args)
         else:

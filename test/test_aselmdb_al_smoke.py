@@ -148,6 +148,30 @@ def test_sdf_supplier_reads_fixture():
     assert all("charge" in a.info for a in atoms_list)
 
 
+def test_load_from_sdf_and_datahub(tmp_path: Path):
+    from enerzyme.data.datahub import DataHub, load_from_sdf
+
+    sdf = FIXTURES / "fragments_tiny.sdf"
+    raw = load_from_sdf(str(sdf))
+    assert set(raw) >= {"Ra", "Za", "N", "Q", "S"}
+    assert len(raw["Ra"]) == 3
+    assert all(np.asarray(za).ndim == 1 for za in raw["Za"])
+
+    hub = DataHub(
+        dump_dir=str(tmp_path / "sdf_hub"),
+        data_path=str(sdf),
+        data_format="sdf",
+        features={"Ra": "Ra", "Za": "Za", "N": "N", "Q": "Q"},
+        targets={},
+        preload=False,
+        neighbor_list="",
+    )
+    default = hub.datahubs["default"]
+    assert default.n_datapoint == 3
+    assert "Ra" in default.data and "Za" in default.data and "Q" in default.data
+
+
+
 def test_resolve_annotate_output_modes():
     from enerzyme.qm.qm_driver import _resolve_annotate_output
 
