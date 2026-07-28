@@ -1,10 +1,10 @@
-# Default: ASE LMDB (Enerzyme-native / future Enerzymette).
+# Enerzymette-compatible pickle output (pickle_name or .pkl output_file).
 Supplier:
   path: fixtures/fragments_tiny.sdf
 QMDriver:
   engine: TeraChem
   template_input_file: fixtures/terachem_template.in
-  output_file: fragments.aselmdb
+  pickle_name: fragments.pkl
   keep_molden: false
   keep_stdout: false
   clean_tmp: true

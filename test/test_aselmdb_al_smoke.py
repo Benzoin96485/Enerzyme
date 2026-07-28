@@ -74,8 +74,14 @@ def test_annotate_config_matches_new_api():
     assert "output_file" in qmd
     assert qmd["output_file"].endswith(".aselmdb")
     assert "template_input_file" in qmd
-    assert "pickle_name" not in qmd
+    assert not qmd.get("pickle_name")
     assert "bs" not in qmd  # basis lives in template
+
+
+def test_annotate_pickle_config_selects_pickle_name():
+    with open(EXAMPLE / "config" / "annotate_pickle.yaml") as f:
+        cfg = yaml.safe_load(f)
+    assert cfg["QMDriver"]["pickle_name"] == "fragments.pkl"
 
 
 def test_legacy_campaign_annotate_still_pickle_shaped():
@@ -124,9 +130,11 @@ def test_mock_qm_driver_writes_aselmdb(tmp_path: Path):
     )
     # Fake collect_results returns E in Ha but SinglePointCalculator expects eV-like floats;
     # for write-path smoke we only assert DB rows exist.
+    assert driver.output_format == "aselmdb"
     driver.run()
     db_files = list(out_dir.rglob("*.aselmdb"))
     assert db_files, f"no aselmdb under {out_dir}"
+    assert not list(out_dir.rglob("*.pkl")), "aselmdb mode must not write pickle"
     with connect(str(db_files[0])) as db:
         assert db.count() == 2
 
@@ -138,3 +146,59 @@ def test_sdf_supplier_reads_fixture():
     atoms_list = list(supplier.suppl())
     assert len(atoms_list) == 3
     assert all("charge" in a.info for a in atoms_list)
+
+
+def test_resolve_annotate_output_modes():
+    from enerzyme.qm.qm_driver import _resolve_annotate_output
+
+    assert _resolve_annotate_output("fragments.aselmdb", None) == ("aselmdb", "fragments.aselmdb")
+    assert _resolve_annotate_output(None, None) == ("aselmdb", "dataset.aselmdb")
+    assert _resolve_annotate_output("fragments.pkl", None) == ("pickle", "fragments.pkl")
+    assert _resolve_annotate_output("x.aselmdb", "fragments.pkl") == ("pickle", "fragments.pkl")
+    assert _resolve_annotate_output(None, "fragments") == ("pickle", "fragments.pkl")
+
+
+def test_mock_qm_driver_writes_pickle(tmp_path: Path):
+    from enerzyme.data.supplier import SDFSupplier
+    from enerzyme.qm.qm_driver import QMDriver
+    import pickle
+
+    class FakeQMDriver(QMDriver):
+        def make_input(self, atoms: Atoms, tmp_dir: Path):
+            path = tmp_dir / f"{atoms.info['index']}.in"
+            path.write_text("run gradient\nend\n")
+            return path
+
+        def invoke_qm(self, input_file, atoms: Atoms, tmp_dir: Path):
+            out = Path(input_file).with_suffix(".out")
+            out.write_text("ok\n")
+            return out
+
+        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+            n = len(atoms)
+            return {
+                "E": -1.0 * ase.units.Ha,
+                "Fa": np.zeros((n, 3)),
+                "M2": np.zeros(3),
+            }
+
+    sdf = FIXTURES / "fragments_tiny.sdf"
+    supplier = SDFSupplier(input_file=str(sdf), start=0, end=2)
+    driver = FakeQMDriver(
+        supplier=supplier,
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(tmp_path / "annot_out"),
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        pickle_name="fragments.pkl",
+        n_processes=1,
+        clean_tmp=True,
+    )
+    assert driver.output_format == "pickle"
+    driver.run()
+    pkl = list((tmp_path / "annot_out").rglob("fragments.pkl"))
+    assert len(pkl) == 1
+    with open(pkl[0], "rb") as f:
+        data = pickle.load(f)
+    assert len(data) == 2
+    assert set(data[0]) >= {"energy", "grad", "dipole", "coord", "atom_type", "total_chrg", "total_spin", "index"}
+    assert abs(data[0]["energy"] - (-1.0)) < 1e-8  # Ha

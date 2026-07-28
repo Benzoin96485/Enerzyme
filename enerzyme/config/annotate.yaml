@@ -3,7 +3,10 @@ Supplier:
 QMDriver:
   engine: TeraChem                                  # quantum chemistry engine
   template_input_file: /your/terachem_template.in   # TeraChem template (basis, xc, solvent, …)
-  output_file: dataset.aselmdb                      # ASE DB / LMDB output (loaded via data_format: aselmdb)
+  # Output (mutually exclusive): default ASE DB; pickle if output_file ends with .pkl/.pickle
+  # or if pickle_name is set (Enerzymette AL still uses pickle_name: fragments.pkl).
+  output_file: dataset.aselmdb                      # .aselmdb → ASE DB; .pkl → legacy pickle
+  # pickle_name: fragments.pkl                      # alternative to select pickle output
   keep_molden: false                                # if molden file is saved
   keep_stdout: false                                # if output log is saved
   clean_tmp: true                                   # if temporary files are cleaned

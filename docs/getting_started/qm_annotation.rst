@@ -1,7 +1,7 @@
 QM Data Annotation
 ==================
 
-Enerzyme can drive batch quantum chemistry calculations to label structures with energies, forces, charges, and dipoles. Labeled data is written to an **ASE LMDB** (:code:`.aselmdb`) for training (:code:`Datahub.data_format: aselmdb`). The reference config is :code:`enerzyme/config/annotate.yaml`.
+Enerzyme can drive batch quantum chemistry calculations to label structures with energies, forces, charges, and dipoles. By default labeled data is written to an **ASE LMDB** (:code:`.aselmdb`); use :code:`pickle_name` or a :code:`.pkl` :code:`output_file` for legacy pickle (Enerzymette). The reference config is :code:`enerzyme/config/annotate.yaml`.
 
 Basic command
 -------------
