@@ -636,6 +636,84 @@ Modelhub:
             output_dim: 1
             node_average: false
             default_dtype: "float32"
+    FF09:
+      suffix:
+      architecture: Equiformer
+      active: false
+      loss:
+        rmse:
+          Qa: 1
+          Fa: 52.917721
+          E: 1
+          M2: 1.8897261
+      Metric:
+        Qa:
+          rmse: 1
+        Fa:
+          rmse: 52.917721
+        E:
+          rmse: 1
+        M2:
+          rmse: 1.8897261
+      build_params:
+        dim_embedding: 64
+        num_rbf: 16
+        max_Za: 86
+        cutoff_sr: 5.0
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+        irreps_node_embedding: "32x0e+16x1e+8x2e"
+      layers:
+        - name: RangeSeparation
+          params:
+            cutoff_fn: polynomial
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: EquiformerNodeEmbedding
+          params:
+            irreps_node_embedding: "32x0e+16x1e+8x2e"
+        - name: Core
+          params:
+            irreps_node_embedding: "32x0e+16x1e+8x2e"
+            irreps_feature: "64x0e"
+            irreps_sh: "1x0e+1x1e+1x2e"
+            irreps_head: "16x0e+8x1o+4x2e"
+            irreps_mlp_mid: "32x0e+16x1e+8x2e"
+            num_layers: 2
+            num_heads: 2
+            fc_neurons: [64, 64]
+            nonlinear_message: true
+            output_mode: feature
+        - name: SimpleReadout
+          params:
+            output_fields:
+              - Ea
+              - Qa
+            head_type: residual_mlp
+            num_residual: 2
+            dim_embedding: 64
+            activation_fn: swish
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

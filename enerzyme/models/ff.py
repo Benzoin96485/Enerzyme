@@ -69,6 +69,12 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         }
         DEFAULT_LAYER_PARAMS = []
         special_loss = {}
+    elif architecture.lower() == "equiformer":
+        from .equiformer.core import EquiformerCore as Core
+        from .equiformer.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    else:
+        raise NotImplementedError(f"Architecture {architecture} not implemented")
     LOSS_REGISTER.update(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 

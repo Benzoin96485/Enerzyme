@@ -199,6 +199,10 @@ Adding an internal architecture
 5. Add tests under :code:`test/` (layer parity or forward-pass smoke)
 6. Document in :doc:`/user_guide/models/architecture_catalog`
 
+Recent internal example: :code:`Equiformer` under :code:`enerzyme/models/equiformer/`
+(irreps atom embedding as a pre-core layer; Core emits :code:`atom_feature` by default;
+shared :code:`SimpleReadout` / physics layers after the Core).
+
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -266,6 +270,7 @@ Tests live in :code:`test/`:
 - :code:`test_scatter.py` — :code:`torch_scatter` equivalence (CPU/GPU parametrized)
 - :code:`test_spookynet.py` — SpookyNet layer and forward tests
 - :code:`test_physnet.py` — PhysNet parity against reference TensorFlow implementation (heavy optional stack)
+- :code:`test_equiformer.py` — Equiformer forward smoke, feature mode, SO(3) energy/force checks
 - :code:`test_scatter_speed.py` — performance-oriented scatter checks
 
 Suggested commands

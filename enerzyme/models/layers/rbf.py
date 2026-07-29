@@ -464,3 +464,66 @@ class GaussianSmearing(BaseFFLayer):
     def get_rbf(self, Dij_sr: Tensor) -> Tensor:
         dist = Dij_sr.view(-1, 1) - self.offset.view(1, -1)
         return torch.exp(self.coeff * torch.pow(dist, 2))
+
+
+class ExpNormalSmearing(BaseFFLayer):
+    """Exponential normal radial basis (TorchMD-Net / Equiformer MD17).
+
+    Includes an internal cosine cutoff; pass raw short-range distances ``Dij_sr``.
+    """
+
+    def __init__(
+        self,
+        num_rbf: int,
+        cutoff_sr: float,
+        cuton: float = 0.0,
+        trainable: bool = False,
+    ) -> None:
+        super().__init__(input_fields={"Dij_sr"}, output_fields={"rbf"})
+        self.num_rbf = num_rbf
+        self.cutoff_sr = cutoff_sr
+        self.cuton = cuton
+        self.trainable = trainable
+        self.alpha = 5.0 / (cutoff_sr - cuton)
+        means, betas = self._initial_params()
+        if trainable:
+            self.means = Parameter(means)
+            self.betas = Parameter(betas)
+        else:
+            self.register_buffer("means", means)
+            self.register_buffer("betas", betas)
+
+    def _initial_params(self):
+        start_value = torch.exp(torch.tensor(-self.cutoff_sr + self.cuton))
+        means = torch.linspace(start_value.item(), 1.0, self.num_rbf)
+        betas = torch.tensor(
+            [(2 / self.num_rbf * (1 - start_value.item())) ** -2] * self.num_rbf
+        )
+        return means, betas
+
+    def _cosine_cutoff(self, distances: Tensor) -> Tensor:
+        if self.cuton > 0:
+            cutoffs = 0.5 * (
+                torch.cos(
+                    math.pi
+                    * (
+                        2
+                        * (distances - self.cuton)
+                        / (self.cutoff_sr - self.cuton)
+                        + 1.0
+                    )
+                )
+                + 1.0
+            )
+            cutoffs = cutoffs * (distances < self.cutoff_sr).to(distances.dtype)
+            cutoffs = cutoffs * (distances > self.cuton).to(distances.dtype)
+            return cutoffs
+        cutoffs = 0.5 * (torch.cos(distances * math.pi / self.cutoff_sr) + 1.0)
+        return cutoffs * (distances < self.cutoff_sr).to(distances.dtype)
+
+    def get_rbf(self, Dij_sr: Tensor) -> Tensor:
+        dist = Dij_sr.view(-1, 1)
+        return self._cosine_cutoff(dist) * torch.exp(
+            -self.betas
+            * (torch.exp(self.alpha * (-dist + self.cuton)) - self.means) ** 2
+        )
