@@ -43,8 +43,8 @@ layers:
   - name: GatherAtomEmbedding
   - name: Core
     params:
-  checkpoint_path: UMA_CHECKPOINT
-  frozen_backbone: false
+      checkpoint_path: UMA_CHECKPOINT
+      frozen_backbone: false
   - name: VelocityReadout
     params:
       head_type: dense
