@@ -178,6 +178,33 @@ def test_singledatahub_loads_m2_from_aselmdb(tmp_path):
     np.testing.assert_allclose(hub.data["M2"][0], dipole)
 
 
+def test_singledatahub_aselmdb_ignores_negative_gradient(tmp_path):
+    """ASELMDB Fa is already physical forces; negative_gradient must not flip them."""
+    from enerzyme.data.transform import NegativeGradientTransform
+
+    db_path = tmp_path / "toy.aselmdb"
+    forces_ev = np.array([[0.25, -0.1, 0.0], [-0.25, 0.1, 0.0]])
+    _write_toy_aselmdb(db_path, forces_ev=forces_ev)
+    expected_fa = forces_ev / ase.units.Ha
+
+    hub = SingleDataHub(
+        dump_dir=str(tmp_path / "out"),
+        data_path=str(db_path),
+        data_format="aselmdb",
+        preload=False,
+        features={"Ra": "Ra", "Za": "Za", "N": "N", "Q": "Q"},
+        targets={"E": "E", "Fa": "Fa"},
+        neighbor_list="",
+        compressed=False,
+        preprocessings={"negative_gradient": True},
+        global_transforms={"negative_gradient": True},
+    )
+    assert not any(isinstance(s, NegativeGradientTransform) for s in hub.preprocessing.scales)
+    assert not any(isinstance(s, NegativeGradientTransform) for s in hub.global_transform.scales)
+    np.testing.assert_allclose(hub.data["Fa"][0, :2], expected_fa)
+    hub.file.close()
+
+
 def test_singledatahub_rejects_pickle_style_aselmdb_maps(tmp_path):
     """Pickle aliases (E: energy, Ra: coord) must fail loudly for aselmdb."""
     db_path = tmp_path / "toy.aselmdb"

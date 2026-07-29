@@ -117,7 +117,7 @@ Transforms
 Defined under :code:`transforms` or :code:`global_transforms`:
 
 - :code:`atomic_energy` — path to CSV (:code:`atom_type`, :code:`atomic_energy`)
-- :code:`negative_gradient` — flip gradient sign for force targets
+- :code:`negative_gradient` — flip gradient sign for force targets (pickle / QC ∇E). Disabled for :code:`aselmdb`, where :code:`Fa` is already ASE physical forces
 - :code:`total_energy_normalization` — global mean/std on :code:`E`
 
 Cache invalidation

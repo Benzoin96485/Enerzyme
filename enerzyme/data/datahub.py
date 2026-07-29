@@ -12,7 +12,12 @@ from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from .datatype import is_atomic, is_rounded, is_int, register_data_type
-from .transform import parse_Za, Transform, EnergyUnitConversionTransform
+from .transform import (
+    parse_Za,
+    Transform,
+    EnergyUnitConversionTransform,
+    NegativeGradientTransform,
+)
 from ..utils import YamlHandler, logger
 
 
@@ -206,6 +211,11 @@ class ASELMDBDataset:
             logger.warning(
                 "energy_unit_conversion transform is disabled for ASELMDB; "
                 f"energies/forces are already converted via new_energy_unit={new_energy_unit}"
+            )
+        if transforms and transforms.get("negative_gradient"):
+            logger.warning(
+                "negative_gradient transform is disabled for ASELMDB; "
+                "Fa already comes from ASE get_forces() (physical forces, not ∇E)"
             )
         if new_energy_unit != "eV":
             logger.info(f"Loading ASE energy in {new_energy_unit}")
@@ -634,6 +644,16 @@ class SingleDataHub:
                 self.global_transform.scales = [
                     s for s in self.global_transform.scales
                     if not isinstance(s, EnergyUnitConversionTransform)
+                ]
+            # ASELMDB Fa is already physical forces (get_forces); do not flip as if Fa were ∇E.
+            if aselmdb_transforms.get("negative_gradient"):
+                self.preprocessing.scales = [
+                    s for s in self.preprocessing.scales
+                    if not isinstance(s, NegativeGradientTransform)
+                ]
+                self.global_transform.scales = [
+                    s for s in self.global_transform.scales
+                    if not isinstance(s, NegativeGradientTransform)
                 ]
         elif not os.path.isfile(self.data_path):
             raise ValueError(f"Data path {self.data_path} doesn't exist.")
