@@ -77,6 +77,14 @@ def convert(pickle_path: Path, out_path: Path, limit: int | None = None) -> int:
             atoms.calc = SinglePointCalculator(atoms, **calc_kwargs)
             db.write(atoms, data=info, index=info["index"])
             n += 1
+        # Prefer schema over first-row probing when Datahub loads the DB.
+        from enerzyme.data.datahub import ASELMDB_METADATA_PROPERTIES_KEY
+
+        meta = dict(db.metadata or {})
+        meta[ASELMDB_METADATA_PROPERTIES_KEY] = [
+            "Ra", "Za", "N", "Q", "S", "E", "Fa", "M2",
+        ]
+        db.metadata = meta
     return n
 
 

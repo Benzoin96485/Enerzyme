@@ -51,6 +51,11 @@ ASE calculator / info key names (:code:`energy`, :code:`dipole`, :code:`charge`,
 (:code:`E: null`, :code:`Fa: null`, …). Pickle-style aliases (:code:`E: energy`,
 :code:`Ra: coord`) are rejected.
 
+Property discovery does **not** rely on the first row alone: :code:`enerzyme annotate`
+writes an :code:`enerzyme_properties` metadata schema, and Datahub also registers any
+calculator field declared in :code:`features` / :code:`targets`. First-row probing remains
+a fallback for legacy databases without schema.
+
 :code:`enerzyme annotate` writes this format by default via :code:`QMDriver.output_file` (see :doc:`/user_guide/workflows/qm_annotation`). Enerzymette's outer AL loop still merges :code:`fragments.pkl` today — keep :code:`pickle_name: fragments.pkl` for those campaigns, or train directly from :code:`.aselmdb` outside Enerzymette.
 
 TeraChem to pickle

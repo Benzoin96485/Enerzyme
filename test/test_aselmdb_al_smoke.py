@@ -158,6 +158,8 @@ def test_mock_qm_driver_writes_aselmdb(tmp_path: Path):
         atoms = row.toatoms()
         assert "dipole" in atoms.calc.results
         np.testing.assert_allclose(atoms.get_dipole_moment(), [0.1, 0.2, 0.3])
+        from enerzyme.data.datahub import ASELMDB_METADATA_PROPERTIES_KEY
+        assert "M2" in db.metadata.get(ASELMDB_METADATA_PROPERTIES_KEY, [])
 
     ds = ASELMDBDataset(str(db_files[0]), new_energy_unit="Ha")
     assert "M2" in ds
