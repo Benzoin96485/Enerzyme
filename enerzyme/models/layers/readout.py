@@ -25,6 +25,7 @@ class BaseReadout(BaseFFLayer):
             input_fields=["atom_feature"], 
             output_fields=output_fields | {"atom_feature"} if keep_feature else output_fields
         )
+        self.num_blocks = num_blocks
         self.shallow_ensemble_size = shallow_ensemble_size
         self.ordered_output_fields = sorted(list(output_fields))
         self.head_type = head_type
@@ -110,7 +111,7 @@ class SimpleReadout(BaseReadout):
 class HierachicalReadout(BaseReadout):
     def __init__(self, use_nhloss: bool=False, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.heads = ModuleList(self._get_head())
+        self.heads = ModuleList([self._get_head() for _ in range(self.num_blocks)])
         self.use_nhloss = use_nhloss
 
     def get_output(self, atom_feature: Tensor) -> Dict[str, Tensor]:
