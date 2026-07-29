@@ -124,7 +124,9 @@ ENV/
 # Cookiecutter-CMS Test Artifacts
 /tests/CI_files
 
-data/
+/data/
 legacy/
 .vscode/
 requirements-dev.yaml
+experiments/
+paper/
