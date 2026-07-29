@@ -47,6 +47,8 @@ Lazy property accessors map ASE calculator results and :code:`atoms.info` / row 
 - :code:`Qa`, :code:`Sa` — charges / magnetic moments when present on the calculator
 - :code:`Q`, :code:`S` — from ASE info ``charge`` / ``spin`` (fairchem-style; :code:`S = spin - 1`)
 
+Roles are disjoint by design: calculator results for :code:`E` / :code:`Fa` / :code:`M2` / :code:`Qa` / :code:`Sa`; row :code:`data` for :code:`charge` / :code:`spin` / :code:`index` and custom numeric fields. If a fixed calculator name is also present in row :code:`data`, Datahub **keeps the calculator accessor** (and unit conversion) and ignores the info copy.
+
 ASE calculator / info key names (:code:`energy`, :code:`dipole`, :code:`charge`, …) stay on the :code:`Atoms` object; Datahub only exposes the standard Enerzyme names above. Training YAML must therefore use **identity** feature/target maps
 (:code:`E: null`, :code:`Fa: null`, …). Pickle-style aliases (:code:`E: energy`,
 :code:`Ra: coord`) are rejected.

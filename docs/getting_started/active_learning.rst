@@ -330,6 +330,7 @@ Current Enerzyme annotate API (template-driven TeraChem). Keep :code:`pickle_nam
         keep_molden: false
         keep_stdout: false
         clean_tmp: true
+        dump_single_run: true   # cache single_run/<index>.pkl; skip finished QM on resume
         n_processes: 8
 
 Put basis / XC / PCM (including a relative :code:`pcm_radii_file` next to the template) in :code:`terachem_template.in`. The driver resolves that path relative to the template and copies the radii file into the job scratch directory.

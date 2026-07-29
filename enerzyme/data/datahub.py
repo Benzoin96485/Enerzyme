@@ -274,26 +274,41 @@ class ASELMDBDataset:
         declared = {str(p) for p in (declared_properties or [])}
         properties_from_calculator = _probe_calculator_properties(first_atoms)
 
-        self.properties_from_info = set()
         # ASE may store data as null / omit it; AtomsRow.data then returns None
         # or raises when wrapping None in FancyDict.
         try:
             row_data = first_row.data
         except TypeError:
             row_data = None
+
+        # Row ``data`` / ``atoms.info`` hold charge/spin/index and custom fields.
+        # Numeric values alone are not enough: fixed calculator / geometry names
+        # (E, Fa, M2, …) must stay calculator-backed even if duplicated in data,
+        # otherwise ``atoms.info.get`` skips unit conversion and can return stale
+        # copies. Annotate writes calculator results + charge/spin/index only.
+        raw_info_keys: set = set()
         if row_data:
             for k, v in row_data.items():
-                if k in _ASE_INFO_STANDARD_KEYS:
+                if k in _ASE_INFO_STANDARD_KEYS or k in _ASELMDB_FIXED_KEYS:
                     continue
-                if isinstance(v, float) or isinstance(v, int) or isinstance(v, np.ndarray):
-                    self.properties_from_info.add(k)
+                if isinstance(v, (float, int, np.floating, np.integer, np.ndarray)):
+                    raw_info_keys.add(k)
 
         schema_calc = properties_from_schema & set(ASE_PROPERTY_METHODS)
         schema_info = properties_from_schema - _ASELMDB_FIXED_KEYS
         declared_calc = declared & set(ASE_PROPERTY_METHODS)
 
         calculator_backed = properties_from_calculator | schema_calc | declared_calc
-        self.properties_from_info |= schema_info
+        # Priority: calculator accessors for ASE_PROPERTY_METHODS; info only for
+        # custom / non-fixed keys. Healthy DBs keep these disjoint.
+        ignored_fixed_in_row_data = set()
+        if row_data:
+            ignored_fixed_in_row_data = (
+                set(row_data) & _ASELMDB_FIXED_KEYS & calculator_backed
+            )
+        self.properties_from_info = raw_info_keys | schema_info
+        self.unique_properties_from_calculator = calculator_backed - self.properties_from_info
+        overlapped_properties = calculator_backed & self.properties_from_info
 
         if (schema_calc or declared_calc) and (
             (schema_calc | declared_calc) - properties_from_calculator
@@ -304,16 +319,22 @@ class ASELMDBDataset:
                 f"schema/declared maps: {sorted(missing_on_first)}"
             )
 
-        self.unique_properties_from_calculator = calculator_backed - self.properties_from_info
-        overlapped_properties = calculator_backed & self.properties_from_info
         # Q / S always available via atoms.info defaults (charge=0, spin multiplicity=1 → S=0)
         self._all_properties = (
             self.unique_properties_from_calculator
             | self.properties_from_info
             | _ASELMDB_GEOMETRY_KEYS
         )
+        if ignored_fixed_in_row_data:
+            logger.warning(
+                f"Property {sorted(ignored_fixed_in_row_data)} present in ASE row "
+                "data/info is ignored; using calculator accessors"
+            )
         if overlapped_properties:
-            logger.warning(f"Property {overlapped_properties} found in calculator will be overwritten by info")
+            logger.warning(
+                f"Property {sorted(overlapped_properties)} found in both calculator "
+                "and info; using calculator accessors"
+            )
         if properties_from_schema:
             logger.info(f"Properties from ASE DB schema: {sorted(properties_from_schema)}")
         if declared:

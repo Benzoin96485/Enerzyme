@@ -47,7 +47,7 @@ The reference driver targets **TeraChem**. Basis, functional, and solvent live i
 - Valid license and scratch space
 - Template input covering basis / XC / PCM as needed (:code:`pcm_radii_file` may be relative to the template; the driver copies it into job scratch)
 
-Results are stored with ASE :code:`SinglePointCalculator` plus :code:`charge` / :code:`spin` / :code:`index` in row data so Datahub can reload them as :code:`aselmdb`.
+Results are stored with ASE :code:`SinglePointCalculator` plus :code:`charge` / :code:`spin` / :code:`index` in row data so Datahub can reload them as :code:`aselmdb`. Re-running annotate **skips** completed :code:`index` rows (and retries incomplete reservations). For pickle output, set :code:`dump_single_run: true` (default) to cache :code:`single_run/<index>.pkl` and skip finished structures the same way.
 
 .. caution::
     Prepare TeraChem and RDKit before running :code:`annotate`. These are not part of the core Enerzyme install.

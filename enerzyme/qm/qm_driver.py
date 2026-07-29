@@ -2,7 +2,7 @@ import numpy as np
 from shutil import copy, rmtree
 import os
 import subprocess
-from pickle import dump
+from pickle import dump, load
 from typing import Any, Dict, Literal, Optional, List
 from pathlib import Path
 from abc import ABC, abstractmethod
@@ -45,6 +45,13 @@ ENERZYMETTE_PICKLE_FIELDS: Dict[str, str] = {
 _PICKLE_SUFFIXES = {".pkl", ".pickle"}
 
 
+# YAML keys once accepted by TeraChemDriver; now live in ``template_input_file``.
+_LEGACY_TC_TEMPLATE_KEYS = frozenset({
+    "bs", "xc", "pcm", "dftd", "epsilon", "pcm_radii_file",
+    "scf_method", "scf_maxit", "scf_guess",
+})
+
+
 def _resolve_keep_stdout(keep_stdout: bool, kwargs: Dict[str, Any]) -> bool:
     """Accept legacy ``keep_output`` from YAML kwargs as an alias for ``keep_stdout``."""
     if "keep_output" not in kwargs:
@@ -66,6 +73,25 @@ def _resolve_keep_stdout(keep_stdout: bool, kwargs: Dict[str, Any]) -> bool:
     return keep_output
 
 
+def _warn_unused_qm_kwargs(kwargs: Dict[str, Any]) -> None:
+    """Pop / warn on leftover YAML keys so silent no-ops are visible."""
+    # Selected by annotate.py before constructing the concrete driver.
+    kwargs.pop("engine", None)
+    legacy = sorted(k for k in kwargs if k in _LEGACY_TC_TEMPLATE_KEYS)
+    for key in legacy:
+        kwargs.pop(key)
+    if legacy:
+        logger.warning(
+            "Ignoring legacy QMDriver keys now owned by `template_input_file`: "
+            f"{legacy}. Put basis / XC / PCM / DFTD / SCF settings in the template."
+        )
+    if kwargs:
+        leftover = sorted(kwargs)
+        for key in leftover:
+            kwargs.pop(key)
+        logger.warning(f"Ignoring unrecognized QMDriver options: {leftover}")
+
+
 def _resolve_annotate_output(
     output_file: Optional[str],
     pickle_name: Optional[str],
@@ -79,6 +105,21 @@ def _resolve_annotate_output(
     if output_file and Path(output_file).suffix.lower() in _PICKLE_SUFFIXES:
         return "pickle", str(output_file)
     return "aselmdb", (output_file or "dataset.aselmdb")
+
+
+def _aselmdb_row_is_complete(row) -> bool:
+    """True when a reserved/written ASE DB row has calculator energy (usable resume hit)."""
+    try:
+        atoms = row.toatoms()
+    except Exception:
+        return False
+    if atoms.calc is None:
+        return False
+    try:
+        energy = atoms.calc.results.get("energy", None)
+    except Exception:
+        return False
+    return energy is not None
 
 
 def _build_standard_pickle_datapoint(
@@ -153,6 +194,7 @@ class QMDriver(ABC):
         clean_tmp: bool = True,
         n_processes: int = 1,
         timeout: Optional[float] = None,
+        dump_single_run: bool = True,
         **kwargs,
     ):
         '''
@@ -164,6 +206,12 @@ class QMDriver(ABC):
 
         Pickle records use standard Enerzyme names (``E``, ``Fa``, ``M2``, ``Ra``, ``Za``, …)
         unless ``pickle_fields`` renames them (e.g. :data:`ENERZYMETTE_PICKLE_FIELDS`).
+
+        Resume / skip completed structures:
+        - pickle: when ``dump_single_run`` is True (default), each success is cached under
+          ``output_dir/<supplier>/single_run/<index>.pkl`` and reloaded on later runs
+        - aselmdb: rows keyed by structure ``index``; completed rows are skipped (incomplete
+          reservations are deleted and retried). ``dump_single_run`` is ignored for ASE DB.
         '''
         self.supplier = supplier
         self.tmp_dir_base = Path(tmp_dir).absolute() / self.supplier.name / "tmp"
@@ -171,6 +219,7 @@ class QMDriver(ABC):
         self.output_format, out_name = _resolve_annotate_output(output_file, pickle_name)
         self.output_path = self.output_dir / out_name
         self.pickle_fields = pickle_fields
+        self.dump_single_run = bool(dump_single_run)
         self.default_connect_args = {
             "use_lock_file": False
         }
@@ -185,9 +234,23 @@ class QMDriver(ABC):
         self.clean_tmp = clean_tmp
         self.n_processes = n_processes if n_processes > 0 else cpu_count()
         self.timeout = timeout
+        if self.output_format == "pickle" and self.dump_single_run:
+            os.makedirs(self.single_run_dir, exist_ok=True)
+        elif self.output_format == "aselmdb" and not self.dump_single_run:
+            logger.info(
+                "dump_single_run=False has no effect for aselmdb; "
+                "completed rows keyed by structure index are always skipped on resume."
+            )
+        _warn_unused_qm_kwargs(kwargs)
         logger.info(f"Annotate output format={self.output_format}, path={self.output_path}")
-        if self.output_format == "pickle" and self.pickle_fields:
-            logger.info(f"Pickle field map: {self.pickle_fields}")
+        if self.output_format == "pickle":
+            logger.info(f"dump_single_run={self.dump_single_run} (per-structure resume cache)")
+            if self.pickle_fields:
+                logger.info(f"Pickle field map: {self.pickle_fields}")
+
+    @property
+    def single_run_dir(self) -> Path:
+        return self.output_dir / "single_run"
 
     @abstractmethod
     def make_input(self, atoms: Atoms, tmp_dir: Path) -> None:
@@ -213,6 +276,27 @@ class QMDriver(ABC):
             else:
                 raise FileNotFoundError(f"Molden file {molden_file} not found")
 
+    def dump_pickle_single_run(self, datapoint: Dict[str, Any]) -> None:
+        """Cache one pickle datapoint for resume (``single_run/<index>.pkl``)."""
+        index = int(datapoint["index"])
+        path = self.single_run_dir / f"{index}.pkl"
+        with open(path, "wb") as f:
+            dump(datapoint, f)
+
+    def load_pickle_single_run(self, index: int) -> Optional[Dict[str, Any]]:
+        """Load a cached pickle datapoint if ``dump_single_run`` left one on disk."""
+        if not self.dump_single_run:
+            return None
+        path = self.single_run_dir / f"{index}.pkl"
+        if not path.exists():
+            return None
+        with open(path, "rb") as f:
+            datapoint = load(f)
+        logger.info(
+            f"Single run results for {index} already exist. Loading from {path}"
+        )
+        return datapoint
+
     def aselmdb_schema_properties(self) -> List[str]:
         """Standard names written into ASE LMDB metadata for Datahub discovery."""
         # Geometry/charge always; E/Fa/M2 from successful QM (Qa/Sa only if a driver adds them).
@@ -233,6 +317,38 @@ class QMDriver(ABC):
             f"Wrote ASE LMDB schema {ASELMDB_METADATA_PROPERTIES_KEY}={props} "
             f"to {self.output_path}"
         )
+
+    def _claim_aselmdb_row_id(self, db, index: int) -> Optional[int]:
+        """Claim or skip a structure ``index`` in the ASE DB for resume-safe writes.
+
+        Returns an ASE primary key to overwrite, or ``None`` when a completed row
+        already exists for ``index`` (skip QM). Incomplete reserved rows are deleted
+        and re-claimed so crashed jobs can resume.
+        """
+        existing = list(db.select(index=index))
+        if existing:
+            complete = [row for row in existing if _aselmdb_row_is_complete(row)]
+            if complete:
+                logger.info(
+                    f"System {index} already completed in {self.output_path}. Skipping..."
+                )
+                return None
+            # Orphaned reservations / incomplete writes: free the index and retry.
+            ids = [row.id for row in existing]
+            logger.warning(
+                f"System {index} has incomplete ASE LMDB row(s) {ids}; "
+                "deleting and recomputing."
+            )
+            db.delete(ids)
+
+        system_id = db.reserve(index=index)
+        if system_id is None:
+            # Race with another writer that finished between select and reserve.
+            logger.info(
+                f"System {index} already exists in {self.output_path}. Skipping..."
+            )
+            return None
+        return system_id
 
     def _run_qm(self, atoms: Atoms) -> Optional[Dict[str, Any]]:
         index = atoms.info["index"]
@@ -263,11 +379,8 @@ class QMDriver(ABC):
             if system_id is None:
                 return
         else:
-            system_id = db.reserve(index=index)
+            system_id = self._claim_aselmdb_row_id(db, index)
             if system_id is None:
-                logger.warning(
-                    f"System {index} already exists in {self.output_path}. Skipping..."
-                )
                 return
 
         # Always release the reservation unless the row is successfully written;
@@ -305,12 +418,19 @@ class QMDriver(ABC):
                     )
 
     def single_run_pickle(self, atoms: Atoms) -> Optional[Dict[str, Any]]:
+        index = int(atoms.info["index"])
+        cached = self.load_pickle_single_run(index)
+        if cached is not None:
+            return cached
         result_package = self._run_qm(atoms)
         if result_package is None:
             return None
-        return _result_package_to_pickle_datapoint(
+        datapoint = _result_package_to_pickle_datapoint(
             atoms, result_package, pickle_fields=self.pickle_fields
         )
+        if self.dump_single_run:
+            self.dump_pickle_single_run(datapoint)
+        return datapoint
 
     def single_run(self, atoms: Atoms):
         if self.output_format == "pickle":
@@ -330,16 +450,14 @@ class QMDriver(ABC):
         ``nextid`` updates are unsafe without a working lock file (aselmdb passes
         a ``Path`` so ASE's lock is never enabled). Parent-side reservation gives
         each structure a distinct primary key; workers only overwrite that row.
+        Completed indices are skipped for resume.
         """
         db = connect(self.output_path, **self.default_connect_args)
         to_run: List[Atoms] = []
         for atoms in atoms_list:
             index = int(atoms.info["index"])
-            system_id = db.reserve(index=index)
+            system_id = self._claim_aselmdb_row_id(db, index)
             if system_id is None:
-                logger.warning(
-                    f"System {index} already exists in {self.output_path}. Skipping..."
-                )
                 continue
             atoms.info["aselmdb_row_id"] = system_id
             to_run.append(atoms)
@@ -516,7 +634,7 @@ class TeraChemDriver(QMDriver):
                 raise FileNotFoundError(f"Center of Mass or dipole moment line not found in {scr_dir / 'results.dat'}")
             com = np.array(list(map(float, lines[com_line_index].split())))
             dipole = np.array(list(map(float, lines[dipole_line_index].split()))) * Debye  # Debye to e Angstrom
-            dipole = dipole + com * atoms.info["charge"]
+            dipole = dipole + com * atoms.info.get("charge", 0)
         with open(scr_dir / "grad.xyz", "r") as f:
             _ = f.readline()
             title = f.readline()

@@ -158,6 +158,38 @@ def test_aselmdb_dataset_handles_none_row_data(tmp_path, monkeypatch):
     np.testing.assert_allclose(ds["Fa"][0], forces_ev / ase.units.Ha)
 
 
+def test_aselmdb_calculator_wins_over_numeric_row_data_duplicates(tmp_path):
+    """Stale E/Fa copies in row data must not steal calculator accessors."""
+    db_path = tmp_path / "dup_info.aselmdb"
+    atoms = Atoms("H2", positions=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
+    energy_ev = -1.5
+    forces_ev = np.array([[0.1, 0.0, 0.0], [-0.1, 0.0, 0.0]])
+    atoms.calc = SinglePointCalculator(atoms, energy=energy_ev, forces=forces_ev)
+    with connect(str(db_path)) as db:
+        db.write(
+            atoms,
+            data={
+                "charge": 0,
+                "spin": 1,
+                "index": 0,
+                "E": -999.0,  # stale / wrong units; must be ignored
+                "Fa": np.zeros((2, 3)),
+                "custom_scalar": 1.25,
+            },
+            index=0,
+        )
+
+    ds = ASELMDBDataset(str(db_path), new_energy_unit="Ha")
+    assert "E" in ds.unique_properties_from_calculator
+    assert "Fa" in ds.unique_properties_from_calculator
+    assert "E" not in ds.properties_from_info
+    assert "Fa" not in ds.properties_from_info
+    assert "custom_scalar" in ds.properties_from_info
+    assert ds["E"][0] == pytest.approx(energy_ev / ase.units.Ha)
+    np.testing.assert_allclose(ds["Fa"][0], forces_ev / ase.units.Ha)
+    assert ds["custom_scalar"][0] == pytest.approx(1.25)
+
+
 def test_singledatahub_loads_m2_from_aselmdb(tmp_path):
     """HDF5 build must include M2 via identity mapping (standard names)."""
     db_path = tmp_path / "dipole.aselmdb"

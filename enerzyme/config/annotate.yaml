@@ -18,6 +18,8 @@ QMDriver:
   keep_molden: false                                # if molden file is saved
   keep_stdout: false                                # if output log is saved
   clean_tmp: true                                   # if temporary files are cleaned
+  # dump_single_run: true                           # pickle: cache single_run/<index>.pkl for resume
+                                                    # aselmdb always skips completed rows by index
   n_processes: 1                                    # parallel QM submissions
   n_gpus: 1                                         # GPUs for TeraChem; <1 means use all
   terachem_args: [terachem]                         # executable prefix

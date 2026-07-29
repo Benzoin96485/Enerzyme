@@ -47,11 +47,20 @@ QMDriver options
 - :code:`output_file` — under the supplier output directory; :code:`.aselmdb` (default) or :code:`.pkl` / :code:`.pickle`
 - :code:`pickle_name` — if set, write pickle only (Enerzymette AL); mutually exclusive with ASE DB output
 - :code:`pickle_fields` — optional map from **standard** names (:code:`E`, :code:`Fa`, :code:`M2`, …) to custom pickle keys; omit for identity. Enerzymette smoke uses :code:`E→energy`, :code:`Fa→grad` (stores :math:`-\mathbf{F}`), :code:`M2→dipole`, …
+- :code:`dump_single_run` — pickle only (default :code:`true`): cache each success under :code:`single_run/<index>.pkl` and **skip QM** for those indices on resume. ASE LMDB always resumes via the structure :code:`index` key (incomplete reserved rows are deleted and retried); this flag is ignored for :code:`.aselmdb`
 - :code:`n_processes` — parallel QM submissions
 - :code:`keep_stdout` / :code:`keep_molden` — retain QC logs (:code:`keep_output` is a deprecated alias for :code:`keep_stdout`)
 - :code:`clean_tmp` — remove scratch after success
 
+Legacy template keys (:code:`bs`, :code:`xc`, :code:`pcm`, …) are ignored with a warning — put them in :code:`template_input_file`. Unknown YAML keys are also warned (they used to be swallowed by :code:`**kwargs`).
+
 For PCM, put :code:`pcm_radii_file <name>` in the template (path relative to the template file is fine). :code:`TeraChemDriver` copies that file into the per-job tmp directory so host absolute paths are not required in committed configs.
+
+Resume / skip completed
+-----------------------
+
+- **Pickle** with :code:`dump_single_run: true` (default): each finished structure is written to :code:`<out>/<supplier>/single_run/<index>.pkl`. A later :code:`annotate` run loads those files instead of re-running QM, then rewrites the aggregate :code:`.pkl`.
+- **ASE LMDB**: rows are keyed by structure :code:`index`. If a completed row (calculator energy present) already exists, that structure is skipped. Orphan reserved rows without energy are cleared so a crashed job can continue.
 
 Output schema
 -------------
