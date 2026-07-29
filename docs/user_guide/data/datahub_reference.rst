@@ -51,7 +51,9 @@ Production configs use :code:`datasets:` so training and validation can point to
             atomic_energy: /path/to/ref.csv
             negative_gradient: true
 
-:code:`global_transforms` apply across datasets unless overridden per dataset.
+:code:`global_transforms` apply across all datasets. Per-dataset
+:code:`transforms:` entries are mapped to dataset-local preprocessing
+(:code:`SingleDataHub.preprocessings`).
 
 Feature and target mapping
 --------------------------
@@ -114,11 +116,14 @@ Preprocessing flags
 Transforms
 ----------
 
-Defined under :code:`transforms` or :code:`global_transforms`:
+Defined under :code:`transforms`, :code:`global_transforms`, or (advanced)
+:code:`preprocessings`:
 
 - :code:`atomic_energy` — path to CSV (:code:`atom_type`, :code:`atomic_energy`)
 - :code:`negative_gradient` — flip gradient sign for force targets (pickle / QC ∇E). Disabled for :code:`aselmdb`, where :code:`Fa` is already ASE physical forces
 - :code:`total_energy_normalization` — global mean/std on :code:`E`
+- :code:`energy_unit_conversion` — convert energy/force units into the training convention
+- :code:`uniform_qs_init` — write per-atom :code:`Q_init_a` / :code:`S_init_a` as :code:`Q/N` and :code:`S/N` for flow-matching init (registers those fields as features automatically). Place under :code:`global_transforms` (single-dataset :code:`transforms:` is remapped there) or per-dataset :code:`transforms:` / :code:`preprocessings`
 
 Cache invalidation
 ------------------

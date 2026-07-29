@@ -468,7 +468,9 @@ class SingleDataHub:
         self.feature_types = _collect_types(features)
         self.target_types = _collect_types(targets)
         self.data_types = self.feature_types | self.target_types
-        self._populate_uniform_qs_init = wants_uniform_qs_init(global_transforms)
+        self._populate_uniform_qs_init = wants_uniform_qs_init(
+            global_transforms
+        ) or wants_uniform_qs_init(preprocessings)
         if self._populate_uniform_qs_init:
             self.feature_types = dict(self.feature_types)
             for _k in UniformSplitQSTransform.POPULATED_KEYS:
@@ -831,6 +833,26 @@ class SingleDataHub:
         return FieldDataset({k: v for k, v in self.data.items() if k in self.target_types})
 
 
+def _coerce_dataset_params(dataset_params: Dict[str, Any]) -> Dict[str, Any]:
+    """Map YAML per-dataset ``transforms`` onto ``SingleDataHub.preprocessings``.
+
+    Historical multi-dataset configs use ``transforms:`` under each dataset entry,
+    but :class:`SingleDataHub` expects ``preprocessings``. Explicit ``preprocessings``
+    wins on key conflicts.
+    """
+    params = dict(dataset_params)
+    transforms = params.pop("transforms", None)
+    if transforms:
+        existing = params.get("preprocessings")
+        if existing:
+            merged = dict(transforms)
+            merged.update(existing)
+            params["preprocessings"] = merged
+        else:
+            params["preprocessings"] = transforms
+    return params
+
+
 class DataHub:
     def __init__(self,  
         dump_dir=".",
@@ -847,9 +869,23 @@ class DataHub:
                 params["global_transforms"] = params.get("transforms", None)
             self.datahubs = {"default": SingleDataHub(dump_dir=dump_dir, **params)}
         elif isinstance(datasets, list):
-            self.datahubs = {str(i): SingleDataHub(dump_dir=dump_dir, global_transforms=params.get("global_transforms", None), **dataset_params) for i, dataset_params in enumerate(datasets)}
+            self.datahubs = {
+                str(i): SingleDataHub(
+                    dump_dir=dump_dir,
+                    global_transforms=params.get("global_transforms", None),
+                    **_coerce_dataset_params(dataset_params),
+                )
+                for i, dataset_params in enumerate(datasets)
+            }
         elif isinstance(datasets, dict):
-            self.datahubs = {name: SingleDataHub(dump_dir=dump_dir, global_transforms=params.get("global_transforms", None), **dataset_params) for name, dataset_params in datasets.items()}
+            self.datahubs = {
+                name: SingleDataHub(
+                    dump_dir=dump_dir,
+                    global_transforms=params.get("global_transforms", None),
+                    **_coerce_dataset_params(dataset_params),
+                )
+                for name, dataset_params in datasets.items()
+            }
         else:
             raise ValueError(f"Unknown type of datasets: {type(datasets)}")
             

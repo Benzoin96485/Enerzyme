@@ -122,11 +122,15 @@ class EnergyUnitConversionTransform(BaseTransform):
             new_output["Fa"][idx] /= self.conversion_factor
 
 
-def wants_uniform_qs_init(global_transforms: Optional[Dict]) -> bool:
-    """True when `uniform_qs_init` is enabled in global_transforms (YAML hooks)."""
-    if not global_transforms or "uniform_qs_init" not in global_transforms:
+def wants_uniform_qs_init(transform_args: Optional[Dict]) -> bool:
+    """True when ``uniform_qs_init`` is enabled in a transforms dict.
+
+    Accepts either ``global_transforms`` or ``preprocessings`` (or any dict that
+    may contain the YAML hook).
+    """
+    if not transform_args or "uniform_qs_init" not in transform_args:
         return False
-    v = global_transforms["uniform_qs_init"]
+    v = transform_args["uniform_qs_init"]
     if v is False or v is None:
         return False
     if isinstance(v, dict) and v.get("enabled") is False:
