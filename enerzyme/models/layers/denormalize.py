@@ -88,4 +88,3 @@ class AtomicAffineLayer(BaseFFLayer):
                     ref = (self.shifts if prefix == "shifts" else self.scales)[prop_name]
                     state_dict[k] = torch.concat([v, ref[len(v) :]], dim=0)
         super()._load_from_state_dict(state_dict, *args, **kwargs)
-        

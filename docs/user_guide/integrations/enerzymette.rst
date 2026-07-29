@@ -5,6 +5,8 @@ Enerzymette Integration
 
 Application: :code:`example/NNP4MTase` in the Enerzyme repository (methyltransferase active learning, scan, and NEB).
 
+For a **tiny** ASELMDB / annotate / Enerzymette AL smoke (vendored fixtures, repo-relative paths), see :code:`example/L3-COMT-aselmdb-smoke/`.
+
 Install
 -------
 

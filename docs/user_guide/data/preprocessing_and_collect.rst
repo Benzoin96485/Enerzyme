@@ -29,7 +29,7 @@ Preprocessing pipeline
 Hash directory
 --------------
 
-The hash string encodes data path, format, neighbor list mode, compression, and transforms. Reusing :code:`preload: true` skips recomputation when nothing relevant changed.
+The hash string encodes data path, neighbor list mode, and transforms. Non-empty :code:`data_format`, :code:`connect_args`, and :code:`select_args` are included when set (empty values are omitted so older caches remain valid). Reusing :code:`preload: true` skips recomputation when nothing relevant changed.
 
 Neighbor list cost
 ------------------
@@ -46,7 +46,7 @@ Transform details
     Subtracts sum of per-atom reference energies from :code:`E`. CSV columns: :code:`atom_type`, :code:`atomic_energy` (same energy unit as targets).
 
 :code:`negative_gradient`
-    Multiplies gradient/force targets by :code:`-1` when QC stored :math:`\nabla E` instead of forces.
+    Multiplies gradient/force targets by :code:`-1` when QC stored :math:`\nabla E` instead of forces. For :code:`aselmdb`, this transform is disabled because :code:`Fa` already comes from ASE :code:`get_forces()`.
 
 :code:`total_energy_normalization`
     Global mean/variance normalization on total energy (use with care for relative energies).

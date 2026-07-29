@@ -170,7 +170,7 @@ Checklist: new data field or transform
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 1. Register type in :code:`datatype.py` if it is a new standard name
-2. Ensure loader supports the source format (:code:`pickle`, :code:`Tensorflow`, :code:`aselmdb`, or HDF5 cache)
+2. Ensure loader supports the source format (:code:`pickle`, :code:`npz`, :code:`aselmdb`, or HDF5 cache)
 3. Add transform logic in :code:`transform.py` if preprocessing is required
 4. Update :code:`train.yaml` example and :doc:`/user_guide/data/datahub_reference`
 5. Run :code:`enerzyme collect -c <yaml> -o <out>` to validate mapping without training
@@ -382,4 +382,4 @@ Register in :code:`get_ff_core` like other architectures. Keep fairchem imports 
 Flow matching (:code:`uma_flow_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Requires :code:`torchdiffeq` for ODE integration in :code:`enerzyme/tasks/generator_ode.py`. Keep ODE utilities in tasks/, not inside Core modules.
+Requires optional :code:`torchdiffeq` (:code:`pip install -e ".[flow]"`) for ODE integration in :code:`enerzyme/tasks/generator_ode.py`. Keep ODE utilities in tasks/, not inside Core modules.

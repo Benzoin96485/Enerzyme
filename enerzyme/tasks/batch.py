@@ -134,6 +134,7 @@ def _decorate_pyg_batch_input(
 ) -> Tuple[Batch, Batch]:
     features, targets, data_keys = zip(*batch)
     feature_list = []
+    n_with_edges = 0
     for feature in features:
         data_dict = dict()
         for k, v in feature.items():
@@ -151,12 +152,26 @@ def _decorate_pyg_batch_input(
         if "idx_i" in feature and "idx_j" in feature:
             data_dict["idx_i"] = torch.tensor(feature["idx_i"], dtype=torch.long)
             data_dict["idx_j"] = torch.tensor(feature["idx_j"], dtype=torch.long)
-            feature_list.append(Data(edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), num_nodes=feature["N"], **data_dict))
+            edge_index = torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0)
+            n_with_edges += 1
         elif otf_graph:
             idx_i, idx_j = full_neighbor_list(feature["N"])
             data_dict["idx_i"] = torch.tensor(idx_i, dtype=torch.long)
             data_dict["idx_j"] = torch.tensor(idx_j, dtype=torch.long)
-            feature_list.append(Data(edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), num_nodes=feature["N"], **data_dict))
+            edge_index = torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0)
+            n_with_edges += 1
+        else:
+            # No precomputed edges; model builds the graph itself (e.g. UMA).
+            # Still append so PyG batch size matches the input / targets.
+            edge_index = torch.empty(2, 0, dtype=torch.long)
+        feature_list.append(Data(edge_index=edge_index, num_nodes=feature["N"], **data_dict))
+    n_structures = len(features)
+    if 0 < n_with_edges < n_structures:
+        raise ValueError(
+            f"Incomplete neighbor lists in batch: {n_with_edges}/{n_structures} "
+            "structures have edges. Precompute neighbor lists for every sample "
+            "or enable otf_graph."
+        )
     batch_features = Batch.from_data_list(feature_list)
     for k, v in batch_features.items():
         if requires_grad(k):
@@ -227,25 +242,35 @@ def _decorate_batch_input(
     batch_idx_j = []
     batch_seg = []
     count = 0
+    n_with_edges = 0
 
-    built_graph = False
+    # Build neighbor indices per structure. A batch-wide "built" flag must not
+    # skip later molecules when otf_graph is enabled (trainer default).
     for i, feature in enumerate(features):
         if "idx_i" in feature:
-            batch_idx_i.append(feature["idx_i"][:feature["N_pair"]] + count)
-            batch_idx_j.append(feature["idx_j"][:feature["N_pair"]] + count)
-            built_graph = True
-        elif otf_graph and not built_graph:
+            n_pair = feature["N_pair"] if "N_pair" in feature else len(feature["idx_i"])
+            batch_idx_i.append(np.asarray(feature["idx_i"][:n_pair]) + count)
+            batch_idx_j.append(np.asarray(feature["idx_j"][:n_pair]) + count)
+            n_with_edges += 1
+        elif otf_graph:
             idx_i, idx_j = full_neighbor_list(feature["N"])
             batch_idx_i.append(idx_i + count)
             batch_idx_j.append(idx_j + count)
-            built_graph = True
+            n_with_edges += 1
         batch_seg.append(np.full(feature["N"], i, dtype=int))
         count += feature["N"]
     batch_features["N"] = [feature["N"] for feature in features]
     batch_features["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
-    if built_graph:
+    n_structures = len(features)
+    if n_with_edges == n_structures:
         batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long)
         batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long)
+    elif n_with_edges > 0:
+        raise ValueError(
+            f"Incomplete neighbor lists in batch: {n_with_edges}/{n_structures} "
+            "structures have edges. Precompute neighbor lists for every sample "
+            "or enable otf_graph."
+        )
 
     if targets[0] is not None:
         for k in targets[0]:

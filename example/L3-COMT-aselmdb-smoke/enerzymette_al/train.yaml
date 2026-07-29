@@ -1,0 +1,7 @@
+# Overlay onto L2-fragments pretrain config: one tiny epoch for smoke.
+Trainer:
+  batch_size: 1
+  max_epochs: 1
+  patience: 1
+  num_workers: 0
+  resume: 0

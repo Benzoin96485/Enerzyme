@@ -6,8 +6,12 @@ setup(
     install_requires=['numpy<2.4.0', 'h5py', 'tqdm', 'ase', 'joblib', 'addict', 
                       'pandas', 'torch', 'scikit-learn', 'transformers',
                       'torch-ema', 'pyyaml', 'torch-geometric', 'rdkit', 'e3nn',
-                      'lightning', "torch-scatter", "flask", "waitress", "torchdiffeq",
+                      'lightning', "torch-scatter", "flask", "waitress",
                       ],
+    extras_require={
+        # ODE integration for architecture uma_flow_qs / Generator predict
+        "flow": ["torchdiffeq"],
+    },
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
     packages=find_packages(include=["enerzyme", "enerzyme.*"]),
     package_data={"enerzyme": [

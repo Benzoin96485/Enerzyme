@@ -1,0 +1,47 @@
+# Minimal restrained MD for one Enerzymette AL iteration (smoke).
+# Paths are repo-relative; run enerzymette from the Enerzyme repository root.
+# Scale: n_step / log_interval / dump_interval kept tiny for rapid testing.
+Simulation:
+  Hartree_in_E: 1.0
+  cuda: true
+  dtype: float64
+  environment: ase
+  external_calculator:
+    name: uma_calculator
+    weight: 1.0
+  fs_in_t: 1
+  idx_start_from: 1
+  initialize:
+    temperature_in_K: 500
+  integrate:
+    friction: 0.01
+    integrator: Langevin
+    n_step: 4
+    temperature_in_K: 500
+    time_step: 0.5
+  internal_calculator_weight: 0.0
+  log_interval: 1
+  neighbor_list: full
+  plumed_config_generator:
+    name: SAMMTConfigGenerator
+    # restrained (no MOVINGRESTRAINT) keeps the smoke MD short and stable
+    method: standard_restrained_md
+  sampling:
+    params:
+      plumed_config:
+        dump_interval: 1
+        lower_bound: -2
+        nucleophile: O9
+        reference_pdb_file: example/L3-COMT-aselmdb-smoke/fixtures/COMT_2ZVJ.pdb
+        substrate: KOM
+        upper_bound: 2
+  task: plumed
+  uncertainty_calculator:
+    name: UDD
+    params:
+      A: 0.08
+      B: 0.0001
+System:
+  charge: -1
+  multiplicity: 1
+  structure_file: example/L3-COMT-aselmdb-smoke/fixtures/cluster.xyz

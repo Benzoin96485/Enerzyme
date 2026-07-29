@@ -1,7 +1,7 @@
 QM Data Annotation
 ==================
 
-Enerzyme can drive batch quantum chemistry calculations to label structures with energies, forces, charges, and dipoles. Labeled data is written to an **ASE LMDB** (:code:`.aselmdb`) for training (:code:`Datahub.data_format: aselmdb`). The reference config is :code:`enerzyme/config/annotate.yaml`.
+Enerzyme can drive batch quantum chemistry calculations to label structures with energies, forces, charges, and dipoles. By default labeled data is written to an **ASE LMDB** (:code:`.aselmdb`); use :code:`pickle_name` or a :code:`.pkl` :code:`output_file` for legacy pickle (Enerzymette). The reference config is :code:`enerzyme/config/annotate.yaml`.
 
 Basic command
 -------------
@@ -45,9 +45,9 @@ The reference driver targets **TeraChem**. Basis, functional, and solvent live i
 
 - :code:`terachem` executable on :code:`PATH` (or via :code:`terachem_args`)
 - Valid license and scratch space
-- Template input covering basis / XC / PCM as needed
+- Template input covering basis / XC / PCM as needed (:code:`pcm_radii_file` may be relative to the template; the driver copies it into job scratch)
 
-Results are stored with ASE :code:`SinglePointCalculator` plus :code:`charge` / :code:`spin` / :code:`index` in row data so Datahub can reload them as :code:`aselmdb`.
+Results are stored with ASE :code:`SinglePointCalculator` plus :code:`charge` / :code:`spin` / :code:`index` in row data so Datahub can reload them as :code:`aselmdb`. Re-running annotate **skips** completed :code:`index` rows (and retries incomplete reservations). For pickle output, set :code:`dump_single_run: true` (default) to cache :code:`single_run/<index>.pkl` and skip finished structures the same way.
 
 .. caution::
     Prepare TeraChem and RDKit before running :code:`annotate`. These are not part of the core Enerzyme install.
