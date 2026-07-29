@@ -127,7 +127,7 @@ class XYZSupplier(Supplier):
 def get_supplier(path: str, start: int = 0, end: int = -1, **kwargs) -> Supplier:
     if path.endswith(".sdf"):
         return SDFSupplier(input_file=path, start=start, end=end, **kwargs)
-    elif path.endswith(".pkl"):
+    elif path.endswith(".pkl") or path.endswith(".pickle"):
         return PickleSupplier(input_file=path, start=start, end=end, **kwargs)
     elif path.endswith(".xyz"):
         return XYZSupplier(input_file=path, start=start, end=end, **kwargs)
