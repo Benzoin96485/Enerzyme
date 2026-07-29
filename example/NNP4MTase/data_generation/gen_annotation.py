@@ -27,7 +27,7 @@ if __name__ == "__main__":
             "pcm_radii_file": os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "QM_cluster/utils/pcm_radii"))),
             "epsilon": 10,
             "keep_molden": True,
-            "keep_stdout": False,
+            "keep_output": False,
             "clean_tmp": True,
             "pickle_name": f"{args.dataset_name}.pkl",
             "dump_single_run": False,
