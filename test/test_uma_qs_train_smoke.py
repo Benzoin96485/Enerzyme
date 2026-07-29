@@ -149,6 +149,55 @@ def test_decorate_batch_input_rejects_incomplete_neighbor_lists():
         )
 
 
+def test_decorate_pyg_batch_input_keeps_samples_without_edges():
+    """Regression: otf_graph=False with omitted edges must still batch every sample.
+
+    UMA-style cores build the graph internally; dropping samples from feature_list
+    desyncs PyG features from targets.
+    """
+    torch = pytest.importorskip("torch")
+    pytest.importorskip("torch_geometric")
+    from enerzyme.tasks.batch import _decorate_pyg_batch_input
+
+    with open(FIXTURE, "rb") as f:
+        frames = pickle.load(f)
+    features = [_feature_from_frame(frame) for frame in frames[:2]]
+    sizes = [feat["N"] for feat in features]
+    batch = [
+        (features[0], {"Q": features[0]["Q"], "S": features[0]["S"]}, 0),
+        (features[1], {"Q": features[1]["Q"], "S": features[1]["S"]}, 1),
+    ]
+    batch_features, batch_targets = _decorate_pyg_batch_input(
+        batch, dtype=torch.float32, device=torch.device("cpu"), otf_graph=False
+    )
+    assert batch_features.num_graphs == len(features) == batch_targets.num_graphs
+    assert batch_features.edge_index.numel() == 0
+    assert batch_features.N.tolist() == sizes
+    assert int(batch_features.Za.numel()) == sum(sizes)
+
+
+def test_decorate_pyg_batch_input_rejects_incomplete_neighbor_lists():
+    torch = pytest.importorskip("torch")
+    pytest.importorskip("torch_geometric")
+    from enerzyme.data.neighbor_list import full_neighbor_list
+    from enerzyme.tasks.batch import _decorate_pyg_batch_input
+
+    with open(FIXTURE, "rb") as f:
+        frames = pickle.load(f)
+    feat0 = _feature_from_frame(frames[0])
+    feat1 = _feature_from_frame(frames[1])
+    idx_i, idx_j = full_neighbor_list(feat0["N"])
+    feat0.update({"idx_i": idx_i, "idx_j": idx_j, "N_pair": len(idx_i)})
+    batch = [
+        (feat0, {"Q": feat0["Q"], "S": feat0["S"]}, 0),
+        (feat1, {"Q": feat1["Q"], "S": feat1["S"]}, 1),
+    ]
+    with pytest.raises(ValueError, match="Incomplete neighbor lists"):
+        _decorate_pyg_batch_input(
+            batch, dtype=torch.float32, device=torch.device("cpu"), otf_graph=False
+        )
+
+
 @pytest.mark.skipif(
     not os.environ.get("UMA_CHECKPOINT"),
     reason="set UMA_CHECKPOINT to a local uma-*.pt for live train smoke",

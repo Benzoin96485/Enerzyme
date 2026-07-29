@@ -10,6 +10,7 @@ from ..data.neighbor_list import full_neighbor_list
 def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device, otf_graph: bool=True) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
     features, targets, data_keys = zip(*batch)
     feature_list = []
+    n_with_edges = 0
     for feature in features:
         data_dict = dict()
         for k, v in feature.items():
@@ -27,12 +28,26 @@ def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str,
         if "idx_i" in feature and "idx_j" in feature:
             data_dict["idx_i"] = torch.tensor(feature["idx_i"], dtype=torch.long)
             data_dict["idx_j"] = torch.tensor(feature["idx_j"], dtype=torch.long)
-            feature_list.append(Data(edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), num_nodes=feature["N"], **data_dict))
+            edge_index = torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0)
+            n_with_edges += 1
         elif otf_graph:
             idx_i, idx_j = full_neighbor_list(feature["N"])
             data_dict["idx_i"] = torch.tensor(idx_i, dtype=torch.long)
             data_dict["idx_j"] = torch.tensor(idx_j, dtype=torch.long)
-            feature_list.append(Data(edge_index=torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0), num_nodes=feature["N"], **data_dict))
+            edge_index = torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0)
+            n_with_edges += 1
+        else:
+            # No precomputed edges; model builds the graph itself (e.g. UMA).
+            # Still append so PyG batch size matches the input / targets.
+            edge_index = torch.empty(2, 0, dtype=torch.long)
+        feature_list.append(Data(edge_index=edge_index, num_nodes=feature["N"], **data_dict))
+    n_structures = len(features)
+    if 0 < n_with_edges < n_structures:
+        raise ValueError(
+            f"Incomplete neighbor lists in batch: {n_with_edges}/{n_structures} "
+            "structures have edges. Precompute neighbor lists for every sample "
+            "or enable otf_graph."
+        )
     batch_features = Batch.from_data_list(feature_list)
     for k, v in batch_features.items():
         if requires_grad(k):
