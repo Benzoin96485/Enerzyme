@@ -510,3 +510,149 @@ def test_mock_qm_driver_writes_pickle(tmp_path: Path):
     }
     assert abs(legacy[0]["energy"] - (-1.0)) < 1e-8
     np.testing.assert_allclose(legacy[0]["grad"], -np.ones_like(legacy[0]["grad"]) / ase.units.Ha)
+
+
+def test_pickle_dump_single_run_resumes(tmp_path: Path):
+    """dump_single_run caches per-index pickles and skips QM on resume."""
+    import pickle
+
+    from enerzyme.data.supplier import SDFSupplier
+
+    call_count = {"n": 0}
+
+    class CountingQMDriver(FakeQMDriver):
+        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+            call_count["n"] += 1
+            return super().collect_results(input_file, atoms, tmp_dir)
+
+    sdf = FIXTURES / "fragments_tiny.sdf"
+    out_dir = tmp_path / "annot_out"
+    common = dict(
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(out_dir),
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        pickle_name="fragments.pkl",
+        dump_single_run=True,
+        n_processes=1,
+        clean_tmp=True,
+    )
+    driver = CountingQMDriver(
+        supplier=SDFSupplier(input_file=str(sdf), start=0, end=2),
+        **common,
+    )
+    driver.run()
+    assert call_count["n"] == 2
+    single_runs = list((out_dir).rglob("single_run/*.pkl"))
+    assert len(single_runs) == 2
+
+    call_count["n"] = 0
+    driver2 = CountingQMDriver(
+        supplier=SDFSupplier(input_file=str(sdf), start=0, end=2),
+        **common,
+    )
+    driver2.run()
+    assert call_count["n"] == 0, "resume must load single_run caches without QM"
+    pkl = list(out_dir.rglob("fragments.pkl"))
+    with open(pkl[0], "rb") as f:
+        data = pickle.load(f)
+    assert len(data) == 2
+    assert {d["index"] for d in data} == {0, 1}
+
+
+def test_pickle_dump_single_run_false_does_not_cache(tmp_path: Path):
+    from enerzyme.data.supplier import SDFSupplier
+
+    driver = FakeQMDriver(
+        supplier=SDFSupplier(input_file=str(FIXTURES / "fragments_tiny.sdf"), start=0, end=1),
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(tmp_path / "annot_out"),
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        pickle_name="fragments.pkl",
+        dump_single_run=False,
+        n_processes=1,
+        clean_tmp=True,
+    )
+    driver.run()
+    assert not list((tmp_path / "annot_out").rglob("single_run/*.pkl"))
+
+
+def test_aselmdb_resume_skips_completed(tmp_path: Path):
+    """Completed ASE LMDB rows keyed by structure index are skipped on re-run."""
+    from enerzyme.data.supplier import get_supplier
+
+    call_count = {"n": 0}
+
+    class CountingQMDriver(FakeQMDriver):
+        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+            call_count["n"] += 1
+            return super().collect_results(input_file, atoms, tmp_dir)
+
+    sdf = FIXTURES / "fragments_tiny.sdf"
+    common = dict(
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(tmp_path / "annot_out"),
+        output_file="fragments.aselmdb",
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        n_processes=1,
+        clean_tmp=True,
+    )
+    CountingQMDriver(supplier=get_supplier(str(sdf), start=0, end=2), **common).run()
+    assert call_count["n"] == 2
+    call_count["n"] = 0
+    CountingQMDriver(supplier=get_supplier(str(sdf), start=0, end=2), **common).run()
+    assert call_count["n"] == 0
+    db_files = list((tmp_path / "annot_out").rglob("*.aselmdb"))
+    with connect(str(db_files[0])) as db:
+        assert db.count() == 2
+
+
+def test_aselmdb_resume_recomputes_incomplete_reservation(tmp_path: Path):
+    """Orphan reserved rows without energy are deleted and recomputed."""
+    from enerzyme.data.supplier import SDFSupplier
+    from enerzyme.qm.qm_driver import _aselmdb_row_is_complete
+
+    call_count = {"n": 0}
+
+    class CountingQMDriver(FakeQMDriver):
+        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+            call_count["n"] += 1
+            return super().collect_results(input_file, atoms, tmp_dir)
+
+    out_dir = tmp_path / "annot_out"
+    supplier = SDFSupplier(input_file=str(FIXTURES / "fragments_tiny.sdf"), start=0, end=1)
+    db_path = out_dir / supplier.name / "fragments.aselmdb"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db = connect(str(db_path), use_lock_file=False)
+    reserved = db.reserve(index=0)
+    assert reserved is not None
+    assert not _aselmdb_row_is_complete(db.get(id=reserved))
+
+    CountingQMDriver(
+        supplier=supplier,
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(out_dir),
+        output_file="fragments.aselmdb",
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        n_processes=1,
+        clean_tmp=True,
+    ).run()
+    assert call_count["n"] == 1
+    with connect(str(db_path), use_lock_file=False) as db2:
+        assert db2.count() == 1
+        row = db2.get(index=0)
+        assert row.toatoms().calc.results.get("energy") is not None
+
+
+def test_warn_unused_qm_kwargs_and_legacy_keys(caplog):
+    import logging
+
+    from enerzyme.qm.qm_driver import _warn_unused_qm_kwargs
+
+    kwargs = {"engine": "TeraChem", "bs": "6-31gs", "xc": "b3lyp", "mystery": 1}
+    with caplog.at_level(logging.WARNING):
+        _warn_unused_qm_kwargs(kwargs)
+    assert kwargs == {}
+    text = "\n".join(r.message for r in caplog.records)
+    assert "bs" in text and "xc" in text
+    assert "mystery" in text
+    assert "engine" not in text  # silently consumed by annotate wiring
