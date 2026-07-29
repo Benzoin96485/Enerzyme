@@ -19,6 +19,7 @@ and annotate → ASE DB), plus a **tiny** Enerzymette AL iteration that uses the
 | `config/annotate_pickle.yaml` | Enerzymette-compat pickle (`pickle_name: fragments.pkl`) |
 | `config/annotate_legacy_pickle.yaml` | Campaign-style annotate (pre-#80) for comparison |
 | `config/train_aselmdb.yaml` | Minimal SpookyNet Datahub pointing at `.aselmdb` |
+| `config/train_uma_qs.yaml` | Minimal `uma_qs` + Q/S readout train (1 epoch; checkpoint via env) |
 | `scripts/pickle_to_aselmdb.py` | Convert campaign pickles → ASE LMDB |
 | `enerzymette_al/` | Min-scale simulate / extract / annotate / train for AL |
 
@@ -41,7 +42,31 @@ python example/L3-COMT-aselmdb-smoke/scripts/pickle_to_aselmdb.py \
   -i example/L3-COMT-aselmdb-smoke/fixtures/fragments_tiny.pkl \
   -o /tmp/fragments_tiny.aselmdb
 
-pytest test/test_aselmdb_al_smoke.py -q
+pytest test/test_aselmdb_al_smoke.py test/test_uma_qs_train_smoke.py -q
+```
+
+## Live uma_qs train smoke (GPU + fairchem)
+
+From the Enerzyme repo root on a GPU node. Set cache / checkpoint env vars on the
+command line only (do not put host paths in the YAML). The committed config uses
+the placeholder `UMA_CHECKPOINT`.
+
+```bash
+# Point UMA_CHECKPOINT at a local uma-s-*.pt under your fairchem cache
+export UMA_CHECKPOINT=...
+export FAIRCHEM_CACHE_DIR=...   # if your install expects it
+export HF_HUB_OFFLINE=1
+export WANDB_MODE=disabled
+
+# On shared GPU nodes, /tmp often has a small per-user quota; put scratch elsewhere
+# (UMA saves a large .pth). Example: local node disk under $UMA_SMOKE_OUT.
+export UMA_SMOKE_OUT=...        # directory for resolved run artifacts
+export TMPDIR="$UMA_SMOKE_OUT/tmp"
+mkdir -p "$TMPDIR"
+
+pytest test/test_uma_qs_train_smoke.py -q -k one_epoch --basetemp="$UMA_SMOKE_OUT/pytest"
+# or resolve the YAML yourself and run:
+#   enerzyme train -c /path/to/train_uma_qs_resolved.yaml -o /path/to/out
 ```
 
 ## Live min AL iteration via Enerzymette (TeraChem)
