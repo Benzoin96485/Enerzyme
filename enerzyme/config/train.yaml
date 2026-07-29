@@ -278,6 +278,15 @@ Modelhub:
             has_norm_before_flag: true
             has_norm_after_flag: false
             reduce_mode: sum
+            output_mode: feature
+        - name: SimpleReadout
+          params:
+            output_fields:
+              - Ea
+              - Qa
+            head_type: residual_mlp
+            num_residual: 2
+            dim_embedding: 128
         - name: AtomicAffine
           params:
             shifts:

@@ -264,3 +264,75 @@ def test_spookynet_build_default_layers_forward_backward():
     out = model(net_input)
     assert "E" in out
     out["E"].sum().backward()
+
+
+def test_alphanet_core_direct_default_is_feature_now():
+    """Constructor default is feature (NSE); explicit direct restores trained heads."""
+    from enerzyme.models.alphanet.core import AlphaNet
+
+    c_default = AlphaNet(
+        num_layers=1,
+        hidden_channels=16,
+        num_radial=8,
+        head=4,
+        main_chi1=4,
+        mp_chi1=4,
+        chi2=2,
+        hidden_channels_chi=8,
+        has_dropout_flag=False,
+    )
+    assert c_default.output_mode == "feature"
+    assert c_default._output_fields == {"atom_feature"}
+    assert not hasattr(c_default, "last_layer")
+
+    c_direct = AlphaNet(
+        num_layers=1,
+        hidden_channels=16,
+        num_radial=8,
+        head=4,
+        main_chi1=4,
+        mp_chi1=4,
+        chi2=2,
+        hidden_channels_chi=8,
+        has_dropout_flag=False,
+        output_mode="direct",
+    )
+    assert c_direct._output_fields == {"Ea", "Qa"}
+    assert hasattr(c_direct, "last_layer")
+
+
+def test_alphanet_build_default_layers_forward_backward():
+    from enerzyme.models.ff import build_model
+    from enerzyme.models.alphanet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+
+    model = build_model(
+        "AlphaNet",
+        layer_params=DEFAULT_LAYER_PARAMS,
+        build_params=DEFAULT_BUILD_PARAMS,
+        verbose=0,
+    ).double()
+    model.train()
+    feat = _smoke_features(n_atoms=6, seed=4, with_charge_spin=False)
+    batch = [(feat, None)]
+    net_input, _ = _decorate_batch_input(
+        batch, dtype=torch.float64, device=torch.device("cpu"), otf_graph=True
+    )
+    out = model(net_input)
+    assert "E" in out
+    out["E"].sum().backward()
+
+
+def test_train_yaml_ff03_uses_feature_and_simple_readout():
+    from pathlib import Path
+
+    import yaml
+
+    cfg_path = Path(__file__).resolve().parents[1] / "enerzyme" / "config" / "train.yaml"
+    with open(cfg_path) as f:
+        cfg = yaml.safe_load(f)
+    ff03 = cfg["Modelhub"]["internal_FFs"]["FF03"]
+    assert ff03["architecture"] == "AlphaNet"
+    names = [layer["name"] for layer in ff03["layers"]]
+    assert "SimpleReadout" in names
+    core = next(layer for layer in ff03["layers"] if layer["name"] == "Core")
+    assert core["params"].get("output_mode") == "feature"

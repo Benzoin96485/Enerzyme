@@ -821,7 +821,7 @@ class AlphaNet(BaseFFCore):
             has_norm_before_flag=True,
             has_norm_after_flag=False,
             reduce_mode='sum',
-            output_mode: Literal["direct", "feature"] = "direct",
+            output_mode: Literal["direct", "feature"] = "feature",
     ):
         self.output_mode: Literal["direct", "feature"] = output_mode
         output_fields = {"Ea", "Qa"} if output_mode == "direct" else {"atom_feature"}
@@ -833,6 +833,7 @@ class AlphaNet(BaseFFCore):
         self.eps = float(eps)
         self.num_layers = num_layers
         self.hidden_channels = hidden_channels
+        self.dim_feature_out = hidden_channels
         self.cutoff = cutoff_sr
         self.chi1 = main_chi1
         self.pos_require_grad= True
@@ -880,7 +881,10 @@ class AlphaNet(BaseFFCore):
         self.kernels_imag = torch.nn.Parameter(torch.stack(self.kernels_imag)) 
 
         self.num_targets = 2
-        # self.out_forces = EquiOutput(hidden_channels)
+        if output_mode == "direct":
+            # Pre-NSE AlphaNet heads (Linear on scalar + quantum features)
+            self.last_layer = nn.Linear(hidden_channels, self.num_targets)
+            self.last_layer_quantum = nn.Linear(self.chi1 * 2, self.num_targets)
 
         # for node-wise frame
         self.mean_neighbor_pos = aggregate_pos(aggr='mean')
@@ -904,6 +908,9 @@ class AlphaNet(BaseFFCore):
             layer.reset_parameters()
         for layer in self.FTEs:
             layer.reset_parameters()
+        if hasattr(self, "last_layer"):
+            self.last_layer.reset_parameters()
+            self.last_layer_quantum.reset_parameters()
         for layer in self.radial_lin:
             if hasattr(layer, 'reset_parameters'):
                 layer.reset_parameters()
@@ -994,7 +1001,7 @@ class AlphaNet(BaseFFCore):
             s = s + ds
             vec = vec + dvec
 
-        return s
+        return s, quantum
 
     def build(self, built_layers) -> None:
         calculate_distance = DistanceLayer()
@@ -1015,11 +1022,13 @@ class AlphaNet(BaseFFCore):
                 self.post_sequence.append(layer)
 
     def get_output(self, Ra, Za, batch_seg, idx_i_sr, idx_j_sr, Dij_sr, vij_sr) -> Dict[str, torch.Tensor]:
-        atom_feature = self.__forward(Ra, batch_seg, Za, idx_i_sr, idx_j_sr, Dij_sr, vij_sr)
+        atom_feature, quantum = self.__forward(Ra, batch_seg, Za, idx_i_sr, idx_j_sr, Dij_sr, vij_sr)
         if self.output_mode == "feature":
             return {"atom_feature": atom_feature}
-        # Legacy direct heads: first two feature channels as Ea / Qa
-        return {"Ea": atom_feature[:, 0], "Qa": atom_feature[:, 1]}
+        out = self.last_layer(atom_feature) + self.last_layer_quantum(
+            torch.cat([quantum.real, quantum.imag], dim=-1)
+        ) / self.chi1
+        return {"Ea": out[:, 0], "Qa": out[:, 1]}
         
     @property
     def num_params(self):
