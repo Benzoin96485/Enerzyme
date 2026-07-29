@@ -30,6 +30,10 @@ ASE_PROPERTY_METHODS: Dict[str, Callable[[Atoms], Any]] = {
 # ASE info keys that are remapped to standard names (not exposed as Datahub keys).
 _ASE_INFO_STANDARD_KEYS = frozenset({"charge", "spin"})
 
+# ASELMDBDataset exposes these under standard Enerzyme names only (not pickle aliases
+# like energy/coord/grad). Custom row-data fields may still use non-identity maps.
+_ASELMDB_FIXED_KEYS = frozenset({"Ra", "Za", "N", "Q", "S"}) | frozenset(ASE_PROPERTY_METHODS)
+
 
 def load_from_pickle(data_path=str):
     with open(data_path, "rb") as f:
@@ -412,6 +416,37 @@ class SingleDataHub:
         else:
             return value_array
 
+    def _validate_aselmdb_field_maps(self) -> None:
+        """Reject pickle-style aliases for fixed ASE LMDB standard names."""
+        bad = {
+            k: src for k, src in self.data_types.items()
+            if k in _ASELMDB_FIXED_KEYS and src != k
+        }
+        if not bad:
+            return
+        examples = ", ".join(f"{k}: {src}" for k, src in sorted(bad.items()))
+        raise ValueError(
+            "data_format=aselmdb exposes standard Enerzyme names only "
+            f"(Ra/Za/N/Q/S and calculator fields {sorted(ASE_PROPERTY_METHODS)}). "
+            "Use identity maps (e.g. E: null or E: E), not pickle-style aliases "
+            f"such as E: energy / Ra: coord. Invalid maps: {{{examples}}}. "
+            "Custom row-data fields may still use non-identity maps."
+        )
+
+    def _missing_source_error(self, k: str, raw_data: Dict) -> KeyError:
+        src = self.data_types[k]
+        available = sorted(raw_data.keys()) if hasattr(raw_data, "keys") else []
+        hint = ""
+        if self.data_format == "aselmdb" and k in _ASELMDB_FIXED_KEYS and src != k:
+            hint = (
+                f" For data_format=aselmdb use an identity map "
+                f"(e.g. {k}: null or {k}: {k}), not a pickle-style alias."
+            )
+        return KeyError(
+            f"Requested field '{k}' (source '{src}') not found in raw data "
+            f"(available: {available}).{hint}"
+        )
+
     def _load_molecular_data(self, k: str, raw_data: Dict) -> None:
         if self.data_types[k] in raw_data.keys():
             values = raw_data[self.data_types[k]]
@@ -421,7 +456,7 @@ class SingleDataHub:
                 self.data.create_dataset(k, data=self._compress(k, values))
             else:
                 raise IndexError(f"Length of '{k}' should be n_datapoint or 1")
-        elif self.data_types[k + "a"] in raw_data.keys():
+        elif (k + "a") in self.data_types and self.data_types[k + "a"] in raw_data.keys():
             self._load_atomic_data(k + "a", raw_data)
             # reduce atomic property into molecular property, mainly for Qa into Q
             logger.info(f"Molecular property {k} are reduced from atomic property {k + 'a'} ({self.data_types[k + 'a']})")
@@ -431,30 +466,46 @@ class SingleDataHub:
                 values = [sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]]) for i in tqdm(range(self.n_datapoint))]
             # don't compress summation of atomic property
             self.data.create_dataset(k, data=np.array(values))
+        else:
+            raise self._missing_source_error(k, raw_data)
 
     def _load_atomic_data(self, k: str, raw_data: Dict) -> None:
         if k in self.data:
             return
-        values = raw_data[self.data_types[k]]
-        v0 = np.array(values[0])
+        src = self.data_types[k]
+        if src not in raw_data.keys():
+            raise self._missing_source_error(k, raw_data)
+        values = raw_data[src]
+        sample = values[0]
+        if sample is None:
+            raise ValueError(
+                f"Atomic field '{k}' (source '{src}') returned None for the first "
+                f"datapoint; check the feature/target map and dataset contents."
+            )
+        v0 = np.array(sample)
         if len(values) == self.n_datapoint:
             # for a datapoint, the shape of this property is (N, a, b, ...)
             # for the whole dataset, the shape of this property is (n_datapoint, max_N, a, b, ...)
             self.data.create_dataset(k, shape=(self.n_datapoint, self.max_N, *v0.shape[1:]), dtype=v0.dtype)
-            logger.info(f"Storing atomic data {k} ({self.data_types[k]})")
+            logger.info(f"Storing atomic data {k} ({src})")
             for i, v in tqdm(enumerate(values), total=self.n_datapoint):
+                if v is None:
+                    raise ValueError(
+                        f"Atomic field '{k}' (source '{src}') returned None at index {i}."
+                    )
                 self.data[k][i,:len(v)] = v
 
         elif len(values) == 1:
             self.data.create_dataset(k, data=self._expand(k, values))
         else:
-            raise IndexError(f"Length of {k} ({self.data_types[k]}) should be n_datapoint")
+            raise IndexError(f"Length of {k} ({src}) should be n_datapoint")
 
     def _init_data(self) -> None:
         suffix = self.data_path.split(".")[-1]
         # aselmdb accepts a file, directory of DB files, or glob; ASELMDBDataset validates the path
         if self.data_format == "aselmdb" or suffix == "aselmdb":
             self.data_format = "aselmdb"
+            self._validate_aselmdb_field_maps()
             aselmdb_transforms = {}
             if self.preprocessings:
                 aselmdb_transforms.update(self.preprocessings)

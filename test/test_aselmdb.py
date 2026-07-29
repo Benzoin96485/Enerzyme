@@ -107,6 +107,43 @@ def test_singledatahub_loads_m2_from_aselmdb(tmp_path):
     np.testing.assert_allclose(hub.data["M2"][0], dipole)
 
 
+def test_singledatahub_rejects_pickle_style_aselmdb_maps(tmp_path):
+    """Pickle aliases (E: energy, Ra: coord) must fail loudly for aselmdb."""
+    db_path = tmp_path / "toy.aselmdb"
+    _write_toy_aselmdb(db_path)
+
+    with pytest.raises(ValueError, match="identity maps"):
+        SingleDataHub(
+            dump_dir=str(tmp_path / "out"),
+            data_path=str(db_path),
+            data_format="aselmdb",
+            preload=False,
+            features={"Ra": "coord", "Za": "atom_type", "N": "N", "Q": "total_chrg"},
+            targets={"E": "energy", "Fa": "grad"},
+            neighbor_list="",
+            compressed=False,
+        )
+
+
+def test_singledatahub_raises_on_missing_molecular_source(tmp_path):
+    """Declared molecular fields absent from raw data must not be skipped silently."""
+    db_path = tmp_path / "toy.aselmdb"
+    _write_toy_aselmdb(db_path)
+
+    with pytest.raises(KeyError, match="Requested field 'M2'"):
+        SingleDataHub(
+            dump_dir=str(tmp_path / "out"),
+            data_path=str(db_path),
+            data_format="aselmdb",
+            preload=False,
+            features={"Ra": "Ra", "Za": "Za", "N": "N", "Q": "Q"},
+            # Toy DB has no dipole → M2 not in ASELMDBDataset.keys()
+            targets={"E": "E", "Fa": "Fa", "M2": "M2"},
+            neighbor_list="",
+            compressed=False,
+        )
+
+
 @pytest.mark.parametrize(
     "path_kind",
     ["directory", "glob"],

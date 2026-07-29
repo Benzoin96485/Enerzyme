@@ -68,6 +68,14 @@ Keys are **standard Enerzyme names**; values are attribute names in your file. U
 
 :code:`N` can be omitted and inferred from :code:`Za`. :code:`Q` defaults to 0 if missing.
 
+For :code:`data_format: aselmdb`, ASE LMDB already exposes standard names
+(:code:`Ra`, :code:`Za`, :code:`E`, :code:`Fa`, …). Use **identity** maps
+(:code:`E: null` / :code:`E: E`), not pickle aliases such as :code:`E: energy`
+or :code:`Ra: coord` — non-identity maps for those fixed fields raise
+:code:`ValueError`. Declared fields that are missing from the source raise
+:code:`KeyError` instead of being skipped silently. Custom keys stored in ASE
+row :code:`data` may still use non-identity maps.
+
 Custom fields
 -------------
 
