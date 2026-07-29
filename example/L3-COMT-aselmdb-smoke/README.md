@@ -20,6 +20,8 @@ and annotate → ASE DB), plus a **tiny** Enerzymette AL iteration that uses the
 | `config/annotate_legacy_pickle.yaml` | Campaign-style annotate (pre-#80) for comparison |
 | `config/train_aselmdb.yaml` | Minimal SpookyNet Datahub pointing at `.aselmdb` |
 | `config/train_uma_qs.yaml` | Minimal `uma_qs` + Q/S readout train (1 epoch; checkpoint via env) |
+| `config/train_uma_flow_qs.yaml` | Minimal `uma_flow_qs` CFM train (1 epoch; needs `.[flow]` + fairchem) |
+| `fixtures/fragments_flow_tiny.pkl` | 3 tiny molecules with synthetic `chrg` / `spin_dens` for flow |
 | `scripts/pickle_to_aselmdb.py` | Convert campaign pickles → ASE LMDB |
 | `enerzymette_al/` | Min-scale simulate / extract / annotate / train for AL |
 
@@ -42,7 +44,24 @@ python example/L3-COMT-aselmdb-smoke/scripts/pickle_to_aselmdb.py \
   -i example/L3-COMT-aselmdb-smoke/fixtures/fragments_tiny.pkl \
   -o /tmp/fragments_tiny.aselmdb
 
-pytest test/test_aselmdb_al_smoke.py test/test_uma_qs_train_smoke.py -q
+pytest test/test_aselmdb_al_smoke.py test/test_uma_qs_train_smoke.py test/test_uma_flow_qs_train_smoke.py -q
+```
+
+## Live uma_flow_qs train smoke (GPU + fairchem + torchdiffeq)
+
+Same scratch rules as `uma_qs` (avoid tiny `/tmp` quotas). Install optional ODE deps with
+`pip install -e ".[flow]"`. Committed config uses placeholder `UMA_CHECKPOINT`.
+
+```bash
+export UMA_CHECKPOINT=...
+export FAIRCHEM_CACHE_DIR=...
+export HF_HUB_OFFLINE=1
+export WANDB_MODE=disabled
+export UMA_SMOKE_OUT=...
+export TMPDIR="$UMA_SMOKE_OUT/tmp"
+mkdir -p "$TMPDIR"
+
+pytest test/test_uma_flow_qs_train_smoke.py -q -k one_epoch --basetemp="$UMA_SMOKE_OUT/pytest"
 ```
 
 ## Live uma_qs train smoke (GPU + fairchem)

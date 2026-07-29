@@ -73,3 +73,44 @@ class ScalarResidualMLPEmbedding(ScalarEmbedding):
             shallow_ensemble_size=1,
             use_residual=use_residual
         )
+
+
+class GraphScalarBroadcastEmbedding(BaseFFLayer):
+    """Embed a per-graph scalar (shape ``(num_graphs,)``) and broadcast to each atom via ``batch_seg``."""
+
+    def __init__(
+        self,
+        dim_embedding: int,
+        embed_field: str,
+        activation_fn: Optional[ACTIVATION_KEY_TYPE] = None,
+        activation_params: ACTIVATION_PARAM_TYPE = dict(),
+        initial_weight: INITIAL_WEIGHT_TYPE = "zero",
+        initial_bias: INITIAL_BIAS_TYPE = "zero",
+        use_bias: bool = True,
+    ) -> None:
+        self.embed_field = embed_field
+        self.output_field = f"{embed_field}_embedding"
+        super().__init__(
+            input_fields={embed_field, "batch_seg"},
+            output_fields={self.output_field},
+        )
+        self.embedding = DenseLayer(
+            dim_feature_in=1,
+            dim_feature_out=dim_embedding,
+            activation_fn=activation_fn,
+            activation_params=activation_params,
+            initial_weight=initial_weight,
+            initial_bias=initial_bias,
+            use_bias=use_bias,
+            shallow_ensemble_size=1,
+        )
+
+    def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        batch_seg = relevant_input["batch_seg"]
+        g = relevant_input[self.embed_field].to(
+            dtype=self.embedding.weight.dtype, device=self.embedding.weight.device
+        )
+        if g.dim() == 0:
+            g = g.unsqueeze(0)
+        t_atom = g[batch_seg].reshape(-1, 1)
+        return {self.output_field: self.embedding(t_atom)}

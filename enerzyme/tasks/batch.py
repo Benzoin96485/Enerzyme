@@ -5,9 +5,133 @@ from torch_geometric.data import Data, Batch
 import numpy as np
 from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, is_target_uq, get_tensor_rank, is_grad
 from ..data.neighbor_list import full_neighbor_list
+from ..utils import logger
 
 
-def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device, otf_graph: bool=True) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
+def _generator_is_enabled(generator_config: Optional[Dict[str, Any]]) -> bool:
+    if generator_config is None:
+        return False
+    if isinstance(generator_config, dict) and generator_config.get("enabled") is False:
+        return False
+    return True
+
+
+def _inject_generator_flow_dict(
+    batch_features: Dict[str, Tensor],
+    batch_targets: Dict[str, Tensor],
+    generator_config: Dict[str, Any],
+    dtype: torch.dtype,
+    generator_training: bool = True,
+) -> None:
+    """Add ``flow_t`` (per graph), ``Q_flow_a``, ``S_flow_a`` for conditional flow matching.
+
+    When ``generator_training`` is False (eval / predict collate), set ``flow_t=0`` and
+    ``Q_flow_a``/``S_flow_a`` to the init values so the ODE can start at t=0 without random
+    interpolation (targets are still required for metrics).
+    """
+    cfg = generator_config
+    init_q = cfg.get("init_q_key", "Q_init_a")
+    init_s = cfg.get("init_s_key", "S_init_a")
+    tq = cfg.get("target_q_key", "Qa")
+    ts = cfg.get("target_s_key", "Sa")
+    out_q = cfg.get("out_q_key", "Q_flow_a")
+    out_s = cfg.get("out_s_key", "S_flow_a")
+    t_key = cfg.get("t_key", "flow_t")
+
+    if not batch_targets:
+        logger.warning("Generator: no targets in batch; skip flow fields.")
+        return
+    missing = []
+    for key, store, label in (
+        (init_q, batch_features, "features"),
+        (init_s, batch_features, "features"),
+        (tq, batch_targets, "targets"),
+        (ts, batch_targets, "targets"),
+    ):
+        if key not in store:
+            missing.append(f"{label}.{key}")
+    if missing:
+        logger.warning("Generator: skip flow fields; missing: %s", ", ".join(missing))
+        return
+
+    batch_seg = batch_features["batch_seg"]
+    num_graphs = int(batch_seg.max().item()) + 1
+    q_init = batch_features[init_q].to(dtype=dtype)
+    s_init = batch_features[init_s].to(dtype=dtype)
+    q_tgt = batch_targets[tq].to(dtype=dtype)
+    s_tgt = batch_targets[ts].to(dtype=dtype)
+    if generator_training:
+        t_g = torch.rand(num_graphs, dtype=dtype, device=batch_seg.device)
+        t_atom = t_g[batch_seg]
+        batch_features[t_key] = t_g
+        batch_features[out_q] = (1.0 - t_atom) * q_init + t_atom * q_tgt
+        batch_features[out_s] = (1.0 - t_atom) * s_init + t_atom * s_tgt
+    else:
+        batch_features[t_key] = torch.zeros(num_graphs, dtype=dtype, device=batch_seg.device)
+        batch_features[out_q] = q_init.clone()
+        batch_features[out_s] = s_init.clone()
+    # Expose init tensors on targets so losses (e.g. CFMLoss) see (output, net_target) only.
+    batch_targets[init_q] = batch_features[init_q]
+    batch_targets[init_s] = batch_features[init_s]
+
+
+def _inject_generator_flow_pyg(
+    batch_features: Batch,
+    batch_targets: Batch,
+    generator_config: Dict[str, Any],
+    dtype: torch.dtype,
+    generator_training: bool = True,
+) -> None:
+    cfg = generator_config
+    init_q = cfg.get("init_q_key", "Q_init_a")
+    init_s = cfg.get("init_s_key", "S_init_a")
+    tq = cfg.get("target_q_key", "Qa")
+    ts = cfg.get("target_s_key", "Sa")
+    out_q = cfg.get("out_q_key", "Q_flow_a")
+    out_s = cfg.get("out_s_key", "S_flow_a")
+    t_key = cfg.get("t_key", "flow_t")
+
+    missing = []
+    for key, store, label in (
+        (init_q, batch_features, "features"),
+        (init_s, batch_features, "features"),
+        (tq, batch_targets, "targets"),
+        (ts, batch_targets, "targets"),
+    ):
+        if key not in store:
+            missing.append(f"{label}.{key}")
+    if missing:
+        logger.warning("Generator (pyg): skip flow fields; missing: %s", ", ".join(missing))
+        return
+
+    b = batch_features.batch
+    num_graphs = int(b.max().item()) + 1
+    q_init = batch_features[init_q].to(dtype=dtype)
+    s_init = batch_features[init_s].to(dtype=dtype)
+    q_tgt = batch_targets[tq].to(dtype=dtype)
+    s_tgt = batch_targets[ts].to(dtype=dtype)
+    if generator_training:
+        t_g = torch.rand(num_graphs, dtype=dtype, device=b.device)
+        t_atom = t_g[b]
+        batch_features[t_key] = t_g
+        batch_features[out_q] = (1.0 - t_atom) * q_init + t_atom * q_tgt
+        batch_features[out_s] = (1.0 - t_atom) * s_init + t_atom * s_tgt
+    else:
+        batch_features[t_key] = torch.zeros(num_graphs, dtype=dtype, device=b.device)
+        batch_features[out_q] = q_init.clone()
+        batch_features[out_s] = s_init.clone()
+    batch_targets[init_q] = batch_features[init_q]
+    batch_targets[init_s] = batch_features[init_s]
+
+
+def _decorate_pyg_batch_input(
+    batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]],
+    dtype: torch.dtype,
+    device: torch.device,
+    otf_graph: bool = True,
+    generator_config: Optional[Dict[str, Any]] = None,
+    generator_training: bool = True,
+) -> Tuple[Batch, Batch]:
     features, targets, data_keys = zip(*batch)
     feature_list = []
     n_with_edges = 0
@@ -78,10 +202,21 @@ def _decorate_pyg_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str,
     for k, v in batch_targets.items():
         if requires_grad(k):
             v.requires_grad_(True)
+    if _generator_is_enabled(generator_config):
+        _inject_generator_flow_pyg(
+            batch_features, batch_targets, generator_config, dtype, generator_training
+        )
     return batch_features, batch_targets
 
 
-def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]], dtype: torch.dtype, device: torch.device, otf_graph: bool=True) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
+def _decorate_batch_input(
+    batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Tensor]]],
+    dtype: torch.dtype,
+    device: torch.device,
+    otf_graph: bool = True,
+    generator_config: Optional[Dict[str, Any]] = None,
+    generator_training: bool = True,
+) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
     if len(batch[0]) == 3:
         features, targets, data_keys = zip(*batch)
     else:
@@ -150,6 +285,10 @@ def _decorate_batch_input(batch: Iterable[Tuple[Dict[str, Tensor], Dict[str, Ten
                     dtype=torch.long if is_int(k) else dtype,
                 )
         batch_targets["data_key"] = data_keys
+    if _generator_is_enabled(generator_config):
+        _inject_generator_flow_dict(
+            batch_features, batch_targets, generator_config, dtype, generator_training
+        )
     return batch_features, batch_targets
 
 
@@ -192,6 +331,23 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
         y_pred["data_key"] = targets["data_key"]
         y_truth["data_key"] = targets["data_key"]
     y_truth["Za"] = y_pred["Za"]
+
+    # Graph-level Q / S targets with atomic-only model output (e.g. ODE flow returns Qa, Sa only).
+    if targets is not None:
+        if (
+            is_target("Q")
+            and "Q" not in y_pred
+            and "Qa" in y_pred
+            and y_pred["Qa"]
+        ):
+            y_pred["Q"] = np.array([float(np.sum(x)) for x in y_pred["Qa"]], dtype=np.float64)
+        if (
+            is_target("S")
+            and "S" not in y_pred
+            and "Sa" in y_pred
+            and y_pred["Sa"]
+        ):
+            y_pred["S"] = np.array([float(np.sum(x)) for x in y_pred["Sa"]], dtype=np.float64)
 
     return y_pred, (y_truth if y_truth else None)
 

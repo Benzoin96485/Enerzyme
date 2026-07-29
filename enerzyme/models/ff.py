@@ -43,6 +43,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .mace import MACECore as Core
         from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "allscaip":
+        from .allscaip import AllScAIPCore as Core
+        from .allscaip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "nequip":
         from .nequip import NequIPWrapper as Core
         from .nequip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
@@ -54,6 +58,15 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
     elif architecture.lower() == "uma_qs":
         from .esen import UMAWrapperQS as Core
         DEFAULT_BUILD_PARAMS = {}
+        DEFAULT_LAYER_PARAMS = []
+        special_loss = {}
+    elif architecture.lower() == "uma_flow_qs":
+        from .esen import UMAFlowWrapperQS as Core
+
+        DEFAULT_BUILD_PARAMS = {
+            # Must match ``sphere_channels`` of the UMA checkpoint used in Core.
+            "dim_embedding": 128,
+        }
         DEFAULT_LAYER_PARAMS = []
         special_loss = {}
     LOSS_REGISTER.update(special_loss)

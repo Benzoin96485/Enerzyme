@@ -58,6 +58,28 @@ class ChargeConservationLayer(BaseFFLayer):
         }
 
 
+class VelocityConservationLayer(BaseFFLayer):
+    """Per graph, subtract the mean so each channel sums to zero over atoms."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            input_fields={"batch_seg", "Q_vel_a", "S_vel_a"},
+            output_fields={"Q_vel_a", "S_vel_a"},
+        )
+
+    def get_output(
+        self, batch_seg: Tensor, Q_vel_a: Tensor, S_vel_a: Tensor
+    ) -> Dict[str, Tensor]:
+        ones = torch.ones(batch_seg.shape[0], dtype=Q_vel_a.dtype, device=Q_vel_a.device)
+        N_per = segment_sum_coo(ones, batch_seg)
+        mean_q = segment_sum_coo(Q_vel_a, batch_seg) / N_per
+        mean_s = segment_sum_coo(S_vel_a, batch_seg) / N_per
+        return {
+            "Q_vel_a": Q_vel_a - mean_q[batch_seg],
+            "S_vel_a": S_vel_a - mean_s[batch_seg],
+        }
+
+
 class ElectrostaticEnergyLayer(BaseFFLayer):
     def __init__(
         self, cutoff_sr: float, cutoff_lr: Optional[float]=None, 
