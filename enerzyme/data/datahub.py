@@ -125,13 +125,43 @@ def load_from_sdf(data_path: str) -> Dict[str, list]:
     return raw_data
 
 
+# Directory / glob expansion only considers these ASE DB suffixes.
+_ASELMDB_FILE_SUFFIXES = (".aselmdb", ".db")
+
+
+def _is_aselmdb_lock_path(path: str) -> bool:
+    name = os.path.basename(path).lower()
+    return name.endswith(".lock") or name.endswith("-lock")
+
+
+def _is_aselmdb_db_path(path: str) -> bool:
+    """True for regular files that look like ASE / ASE LMDB databases."""
+    if not os.path.isfile(path) or _is_aselmdb_lock_path(path):
+        return False
+    name = os.path.basename(path).lower()
+    return any(name.endswith(suffix) for suffix in _ASELMDB_FILE_SUFFIXES)
+
+
 def _get_single_aselmdb_data_path(data_path=str) -> List[str]:
+    """Resolve a file, directory, or glob to ASE DB file paths.
+
+    Directories only include ``*.aselmdb`` / ``*.db`` regular files (lock files
+    and other non-DB paths are ignored). Explicit globs still expand as given,
+    but lock files are filtered out.
+    """
     if os.path.isfile(data_path):
         return [data_path]
     elif os.path.isdir(data_path):
-        return glob(os.path.join(data_path, "*"))
+        candidates = [
+            p for p in glob(os.path.join(data_path, "*")) if _is_aselmdb_db_path(p)
+        ]
+        return sorted(candidates)
     else:
-        return glob(data_path)
+        candidates = [
+            p for p in glob(data_path)
+            if os.path.isfile(p) and not _is_aselmdb_lock_path(p)
+        ]
+        return sorted(candidates)
 
 
 class ASELMDBSingleProperty:
@@ -194,17 +224,19 @@ class ASELMDBDataset:
         else:
             self.data_paths.extend(_get_single_aselmdb_data_path(data_path))
         if not self.data_paths:
-            raise ValueError(f"No data paths found in {data_path}")
-        
+            raise ValueError(f"No ASE LMDB / ASE DB files found in {data_path}")
+
+        connected_paths: List[str] = []
         for single_data_path in self.data_paths:
             try:
                 self.dbs.append(connect(single_data_path, **default_connect_args))
             except Exception as e:
-                logger.warning(f"Failed to connect to {single_data_path}: {e}")
-                continue
-        if not self.dbs:
-            raise ValueError(f"Failed to connect to any of the data paths in {data_path}")
-        
+                raise ValueError(
+                    f"Failed to connect to ASE LMDB path {single_data_path}: {e}"
+                ) from e
+            connected_paths.append(single_data_path)
+        self.data_paths = connected_paths
+
         for db in self.dbs:
             if hasattr(db, "ids") and not select_args:
                 self.db_ids.append(db.ids)

@@ -37,7 +37,7 @@ Used both as an input format and as the **preprocessed cache** written by Datahu
 ASE LMDB (:code:`aselmdb`)
 --------------------------
 
-ASE database / LMDB stores (:code:`ase.db.connect`) for large QM-labeled sets. Set :code:`data_format: aselmdb` or use a path/suffix of :code:`.aselmdb`. :code:`data_path` may be a file, a directory of DB files, or a glob.
+ASE database / LMDB stores (:code:`ase.db.connect`) for large QM-labeled sets. Set :code:`data_format: aselmdb` or use a path/suffix of :code:`.aselmdb`. :code:`data_path` may be a file, a directory of DB files, or a glob. Directory expansion only picks up :code:`*.aselmdb` / :code:`*.db` files (lock files and other non-DB paths are ignored); failed connections raise instead of silently shrinking the dataset.
 
 Lazy property accessors map ASE calculator results and :code:`atoms.info` / row :code:`data` onto Enerzyme fields:
 

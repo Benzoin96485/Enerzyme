@@ -1,4 +1,6 @@
 """Minimal tests for ASE LMDB dataset helpers."""
+from pathlib import Path
+
 import ase.units
 import numpy as np
 import pytest
@@ -27,9 +29,38 @@ def test_get_single_aselmdb_data_path_file_and_glob(tmp_path):
     f2 = tmp_path / "b.aselmdb"
     f1.write_text("")
     f2.write_text("")
+    (tmp_path / "README.txt").write_text("ignore me")
+    (tmp_path / "a.aselmdb-lock").write_text("lock")
+    (tmp_path / "notes.json").write_text("{}")
+    (tmp_path / "subdir").mkdir()
     assert _get_single_aselmdb_data_path(str(f1)) == [str(f1)]
-    found = set(_get_single_aselmdb_data_path(str(tmp_path)))
-    assert str(f1) in found and str(f2) in found
+    found = _get_single_aselmdb_data_path(str(tmp_path))
+    assert found == sorted([str(f1), str(f2)])
+    # Explicit globs still work; lock files are filtered out.
+    globbed = _get_single_aselmdb_data_path(str(tmp_path / "*.aselmdb*"))
+    assert set(globbed) == {str(f1), str(f2)}
+
+
+def test_aselmdb_dataset_directory_skips_non_db_and_fails_loud(tmp_path):
+    """Directory loads must ignore junk/locks and raise on a bad DB file."""
+    db_dir = tmp_path / "dbs"
+    db_dir.mkdir()
+    _write_toy_aselmdb(db_dir / "a.aselmdb", energy_ev=-1.0, index=0)
+    _write_toy_aselmdb(db_dir / "b.aselmdb", energy_ev=-2.0, index=1)
+    (db_dir / "README.txt").write_text("not a db")
+    (db_dir / "a.aselmdb-lock").write_text("lock")
+    (db_dir / "notes.json").write_text("{}")
+
+    ds = ASELMDBDataset(str(db_dir), new_energy_unit="Ha")
+    assert len(ds) == 2
+    assert len(ds.dbs) == 2
+    assert len(ds.data_paths) == 2
+    assert {Path(p).name for p in ds.data_paths} == {"a.aselmdb", "b.aselmdb"}
+
+    bad = db_dir / "corrupt.aselmdb"
+    bad.write_text("not-a-real-aselmdb")
+    with pytest.raises(ValueError, match="Failed to connect"):
+        ASELMDBDataset(str(db_dir), new_energy_unit="Ha")
 
 
 def test_aselmdb_dataset_loads_energy_forces_and_qs(tmp_path):
