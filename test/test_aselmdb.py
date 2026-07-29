@@ -170,3 +170,20 @@ def test_singledatahub_preload_hash_includes_aselmdb_args_when_set(tmp_path):
     assert with_select != baseline
     assert with_connect != baseline
     assert len({with_format, with_select, with_connect}) == 3
+
+
+def test_resolve_keep_stdout_accepts_legacy_keep_output():
+    from enerzyme.qm.qm_driver import _resolve_keep_stdout
+
+    assert _resolve_keep_stdout(False, {}) is False
+    assert _resolve_keep_stdout(True, {}) is True
+
+    kwargs = {"keep_output": True}
+    assert _resolve_keep_stdout(False, kwargs) is True
+    assert "keep_output" not in kwargs
+
+    kwargs = {"keep_output": False}
+    assert _resolve_keep_stdout(False, kwargs) is False
+
+    kwargs = {"keep_output": False}
+    assert _resolve_keep_stdout(True, kwargs) is True

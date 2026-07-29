@@ -48,7 +48,7 @@ QMDriver options
 - :code:`pickle_name` — if set, write pickle only (Enerzymette AL); mutually exclusive with ASE DB output
 - :code:`pickle_fields` — optional map from **standard** names (:code:`E`, :code:`Fa`, :code:`M2`, …) to custom pickle keys; omit for identity. Enerzymette smoke uses :code:`E→energy`, :code:`Fa→grad` (stores :math:`-\mathbf{F}`), :code:`M2→dipole`, …
 - :code:`n_processes` — parallel QM submissions
-- :code:`keep_stdout` / :code:`keep_molden` — retain QC logs
+- :code:`keep_stdout` / :code:`keep_molden` — retain QC logs (:code:`keep_output` is a deprecated alias for :code:`keep_stdout`)
 - :code:`clean_tmp` — remove scratch after success
 
 For PCM, put :code:`pcm_radii_file <name>` in the template (path relative to the template file is fine). :code:`TeraChemDriver` copies that file into the per-job tmp directory so host absolute paths are not required in committed configs.

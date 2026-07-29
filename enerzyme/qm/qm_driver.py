@@ -42,6 +42,27 @@ ENERZYMETTE_PICKLE_FIELDS: Dict[str, str] = {
 _PICKLE_SUFFIXES = {".pkl", ".pickle"}
 
 
+def _resolve_keep_stdout(keep_stdout: bool, kwargs: Dict[str, Any]) -> bool:
+    """Accept legacy ``keep_output`` from YAML kwargs as an alias for ``keep_stdout``."""
+    if "keep_output" not in kwargs:
+        return keep_stdout
+    keep_output = bool(kwargs.pop("keep_output"))
+    logger.warning(
+        "QMDriver option `keep_output` is deprecated; use `keep_stdout` instead. "
+        f"Interpreting keep_output={keep_output} as keep_stdout."
+    )
+    # Prefer explicit keep_stdout when it is True; otherwise honor the legacy key
+    # (covers default keep_stdout=False + keep_output=True from old YAML).
+    if keep_stdout:
+        if keep_stdout != keep_output:
+            logger.warning(
+                f"Both keep_stdout={keep_stdout} and keep_output={keep_output} were set; "
+                "using keep_stdout."
+            )
+        return keep_stdout
+    return keep_output
+
+
 def _resolve_annotate_output(
     output_file: Optional[str],
     pickle_name: Optional[str],
@@ -155,8 +176,8 @@ class QMDriver(ABC):
         self.keep_molden = keep_molden
         if keep_molden:
             os.makedirs(self.output_dir / "moldens", exist_ok=True)
-        self.keep_stdout = keep_stdout
-        if keep_stdout:
+        self.keep_stdout = _resolve_keep_stdout(keep_stdout, kwargs)
+        if self.keep_stdout:
             os.makedirs(self.output_dir / "stdout", exist_ok=True)
         self.clean_tmp = clean_tmp
         self.n_processes = n_processes if n_processes > 0 else cpu_count()

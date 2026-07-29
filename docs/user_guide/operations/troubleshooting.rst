@@ -58,7 +58,7 @@ QM annotation
     Module load / PATH / license.
 
 **Unfinished jobs in batch**
-    Run :code:`enerzymette terachem_timing`; inspect scratch and :code:`keep_output`.
+    Run :code:`enerzymette terachem_timing`; inspect scratch and :code:`keep_stdout` (legacy :code:`keep_output` is still accepted).
 
 Active learning
 ---------------
