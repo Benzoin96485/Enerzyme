@@ -22,8 +22,9 @@ Internal architectures
 +----------------+----------+--------+--------+-------------+------------------+
 | AlphaNet       | varies   | varies | partial| varies      | See config TODOs |
 +----------------+----------+--------+--------+-------------+------------------+
-| AllScAIP       | yes      | yes    | yes    | yes         | Attention Core + |
-|                |          |        |        |             | shared readouts  |
+| AllScAIP       | yes      | yes    | yes    | yes         | **Experimental** |
+|                |          |        |        |             | (魔改 / not      |
+|                |          |        |        |             | recommended)     |
 +----------------+----------+--------+--------+-------------+------------------+
 
 External wrappers
@@ -41,6 +42,11 @@ External models are declared under :code:`Modelhub.external_FFs` with the same :
 
 **UMA** (:code:`architecture: uma_qs`) requires the :code:`fairchem` package. The Core wraps Meta's UMA / eSCN-MD backbone as an atom descriptor; shared layers such as :code:`SimpleReadout`, :code:`HierachicalReadout`, and :code:`SpinConservation` predict atomic or molecular charge/spin outside the Core. Pair with :code:`aselmdb` datasets that provide :code:`Q` / :code:`S` (and optionally :code:`Qa` / :code:`Sa`).
 
+.. warning::
+
+   **AllScAIP** (:code:`architecture: AllScAIP`) in Enerzyme is an **experimental, heavily adapted (魔改)** port of fairchem-style attention IP, not a drop-in of the upstream model.
+   It is **not recommended as a primary production architecture** yet. Prefer PhysNet, SpookyNet, MACE, or UMA for real campaigns; keep AllScAIP for research / ablation only (:code:`train.yaml` FF08 stays :code:`active: false` by default). The Core emits :code:`atom_feature` only — always attach :code:`SimpleReadout` (or NSE heads) before energy/charge physics layers.
+
 Selection guidelines
 --------------------
 
@@ -55,6 +61,9 @@ Selection guidelines
 
 **Active learning with force variance**
     Any architecture with :code:`ShallowEnsembleReduce` or :code:`committee_size` > 1.
+
+**Not for production yet**
+    AllScAIP — experimental Enerzyme adaptation; see warning above.
 
 Spin and charge
 ---------------

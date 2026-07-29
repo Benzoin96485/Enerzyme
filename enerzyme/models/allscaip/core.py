@@ -25,6 +25,7 @@ from .graph_preprocess import (
 )
 
 # Defaults align with fairchem AllScAIP-style configs (Global / MolecularGraph / GNN / Regularization).
+# Experimental Enerzyme adaptation (魔改): not a recommended primary production model yet.
 DEFAULT_BUILD_PARAMS = {
     # Global
     "dim_embedding": 128,
@@ -141,12 +142,16 @@ DEFAULT_LAYER_PARAMS = [
 
 
 class AllScAIPCore(BaseFFCore):
-    """AllScAIP backbone: kNN graph → InputBlock → GraphAttentionBlocks → atomic readout."""
+    """Experimental AllScAIP-style backbone (Enerzyme-adapted / 魔改).
+
+    Not recommended as a primary production architecture yet. Emits ``atom_feature``
+    only — attach ``SimpleReadout`` or NSE heads before energy/charge layers.
+    """
 
     def __str__(self) -> str:
         return """
 ###################################################################
-# AllScAIP-style attention MLIP (All-to-all Scaled Attention IP)   #
+# AllScAIP-style attention MLIP (EXPERIMENTAL / 魔改 — not primary) #
 ###################################################################
 """
 
@@ -200,6 +205,7 @@ class AllScAIPCore(BaseFFCore):
             output_fields={"atom_feature"},
         )
         self.dim_embedding = dim_embedding
+        self.dim_feature_out = dim_embedding
         self.num_layers = num_layers
         self.atten_num_heads = atten_num_heads
         self.ffn_hidden_layer_multiplier = ffn_hidden_layer_multiplier

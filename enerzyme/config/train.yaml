@@ -443,6 +443,7 @@ Modelhub:
         - name: Force
     FF08:
       suffix:
+      # Experimental: Enerzyme-adapted (魔改) AllScAIP — not a recommended production model yet.
       architecture: AllScAIP
       active: false
       loss:
@@ -518,6 +519,15 @@ Modelhub:
             attribute: spin
         - name: Core
           params: {}
+        # Core only emits atom_feature; Ea/Qa come from SimpleReadout (see DEFAULT_LAYER_PARAMS).
+        - name: SimpleReadout
+          params:
+            output_fields:
+              - Ea
+              - Qa
+            head_type: residual_mlp
+            num_residual: 2
+            dim_embedding: 128
         - name: AtomicAffine
           params:
             shifts:

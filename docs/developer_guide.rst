@@ -379,6 +379,11 @@ External UMA (:code:`uma_qs`)
 
 Register in :code:`get_ff_core` like other architectures. Keep fairchem imports inside :code:`enerzyme/models/esen/` so non-UMA installs do not import it until selected. Prefer shared :code:`layers/readout.py` and :code:`layers/spin.py` for Q/S heads.
 
+AllScAIP (:code:`AllScAIP`)
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Enerzyme's AllScAIP is an **experimental, modified (魔改)** attention Core under :code:`enerzyme/models/allscaip/`. Do **not** treat it as the recommended production model; document regressions and keep example FF entries inactive unless deliberately testing. The Core returns :code:`atom_feature` only — YAML stacks must include :code:`SimpleReadout` / NSE heads (see :code:`DEFAULT_LAYER_PARAMS`).
+
 Flow matching (:code:`uma_flow_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

@@ -95,8 +95,11 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |
 +----------------+------------------------------------------+---------------------------+
+| AllScAIP       | Research only (do not use as primary)   | Experimental 魔改 port;   |
+|                |                                          | see architecture catalog  |
++----------------+------------------------------------------+---------------------------+
 
-Enable exactly one model (:code:`active: true`) when starting out.
+Enable exactly one model (:code:`active: true`) when starting out. Prefer PhysNet / SpookyNet / MACE / UMA for production; AllScAIP remains experimental.
 
 SchNet configuration
 ^^^^^^^^^^^^^^^^^^^^

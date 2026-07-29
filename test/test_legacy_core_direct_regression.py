@@ -336,3 +336,21 @@ def test_train_yaml_ff03_uses_feature_and_simple_readout():
     assert "SimpleReadout" in names
     core = next(layer for layer in ff03["layers"] if layer["name"] == "Core")
     assert core["params"].get("output_mode") == "feature"
+
+
+def test_train_yaml_ff08_allscaip_has_simple_readout():
+    """AllScAIP Core only emits atom_feature; FF08 must include SimpleReadout."""
+    from pathlib import Path
+
+    import yaml
+
+    cfg_path = Path(__file__).resolve().parents[1] / "enerzyme" / "config" / "train.yaml"
+    with open(cfg_path) as f:
+        cfg = yaml.safe_load(f)
+    ff08 = cfg["Modelhub"]["internal_FFs"]["FF08"]
+    assert ff08["architecture"] == "AllScAIP"
+    assert ff08.get("active") is False
+    names = [layer["name"] for layer in ff08["layers"]]
+    assert names.index("Core") < names.index("SimpleReadout") < names.index("AtomicAffine")
+    readout = next(layer for layer in ff08["layers"] if layer["name"] == "SimpleReadout")
+    assert set(readout["params"]["output_fields"]) == {"Ea", "Qa"}
