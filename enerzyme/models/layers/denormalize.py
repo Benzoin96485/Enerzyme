@@ -49,7 +49,7 @@ class AtomicAffineLayer(BaseFFLayer):
     
     def _load_from_state_dict(self, state_dict: Dict[str, Tensor], *args, **kwargs):
         for k, v in state_dict.items():
-            if k.endswith("shifts.Ea") or k.endswith("shifts.Qa") or k.endswith("scales.Ea") or k.endswith("scales.Qa"):
+            if k.endswith("shifts.Ea") or k.endswith("shifts.Qa") or k.endswith("scales.Ea") or k.endswith("scales.Qa") or k.endswith("scales.Sa") or k.endswith("shifts.Sa"):
                 if len(v) > self.max_Za + 1:
                     state_dict[k] = v[:self.max_Za + 1]
                 elif len(v) < self.max_Za + 1:
