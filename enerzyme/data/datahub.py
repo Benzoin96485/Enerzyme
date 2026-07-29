@@ -196,6 +196,10 @@ class ASELMDBSingleProperty:
 
         return self.get_property_method(atoms)
 
+    def __iter__(self):
+        for idx in range(len(self)):
+            yield self[idx]
+
 
 class ASELMDBDataset:
     def __init__(
@@ -547,6 +551,8 @@ class SingleDataHub:
     
     def _compress(self, k: str, values: Iterable) -> np.ndarray:
         # only works for equal length data
+        if not (isinstance(values, list) or isinstance(values, np.ndarray)):
+            values = list(tqdm(values, total=len(values), desc=f"Enumerating {k} (data type {self.data_types[k]})"))
         value_array = np.array(values)
         if is_int(k) and self.compressed and (value_array == value_array[0]).all():
             logger.info(f"Values of {k} (data type {self.data_types[k]}) are all the same and compressed into a single value")
@@ -705,7 +711,10 @@ class SingleDataHub:
             raise KeyError(f"Dataset must contain 'Za' key (Atomic numbers)")
         
         n_Za = len(raw_data[self.data_types["Za"]])
-        Zas = parse_Za(raw_data[self.data_types["Za"]])
+        if self.data_format == "pickle":
+            Zas = parse_Za(raw_data[self.data_types["Za"]])
+        else:
+            Zas = raw_data[self.data_types["Za"]]
         if n_Za == 1:
             # list-of-dicts pickle yields Za as [Za_array]; unwrap to the shared topology
             Za_ref = Zas[0] if isinstance(Zas, list) else Zas

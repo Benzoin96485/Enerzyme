@@ -1,6 +1,6 @@
 import os
 import bisect
-from inspect import signature
+from inspect import signature, Parameter
 from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable, Union
 from collections import OrderedDict
 from functools import partial
@@ -51,12 +51,18 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .xpainn import XPaiNNWrapper as Core
         from .xpainn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "uma_qs":
+        from .esen import UMAWrapperQS as Core
+        DEFAULT_BUILD_PARAMS = {}
+        DEFAULT_LAYER_PARAMS = []
+        special_loss = {}
     LOSS_REGISTER.update(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
 
 def build_layer(layer: Callable, layer_params: Dict[str, Any], build_params: Dict[str, Any], built_layers: Optional[Dict[str, Module]]=None) -> Module:
     final_params = dict()
+    var_keyword = False
     for name, attr in signature(layer).parameters.items():
         if name in layer_params:
             final_params[name] = layer_params[name]
@@ -64,8 +70,15 @@ def build_layer(layer: Callable, layer_params: Dict[str, Any], build_params: Dic
             final_params[name] = build_params[name]
         elif name == "built_layers" and built_layers is not None:
             final_params[name] = built_layers
-        elif attr.default is attr.empty:
-            raise TypeError(f"{name} value should be provided")
+        else:
+            if attr.kind == Parameter.VAR_KEYWORD:
+                var_keyword = True
+            elif attr.default is attr.empty:
+                raise TypeError(f"{name} value should be provided")
+    if var_keyword:
+        for key, value in layer_params.items():
+            if key not in final_params:
+                final_params[key] = value
     return layer(**final_params)
 
 
