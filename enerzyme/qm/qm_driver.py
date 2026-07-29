@@ -634,7 +634,7 @@ class TeraChemDriver(QMDriver):
                 raise FileNotFoundError(f"Center of Mass or dipole moment line not found in {scr_dir / 'results.dat'}")
             com = np.array(list(map(float, lines[com_line_index].split())))
             dipole = np.array(list(map(float, lines[dipole_line_index].split()))) * Debye  # Debye to e Angstrom
-            dipole = dipole + com * atoms.info["charge"]
+            dipole = dipole + com * atoms.info.get("charge", 0)
         with open(scr_dir / "grad.xyz", "r") as f:
             _ = f.readline()
             title = f.readline()
