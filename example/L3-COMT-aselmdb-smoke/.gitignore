@@ -1,0 +1,4 @@
+*.aselmdb
+*.aselmdb-lock
+tmp/
+annot_*/

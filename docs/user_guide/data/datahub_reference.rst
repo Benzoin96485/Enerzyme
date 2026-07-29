@@ -68,6 +68,16 @@ Keys are **standard Enerzyme names**; values are attribute names in your file. U
 
 :code:`N` can be omitted and inferred from :code:`Za`. :code:`Q` defaults to 0 if missing.
 
+For :code:`data_format: aselmdb`, ASE LMDB already exposes standard names
+(:code:`Ra`, :code:`Za`, :code:`E`, :code:`Fa`, …). Use **identity** maps
+(:code:`E: null` / :code:`E: E`), not pickle aliases such as :code:`E: energy`
+or :code:`Ra: coord` — non-identity maps for those fixed fields raise
+:code:`ValueError`. Declared calculator fields (:code:`E`, :code:`Fa`, :code:`M2`, …)
+are registered even when the first DB row lacks them; annotate also stores an
+:code:`enerzyme_properties` schema in ASE DB metadata. Declared fields that are
+still missing from the source raise at load time instead of being skipped silently.
+Custom keys stored in ASE row :code:`data` may still use non-identity maps.
+
 Custom fields
 -------------
 
@@ -107,10 +117,10 @@ Transforms
 Defined under :code:`transforms` or :code:`global_transforms`:
 
 - :code:`atomic_energy` — path to CSV (:code:`atom_type`, :code:`atomic_energy`)
-- :code:`negative_gradient` — flip gradient sign for force targets
+- :code:`negative_gradient` — flip gradient sign for force targets (pickle / QC ∇E). Disabled for :code:`aselmdb`, where :code:`Fa` is already ASE physical forces
 - :code:`total_energy_normalization` — global mean/std on :code:`E`
 
 Cache invalidation
 ------------------
 
-The preprocessing hash depends on :code:`data_path`, :code:`data_format`, neighbor list settings, and transforms. Changing any of these creates a new :code:`processed_dataset_<hash>/` directory.
+The preprocessing hash depends on :code:`data_path`, neighbor list settings, and transforms. Non-empty :code:`data_format`, :code:`connect_args`, and :code:`select_args` are included as well (empty / unset values are omitted for cache compatibility). Changing any of these creates a new :code:`processed_dataset_<hash>/` directory.

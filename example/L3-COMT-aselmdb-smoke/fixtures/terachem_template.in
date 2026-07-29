@@ -1,0 +1,11 @@
+basis 6-31gs
+method b3lyp
+maxit 1000
+scf diis+a
+guess generate
+dftd d3
+pcm cosmo
+epsilon 10
+pcm_radii read
+pcm_radii_file pcm_radii
+end
