@@ -61,6 +61,46 @@ def test_aselmdb_dataset_loads_dipole_as_m2(tmp_path):
     np.testing.assert_allclose(ds["M2"][0], dipole)
 
 
+def test_aselmdb_declared_m2_when_first_row_lacks_dipole(tmp_path):
+    """Declared / schema registration must not depend on the first row alone."""
+    from enerzyme.data.datahub import ASELMDB_METADATA_PROPERTIES_KEY
+
+    db_path = tmp_path / "sparse_dipole.aselmdb"
+    dipole = np.array([0.11, -0.22, 0.33])
+    _write_toy_aselmdb(db_path, energy_ev=-1.0, index=0)  # no dipole
+    atoms = Atoms("H2", positions=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
+    atoms.calc = SinglePointCalculator(
+        atoms,
+        energy=-2.0,
+        forces=np.array([[0.1, 0.0, 0.0], [-0.1, 0.0, 0.0]]),
+        dipole=dipole,
+    )
+    with connect(str(db_path)) as db:
+        db.write(atoms, data={"charge": 0, "spin": 1, "index": 1}, index=1)
+
+    # Without help, first-row probe misses M2.
+    ds_probe = ASELMDBDataset(str(db_path), new_energy_unit="Ha")
+    assert "M2" not in ds_probe
+
+    # Declared Datahub targets register M2 even when row 0 lacks dipole.
+    ds_declared = ASELMDBDataset(
+        str(db_path),
+        new_energy_unit="Ha",
+        declared_properties=["E", "Fa", "M2"],
+    )
+    assert "M2" in ds_declared
+    np.testing.assert_allclose(ds_declared["M2"][1], dipole)
+
+    # Writer schema likewise registers M2 without probing row 0.
+    with connect(str(db_path)) as db:
+        meta = dict(db.metadata or {})
+        meta[ASELMDB_METADATA_PROPERTIES_KEY] = ["Ra", "Za", "N", "Q", "S", "E", "Fa", "M2"]
+        db.metadata = meta
+    ds_schema = ASELMDBDataset(str(db_path), new_energy_unit="Ha")
+    assert "M2" in ds_schema
+    np.testing.assert_allclose(ds_schema["M2"][1], dipole)
+
+
 def test_aselmdb_dataset_handles_none_row_data(tmp_path, monkeypatch):
     """Rows with data=None / null must still expose calculator-backed E/Fa."""
     from ase_db_backends.aselmdb import LMDBDatabase
@@ -105,6 +145,61 @@ def test_singledatahub_loads_m2_from_aselmdb(tmp_path):
     )
     assert "M2" in hub.data
     np.testing.assert_allclose(hub.data["M2"][0], dipole)
+
+
+def test_singledatahub_rejects_pickle_style_aselmdb_maps(tmp_path):
+    """Pickle aliases (E: energy, Ra: coord) must fail loudly for aselmdb."""
+    db_path = tmp_path / "toy.aselmdb"
+    _write_toy_aselmdb(db_path)
+
+    with pytest.raises(ValueError, match="identity maps"):
+        SingleDataHub(
+            dump_dir=str(tmp_path / "out"),
+            data_path=str(db_path),
+            data_format="aselmdb",
+            preload=False,
+            features={"Ra": "coord", "Za": "atom_type", "N": "N", "Q": "total_chrg"},
+            targets={"E": "energy", "Fa": "grad"},
+            neighbor_list="",
+            compressed=False,
+        )
+
+
+def test_singledatahub_raises_on_missing_molecular_source(tmp_path):
+    """Declared molecular fields that no row can supply must fail while loading."""
+    db_path = tmp_path / "toy.aselmdb"
+    _write_toy_aselmdb(db_path)  # no dipole on any row
+
+    with pytest.raises(Exception, match=r"dipole"):
+        SingleDataHub(
+            dump_dir=str(tmp_path / "out"),
+            data_path=str(db_path),
+            data_format="aselmdb",
+            preload=False,
+            features={"Ra": "Ra", "Za": "Za", "N": "N", "Q": "Q"},
+            # Declared M2 is registered, then get_dipole_moment fails on the toy row.
+            targets={"E": "E", "Fa": "Fa", "M2": "M2"},
+            neighbor_list="",
+            compressed=False,
+        )
+
+
+def test_singledatahub_raises_on_unknown_custom_source(tmp_path):
+    """Custom targets absent from row data still raise KeyError (not silent skip)."""
+    db_path = tmp_path / "toy.aselmdb"
+    _write_toy_aselmdb(db_path)
+
+    with pytest.raises(KeyError, match="Requested field 'foo'"):
+        SingleDataHub(
+            dump_dir=str(tmp_path / "out"),
+            data_path=str(db_path),
+            data_format="aselmdb",
+            preload=False,
+            features={"Ra": "Ra", "Za": "Za", "N": "N", "Q": "Q"},
+            targets={"E": "E", "Fa": "Fa", "foo": "foo"},
+            neighbor_list="",
+            compressed=False,
+        )
 
 
 @pytest.mark.parametrize(

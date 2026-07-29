@@ -47,7 +47,14 @@ Lazy property accessors map ASE calculator results and :code:`atoms.info` / row 
 - :code:`Qa`, :code:`Sa` — charges / magnetic moments when present on the calculator
 - :code:`Q`, :code:`S` — from ASE info ``charge`` / ``spin`` (fairchem-style; :code:`S = spin - 1`)
 
-ASE calculator / info key names (:code:`energy`, :code:`dipole`, :code:`charge`, …) stay on the :code:`Atoms` object; Datahub only exposes the standard Enerzyme names above.
+ASE calculator / info key names (:code:`energy`, :code:`dipole`, :code:`charge`, …) stay on the :code:`Atoms` object; Datahub only exposes the standard Enerzyme names above. Training YAML must therefore use **identity** feature/target maps
+(:code:`E: null`, :code:`Fa: null`, …). Pickle-style aliases (:code:`E: energy`,
+:code:`Ra: coord`) are rejected.
+
+Property discovery does **not** rely on the first row alone: :code:`enerzyme annotate`
+writes an :code:`enerzyme_properties` metadata schema, and Datahub also registers any
+calculator field declared in :code:`features` / :code:`targets`. First-row probing remains
+a fallback for legacy databases without schema.
 
 :code:`enerzyme annotate` writes this format by default via :code:`QMDriver.output_file` (see :doc:`/user_guide/workflows/qm_annotation`). Enerzymette's outer AL loop still merges :code:`fragments.pkl` today — keep :code:`pickle_name: fragments.pkl` for those campaigns, or train directly from :code:`.aselmdb` outside Enerzymette.
 

@@ -27,8 +27,66 @@ ASE_PROPERTY_METHODS: Dict[str, Callable[[Atoms], Any]] = {
     "M2": lambda atoms: atoms.get_dipole_moment(),
 }
 
+# ASE SinglePointCalculator.results keys → standard Enerzyme names.
+_ASE_RESULTS_KEY_TO_STANDARD = {
+    "energy": "E",
+    "forces": "Fa",
+    "dipole": "M2",
+    "charges": "Qa",
+    "magmoms": "Sa",
+}
+
+# Written by annotate into ase.db metadata; preferred over first-row probing.
+ASELMDB_METADATA_PROPERTIES_KEY = "enerzyme_properties"
+
 # ASE info keys that are remapped to standard names (not exposed as Datahub keys).
 _ASE_INFO_STANDARD_KEYS = frozenset({"charge", "spin"})
+
+# Always available geometry / charge fields (no calculator required).
+_ASELMDB_GEOMETRY_KEYS = frozenset({"Ra", "Za", "N", "Q", "S"})
+
+# ASELMDBDataset exposes these under standard Enerzyme names only (not pickle aliases
+# like energy/coord/grad). Custom row-data fields may still use non-identity maps.
+_ASELMDB_FIXED_KEYS = _ASELMDB_GEOMETRY_KEYS | frozenset(ASE_PROPERTY_METHODS)
+
+
+def _probe_calculator_properties(atoms: Atoms) -> set:
+    """Discover calculator-backed fields from ``calc.results`` (fallback: accessors)."""
+    found: set = set()
+    if atoms.calc is None:
+        return found
+    results = getattr(atoms.calc, "results", None) or {}
+    for ase_key, std_key in _ASE_RESULTS_KEY_TO_STANDARD.items():
+        if ase_key in results:
+            found.add(std_key)
+    for prop, method in ASE_PROPERTY_METHODS.items():
+        if prop in found:
+            continue
+        try:
+            method(atoms)
+        except Exception as e:
+            logger.warning(f"Failed to get {prop} directly from calculator: {e}")
+        else:
+            found.add(prop)
+    return found
+
+
+def _read_aselmdb_schema_properties(dbs) -> set:
+    """Union ``enerzyme_properties`` metadata across connected ASE databases."""
+    schema: set = set()
+    for db in dbs:
+        try:
+            meta = dict(getattr(db, "metadata", None) or {})
+        except Exception as e:
+            logger.warning(f"Failed to read ASE DB metadata: {e}")
+            continue
+        props = meta.get(ASELMDB_METADATA_PROPERTIES_KEY)
+        if not props:
+            continue
+        if isinstance(props, str):
+            props = [props]
+        schema.update(str(p) for p in props)
+    return schema
 
 
 def load_from_pickle(data_path=str):
@@ -112,6 +170,7 @@ class ASELMDBDataset:
         connect_args: Dict[str, Any]=dict(),
         select_args: Dict[str, Any]=dict(),
         transforms: Optional[Dict[str, Any]]=None,
+        declared_properties: Optional[Iterable[str]]=None,
     ):
         if transforms and transforms.get("energy_unit_conversion"):
             logger.warning(
@@ -153,6 +212,8 @@ class ASELMDBDataset:
                 self.db_ids.append([row.id for row in db.select(**select_args)])
         self.id_lens = [len(ids) for ids in self.db_ids]
         self._id_len_segments = np.cumsum(self.id_lens).tolist()
+        if not self._id_len_segments or self._id_len_segments[-1] == 0:
+            raise ValueError(f"No rows found in ASE LMDB path(s): {data_path}")
 
         first_db = self.dbs[0]
         try:
@@ -160,17 +221,13 @@ class ASELMDBDataset:
             first_atoms = first_row.toatoms()
         except Exception as e:
             raise ValueError(f"Failed to get atoms from {first_db}: {e}")
-        
-        properties_from_calculator = set()
-        if first_atoms.calc is not None:
-            for prop, method in ASE_PROPERTY_METHODS.items():
-                try:
-                    method(first_atoms)
-                except Exception as e:
-                    logger.warning(f"Failed to get {prop} directly from calculator: {e}")
-                else:
-                    properties_from_calculator.add(prop)
-        
+
+        # Discovery priority: DB schema metadata → Datahub-declared fields → first-row probe.
+        # First-row probing alone misses properties present only on later frames.
+        properties_from_schema = _read_aselmdb_schema_properties(self.dbs)
+        declared = {str(p) for p in (declared_properties or [])}
+        properties_from_calculator = _probe_calculator_properties(first_atoms)
+
         self.properties_from_info = set()
         # ASE may store data as null / omit it; AtomsRow.data then returns None
         # or raises when wrapping None in FancyDict.
@@ -185,14 +242,36 @@ class ASELMDBDataset:
                 if isinstance(v, float) or isinstance(v, int) or isinstance(v, np.ndarray):
                     self.properties_from_info.add(k)
 
-        self.unique_properties_from_calculator = properties_from_calculator - self.properties_from_info
-        overlapped_properties = properties_from_calculator & self.properties_from_info
+        schema_calc = properties_from_schema & set(ASE_PROPERTY_METHODS)
+        schema_info = properties_from_schema - _ASELMDB_FIXED_KEYS
+        declared_calc = declared & set(ASE_PROPERTY_METHODS)
+
+        calculator_backed = properties_from_calculator | schema_calc | declared_calc
+        self.properties_from_info |= schema_info
+
+        if (schema_calc or declared_calc) and (
+            (schema_calc | declared_calc) - properties_from_calculator
+        ):
+            missing_on_first = (schema_calc | declared_calc) - properties_from_calculator
+            logger.info(
+                "Calculator fields not on the first ASE row but registered via "
+                f"schema/declared maps: {sorted(missing_on_first)}"
+            )
+
+        self.unique_properties_from_calculator = calculator_backed - self.properties_from_info
+        overlapped_properties = calculator_backed & self.properties_from_info
         # Q / S always available via atoms.info defaults (charge=0, spin multiplicity=1 → S=0)
-        self._all_properties = self.unique_properties_from_calculator | self.properties_from_info | {
-            "Ra", "Za", "N", "Q", "S"
-        }
+        self._all_properties = (
+            self.unique_properties_from_calculator
+            | self.properties_from_info
+            | _ASELMDB_GEOMETRY_KEYS
+        )
         if overlapped_properties:
             logger.warning(f"Property {overlapped_properties} found in calculator will be overwritten by info")
+        if properties_from_schema:
+            logger.info(f"Properties from ASE DB schema: {sorted(properties_from_schema)}")
+        if declared:
+            logger.info(f"Properties declared by Datahub: {sorted(declared)}")
         logger.info(f"Properties from calculator: {self.unique_properties_from_calculator}")
         logger.info(f"Properties from info: {self.properties_from_info}")
 
@@ -210,7 +289,7 @@ class ASELMDBDataset:
             get_property_method = lambda atoms: atoms.info.get("charge", 0)
         elif k == "S":
             get_property_method = lambda atoms: atoms.info.get("spin", 1) - 1
-        elif k in ASE_PROPERTY_METHODS.keys() and k in self.unique_properties_from_calculator:
+        elif k in ASE_PROPERTY_METHODS and k in self.unique_properties_from_calculator:
             if k in {"E", "Fa"}:
                 get_property_method = lambda atoms, p=k: ASE_PROPERTY_METHODS[p](atoms) * self.energy_unit_conversion_factor
             else:
@@ -412,6 +491,37 @@ class SingleDataHub:
         else:
             return value_array
 
+    def _validate_aselmdb_field_maps(self) -> None:
+        """Reject pickle-style aliases for fixed ASE LMDB standard names."""
+        bad = {
+            k: src for k, src in self.data_types.items()
+            if k in _ASELMDB_FIXED_KEYS and src != k
+        }
+        if not bad:
+            return
+        examples = ", ".join(f"{k}: {src}" for k, src in sorted(bad.items()))
+        raise ValueError(
+            "data_format=aselmdb exposes standard Enerzyme names only "
+            f"(Ra/Za/N/Q/S and calculator fields {sorted(ASE_PROPERTY_METHODS)}). "
+            "Use identity maps (e.g. E: null or E: E), not pickle-style aliases "
+            f"such as E: energy / Ra: coord. Invalid maps: {{{examples}}}. "
+            "Custom row-data fields may still use non-identity maps."
+        )
+
+    def _missing_source_error(self, k: str, raw_data: Dict) -> KeyError:
+        src = self.data_types[k]
+        available = sorted(raw_data.keys()) if hasattr(raw_data, "keys") else []
+        hint = ""
+        if self.data_format == "aselmdb" and k in _ASELMDB_FIXED_KEYS and src != k:
+            hint = (
+                f" For data_format=aselmdb use an identity map "
+                f"(e.g. {k}: null or {k}: {k}), not a pickle-style alias."
+            )
+        return KeyError(
+            f"Requested field '{k}' (source '{src}') not found in raw data "
+            f"(available: {available}).{hint}"
+        )
+
     def _load_molecular_data(self, k: str, raw_data: Dict) -> None:
         if self.data_types[k] in raw_data.keys():
             values = raw_data[self.data_types[k]]
@@ -421,7 +531,7 @@ class SingleDataHub:
                 self.data.create_dataset(k, data=self._compress(k, values))
             else:
                 raise IndexError(f"Length of '{k}' should be n_datapoint or 1")
-        elif self.data_types[k + "a"] in raw_data.keys():
+        elif (k + "a") in self.data_types and self.data_types[k + "a"] in raw_data.keys():
             self._load_atomic_data(k + "a", raw_data)
             # reduce atomic property into molecular property, mainly for Qa into Q
             logger.info(f"Molecular property {k} are reduced from atomic property {k + 'a'} ({self.data_types[k + 'a']})")
@@ -431,30 +541,46 @@ class SingleDataHub:
                 values = [sum(self.data[k + "a"][i][:self.data["N"][i % len(self.data["N"])]]) for i in tqdm(range(self.n_datapoint))]
             # don't compress summation of atomic property
             self.data.create_dataset(k, data=np.array(values))
+        else:
+            raise self._missing_source_error(k, raw_data)
 
     def _load_atomic_data(self, k: str, raw_data: Dict) -> None:
         if k in self.data:
             return
-        values = raw_data[self.data_types[k]]
-        v0 = np.array(values[0])
+        src = self.data_types[k]
+        if src not in raw_data.keys():
+            raise self._missing_source_error(k, raw_data)
+        values = raw_data[src]
+        sample = values[0]
+        if sample is None:
+            raise ValueError(
+                f"Atomic field '{k}' (source '{src}') returned None for the first "
+                f"datapoint; check the feature/target map and dataset contents."
+            )
+        v0 = np.array(sample)
         if len(values) == self.n_datapoint:
             # for a datapoint, the shape of this property is (N, a, b, ...)
             # for the whole dataset, the shape of this property is (n_datapoint, max_N, a, b, ...)
             self.data.create_dataset(k, shape=(self.n_datapoint, self.max_N, *v0.shape[1:]), dtype=v0.dtype)
-            logger.info(f"Storing atomic data {k} ({self.data_types[k]})")
+            logger.info(f"Storing atomic data {k} ({src})")
             for i, v in tqdm(enumerate(values), total=self.n_datapoint):
+                if v is None:
+                    raise ValueError(
+                        f"Atomic field '{k}' (source '{src}') returned None at index {i}."
+                    )
                 self.data[k][i,:len(v)] = v
 
         elif len(values) == 1:
             self.data.create_dataset(k, data=self._expand(k, values))
         else:
-            raise IndexError(f"Length of {k} ({self.data_types[k]}) should be n_datapoint")
+            raise IndexError(f"Length of {k} ({src}) should be n_datapoint")
 
     def _init_data(self) -> None:
         suffix = self.data_path.split(".")[-1]
         # aselmdb accepts a file, directory of DB files, or glob; ASELMDBDataset validates the path
         if self.data_format == "aselmdb" or suffix == "aselmdb":
             self.data_format = "aselmdb"
+            self._validate_aselmdb_field_maps()
             aselmdb_transforms = {}
             if self.preprocessings:
                 aselmdb_transforms.update(self.preprocessings)
@@ -465,6 +591,7 @@ class SingleDataHub:
                 connect_args=self.connect_args,
                 select_args=self.select_args,
                 transforms=aselmdb_transforms or None,
+                declared_properties=self.data_types.keys(),
             )
             # Unit conversion is already applied in ASELMDBDataset; drop the transform so it is not applied twice.
             if aselmdb_transforms.get("energy_unit_conversion"):

@@ -26,6 +26,9 @@ QM_CALCULATED_TO_ASE_PROPERTY = {
     "Sa": "magmoms",
 }
 
+# Geometry / charge fields always present on ASE LMDB rows written by annotate.
+_ASELMDB_SCHEMA_GEOMETRY = ("Ra", "Za", "N", "Q", "S")
+
 # Optional annotate pickle rename: standard Enerzyme name → custom key in the .pkl dict.
 # Values stay standard (E/Fa in Ha / Ha·Å⁻¹, M2 in e·Å, Za atomic numbers, Q, S=2S+1−1).
 # Enerzymette AL historically expects the names below (and Fa stored as ∇E under ``grad``).
@@ -210,6 +213,27 @@ class QMDriver(ABC):
             else:
                 raise FileNotFoundError(f"Molden file {molden_file} not found")
 
+    def aselmdb_schema_properties(self) -> List[str]:
+        """Standard names written into ASE LMDB metadata for Datahub discovery."""
+        # Geometry/charge always; E/Fa/M2 from successful QM (Qa/Sa only if a driver adds them).
+        return list(_ASELMDB_SCHEMA_GEOMETRY) + ["E", "Fa", "M2"]
+
+    def _ensure_aselmdb_schema(self) -> None:
+        """Persist property schema so readers need not rely on the first row alone."""
+        from ..data.datahub import ASELMDB_METADATA_PROPERTIES_KEY
+
+        props = self.aselmdb_schema_properties()
+        db = connect(self.output_path, **self.default_connect_args)
+        meta = dict(db.metadata or {})
+        if meta.get(ASELMDB_METADATA_PROPERTIES_KEY) == props:
+            return
+        meta[ASELMDB_METADATA_PROPERTIES_KEY] = props
+        db.metadata = meta
+        logger.info(
+            f"Wrote ASE LMDB schema {ASELMDB_METADATA_PROPERTIES_KEY}={props} "
+            f"to {self.output_path}"
+        )
+
     def _run_qm(self, atoms: Atoms) -> Optional[Dict[str, Any]]:
         index = atoms.info["index"]
         tmp_dir = Path(str(self.tmp_dir_base) + f".{index}")
@@ -343,6 +367,7 @@ class QMDriver(ABC):
             self.supplier = supplier
 
     def _run_aselmdb(self) -> None:
+        self._ensure_aselmdb_schema()
         if self.n_processes == 1:
             for atoms in tqdm(self.supplier.suppl(), desc="Running QM", dynamic_ncols=True, leave=False, position=0):
                 self.single_run_aselmdb(atoms)
