@@ -71,6 +71,45 @@ class BaseReadout(BaseFFLayer):
                 **self.head_params
             )
 
+    def _split_field_outputs(self, head_output: Tensor) -> Dict[str, Tensor]:
+        """Map head tensor columns onto named fields.
+
+        Head layout matches :class:`~enerzyme.models.blocks.mlp.DenseLayer`:
+        ``(N, fields)`` when ``shallow_ensemble_size == 1``, or
+        ``(N, fields, ensemble)`` when ``shallow_ensemble_size > 1``.
+
+        Selecting field ``i`` with ``select(1, i)`` therefore yields per-atom
+        scalars ``(N,)`` or shallow-ensemble predictions ``(N, ensemble)``.
+        That trailing ensemble axis is the Enerzyme contract used by PhysNet /
+        SchNet / MACE cores and by ChargeConservation, AtomicAffine, Force,
+        WeightedLoss, and ShallowEnsembleReduce — it must not be squeezed away.
+        """
+        if head_output.ndim == 2:
+            expected = (head_output.shape[0], self.dim_feature_out)
+        elif head_output.ndim == 3:
+            expected = (
+                head_output.shape[0],
+                self.dim_feature_out,
+                self.shallow_ensemble_size,
+            )
+            if self.shallow_ensemble_size <= 1:
+                raise ValueError(
+                    "Readout head returned a 3D tensor but shallow_ensemble_size "
+                    f"is {self.shallow_ensemble_size}; expected 2D (N, fields)."
+                )
+        else:
+            raise ValueError(
+                f"Readout head output must be 2D or 3D, got shape {tuple(head_output.shape)}"
+            )
+        if tuple(head_output.shape) != expected:
+            raise ValueError(
+                f"Readout head output shape {tuple(head_output.shape)} != expected {expected}"
+            )
+        return {
+            self.ordered_output_fields[i]: head_output.select(1, i)
+            for i in range(self.dim_feature_out)
+        }
+
 
 class SimpleReadout(BaseReadout):
     def __init__(self, 
@@ -103,9 +142,11 @@ class SimpleReadout(BaseReadout):
             output = self.head(atom_feature)
         elif atom_feature.ndim == 3:
             output = self.head(atom_feature[:, :, -1])
-        return {
-            self.ordered_output_fields[i]: output[:, i] for i in range(self.dim_feature_out)
-        }
+        else:
+            raise ValueError(
+                f"atom_feature must be 2D or 3D, got shape {tuple(atom_feature.shape)}"
+            )
+        return self._split_field_outputs(output)
 
 
 class HierachicalReadout(BaseReadout):
@@ -126,9 +167,7 @@ class HierachicalReadout(BaseReadout):
                 if i > 0:
                     nhloss += torch.mean(output2 / (output2 + lastoutput2 + 1e-7))
                 lastoutput2 = output2
-        output = {
-            self.ordered_output_fields[i]: raw_output[:, i] for i in range(self.dim_feature_out)
-        }
+        output = self._split_field_outputs(raw_output)
         if self.use_nhloss:
             output["nh_loss"] = nhloss
         return output
