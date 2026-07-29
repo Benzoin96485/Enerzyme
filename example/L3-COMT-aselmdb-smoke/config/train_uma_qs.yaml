@@ -56,7 +56,8 @@ Trainer:
     preload: false
     save: true
     seed: 114514
-  batch_size: 1
+  # >1 exercises OTF neighbor construction for every structure in a batch
+  batch_size: 2
   # Trainer treats num_workers<=0 as "auto"; keep a small positive value for smoke.
   num_workers: 1
   max_epochs: 1

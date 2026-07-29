@@ -10,15 +10,18 @@ committed YAML (placeholder ``UMA_CHECKPOINT``).
 from __future__ import annotations
 
 import os
+import pickle
 import shutil
 from pathlib import Path
 
+import numpy as np
 import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "example" / "L3-COMT-aselmdb-smoke"
 CFG = EXAMPLE / "config" / "train_uma_qs.yaml"
+FIXTURE = EXAMPLE / "fixtures" / "fragments_tiny.pkl"
 PLACEHOLDER = "UMA_CHECKPOINT"
 
 
@@ -27,6 +30,8 @@ def test_train_uma_qs_config_shape():
         cfg = yaml.safe_load(f)
     assert cfg["Datahub"]["data_format"] == "pickle"
     assert cfg["Datahub"]["data_path"] == "fixtures/fragments_tiny.pkl"
+    assert cfg["Datahub"]["neighbor_list"] in ("", None)
+    assert cfg["Trainer"]["batch_size"] > 1
     assert "S" in cfg["Datahub"]["features"]
     assert "Q" in cfg["Datahub"]["targets"] and "S" in cfg["Datahub"]["targets"]
 
@@ -41,7 +46,107 @@ def test_train_uma_qs_config_shape():
 
 
 def test_train_uma_qs_fixture_exists():
-    assert (EXAMPLE / "fixtures" / "fragments_tiny.pkl").is_file()
+    assert FIXTURE.is_file()
+
+
+def _feature_from_frame(frame: dict) -> dict:
+    from enerzyme.data.transform import parse_Za
+
+    za = parse_Za(frame["atom_type"])
+    ra = np.asarray(frame["coord"], dtype=float)
+    return {
+        "N": int(len(za)),
+        "Za": np.asarray(za, dtype=int),
+        "Ra": ra,
+        "Q": int(frame["total_chrg"]),
+        "S": int(frame["total_spin"]),
+    }
+
+
+def _assert_full_batch_graph(batch_features: dict, sizes: list[int]) -> None:
+    """Every atom in every structure must participate in a full neighbor graph."""
+    assert "idx_i" in batch_features and "idx_j" in batch_features
+    idx_i = batch_features["idx_i"].detach().cpu().numpy()
+    idx_j = batch_features["idx_j"].detach().cpu().numpy()
+    expected_edges = sum(n * (n - 1) for n in sizes)
+    assert len(idx_i) == expected_edges == len(idx_j)
+
+    offset = 0
+    for n in sizes:
+        atom_ids = set(range(offset, offset + n))
+        mask = (idx_i >= offset) & (idx_i < offset + n)
+        assert mask.sum() == n * (n - 1)
+        assert set(idx_i[mask].tolist()) == atom_ids
+        assert set(idx_j[mask].tolist()) == atom_ids
+        # No cross-molecule edges
+        assert np.all((idx_j[mask] >= offset) & (idx_j[mask] < offset + n))
+        offset += n
+    assert offset == sum(sizes)
+    assert set(idx_i.tolist()) | set(idx_j.tolist()) == set(range(sum(sizes)))
+
+
+def test_decorate_batch_input_otf_graph_covers_all_uma_fixture_structures():
+    """Regression: otf_graph must build idx_i/idx_j for *every* molecule in a batch.
+
+    uma_qs smoke uses neighbor_list='' (OTF) and batch_size>1; a batch-wide
+    ``built_graph`` flag previously stopped after the first structure.
+    """
+    torch = pytest.importorskip("torch")
+    from enerzyme.data.neighbor_list import full_neighbor_list
+    from enerzyme.tasks.batch import _decorate_batch_input
+
+    with open(FIXTURE, "rb") as f:
+        frames = pickle.load(f)
+    assert len(frames) >= 2
+
+    features = [_feature_from_frame(frame) for frame in frames[:2]]
+    sizes = [feat["N"] for feat in features]
+    batch = [
+        (features[0], {"Q": features[0]["Q"], "S": features[0]["S"]}, 0),
+        (features[1], {"Q": features[1]["Q"], "S": features[1]["S"]}, 1),
+    ]
+    batch_features, _ = _decorate_batch_input(
+        batch, dtype=torch.float32, device=torch.device("cpu"), otf_graph=True
+    )
+    _assert_full_batch_graph(batch_features, sizes)
+
+    # Mixed: precomputed edges on the first structure, OTF on the second
+    idx_i, idx_j = full_neighbor_list(features[0]["N"])
+    features[0] = {
+        **features[0],
+        "idx_i": idx_i,
+        "idx_j": idx_j,
+        "N_pair": len(idx_i),
+    }
+    batch_mixed = [
+        (features[0], {"Q": features[0]["Q"], "S": features[0]["S"]}, 0),
+        (features[1], {"Q": features[1]["Q"], "S": features[1]["S"]}, 1),
+    ]
+    mixed_features, _ = _decorate_batch_input(
+        batch_mixed, dtype=torch.float32, device=torch.device("cpu"), otf_graph=True
+    )
+    _assert_full_batch_graph(mixed_features, sizes)
+
+
+def test_decorate_batch_input_rejects_incomplete_neighbor_lists():
+    torch = pytest.importorskip("torch")
+    from enerzyme.data.neighbor_list import full_neighbor_list
+    from enerzyme.tasks.batch import _decorate_batch_input
+
+    with open(FIXTURE, "rb") as f:
+        frames = pickle.load(f)
+    feat0 = _feature_from_frame(frames[0])
+    feat1 = _feature_from_frame(frames[1])
+    idx_i, idx_j = full_neighbor_list(feat0["N"])
+    feat0.update({"idx_i": idx_i, "idx_j": idx_j, "N_pair": len(idx_i)})
+    batch = [
+        (feat0, {"Q": feat0["Q"], "S": feat0["S"]}, 0),
+        (feat1, {"Q": feat1["Q"], "S": feat1["S"]}, 1),
+    ]
+    with pytest.raises(ValueError, match="Incomplete neighbor lists"):
+        _decorate_batch_input(
+            batch, dtype=torch.float32, device=torch.device("cpu"), otf_graph=False
+        )
 
 
 @pytest.mark.skipif(
@@ -68,6 +173,8 @@ def test_uma_qs_one_epoch_train(tmp_path: Path):
 
     cfg["Trainer"]["cuda"] = bool(torch.cuda.is_available())
     cfg["Trainer"]["num_workers"] = 1
+    assert cfg["Trainer"]["batch_size"] > 1
+    assert not cfg["Datahub"].get("neighbor_list")
 
     # UMA checkpoints are large; prefer a roomy local scratch over pytest's /tmp nest.
     scratch = Path(os.environ.get("UMA_SMOKE_OUT", "/tmp/uma_qs_train_smoke"))
@@ -88,6 +195,24 @@ def test_uma_qs_one_epoch_train(tmp_path: Path):
 
     try:
         trainer = FFTrain(config_path=str(resolved), out_dir=str(out_dir))
+        assert trainer.trainer.batch_size > 1
+        assert trainer.trainer.otf_graph is True
+
+        # Collate the two training frames before the epoch so a broken OTF batch
+        # graph fails fast (even if the backbone rebuilds edges internally).
+        with open(FIXTURE, "rb") as f:
+            frames = pickle.load(f)
+        collated, _ = trainer.trainer.decorate_batch_input(
+            [
+                (_feature_from_frame(frames[0]), {"Q": frames[0]["total_chrg"], "S": frames[0]["total_spin"]}, 0),
+                (_feature_from_frame(frames[1]), {"Q": frames[1]["total_chrg"], "S": frames[1]["total_spin"]}, 1),
+            ]
+        )
+        _assert_full_batch_graph(
+            collated,
+            [len(frames[0]["atom_type"]), len(frames[1]["atom_type"])],
+        )
+
         trainer.train_all()
 
         model_dirs = [
