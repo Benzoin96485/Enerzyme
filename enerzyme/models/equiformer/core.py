@@ -10,6 +10,7 @@ from e3nn import o3
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
+from ..irreps_tools import extract_scalar_0e, scalar_0e_dim
 from ..layers._base_layer import BaseFFCore
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.electrostatics import ChargeConservationLayer
@@ -74,8 +75,7 @@ DEFAULT_LAYER_PARAMS = [
         "name": "SimpleReadout",
         "params": {
             "output_fields": ["Ea", "Qa"],
-            "head_type": "residual_mlp",
-            "num_residual": 2,
+            "head_type": "two_layer",
             "dim_embedding": 64,
             "activation_fn": "swish",
         },
@@ -98,25 +98,6 @@ DEFAULT_LAYER_PARAMS = [
     {"name": "EnergyReduce"},
     {"name": "Force"},
 ]
-
-
-def _scalar_dim(irreps: o3.Irreps) -> int:
-    """Number of even scalar (0e) channels in an irreps."""
-    return sum(mul for mul, ir in irreps if ir.l == 0 and ir.p == 1)
-
-
-def _extract_scalars(node_features: Tensor, irreps: o3.Irreps) -> Tensor:
-    """Concatenate all 0e slices from an irreps feature tensor."""
-    pieces = []
-    offset = 0
-    for mul, ir in irreps:
-        width = mul * ir.dim
-        if ir.l == 0 and ir.p == 1:
-            pieces.append(node_features[:, offset : offset + width])
-        offset += width
-    if not pieces:
-        raise ValueError(f"No scalar (0e) channels in irreps {irreps}")
-    return torch.cat(pieces, dim=-1)
 
 
 class EquiformerCore(BaseFFCore):
@@ -184,7 +165,9 @@ class EquiformerCore(BaseFFCore):
         self.nonlinear_message = nonlinear_message
         self.use_attn_head = use_attn_head
         self.irreps_pre_attn = irreps_pre_attn
-        self.dim_feature_out = _scalar_dim(self.irreps_feature)
+        # Scalar readout contract: dim_feature_out is 0e channel count.
+        self.feature_irreps = str(self.irreps_feature)
+        self.dim_feature_out = scalar_0e_dim(self.irreps_feature)
 
         self.edge_deg_embed = EdgeDegreeEmbeddingNetwork(
             self.irreps_node_embedding,
@@ -375,7 +358,8 @@ class EquiformerCore(BaseFFCore):
         )
 
         if self.output_mode == "feature":
-            return {"atom_feature": _extract_scalars(node_features, self.irreps_feature)}
+            # Full irreps tensor; SimpleReadout extracts 0e via feature_irreps.
+            return {"atom_feature": node_features}
 
         if self.use_attn_head:
             outputs = self.head(

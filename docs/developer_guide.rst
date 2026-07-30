@@ -200,8 +200,9 @@ Adding an internal architecture
 6. Document in :doc:`/user_guide/models/architecture_catalog`
 
 Recent internal example: :code:`Equiformer` under :code:`enerzyme/models/equiformer/`
-(irreps atom embedding as a pre-core layer; Core emits :code:`atom_feature` by default;
-shared :code:`SimpleReadout` / physics layers after the Core).
+(irreps atom embedding as a pre-core layer; Core emits full-irreps :code:`atom_feature`
+with :code:`feature_irreps` by default; shared :code:`SimpleReadout` extracts 0e then MLP,
+or optional :code:`EquiformerGraphAttentionReadout` / physics layers after the Core).
 
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -271,7 +272,11 @@ Tests live in :code:`test/`:
 - :code:`test_spookynet.py` — SpookyNet layer and forward tests
 - :code:`test_physnet.py` — PhysNet parity against reference TensorFlow implementation (heavy optional stack)
 - :code:`test_equiformer.py` — Equiformer forward smoke, feature mode, SO(3) energy/force checks
-- :code:`test_equiformer_parity_*.py` — numerical parity vs vendored upstream Equiformer (ops / Core latent / direct E·F / grads; no training loop)
+- :code:`test_equiformer_readout.py` — 0e extract, :code:`two_layer` SimpleReadout, GraphAttention readout
+- :code:`test_equiformer_parity_*.py` — numerical parity vs vendored upstream Equiformer
+  (ops / Core latent incl. feature ``get_output`` / direct E·F / grads /
+  feature-mode + GraphAttention readout; no training loop; production
+  :code:`SimpleReadout` Dense MLP is not LinearRS-parity)
 - :code:`test_scatter_speed.py` — performance-oriented scatter checks
 
 Suggested commands
