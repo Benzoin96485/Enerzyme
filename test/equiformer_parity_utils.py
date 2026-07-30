@@ -397,3 +397,36 @@ def enerzyme_atomic_energy(
     e_sum = scatter(ea, batch, dim=0, reduce="sum")
     e_graph = e_sum / (avg_num_nodes ** 0.5)
     return ea, e_graph
+
+
+def enerzyme_feature_atom_feature(
+    core: torch.nn.Module,
+    embed: torch.nn.Module,
+    rbf: torch.nn.Module,
+    za: Tensor,
+    batch: Tensor,
+    ez: Dict[str, Tensor],
+) -> Tensor:
+    """Feature-mode Core ``get_output`` → full-irreps ``atom_feature``."""
+    assert getattr(core, "output_mode", None) == "feature", (
+        "enerzyme_feature_atom_feature expects output_mode='feature'"
+    )
+    atom_emb = embed.get_atom_embedding(za)
+    rbf_vals = rbf.get_rbf(ez["Dij_sr"])
+    out = core.get_output(
+        vij_sr=ez["vij_sr"],
+        idx_i_sr=ez["idx_i_sr"],
+        idx_j_sr=ez["idx_j_sr"],
+        rbf=rbf_vals,
+        atom_embedding=atom_emb,
+        batch_seg=batch,
+    )
+    return out["atom_feature"]
+
+
+def scaled_scatter_energy(ea: Tensor, batch: Tensor, avg_num_nodes: float) -> Tensor:
+    """Upstream ScaledScatter: sum / sqrt(N_avg)."""
+    from torch_scatter import scatter
+
+    e_sum = scatter(ea.view(-1), batch, dim=0, reduce="sum")
+    return e_sum / (avg_num_nodes ** 0.5)
