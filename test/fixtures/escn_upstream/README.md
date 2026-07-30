@@ -8,10 +8,11 @@ parity tests of Enerzyme's native paper eSCN / SO(2)–SO(3) primitives.
 - Local adaptations for offline CI:
   - `escn_blocks.py` extracts `SO2Conv` / `SO2Block` / `EdgeBlock` / `MessageBlock` /
     `LayerBlock` without `fairchem.core` registry / GraphModelMixin imports
-  - `EdgeBlock` accepts a precomputed distance feature tensor (`distance_features`)
-    with attribute `num_output` on a tiny wrapper (parity harness), instead of
-    importing fairchem SCN smearing modules
+  - `EdgeBlock` accepts a precomputed `distance_features` tensor (parity harness)
+    instead of importing fairchem SCN smearing modules
   - `so3.py` loads `Jd.pt` from this directory (same bytes as Enerzyme `models/so3/Jd.pt`)
+  - dtype-safe casts for Wigner / grid / `to_m` when running float64 parity tests
+  - absolute `from so3 import …` (fixture dir on `sys.path`)
 
 Do **not** use this fixture as a production dependency. Refresh:
 
