@@ -120,7 +120,10 @@ class eSCNCore(BaseFFCore):
         self.mmax_list = [mmax]
         self.num_layers = num_layers
         self.num_resolutions = len(self.lmax_list)
+        # Align with shared SimpleReadout contract: dim_feature_out = 0e width;
+        # feature_irreps advertises that atom_feature is pure even scalars.
         self.dim_feature_out = self.num_resolutions * self.sphere_channels
+        self.feature_irreps = f"{self.dim_feature_out}x0e"
 
         self.act = SiLU()
         self.sphere_proj = torch.nn.Linear(dim_embedding, self.dim_feature_out)

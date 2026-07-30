@@ -52,6 +52,33 @@ def test_escn_core_atom_feature_shape():
     assert "atom_sphere_feature" in out
     assert out["atom_sphere_feature"].shape[0] == N
     assert out["atom_sphere_feature"].shape[-1] == sphere_channels
+    assert core.feature_irreps == f"{sphere_channels}x0e"
+    assert core.dim_feature_out == sphere_channels
+
+
+def test_escn_simple_readout_resolves_feature_irreps():
+    from enerzyme.models.escn import eSCNCore
+    from enerzyme.models.layers import SimpleReadout
+
+    core = eSCNCore(
+        dim_embedding=16,
+        num_rbf=8,
+        sphere_channels=16,
+        hidden_channels=32,
+        edge_channels=16,
+        lmax=2,
+        mmax=1,
+        num_layers=1,
+    )
+    ro = SimpleReadout(
+        output_fields={"Ea"},
+        built_layers=[core],
+        head_type="dense",
+    )
+    assert ro.feature_irreps == "16x0e"
+    assert ro.dim_feature_in == 16
+    out = ro.get_output(torch.randn(4, 16))
+    assert out["Ea"].shape == (4,)
 
 
 def test_escn_build_model_energy_force_finite():

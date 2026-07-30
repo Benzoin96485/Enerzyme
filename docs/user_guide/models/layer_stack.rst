@@ -26,6 +26,16 @@ From :code:`enerzyme/models/layers/`:
 **Output**
     :code:`EnergyReduce`, :code:`Force`, :code:`ShallowEnsembleReduce`
 
+**Readouts**
+    :code:`SimpleReadout` — per-atom MLP over scalar features. With equivariant Cores
+    that set :code:`feature_irreps`, it extracts even-scalar (:code:`0e`) channels first,
+    then applies :code:`dense` / :code:`residual_*` / :code:`two_layer` heads.
+    Use :code:`head_type: equiformer_linear_rs` for the official Equiformer MD17 scalar
+    energy MLP (:code:`LinearRS` → :code:`normalize2mom(SiLU)` → :code:`LinearRS`).
+    :code:`EquiformerGraphAttentionReadout` — separate GraphAttention head over full
+    irreps + graph edges (not mixed into SimpleReadout); use when you want an
+    attention-style multi-field atomic scalar head.
+
 Typical charge-aware stack
 --------------------------
 
@@ -93,13 +103,24 @@ UMA and modular readouts
 
 With :code:`architecture: uma_qs`, the Core returns atom-level embeddings; attach :code:`SimpleReadout` / :code:`HierachicalReadout` and optional :code:`SpinConservation` in the Modelhub :code:`layers` list rather than embedding prediction heads inside the Core.
 
+Equivariant feature contract and Equiformer readouts
+----------------------------------------------------
+
+Equivariant Cores may emit a flat irreps tensor as :code:`atom_feature` and advertise
+layout via :code:`feature_irreps` (e.g. :code:`"64x0e+32x1e"`). :code:`dim_feature_out` is the
+**0e channel count** used by scalar MLP readouts. :code:`SimpleReadout` extracts those
+0e channels (identity when :code:`feature_irreps` is absent). For a GraphAttention
+energy/charge head, swap in :code:`EquiformerGraphAttentionReadout` (see FF09 comments
+in :code:`train.yaml`).
+
 eSCN and modular readouts
 -------------------------
 
 With :code:`architecture: escn`, the native paper eSCN Core returns :code:`atom_feature`
-(spherical :code:`l=0` scalars) and :code:`atom_sphere_feature` (full SH coefficients).
-Default stacks use :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` for
-energy-conserving forces. Opt-in :code:`SphereSampleReadout` integrates
+as spherical :code:`l=0` scalars (advertised as :code:`feature_irreps: "Cx0e"`) and
+:code:`atom_sphere_feature` (full SH coefficients, shape :code:`(N, (lmax+1)^2, C)` —
+not e3nn-flat). Default stacks use :code:`SimpleReadout` → :code:`EnergyReduce` →
+:code:`Force` for energy-conserving forces. Opt-in :code:`SphereSampleReadout` integrates
 :code:`atom_sphere_feature` over fixed S² samples (Passaro & Zitnick energy-head
 pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …), with optional
 :code:`vector_output_fields` for direct vector properties. See

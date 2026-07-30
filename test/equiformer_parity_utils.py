@@ -9,6 +9,7 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 import torch
+from e3nn import o3
 from numpy.testing import assert_allclose
 from torch import Tensor
 
@@ -397,3 +398,67 @@ def enerzyme_atomic_energy(
     e_sum = scatter(ea, batch, dim=0, reduce="sum")
     e_graph = e_sum / (avg_num_nodes ** 0.5)
     return ea, e_graph
+
+
+def enerzyme_feature_atom_feature(
+    core: torch.nn.Module,
+    embed: torch.nn.Module,
+    rbf: torch.nn.Module,
+    za: Tensor,
+    batch: Tensor,
+    ez: Dict[str, Tensor],
+) -> Tensor:
+    """Feature-mode Core ``get_output`` → full-irreps ``atom_feature``."""
+    assert getattr(core, "output_mode", None) == "feature", (
+        "enerzyme_feature_atom_feature expects output_mode='feature'"
+    )
+    atom_emb = embed.get_atom_embedding(za)
+    rbf_vals = rbf.get_rbf(ez["Dij_sr"])
+    out = core.get_output(
+        vij_sr=ez["vij_sr"],
+        idx_i_sr=ez["idx_i_sr"],
+        idx_j_sr=ez["idx_j_sr"],
+        rbf=rbf_vals,
+        atom_embedding=atom_emb,
+        batch_seg=batch,
+    )
+    return out["atom_feature"]
+
+
+def scaled_scatter_energy(ea: Tensor, batch: Tensor, avg_num_nodes: float) -> Tensor:
+    """Upstream ScaledScatter: sum / sqrt(N_avg)."""
+    from torch_scatter import scatter
+
+    e_sum = scatter(ea.view(-1), batch, dim=0, reduce="sum")
+    return e_sum / (avg_num_nodes ** 0.5)
+
+
+def build_linear_rs_energy_head(
+    num_0e: int,
+    *,
+    flavor: str = "enerzyme",
+    dtype: torch.dtype = torch.float64,
+) -> torch.nn.Module:
+    """Official-style scalar energy MLP: LinearRS → SiLU → LinearRS → 1x0e.
+
+    ``flavor='official'`` uses vendored upstream modules; ``enerzyme`` uses the
+    ported LinearRS / Activation. State dicts are compatible across flavors.
+    """
+    ir = o3.Irreps(f"{num_0e}x0e")
+    ir_out = o3.Irreps("1x0e")
+    if flavor == "official":
+        from nets.fast_activation import Activation
+        from nets.graph_attention_transformer_md17 import _RESCALE
+        from nets.tensor_product_rescale import LinearRS
+    elif flavor == "enerzyme":
+        from enerzyme.models.equiformer.attention import _RESCALE
+        from enerzyme.models.equiformer.fast_activation import Activation
+        from enerzyme.models.equiformer.tensor_product import LinearRS
+    else:
+        raise ValueError(f"unknown flavor {flavor!r}")
+    head = torch.nn.Sequential(
+        LinearRS(ir, ir, rescale=_RESCALE),
+        Activation(ir, acts=[torch.nn.SiLU()]),
+        LinearRS(ir, ir_out, rescale=_RESCALE),
+    )
+    return head.to(dtype=dtype).eval()

@@ -200,8 +200,9 @@ Adding an internal architecture
 6. Document in :doc:`/user_guide/models/architecture_catalog`
 
 Recent internal example: :code:`Equiformer` under :code:`enerzyme/models/equiformer/`
-(irreps atom embedding as a pre-core layer; Core emits :code:`atom_feature` by default;
-shared :code:`SimpleReadout` / physics layers after the Core).
+(irreps atom embedding as a pre-core layer; Core emits full-irreps :code:`atom_feature`
+with :code:`feature_irreps` by default; shared :code:`SimpleReadout` extracts 0e then MLP,
+or optional :code:`EquiformerGraphAttentionReadout` / physics layers after the Core).
 
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -271,7 +272,11 @@ Tests live in :code:`test/`:
 - :code:`test_spookynet.py` — SpookyNet layer and forward tests
 - :code:`test_physnet.py` — PhysNet parity against reference TensorFlow implementation (heavy optional stack)
 - :code:`test_equiformer.py` — Equiformer forward smoke, feature mode, SO(3) energy/force checks
-- :code:`test_equiformer_parity_*.py` — numerical parity vs vendored upstream Equiformer (ops / Core latent / direct E·F / grads; no training loop)
+- :code:`test_equiformer_readout.py` — 0e extract, :code:`two_layer` SimpleReadout, GraphAttention readout
+- :code:`test_equiformer_parity_*.py` — numerical parity vs vendored upstream Equiformer
+  (ops / Core latent incl. feature ``get_output`` / direct E·F / grads /
+  feature-mode + GraphAttention readout; no training loop; production
+  :code:`SimpleReadout` Dense MLP is not LinearRS-parity)
 - :code:`test_escn_parity_*.py` — numerical parity vs vendored fairchem v1 eSCN (SO3 ops / Message+Layer blocks; injected edge frames)
 - :code:`test_sphere_sample_readout.py` — SphereSampleReadout shapes / scalar invariance smoke
 - :code:`test_scatter_speed.py` — performance-oriented scatter checks
@@ -390,7 +395,7 @@ Register in :code:`get_ff_core` like other architectures. Keep fairchem imports 
 Native eSCN (:code:`escn`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Paper eSCN (Passaro & Zitnick, 2023) lives under :code:`enerzyme/models/escn/` with shared SO(2)/SO(3) primitives in :code:`enerzyme/models/so3/` (including :code:`Jd.pt` in package data). The Core emits :code:`atom_feature` (l=0) and :code:`atom_sphere_feature`; compose :code:`SimpleReadout` / :code:`SphereSampleReadout` / :code:`EnergyReduce` / :code:`Force` outside the Core. No fairchem dependency. Offline numerical parity against vendored fairchem :code:`fairchem_core-1.10.0` blocks is in :code:`test/test_escn_parity_*.py` (ops + Message/LayerBlock; injected edge frames; not OC20 E/F). Enerzymette and other YAML-driven workflows only need :code:`architecture: escn` plus a resolved :code:`config.yaml` — checkpoint layout is unchanged.
+Paper eSCN (Passaro & Zitnick, 2023) lives under :code:`enerzyme/models/escn/` with shared SO(2)/SO(3) primitives in :code:`enerzyme/models/so3/` (including :code:`Jd.pt` in package data). The Core emits :code:`atom_feature` (l=0 scalars with :code:`feature_irreps = "Cx0e"`) and :code:`atom_sphere_feature` (SH grid layout for :code:`SphereSampleReadout`); compose :code:`SimpleReadout` / :code:`SphereSampleReadout` / :code:`EnergyReduce` / :code:`Force` outside the Core. No fairchem dependency. Offline numerical parity against vendored fairchem :code:`fairchem_core-1.10.0` blocks is in :code:`test/test_escn_parity_*.py` (ops + Message/LayerBlock; injected edge frames; not OC20 E/F). Enerzymette and other YAML-driven workflows only need :code:`architecture: escn` plus a resolved :code:`config.yaml` — checkpoint layout is unchanged.
 
 AllScAIP (:code:`AllScAIP`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^
