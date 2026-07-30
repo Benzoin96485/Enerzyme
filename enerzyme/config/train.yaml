@@ -724,6 +724,48 @@ Modelhub:
         - name: AtomicCharge2Dipole
         - name: EnergyReduce
         - name: Force
+    FF10:
+      suffix:
+      # Native paper eSCN (Passaro & Zitnick 2023). Distinct from uma_qs (Meta UMA wrappers).
+      architecture: escn
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 64
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            cutoff_fn: polynomial
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            sphere_channels: 64
+            hidden_channels: 128
+            edge_channels: 64
+            lmax: 2
+            mmax: 2
+            num_layers: 2
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

@@ -32,3 +32,4 @@ from .readout import (
     VelocityReadout,
     EquiformerGraphAttentionReadout,
 )
+from .sphere_sample_readout import SphereSampleReadout

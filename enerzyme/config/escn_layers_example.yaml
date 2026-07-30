@@ -1,0 +1,33 @@
+# Example layer stack for architecture: escn (paper eSCN Core).
+# Core emits atom_feature (spherical l=0). Energy/forces use shared readout + autograd Force.
+# Distinct from architecture: uma_qs / uma_flow_qs (Meta UMA fairchem wrappers under esen/).
+
+build_params:
+  dim_embedding: 64
+  num_rbf: 32
+  max_Za: 94
+  cutoff_sr: 6.0
+  cutoff_fn: polynomial
+
+layers:
+  - name: RangeSeparation
+  - name: BesselRBF
+    params:
+      cutoff_fn: polynomial
+      trainable: false
+  - name: RandomAtomEmbedding
+  - name: Core
+    params:
+      sphere_channels: 64
+      hidden_channels: 128
+      edge_channels: 64
+      lmax: 2
+      mmax: 2
+      num_layers: 2
+  - name: SimpleReadout
+    params:
+      output_fields: [Ea]
+      head_type: dense
+      keep_feature: false
+  - name: EnergyReduce
+  - name: Force

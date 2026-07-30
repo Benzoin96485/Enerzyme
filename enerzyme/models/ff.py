@@ -55,6 +55,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .xpainn import XPaiNNWrapper as Core
         from .xpainn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "escn":
+        from .escn import eSCNCore as Core
+        from .escn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "uma_qs":
         from .esen import UMAWrapperQS as Core
         DEFAULT_BUILD_PARAMS = {}
