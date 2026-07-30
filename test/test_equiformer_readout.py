@@ -132,6 +132,16 @@ def test_equiformer_graph_attention_readout_requires_irreps():
         )
 
 
+def _complete_graph(n: int):
+    idx_i, idx_j = [], []
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                idx_i.append(i)
+                idx_j.append(j)
+    return torch.tensor(idx_i, dtype=torch.long), torch.tensor(idx_j, dtype=torch.long)
+
+
 def test_equiformer_build_model_smoke_two_layer():
     model = build_model("equiformer", verbose=0)
     assert getattr(model, "feature_irreps", None) is not None
@@ -145,18 +155,13 @@ def test_equiformer_build_model_smoke_two_layer():
     za = torch.tensor([1, 6, 1, 8, 1], dtype=torch.long)
     ra = torch.randn(n, 3) * 0.3
     ra.requires_grad_(True)
-    idx_i, idx_j = [], []
-    for i in range(n):
-        for j in range(n):
-            if i != j:
-                idx_i.append(i)
-                idx_j.append(j)
+    idx_i, idx_j = _complete_graph(n)
     out = model(
         {
             "Ra": ra,
             "Za": za,
-            "idx_i": torch.tensor(idx_i),
-            "idx_j": torch.tensor(idx_j),
+            "idx_i": idx_i,
+            "idx_j": idx_j,
             "batch_seg": torch.zeros(n, dtype=torch.long),
             "offsets": None,
         }
@@ -164,6 +169,69 @@ def test_equiformer_build_model_smoke_two_layer():
     assert out["E"].shape == (1,)
     assert out["Ea"].shape == (n,)
     assert out["Qa"].shape == (n,)
+
+
+def test_equiformer_mixed_irreps_simple_readout_stack():
+    """Full stack: mixed-irreps Core → SimpleReadout 0e extract → two_layer MLP."""
+    import copy
+
+    from enerzyme.models.equiformer.core import (
+        DEFAULT_BUILD_PARAMS,
+        DEFAULT_LAYER_PARAMS,
+    )
+
+    irreps_feature = "32x0e+16x1e+8x2e"
+    mul0 = scalar_0e_dim(irreps_feature)
+    layers = copy.deepcopy(DEFAULT_LAYER_PARAMS)
+    for layer in layers:
+        if layer["name"] == "Core":
+            layer["params"]["irreps_feature"] = irreps_feature
+            layer["params"]["num_layers"] = 1
+        if layer["name"] == "SimpleReadout":
+            layer["params"]["head_type"] = "two_layer"
+            layer["params"]["activation_fn"] = "swish"
+
+    model = build_model(
+        "equiformer",
+        layer_params=layers,
+        build_params=dict(DEFAULT_BUILD_PARAMS),
+        verbose=0,
+    )
+    assert model.feature_irreps == str(o3.Irreps(irreps_feature))
+    assert model.dim_feature_out == mul0
+    assert o3.Irreps(irreps_feature).dim > mul0
+
+    readout = next(m for m in model.post_sequence if isinstance(m, SimpleReadout))
+    assert readout.head_type == "two_layer"
+    assert readout.feature_irreps == str(o3.Irreps(irreps_feature))
+    assert readout.dim_feature_in == mul0
+
+    n = 5
+    torch.manual_seed(4)
+    za = torch.tensor([1, 6, 1, 8, 1], dtype=torch.long)
+    ra = torch.randn(n, 3) * 0.3
+    ra.requires_grad_(True)
+    idx_i, idx_j = _complete_graph(n)
+    out = model(
+        {
+            "Ra": ra,
+            "Za": za,
+            "idx_i": idx_i,
+            "idx_j": idx_j,
+            "batch_seg": torch.zeros(n, dtype=torch.long),
+            "offsets": None,
+        }
+    )
+    assert out["E"].shape == (1,)
+    assert out["Ea"].shape == (n,)
+    assert out["Qa"].shape == (n,)
+    assert torch.isfinite(out["E"]).all()
+    assert torch.isfinite(out["Fa"]).all()
+
+    # Autograd through 0e extract + MLP + EnergyReduce + Force
+    out["E"].sum().backward()
+    assert ra.grad is not None
+    assert torch.isfinite(ra.grad).all()
 
 
 def test_equiformer_core_emits_full_irreps_feature():
