@@ -686,6 +686,8 @@ Modelhub:
             nonlinear_message: true
             output_mode: feature
         # Default: SimpleReadout extracts 0e from equivariant atom_feature, then MLP.
+        # Official LinearRS + normalize2mom(SiLU) energy head (parity with MD17 MLP):
+        #   head_type: equiformer_linear_rs
         # To use GraphAttention readout instead, replace SimpleReadout with:
         # - name: EquiformerGraphAttentionReadout
         #   params:

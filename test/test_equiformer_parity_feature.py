@@ -87,6 +87,22 @@ def test_feature_atom_feature_feeds_official_mlp_head():
     ea_ez = ez_head(feats_ours).view(-1)
     assert_close(ea_ez, ea_ref, atol=1e-5, rtol=1e-5, err_msg="Ea_enerzyme_LinearRS")
 
+    # SimpleReadout(equiformer_linear_rs) with official head weights
+    from enerzyme.models.layers.readout import SimpleReadout
+
+    class _Core:
+        dim_feature_out = mul0
+        feature_irreps = core.feature_irreps
+
+    ro = SimpleReadout(
+        output_fields={"Ea"},
+        built_layers=[_Core()],
+        head_type="equiformer_linear_rs",
+    ).to(dtype=dtype).eval()
+    ro.head.load_state_dict(official.head.state_dict())
+    ea_ro = ro.get_output(feats_ours)["Ea"].view(-1)
+    assert_close(ea_ro, ea_ref, atol=1e-5, rtol=1e-5, err_msg="Ea_SimpleReadout_LinearRS")
+
 
 def test_mixed_irreps_0e_extract_linear_rs_energy_head_parity():
     """Mixed ``irreps_feature`` → extract 0e → official-style LinearRS energy head.

@@ -8,6 +8,15 @@ from torch.nn import ModuleList, Module, Sequential
 from torch import Tensor
 
 
+HEAD_TYPE = Literal[
+    "dense",
+    "residual_layer",
+    "residual_mlp",
+    "two_layer",
+    "equiformer_linear_rs",
+]
+
+
 def _resolve_feature_irreps(built_layers: List[Module]) -> Optional[str]:
     """Find ``feature_irreps`` on the nearest prior Core (or any layer)."""
     for layer in reversed(built_layers):
@@ -22,7 +31,7 @@ class BaseReadout(BaseFFLayer):
         num_blocks: int,
         output_fields: Set[str],
         built_layers: List[Module],
-        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"],
+        head_type: HEAD_TYPE,
         dim_embedding: Optional[int]=None,
         shallow_ensemble_size: int=1,
         keep_feature: bool=False,
@@ -99,7 +108,7 @@ class BaseReadout(BaseFFLayer):
                 **self.head_params
             )
         elif self.head_type == "two_layer":
-            # Official-style energy MLP: Linear → SiLU/Swish → Linear.
+            # Dense MLP morphologically like the official energy head (not LinearRS).
             act = self.activation_fn if self.activation_fn is not None else "swish"
             return Sequential(
                 DenseLayer(
@@ -114,6 +123,26 @@ class BaseReadout(BaseFFLayer):
                     shallow_ensemble_size=self.shallow_ensemble_size,
                     **self.head_params,
                 ),
+            )
+        elif self.head_type == "equiformer_linear_rs":
+            # Official Equiformer MD17 scalar energy MLP:
+            # LinearRS → Activation(normalize2mom(SiLU)) → LinearRS.
+            if self.shallow_ensemble_size != 1:
+                raise ValueError(
+                    "head_type='equiformer_linear_rs' does not support "
+                    f"shallow_ensemble_size={self.shallow_ensemble_size}"
+                )
+            from e3nn import o3
+            from ..equiformer.attention import _RESCALE
+            from ..equiformer.fast_activation import Activation
+            from ..equiformer.tensor_product import LinearRS
+
+            ir_hid = o3.Irreps(f"{self.dim_feature_in}x0e")
+            ir_out = o3.Irreps(f"{self.dim_feature_out}x0e")
+            return Sequential(
+                LinearRS(ir_hid, ir_hid, rescale=_RESCALE),
+                Activation(ir_hid, acts=[torch.nn.SiLU()]),
+                LinearRS(ir_hid, ir_out, rescale=_RESCALE),
             )
         else:
             raise ValueError(f"Unknown head_type: {self.head_type}")
@@ -162,7 +191,7 @@ class SimpleReadout(BaseReadout):
     def __init__(self,
         output_fields: Set[str],
         built_layers: List[Module],
-        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"]="dense",
+        head_type: HEAD_TYPE="dense",
         dim_embedding: Optional[int]=None,
         shallow_ensemble_size: int=1,
         keep_feature: bool=False,
@@ -209,7 +238,7 @@ class NSEReadout(BaseReadout):
         self,
         output_fields: Optional[Set[str]] = None,
         built_layers: List[Module] = [],
-        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"] = "residual_mlp",
+        head_type: HEAD_TYPE = "residual_mlp",
         dim_embedding: Optional[int] = None,
         shallow_ensemble_size: int = 1,
         keep_feature: bool = False,
@@ -291,7 +320,7 @@ class HierachicalNSEReadout(BaseReadout):
         num_blocks: int,
         output_fields: Optional[Set[str]] = None,
         built_layers: List[Module] = [],
-        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"] = "residual_mlp",
+        head_type: HEAD_TYPE = "residual_mlp",
         dim_embedding: Optional[int] = None,
         shallow_ensemble_size: int = 1,
         keep_feature: bool = False,
@@ -355,7 +384,7 @@ class VelocityReadout(BaseReadout):
         self,
         output_fields: Optional[Set[str]] = None,
         built_layers: List[Module] = [],
-        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"] = "dense",
+        head_type: HEAD_TYPE = "dense",
         dim_embedding: Optional[int] = None,
         shallow_ensemble_size: int = 1,
         keep_feature: bool = False,

@@ -152,3 +152,48 @@ def test_simple_readout_two_layer_vs_linear_rs_head_with_mapped_weights():
         "SimpleReadout(swish) should still differ from LinearRS+normalize2mom(SiLU) "
         f"even with mapped weights; got maxdiff={err_swish}"
     )
+
+
+def test_equiformer_linear_rs_head_matches_official_energy_mlp():
+    """head_type=equiformer_linear_rs reproduces LinearRS + normalize2mom(SiLU)."""
+    dtype = torch.float64
+    torch.manual_seed(3)
+    d, n = 64, 12
+    x = torch.randn(n, d, dtype=dtype)
+
+    lin1 = LinearRS(o3.Irreps(f"{d}x0e"), o3.Irreps(f"{d}x0e"), rescale=True).to(dtype)
+    act = Activation(o3.Irreps(f"{d}x0e"), acts=[torch.nn.SiLU()])
+    lin2 = LinearRS(o3.Irreps(f"{d}x0e"), o3.Irreps("1x0e"), rescale=True).to(dtype)
+    head_rs = torch.nn.Sequential(lin1, act, lin2).eval()
+
+    class _Core:
+        dim_feature_out = d
+
+    ro = SimpleReadout(
+        output_fields={"Ea"},
+        built_layers=[_Core()],
+        head_type="equiformer_linear_rs",
+    ).to(dtype)
+    assert ro.head_type == "equiformer_linear_rs"
+    ro.head.load_state_dict(head_rs.state_dict())
+
+    y_rs = head_rs(x).view(-1)
+    y_ro = ro.get_output(x)["Ea"]
+    _assert_close(y_rs, y_ro, atol=1e-12, msg="equiformer_linear_rs vs official MLP")
+
+
+def test_equiformer_linear_rs_rejects_shallow_ensemble():
+    class _Core:
+        dim_feature_out = 8
+
+    try:
+        SimpleReadout(
+            output_fields={"Ea"},
+            built_layers=[_Core()],
+            head_type="equiformer_linear_rs",
+            shallow_ensemble_size=2,
+        )
+    except ValueError as exc:
+        assert "shallow_ensemble" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for shallow_ensemble_size>1")

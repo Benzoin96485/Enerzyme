@@ -30,6 +30,8 @@ From :code:`enerzyme/models/layers/`:
     :code:`SimpleReadout` — per-atom MLP over scalar features. With equivariant Cores
     that set :code:`feature_irreps`, it extracts even-scalar (:code:`0e`) channels first,
     then applies :code:`dense` / :code:`residual_*` / :code:`two_layer` heads.
+    Use :code:`head_type: equiformer_linear_rs` for the official Equiformer MD17 scalar
+    energy MLP (:code:`LinearRS` → :code:`normalize2mom(SiLU)` → :code:`LinearRS`).
     :code:`EquiformerGraphAttentionReadout` — separate GraphAttention head over full
     irreps + graph edges (not mixed into SimpleReadout); use when you want an
     attention-style multi-field atomic scalar head.
