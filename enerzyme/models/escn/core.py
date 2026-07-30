@@ -1,8 +1,10 @@
 """Native paper eSCN Core (Passaro & Zitnick, 2023).
 
-Message-passing Core only: emits scalar ``atom_feature`` from spherical ``l=0``
-channels. Energy / forces come from shared ``SimpleReadout`` + ``EnergyReduce``
-+ ``Force`` (energy-conserving), not paper sphere-sample heads.
+Message-passing Core: emits ``atom_feature`` (spherical ``l=0``) and
+``atom_sphere_feature`` (full SH coeffs). Default energy/forces use shared
+``SimpleReadout`` + ``EnergyReduce`` + ``Force``. Opt-in ``SphereSampleReadout``
+consumes ``atom_sphere_feature`` for paper-style S² integration of any atomic
+property fields.
 
 Distinct from ``enerzyme.models.esen`` (Meta UMA / eSCN-MD fairchem wrappers).
 """
@@ -103,7 +105,7 @@ class eSCNCore(BaseFFCore):
                 "idx_j_sr",
                 "vij_sr",
             },
-            output_fields={"atom_feature"},
+            output_fields={"atom_feature", "atom_sphere_feature"},
         )
         if mmax > lmax:
             raise ValueError(f"mmax ({mmax}) cannot exceed lmax ({lmax})")
@@ -171,7 +173,7 @@ class eSCNCore(BaseFFCore):
             else:
                 self.post_sequence.append(layer)
 
-    def get_output(
+    def encode_sphere(
         self,
         atom_embedding: Tensor,
         Za: Tensor,
@@ -179,14 +181,21 @@ class eSCNCore(BaseFFCore):
         idx_i_sr: Tensor,
         idx_j_sr: Tensor,
         vij_sr: Tensor,
-    ) -> Dict[str, Tensor]:
+        edge_rot_mat: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Return full spherical node coeffs after message layers (pre-readout).
+
+        Used by numerical parity tests and :meth:`get_output`. When ``edge_rot_mat``
+        is provided it is used as-is (parity harness injects a shared frame).
+        """
         device = atom_embedding.device
         dtype = atom_embedding.dtype
         num_atoms = atom_embedding.shape[0]
         Za = Za.long()
 
         edge_index = torch.stack([idx_i_sr.long(), idx_j_sr.long()], dim=0)
-        edge_rot_mat = init_edge_rot_mat(vij_sr.to(dtype=dtype))
+        if edge_rot_mat is None:
+            edge_rot_mat = init_edge_rot_mat(vij_sr.to(dtype=dtype))
 
         SO3_edge_rot = [
             SO3_Rotation(edge_rot_mat, self.lmax_list[i])
@@ -226,11 +235,29 @@ class eSCNCore(BaseFFCore):
             else:
                 x = x_message
 
+        return x.embedding
+
+    def get_output(
+        self,
+        atom_embedding: Tensor,
+        Za: Tensor,
+        rbf: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+        vij_sr: Tensor,
+    ) -> Dict[str, Tensor]:
+        atom_sphere_feature = self.encode_sphere(
+            atom_embedding, Za, rbf, idx_i_sr, idx_j_sr, vij_sr
+        )
+
         # Scalar atom features: concatenate l=0,m=0 channels across resolutions
         features = []
         offset_res = 0
         for i in range(self.num_resolutions):
-            features.append(x.embedding[:, offset_res, :])
+            features.append(atom_sphere_feature[:, offset_res, :])
             offset_res = offset_res + int((self.lmax_list[i] + 1) ** 2)
         atom_feature = torch.cat(features, dim=-1)
-        return {"atom_feature": atom_feature}
+        return {
+            "atom_feature": atom_feature,
+            "atom_sphere_feature": atom_sphere_feature,
+        }

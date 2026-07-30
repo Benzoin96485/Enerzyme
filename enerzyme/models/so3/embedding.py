@@ -94,10 +94,12 @@ class SO3_Embedding(torch.nn.Module):
         self.set_embedding(new_embedding)
 
     def _m_primary(self, mapping) -> None:
-        self.embedding = torch.einsum("nac,ba->nbc", self.embedding, mapping.to_m)
+        to_m = mapping.to_m.to(dtype=self.embedding.dtype, device=self.embedding.device)
+        self.embedding = torch.einsum("nac,ba->nbc", self.embedding, to_m)
 
     def _l_primary(self, mapping) -> None:
-        self.embedding = torch.einsum("nac,ab->nbc", self.embedding, mapping.to_m)
+        to_m = mapping.to_m.to(dtype=self.embedding.dtype, device=self.embedding.device)
+        self.embedding = torch.einsum("nac,ab->nbc", self.embedding, to_m)
 
     def _rotate(self, SO3_rotation, lmax_list: list[int], mmax_list: list[int]) -> None:
         embedding_rotate = torch.tensor([], device=self.device, dtype=self.dtype)
@@ -155,6 +157,8 @@ class SO3_Embedding(torch.nn.Module):
             from_grid_mat = SO3_grid[self.lmax_list[i]][
                 self.mmax_list[i]
             ].get_from_grid_mat(self.device)
+            to_grid_mat = to_grid_mat.to(dtype=x_res.dtype)
+            from_grid_mat = from_grid_mat.to(dtype=x_res.dtype)
             x_grid = torch.einsum("bai,zic->zbac", to_grid_mat, x_res)
             x_grid = act(x_grid)
             x_res = torch.einsum("bai,zbac->zic", from_grid_mat, x_grid)
@@ -170,7 +174,7 @@ class SO3_Embedding(torch.nn.Module):
         grid_mapping = SO3_grid[lmax][lmax].mapping
 
         offset = 0
-        x_grid = torch.tensor([], device=self.device)
+        x_grid = torch.tensor([], device=self.device, dtype=self.dtype)
 
         for i in range(self.num_resolutions):
             num_coefficients = int((self.lmax_list[i] + 1) ** 2)
@@ -179,7 +183,7 @@ class SO3_Embedding(torch.nn.Module):
                 :,
                 :,
                 grid_mapping.coefficient_idx(self.lmax_list[i], self.lmax_list[i]),
-            ]
+            ].to(dtype=x_res.dtype)
             x_grid = torch.cat(
                 [x_grid, torch.einsum("bai,zic->zbac", to_grid_mat, x_res)],
                 dim=3,
@@ -202,7 +206,7 @@ class SO3_Embedding(torch.nn.Module):
                 :,
                 :,
                 grid_mapping.coefficient_idx(self.lmax_list[i], self.lmax_list[i]),
-            ]
+            ].to(dtype=x_grid.dtype)
             x_res = torch.einsum(
                 "bai,zbac->zic",
                 from_grid_mat,

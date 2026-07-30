@@ -96,7 +96,15 @@ With :code:`architecture: uma_qs`, the Core returns atom-level embeddings; attac
 eSCN and modular readouts
 -------------------------
 
-With :code:`architecture: escn`, the native paper eSCN Core likewise returns :code:`atom_feature` (spherical :code:`l=0` scalars). Default stacks use :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` for energy-conserving forces. Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`).
+With :code:`architecture: escn`, the native paper eSCN Core returns :code:`atom_feature`
+(spherical :code:`l=0` scalars) and :code:`atom_sphere_feature` (full SH coefficients).
+Default stacks use :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` for
+energy-conserving forces. Opt-in :code:`SphereSampleReadout` integrates
+:code:`atom_sphere_feature` over fixed S² samples (Passaro & Zitnick energy-head
+pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …), with optional
+:code:`vector_output_fields` for direct vector properties. See
+:code:`enerzyme/config/escn_sphere_readout_example.yaml`. Do not confuse with
+:code:`uma_qs` (Meta UMA under :code:`esen/`).
 
 NSE readout layers
 ------------------

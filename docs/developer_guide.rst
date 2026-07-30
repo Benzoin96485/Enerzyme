@@ -272,6 +272,8 @@ Tests live in :code:`test/`:
 - :code:`test_physnet.py` — PhysNet parity against reference TensorFlow implementation (heavy optional stack)
 - :code:`test_equiformer.py` — Equiformer forward smoke, feature mode, SO(3) energy/force checks
 - :code:`test_equiformer_parity_*.py` — numerical parity vs vendored upstream Equiformer (ops / Core latent / direct E·F / grads; no training loop)
+- :code:`test_escn_parity_*.py` — numerical parity vs vendored fairchem v1 eSCN (SO3 ops / Message+Layer blocks; injected edge frames)
+- :code:`test_sphere_sample_readout.py` — SphereSampleReadout shapes / scalar invariance smoke
 - :code:`test_scatter_speed.py` — performance-oriented scatter checks
 
 Suggested commands
@@ -388,7 +390,7 @@ Register in :code:`get_ff_core` like other architectures. Keep fairchem imports 
 Native eSCN (:code:`escn`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Paper eSCN (Passaro & Zitnick, 2023) lives under :code:`enerzyme/models/escn/` with shared SO(2)/SO(3) primitives in :code:`enerzyme/models/so3/` (including :code:`Jd.pt` in package data). The Core emits :code:`atom_feature` only; compose :code:`SimpleReadout` / :code:`EnergyReduce` / :code:`Force` outside the Core. No fairchem dependency. Enerzymette and other YAML-driven workflows only need :code:`architecture: escn` plus a resolved :code:`config.yaml` — checkpoint layout is unchanged.
+Paper eSCN (Passaro & Zitnick, 2023) lives under :code:`enerzyme/models/escn/` with shared SO(2)/SO(3) primitives in :code:`enerzyme/models/so3/` (including :code:`Jd.pt` in package data). The Core emits :code:`atom_feature` (l=0) and :code:`atom_sphere_feature`; compose :code:`SimpleReadout` / :code:`SphereSampleReadout` / :code:`EnergyReduce` / :code:`Force` outside the Core. No fairchem dependency. Offline numerical parity against vendored fairchem :code:`fairchem_core-1.10.0` blocks is in :code:`test/test_escn_parity_*.py` (ops + Message/LayerBlock; injected edge frames; not OC20 E/F). Enerzymette and other YAML-driven workflows only need :code:`architecture: escn` plus a resolved :code:`config.yaml` — checkpoint layout is unchanged.
 
 AllScAIP (:code:`AllScAIP`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^

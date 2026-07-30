@@ -31,3 +31,4 @@ from .readout import (
     HierachicalNSEReadout,
     VelocityReadout,
 )
+from .sphere_sample_readout import SphereSampleReadout

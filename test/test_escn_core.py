@@ -49,6 +49,9 @@ def test_escn_core_atom_feature_shape():
     )
     assert "atom_feature" in out
     assert out["atom_feature"].shape == (N, sphere_channels)
+    assert "atom_sphere_feature" in out
+    assert out["atom_sphere_feature"].shape[0] == N
+    assert out["atom_sphere_feature"].shape[-1] == sphere_channels
 
 
 def test_escn_build_model_energy_force_finite():
