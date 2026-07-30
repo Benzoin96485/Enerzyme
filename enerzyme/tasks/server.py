@@ -46,7 +46,7 @@ class Server:
                 raise ValueError(
                     "Internal calculator requires a loaded model and model_path"
                 )
-            self.model = model.to(self.device).type(self.dtype)
+            self.model = model.to(device=self.device, dtype=self.dtype)
             _load_state_dict(self.model, self.device, model_path, inference=True)
             self.model.eval()
         else:

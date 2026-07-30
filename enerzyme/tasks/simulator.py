@@ -79,7 +79,7 @@ class Simulation:
         self.dtype = DTYPE_MAPPING[config.Simulation.get("dtype", "float64")]
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
         # single ff simulation
-        self.model = model.to(self.device).type(self.dtype)
+        self.model = model.to(device=self.device, dtype=self.dtype)
         _load_state_dict(model, self.device, model_path, inference=True)
         self.model.eval()
         self.calculator = None
