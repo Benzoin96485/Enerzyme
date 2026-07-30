@@ -30,6 +30,11 @@ Internal architectures
 |                | readout  | readout|        | readout     | SO(2) GNN; no    |
 |                |          |        |        |             | fairchem needed  |
 +----------------+----------+--------+--------+-------------+------------------+
+| Equiformer     | yes      | yes    | yes    | no          | Equivariant      |
+|                |          |        |        |             | graph attention; |
+|                |          |        |        |             | higher cost;     |
+|                |          |        |        |             | see parity tests |
++----------------+----------+--------+--------+-------------+------------------+
 
 External wrappers
 -----------------
@@ -63,7 +68,12 @@ Selection guidelines
     PhysNet or SpookyNet — long-range electrostatics, optional dispersion layers.
 
 **Maximum accuracy on diverse geometries**
-    MACE or NequIP — equivariant message passing; tune cutoff and depth.
+    MACE, NequIP, or Equiformer — equivariant message passing; tune cutoff and depth.
+    Equiformer uses SO(3) graph attention (default MD17-style stack with ``ExpNormalSmearing``
+    and :code:`output_mode: feature`); prefer smaller irreps / fewer layers for enzyme-scale
+    clusters. Charge/dipole use shared readouts outside the Core. Numerical fidelity against
+    the official Equiformer MD17 path is covered by :code:`test/test_equiformer_parity_*.py`
+    (operator / latent / direct E·F / gradient checks — not the production SimpleReadout stack).
 
 **Active learning with force variance**
     Any architecture with :code:`ShallowEnsembleReduce` or :code:`committee_size` > 1.

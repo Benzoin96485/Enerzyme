@@ -3,9 +3,11 @@ from .geometry import DistanceLayer, RangeSeparationLayer
 from .rbf import (
     BaseRBF, 
     ExponentialGaussianRBFLayer, ExponentialBernsteinRBFLayer,
-    GaussianRBFLayer, BernsteinRBFLayer, SincRBFLayer, BesselRBFLayer, GaussianSmearing
+    GaussianRBFLayer, BernsteinRBFLayer, SincRBFLayer, BesselRBFLayer, GaussianSmearing,
+    ExpNormalSmearing,
 )
 from .atom_embedding import BaseAtomEmbedding, RandomAtomEmbedding, NuclearEmbedding
+from ..equiformer.node_embedding_layer import EquiformerNodeEmbedding
 from .electron_embedding import BaseElectronEmbedding, ElectronicEmbedding
 from .electrostatics import (
     ElectrostaticEnergyLayer,

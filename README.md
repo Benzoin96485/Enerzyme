@@ -24,6 +24,7 @@ Currently supported model architectures:
 | AllScAIP | internal |             ✅             |              ✅              |       ✅       |        ❌        | **Experimental 魔改** — not recommended as a primary model yet | fairchem-inspired |
 |  XPaiNN  | external |             ✅             |              ❌              |       ❌       |        ❌        | [J. Chem. Theory Comput. 2024, 20, 21, 9500–9511](https://pubs.acs.org/doi/10.1021/acs.jctc.4c01151) | [Github](https://github.com/X1X1010/XequiNet) |
 |  SchNet  | internal |             ✅             |              ✅              |       ❌       |  ✅       |  [NeurIPS 2017, arXiv: 1706.08566](https://arxiv.org/abs/1706.08566) | [Github](https://github.com/pyg-team/pytorch_geometric/blob/master/torch_geometric/nn/models/schnet.py) |
+| Equiformer | internal |             ✅             |              ✅              |       ✅       |        ❌        | [ICLR 2023, arXiv:2206.11990](https://arxiv.org/abs/2206.11990) | [Github](https://github.com/atomicarchitects/equiformer) |
 
 ## Usage
 
