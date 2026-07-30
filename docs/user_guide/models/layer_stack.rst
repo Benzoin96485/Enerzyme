@@ -26,6 +26,14 @@ From :code:`enerzyme/models/layers/`:
 **Output**
     :code:`EnergyReduce`, :code:`Force`, :code:`ShallowEnsembleReduce`
 
+**Readouts**
+    :code:`SimpleReadout` — per-atom MLP over scalar features. With equivariant Cores
+    that set :code:`feature_irreps`, it extracts even-scalar (:code:`0e`) channels first,
+    then applies :code:`dense` / :code:`residual_*` / :code:`two_layer` heads.
+    :code:`EquiformerGraphAttentionReadout` — separate GraphAttention head over full
+    irreps + graph edges (not mixed into SimpleReadout); use when you want an
+    attention-style multi-field atomic scalar head.
+
 Typical charge-aware stack
 --------------------------
 
@@ -92,6 +100,16 @@ UMA and modular readouts
 ------------------------
 
 With :code:`architecture: uma_qs`, the Core returns atom-level embeddings; attach :code:`SimpleReadout` / :code:`HierachicalReadout` and optional :code:`SpinConservation` in the Modelhub :code:`layers` list rather than embedding prediction heads inside the Core.
+
+Equivariant feature contract and Equiformer readouts
+----------------------------------------------------
+
+Equivariant Cores may emit a flat irreps tensor as :code:`atom_feature` and advertise
+layout via :code:`feature_irreps` (e.g. :code:`"64x0e+32x1e"`). :code:`dim_feature_out` is the
+**0e channel count** used by scalar MLP readouts. :code:`SimpleReadout` extracts those
+0e channels (identity when :code:`feature_irreps` is absent). For a GraphAttention
+energy/charge head, swap in :code:`EquiformerGraphAttentionReadout` (see FF09 comments
+in :code:`train.yaml`).
 
 NSE readout layers
 ------------------

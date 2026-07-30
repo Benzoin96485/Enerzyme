@@ -30,4 +30,5 @@ from .readout import (
     NSEReadout,
     HierachicalNSEReadout,
     VelocityReadout,
+    EquiformerGraphAttentionReadout,
 )

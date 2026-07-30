@@ -685,13 +685,21 @@ Modelhub:
             fc_neurons: [64, 64]
             nonlinear_message: true
             output_mode: feature
+        # Default: SimpleReadout extracts 0e from equivariant atom_feature, then MLP.
+        # To use GraphAttention readout instead, replace SimpleReadout with:
+        # - name: EquiformerGraphAttentionReadout
+        #   params:
+        #     output_fields: [Ea, Qa]
+        #     irreps_head: "16x0e+8x1o+4x2e"
+        #     num_heads: 2
+        #     fc_neurons: [64, 64]
+        #     nonlinear_message: true
         - name: SimpleReadout
           params:
             output_fields:
               - Ea
               - Qa
-            head_type: residual_mlp
-            num_residual: 2
+            head_type: two_layer
             dim_embedding: 64
             activation_fn: swish
         - name: AtomicAffine

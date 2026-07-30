@@ -64,9 +64,12 @@ Selection guidelines
 **Maximum accuracy on diverse geometries**
     MACE, NequIP, or Equiformer — equivariant message passing; tune cutoff and depth.
     Equiformer uses SO(3) graph attention (default MD17-style stack with ``ExpNormalSmearing``
-    and :code:`output_mode: feature`); prefer smaller irreps / fewer layers for enzyme-scale
-    clusters. Charge/dipole use shared readouts outside the Core. Numerical fidelity against
-    the official Equiformer MD17 path is covered by :code:`test/test_equiformer_parity_*.py`
+    and :code:`output_mode: feature` emitting full irreps plus :code:`feature_irreps`;
+    production default is :code:`SimpleReadout` with :code:`head_type: two_layer` after 0e
+    extract, optional :code:`EquiformerGraphAttentionReadout`); prefer smaller irreps /
+    fewer layers for enzyme-scale clusters. Charge/dipole use shared readouts outside the
+    Core. Numerical fidelity against the official Equiformer MD17 path is covered by
+    :code:`test/test_equiformer_parity_*.py`
     (operator / latent / direct E·F / gradient checks — not the production SimpleReadout stack).
 
 **Active learning with force variance**

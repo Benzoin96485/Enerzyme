@@ -1,34 +1,49 @@
-from abc import ABC
-from typing import Set, Literal, Dict, Any, Optional, List
+from typing import Set, Literal, Dict, Optional, List
 from . import BaseFFLayer
 from ..blocks.mlp import DenseLayer, ResidualMLP, ResidualLayer
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, POSITIVE_ACTIVATION_KEY_TYPE, get_positive_activation_fn
+from ..irreps_tools import extract_scalar_0e
 import torch
 from torch.nn import ModuleList, Module, Sequential
 from torch import Tensor
 
 
+def _resolve_feature_irreps(built_layers: List[Module]) -> Optional[str]:
+    """Find ``feature_irreps`` on the nearest prior Core (or any layer)."""
+    for layer in reversed(built_layers):
+        irreps = getattr(layer, "feature_irreps", None)
+        if irreps is not None:
+            return str(irreps)
+    return None
+
+
 class BaseReadout(BaseFFLayer):
-    def __init__(self, 
+    def __init__(self,
         num_blocks: int,
-        output_fields: Set[str], 
+        output_fields: Set[str],
         built_layers: List[Module],
-        head_type: Literal["dense", "residual_layer", "residual_mlp"],
+        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"],
         dim_embedding: Optional[int]=None,
-        shallow_ensemble_size: int=1, 
-        keep_feature: bool=False, 
+        shallow_ensemble_size: int=1,
+        keep_feature: bool=False,
         activation_fn: Optional[ACTIVATION_KEY_TYPE]=None,
         activation_params: ACTIVATION_PARAM_TYPE=dict(),
+        feature_irreps: Optional[str]=None,
         **head_params
     ) -> None:
         super().__init__(
-            input_fields=["atom_feature"], 
+            input_fields=["atom_feature"],
             output_fields=output_fields | {"atom_feature"} if keep_feature else output_fields
         )
         self.num_blocks = num_blocks
         self.shallow_ensemble_size = shallow_ensemble_size
         self.ordered_output_fields = sorted(list(output_fields))
         self.head_type = head_type
+        self.feature_irreps = (
+            feature_irreps
+            if feature_irreps is not None
+            else _resolve_feature_irreps(built_layers)
+        )
         if len(built_layers) > 0 and hasattr(built_layers[-1], "dim_feature_out"):
             self.dim_feature_in = built_layers[-1].dim_feature_out
         elif dim_embedding is not None:
@@ -40,10 +55,20 @@ class BaseReadout(BaseFFLayer):
         self.activation_params = activation_params
         self.head_params = head_params
 
+    def _scalar_atom_feature(self, atom_feature: Tensor) -> Tensor:
+        """Take last hierarchical block if needed, then extract 0e when equivariant."""
+        if atom_feature.ndim == 3:
+            atom_feature = atom_feature[:, :, -1]
+        elif atom_feature.ndim != 2:
+            raise ValueError(
+                f"atom_feature must be 2D or 3D, got shape {tuple(atom_feature.shape)}"
+            )
+        return extract_scalar_0e(atom_feature, self.feature_irreps)
+
     def _get_head(self):
         if self.head_type == "dense":
             return DenseLayer(
-                dim_feature_in=self.dim_feature_in, 
+                dim_feature_in=self.dim_feature_in,
                 dim_feature_out=self.dim_feature_out,
                 shallow_ensemble_size=self.shallow_ensemble_size,
                 **self.head_params
@@ -51,14 +76,14 @@ class BaseReadout(BaseFFLayer):
         elif self.head_type == "residual_layer":
             return Sequential(
                 ResidualLayer(
-                    dim_feature_in=self.dim_feature_in, 
+                    dim_feature_in=self.dim_feature_in,
                     dim_feature_out=self.dim_feature_in,
                     activation_fn=self.activation_fn,
                     activation_params=self.activation_params,
                     **self.head_params
                 ),
                 DenseLayer(
-                    dim_feature_in=self.dim_feature_in, 
+                    dim_feature_in=self.dim_feature_in,
                     dim_feature_out=self.dim_feature_out,
                     shallow_ensemble_size=self.shallow_ensemble_size,
                     **self.head_params
@@ -66,13 +91,32 @@ class BaseReadout(BaseFFLayer):
             )
         elif self.head_type == "residual_mlp":
             return ResidualMLP(
-                dim_feature_in=self.dim_feature_in, 
+                dim_feature_in=self.dim_feature_in,
                 dim_feature_out=self.dim_feature_out,
                 shallow_ensemble_size=self.shallow_ensemble_size,
                 activation_fn=self.activation_fn,
                 activation_params=self.activation_params,
                 **self.head_params
             )
+        elif self.head_type == "two_layer":
+            # Official-style energy MLP: Linear → SiLU/Swish → Linear.
+            act = self.activation_fn if self.activation_fn is not None else "swish"
+            return Sequential(
+                DenseLayer(
+                    dim_feature_in=self.dim_feature_in,
+                    dim_feature_out=self.dim_feature_in,
+                    activation_fn=act,
+                    activation_params=self.activation_params,
+                ),
+                DenseLayer(
+                    dim_feature_in=self.dim_feature_in,
+                    dim_feature_out=self.dim_feature_out,
+                    shallow_ensemble_size=self.shallow_ensemble_size,
+                    **self.head_params,
+                ),
+            )
+        else:
+            raise ValueError(f"Unknown head_type: {self.head_type}")
 
     def _split_field_outputs(self, head_output: Tensor) -> Dict[str, Tensor]:
         """Map head tensor columns onto named fields.
@@ -115,15 +159,16 @@ class BaseReadout(BaseFFLayer):
 
 
 class SimpleReadout(BaseReadout):
-    def __init__(self, 
-        output_fields: Set[str], 
+    def __init__(self,
+        output_fields: Set[str],
         built_layers: List[Module],
-        head_type: Literal["dense", "residual_layer", "residual_mlp"],
+        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"]="dense",
         dim_embedding: Optional[int]=None,
-        shallow_ensemble_size: int=1, 
-        keep_feature: bool=False, 
+        shallow_ensemble_size: int=1,
+        keep_feature: bool=False,
         activation_fn: Optional[ACTIVATION_KEY_TYPE]=None,
         activation_params: ACTIVATION_PARAM_TYPE=dict(),
+        feature_irreps: Optional[str]=None,
         **head_params
     ) -> None:
         super().__init__(
@@ -136,20 +181,13 @@ class SimpleReadout(BaseReadout):
             keep_feature=keep_feature,
             activation_fn=activation_fn,
             activation_params=activation_params,
+            feature_irreps=feature_irreps,
             **head_params
         )
         self.head = self._get_head()
 
     def get_output(self, atom_feature: Tensor) -> Dict[str, Tensor]:
-        if atom_feature.ndim == 2:
-            output = self.head(atom_feature)
-        elif atom_feature.ndim == 3:
-            output = self.head(atom_feature[:, :, -1])
-        else:
-            raise ValueError(
-                f"atom_feature must be 2D or 3D, got shape {tuple(atom_feature.shape)}"
-            )
-        return self._split_field_outputs(output)
+        return self._split_field_outputs(self.head(self._scalar_atom_feature(atom_feature)))
 
 
 class NSEReadout(BaseReadout):
@@ -171,13 +209,14 @@ class NSEReadout(BaseReadout):
         self,
         output_fields: Optional[Set[str]] = None,
         built_layers: List[Module] = [],
-        head_type: Literal["dense", "residual_layer", "residual_mlp"] = "residual_mlp",
+        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"] = "residual_mlp",
         dim_embedding: Optional[int] = None,
         shallow_ensemble_size: int = 1,
         keep_feature: bool = False,
         activation_fn: Optional[ACTIVATION_KEY_TYPE] = None,
         activation_params: ACTIVATION_PARAM_TYPE = dict(),
         positive_activation_fn: POSITIVE_ACTIVATION_KEY_TYPE = "softplus",
+        feature_irreps: Optional[str] = None,
         **head_params,
     ) -> None:
         if output_fields is None:
@@ -197,16 +236,14 @@ class NSEReadout(BaseReadout):
             keep_feature=keep_feature,
             activation_fn=activation_fn,
             activation_params=activation_params,
+            feature_irreps=feature_irreps,
             **head_params,
         )
         self.head = self._get_head()
         self.positive_activation_fn = get_positive_activation_fn(positive_activation_fn)
 
     def get_output(self, atom_feature: Tensor) -> Dict[str, Tensor]:
-        if atom_feature.ndim == 2:
-            output = self.head(atom_feature)
-        elif atom_feature.ndim == 3:
-            output = self.head(atom_feature[:, :, -1])
+        output = self.head(self._scalar_atom_feature(atom_feature))
         results = dict()
         for i, output_field in enumerate(self.ordered_output_fields):
             if output_field.startswith("fa"):
@@ -228,7 +265,8 @@ class HierachicalReadout(BaseReadout):
             nhloss = 0.
             lastoutput2 = 0.
         for i in range(self.num_blocks):
-            raw_output += self.heads[i](atom_feature[:, :, i])
+            block = extract_scalar_0e(atom_feature[:, :, i], self.feature_irreps)
+            raw_output += self.heads[i](block)
             if self.use_nhloss:
                 output2 = raw_output ** 2
                 if i > 0:
@@ -253,13 +291,14 @@ class HierachicalNSEReadout(BaseReadout):
         num_blocks: int,
         output_fields: Optional[Set[str]] = None,
         built_layers: List[Module] = [],
-        head_type: Literal["dense", "residual_layer", "residual_mlp"] = "residual_mlp",
+        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"] = "residual_mlp",
         dim_embedding: Optional[int] = None,
         shallow_ensemble_size: int = 1,
         keep_feature: bool = False,
         activation_fn: Optional[ACTIVATION_KEY_TYPE] = None,
         activation_params: ACTIVATION_PARAM_TYPE = dict(),
         positive_activation_fn: POSITIVE_ACTIVATION_KEY_TYPE = "softplus",
+        feature_irreps: Optional[str] = None,
         **head_params,
     ) -> None:
         if output_fields is None:
@@ -279,6 +318,7 @@ class HierachicalNSEReadout(BaseReadout):
             keep_feature=keep_feature,
             activation_fn=activation_fn,
             activation_params=activation_params,
+            feature_irreps=feature_irreps,
             **head_params,
         )
         self.heads = ModuleList([self._get_head() for _ in range(self.num_blocks)])
@@ -296,7 +336,8 @@ class HierachicalNSEReadout(BaseReadout):
 
         raw_output = 0.0
         for i in range(self.num_blocks):
-            raw_output = raw_output + self.heads[i](atom_feature[:, :, i])
+            block = extract_scalar_0e(atom_feature[:, :, i], self.feature_irreps)
+            raw_output = raw_output + self.heads[i](block)
 
         results: Dict[str, Tensor] = {}
         for i, output_field in enumerate(self.ordered_output_fields):
@@ -314,12 +355,13 @@ class VelocityReadout(BaseReadout):
         self,
         output_fields: Optional[Set[str]] = None,
         built_layers: List[Module] = [],
-        head_type: Literal["dense", "residual_layer", "residual_mlp"] = "dense",
+        head_type: Literal["dense", "residual_layer", "residual_mlp", "two_layer"] = "dense",
         dim_embedding: Optional[int] = None,
         shallow_ensemble_size: int = 1,
         keep_feature: bool = False,
         activation_fn: Optional[ACTIVATION_KEY_TYPE] = None,
         activation_params: ACTIVATION_PARAM_TYPE = dict(),
+        feature_irreps: Optional[str] = None,
         **head_params,
     ) -> None:
         if output_fields is None:
@@ -336,16 +378,154 @@ class VelocityReadout(BaseReadout):
             keep_feature=keep_feature,
             activation_fn=activation_fn,
             activation_params=activation_params,
+            feature_irreps=feature_irreps,
             **head_params,
         )
         self.head = self._get_head()
 
     def get_output(self, atom_feature: Tensor) -> Dict[str, Tensor]:
-        if atom_feature.ndim == 2:
-            output = self.head(atom_feature)
-        elif atom_feature.ndim == 3:
-            output = self.head(atom_feature[:, :, -1])
+        output = self.head(self._scalar_atom_feature(atom_feature))
         return {
             self.ordered_output_fields[i]: output[:, i] for i in range(self.dim_feature_out)
         }
 
+
+class EquiformerGraphAttentionReadout(BaseFFLayer):
+    """Equivariant GraphAttention head mapping full irreps → atomic scalars.
+
+    Unlike :class:`SimpleReadout` (0e extract + MLP), this consumes the full
+    ``atom_feature`` irreps tensor and graph edges, producing one 0e channel
+    per ``output_fields`` entry (e.g. ``Ea``, ``Qa``). Requires
+    ``feature_irreps`` from a prior equivariant Core.
+    """
+
+    def __init__(
+        self,
+        output_fields: Set[str],
+        built_layers: List[Module],
+        irreps_head: str = "16x0e+8x1o+4x2e",
+        num_heads: int = 2,
+        fc_neurons: Optional[List[int]] = None,
+        irreps_sh: str = "1x0e+1x1e+1x2e",
+        irreps_node_attr: str = "1x0e",
+        irreps_pre_attn: Optional[str] = None,
+        rescale_degree: bool = False,
+        nonlinear_message: bool = True,
+        alpha_drop: float = 0.0,
+        proj_drop: float = 0.0,
+        feature_irreps: Optional[str] = None,
+        num_rbf: Optional[int] = None,
+        **kwargs,
+    ) -> None:
+        from e3nn import o3
+        from ..equiformer.attention import GraphAttention
+
+        ordered = sorted(list(output_fields))
+        super().__init__(
+            input_fields={
+                "atom_feature",
+                "idx_i_sr",
+                "idx_j_sr",
+                "vij_sr",
+                "rbf",
+                "batch_seg",
+            },
+            output_fields=set(ordered),
+        )
+        self.ordered_output_fields = ordered
+        self.dim_feature_out = len(ordered)
+
+        irreps_str = (
+            feature_irreps
+            if feature_irreps is not None
+            else _resolve_feature_irreps(built_layers)
+        )
+        if irreps_str is None:
+            raise ValueError(
+                "EquiformerGraphAttentionReadout requires feature_irreps "
+                "(from an equivariant Core) or an explicit feature_irreps=..."
+            )
+        self.feature_irreps = o3.Irreps(irreps_str)
+        self.irreps_edge_attr = o3.Irreps(irreps_sh)
+        self.irreps_node_attr = o3.Irreps(irreps_node_attr)
+
+        if fc_neurons is None:
+            fc_neurons = [64, 64]
+        if num_rbf is None:
+            num_rbf = 16
+            for layer in reversed(built_layers):
+                if hasattr(layer, "num_rbf"):
+                    num_rbf = int(layer.num_rbf)
+                    break
+                if hasattr(layer, "fc_neurons") and isinstance(layer.fc_neurons, list) and layer.fc_neurons:
+                    num_rbf = int(layer.fc_neurons[0])
+                    break
+        self.fc_neurons = [num_rbf] + list(fc_neurons)
+
+        self.head = GraphAttention(
+            irreps_node_input=self.feature_irreps,
+            irreps_node_attr=self.irreps_node_attr,
+            irreps_edge_attr=self.irreps_edge_attr,
+            irreps_node_output=o3.Irreps(f"{self.dim_feature_out}x0e"),
+            fc_neurons=self.fc_neurons,
+            irreps_head=o3.Irreps(irreps_head),
+            num_heads=num_heads,
+            irreps_pre_attn=irreps_pre_attn,
+            rescale_degree=rescale_degree,
+            nonlinear_message=nonlinear_message,
+            alpha_drop=alpha_drop,
+            proj_drop=proj_drop,
+        )
+
+    def get_output(
+        self,
+        atom_feature: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+        vij_sr: Tensor,
+        rbf: Tensor,
+        batch_seg: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        from e3nn import o3
+
+        if atom_feature.ndim != 2:
+            raise ValueError(
+                "EquiformerGraphAttentionReadout expects 2D atom_feature "
+                f"(N, irreps.dim); got shape {tuple(atom_feature.shape)}"
+            )
+        if atom_feature.shape[-1] != self.feature_irreps.dim:
+            raise ValueError(
+                f"atom_feature last dim {atom_feature.shape[-1]} != "
+                f"feature_irreps.dim {self.feature_irreps.dim}"
+            )
+        n_atoms = atom_feature.shape[0]
+        if batch_seg is None:
+            batch_seg = torch.zeros(n_atoms, dtype=torch.long, device=atom_feature.device)
+        # Enerzyme edge convention: edge_src = idx_j, edge_dst = idx_i
+        edge_src = idx_j_sr
+        edge_dst = idx_i_sr
+        node_attr = torch.ones_like(atom_feature.narrow(1, 0, 1))
+        edge_sh = o3.spherical_harmonics(
+            l=self.irreps_edge_attr,
+            x=vij_sr,
+            normalize=True,
+            normalization="component",
+        )
+        outputs = self.head(
+            node_input=atom_feature,
+            node_attr=node_attr,
+            edge_src=edge_src,
+            edge_dst=edge_dst,
+            edge_attr=edge_sh,
+            edge_scalars=rbf,
+            batch=batch_seg,
+        )
+        if outputs.ndim != 2 or outputs.shape[-1] != self.dim_feature_out:
+            raise ValueError(
+                f"GraphAttention output shape {tuple(outputs.shape)} != "
+                f"(N, {self.dim_feature_out})"
+            )
+        return {
+            self.ordered_output_fields[i]: outputs.select(1, i)
+            for i in range(self.dim_feature_out)
+        }
