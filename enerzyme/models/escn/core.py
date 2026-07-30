@@ -1,10 +1,13 @@
 """Native paper eSCN Core (Passaro & Zitnick, 2023).
 
 Message-passing Core: emits ``atom_feature`` (spherical ``l=0``) and
-``atom_sphere_feature`` (full SH coeffs). Default energy/forces use shared
-``SimpleReadout`` + ``EnergyReduce`` + ``Force``. Opt-in ``SphereSampleReadout``
-consumes ``atom_sphere_feature`` for paper-style S² integration of any atomic
-property fields.
+``atom_sphere_feature`` (full SH coeffs, shape ``(N, (lmax+1)**2, C)``).
+Message SO(2) may use ``mmax < lmax`` on edges; after ``rotate_inv`` node
+features are always full degree. Default energy/forces use shared
+``SimpleReadout`` + ``EnergyReduce`` + ``Force`` (requires differentiable edge
+frames in ``so3.rotation``). Opt-in ``SphereSampleReadout`` consumes
+``atom_sphere_feature`` for paper-style S² integration; optional
+``vector_output_fields`` mirror the paper direct-force head.
 
 Distinct from ``enerzyme.models.esen`` (Meta UMA / eSCN-MD fairchem wrappers).
 """

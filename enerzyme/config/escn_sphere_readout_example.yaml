@@ -1,7 +1,8 @@
 # Example layer stack: eSCN Core + SphereSampleReadout (paper-style S² integration).
 # Predicts any atomic scalar fields listed in output_fields (here Ea and Qa).
-# Default production path remains SimpleReadout + energy-conserving Force; this stack
-# is opt-in. Direct vector Fa via vector_output_fields is supported but not shown.
+# Default production path remains SimpleReadout + energy-conserving Force (needs
+# differentiable edge frames); this stack is opt-in. Direct vector Fa via
+# vector_output_fields is the paper-style alternative (omit Force).
 
 build_params:
   dim_embedding: 64

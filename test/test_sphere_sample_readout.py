@@ -66,6 +66,59 @@ def test_sphere_sample_readout_vector_field():
     assert out["Fa"].shape == (N, 3)
 
 
+def test_sphere_sample_with_core_mmax_lt_lmax():
+    """Core emits full (lmax+1)^2 node coeffs even when message SO2 uses mmax < lmax."""
+    from enerzyme.models.escn import eSCNCore
+    from enerzyme.models.layers import SphereSampleReadout
+
+    torch.manual_seed(0)
+    lmax, mmax = 2, 1
+    sphere_channels = 16
+    core = eSCNCore(
+        dim_embedding=16,
+        num_rbf=8,
+        sphere_channels=sphere_channels,
+        hidden_channels=32,
+        edge_channels=16,
+        lmax=lmax,
+        mmax=mmax,
+        num_layers=1,
+    )
+    readout = SphereSampleReadout(
+        output_fields={"Ea"},
+        built_layers=[core],
+        head_type="escn_mlp",
+        num_sphere_samples=16,
+    )
+    N = 4
+    Za = torch.tensor([1, 6, 8, 1])
+    atom_embedding = torch.randn(N, 16)
+    idx_i, idx_j = [], []
+    for i in range(N):
+        for j in range(N):
+            if i != j:
+                idx_i.append(i)
+                idx_j.append(j)
+    idx_i = torch.tensor(idx_i)
+    idx_j = torch.tensor(idx_j)
+    Ra = torch.randn(N, 3)
+    vij = Ra[idx_j] - Ra[idx_i]
+    Dij = torch.linalg.norm(vij, dim=1).clamp(min=1e-6)
+    rbf = torch.exp(-((Dij.unsqueeze(1) - torch.linspace(0, 5, 8)) ** 2))
+    out = core.get_output(
+        atom_embedding=atom_embedding,
+        Za=Za,
+        rbf=rbf,
+        idx_i_sr=idx_i,
+        idx_j_sr=idx_j,
+        vij_sr=vij,
+    )
+    assert out["atom_sphere_feature"].shape == (N, (lmax + 1) ** 2, sphere_channels)
+    ea = readout.get_output(atom_sphere_feature=out["atom_sphere_feature"])["Ea"]
+    assert ea.shape == (N,)
+    assert torch.isfinite(ea).all()
+
+
 def test_sphere_sample_with_core_energy_rotation_invariance():
     """Geometry rotation leaves SphereSampleReadout Ea approximately invariant."""
     from enerzyme.models.escn import eSCNCore

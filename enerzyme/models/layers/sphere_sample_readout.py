@@ -5,6 +5,10 @@ sample, then integrates (mean) to per-atom scalars — the same pattern as
 Passaro & Zitnick (2023) energy heads, but with Enerzyme ``output_fields`` so
 any atomic scalar property can be predicted. Optional ``vector_output_fields``
 mirror the paper force head (scalar × sample direction).
+
+Expects ``atom_sphere_feature`` in full degree-major layout
+``(N, (lmax+1)**2, C)`` after message ``rotate_inv``. Reduced ``mmax`` is an
+internal edge-frame SO(2) detail and is not present on this tensor.
 """
 
 from __future__ import annotations

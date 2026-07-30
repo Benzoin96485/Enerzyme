@@ -28,11 +28,10 @@ class SO3_Rotation:
         self.device = rot_mat3x3.device
         self.dtype = rot_mat3x3.dtype
 
+        # Keep the Wigner graph so EnergyReduce+Force can form Fa = -dE/dRa
+        # through edge frames (fairchem v1 detached here for direct ForceBlock).
         self.wigner = self.RotationToWignerDMatrix(rot_mat3x3, 0, lmax)
         self.wigner_inv = torch.transpose(self.wigner, 1, 2).contiguous()
-
-        self.wigner = self.wigner.detach()
-        self.wigner_inv = self.wigner_inv.detach()
 
         self.set_lmax(lmax)
 
@@ -72,7 +71,7 @@ class SO3_Rotation:
             wigner[:, start:end, start:end] = block
             start = end
 
-        return wigner.detach()
+        return wigner
 
     def wigner_D(self, lval: int, alpha, beta, gamma) -> torch.Tensor:
         if not lval < len(_Jd):
@@ -103,6 +102,9 @@ def init_edge_rot_mat(edge_distance_vec: torch.Tensor) -> torch.Tensor:
 
     Unlike the original fairchem eSCN random completion, this uses a stable
     axis choice so rotations of the system transform the frame consistently.
+    The returned matrix stays in the autograd graph so default EnergyReduce+Force
+    stacks obtain the angular contribution to Fa = -dE/dRa (fairchem v1 detached
+    the frame for its direct ForceBlock path).
     """
     edge_vec_0 = edge_distance_vec
     edge_vec_0_distance = torch.linalg.norm(edge_vec_0, dim=1).clamp(min=1e-8)
@@ -125,4 +127,4 @@ def init_edge_rot_mat(edge_distance_vec: torch.Tensor) -> torch.Tensor:
 
     edge_rot_mat_inv = torch.cat([norm_z, norm_x, norm_y], dim=2)
     edge_rot_mat = torch.transpose(edge_rot_mat_inv, 1, 2)
-    return edge_rot_mat.detach()
+    return edge_rot_mat

@@ -119,13 +119,16 @@ eSCN and modular readouts
 With :code:`architecture: escn`, the native paper eSCN Core returns :code:`atom_feature`
 as spherical :code:`l=0` scalars (advertised as :code:`feature_irreps: "Cx0e"`) and
 :code:`atom_sphere_feature` (full SH coefficients, shape :code:`(N, (lmax+1)^2, C)` —
-not e3nn-flat). Default stacks use :code:`SimpleReadout` → :code:`EnergyReduce` →
-:code:`Force` for energy-conserving forces. Opt-in :code:`SphereSampleReadout` integrates
+not e3nn-flat; reduced :code:`mmax` applies only inside edge SO(2) messages). Default
+stacks use :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` for
+energy-conserving forces, which needs differentiable edge frames / Wigner-D in
+:code:`enerzyme.models.so3.rotation` (unlike fairchem v1, which detached frames for a
+direct force head). Opt-in :code:`SphereSampleReadout` integrates
 :code:`atom_sphere_feature` over fixed S² samples (Passaro & Zitnick energy-head
-pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …), with optional
-:code:`vector_output_fields` for direct vector properties. See
-:code:`enerzyme/config/escn_sphere_readout_example.yaml`. Do not confuse with
-:code:`uma_qs` (Meta UMA under :code:`esen/`).
+pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …); use
+:code:`vector_output_fields: [Fa]` (and omit :code:`Force`) for the paper-style
+direct vector path. See :code:`enerzyme/config/escn_sphere_readout_example.yaml`.
+Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`).
 
 NSE readout layers
 ------------------
