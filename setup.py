@@ -17,7 +17,8 @@ setup(
     package_data={"enerzyme": [
         "data/periodic-table.csv", 
         "models/layers/dispersion/grimme_d3_tables/*.npy", 
-        "models/layers/dispersion/grimme_d4_tables/*.pth"
+        "models/layers/dispersion/grimme_d4_tables/*.pth",
+        "models/so3/Jd.pt",
     ]},
     auth='Benzoin96485',
     author_email='luowl7@mit.edu',

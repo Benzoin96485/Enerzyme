@@ -93,6 +93,11 @@ UMA and modular readouts
 
 With :code:`architecture: uma_qs`, the Core returns atom-level embeddings; attach :code:`SimpleReadout` / :code:`HierachicalReadout` and optional :code:`SpinConservation` in the Modelhub :code:`layers` list rather than embedding prediction heads inside the Core.
 
+eSCN and modular readouts
+-------------------------
+
+With :code:`architecture: escn`, the native paper eSCN Core likewise returns :code:`atom_feature` (spherical :code:`l=0` scalars). Default stacks use :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` for energy-conserving forces. Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`).
+
 NSE readout layers
 ------------------
 

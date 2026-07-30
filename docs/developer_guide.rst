@@ -377,7 +377,12 @@ Keep this single page while the contributor surface is still evolving. Split int
 External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Register in :code:`get_ff_core` like other architectures. Keep fairchem imports inside :code:`enerzyme/models/esen/` so non-UMA installs do not import it until selected. Prefer shared :code:`layers/readout.py` and :code:`layers/spin.py` for Q/S heads.
+Register in :code:`get_ff_core` like other architectures. Keep fairchem imports inside :code:`enerzyme/models/esen/` so non-UMA installs do not import it until selected. Prefer shared :code:`layers/readout.py` and :code:`layers/spin.py` for Q/S heads. Package name :code:`esen/` is historical (UMA / eSCN-MD lineage); it is **not** the 2023 paper eSCN.
+
+Native eSCN (:code:`escn`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Paper eSCN (Passaro & Zitnick, 2023) lives under :code:`enerzyme/models/escn/` with shared SO(2)/SO(3) primitives in :code:`enerzyme/models/so3/` (including :code:`Jd.pt` in package data). The Core emits :code:`atom_feature` only; compose :code:`SimpleReadout` / :code:`EnergyReduce` / :code:`Force` outside the Core. No fairchem dependency. Enerzymette and other YAML-driven workflows only need :code:`architecture: escn` plus a resolved :code:`config.yaml` — checkpoint layout is unchanged.
 
 AllScAIP (:code:`AllScAIP`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^
