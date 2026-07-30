@@ -271,6 +271,7 @@ Tests live in :code:`test/`:
 - :code:`test_spookynet.py` — SpookyNet layer and forward tests
 - :code:`test_physnet.py` — PhysNet parity against reference TensorFlow implementation (heavy optional stack)
 - :code:`test_equiformer.py` — Equiformer forward smoke, feature mode, SO(3) energy/force checks
+- :code:`test_equiformer_parity_*.py` — numerical parity vs vendored upstream Equiformer (ops / Core latent / direct E·F / grads; no training loop)
 - :code:`test_scatter_speed.py` — performance-oriented scatter checks
 
 Suggested commands

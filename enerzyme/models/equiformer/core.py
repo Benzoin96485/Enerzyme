@@ -285,7 +285,7 @@ class EquiformerCore(BaseFFCore):
                     self.charge_conservation = layer
                 self.post_sequence.append(layer)
 
-    def get_output(
+    def encode_irreps(
         self,
         vij_sr: Tensor,
         idx_i_sr: Tensor,
@@ -293,10 +293,17 @@ class EquiformerCore(BaseFFCore):
         rbf: Tensor,
         atom_embedding: Tensor,
         batch_seg: Optional[Tensor] = None,
-    ) -> Dict[str, Tensor]:
+    ) -> Tensor:
+        """Return node irreps features after TransBlocks + final LayerNorm (pre-head).
+
+        Used by numerical parity tests against upstream Equiformer; production
+        :meth:`get_output` still emits only ``atom_feature`` / ``Ea``.
+        """
         n_atoms = atom_embedding.shape[0]
         if batch_seg is None:
-            batch_seg = torch.zeros(n_atoms, dtype=torch.long, device=atom_embedding.device)
+            batch_seg = torch.zeros(
+                n_atoms, dtype=torch.long, device=atom_embedding.device
+            )
 
         # Enerzyme: vij = Rj - Ri; Equiformer: edge_vec = pos[src] - pos[dst]
         # with src=neighbor (j), dst=center (i).
@@ -333,6 +340,39 @@ class EquiformerCore(BaseFFCore):
         node_features = self.norm(node_features, batch=batch_seg)
         if self.out_dropout is not None:
             node_features = self.out_dropout(node_features)
+        return node_features
+
+    def get_output(
+        self,
+        vij_sr: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+        rbf: Tensor,
+        atom_embedding: Tensor,
+        batch_seg: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        edge_src = idx_j_sr
+        edge_dst = idx_i_sr
+        node_features = self.encode_irreps(
+            vij_sr=vij_sr,
+            idx_i_sr=idx_i_sr,
+            idx_j_sr=idx_j_sr,
+            rbf=rbf,
+            atom_embedding=atom_embedding,
+            batch_seg=batch_seg,
+        )
+        n_atoms = atom_embedding.shape[0]
+        if batch_seg is None:
+            batch_seg = torch.zeros(
+                n_atoms, dtype=torch.long, device=atom_embedding.device
+            )
+        node_attr = torch.ones_like(node_features.narrow(1, 0, 1))
+        edge_sh = o3.spherical_harmonics(
+            l=self.irreps_edge_attr,
+            x=vij_sr,
+            normalize=True,
+            normalization="component",
+        )
 
         if self.output_mode == "feature":
             return {"atom_feature": _extract_scalars(node_features, self.irreps_feature)}
