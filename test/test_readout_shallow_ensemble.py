@@ -131,7 +131,7 @@ def test_ensemble_readout_compatible_with_conservation_affine_reduce_loss():
     assert sa["Sa"].shape == (n, ensemble)
     assert sa["S"].shape == (2, ensemble)
 
-    ea = AtomicAffineLayer(max_Za=86).get_Ea(pred["Ea"], za)
+    ea = AtomicAffineLayer(max_Za=86).get_output(Za=za, Ea=pred["Ea"])["Ea"]
     assert ea.shape == (n, ensemble)
     reduced = EnergyReduceLayer().get_output(Ea=ea, batch_seg=batch_seg, Za=za)
     assert reduced["E"].shape == (2, ensemble)

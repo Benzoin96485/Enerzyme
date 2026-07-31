@@ -72,6 +72,32 @@ def test_coerce_dataset_params_preprocessings_wins_on_conflict():
     assert out["preprocessings"]["negative_gradient"] is True
 
 
+def test_coerce_dataset_params_drops_keys_overlapping_global_transforms():
+    out = _coerce_dataset_params(
+        {
+            "data_path": "x.pkl",
+            "transforms": {
+                "atomic_energy": "/ae.csv",
+                "negative_gradient": True,
+                "uniform_qs_init": True,
+            },
+        },
+        global_transforms={
+            "atomic_energy": "/ae.csv",
+            "negative_gradient": True,
+        },
+    )
+    assert out["preprocessings"] == {"uniform_qs_init": True}
+
+
+def test_coerce_dataset_params_global_wins_when_overlap_values_differ():
+    out = _coerce_dataset_params(
+        {"transforms": {"negative_gradient": False}},
+        global_transforms={"negative_gradient": True},
+    )
+    assert out["preprocessings"] is None
+
+
 def _write_tiny_qs_pickle(path: Path) -> None:
     frames = [
         {
@@ -172,3 +198,55 @@ def test_datahub_multidataset_transforms_remap_enables_uniform_qs(tmp_path: Path
     assert train.preprocessings == {"uniform_qs_init": True}
     assert train._populate_uniform_qs_init is True
     _assert_init_features(train)
+
+
+def test_datahub_overlapping_transforms_apply_atomic_energy_once(tmp_path: Path):
+    """Legacy AL YAML duplicates transforms under datasets and global_transforms."""
+    ae_csv = tmp_path / "ae.csv"
+    ae_csv.write_text("atom_type,atomic_energy\nH,-0.5\nC,-10.0\nO,-20.0\n")
+    frames = [
+        {
+            "atom_type": ["C", "O"],
+            "coord": [[0.0, 0.0, 0.0], [1.1, 0.0, 0.0]],
+            "total_chrg": 0,
+            "energy": -35.5,
+            "grad": [[0.1, 0.0, 0.0], [-0.1, 0.0, 0.0]],
+            "dipole": [0.0, 0.0, 0.0],
+        }
+    ]
+    pkl = tmp_path / "labeled.pkl"
+    with open(pkl, "wb") as f:
+        pickle.dump(frames, f)
+
+    transforms = {
+        "atomic_energy": str(ae_csv),
+        "negative_gradient": True,
+    }
+    hub = DataHub(
+        dump_dir=str(tmp_path / "out"),
+        global_transforms=transforms,
+        datasets={
+            "training": {
+                "data_path": str(pkl),
+                "data_format": "pickle",
+                "preload": True,
+                "neighbor_list": "",
+                "compressed": False,
+                "features": {
+                    "Ra": "coord",
+                    "Za": "atom_type",
+                    "Q": "total_chrg",
+                    "N": None,
+                },
+                "targets": {"E": "energy", "Fa": "grad"},
+                "transforms": transforms,
+            }
+        },
+    )
+    train = hub.datahubs["training"]
+    assert train.preprocessings in (None, {})
+    e = float(np.asarray(train.targets["E"]).ravel()[0])
+    fa0 = np.asarray(train.targets["Fa"][0][0])
+    # once: -35.5 - (-10 - 20) = -5.5; twice would be +24.5
+    assert np.isclose(e, -5.5)
+    assert np.allclose(fa0, [-0.1, 0.0, 0.0])

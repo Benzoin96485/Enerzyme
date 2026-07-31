@@ -63,16 +63,21 @@ class L0Contraction(Module):
         )
         cg_diag = np.diagonal(cg_matrix, axis1=1, axis2=2)[0]
 
-        cg_rep = []
-        degrees_np = np.array(degrees)
-        unique_degrees, counts = np.unique(degrees_np, return_counts=True)
-        for d, r in zip(unique_degrees, counts):
-            block = cg_diag[_indx_fn(d - 1) : _indx_fn(d)]
-            tiled = np.tile(block, r)
-            cg_rep.append(tiled)
-        cg_rep = np.concatenate(cg_rep)
+        # Build cg_rep in the *same* order as ``degrees`` / RealSphericalHarmonics /
+        # ``segment_ids`` (one CG diagonal block per list entry, including duplicates).
+        #
+        # Do NOT use ``np.unique(degrees)`` here: that sorts ascending and would
+        # mis-align weights when ``degrees`` is not strictly increasing (e.g.
+        # ``[3, 1, 2]``). So3krates-torch historically tiled via unique+counts,
+        # which is only safe for sorted unique lists like the usual ``[1, 2, 3]``.
+        cg_blocks = [
+            cg_diag[_indx_fn(d - 1) : _indx_fn(d)] for d in degrees
+        ]
+        cg_rep = np.concatenate(cg_blocks) if cg_blocks else np.array([], dtype=float)
         self.register_buffer("cg_rep", torch.tensor(cg_rep, dtype=dtype))
 
+        # segment_ids[m] = index into ``degrees`` for the m-th SPHC coefficient,
+        # matching concatenation order of SH blocks for those degrees.
         segment_ids = list(
             it.chain(*[[n] * (2 * degrees[n] + 1) for n in range(len(degrees))])
         )

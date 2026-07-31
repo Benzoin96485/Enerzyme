@@ -121,6 +121,47 @@ def test_equiformer_graph_attention_readout_multi_field():
     assert torch.isfinite(out["Ea"]).all()
 
 
+def test_equiformer_graph_attention_readout_shallow_ensemble():
+    torch.manual_seed(2)
+    n, e, ensemble = 4, 10, 3
+    irreps = o3.Irreps("16x0e+8x1e+4x2e")
+    n_rbf = 8
+
+    class _Core:
+        dim_feature_out = scalar_0e_dim(irreps)
+        feature_irreps = str(irreps)
+        num_rbf = n_rbf
+
+    ro = EquiformerGraphAttentionReadout(
+        output_fields={"Ea", "Qa"},
+        built_layers=[_Core()],
+        irreps_head="8x0e+4x1o+2x2e",
+        num_heads=2,
+        fc_neurons=[32],
+        irreps_sh="1x0e+1x1e+1x2e",
+        nonlinear_message=True,
+        num_rbf=n_rbf,
+        shallow_ensemble_size=ensemble,
+    )
+    feat = torch.randn(n, irreps.dim)
+    idx_i = torch.randint(0, n, (e,))
+    idx_j = torch.randint(0, n, (e,))
+    vij = torch.randn(e, 3)
+    rbf = torch.randn(e, n_rbf)
+    batch = torch.zeros(n, dtype=torch.long)
+    out = ro.get_output(
+        atom_feature=feat,
+        idx_i_sr=idx_i,
+        idx_j_sr=idx_j,
+        vij_sr=vij,
+        rbf=rbf,
+        batch_seg=batch,
+    )
+    assert out["Ea"].shape == (n, ensemble)
+    assert out["Qa"].shape == (n, ensemble)
+    assert torch.isfinite(out["Ea"]).all()
+
+
 def test_equiformer_graph_attention_readout_requires_irreps():
     class _Core:
         dim_feature_out = 8
@@ -169,6 +210,56 @@ def test_equiformer_build_model_smoke_two_layer():
     assert out["E"].shape == (1,)
     assert out["Ea"].shape == (n,)
     assert out["Qa"].shape == (n,)
+
+
+def test_equiformer_shallow_ensemble_yaml_build_model_smoke():
+    import yaml
+
+    root = Path(__file__).resolve().parents[1]
+    example = root / "enerzyme" / "config" / "equiformer_shallow_ensemble_example.yaml"
+    assert example.is_file()
+    with open(example) as f:
+        cfg = yaml.safe_load(f)
+    ff = next(iter(cfg["Modelhub"]["internal_FFs"].values()))
+    ensemble = 4
+    model = build_model(
+        architecture=ff["architecture"],
+        layer_params=ff["layers"],
+        build_params=ff["build_params"],
+        verbose=0,
+    )
+    n = 5
+    za = torch.tensor([1, 6, 1, 8, 1], dtype=torch.long)
+    ra = torch.randn(n, 3) * 0.3
+    ra.requires_grad_(True)
+    idx_i, idx_j = _complete_graph(n)
+    batch = {
+        "Ra": ra,
+        "Za": za,
+        "idx_i": idx_i,
+        "idx_j": idx_j,
+        "batch_seg": torch.zeros(n, dtype=torch.long),
+        "offsets": None,
+    }
+    model.train()
+    out = model(batch)
+    assert out["E"].shape == (1, ensemble)
+    assert out["Fa"].shape == (n, 3, ensemble)
+    assert "E_var" in out
+    assert out["E_var"].shape == (1,)
+    assert torch.isfinite(out["E"]).all()
+    assert torch.isfinite(out["Fa"]).all()
+    assert torch.isfinite(out["E_var"]).all()
+
+    model.eval()
+    ra2 = torch.randn(n, 3) * 0.3
+    ra2.requires_grad_(True)
+    batch["Ra"] = ra2
+    out_eval = model(batch)
+    assert "E_var" in out_eval and "Fa_var" in out_eval
+    assert out_eval["Fa_var"].shape == (n, 3)
+    assert torch.isfinite(out_eval["E_var"]).all()
+    assert torch.isfinite(out_eval["Fa_var"]).all()
 
 
 def test_equiformer_mixed_irreps_simple_readout_stack():
