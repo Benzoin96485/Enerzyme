@@ -33,3 +33,10 @@ from .readout import (
     EquiformerGraphAttentionReadout,
 )
 from .sphere_sample_readout import SphereSampleReadout
+from .charge_spin_embedding import ChargeSpinEmbeddingLayer
+from .so3lr_readout import PartialChargeReadout, HirshfeldReadout
+from .so3lr_physics import (
+    SO3LRZBLRepulsionEnergyLayer,
+    ErfCoulombEnergyLayer,
+    TSQDODispersionEnergyLayer,
+)

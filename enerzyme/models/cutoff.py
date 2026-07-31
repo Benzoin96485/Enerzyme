@@ -83,8 +83,10 @@ def cosine_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
 
 CUTOFF_REGISTER = {
     "polynomial": polynomial_transition,
+    # SO3LR / So3krates-torch alias for the PhysNet polynomial envelope.
+    "phys": polynomial_transition,
     "bump": bump_transition,
     "smooth": smooth_transition,
     "cosine": cosine_transition,
 }
-CUTOFF_KEY_TYPE = Literal["polynomial", "bump", "smooth", "cosine"]
+CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine"]

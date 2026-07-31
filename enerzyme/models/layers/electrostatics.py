@@ -130,7 +130,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
                 self.lr_shield = self._smooth_lr_shield
 
     def _lr_ordinary(self, Dij: Tensor) -> Tensor:
-        return 1.0 / Dij + Dij / self.lr_cutoff2 - self.two_div_cut
+        return 1.0 / Dij + Dij / self.cutoff_lr2 - self.two_div_cut
 
     def _shield(self, Dij: Tensor) -> Tensor:
         return torch.sqrt(Dij * Dij + 1.0)

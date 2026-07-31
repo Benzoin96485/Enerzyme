@@ -81,6 +81,11 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .so3krates.core import So3kratesCore as Core
         from .so3krates.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "so3lr":
+        # SO3LR = So3krates Core + universal pairwise FF (ZBL / erf-Coulomb / TS–QDO).
+        from .so3krates.core import So3kratesCore as Core
+        from .so3krates.so3lr import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     else:
         raise NotImplementedError(f"Architecture {architecture} not implemented")
     LOSS_REGISTER.update(special_loss)

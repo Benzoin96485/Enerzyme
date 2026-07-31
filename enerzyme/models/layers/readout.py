@@ -40,6 +40,8 @@ class BaseReadout(BaseFFLayer):
         feature_irreps: Optional[str]=None,
         **head_params
     ) -> None:
+        if not isinstance(output_fields, set):
+            output_fields = set(output_fields)
         super().__init__(
             input_fields=["atom_feature"],
             output_fields=output_fields | {"atom_feature"} if keep_feature else output_fields
