@@ -21,7 +21,7 @@ From :code:`enerzyme/models/layers/`:
     Architecture-specific message passing (:code:`Core` with :code:`architecture` in Modelhub)
 
 **Physics / post-processing**
-    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy` (SpookyNet / PhysNet), :code:`ErfCoulombEnergy` (SO3LR), :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`ZBLRepulsionEnergy` (SpookyNet), :code:`SO3LRZBLRepulsionEnergy`, :code:`TSQDODispersionEnergy` (SO3LR; not Grimme)
+    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy` (flavors: SpookyNet / PhysNet / SO3LR), :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`TSQDODispersionEnergy` (SO3LR; not Grimme), :code:`ZBLRepulsionEnergy` (optional :code:`switch_off` for SO3LR)
 
 **Output**
     :code:`EnergyReduce`, :code:`Force`, :code:`ShallowEnsembleReduce`
@@ -149,11 +149,10 @@ SO3LR (So3krates + universal pairwise FF)
 :code:`architecture: so3lr` reuses :code:`So3kratesCore` and composes SO3LR-specific
 layers: :code:`ChargeSpinEmbedding` + :code:`GatherAtomEmbedding(scale_by_sqrt_count=true)`,
 :code:`PartialChargeReadout` / :code:`ChargeConservation` / :code:`HirshfeldReadout`,
-then :code:`SO3LRZBLRepulsionEnergy`, :code:`ErfCoulombEnergy`, and
-:code:`TSQDODispersionEnergy`. Do **not** substitute Grimme D3/D4 or SpookyNet
-:code:`ElectrostaticEnergy` / :code:`ZBLRepulsionEnergy` when targeting SO3LR physics.
-Example: :code:`enerzyme/config/so3lr_layers_example.yaml`. For Enerzymette, set
-:code:`architecture: so3lr` in the resolved :code:`config.yaml`.
+then :code:`ZBLRepulsionEnergy(switch_off=1.5)`, :code:`ElectrostaticEnergy(flavor=SO3LR)`,
+and :code:`TSQDODispersionEnergy`. Do **not** substitute Grimme D3/D4 when targeting
+SO3LR dispersion. Example: :code:`enerzyme/config/so3lr_layers_example.yaml`. For
+Enerzymette, set :code:`architecture: so3lr` in the resolved :code:`config.yaml`.
 
 NSE readout layers
 ------------------

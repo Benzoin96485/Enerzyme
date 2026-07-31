@@ -1,9 +1,9 @@
 # SO3LR stack (Kabylda et al., JACS 2025): So3krates Core + universal pairwise FF.
 # Use architecture: so3lr under Modelhub.internal_FFs (Enerzymette-compatible).
 #
-# Core is identical to so3krates; physics (ZBL / erf-Coulomb / TS–QDO) and
-# Hirshfeld / partial-charge heads are post-core layers. Do not use Grimme D3/D4
-# or SpookyNet ElectrostaticEnergy for SO3LR parity.
+# Core is identical to so3krates; physics uses shared layers with SO3LR options:
+#   ZBLRepulsionEnergy(switch_off=1.5), ElectrostaticEnergy(flavor=SO3LR),
+#   TSQDODispersionEnergy (not Grimme D3/D4).
 #
 # Defaults match the pretrained SO3LR hyperparams (r_max=4.5 Å, L≤4, H=128, T=3,
 # σ=4.0, γ=1.2). For gas-phase eval set cutoff_lr ≈ 1000; MD often uses 12 Å
@@ -60,9 +60,13 @@ Modelhub:
         - name: PartialChargeReadout
         - name: ChargeConservation
         - name: HirshfeldReadout
-        - name: SO3LRZBLRepulsionEnergy
-        - name: ErfCoulombEnergy
+        - name: ZBLRepulsionEnergy
           params:
+            switch_off: 1.5
+            ke: 14.399645351950548
+        - name: ElectrostaticEnergy
+          params:
+            flavor: SO3LR
             electrostatic_energy_scale: 4.0
             neighborlist_format_lr: sparse
         - name: TSQDODispersionEnergy

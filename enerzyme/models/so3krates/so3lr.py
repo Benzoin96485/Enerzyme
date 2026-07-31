@@ -7,9 +7,10 @@ dispersion priors. Use ``architecture: so3lr`` in YAML / Enerzymette.
 
 from __future__ import annotations
 
-# Pretrained SO3LR (so3lr params / paper SI): r_max=4.5, L<=4, H=128, T=3,
+# Pretrained SO3LR (so3lr params / paper SI): r_max=4.5, L≤4, H=128, T=3,
 # σ=4.0, γ=1.2, avg_num_neighbors≈13.17, phys cutoff, charge+spin embeds.
 _SO3LR_AVG_NUM_NEIGHBORS = 13.168995780096482
+_KE_EV_ANG = 14.399645351950548
 
 DEFAULT_BUILD_PARAMS = {
     "dim_embedding": 128,
@@ -56,10 +57,14 @@ DEFAULT_LAYER_PARAMS = [
     {"name": "PartialChargeReadout"},
     {"name": "ChargeConservation"},
     {"name": "HirshfeldReadout"},
-    {"name": "SO3LRZBLRepulsionEnergy"},
     {
-        "name": "ErfCoulombEnergy",
+        "name": "ZBLRepulsionEnergy",
+        "params": {"switch_off": 1.5, "ke": _KE_EV_ANG},
+    },
+    {
+        "name": "ElectrostaticEnergy",
         "params": {
+            "flavor": "SO3LR",
             "electrostatic_energy_scale": 4.0,
             "neighborlist_format_lr": "sparse",
         },

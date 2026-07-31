@@ -11,50 +11,43 @@ from numpy.testing import assert_allclose
 sys.path.extend(["..", "."])
 
 
-def test_switching_fn_endpoints():
-    from enerzyme.models.layers.so3lr_physics import switching_fn
+def test_zbl_default_ke_matches_spookynet_ev():
+    """Without Hartree_in_E, ZBL uses SpookyNet eV Coulomb constant."""
+    from enerzyme.models.layers import ZBLRepulsionEnergyLayer
 
-    x = torch.tensor([0.0, 0.75, 1.5])
-    w = switching_fn(x, 0.0, 1.5)
-    assert w[0].item() > 0.99
-    assert w[-1].item() < 0.01
-    assert 0.0 < w[1].item() < 1.0
+    zbl = ZBLRepulsionEnergyLayer()
+    assert_allclose(zbl.kehalf, 0.5 * 14.399645351950548, rtol=1e-12)
 
 
-def test_so3lr_zbl_positive_and_decays():
-    from enerzyme.models.layers import SO3LRZBLRepulsionEnergyLayer
+def test_zbl_positive_decays_and_switch_off():
+    from enerzyme.models.layers import ZBLRepulsionEnergyLayer
 
-    zbl = SO3LRZBLRepulsionEnergyLayer()
+    zbl = ZBLRepulsionEnergyLayer(ke=14.399645351950548, switch_off=1.5)
     za = torch.tensor([1, 1], dtype=torch.long)
     energies = []
     for r in (0.5, 1.0, 2.0):
         dij = torch.tensor([r, r])
         idx_i = torch.tensor([0, 1], dtype=torch.long)
         idx_j = torch.tensor([1, 0], dtype=torch.long)
-        cut = torch.ones_like(dij)
-        e = zbl.get_E_zbl_a(za, dij, idx_i, idx_j, cut)
+        e = zbl.get_E_zbl_a(za, dij, idx_i, idx_j, torch.ones_like(dij))
         energies.append(e.sum().item())
         assert torch.all(e >= 0)
     assert energies[0] > energies[1] > energies[2]
-
-
-def test_so3lr_zbl_switch_off():
-    from enerzyme.models.layers import SO3LRZBLRepulsionEnergyLayer
-
-    zbl = SO3LRZBLRepulsionEnergyLayer()
-    za = torch.tensor([1, 1], dtype=torch.long)
-    dij = torch.tensor([5.0, 5.0])
-    idx_i = torch.tensor([0, 1], dtype=torch.long)
-    idx_j = torch.tensor([1, 0], dtype=torch.long)
-    e = zbl.get_E_zbl_a(za, dij, idx_i, idx_j, torch.ones_like(dij))
-    assert torch.all(e < 1e-2)
+    e_far = zbl.get_E_zbl_a(
+        za,
+        torch.tensor([5.0, 5.0]),
+        torch.tensor([0, 1], dtype=torch.long),
+        torch.tensor([1, 0], dtype=torch.long),
+        torch.ones(2),
+    )
+    assert torch.all(e_far < 1e-2)
 
 
 def test_erf_coulomb_h2_analytic():
-    from enerzyme.models.layers import ErfCoulombEnergyLayer
+    from enerzyme.models.layers import ElectrostaticEnergyLayer
 
-    # Sparse bidirectional H–H, qi=qj=1, r=1, σ=4 → 2 * (0.5 * ke * erf(1/4)/1)
-    layer = ErfCoulombEnergyLayer(
+    layer = ElectrostaticEnergyLayer(
+        flavor="SO3LR",
         electrostatic_energy_scale=4.0,
         cutoff_lr=None,
         neighborlist_format_lr="sparse",
@@ -71,9 +64,10 @@ def test_erf_coulomb_h2_analytic():
 
 
 def test_erf_coulomb_cutoff_zero_beyond():
-    from enerzyme.models.layers import ErfCoulombEnergyLayer
+    from enerzyme.models.layers import ElectrostaticEnergyLayer
 
-    layer = ErfCoulombEnergyLayer(
+    layer = ElectrostaticEnergyLayer(
+        flavor="SO3LR",
         electrostatic_energy_scale=4.0,
         cutoff_lr=3.0,
         neighborlist_format_lr="sparse",
@@ -128,26 +122,27 @@ def test_charge_spin_embedding_shapes():
     emb = ChargeSpinEmbeddingLayer(dim_embedding=F, max_Za=118, attribute="charge")
     out = emb.get_output(Za=za, batch_seg=batch, Q=q)
     assert out["charge_embedding"].shape == (N, F)
-    assert emb.Wq.in_features == 118  # So3krates-torch num_elements, index Za-1
+    assert emb.Wq.in_features == 118
 
 
 def test_charge_spin_one_hot_matches_z_table_convention():
-    """Wq column for hydrogen must be index 0 (Za-1), not Za."""
     from enerzyme.models.layers import ChargeSpinEmbeddingLayer
 
     layer = ChargeSpinEmbeddingLayer(dim_embedding=4, max_Za=10, attribute="charge")
     with torch.no_grad():
         layer.Wq.weight.zero_()
-        layer.Wq.weight[:, 0] = 1.0  # H column
+        layer.Wq.weight[:, 0] = 1.0
         layer.Wk.zero_()
         layer.Wv.zero_()
         layer.Wv[0] = 1.0
         for m in layer.mlp:
             if hasattr(m, "weight"):
                 m.weight.zero_()
-    za = torch.tensor([1, 2])
-    batch = torch.zeros(2, dtype=torch.long)
-    out = layer.get_output(Za=za, batch_seg=batch, Q=torch.tensor([1.0]))
+    out = layer.get_output(
+        Za=torch.tensor([1, 2]),
+        batch_seg=torch.zeros(2, dtype=torch.long),
+        Q=torch.tensor([1.0]),
+    )
     assert out["charge_embedding"].shape == (2, 4)
 
 
@@ -155,7 +150,6 @@ def test_so3lr_build_model_energy_force_finite():
     from enerzyme.models.ff import build_model
 
     torch.manual_seed(0)
-    # Tiny SO3LR stack for speed (same wiring, smaller width / depth).
     build_params = {
         "dim_embedding": 8,
         "num_rbf": 8,
@@ -194,10 +188,13 @@ def test_so3lr_build_model_energy_force_finite():
         {"name": "PartialChargeReadout"},
         {"name": "ChargeConservation"},
         {"name": "HirshfeldReadout"},
-        {"name": "SO3LRZBLRepulsionEnergy"},
         {
-            "name": "ErfCoulombEnergy",
-            "params": {"electrostatic_energy_scale": 4.0},
+            "name": "ZBLRepulsionEnergy",
+            "params": {"switch_off": 1.5, "ke": 14.399645351950548},
+        },
+        {
+            "name": "ElectrostaticEnergy",
+            "params": {"flavor": "SO3LR", "electrostatic_energy_scale": 4.0},
         },
         {
             "name": "TSQDODispersionEnergy",
@@ -213,7 +210,6 @@ def test_so3lr_build_model_energy_force_finite():
     model.eval()
 
     N = 4
-    # Complete graph under cutoff_lr
     idx_i, idx_j = [], []
     for i in range(N):
         for j in range(N):
@@ -223,25 +219,24 @@ def test_so3lr_build_model_energy_force_finite():
     idx_i = torch.tensor(idx_i, dtype=torch.long)
     idx_j = torch.tensor(idx_j, dtype=torch.long)
     ra = torch.randn(N, 3, dtype=torch.float64, requires_grad=True) * 0.8
-    data = {
-        "Ra": ra,
-        "Za": torch.tensor([1, 6, 1, 8], dtype=torch.long),
-        "idx_i": idx_i,
-        "idx_j": idx_j,
-        "batch_seg": torch.zeros(N, dtype=torch.long),
-        "Q": torch.tensor([0.0]),
-        "S": torch.tensor([0.0]),
-    }
-    out = model(data)
+    out = model(
+        {
+            "Ra": ra,
+            "Za": torch.tensor([1, 6, 1, 8], dtype=torch.long),
+            "idx_i": idx_i,
+            "idx_j": idx_j,
+            "batch_seg": torch.zeros(N, dtype=torch.long),
+            "Q": torch.tensor([0.0]),
+            "S": torch.tensor([0.0]),
+        }
+    )
     assert torch.isfinite(out["E"]).all()
     assert out["Fa"].shape == (N, 3)
     assert torch.isfinite(out["Fa"]).all()
-    assert "ha" in out
-    assert "Qa" in out
+    assert "ha" in out and "Qa" in out
 
 
 def test_electrostatic_lr_cutoff_attribute_fixed():
-    """Regression: ElectrostaticEnergyLayer used lr_cutoff2 (missing) when cutoff_lr>0."""
     from enerzyme.models.layers import ElectrostaticEnergyLayer
 
     layer = ElectrostaticEnergyLayer(

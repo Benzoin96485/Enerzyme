@@ -3,10 +3,9 @@
 #
 # Core emits atom_feature (invariants) + atom_sphere_feature (SPHC χ,
 # shape [N, m_tot]). Energy uses SimpleReadout on atom_feature.
-# Optional physics: for SpookyNet/PhysNet-style stacks use ZBLRepulsionEnergy /
-# ElectrostaticEnergy / GrimmeD3|D4. For SO3LR (Kabylda et al. 2025) use
-# architecture: so3lr — see so3lr_layers_example.yaml (SO3LRZBL / ErfCoulomb /
-# TSQDODispersion + Hirshfeld; not Grimme D3/D4).
+# Optional physics: ZBLRepulsionEnergy / ElectrostaticEnergy / GrimmeD3|D4
+# (PhysNet/SpookyNet), or architecture: so3lr — see so3lr_layers_example.yaml
+# (ZBL with switch_off, ElectrostaticEnergy flavor=SO3LR, TSQDODispersion).
 
 Modelhub:
   internal_FFs:
