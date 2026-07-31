@@ -6,6 +6,10 @@ Emits ``atom_feature`` (``x``) and ``atom_sphere_feature`` (``χ``, shape
 stay in pre-core layers; energy / force / charge / physics heads stay in
 post-core layers.
 
+Optional Euclidean Fast Attention (EFA) on the invariant stream via
+``era_use_in_iterations`` (Frank et al., arXiv:2412.08541). Architectures
+``efa`` / ``so3lr_efa`` enable this by default.
+
 Algorithm follows So3krates-torch EuclideanTransformer
 (https://github.com/TCPUniLU/So3krates-torch, MIT), matching mlff FeatureBlock
 + GeometricBlock + InteractionBlock.
@@ -20,6 +24,7 @@ from torch import Tensor
 from torch.nn import Identity, Module, ModuleList, SiLU
 
 from ..cutoff import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
+from ..efa import apply_efa_if_configured, build_efa_blocks, parse_era_iterations
 from ..layers import (
     BaseAtomEmbedding,
     BaseFFCore,
@@ -80,6 +85,7 @@ class So3kratesCore(BaseFFCore):
 #################################################################################
 # So3krates Core (Frank et al., NeurIPS 2022)                                  #
 # Dual-stream Euclidean transformer; atom_feature = invariants x                #
+# Optional EFA nonlocal on invariant stream (era_use_in_iterations)             #
 #################################################################################
 """
 
@@ -103,19 +109,31 @@ class So3kratesCore(BaseFFCore):
         residual_mlp_1: bool = False,
         residual_mlp_2: bool = False,
         qk_non_linearity: str = "identity",
+        # EFA (Euclidean Fast Attention) — optional nonlocal on invariants
+        era_use_in_iterations: Optional[object] = None,
+        era_lebedev_num: int = 146,
+        era_max_frequency: Optional[float] = None,
+        era_max_length: float = 10.0,
+        era_qk_num_features: Optional[int] = None,
+        era_v_num_features: Optional[int] = None,
         # Accept build_params alias: dim_embedding may equal num_features when
         # RandomAtomEmbedding width matches Core feature dim.
         **kwargs,
     ) -> None:
+        era_iters = parse_era_iterations(era_use_in_iterations)
+        self.era_enabled = era_iters is not None
+        input_fields = {
+            "atom_embedding",
+            "rbf",
+            "idx_i_sr",
+            "idx_j_sr",
+            "vij_sr",
+            "Dij_sr",
+        }
+        if self.era_enabled:
+            input_fields |= {"Ra", "batch_seg"}
         super().__init__(
-            input_fields={
-                "atom_embedding",
-                "rbf",
-                "idx_i_sr",
-                "idx_j_sr",
-                "vij_sr",
-                "Dij_sr",
-            },
+            input_fields=input_fields,
             output_fields={"atom_feature", "atom_sphere_feature"},
         )
         del kwargs  # absorb unused build_params (e.g. max_Za passed twice)
@@ -186,6 +204,21 @@ class So3kratesCore(BaseFFCore):
             ]
         )
 
+        qk = era_qk_num_features if era_qk_num_features is not None else min(32, num_features)
+        if qk % 2 != 0:
+            qk += 1
+        self.efa_blocks = build_efa_blocks(
+            num_layers,
+            num_features,
+            era_use_in_iterations=era_iters,
+            num_features_qk=qk,
+            num_features_v=era_v_num_features if era_v_num_features is not None else min(16, num_features),
+            lebedev_num=era_lebedev_num,
+            max_frequency=era_max_frequency,
+            max_length=era_max_length,
+            as_delta=True,
+        )
+
     def build(self, built_layers: List[Module]) -> None:
         self.calculate_distance = DistanceLayer()
         self.calculate_distance.with_vector_on("vij_lr")
@@ -218,8 +251,10 @@ class So3kratesCore(BaseFFCore):
         idx_j_sr: Tensor,
         vij_sr: Tensor,
         Dij_sr: Tensor,
+        Ra: Optional[Tensor] = None,
+        batch_seg: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
-        """Run Euclidean transformer stack.
+        """Run Euclidean transformer stack (+ optional EFA on invariants).
 
         Enerzyme ``vij_sr = R_j - R_i``. So3krates-torch evaluates SH on the
         negated displacements; we match that convention with ``-vij_sr``.
@@ -251,7 +286,16 @@ class So3kratesCore(BaseFFCore):
                 dim_size=num_atoms,
             )
 
-        for layer in self.layers:
+        if self.era_enabled:
+            if Ra is None:
+                raise ValueError("Ra is required when era_use_in_iterations is set")
+            if batch_seg is None:
+                batch_seg = torch.zeros(
+                    num_atoms, dtype=torch.long, device=atom_embedding.device
+                )
+            Ra = Ra.to(dtype=dtype)
+
+        for i, layer in enumerate(self.layers):
             inv_features, ev_features = layer(
                 inv_features,
                 ev_features,
@@ -261,6 +305,15 @@ class So3kratesCore(BaseFFCore):
                 sh_vectors=sh_vectors,
                 cutoffs=cutoffs,
             )
+            if self.era_enabled:
+                delta = apply_efa_if_configured(
+                    inv_features,
+                    Ra,
+                    batch_seg,
+                    self.efa_blocks[i],
+                    as_delta=True,
+                )
+                inv_features = inv_features + delta
 
         return {
             "atom_feature": inv_features,

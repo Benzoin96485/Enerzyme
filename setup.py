@@ -20,6 +20,8 @@ setup(
         "models/layers/dispersion/grimme_d4_tables/*.pth",
         "models/so3/Jd.pt",
         "models/so3/cgmatrix.npz",
+        "models/efa/lebedev_grids.npz",
+        "models/efa/NOTICE",
     ]},
     auth='Benzoin96485',
     author_email='luowl7@mit.edu',

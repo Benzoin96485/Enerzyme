@@ -74,11 +74,21 @@ class SpookyNetCore(BaseFFCore):
         num_residual_post: int, num_residual_output: int, activation_fn: ACTIVATION_KEY_TYPE, use_irreps: bool, dropout_rate: float=0.0,
         shallow_ensemble_size: int=1,
         output_mode: Literal["direct", "feature"]="direct",
+        use_efa: bool = False,
+        efa_lebedev_num: int = 146,
+        efa_max_frequency: Optional[float] = None,
+        efa_max_length: float = 10.0,
+        efa_num_features_qk: Optional[int] = None,
+        efa_num_features_v: Optional[int] = None,
     ) -> None:
         self.output_mode: Literal["direct", "feature"] = output_mode
+        self.use_efa = bool(use_efa)
         output_fields = {"Ea", "Qa"} if output_mode == "direct" else {"atom_feature"}
+        input_fields = {"Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf", "atom_embedding", "batch_seg"}
+        if self.use_efa:
+            input_fields = set(input_fields) | {"Ra"}
         super().__init__(
-            input_fields={"Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf", "atom_embedding", "batch_seg"},
+            input_fields=input_fields,
             output_fields=output_fields,
         )
         self.interaction = ModuleList(
@@ -98,6 +108,12 @@ class SpookyNetCore(BaseFFCore):
                     num_residual_post=num_residual_post,
                     num_residual_output=num_residual_output,
                     activation_fn=activation_fn,
+                    use_efa=self.use_efa,
+                    efa_lebedev_num=efa_lebedev_num,
+                    efa_max_frequency=efa_max_frequency,
+                    efa_max_length=efa_max_length,
+                    efa_num_features_qk=efa_num_features_qk,
+                    efa_num_features_v=efa_num_features_v,
                 )   
                 for _ in range(num_modules)
             ]
@@ -189,13 +205,15 @@ class SpookyNetCore(BaseFFCore):
     
     def _atomic_properties_dynamic(
         self, atom_embedding: Tensor, num_batch: int,
-        rbf: Tensor, pij: Tensor, dij: Tensor, idx_i_sr: Tensor, idx_j_sr: Tensor, mask: Tensor, batch_seg: Optional[Tensor]=None):
+        rbf: Tensor, pij: Tensor, dij: Tensor, idx_i_sr: Tensor, idx_j_sr: Tensor, mask: Tensor, batch_seg: Optional[Tensor]=None,
+        Ra: Optional[Tensor]=None,
+    ):
         x = atom_embedding
         dropout_mask = torch.ones((num_batch, 1), dtype=x.dtype, device=x.device)
         f = x.new_zeros(x.size())
         for module in self.interaction:
             x, y = module(
-                x, rbf, pij, dij, idx_i_sr, idx_j_sr, num_batch, batch_seg, mask
+                x, rbf, pij, dij, idx_i_sr, idx_j_sr, num_batch, batch_seg, mask, Ra=Ra
             )
             # apply dropout mask
             if self.training and self.module_keep_prob < 1.0:
@@ -211,15 +229,16 @@ class SpookyNetCore(BaseFFCore):
 
     def get_output(
         self, Dij_sr: Tensor, vij_sr: Tensor, idx_i_sr: Tensor, idx_j_sr: Tensor, 
-        rbf: Tensor, atom_embedding: Tensor, batch_seg: Optional[Tensor]=None
+        rbf: Tensor, atom_embedding: Tensor, batch_seg: Optional[Tensor]=None,
+        Ra: Optional[Tensor]=None,
     ) -> Dict[str, Tensor]:
         pij, dij, mask, num_batch = self._atomic_properties_static(Dij_sr, vij_sr, batch_seg)
         if self.output_mode == "feature":
             f = self._atomic_properties_dynamic(
-                atom_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg
+                atom_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg, Ra=Ra
             )
             return {"atom_feature": f}
         ea, qa = self._atomic_properties_dynamic(
-            atom_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg
+            atom_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg, Ra=Ra
         )
         return {"Ea": ea, "Qa": qa}

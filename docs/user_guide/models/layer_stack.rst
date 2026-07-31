@@ -179,6 +179,24 @@ and :code:`TSQDODispersionEnergy`. Do **not** substitute Grimme D3/D4 when targe
 SO3LR dispersion. Example: :code:`enerzyme/config/so3lr_layers_example.yaml`. For
 Enerzymette, set :code:`architecture: so3lr` in the resolved :code:`config.yaml`.
 
+Euclidean Fast Attention (EFA)
+------------------------------
+
+EFA is a **Core-internal** nonlocal block (not a YAML physics layer). Shared
+implementation: :code:`enerzyme/models/efa/` (:code:`EFABlock`,
+:code:`apply_efa_if_configured`).
+
+* :code:`architecture: efa` — So3krates stack with :code:`era_use_in_iterations`
+  set (needs :code:`Ra` + :code:`batch_seg` in the Core). Example:
+  :code:`enerzyme/config/efa_layers_example.yaml`.
+* :code:`architecture: so3lr_efa` — SO3LR post-core physics with EFA on the Core.
+  Example: :code:`enerzyme/config/so3lr_efa_layers_example.yaml`.
+* SpookyNet — Core param :code:`use_efa: true` replaces Performer nonlocal;
+  default :code:`false`.
+* New Cores — declare :code:`Ra` / :code:`batch_seg` inputs, construct
+  :code:`EFABlock`, add its delta to invariant :code:`atom_feature` on selected
+  layers. Feed only ``[N, F]`` scalars (not eSCN/EquiformerV2 sphere layouts).
+
 NSE readout layers
 ------------------
 
