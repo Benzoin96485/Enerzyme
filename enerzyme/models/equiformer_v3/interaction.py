@@ -684,7 +684,7 @@ class TransBlockV3(torch.nn.Module):
                 del self.ga.alpha_norm
                 self.ga.alpha_norm = RMSNorm(attn_alpha_channels)
 
-        self.drop_path = GraphDropPath(drop_path_rate) #if drop_path_rate > 0.0 else None
+        self.drop_path = GraphDropPath(drop_path_rate) if drop_path_rate > 0.0 else None
         self.proj_drop = EquivariantDropout(lmax=lmax, mmax=lmax, drop_prob=proj_drop) if proj_drop > 0.0 else None
 
         self.norm_2 = get_normalization_layer(norm_type, lmax=lmax, num_channels=num_in_channels)

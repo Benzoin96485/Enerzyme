@@ -267,3 +267,13 @@ def test_equiformer_v3_wigner_stays_in_autograd_graph():
     loss.backward()
     assert vij.grad is not None
     assert torch.isfinite(vij.grad).all()
+
+
+def test_equiformer_v3_drop_path_disabled_when_rate_zero():
+    """drop_path_rate=0 must omit GraphDropPath (avoids empty batch_seg.max crash)."""
+    core_off = _tiny_core(drop_path_rate=0.0)
+    for blk in core_off.blocks:
+        assert blk.drop_path is None
+    core_on = _tiny_core(drop_path_rate=0.1)
+    for blk in core_on.blocks:
+        assert blk.drop_path is not None

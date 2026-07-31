@@ -143,9 +143,10 @@ With :code:`architecture: equiformer_v2` or :code:`equiformer_v3`, the Core retu
 (:code:`atom_feature` as :code:`l=0` scalars with :code:`feature_irreps: "Cx0e"`, plus
 :code:`atom_sphere_feature`). Default stacks use :code:`SimpleReadout` →
 :code:`EnergyReduce` → :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout`
-applies the paper sphere FFN energy head to :code:`atom_sphere_feature` (instead of
-:code:`SimpleReadout`; also usable after EquiformerV3 when the Core exposes the same
-sphere layout). Shared :code:`so3` primitives provide component-normalized
+applies the paper sphere FFN energy head to :code:`atom_sphere_feature` after an
+**EquiformerV2** Core (it looks up :code:`SO3_grid` on that Core and is **not**
+wired for :code:`EquiformerV3Core`; use :code:`SimpleReadout` with V3 for now).
+Shared :code:`so3` primitives provide component-normalized
 grids, :code:`mmax < lmax` rotate-back rescale, and EquiformerV3 additions
 (merged LN, SwiGLU-S², :code:`PolynomialEnvelope` / :code:`GraphSoftmax`).
 All external Equiformer / EquiformerV2 readouts
