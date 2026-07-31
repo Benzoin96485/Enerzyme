@@ -2,6 +2,9 @@
 
 Distinct from Grimme D3/D4. Requires Hirshfeld volume ratios ``ha``.
 Reference: DOI 10.1021/acs.jctc.3c00797; Kabylda et al., JACS 2025.
+
+Energies are converted with ``Hartree_in_E`` (same convention as Grimme D3/D4):
+Ha targets → ``Hartree_in_E=1``; eV → ``≈27.211``. Distances use ``Bohr_in_R``.
 """
 
 from __future__ import annotations
@@ -15,8 +18,6 @@ from torch_scatter import segment_sum_coo
 from ...cutoff import CUTOFF_REGISTER
 from .. import BaseFFLayer
 
-_BOHR = 0.5291772105638411
-_HARTREE = 27.211386245988
 _FINE_STRUCTURE = 0.0072973525693
 
 # Free-atom polarizabilities and C6 (mlff / SO3LR), Z = 1..
@@ -57,6 +58,8 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
         cutoff_lr: Optional[float] = None,
         cutoff_lr_damping: Optional[float] = None,
         neighborlist_format_lr: Literal["sparse", "ordered_sparse"] = "sparse",
+        Hartree_in_E: float = 1,
+        Bohr_in_R: float = 0.5291772105638411,
     ) -> None:
         super().__init__(
             input_fields={"Za", "ha", "Dij_lr", "idx_i", "idx_j"},
@@ -74,6 +77,8 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
         self.gamma_scale = float(dispersion_energy_scale)
         self.cutoff_lr = cutoff_lr
         self.cutoff_lr_damping = cutoff_lr_damping
+        self.Hartree_in_E = float(Hartree_in_E)
+        self.Bohr_in_R = float(Bohr_in_R)
         self.pair_factor = 0.5 if neighborlist_format_lr == "sparse" else 1.0
         self._switch = CUTOFF_REGISTER["smooth"]
         self.register_buffer(
@@ -126,16 +131,17 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
         r = Dij_lr.reshape(-1)
         alpha_ij, c6_ij = self._mixing(Za, idx_i, idx_j, ha)
         gamma = self._gamma_cubic_fit(alpha_ij)
-        r_au = r / _BOHR
+        r_au = r / self.Bohr_in_R
         c8 = 5.0 / gamma * c6_ij
         c10 = 245.0 / 8.0 / gamma.square() * c6_ij
         p = self.gamma_scale * 2.0 * 2.54 * alpha_ij ** (1.0 / 7.0)
+        # v is in Hartree; scale to dataset energy units via Hartree_in_E.
         v = (
             -c6_ij / (r_au.pow(6) + p.pow(6))
             - c8 / (r_au.pow(8) + p.pow(8))
             - c10 / (r_au.pow(10) + p.pow(10))
         )
-        edge = self.pair_factor * v * _HARTREE
+        edge = self.pair_factor * v * self.Hartree_in_E
         if self.cutoff_lr is not None:
             w = self._switch(
                 r,

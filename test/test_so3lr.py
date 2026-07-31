@@ -96,6 +96,8 @@ def test_tsqdo_dispersion_negative_attractive():
         dispersion_energy_scale=1.2,
         cutoff_lr=None,
         neighborlist_format_lr="sparse",
+        Hartree_in_E=_HARTREE_EV,
+        Bohr_in_R=_BOHR,
     )
     za = torch.tensor([6, 6], dtype=torch.long)
     ha = torch.tensor([1.0, 1.0])
@@ -104,6 +106,28 @@ def test_tsqdo_dispersion_negative_attractive():
     idx_j = torch.tensor([1, 0], dtype=torch.long)
     e = layer.get_E_disp_a(za, ha, dij, idx_i, idx_j)
     assert torch.all(e < 0)
+
+
+def test_tsqdo_scales_with_hartree_in_e():
+    """Dispersion must follow Hartree_in_E (not a hard-coded eV factor)."""
+    from enerzyme.models.layers import TSQDODispersionEnergyLayer
+
+    kwargs = dict(
+        dispersion_energy_scale=1.2,
+        cutoff_lr=None,
+        neighborlist_format_lr="sparse",
+        Bohr_in_R=_BOHR,
+    )
+    e_ha = TSQDODispersionEnergyLayer(Hartree_in_E=1.0, **kwargs)
+    e_ev = TSQDODispersionEnergyLayer(Hartree_in_E=_HARTREE_EV, **kwargs)
+    za = torch.tensor([6, 6], dtype=torch.long)
+    ha = torch.tensor([1.0, 1.0])
+    dij = torch.tensor([3.0, 3.0])
+    idx_i = torch.tensor([0, 1], dtype=torch.long)
+    idx_j = torch.tensor([1, 0], dtype=torch.long)
+    out_ha = e_ha.get_E_disp_a(za, ha, dij, idx_i, idx_j)
+    out_ev = e_ev.get_E_disp_a(za, ha, dij, idx_i, idx_j)
+    assert_allclose(out_ev.numpy(), (out_ha * _HARTREE_EV).numpy(), rtol=1e-6)
 
 
 def test_hirshfeld_and_partial_charge_shapes():
