@@ -1,6 +1,6 @@
-"""Radial basis and C^3 envelopes for DPA4.
+"""Radial basis for DPA4 (Bessel / Gaussian × C³ envelope).
 
-Reimplemented after deepmd-kit ``dpa4_nn.radial`` (Li et al., arXiv:2606.02419).
+``C3CutoffEnvelope`` lives in shared ``enerzyme.models.so3.envelope``.
 """
 
 from __future__ import annotations
@@ -10,39 +10,15 @@ from typing import List, Optional, Sequence
 
 import torch
 from torch import Tensor, nn
-from torch.nn import functional as F
 
+from ..so3 import C3CutoffEnvelope
 
-class C3CutoffEnvelope(nn.Module):
-    """C^3-continuous polynomial cutoff envelope ``E_p(x)``."""
-
-    def __init__(self, rcut: float, exponent: int = 5) -> None:
-        super().__init__()
-        if rcut <= 0.0:
-            raise ValueError("`rcut` must be positive")
-        if exponent <= 0:
-            raise ValueError("`exponent` must be positive")
-        self.rcut = float(rcut)
-        self.p = int(exponent)
-        coeffs = tuple(float(math.comb(k + 3, 3)) for k in range(self.p))
-        self.register_buffer(
-            "series_coefficients",
-            torch.tensor(coeffs, dtype=torch.float64),
-            persistent=False,
-        )
-
-    def forward(self, dst: Tensor) -> Tensor:
-        u = ((self.rcut - dst) / self.rcut).clamp(min=0.0, max=1.0)
-        x = 1.0 - u
-        coeffs = self.series_coefficients.to(dtype=x.dtype, device=x.device)
-        series = torch.full(x.shape, coeffs[-1].item(), dtype=x.dtype, device=x.device)
-        for coefficient in reversed(coeffs[:-1].tolist()):
-            series = coefficient + x * series
-        return (u**4) * series
+# Re-export for historical ``from enerzyme.models.dpa4.radial import C3CutoffEnvelope``.
+__all__ = ["C3CutoffEnvelope", "RadialBasis", "RadialMLP"]
 
 
 class RadialBasis(nn.Module):
-    """Bessel / Gaussian radial basis multiplied by a C^3 envelope."""
+    """Bessel / Gaussian radial basis multiplied by a C³ envelope."""
 
     def __init__(
         self,
@@ -77,7 +53,9 @@ class RadialBasis(nn.Module):
             x = r * freqs
             z = x / math.pi
             pz = math.pi * z
-            sinc = torch.where(z == 0, torch.ones_like(pz), torch.sin(pz) / pz.clamp_min(1e-12))
+            sinc = torch.where(
+                z == 0, torch.ones_like(pz), torch.sin(pz) / pz.clamp_min(1e-12)
+            )
             raw = freqs * sinc
         else:
             dr = r - freqs
@@ -86,7 +64,7 @@ class RadialBasis(nn.Module):
 
 
 class RadialMLP(nn.Module):
-    """Per-degree radial MLP: ``(E, n_in)`` → ``(E, n_out)`` or broadcast over degrees."""
+    """MLP used to lift RBF features to per-degree channel features."""
 
     def __init__(
         self,
@@ -97,7 +75,6 @@ class RadialMLP(nn.Module):
     ) -> None:
         super().__init__()
         hidden = list(hidden) if hidden is not None else []
-        # Convention from DPA4: ``[0]`` means a single Linear to ``n_out``.
         if len(hidden) == 1 and hidden[0] == 0:
             hidden = []
         dims: List[int] = [n_in, *hidden, n_out]

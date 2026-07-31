@@ -1,13 +1,17 @@
-"""Polynomial envelope for smooth attention cutoffs (EquiformerV3).
+"""Smooth radial envelopes for equivariant message passing.
 
-Distinct from PhysNet-style ``cutoff.polynomial_transition`` used in
-range-separation; this matches fairchem eSEN / EquiformerV3
-``PolynomialEnvelope``.
+* ``PolynomialEnvelope`` — EquiformerV3 / fairchem eSEN attention cutoff
+  (distinct from PhysNet-style ``cutoff.polynomial_transition``).
+* ``C3CutoffEnvelope`` — DPA4 / DeePMD C³-continuous envelope used with
+  Bessel radial bases (Li et al., arXiv:2606.02419).
 """
 
 from __future__ import annotations
 
+import math
+
 import torch
+from torch import Tensor
 
 
 class PolynomialEnvelope(torch.nn.Module):
@@ -41,3 +45,44 @@ class PolynomialEnvelope(torch.nn.Module):
 
     def extra_repr(self) -> str:
         return f"cutoff={self.cutoff}, exponent={self.exponent}"
+
+
+class C3CutoffEnvelope(torch.nn.Module):
+    """C³-continuous polynomial cutoff envelope ``E_p(x)``.
+
+    For scaled distance ``x = r / rcut`` and ``u = 1 - x``::
+
+        E_p(x) = u^4 * sum_{k=0}^{p-1} C(k+3, 3) x^k   (x < 1)
+        E_p(x) = 0                                        (x >= 1)
+
+    Default ``p=5`` gives ``E_5(x) = u^4 (1 + 4x + 10x^2 + 20x^3 + 35x^4)``.
+    """
+
+    def __init__(self, rcut: float, exponent: int = 5) -> None:
+        super().__init__()
+        if rcut <= 0.0:
+            raise ValueError("`rcut` must be positive")
+        if exponent <= 0:
+            raise ValueError("`exponent` must be positive")
+        self.rcut = float(rcut)
+        self.p = int(exponent)
+        coeffs = tuple(float(math.comb(k + 3, 3)) for k in range(self.p))
+        self.register_buffer(
+            "series_coefficients",
+            torch.tensor(coeffs, dtype=torch.float64),
+            persistent=False,
+        )
+
+    def forward(self, dst: Tensor) -> Tensor:
+        u = ((self.rcut - dst) / self.rcut).clamp(min=0.0, max=1.0)
+        x = 1.0 - u
+        coeffs = self.series_coefficients.to(dtype=x.dtype, device=x.device)
+        series = torch.full(
+            x.shape, float(coeffs[-1].item()), dtype=x.dtype, device=x.device
+        )
+        for coefficient in reversed(coeffs[:-1].tolist()):
+            series = coefficient + x * series
+        return (u**4) * series
+
+    def extra_repr(self) -> str:
+        return f"rcut={self.rcut}, exponent={self.p}"

@@ -34,7 +34,7 @@ def test_m_major_index_matches_published_layout():
 
 
 def test_c3_envelope_matches_closed_form_p5():
-    from enerzyme.models.dpa4.radial import C3CutoffEnvelope
+    from enerzyme.models.so3 import C3CutoffEnvelope
 
     rcut = 6.0
     env = C3CutoffEnvelope(rcut=rcut, exponent=5).double()
@@ -49,6 +49,75 @@ def test_c3_envelope_matches_closed_form_p5():
     assert out[0].item() == 1.0
     assert out[2].item() == 0.0
     assert out[3].item() == 0.0
+
+
+def test_so2_convolution_uses_radial_feat():
+    """Changing Core radial_feat must change SO2Convolution messages."""
+    import torch.nn as nn
+    from enerzyme.models.dpa4.edge_cache import EdgeCache
+    from enerzyme.models.dpa4.so2 import SO2Convolution
+    from enerzyme.models.dpa4.wignerd import WignerDCalculator, build_edge_quaternion
+
+    torch.manual_seed(0)
+    n, e, c, lmax, mmax = 4, 6, 8, 2, 1
+    conv = SO2Convolution(
+        lmax=lmax,
+        mmax=mmax,
+        channels=c,
+        n_focus=1,
+        mixing_layers=1,
+        n_atten_head=1,
+        radial_so2_mode="degree_channel",
+        radial_so2_rank=1,
+    )
+    # post_mix is zero-init for residual identity; reinit so radial changes are visible.
+    nn.init.xavier_uniform_(conv.post_mix.weight)
+    conv.eval()
+    src = torch.tensor([1, 2, 3, 0, 1, 2])
+    dst = torch.tensor([0, 0, 1, 1, 2, 3])
+    vij = torch.randn(e, 3)
+    edge_len = vij.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+    quat = build_edge_quaternion(vij, edge_len)
+    D, Dt = WignerDCalculator(lmax)(quat)
+    cache = EdgeCache(
+        src=src,
+        dst=dst,
+        edge_vec=vij,
+        edge_rbf=torch.randn(e, 16),
+        edge_env=torch.ones(e, 1) * 0.5,
+        deg=torch.ones(n),
+        inv_sqrt_deg=torch.ones(n, 1, 1),
+        D_full=D,
+        Dt_full=Dt,
+    )
+    x = torch.randn(n, (lmax + 1) ** 2, c)
+    rad_a = torch.randn(e, lmax + 1, c)
+    rad_b = rad_a + 1.0
+    with torch.no_grad():
+        ya = conv(x, cache, rad_a)
+        yb = conv(x, cache, rad_b)
+    assert torch.isfinite(ya).all()
+    assert not torch.allclose(ya, yb, atol=1e-6, rtol=1e-6)
+
+
+def test_s2_lebedev_projector_loads_and_roundtrips_l0():
+    from enerzyme.models.so3 import S2LebedevProjector
+
+    proj = S2LebedevProjector(lmax=2)
+    x = torch.zeros(3, 9, 4)
+    x[:, 0, :] = torch.randn(3, 4)
+    g = proj.to_grid(x)
+    y = proj.from_grid(g)
+    # Scalar channel should be approximately recovered (quadrature identity on l=0).
+    torch.testing.assert_close(y[:, 0, :], x[:, 0, :], atol=1e-4, rtol=1e-4)
+
+
+def test_s2_lebedev_missing_rule_raises():
+    from enerzyme.models.so3.lebedev import load_lebedev_rule
+    import pytest
+
+    with pytest.raises(ValueError, match="not packaged"):
+        load_lebedev_rule(999)
 
 
 def test_so2_linear_complex_multiply_equivariance():

@@ -25,7 +25,13 @@ from .activation_v3 import (
     SwiGLU,
     SeparableGateS2Activation_SwiGLU_Merge,
 )
-from .envelope import PolynomialEnvelope
+from .envelope import C3CutoffEnvelope, PolynomialEnvelope
+from .lebedev import (
+    LEBEDEV_PRECISION_TO_NPOINTS,
+    S2LebedevProjector,
+    load_lebedev_rule,
+    resolve_lebedev_precision,
+)
 from .softmax import GraphSoftmax, SoftCap
 from .so2_ops import SO2Linear, SO2MLinear
 from .linear import SO3Linear
@@ -85,6 +91,11 @@ __all__ = [
     "load_cgmatrix",
     "spherical_harmonics",
     "PolynomialEnvelope",
+    "C3CutoffEnvelope",
+    "LEBEDEV_PRECISION_TO_NPOINTS",
+    "S2LebedevProjector",
+    "load_lebedev_rule",
+    "resolve_lebedev_precision",
     "GraphSoftmax",
     "SoftCap",
     "SO2Linear",

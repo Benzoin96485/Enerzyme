@@ -428,7 +428,7 @@ Liao et al. (2026, arXiv:2604.09130) lives under :code:`enerzyme/models/equiform
 DPA4 (:code:`dpa4`)
 ^^^^^^^^^^^^^^^^^^^^^
 
-DPA4 (Li et al., 2026, arXiv:2606.02419) lives under :code:`enerzyme/models/dpa4/`. Its focus-major, m-major EMFA operators and quaternion edge frames are local because their layout differs from shared Equiformer/eSCN primitives. The Core owns its radial basis and emits the standard :code:`atom_feature` / :code:`atom_sphere_feature` pair; compose :code:`SimpleReadout`, :code:`EnergyReduce`, and :code:`Force` outside it. Core / Wigner / force-FD coverage is in :code:`test/test_dpa4_core.py`; algebraic op checks are in :code:`test/test_dpa4_parity_ops.py`. Enerzymette only needs :code:`architecture: dpa4` plus a resolved :code:`config.yaml`.
+DPA4 (Li et al., 2026, arXiv:2606.02419) lives under :code:`enerzyme/models/dpa4/`. Focus-major / m-major EMFA operators and quaternion edge frames stay local because their layout differs from shared Equiformer/eSCN primitives. Shared pieces already lifted into :code:`enerzyme/models/so3/` include :code:`C3CutoffEnvelope` and Lebedev S² projection (:code:`S2LebedevProjector` / :code:`lebedev_rules.npz`). The Core owns its Bessel radial basis and emits the standard :code:`atom_feature` / :code:`atom_sphere_feature` pair; compose :code:`SimpleReadout`, :code:`EnergyReduce`, and :code:`Force` outside it. Core / Wigner / force-FD coverage is in :code:`test/test_dpa4_core.py`; algebraic op checks are in :code:`test/test_dpa4_parity_ops.py`. Enerzymette only needs :code:`architecture: dpa4` plus a resolved :code:`config.yaml`.
 
 So3krates (:code:`so3krates`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
