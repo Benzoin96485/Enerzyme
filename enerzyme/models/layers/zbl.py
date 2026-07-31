@@ -1,18 +1,11 @@
 """Ziegler–Biersack–Littmark short-range repulsion.
 
-Matches SpookyNet ``ZBLRepulsionEnergy`` (learnable softplus params) and
-optionally SO3LR's extra hard switch that drives the term to zero by
-``switch_off`` (default 1.5 Å in SO3LR stacks).
+Matches SpookyNet ``ZBLRepulsionEnergy`` (learnable softplus params). Optional
+``switch_off`` adds SO3LR's extra smooth cutoff that drives the term to zero
+by that distance (typically 1.5 Å).
 
-Coulomb prefactor
----------------
-``kehalf = 0.5 * Bohr_in_R * Hartree_in_E`` when ``Hartree_in_E`` is set via
-build params (Ha/Å → ~0.265; eV/Å → ~7.2). If neither ``ke`` nor a non-default
-unit path is intended, pass ``ke=14.399...`` explicitly (SpookyNet / SO3LR eV).
-
-Historical bug: older defaults with ``Hartree_in_E=1`` while comparing to
-SpookyNet's hard-coded eV ``ke`` produced ~27× too-small energies; parity
-tests had to patch ``kehalf``. Prefer setting units correctly or ``ke``.
+Coulomb prefactor: ``kehalf = 0.5 * Bohr_in_R * Hartree_in_E`` from model unit
+settings (Ha/Å → Hartree_in_E=1; eV/Å → Hartree_in_E≈27.211).
 """
 
 from __future__ import annotations
@@ -29,19 +22,14 @@ from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 from ..functional import softplus_inverse
 from . import BaseFFLayer
 
-# SpookyNet / SO3LR default Coulomb constant (eV·Å/e²).
-_KE_EV_ANG = 14.399645351950548
-_BOHR = 0.5291772105638411
-
 
 class ZBLRepulsionEnergyLayer(BaseFFLayer):
     """ZBL-inspired short-range nuclear repulsion (SpookyNet + optional SO3LR switch)."""
 
     def __init__(
         self,
-        Bohr_in_R: float = _BOHR,
-        Hartree_in_E: Optional[float] = None,
-        ke: Optional[float] = None,
+        Bohr_in_R: float = 0.5291772105638411,
+        Hartree_in_E: float = 1,
         cutoff_sr: Optional[float] = None,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = None,
         switch_off: Optional[float] = None,
@@ -49,19 +37,12 @@ class ZBLRepulsionEnergyLayer(BaseFFLayer):
         """
         Args:
             Bohr_in_R / Hartree_in_E: unit conversion; ``kehalf = 0.5 * Bohr * Hartree``.
-            ke: optional explicit Coulomb constant (overrides Bohr/Hartree). SpookyNet
-                and SO3LR (eV) use ``14.399645351950548``.
             switch_off: if set (SO3LR: 1.5), multiply by smooth switch on ``[0, switch_off]``.
                 ``None`` keeps SpookyNet behaviour (envelope only via ``cutoff_values_sr``).
         """
         super().__init__(output_fields={"E_zbl_a"})
         self.a0 = Bohr_in_R
-        if ke is not None:
-            self.kehalf = 0.5 * float(ke)
-        elif Hartree_in_E is not None:
-            self.kehalf = 0.5 * Bohr_in_R * float(Hartree_in_E)
-        else:
-            self.kehalf = 0.5 * _KE_EV_ANG
+        self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
         self.switch_off = switch_off
         if cutoff_fn is not None:
             self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]

@@ -6,8 +6,6 @@ from . import BaseFFLayer
 from ..functional import segment_sum_coo
 from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
-_KE_EV_ANG = 14.399645351950548
-
 
 class ChargeConservationLayer(BaseFFLayer):
     def __init__(self) -> None:
@@ -94,7 +92,6 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         flavor: Literal["PhysNet", "SpookyNet", "SO3LR"] = "SpookyNet",
         electrostatic_energy_scale: float = 4.0,
         neighborlist_format_lr: Literal["sparse", "ordered_sparse"] = "sparse",
-        ke: Optional[float] = None,
     ) -> None:
         r"""
         Pairwise electrostatic energy.
@@ -108,9 +105,8 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
 
         Params:
         -----
-        Bohr_in_R / Hartree_in_E: unit conversion for PhysNet/SpookyNet
-            (``kehalf = 0.5 * Bohr * Hartree``). Ignored when ``ke`` is set or
-            ``flavor='SO3LR'`` (defaults to eV·Å Coulomb constant).
+        Bohr_in_R / Hartree_in_E: unit conversion
+            (``kehalf = 0.5 * Bohr * Hartree``).
 
         cutoff_sr: short-range blend cutoff (required for PhysNet/SpookyNet).
 
@@ -124,6 +120,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         self.flavor = flavor
         self.cutoff_lr = cutoff_lr
         self.dielectric_constant = dielectric_constant
+        self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
 
         if flavor == "SO3LR":
             if neighborlist_format_lr not in {"sparse", "ordered_sparse"}:
@@ -131,8 +128,12 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
                     "neighborlist_format_lr must be 'sparse' or 'ordered_sparse'"
                 )
             self.sigma = float(electrostatic_energy_scale)
-            self.ke = float(ke) if ke is not None else _KE_EV_ANG
-            self.pair_factor = 0.5 if neighborlist_format_lr == "sparse" else 1.0
+            # sparse bidirectional list → kehalf; ordered_sparse → full ke = 2*kehalf
+            self.pair_kehalf = (
+                self.kehalf
+                if neighborlist_format_lr == "sparse"
+                else 2.0 * self.kehalf
+            )
             self._switch = CUTOFF_REGISTER["smooth"]
             if cutoff_lr is not None and cutoff_lr > 0:
                 self.cuton = 0.45 * float(cutoff_lr)
@@ -140,11 +141,6 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
 
         if cutoff_sr is None:
             raise TypeError("cutoff_sr is required for PhysNet/SpookyNet electrostatics")
-        self.kehalf = (
-            0.5 * float(ke)
-            if ke is not None
-            else 0.5 * Bohr_in_R * Hartree_in_E
-        )
         if flavor == "PhysNet":
             self.cutoff = cutoff_sr / 2
             self.cuton = 0
@@ -213,7 +209,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         qj = Qa[idx_j]
         pairwise = self._erf_potential(r, self.sigma)
         if self.cutoff_lr is None or self.cutoff_lr <= 0:
-            edge = self.pair_factor * self.ke * qi * qj * pairwise
+            edge = self.pair_kehalf * qi * qj * pairwise / self.dielectric_constant
         else:
             cutoff = float(self.cutoff_lr)
             f = self._switch(r, cutoff, self.cuton)
@@ -226,7 +222,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             energy_shifted = pairwise - shift
             force_shifted = pairwise - shift - force_shift * (r - cutoff)
             blended = f * energy_shifted + (1.0 - f) * force_shifted
-            edge = self.pair_factor * self.ke * qi * qj * blended
+            edge = self.pair_kehalf * qi * qj * blended / self.dielectric_constant
             edge = torch.where(r < cutoff, edge, torch.zeros_like(edge))
         return segment_sum_coo(edge, idx_i, dim_size=len(Qa))
 

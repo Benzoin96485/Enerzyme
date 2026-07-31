@@ -9,8 +9,8 @@ from __future__ import annotations
 
 # Pretrained SO3LR (so3lr params / paper SI): r_max=4.5, L≤4, H=128, T=3,
 # σ=4.0, γ=1.2, avg_num_neighbors≈13.17, phys cutoff, charge+spin embeds.
+# Energies in eV → Hartree_in_E ≈ 27.211 (kehalf = 0.5 * Bohr * Hartree).
 _SO3LR_AVG_NUM_NEIGHBORS = 13.168995780096482
-_KE_EV_ANG = 14.399645351950548
 
 DEFAULT_BUILD_PARAMS = {
     "dim_embedding": 128,
@@ -20,6 +20,8 @@ DEFAULT_BUILD_PARAMS = {
     "cutoff_fn": "phys",
     # Long-range neighbor cutoff for elec / disp (MD default 12 Å; gas ≈1000).
     "cutoff_lr": 12.0,
+    "Bohr_in_R": 0.5291772105638411,
+    "Hartree_in_E": 27.211386245988,
 }
 
 DEFAULT_LAYER_PARAMS = [
@@ -57,10 +59,7 @@ DEFAULT_LAYER_PARAMS = [
     {"name": "PartialChargeReadout"},
     {"name": "ChargeConservation"},
     {"name": "HirshfeldReadout"},
-    {
-        "name": "ZBLRepulsionEnergy",
-        "params": {"switch_off": 1.5, "ke": _KE_EV_ANG},
-    },
+    {"name": "ZBLRepulsionEnergy", "params": {"switch_off": 1.5}},
     {
         "name": "ElectrostaticEnergy",
         "params": {

@@ -10,19 +10,25 @@ from numpy.testing import assert_allclose
 
 sys.path.extend(["..", "."])
 
+_BOHR = 0.5291772105638411
+_HARTREE_EV = 27.211386245988
 
-def test_zbl_default_ke_matches_spookynet_ev():
-    """Without Hartree_in_E, ZBL uses SpookyNet eV Coulomb constant."""
+
+def test_zbl_kehalf_from_units():
     from enerzyme.models.layers import ZBLRepulsionEnergyLayer
 
-    zbl = ZBLRepulsionEnergyLayer()
-    assert_allclose(zbl.kehalf, 0.5 * 14.399645351950548, rtol=1e-12)
+    zbl_ha = ZBLRepulsionEnergyLayer(Bohr_in_R=_BOHR, Hartree_in_E=1.0)
+    zbl_ev = ZBLRepulsionEnergyLayer(Bohr_in_R=_BOHR, Hartree_in_E=_HARTREE_EV)
+    assert_allclose(zbl_ha.kehalf, 0.5 * _BOHR, rtol=1e-12)
+    assert_allclose(zbl_ev.kehalf, 0.5 * _BOHR * _HARTREE_EV, rtol=1e-12)
 
 
 def test_zbl_positive_decays_and_switch_off():
     from enerzyme.models.layers import ZBLRepulsionEnergyLayer
 
-    zbl = ZBLRepulsionEnergyLayer(ke=14.399645351950548, switch_off=1.5)
+    zbl = ZBLRepulsionEnergyLayer(
+        Bohr_in_R=_BOHR, Hartree_in_E=_HARTREE_EV, switch_off=1.5
+    )
     za = torch.tensor([1, 1], dtype=torch.long)
     energies = []
     for r in (0.5, 1.0, 2.0):
@@ -48,6 +54,8 @@ def test_erf_coulomb_h2_analytic():
 
     layer = ElectrostaticEnergyLayer(
         flavor="SO3LR",
+        Bohr_in_R=_BOHR,
+        Hartree_in_E=_HARTREE_EV,
         electrostatic_energy_scale=4.0,
         cutoff_lr=None,
         neighborlist_format_lr="sparse",
@@ -57,8 +65,7 @@ def test_erf_coulomb_h2_analytic():
     idx_i = torch.tensor([0, 1], dtype=torch.long)
     idx_j = torch.tensor([1, 0], dtype=torch.long)
     e = layer.get_E_ele_a(dij, qa, idx_i, idx_j)
-    ke = 14.399645351950548
-    expected_edge = 0.5 * ke * math.erf(1.0 / 4.0)
+    expected_edge = layer.kehalf * math.erf(1.0 / 4.0)
     assert_allclose(e[0].item(), expected_edge, rtol=1e-6)
     assert_allclose(e[1].item(), expected_edge, rtol=1e-6)
 
@@ -68,6 +75,8 @@ def test_erf_coulomb_cutoff_zero_beyond():
 
     layer = ElectrostaticEnergyLayer(
         flavor="SO3LR",
+        Bohr_in_R=_BOHR,
+        Hartree_in_E=_HARTREE_EV,
         electrostatic_energy_scale=4.0,
         cutoff_lr=3.0,
         neighborlist_format_lr="sparse",
@@ -157,6 +166,8 @@ def test_so3lr_build_model_energy_force_finite():
         "cutoff_sr": 4.5,
         "cutoff_fn": "phys",
         "cutoff_lr": 6.0,
+        "Bohr_in_R": _BOHR,
+        "Hartree_in_E": _HARTREE_EV,
     }
     layers = [
         {"name": "RangeSeparation", "params": {"cutoff_fn": "phys"}},
@@ -188,10 +199,7 @@ def test_so3lr_build_model_energy_force_finite():
         {"name": "PartialChargeReadout"},
         {"name": "ChargeConservation"},
         {"name": "HirshfeldReadout"},
-        {
-            "name": "ZBLRepulsionEnergy",
-            "params": {"switch_off": 1.5, "ke": 14.399645351950548},
-        },
+        {"name": "ZBLRepulsionEnergy", "params": {"switch_off": 1.5}},
         {
             "name": "ElectrostaticEnergy",
             "params": {"flavor": "SO3LR", "electrostatic_energy_scale": 4.0},
