@@ -68,9 +68,23 @@ def smooth_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     return fm / (fp + fm)
 
 
+@scale
+def cosine_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
+    """
+    Cosine cutoff on the scaled interval ``[0, 1]`` (So3krates / Eq. 17 style).
+    For x <= 0 return 1; for x >= 1 return 0; else ``0.5 * (cos(pi * x) + 1)``.
+    """
+    return torch.where(
+        x_ <= 0,
+        ones,
+        torch.where(x_ >= 1, zeros, 0.5 * (torch.cos(torch.pi * x_) + 1.0)),
+    )
+
+
 CUTOFF_REGISTER = {
     "polynomial": polynomial_transition,
     "bump": bump_transition,
-    "smooth": smooth_transition
+    "smooth": smooth_transition,
+    "cosine": cosine_transition,
 }
-CUTOFF_KEY_TYPE = Literal["polynomial", "bump", "smooth"]
+CUTOFF_KEY_TYPE = Literal["polynomial", "bump", "smooth", "cosine"]

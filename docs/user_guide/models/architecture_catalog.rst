@@ -35,6 +35,11 @@ Internal architectures
 |                |          |        |        |             | higher cost;     |
 |                |          |        |        |             | see parity tests |
 +----------------+----------+--------+--------+-------------+------------------+
+| So3krates      | via      | via    | yes    | via         | Dual-stream      |
+|                | readout  | readout|        | readout     | Euclidean        |
+|                |          |        |        |             | transformer;     |
+|                |          |        |        |             | SPHC ``χ``       |
++----------------+----------+--------+--------+-------------+------------------+
 
 External wrappers
 -----------------
@@ -50,6 +55,8 @@ External wrappers
 External models are declared under :code:`Modelhub.external_FFs` with the same :code:`active` / :code:`layers` pattern where supported.
 
 **eSCN** (:code:`architecture: escn`) is a native port of Passaro & Zitnick (2023) SO(3)→SO(2) convolutions under :code:`enerzyme/models/escn/`, backed by shared primitives in :code:`enerzyme/models/so3/`. The Core emits scalar :code:`atom_feature` (spherical :code:`l=0`, with :code:`feature_irreps: "Cx0e"` and :code:`dim_feature_out = C`) and :code:`atom_sphere_feature` (full :code:`(lmax+1)^2` SH coefficients after message :code:`rotate_inv`; :code:`mmax` only reduces edge-frame SO(2)). Default stacks use :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force` (energy-conserving :code:`Fa=-∇E`, so edge frames stay in the autograd graph). Opt-in :code:`SphereSampleReadout` applies the paper's S² sampling head to any atomic property fields in :code:`output_fields`; :code:`vector_output_fields: [Fa]` is the paper-style direct-force alternative. Examples: :code:`enerzyme/config/escn_layers_example.yaml`, :code:`escn_sphere_readout_example.yaml`. No fairchem dependency. Ops/block numerical parity vs vendored fairchem v1 lives in :code:`test/test_escn_parity_*.py` (forward only; force conservation is covered by unit tests).
+
+**So3krates** (:code:`architecture: so3krates`) is a native port of Frank et al. (NeurIPS 2022) under :code:`enerzyme/models/so3krates/`, following the So3krates-torch EuclideanTransformer (fused FeatureBlock + GeometricBlock + InteractionBlock). Shared :code:`RealSphericalHarmonics` and :code:`L0Contraction` live in :code:`enerzyme/models/so3/`. The Core emits :code:`atom_feature` (invariant stream ``x``, :code:`feature_irreps: "Fx0e"`) and :code:`atom_sphere_feature` (SPHC ``χ`` with shape ``[N, m_tot]``, **not** eSCN's ``[N, (lmax+1)^2, C]`` — :code:`SphereSampleReadout` does not apply). Default stacks use :code:`BernsteinRBF` + :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force`. Long-range physics (ZBL / electrostatics / dispersion) belong in post-core layers, not inside the Core. Example: :code:`enerzyme/config/so3krates_layers_example.yaml`. Parity: :code:`test/test_so3krates_parity_ops.py`.
 
 **UMA** (:code:`architecture: uma_qs`) requires the :code:`fairchem` package. The Core wraps Meta's UMA / eSCN-MD backbone as an atom descriptor under :code:`enerzyme/models/esen/` (name is historical; this is **not** the 2023 paper eSCN). Shared layers such as :code:`SimpleReadout`, :code:`HierachicalReadout`, and :code:`SpinConservation` predict atomic or molecular charge/spin outside the Core. Pair with :code:`aselmdb` datasets that provide :code:`Q` / :code:`S` (and optionally :code:`Qa` / :code:`Sa`).
 
@@ -68,15 +75,17 @@ Selection guidelines
     PhysNet or SpookyNet — long-range electrostatics, optional dispersion layers.
 
 **Maximum accuracy on diverse geometries**
-    MACE, NequIP, or Equiformer — equivariant message passing; tune cutoff and depth.
+    MACE, NequIP, Equiformer, or So3krates — equivariant message passing; tune cutoff and depth.
     Equiformer uses SO(3) graph attention (default MD17-style stack with ``ExpNormalSmearing``
     and :code:`output_mode: feature` emitting full irreps plus :code:`feature_irreps`;
     production default is :code:`SimpleReadout` with :code:`head_type: two_layer` after 0e
     extract, optional :code:`EquiformerGraphAttentionReadout`); prefer smaller irreps /
-    fewer layers for enzyme-scale clusters. Charge/dipole use shared readouts outside the
-    Core. Numerical fidelity against the official Equiformer MD17 path is covered by
-    :code:`test/test_equiformer_parity_*.py`
-    (operator / latent / direct E·F / gradient checks — not the production SimpleReadout stack).
+    fewer layers for enzyme-scale clusters. So3krates uses dual-stream geometric attention
+    (invariants + SPHC; default :code:`BernsteinRBF` + :code:`architecture: so3krates`).
+    Charge/dipole use shared readouts outside the Core. Numerical fidelity against the
+    official Equiformer MD17 path is covered by :code:`test/test_equiformer_parity_*.py`
+    (operator / latent / direct E·F / gradient checks — not the production SimpleReadout stack);
+    So3krates by :code:`test/test_so3krates_parity_ops.py`.
 
 **Active learning with force variance**
     Any architecture with :code:`ShallowEnsembleReduce` or :code:`committee_size` > 1.

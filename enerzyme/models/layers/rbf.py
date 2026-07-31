@@ -7,8 +7,7 @@ from torch import Tensor
 from torch.nn import Parameter
 import torch.nn.functional as F
 from . import BaseFFLayer
-from ..cutoff import CUTOFF_REGISTER
-from ..functional import softplus_inverse
+from ..cutoff import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
 
 
 class BaseRBF(BaseFFLayer):
@@ -16,7 +15,7 @@ class BaseRBF(BaseFFLayer):
         self,
         num_rbf: int,
         cutoff_sr: float,
-        cutoff_fn: Literal["polynomial", "bump"]
+        cutoff_fn: CUTOFF_KEY_TYPE,
     ) -> None:
         super().__init__(input_fields={"Dij_sr", "cutoff_values_sr"}, output_fields={"rbf"})
         self.num_rbf = num_rbf
@@ -50,7 +49,7 @@ class GaussianRBFLayer(BaseRBF):
             Cutoff radius.
     """
 
-    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: Literal["polynomial", "bump"]="bump") -> None:
+    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: CUTOFF_KEY_TYPE = "bump") -> None:
         """ Initializes the GaussianFunctions class. """
         super().__init__(num_rbf, cutoff_sr, cutoff_fn)
         self.register_buffer(
@@ -97,7 +96,7 @@ class BernsteinRBFLayer(BaseRBF):
             Cutoff radius.
     """
 
-    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: Literal["polynomial", "bump"]="bump") -> None:
+    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: CUTOFF_KEY_TYPE = "bump") -> None:
         """ Initializes the BernsteinPolynomials class. """
         super().__init__(num_rbf, cutoff_sr, cutoff_fn)
         # compute values to initialize buffers
