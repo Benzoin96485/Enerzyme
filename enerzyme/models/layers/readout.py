@@ -618,6 +618,7 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
             use_sep_s2_act=getattr(core, "use_sep_s2_act", True),
         )
         self.lmax_list = list(core.lmax_list)
+        self.mmax_list = list(core.mmax_list)
         self.sphere_channels = core.sphere_channels
 
     def get_output(self, atom_sphere_feature: Tensor) -> Dict[str, Tensor]:
@@ -629,6 +630,7 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
             dtype=atom_sphere_feature.dtype,
         )
         x.set_embedding(atom_sphere_feature)
+        # Node features after Core are full degree (mmax == lmax); match Core output.
         x.set_lmax_mmax(self.lmax_list.copy(), self.lmax_list.copy())
         node_out = self.ffn(x)
         # l=0 channels only → (N, n_out)
@@ -639,4 +641,11 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
         }
         if self.keep_feature:
             result["atom_sphere_feature"] = atom_sphere_feature
+            # Concatenate l=0,m=0 channels across resolutions (same as Core).
+            features = []
+            offset_res = 0
+            for i, lmax in enumerate(self.lmax_list):
+                features.append(atom_sphere_feature[:, offset_res, :])
+                offset_res = offset_res + int((lmax + 1) ** 2)
+            result["atom_feature"] = torch.cat(features, dim=-1)
         return result

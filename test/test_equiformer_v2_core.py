@@ -125,7 +125,46 @@ def test_equiformer_v2_build_model_energy_force_finite():
     assert torch.isfinite(out["Fa"]).all()
 
 
-def test_equiformer_v2_atom_feature_so3_invariance():
+def test_equiformer_v2_ffn_readout_keep_feature():
+    from enerzyme.models.equiformer_v2 import EquiformerV2Core
+    from enerzyme.models.layers import EquiformerV2FeedForwardReadout
+
+    torch.manual_seed(0)
+    core = EquiformerV2Core(
+        dim_embedding=8,
+        num_rbf=8,
+        sphere_channels=8,
+        attn_hidden_channels=8,
+        num_heads=2,
+        attn_alpha_channels=4,
+        attn_value_channels=4,
+        ffn_hidden_channels=16,
+        lmax=2,
+        mmax=1,
+        num_layers=1,
+        edge_channels=8,
+    )
+    ro = EquiformerV2FeedForwardReadout(
+        output_fields={"Ea"},
+        built_layers=[core],
+        keep_feature=True,
+    )
+    N = 3
+    sphere = torch.randn(N, 9, 8)
+    out = ro.get_output(sphere)
+    assert out["Ea"].shape == (N,)
+    assert out["atom_sphere_feature"].shape == sphere.shape
+    assert out["atom_feature"].shape == (N, 8)
+
+
+def test_equivariant_degree_layer_scale_imports_math():
+    from enerzyme.models.equiformer_v2.layer_norm import EquivariantDegreeLayerScale
+
+    scale = EquivariantDegreeLayerScale(lmax=2, num_channels=4)
+    x = torch.randn(2, 9, 4)
+    y = scale(x)
+    assert y.shape == x.shape
+
     from enerzyme.models.equiformer_v2 import EquiformerV2Core
 
     torch.manual_seed(0)

@@ -6,6 +6,8 @@
     the same number of channels and input features are of shape (N, sphere_basis, C).
 '''
 
+import math
+
 import torch
 import torch.nn as nn
 
