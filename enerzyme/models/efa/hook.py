@@ -25,13 +25,25 @@ def build_efa_blocks(
     """Build a ``ModuleList`` of length ``num_layers`` with ``EFABlock`` or ``None``.
 
     Entries are ``EFABlock`` where layer index is in ``era_use_in_iterations``,
-    else ``None`` (stored as :class:`torch.nn.Identity` placeholders are avoided;
-    callers should check ``blocks[i] is not None``).
+    else a :class:`_NoEFA` sentinel.
 
-    Because ``ModuleList`` cannot hold raw ``None``, inactive slots use a
-    disabled sentinel module :class:`_NoEFA`.
+    Raises
+    ------
+    ValueError
+        If any requested iteration index is outside ``[0, num_layers)``.
     """
     active = parse_era_iterations(era_use_in_iterations)
+    if active is not None:
+        invalid = [i for i in active if i < 0 or i >= num_layers]
+        if invalid:
+            raise ValueError(
+                f"era_use_in_iterations entries {invalid} are outside "
+                f"[0, {num_layers}) (num_layers={num_layers}). "
+                f"Got era_use_in_iterations={list(active)}."
+            )
+        if not active:
+            # parse_era_iterations already maps [] -> None; keep defensive.
+            active = None
     active_set = set(active) if active is not None else set()
     blocks: list[Module] = []
     for i in range(num_layers):

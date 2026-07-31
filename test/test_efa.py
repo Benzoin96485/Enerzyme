@@ -151,6 +151,45 @@ def test_apply_efa_if_configured_hook():
     assert z1.shape == x.shape
 
 
+def test_build_efa_blocks_rejects_out_of_range_iterations():
+    from enerzyme.models.efa import build_efa_blocks
+    import pytest
+
+    with pytest.raises(ValueError, match="outside"):
+        build_efa_blocks(
+            3,
+            8,
+            era_use_in_iterations=[0, 3],
+            num_features_qk=8,
+            num_features_v=8,
+            lebedev_num=50,
+            max_frequency=math.pi,
+            max_length=5.0,
+        )
+
+
+def test_so3krates_rejects_out_of_range_era_iterations():
+    from enerzyme.models.so3krates import So3kratesCore
+    import pytest
+
+    with pytest.raises(ValueError, match="era_use_in_iterations"):
+        So3kratesCore(
+            dim_embedding=12,
+            num_rbf=8,
+            degrees=[1, 2, 3],
+            num_features=12,
+            num_heads=3,
+            num_layers=2,
+            avg_num_neighbors=4.0,
+            era_use_in_iterations=[0, 5],
+            era_lebedev_num=50,
+            era_max_frequency=math.pi,
+            era_max_length=10.0,
+            era_qk_num_features=8,
+            era_v_num_features=8,
+        )
+
+
 def test_so3krates_with_efa_get_output():
     from enerzyme.models.so3krates import So3kratesCore
 
