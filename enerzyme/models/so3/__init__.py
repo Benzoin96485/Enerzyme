@@ -1,4 +1,4 @@
-"""Shared SO(3) / SO(2) primitives for equivariant GNNs (eSCN, EquiformerV2, EquiformerV3, So3krates, …).
+"""Shared SO(3) / SO(2) primitives for equivariant GNNs (eSCN, EquiformerV2, EquiformerV3, So3krates, DPA4, …).
 
 These modules are adapted from fairchem v1 eSCN (Passaro & Zitnick, *Reducing SO(3)
 Convolutions to SO(2)*, 2023) with EquiformerV2 extensions (``get_rotate_inv_rescale``,
@@ -7,6 +7,10 @@ grid kwargs, ``SO3_LinearV2``). So3krates additionally uses closed-form
 ``L0Contraction`` (mlff / So3krates-torch). SpookyNet uses ``layout='spookynet_d'``.
 EquiformerV2 SO(2) convolution lives in ``so2_ops`` alongside the eSCN-style
 ``SO2Block`` / ``SO2Conv`` (different parameterization — not interchangeable).
+DPA4 / EMFA contributes packed/m-major indexing, focus-stream gated activations,
+``SO3FocusLinear``, degree-balanced ``EquivariantDegreeRMSNorm``, and
+``BesselC3RadialBasis`` (focus-major ``SO2Linear`` / quaternion Wigner-D stay in
+``enerzyme.models.dpa4``).
 
 They are **not** used by the Meta UMA wrappers under ``enerzyme.models.esen``, which
 keep the fairchem ``eSCNMD*`` checkpoint path.
@@ -26,6 +30,20 @@ from .activation_v3 import (
     SeparableGateS2Activation_SwiGLU_Merge,
 )
 from .envelope import C3CutoffEnvelope, PolynomialEnvelope
+from .gated import FocusLinear, SO3GatedActivation
+from .indexing import (
+    build_gie_zonal_index,
+    build_m_major_index,
+    build_m_major_l_index,
+    build_rotate_inv_rescale,
+    get_so3_dim,
+    get_so3_dim_of_lmax,
+    m_major_reduced_dim,
+    map_degree_idx,
+    project_D_to_m,
+    project_Dt_from_m,
+    so3_packed_index,
+)
 from .lebedev import (
     LEBEDEV_PRECISION_TO_NPOINTS,
     S2LebedevProjector,
@@ -34,12 +52,14 @@ from .lebedev import (
 )
 from .softmax import GraphSoftmax, SoftCap
 from .so2_ops import SO2Linear, SO2MLinear
-from .linear import SO3Linear
+from .linear import SO3FocusLinear, SO3Linear
 from .layer_norm import (
+    EquivariantDegreeRMSNorm,
     EquivariantMergeLayerNorm,
     EquivariantSeparableLayerNorm,
     RMSNorm,
 )
+from .radial import BesselC3RadialBasis, RadialMLP
 from .rotation_fused import SO3RotationFused, CoefficientMappingModule
 from .grid_resolved import SO3GridResolved
 from .coefficient_mapping import CoefficientMapping
@@ -101,9 +121,26 @@ __all__ = [
     "SO2Linear",
     "SO2MLinear",
     "SO3Linear",
+    "SO3FocusLinear",
+    "EquivariantDegreeRMSNorm",
     "EquivariantMergeLayerNorm",
     "EquivariantSeparableLayerNorm",
     "RMSNorm",
+    "FocusLinear",
+    "SO3GatedActivation",
+    "BesselC3RadialBasis",
+    "RadialMLP",
+    "build_gie_zonal_index",
+    "build_m_major_index",
+    "build_m_major_l_index",
+    "build_rotate_inv_rescale",
+    "get_so3_dim",
+    "get_so3_dim_of_lmax",
+    "m_major_reduced_dim",
+    "map_degree_idx",
+    "project_D_to_m",
+    "project_Dt_from_m",
+    "so3_packed_index",
     "SO3RotationFused",
     "CoefficientMappingModule",
     "SO3GridResolved",
