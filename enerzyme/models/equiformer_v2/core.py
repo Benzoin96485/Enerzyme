@@ -316,7 +316,11 @@ class EquiformerV2Core(BaseFFCore):
             edge_rot_mat = init_edge_rot_mat(vij_sr.to(dtype=dtype))
 
         for i in range(self.num_resolutions):
-            self.SO3_rotation[i] = SO3_Rotation(edge_rot_mat, self.lmax_list[i])
+            self.SO3_rotation[i] = SO3_Rotation(
+                edge_rot_mat,
+                self.lmax_list[i],
+                apply_rotate_inv_rescale=True,
+            )
 
         x = SO3_Embedding(
             num_atoms,

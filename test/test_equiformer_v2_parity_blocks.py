@@ -86,7 +86,7 @@ def test_transblock_v2_matches_upstream():
     off_rot.set_wigner(rot_mat)
     # Upstream stores ModuleList-like list; use same object references.
     off_rot_list = [off_rot]
-    ez_rot_list[0] = EZRot(rot_mat, lmax)
+    ez_rot_list[0] = EZRot(rot_mat, lmax, apply_rotate_inv_rescale=True)
 
     ez_map = EZMap([lmax], [mmax], device)
     off_map = OffMap([lmax], [mmax])

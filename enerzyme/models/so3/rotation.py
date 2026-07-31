@@ -24,9 +24,17 @@ _Jd = torch.load(
 class SO3_Rotation:
     """Build Wigner-D matrices from per-edge 3x3 rotation matrices and apply them."""
 
-    def __init__(self, rot_mat3x3: torch.Tensor, lmax: int) -> None:
+    def __init__(
+        self,
+        rot_mat3x3: torch.Tensor,
+        lmax: int,
+        apply_rotate_inv_rescale: bool = False,
+    ) -> None:
         self.device = rot_mat3x3.device
         self.dtype = rot_mat3x3.dtype
+        # EquiformerV2 needs mmax-truncation rescale on rotate-back; paper eSCN
+        # (fairchem v1) does not — keep False for escn backward compatibility.
+        self.apply_rotate_inv_rescale = apply_rotate_inv_rescale
 
         # Keep the Wigner graph so EnergyReduce+Force can form Fa = -dE/dRa
         # through edge frames (fairchem v1 detached here for direct ForceBlock).
@@ -47,8 +55,7 @@ class SO3_Rotation:
     def rotate_inv(self, embedding: torch.Tensor, in_lmax: int, in_mmax: int) -> torch.Tensor:
         in_mask = self.mapping.coefficient_idx(in_lmax, in_mmax)
         wigner_inv = self.wigner_inv[:, :, in_mask]
-        # EquiformerV2 rescale when SO(2) used mmax < lmax; identity if equal.
-        if in_mmax < in_lmax:
+        if self.apply_rotate_inv_rescale and in_mmax < in_lmax:
             wigner_inv = wigner_inv * self.mapping.get_rotate_inv_rescale(
                 in_lmax, in_mmax
             )

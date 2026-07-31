@@ -139,7 +139,7 @@ def test_rotate_inv_rescale_when_mmax_lt_lmax():
     from equiformer_v2_parity_utils import deterministic_edge_rot_mat
 
     rot_mat = deterministic_edge_rot_mat(vij)
-    rot = SO3_Rotation(rot_mat, lmax)
+    rot = SO3_Rotation(rot_mat, lmax, apply_rotate_inv_rescale=True)
     emb = torch.randn(num_edges, (lmax + 1) ** 2, channels, dtype=dtype)
     x = SO3_Embedding(0, [lmax], channels, device, dtype)
     x.set_embedding(emb.clone())
