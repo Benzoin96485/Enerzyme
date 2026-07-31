@@ -26,6 +26,73 @@ def _resolve_feature_irreps(built_layers: List[Module]) -> Optional[str]:
     return None
 
 
+def reshape_ensemble_head_output(
+    head_output: Tensor,
+    dim_feature_out: int,
+    shallow_ensemble_size: int,
+) -> Tensor:
+    """Normalize head output to ``(N, fields)`` or ``(N, fields, ensemble)``.
+
+    Accepts already-shaped tensors or a flat ``(N, fields * ensemble)`` layout
+    from widened last-linear heads (LinearRS, GraphAttention, sphere FFN).
+    """
+    if shallow_ensemble_size <= 1:
+        return head_output
+    if head_output.ndim == 3:
+        return head_output
+    if head_output.ndim == 2 and head_output.shape[-1] == dim_feature_out * shallow_ensemble_size:
+        return head_output.view(-1, dim_feature_out, shallow_ensemble_size)
+    return head_output
+
+
+def split_readout_field_outputs(
+    head_output: Tensor,
+    ordered_output_fields: List[str],
+    shallow_ensemble_size: int = 1,
+) -> Dict[str, Tensor]:
+    """Map head tensor columns onto named fields.
+
+    Head layout matches :class:`~enerzyme.models.blocks.mlp.DenseLayer`:
+    ``(N, fields)`` when ``shallow_ensemble_size == 1``, or
+    ``(N, fields, ensemble)`` when ``shallow_ensemble_size > 1``.
+
+    Selecting field ``i`` with ``select(1, i)`` therefore yields per-atom
+    scalars ``(N,)`` or shallow-ensemble predictions ``(N, ensemble)``.
+    That trailing ensemble axis is the Enerzyme contract used by PhysNet /
+    SchNet / MACE cores and by ChargeConservation, AtomicAffine, Force,
+    WeightedLoss, and ShallowEnsembleReduce — it must not be squeezed away.
+    """
+    dim_feature_out = len(ordered_output_fields)
+    head_output = reshape_ensemble_head_output(
+        head_output, dim_feature_out, shallow_ensemble_size
+    )
+    if head_output.ndim == 2:
+        expected = (head_output.shape[0], dim_feature_out)
+    elif head_output.ndim == 3:
+        expected = (
+            head_output.shape[0],
+            dim_feature_out,
+            shallow_ensemble_size,
+        )
+        if shallow_ensemble_size <= 1:
+            raise ValueError(
+                "Readout head returned a 3D tensor but shallow_ensemble_size "
+                f"is {shallow_ensemble_size}; expected 2D (N, fields)."
+            )
+    else:
+        raise ValueError(
+            f"Readout head output must be 2D or 3D, got shape {tuple(head_output.shape)}"
+        )
+    if tuple(head_output.shape) != expected:
+        raise ValueError(
+            f"Readout head output shape {tuple(head_output.shape)} != expected {expected}"
+        )
+    return {
+        ordered_output_fields[i]: head_output.select(1, i)
+        for i in range(dim_feature_out)
+    }
+
+
 class BaseReadout(BaseFFLayer):
     def __init__(self,
         num_blocks: int,
@@ -127,18 +194,16 @@ class BaseReadout(BaseFFLayer):
         elif self.head_type == "equiformer_linear_rs":
             # Official Equiformer MD17 scalar energy MLP:
             # LinearRS → Activation(normalize2mom(SiLU)) → LinearRS.
-            if self.shallow_ensemble_size != 1:
-                raise ValueError(
-                    "head_type='equiformer_linear_rs' does not support "
-                    f"shallow_ensemble_size={self.shallow_ensemble_size}"
-                )
+            # Final LinearRS is widened by shallow_ensemble_size; reshape happens
+            # in split_readout_field_outputs via reshape_ensemble_head_output.
             from e3nn import o3
             from ..equiformer.attention import _RESCALE
             from ..equiformer.fast_activation import Activation
             from ..equiformer.tensor_product import LinearRS
 
             ir_hid = o3.Irreps(f"{self.dim_feature_in}x0e")
-            ir_out = o3.Irreps(f"{self.dim_feature_out}x0e")
+            n_out = self.dim_feature_out * self.shallow_ensemble_size
+            ir_out = o3.Irreps(f"{n_out}x0e")
             return Sequential(
                 LinearRS(ir_hid, ir_hid, rescale=_RESCALE),
                 Activation(ir_hid, acts=[torch.nn.SiLU()]),
@@ -148,43 +213,11 @@ class BaseReadout(BaseFFLayer):
             raise ValueError(f"Unknown head_type: {self.head_type}")
 
     def _split_field_outputs(self, head_output: Tensor) -> Dict[str, Tensor]:
-        """Map head tensor columns onto named fields.
-
-        Head layout matches :class:`~enerzyme.models.blocks.mlp.DenseLayer`:
-        ``(N, fields)`` when ``shallow_ensemble_size == 1``, or
-        ``(N, fields, ensemble)`` when ``shallow_ensemble_size > 1``.
-
-        Selecting field ``i`` with ``select(1, i)`` therefore yields per-atom
-        scalars ``(N,)`` or shallow-ensemble predictions ``(N, ensemble)``.
-        That trailing ensemble axis is the Enerzyme contract used by PhysNet /
-        SchNet / MACE cores and by ChargeConservation, AtomicAffine, Force,
-        WeightedLoss, and ShallowEnsembleReduce — it must not be squeezed away.
-        """
-        if head_output.ndim == 2:
-            expected = (head_output.shape[0], self.dim_feature_out)
-        elif head_output.ndim == 3:
-            expected = (
-                head_output.shape[0],
-                self.dim_feature_out,
-                self.shallow_ensemble_size,
-            )
-            if self.shallow_ensemble_size <= 1:
-                raise ValueError(
-                    "Readout head returned a 3D tensor but shallow_ensemble_size "
-                    f"is {self.shallow_ensemble_size}; expected 2D (N, fields)."
-                )
-        else:
-            raise ValueError(
-                f"Readout head output must be 2D or 3D, got shape {tuple(head_output.shape)}"
-            )
-        if tuple(head_output.shape) != expected:
-            raise ValueError(
-                f"Readout head output shape {tuple(head_output.shape)} != expected {expected}"
-            )
-        return {
-            self.ordered_output_fields[i]: head_output.select(1, i)
-            for i in range(self.dim_feature_out)
-        }
+        return split_readout_field_outputs(
+            head_output,
+            self.ordered_output_fields,
+            self.shallow_ensemble_size,
+        )
 
 
 class SimpleReadout(BaseReadout):
@@ -426,6 +459,9 @@ class EquiformerGraphAttentionReadout(BaseFFLayer):
     ``atom_feature`` irreps tensor and graph edges, producing one 0e channel
     per ``output_fields`` entry (e.g. ``Ea``, ``Qa``). Requires
     ``feature_irreps`` from a prior equivariant Core.
+
+    With ``shallow_ensemble_size > 1``, the final GraphAttention ``LinearRS``
+    proj is widened and fields keep a trailing ensemble axis.
     """
 
     def __init__(
@@ -444,6 +480,7 @@ class EquiformerGraphAttentionReadout(BaseFFLayer):
         proj_drop: float = 0.0,
         feature_irreps: Optional[str] = None,
         num_rbf: Optional[int] = None,
+        shallow_ensemble_size: int = 1,
         **kwargs,
     ) -> None:
         from e3nn import o3
@@ -463,6 +500,7 @@ class EquiformerGraphAttentionReadout(BaseFFLayer):
         )
         self.ordered_output_fields = ordered
         self.dim_feature_out = len(ordered)
+        self.shallow_ensemble_size = int(shallow_ensemble_size)
 
         irreps_str = (
             feature_irreps
@@ -491,11 +529,12 @@ class EquiformerGraphAttentionReadout(BaseFFLayer):
                     break
         self.fc_neurons = [num_rbf] + list(fc_neurons)
 
+        n_out = self.dim_feature_out * self.shallow_ensemble_size
         self.head = GraphAttention(
             irreps_node_input=self.feature_irreps,
             irreps_node_attr=self.irreps_node_attr,
             irreps_edge_attr=self.irreps_edge_attr,
-            irreps_node_output=o3.Irreps(f"{self.dim_feature_out}x0e"),
+            irreps_node_output=o3.Irreps(f"{n_out}x0e"),
             fc_neurons=self.fc_neurons,
             irreps_head=o3.Irreps(irreps_head),
             num_heads=num_heads,
@@ -549,15 +588,17 @@ class EquiformerGraphAttentionReadout(BaseFFLayer):
             edge_scalars=rbf,
             batch=batch_seg,
         )
-        if outputs.ndim != 2 or outputs.shape[-1] != self.dim_feature_out:
+        expected_last = self.dim_feature_out * self.shallow_ensemble_size
+        if outputs.ndim != 2 or outputs.shape[-1] != expected_last:
             raise ValueError(
                 f"GraphAttention output shape {tuple(outputs.shape)} != "
-                f"(N, {self.dim_feature_out})"
+                f"(N, {expected_last})"
             )
-        return {
-            self.ordered_output_fields[i]: outputs.select(1, i)
-            for i in range(self.dim_feature_out)
-        }
+        return split_readout_field_outputs(
+            outputs,
+            self.ordered_output_fields,
+            self.shallow_ensemble_size,
+        )
 
 
 class EquiformerV2FeedForwardReadout(BaseFFLayer):
@@ -565,6 +606,9 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
 
     Consumes ``atom_sphere_feature`` and Core ``SO3_grid`` / FFN hyperparameters.
     Default production stacks use ``SimpleReadout`` on ``atom_feature`` instead.
+
+    With ``shallow_ensemble_size > 1``, the final ``SO3_LinearV2`` is widened;
+    only l=0 channels are used as field × ensemble scalars.
     """
 
     def __init__(
@@ -573,6 +617,7 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
         built_layers: List[Module],
         ffn_hidden_channels: Optional[int] = None,
         keep_feature: bool = False,
+        shallow_ensemble_size: int = 1,
         **_unused,
     ) -> None:
         out = set(output_fields)
@@ -584,6 +629,8 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
         )
         self.ordered_output_fields = sorted(list(output_fields))
         self.keep_feature = keep_feature
+        self.shallow_ensemble_size = int(shallow_ensemble_size)
+        self.dim_feature_out = len(self.ordered_output_fields)
 
         core = None
         for layer in reversed(built_layers):
@@ -599,7 +646,7 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
         from ..so3 import SO3_Embedding
 
         self._SO3_Embedding = SO3_Embedding
-        n_out = len(self.ordered_output_fields)
+        n_out = self.dim_feature_out * self.shallow_ensemble_size
         hidden = (
             ffn_hidden_channels
             if ffn_hidden_channels is not None
@@ -633,12 +680,13 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
         # Node features after Core are full degree (mmax == lmax); match Core output.
         x.set_lmax_mmax(self.lmax_list.copy(), self.lmax_list.copy())
         node_out = self.ffn(x)
-        # l=0 channels only → (N, n_out)
+        # l=0 channels only → (N, n_fields * ensemble)
         scalars = node_out.embedding.narrow(1, 0, 1).squeeze(1)
-        result = {
-            self.ordered_output_fields[i]: scalars.select(-1, i)
-            for i in range(len(self.ordered_output_fields))
-        }
+        result = split_readout_field_outputs(
+            scalars,
+            self.ordered_output_fields,
+            self.shallow_ensemble_size,
+        )
         if self.keep_feature:
             result["atom_sphere_feature"] = atom_sphere_feature
             # Concatenate l=0,m=0 channels across resolutions (same as Core).

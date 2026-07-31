@@ -182,18 +182,28 @@ def test_equiformer_linear_rs_head_matches_official_energy_mlp():
     _assert_close(y_rs, y_ro, atol=1e-12, msg="equiformer_linear_rs vs official MLP")
 
 
-def test_equiformer_linear_rs_rejects_shallow_ensemble():
+def test_equiformer_linear_rs_accepts_shallow_ensemble():
     class _Core:
         dim_feature_out = 8
 
-    try:
-        SimpleReadout(
-            output_fields={"Ea"},
-            built_layers=[_Core()],
-            head_type="equiformer_linear_rs",
-            shallow_ensemble_size=2,
-        )
-    except ValueError as exc:
-        assert "shallow_ensemble" in str(exc)
-    else:
-        raise AssertionError("expected ValueError for shallow_ensemble_size>1")
+    n, ensemble = 5, 3
+    ro = SimpleReadout(
+        output_fields={"Ea"},
+        built_layers=[_Core()],
+        head_type="equiformer_linear_rs",
+        shallow_ensemble_size=ensemble,
+    )
+    out = ro.get_output(torch.randn(n, 8))
+    assert out["Ea"].shape == (n, ensemble)
+    assert torch.isfinite(out["Ea"]).all()
+
+    # size=1 still returns per-atom scalars
+    ro1 = SimpleReadout(
+        output_fields={"Ea", "Qa"},
+        built_layers=[_Core()],
+        head_type="equiformer_linear_rs",
+        shallow_ensemble_size=1,
+    )
+    out1 = ro1.get_output(torch.randn(n, 8))
+    assert out1["Ea"].shape == (n,)
+    assert out1["Qa"].shape == (n,)

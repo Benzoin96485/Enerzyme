@@ -6,8 +6,6 @@
     the same number of channels and input features are of shape (N, sphere_basis, C).
 '''
 
-import math
-
 import torch
 import torch.nn as nn
 
@@ -200,67 +198,6 @@ class EquivariantLayerNormArraySphericalHarmonics(nn.Module):
         return out
 
     
-class EquivariantRMSNormArraySphericalHarmonics(nn.Module):
-    '''
-        1. Normalize across all m components from degrees L >= 0.
-    '''
-    def __init__(self, lmax, num_channels, eps=1e-5, affine=True, normalization='component'):
-        super().__init__()
-
-        self.lmax = lmax
-        self.num_channels = num_channels
-        self.eps = eps
-        self.affine = affine
-        
-        # for L >= 0
-        if self.affine:
-            self.affine_weight = nn.Parameter(torch.ones((self.lmax + 1), self.num_channels))
-        else:
-            self.register_parameter('affine_weight', None)
-
-        assert normalization in ['norm', 'component']
-        self.normalization = normalization
-
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(lmax={self.lmax}, num_channels={self.num_channels}, eps={self.eps})"
-
-
-    @torch.cuda.amp.autocast(enabled=False)
-    def forward(self, node_input):
-        '''
-            Assume input is of shape [N, sphere_basis, C]
-        '''
-        
-        out = []
-
-        # for L >= 0
-        feature = node_input    
-        if self.normalization == 'norm':
-            feature_norm = feature.pow(2).sum(dim=1, keepdim=True)      # [N, 1, C]
-        elif self.normalization == 'component':
-            feature_norm = feature.pow(2).mean(dim=1, keepdim=True)     # [N, 1, C]
-            
-        feature_norm = torch.mean(feature_norm, dim=2, keepdim=True)    # [N, 1, 1]
-        feature_norm = (feature_norm + self.eps).pow(-0.5)
-
-        for l in range(0, self.lmax + 1):
-            start_idx = l ** 2
-            length = 2 * l + 1
-            feature = node_input.narrow(1, start_idx, length)       # [N, (2L + 1), C]
-            if self.affine:
-                weight = self.affine_weight.narrow(0, l, 1)         # [1, C]
-                weight = weight.view(1, 1, -1)                      # [1, 1, C]
-                feature_scale = feature_norm * weight               # [N, 1, C]
-            else:
-                feature_scale = feature_norm
-            feature = feature * feature_scale
-            out.append(feature)
-            
-        out = torch.cat(out, dim=1)
-        return out
-
-
 class EquivariantRMSNormArraySphericalHarmonicsV2(nn.Module):
     '''
         1. Normalize across all m components from degrees L >= 0.
@@ -350,30 +287,3 @@ class EquivariantRMSNormArraySphericalHarmonicsV2(nn.Module):
         return out
 
 
-class EquivariantDegreeLayerScale(nn.Module):
-    '''
-        1. Similar to Layer Scale used in CaiT (Going Deeper With Image Transformers (ICCV'21)), we scale the output of both attention and FFN. 
-        2. For degree L > 0, we scale down the square root of 2 * L, which is to emulate halving the number of channels when using higher L. 
-    '''
-    def __init__(self, lmax, num_channels, scale_factor=2.0):
-        super().__init__()
-        
-        self.lmax = lmax
-        self.num_channels = num_channels
-        self.scale_factor = scale_factor
-
-        self.affine_weight = nn.Parameter(torch.ones(1, (self.lmax + 1), self.num_channels))
-        for l in range(1, self.lmax + 1):
-            self.affine_weight.data[0, l, :].mul_(1.0 / math.sqrt(self.scale_factor * l))        
-        expand_index = get_l_to_all_m_expand_index(self.lmax)
-        self.register_buffer('expand_index', expand_index)
-
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(lmax={self.lmax}, num_channels={self.num_channels}, scale_factor={self.scale_factor})"
-
-    
-    def forward(self, node_input):
-        weight = torch.index_select(self.affine_weight, dim=1, index=self.expand_index)     # [1, (L_max + 1)**2, C]
-        node_input = node_input * weight                                                    # [N, (L_max + 1)**2, C]
-        return node_input

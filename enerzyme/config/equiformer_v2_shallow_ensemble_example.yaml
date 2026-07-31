@@ -1,8 +1,8 @@
-# Minimal EquiformerV2 stack (enzyme-scale defaults).
+# EquiformerV2 with shallow ensemble on SimpleReadout.
 # Use architecture: equiformer_v2 under Modelhub.internal_FFs.
 #
-# Paper sphere FFN energy head instead of SimpleReadout:
-#   see equiformer_v2_ffn_readout_example.yaml
+# EquiformerV2FeedForwardReadout also accepts shallow_ensemble_size
+# (see equiformer_v2_ffn_readout_example.yaml).
 
 Modelhub:
   internal_FFs:
@@ -36,6 +36,15 @@ Modelhub:
           params:
             output_fields: [Ea]
             head_type: dense
+            shallow_ensemble_size: 4
             keep_feature: false
         - name: EnergyReduce
+        - name: ShallowEnsembleReduce
+          params:
+            var: [E]
+            train_only: true
         - name: Force
+        - name: ShallowEnsembleReduce
+          params:
+            var: [E, Fa]
+            eval_only: true
