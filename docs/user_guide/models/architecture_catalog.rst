@@ -30,10 +30,15 @@ Internal architectures
 |                | readout  | readout|        | readout     | SO(2) GNN; no    |
 |                |          |        |        |             | fairchem needed  |
 +----------------+----------+--------+--------+-------------+------------------+
-| Equiformer     | yes      | yes    | yes    | no          | Equivariant      |
-|                |          |        |        |             | graph attention; |
+| Equiformer     | yes      | yes    | yes    | via         | Equivariant      |
+|                |          |        |        | readout     | graph attention; |
 |                |          |        |        |             | higher cost;     |
 |                |          |        |        |             | see parity tests |
++----------------+----------+--------+--------+-------------+------------------+
+| EquiformerV2   | via      | via    | yes    | via         | SO(2) attention  |
+|                | readout  | readout|        | readout     | + S2/gate FFN;   |
+|                |          |        |        |             | higher ``lmax``  |
+|                |          |        |        |             | with ``mmax``    |
 +----------------+----------+--------+--------+-------------+------------------+
 
 External wrappers
@@ -50,6 +55,8 @@ External wrappers
 External models are declared under :code:`Modelhub.external_FFs` with the same :code:`active` / :code:`layers` pattern where supported.
 
 **eSCN** (:code:`architecture: escn`) is a native port of Passaro & Zitnick (2023) SO(3)→SO(2) convolutions under :code:`enerzyme/models/escn/`, backed by shared primitives in :code:`enerzyme/models/so3/`. The Core emits scalar :code:`atom_feature` (spherical :code:`l=0`, with :code:`feature_irreps: "Cx0e"` and :code:`dim_feature_out = C`) and :code:`atom_sphere_feature` (full :code:`(lmax+1)^2` SH coefficients after message :code:`rotate_inv`; :code:`mmax` only reduces edge-frame SO(2)). Default stacks use :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force` (energy-conserving :code:`Fa=-∇E`, so edge frames stay in the autograd graph). Opt-in :code:`SphereSampleReadout` applies the paper's S² sampling head to any atomic property fields in :code:`output_fields`; :code:`vector_output_fields: [Fa]` is the paper-style direct-force alternative. Examples: :code:`enerzyme/config/escn_layers_example.yaml`, :code:`escn_sphere_readout_example.yaml`. No fairchem dependency. Ops/block numerical parity vs vendored fairchem v1 lives in :code:`test/test_escn_parity_*.py` (forward only; force conservation is covered by unit tests).
+
+**EquiformerV2** (:code:`architecture: equiformer_v2`) is a native port of Liao et al. (ICLR 2024) under :code:`enerzyme/models/equiformer_v2/`. It reuses shared :code:`enerzyme/models/so3/` (with EquiformerV2 ``mmax`` rescale / component grids / :code:`SO3_LinearV2`) and implements SO(2) equivariant graph attention + S²/gate feed-forward blocks. The Core emits the same latent contract as eSCN (:code:`atom_feature` / :code:`atom_sphere_feature`). Default production stacks use :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout` wraps the paper energy FFN on :code:`atom_sphere_feature`. All external EquiformerV2 readouts accept :code:`shallow_ensemble_size` (widen last linear → :code:`ShallowEnsembleReduce`). Distinct from Equiformer V1 (e3nn TP attention) and from paper eSCN (message SO(2) without transformer attention). Examples: :code:`enerzyme/config/equiformer_v2_layers_example.yaml`, :code:`equiformer_v2_ffn_readout_example.yaml`, :code:`equiformer_v2_shallow_ensemble_example.yaml`. Parity vs vendored upstream nets: :code:`test/test_equiformer_v2_parity_*.py`.
 
 **UMA** (:code:`architecture: uma_qs`) requires the :code:`fairchem` package. The Core wraps Meta's UMA / eSCN-MD backbone as an atom descriptor under :code:`enerzyme/models/esen/` (name is historical; this is **not** the 2023 paper eSCN). Shared layers such as :code:`SimpleReadout`, :code:`HierachicalReadout`, and :code:`SpinConservation` predict atomic or molecular charge/spin outside the Core. Pair with :code:`aselmdb` datasets that provide :code:`Q` / :code:`S` (and optionally :code:`Qa` / :code:`Sa`).
 
@@ -68,15 +75,18 @@ Selection guidelines
     PhysNet or SpookyNet — long-range electrostatics, optional dispersion layers.
 
 **Maximum accuracy on diverse geometries**
-    MACE, NequIP, or Equiformer — equivariant message passing; tune cutoff and depth.
+    MACE, NequIP, Equiformer, or EquiformerV2 — equivariant message passing; tune cutoff and depth.
     Equiformer uses SO(3) graph attention (default MD17-style stack with ``ExpNormalSmearing``
     and :code:`output_mode: feature` emitting full irreps plus :code:`feature_irreps`;
     production default is :code:`SimpleReadout` with :code:`head_type: two_layer` after 0e
     extract, optional :code:`EquiformerGraphAttentionReadout`); prefer smaller irreps /
-    fewer layers for enzyme-scale clusters. Charge/dipole use shared readouts outside the
-    Core. Numerical fidelity against the official Equiformer MD17 path is covered by
-    :code:`test/test_equiformer_parity_*.py`
-    (operator / latent / direct E·F / gradient checks — not the production SimpleReadout stack).
+    fewer layers for enzyme-scale clusters. EquiformerV2 uses SO(2)-reduced attention
+    (default :code:`GaussianSmearing` + :code:`atom_feature` / :code:`atom_sphere_feature`)
+    and scales more easily to higher :code:`lmax` with truncated :code:`mmax`.
+    Charge/dipole use shared readouts outside the Core. Numerical fidelity against the
+    official Equiformer MD17 path is covered by :code:`test/test_equiformer_parity_*.py`
+    (operator / latent / direct E·F / gradient checks — not the production SimpleReadout stack);
+    EquiformerV2 ops/blocks by :code:`test/test_equiformer_v2_parity_*.py`.
 
 **Active learning with force variance**
     Any architecture with :code:`ShallowEnsembleReduce` or :code:`committee_size` > 1.
