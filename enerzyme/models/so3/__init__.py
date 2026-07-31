@@ -29,8 +29,11 @@ from .linear import SO3_LinearV2
 from .rotation import SO3_Rotation, init_edge_rot_mat
 from .so2_conv import SO2Block, SO2Conv
 from .so2_ops import SO2_Convolution, SO2_m_Convolution
-from .sphere_sample_readout import SphereSampleReadout, calc_sphere_points
 from .spherical_harmonics import RealSphericalHarmonics, spherical_harmonics
+
+# SphereSampleReadout subclasses layers.BaseFFLayer. Keep it lazy so importing
+# ``enerzyme.models.so3`` does not pull ``layers`` (which re-exports the readout
+# for YAML discovery) and create a circular import.
 
 __all__ = [
     "CoefficientMapping",
@@ -59,3 +62,15 @@ __all__ = [
     "load_cgmatrix",
     "spherical_harmonics",
 ]
+
+
+def __getattr__(name: str):
+    if name in {"SphereSampleReadout", "calc_sphere_points"}:
+        from .sphere_sample_readout import SphereSampleReadout, calc_sphere_points
+
+        mapping = {
+            "SphereSampleReadout": SphereSampleReadout,
+            "calc_sphere_points": calc_sphere_points,
+        }
+        return mapping[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
