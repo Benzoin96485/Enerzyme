@@ -95,10 +95,10 @@ Boundary with Enerzyme
 | QM engines       | :code:`annotate`       | ORCA bridge utilities     |
 +------------------+------------------------+---------------------------+
 
-Architecture selection (e.g. :code:`Equiformer`) is entirely in the Enerzyme training /
+Architecture selection (e.g. :code:`Equiformer`, :code:`equiformer_v2`, :code:`escn`) is entirely in the Enerzyme training /
 model YAML (:code:`Modelhub.*.architecture`). Enerzymette only rewrites dataset paths,
 suffixes, and pretrain paths — no Enerzymette code changes are required when adding a
-new Enerzyme Core. Future shallow-ensemble or larger-irrep Equiformer configs remain
+new Enerzyme Core. Future shallow-ensemble or larger-degree EquiformerV2 configs remain
 YAML-only as long as checkpoint paths stay stable.
 
 Recommended task directory

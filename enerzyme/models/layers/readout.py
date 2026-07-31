@@ -558,3 +558,85 @@ class EquiformerGraphAttentionReadout(BaseFFLayer):
             self.ordered_output_fields[i]: outputs.select(1, i)
             for i in range(self.dim_feature_out)
         }
+
+
+class EquiformerV2FeedForwardReadout(BaseFFLayer):
+    """Paper EquiformerV2 energy head: sphere FFN → per-atom scalars.
+
+    Consumes ``atom_sphere_feature`` and Core ``SO3_grid`` / FFN hyperparameters.
+    Default production stacks use ``SimpleReadout`` on ``atom_feature`` instead.
+    """
+
+    def __init__(
+        self,
+        output_fields: Set[str],
+        built_layers: List[Module],
+        ffn_hidden_channels: Optional[int] = None,
+        keep_feature: bool = False,
+        **_unused,
+    ) -> None:
+        out = set(output_fields)
+        if keep_feature:
+            out = out | {"atom_feature", "atom_sphere_feature"}
+        super().__init__(
+            input_fields={"atom_sphere_feature"},
+            output_fields=out,
+        )
+        self.ordered_output_fields = sorted(list(output_fields))
+        self.keep_feature = keep_feature
+
+        core = None
+        for layer in reversed(built_layers):
+            if hasattr(layer, "SO3_grid") and hasattr(layer, "sphere_channels"):
+                core = layer
+                break
+        if core is None:
+            raise ValueError(
+                "EquiformerV2FeedForwardReadout requires a preceding EquiformerV2 Core"
+            )
+
+        from ..equiformer_v2.transformer_block import FeedForwardNetwork
+        from ..so3 import SO3_Embedding
+
+        self._SO3_Embedding = SO3_Embedding
+        n_out = len(self.ordered_output_fields)
+        hidden = (
+            ffn_hidden_channels
+            if ffn_hidden_channels is not None
+            else core.ffn_hidden_channels
+        )
+        self.ffn = FeedForwardNetwork(
+            sphere_channels=core.sphere_channels,
+            hidden_channels=hidden,
+            output_channels=n_out,
+            lmax_list=list(core.lmax_list),
+            mmax_list=list(core.mmax_list),
+            SO3_grid=core.SO3_grid,
+            activation=getattr(core, "ffn_activation", "scaled_silu"),
+            use_gate_act=getattr(core, "use_gate_act", False),
+            use_grid_mlp=getattr(core, "use_grid_mlp", False),
+            use_sep_s2_act=getattr(core, "use_sep_s2_act", True),
+        )
+        self.lmax_list = list(core.lmax_list)
+        self.sphere_channels = core.sphere_channels
+
+    def get_output(self, atom_sphere_feature: Tensor) -> Dict[str, Tensor]:
+        x = self._SO3_Embedding(
+            0,
+            self.lmax_list.copy(),
+            self.sphere_channels,
+            device=atom_sphere_feature.device,
+            dtype=atom_sphere_feature.dtype,
+        )
+        x.set_embedding(atom_sphere_feature)
+        x.set_lmax_mmax(self.lmax_list.copy(), self.lmax_list.copy())
+        node_out = self.ffn(x)
+        # l=0 channels only → (N, n_out)
+        scalars = node_out.embedding.narrow(1, 0, 1).squeeze(1)
+        result = {
+            self.ordered_output_fields[i]: scalars.select(-1, i)
+            for i in range(len(self.ordered_output_fields))
+        }
+        if self.keep_feature:
+            result["atom_sphere_feature"] = atom_sphere_feature
+        return result

@@ -47,6 +47,11 @@ class SO3_Rotation:
     def rotate_inv(self, embedding: torch.Tensor, in_lmax: int, in_mmax: int) -> torch.Tensor:
         in_mask = self.mapping.coefficient_idx(in_lmax, in_mmax)
         wigner_inv = self.wigner_inv[:, :, in_mask]
+        # EquiformerV2 rescale when SO(2) used mmax < lmax; identity if equal.
+        if in_mmax < in_lmax:
+            wigner_inv = wigner_inv * self.mapping.get_rotate_inv_rescale(
+                in_lmax, in_mmax
+            )
         return torch.bmm(wigner_inv, embedding)
 
     def RotationToWignerDMatrix(

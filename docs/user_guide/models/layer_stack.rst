@@ -130,6 +130,18 @@ pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …); use
 direct vector path. See :code:`enerzyme/config/escn_sphere_readout_example.yaml`.
 Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`).
 
+EquiformerV2 and modular readouts
+---------------------------------
+
+With :code:`architecture: equiformer_v2`, the Core returns the same latent pair as eSCN
+(:code:`atom_feature` as :code:`l=0` scalars with :code:`feature_irreps: "Cx0e"`, plus
+:code:`atom_sphere_feature`). Default stacks use :code:`SimpleReadout` →
+:code:`EnergyReduce` → :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout`
+applies the paper sphere FFN energy head to :code:`atom_sphere_feature` (instead of
+:code:`SimpleReadout`). Shared :code:`so3` primitives provide component-normalized
+grids and :code:`mmax < lmax` rotate-back rescale used by SO(2) attention. Example:
+:code:`enerzyme/config/equiformer_v2_layers_example.yaml`.
+
 NSE readout layers
 ------------------
 
