@@ -76,3 +76,35 @@ def test_init_edge_rot_mat_orthonormal():
     eye = torch.eye(3).expand(7, -1, -1)
     assert torch.allclose(R @ R.transpose(1, 2), eye, atol=1e-5)
     assert torch.allclose(torch.det(R), torch.ones(7), atol=1e-5)
+
+
+def test_real_sh_and_l0_shapes():
+    from enerzyme.models.so3 import L0Contraction, RealSphericalHarmonics
+
+    degrees = [1, 2, 3]
+    sh = RealSphericalHarmonics(degrees)
+    m_tot = sum(2 * l + 1 for l in degrees)
+    y = sh(torch.randn(4, 3))
+    assert y.shape == (4, m_tot)
+    inv = L0Contraction(degrees)(y)
+    assert inv.shape == (4, len(degrees))
+    assert torch.isfinite(inv).all()
+
+
+def test_l0_cg_rep_follows_degrees_list_order():
+    """cg_rep must track caller degree order, not np.unique sorted order."""
+    from enerzyme.models.so3 import L0Contraction
+
+    degrees = [3, 1, 2]
+    l0 = L0Contraction(degrees, dtype=torch.float64)
+    # Expected layout: l=3 (7), l=1 (3), l=2 (5) → m_tot = 15
+    assert l0.cg_rep.shape == (15,)
+    assert l0.segment_ids.tolist() == (
+        [0] * 7 + [1] * 3 + [2] * 5
+    )
+    # Each segment's CG block equals the block for that degree alone
+    for seg, d in enumerate(degrees):
+        alone = L0Contraction([d], dtype=torch.float64)
+        mask = l0.segment_ids == seg
+        assert torch.allclose(l0.cg_rep[mask], alone.cg_rep)
+

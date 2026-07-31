@@ -153,6 +153,18 @@ accept :code:`shallow_ensemble_size` on the last linear head; pair with
 :code:`equiformer_v2_shallow_ensemble_example.yaml`,
 :code:`equiformer_shallow_ensemble_example.yaml`.
 
+So3krates and modular readouts
+------------------------------
+
+With :code:`architecture: so3krates`, the Core returns :code:`atom_feature` (invariant
+stream ``x``, :code:`feature_irreps: "Fx0e"`) and :code:`atom_sphere_feature` (SPHC
+``χ`` with shape :code:`[N, m_tot]`). This SPHC layout is **not** the eSCN /
+EquiformerV2 :code:`[N, (lmax+1)^2, C]` tensor — do not attach :code:`SphereSampleReadout`.
+Default stacks use :code:`BernsteinRBF` + :code:`SimpleReadout` → :code:`EnergyReduce`
+→ :code:`Force`. Optional ZBL / electrostatics / dispersion are post-core layers
+(same as PhysNet / SpookyNet), not part of the Core. Example:
+:code:`enerzyme/config/so3krates_layers_example.yaml`.
+
 NSE readout layers
 ------------------
 
