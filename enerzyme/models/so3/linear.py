@@ -66,3 +66,41 @@ class SO3_LinearV2(torch.nn.Module):
             f"{self.__class__.__name__}(in_features={self.in_features}, "
             f"out_features={self.out_features}, lmax={self.lmax})"
         )
+
+
+class SO3Linear(torch.nn.Module):
+    """Per-degree linear on raw SH tensors ``[N, (lmax+1)**2, C]`` (EquiformerV3).
+
+    Distinct from ``SO3_LinearV2``, which wraps ``SO3_Embedding``.
+    """
+
+    def __init__(self, in_features, out_features, lmax, bias=True):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.lmax = lmax
+        self.weight = Parameter(torch.randn((self.lmax + 1), out_features, in_features))
+        bound = 1 / math.sqrt(self.in_features)
+        torch.nn.init.uniform_(self.weight, -bound, bound)
+        self.bias = Parameter(torch.zeros(1, 1, out_features)) if bias else None
+        expand_index = torch.zeros([(lmax + 1) ** 2]).long()
+        for lval in range(lmax + 1):
+            start_idx = lval**2
+            length = 2 * lval + 1
+            expand_index[start_idx : (start_idx + length)] = lval
+        self.register_buffer("expand_index", expand_index)
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        weight = torch.index_select(self.weight, dim=0, index=self.expand_index)
+        outputs = torch.einsum("bmi, moi -> bmo", inputs, weight)
+        if self.bias is not None:
+            outputs = outputs.clone()
+            outputs[:, 0:1, :] = outputs.narrow(1, 0, 1) + self.bias
+        return outputs
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(in_features={self.in_features}, "
+            f"out_features={self.out_features}, lmax={self.lmax}, "
+            f"bias={(self.bias is not None)})"
+        )

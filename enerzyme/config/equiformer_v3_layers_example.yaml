@@ -1,0 +1,47 @@
+# Minimal EquiformerV3 stack (enzyme-scale defaults).
+# Use architecture: equiformer_v3 under Modelhub.internal_FFs.
+#
+# Paper highlights vs V2: merge_layer_norm, sep-merge_gates2_swiglu,
+# use_envelope (smooth-cutoff attention), wider FFN.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: equiformer_v3
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: GaussianSmearing
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            sphere_channels: 64
+            attn_hidden_channels: 64
+            num_heads: 4
+            attn_alpha_channels: 32
+            attn_value_channels: 16
+            ffn_hidden_channels: 256
+            lmax: 2
+            mmax: 2
+            num_layers: 2
+            edge_channels: 64
+            norm_type: merge_layer_norm
+            use_envelope: true
+            attn_activation: sep-merge_gates2_swiglu
+            ffn_activation: sep-merge_gates2_swiglu
+            use_grid_mlp: true
+            attn_grid_resolution: [8, 8]
+            ffn_grid_resolution: [8, 8]
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

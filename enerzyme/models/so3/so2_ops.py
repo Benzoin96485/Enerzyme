@@ -203,3 +203,103 @@ class SO2_Convolution(torch.nn.Module):
         else:
             return out_embedding
 
+
+
+class SO2MLinear(torch.nn.Module):
+    """SO(2) linear on +-m features (EquiformerV3 fused path).
+
+    Expects m-primary layout from ``SO3RotationFused``. Distinct from
+    ``SO2_m_Convolution`` used by EquiformerV2.
+    """
+
+    def __init__(self, m, num_in_channels, num_out_channels, lmax, mmax):
+        super().__init__()
+        self.m = m
+        self.num_in_channels = num_in_channels
+        self.num_out_channels = num_out_channels
+        self.lmax = lmax
+        self.mmax = mmax
+        num_m_components = self.lmax - self.m + 1
+        assert num_m_components > 0
+        self.in_features = num_m_components * self.num_in_channels
+        self.out_features = num_m_components * self.num_out_channels
+        self.fc = Linear(self.in_features, (2 * self.out_features), bias=False)
+        self.fc.weight.data.mul_(1 / math.sqrt(2))
+
+    def forward(self, x_m, concat_outputs=True):
+        x_m = self.fc(x_m)
+        x_r = x_m.narrow(2, 0, self.out_features)
+        x_i = x_m.narrow(2, self.out_features, self.out_features)
+        x_m_r = x_r.narrow(1, 0, 1) - x_i.narrow(1, 1, 1)
+        x_m_i = x_r.narrow(1, 1, 1) + x_i.narrow(1, 0, 1)
+        x_out = (x_m_r, x_m_i)
+        if concat_outputs:
+            x_out = torch.cat(x_out, dim=1)
+        return x_out
+
+
+class SO2Linear(torch.nn.Module):
+    """SO(2) linear over all m (EquiformerV3).
+
+    Input layout is m-primary: (0,...), (1,...), ... as produced by
+    ``SO3RotationFused.rotate``.
+    """
+
+    def __init__(
+        self,
+        num_in_channels,
+        num_out_channels,
+        lmax,
+        mmax,
+        extra_m0_out_channels=None,
+    ):
+        super().__init__()
+        self.num_in_channels = num_in_channels
+        self.num_out_channels = num_out_channels
+        self.lmax = lmax
+        self.mmax = mmax
+        self.extra_m0_out_channels = extra_m0_out_channels
+
+        num_in_channels_m0 = (self.lmax + 1) * self.num_in_channels
+        num_out_channels_m0 = (self.lmax + 1) * self.num_out_channels
+        if self.extra_m0_out_channels is not None:
+            self.num_channels_m0_list = [self.extra_m0_out_channels, num_out_channels_m0]
+            num_out_channels_m0 = num_out_channels_m0 + self.extra_m0_out_channels
+        self.fc_m0 = Linear(num_in_channels_m0, num_out_channels_m0)
+
+        self.so2_m_linear = nn.ModuleList()
+        for m in range(1, self.mmax + 1):
+            self.so2_m_linear.append(
+                SO2MLinear(
+                    m,
+                    self.num_in_channels,
+                    self.num_out_channels,
+                    self.lmax,
+                    self.mmax,
+                )
+            )
+
+    def forward(self, x):
+        num_edges = x.shape[0]
+        outputs = []
+        x_m0 = x.narrow(1, 0, (self.lmax + 1))
+        x_m0 = x_m0.reshape(num_edges, -1)
+        x_m0 = self.fc_m0(x_m0)
+        x_m0_extra = None
+        if self.extra_m0_out_channels is not None:
+            x_m0_extra, x_m0 = torch.split(x_m0, self.num_channels_m0_list, dim=1)
+        x_m0 = x_m0.view(num_edges, -1, self.num_out_channels)
+        outputs.append(x_m0)
+        offset = self.lmax + 1
+        for m in range(1, self.mmax + 1):
+            x_m = x.narrow(1, offset, 2 * (self.lmax + 1 - m))
+            offset = offset + 2 * (self.lmax + 1 - m)
+            x_m = x_m.reshape(num_edges, 2, -1)
+            x_m = self.so2_m_linear[m - 1](x_m, concat_outputs=False)
+            x_m_pos, x_m_neg = x_m[0], x_m[1]
+            outputs.append(x_m_pos.view(num_edges, -1, self.num_out_channels))
+            outputs.append(x_m_neg.view(num_edges, -1, self.num_out_channels))
+        outputs = torch.cat(outputs, dim=1)
+        if self.extra_m0_out_channels is not None:
+            return outputs, x_m0_extra
+        return outputs
