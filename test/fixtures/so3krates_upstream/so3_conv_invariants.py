@@ -44,15 +44,12 @@ class L0Contraction(Module):
         )
         cg_diag = np.diagonal(cg_matrix, axis1=1, axis2=2)[0]
 
-        cg_rep = []
-        degrees_np = np.array(degrees)
-        unique_degrees, counts = np.unique(degrees_np, return_counts=True)
-        for d, r in zip(unique_degrees, counts):
-            block = cg_diag[indx_fn(d - 1) : indx_fn(d)]
-            tiled = np.tile(block, r)
-            cg_rep.append(tiled)
-
-        cg_rep = np.concatenate(cg_rep)
+        # Match Enerzyme: concatenate CG blocks in caller ``degrees`` order
+        # (not np.unique sorted). See enerzyme.models.so3.l0_contraction.
+        cg_blocks = [
+            cg_diag[indx_fn(d - 1) : indx_fn(d)] for d in degrees
+        ]
+        cg_rep = np.concatenate(cg_blocks) if cg_blocks else np.array([], dtype=float)
         self.register_buffer(
             "cg_rep", torch.tensor(cg_rep, dtype=dtype, device=device)
         )
