@@ -53,7 +53,10 @@ Production configs use :code:`datasets:` so training and validation can point to
 
 :code:`global_transforms` apply across all datasets. Per-dataset
 :code:`transforms:` entries are mapped to dataset-local preprocessing
-(:code:`SingleDataHub.preprocessings`).
+(:code:`SingleDataHub.preprocessings`). Keys that already appear under
+:code:`global_transforms` are omitted from that remapping so overlapping
+configs (common in active-learning YAML) are not applied twice; when values
+differ, :code:`global_transforms` wins.
 
 Feature and target mapping
 --------------------------
