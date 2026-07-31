@@ -18,7 +18,7 @@ FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "dpa4_upstream"
 
 
 def test_m_major_index_matches_published_layout():
-    from enerzyme.models.dpa4.indexing import (
+    from enerzyme.models.so3.indexing import (
         build_m_major_index,
         build_m_major_l_index,
         build_rotate_inv_rescale,
@@ -54,9 +54,11 @@ def test_c3_envelope_matches_closed_form_p5():
 def test_so2_convolution_uses_radial_feat():
     """Changing Core radial_feat must change SO2Convolution messages."""
     import torch.nn as nn
-    from enerzyme.models.dpa4.edge_cache import EdgeCache
-    from enerzyme.models.dpa4.so2 import SO2Convolution
-    from enerzyme.models.dpa4.wignerd import WignerDCalculator, build_edge_quaternion
+    from enerzyme.models.dpa4.so2 import EdgeCache, SO2Convolution
+    from enerzyme.models.so3.wigner_quaternion import (
+        WignerDCalculator,
+        build_edge_quaternion,
+    )
 
     torch.manual_seed(0)
     n, e, c, lmax, mmax = 4, 6, 8, 2, 1
@@ -122,11 +124,13 @@ def test_s2_lebedev_missing_rule_raises():
 
 def test_so2_linear_complex_multiply_equivariance():
     """Rotating (±m) inputs by φ must rotate outputs by the same angle."""
-    from enerzyme.models.dpa4.so2 import SO2Linear
+    from enerzyme.models.so3.so2_focus import FocusSO2Linear
 
     torch.manual_seed(0)
     dtype = torch.float64
-    layer = SO2Linear(lmax=2, mmax=1, in_channels=2, out_channels=2, n_focus=1).to(dtype)
+    layer = FocusSO2Linear(
+        lmax=2, mmax=1, in_channels=2, out_channels=2, n_focus=1
+    ).to(dtype)
     layer.eval()
     # Layout: m=0 [0:3], m=-1 [3:5], m=+1 [5:7]
     x = torch.randn(1, 4, 7, 2, dtype=dtype)
@@ -150,7 +154,7 @@ def test_so2_linear_complex_multiply_equivariance():
 
 
 def test_envelope_gated_softmax_sums_with_null_mass():
-    from enerzyme.models.dpa4.attention import segment_envelope_gated_softmax
+    from enerzyme.models.so3.softmax import segment_envelope_gated_softmax
 
     torch.manual_seed(1)
     dtype = torch.float64
@@ -162,8 +166,6 @@ def test_envelope_gated_softmax_sums_with_null_mass():
     alpha = segment_envelope_gated_softmax(
         logits, edge_env, dst, n_nodes, z_bias, eps=1e-6
     )
-    # Per destination: sum_e alpha + null_mass_contribution ≈ 1 is not stored;
-    # check non-negativity, finiteness, and masked-zero env kills weight.
     assert torch.isfinite(alpha).all()
     assert (alpha >= 0).all()
     # Zero envelope → zero attention
@@ -177,7 +179,7 @@ def test_envelope_gated_softmax_sums_with_null_mass():
 
 def test_indexing_fixture_roundtrip_optional():
     """If a fixture npz exists, compare against it; otherwise generate & skip soft."""
-    from enerzyme.models.dpa4.indexing import (
+    from enerzyme.models.so3.indexing import (
         build_gie_zonal_index,
         build_m_major_index,
         build_m_major_l_index,

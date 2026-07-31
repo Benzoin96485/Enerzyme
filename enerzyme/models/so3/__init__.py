@@ -8,9 +8,9 @@ grid kwargs, ``SO3_LinearV2``). So3krates additionally uses closed-form
 EquiformerV2 SO(2) convolution lives in ``so2_ops`` alongside the eSCN-style
 ``SO2Block`` / ``SO2Conv`` (different parameterization — not interchangeable).
 DPA4 / EMFA contributes packed/m-major indexing, focus-stream gated activations,
-``SO3FocusLinear``, degree-balanced ``EquivariantDegreeRMSNorm``, and
-``BesselC3RadialBasis`` (focus-major ``SO2Linear`` / quaternion Wigner-D stay in
-``enerzyme.models.dpa4``).
+``SO3FocusLinear``, ``FocusSO2Linear``, degree-balanced ``EquivariantDegreeRMSNorm``,
+``BesselC3RadialBasis``, quaternion Wigner-D (:mod:`wigner_quaternion`), and
+shared Lebedev tables / ``S2LebedevProjector`` (also used by EFA for points).
 
 They are **not** used by the Meta UMA wrappers under ``enerzyme.models.esen``, which
 keep the fairchem ``eSCNMD*`` checkpoint path.
@@ -45,12 +45,19 @@ from .indexing import (
     so3_packed_index,
 )
 from .lebedev import (
+    LEBEDEV_FREQUENCY_LOOKUP,
     LEBEDEV_PRECISION_TO_NPOINTS,
     S2LebedevProjector,
+    available_lebedev_nums,
+    available_lebedev_precisions,
+    lebedev_quadrature,
+    lebedev_tensors,
     load_lebedev_rule,
+    recommend_max_frequency,
     resolve_lebedev_precision,
 )
-from .softmax import GraphSoftmax, SoftCap
+from .softmax import GraphSoftmax, SoftCap, segment_envelope_gated_softmax
+from .so2_focus import FocusSO2Linear
 from .so2_ops import SO2Linear, SO2MLinear
 from .linear import SO3FocusLinear, SO3Linear
 from .layer_norm import (
@@ -79,6 +86,15 @@ from .rotation import SO3_Rotation, init_edge_rot_mat
 from .so2_conv import SO2Block, SO2Conv
 from .so2_ops import SO2_Convolution, SO2_m_Convolution
 from .spherical_harmonics import RealSphericalHarmonics, spherical_harmonics
+from .wigner_quaternion import (
+    WignerDCalculator,
+    build_edge_quaternion,
+    quaternion_multiply,
+    quaternion_normalize,
+    quaternion_to_rotation_matrix,
+    quaternion_z_rotation,
+    safe_norm,
+)
 
 # SphereSampleReadout subclasses layers.BaseFFLayer. Keep it lazy so importing
 # ``enerzyme.models.so3`` does not pull ``layers`` (which re-exports the readout
@@ -113,13 +129,21 @@ __all__ = [
     "PolynomialEnvelope",
     "C3CutoffEnvelope",
     "LEBEDEV_PRECISION_TO_NPOINTS",
+    "LEBEDEV_FREQUENCY_LOOKUP",
     "S2LebedevProjector",
+    "available_lebedev_nums",
+    "available_lebedev_precisions",
+    "lebedev_quadrature",
+    "lebedev_tensors",
     "load_lebedev_rule",
+    "recommend_max_frequency",
     "resolve_lebedev_precision",
     "GraphSoftmax",
     "SoftCap",
+    "segment_envelope_gated_softmax",
     "SO2Linear",
     "SO2MLinear",
+    "FocusSO2Linear",
     "SO3Linear",
     "SO3FocusLinear",
     "EquivariantDegreeRMSNorm",
@@ -141,6 +165,13 @@ __all__ = [
     "project_D_to_m",
     "project_Dt_from_m",
     "so3_packed_index",
+    "WignerDCalculator",
+    "build_edge_quaternion",
+    "quaternion_multiply",
+    "quaternion_normalize",
+    "quaternion_to_rotation_matrix",
+    "quaternion_z_rotation",
+    "safe_norm",
     "SO3RotationFused",
     "CoefficientMappingModule",
     "SO3GridResolved",

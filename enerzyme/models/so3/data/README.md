@@ -1,7 +1,8 @@
-# Lebedev quadrature rules
+# Lebedev quadrature grids
 #
-# Vendored from deepmd-kit (`deepmd/dpmodel/utils/lebedev_rules.npz`,
-# LGPL-3.0-or-later). Underlying sphere Lebedev rules: John Burkardt,
-# https://people.sc.fsu.edu/~jburkardt/datasets/sphere_lebedev_rule/
+# Canonical copy: `lebedev_grids.npz` vendored from Google e3x
+# (`e3x/so3/_lebedev_grids.npz`, Apache-2.0). Weights sum to 1.
+# Shared by EFA (points/weights) and DPA4 `S2LebedevProjector`.
 #
-# Keys: `points_PPP`, `weights_PPP` (weights sum to 1; integral = 4π Σ w f).
+# Indexed by both point count (`lebedev_quadrature(num=…)`) and algebraic
+# precision (`load_lebedev_rule(precision=…)`).

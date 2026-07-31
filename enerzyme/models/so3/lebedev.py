@@ -1,13 +1,14 @@
-"""Lebedev quadrature and S² grid projectors for equivariant FFNs.
+"""Lebedev quadrature tables and S² grid projectors.
 
-Lebedev rules are vendored from deepmd-kit (LGPL-3.0-or-later), originally from
-John Burkardt's sphere Lebedev dataset. Used by DPA4 EMFA FFN (arXiv:2606.02419)
-and available for other SO(3) grid paths.
+Point/weight tables are vendored from Google e3x
+(``e3x/so3/_lebedev_grids.npz``, Apache-2.0). Weights satisfy ``sum(w) == 1``.
+Used by EFA (points only) and DPA4 EMFA FFN (``S2LebedevProjector``).
 """
 
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -17,8 +18,9 @@ from torch import Tensor, nn
 
 from .spherical_harmonics import spherical_harmonics
 
-LEBEDEV_RULES_FILE = Path(__file__).with_name("data") / "lebedev_rules.npz"
+LEBEDEV_GRIDS_FILE = Path(__file__).with_name("data") / "lebedev_grids.npz"
 
+# Static map matching the packaged e3x table (precision → point count).
 LEBEDEV_PRECISION_TO_NPOINTS: Dict[int, int] = {
     3: 6,
     5: 14,
@@ -54,6 +56,91 @@ LEBEDEV_PRECISION_TO_NPOINTS: Dict[int, int] = {
     131: 5810,
 }
 
+# EFA SI-recommended max RoPE frequency vs Lebedev point count.
+LEBEDEV_FREQUENCY_LOOKUP: Dict[int, float] = {
+    50: float(np.pi),
+    86: float(2 * np.pi),
+    110: float(2.5 * np.pi),
+    146: float(3 * np.pi),
+    194: float(4 * np.pi),
+    230: float(4.5 * np.pi),
+    266: float(5 * np.pi),
+    302: float(5.5 * np.pi),
+    350: float(6.5 * np.pi),
+    434: float(7.5 * np.pi),
+    590: float(9 * np.pi),
+    770: float(11 * np.pi),
+    974: float(12.5 * np.pi),
+    6000: float(35 * np.pi),
+}
+
+
+@lru_cache(maxsize=1)
+def _load_index() -> Tuple[np.ndarray, np.ndarray]:
+    if not LEBEDEV_GRIDS_FILE.exists():
+        raise FileNotFoundError(
+            f"Lebedev quadrature data file is missing: {LEBEDEV_GRIDS_FILE}"
+        )
+    data = np.load(LEBEDEV_GRIDS_FILE)
+    return np.asarray(data["num"]), np.asarray(data["precision"])
+
+
+def available_lebedev_nums() -> Tuple[int, ...]:
+    nums, _ = _load_index()
+    return tuple(int(n) for n in nums)
+
+
+def available_lebedev_precisions() -> Tuple[int, ...]:
+    _, precs = _load_index()
+    return tuple(int(p) for p in precs)
+
+
+def lebedev_quadrature(num: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Return Lebedev points ``(M, 3)`` and weights ``(M,)`` for point count ``num``.
+
+    Requires an exact packaged grid size (e3x / EFA convention).
+    """
+    nums, _ = _load_index()
+    if num < int(nums.min()):
+        raise ValueError(
+            f"Lebedev num={num} is below the smallest available grid "
+            f"({int(nums.min())}). Available: {available_lebedev_nums()}"
+        )
+    eligible = np.where(nums <= num)[0]
+    i = int(eligible[np.argmax(nums[eligible])])
+    if int(nums[i]) != num:
+        raise ValueError(
+            f"Lebedev num={num} is not available. Closest ≤num is "
+            f"{int(nums[i])}. Available: {available_lebedev_nums()}"
+        )
+    data = np.load(LEBEDEV_GRIDS_FILE)
+    points = np.asarray(data[f"r{i}"], dtype=np.float64)
+    weights = np.asarray(data[f"w{i}"], dtype=np.float64)
+    return points, weights
+
+
+def lebedev_tensors(
+    num: int,
+    *,
+    device: Optional[torch.device] = None,
+    dtype: torch.dtype = torch.float32,
+) -> Tuple[Tensor, Tensor]:
+    """Lebedev grid as torch tensors."""
+    points, weights = lebedev_quadrature(num)
+    grid_u = torch.as_tensor(points, device=device, dtype=dtype)
+    grid_w = torch.as_tensor(weights, device=device, dtype=dtype)
+    return grid_u, grid_w
+
+
+def recommend_max_frequency(lebedev_num: int) -> float:
+    """Return the SI-recommended ``b_max`` for a Lebedev order, if tabulated."""
+    if lebedev_num not in LEBEDEV_FREQUENCY_LOOKUP:
+        raise KeyError(
+            f"No recommended max_frequency for lebedev_num={lebedev_num}. "
+            f"Known orders: {sorted(LEBEDEV_FREQUENCY_LOOKUP)}"
+        )
+    return LEBEDEV_FREQUENCY_LOOKUP[lebedev_num]
+
 
 def resolve_lebedev_precision(lmax: int) -> int:
     """Smallest packaged Lebedev precision with algebraic order ``>= 3 * lmax``."""
@@ -68,26 +155,23 @@ def resolve_lebedev_precision(lmax: int) -> int:
 
 
 def load_lebedev_rule(precision: int) -> Tuple[np.ndarray, np.ndarray]:
-    """Load Cartesian unit points ``(A, 3)`` and weights ``(A,)`` (sum to 1)."""
+    """Load Cartesian unit points ``(A, 3)`` and weights ``(A,)`` by precision."""
     if not isinstance(precision, (int, np.integer)) or isinstance(precision, bool):
         raise TypeError(
             f"`precision` must be an integer, got {type(precision).__name__}"
         )
-    if not LEBEDEV_RULES_FILE.exists():
-        raise FileNotFoundError(
-            f"Lebedev quadrature data file is missing: {LEBEDEV_RULES_FILE}"
+    nums, precs = _load_index()
+    matches = np.where(precs == int(precision))[0]
+    if matches.size == 0:
+        raise ValueError(
+            f"Lebedev rule with precision {precision} is not packaged; "
+            f"available precisions: {sorted(LEBEDEV_PRECISION_TO_NPOINTS)}"
         )
-    rule_key = f"{int(precision):03d}"
-    with np.load(LEBEDEV_RULES_FILE) as rules:
-        point_key = f"points_{rule_key}"
-        weight_key = f"weights_{rule_key}"
-        if point_key not in rules or weight_key not in rules:
-            raise ValueError(
-                f"Lebedev rule with precision {precision} is not packaged; "
-                f"available precisions: {sorted(LEBEDEV_PRECISION_TO_NPOINTS)}"
-            )
-        points = np.asarray(rules[point_key], dtype=np.float64)
-        weights = np.asarray(rules[weight_key], dtype=np.float64)
+    i = int(matches[0])
+    data = np.load(LEBEDEV_GRIDS_FILE)
+    points = np.asarray(data[f"r{i}"], dtype=np.float64)
+    weights = np.asarray(data[f"w{i}"], dtype=np.float64)
+    assert int(nums[i]) == LEBEDEV_PRECISION_TO_NPOINTS[int(precision)]
     return points, weights
 
 

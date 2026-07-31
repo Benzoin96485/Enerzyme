@@ -1,9 +1,12 @@
-"""Quaternion-based Wigner-D for DPA4 edge frames.
+"""Quaternion-based Wigner-D edge frames (DPA4 / SeZM).
 
-Reimplemented in PyTorch from DPA4/SeZM concepts (arXiv:2606.02419).
-Only the essential l<=2 path is implemented here for the water-mini
-default (lmax=2). The generic polynomial path for higher l is omitted
-for v1 but the API is forward-compatible.
+Reimplemented in PyTorch from DPA4 concepts (Li et al., arXiv:2606.02419).
+Only the essential ``lmax <= 2`` path is implemented for the water-mini
+default; the generic polynomial path for higher ``l`` is omitted for v1
+but the API is forward-compatible.
+
+Complementary to :class:`~enerzyme.models.so3.rotation.SO3_Rotation`, which
+builds Wigner-D from 3×3 rotation matrices via e3nn Euler angles and ``Jd.pt``.
 """
 
 from __future__ import annotations

@@ -428,7 +428,7 @@ Liao et al. (2026, arXiv:2604.09130) lives under :code:`enerzyme/models/equiform
 DPA4 (:code:`dpa4`)
 ^^^^^^^^^^^^^^^^^^^^^
 
-DPA4 (Li et al., 2026, arXiv:2606.02419) lives under :code:`enerzyme/models/dpa4/`. Focus-major / m-major EMFA :code:`SO2Linear` / :code:`SO2Convolution` and quaternion edge frames stay local because their layout differs from shared Equiformer/eSCN SO(2) ops. Shared pieces in :code:`enerzyme/models/so3/` include :code:`C3CutoffEnvelope`, Lebedev S² projection (:code:`S2LebedevProjector` / :code:`lebedev_rules.npz`), packed/m-major :code:`indexing`, :code:`SO3FocusLinear`, :code:`SO3GatedActivation` / :code:`FocusLinear`, :code:`EquivariantDegreeRMSNorm`, and :code:`BesselC3RadialBasis` / :code:`RadialMLP` (DPA4 modules re-export these for stable import paths). The Core emits the standard :code:`atom_feature` / :code:`atom_sphere_feature` pair; compose :code:`SimpleReadout`, :code:`EnergyReduce`, and :code:`Force` outside it. Core / Wigner / force-FD coverage is in :code:`test/test_dpa4_core.py`; algebraic op checks are in :code:`test/test_dpa4_parity_ops.py`. Enerzymette only needs :code:`architecture: dpa4` plus a resolved :code:`config.yaml`.
+DPA4 (Li et al., 2026, arXiv:2606.02419) lives under :code:`enerzyme/models/dpa4/` as :code:`core.py` / :code:`interaction.py` / :code:`so2.py`. EMFA orchestration (:code:`SO2Convolution`, :code:`DynamicRadialDegreeMixer`, :code:`EdgeCache`) stays local. Shared pieces in :code:`enerzyme/models/so3/` include :code:`C3CutoffEnvelope`, Apache e3x Lebedev tables (:code:`lebedev_grids.npz`, also used by EFA) / :code:`S2LebedevProjector`, packed/m-major :code:`indexing`, :code:`FocusSO2Linear`, :code:`SO3FocusLinear`, :code:`SO3GatedActivation`, :code:`EquivariantDegreeRMSNorm`, :code:`BesselC3RadialBasis` / :code:`RadialMLP`, and quaternion :code:`WignerDCalculator`. EquiformerV3 FFN grids remain e3nn lat/long (:code:`SO3GridResolved`), not Lebedev. The Core emits :code:`atom_feature` / :code:`atom_sphere_feature`; compose :code:`SimpleReadout`, :code:`EnergyReduce`, and :code:`Force` outside it. Tests: :code:`test/test_dpa4_core.py`, :code:`test/test_dpa4_parity_ops.py`. Enerzymette only needs :code:`architecture: dpa4` plus a resolved :code:`config.yaml`.
 
 So3krates (:code:`so3krates`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -443,7 +443,7 @@ Kabylda et al. (JACS 2025) is registered as :code:`architecture: so3lr` but **re
 EFA (:code:`efa` / :code:`so3lr_efa`) and SpookyNet :code:`use_efa`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Frank et al. (arXiv:2412.08541) — shared package :code:`enerzyme/models/efa/` (ERoPE + Lebedev linear attention; Lebedev tables vendored from e3x Apache-2.0).
+Frank et al. (arXiv:2412.08541) — shared package :code:`enerzyme/models/efa/` (ERoPE + Lebedev linear attention). Lebedev point tables live in :code:`enerzyme/models/so3/data/lebedev_grids.npz` (e3x Apache-2.0) and are re-exported via :code:`efa.lebedev`.
 
 * Register :code:`efa` / :code:`so3lr_efa` in :code:`get_ff_core` (both use :code:`So3kratesCore` with :code:`era_use_in_iterations`).
 * SpookyNet: Core / :code:`InteractionModule` flag :code:`use_efa` swaps :code:`NonlocalInteraction` for :code:`EFABlock` (pass :code:`Ra`).

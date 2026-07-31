@@ -1,6 +1,9 @@
 """Wigner-D rotations for spherical harmonic embeddings.
 
 Adapted from fairchem v1 eSCN / e3nn 0.4.0 (MIT license).
+
+For quaternion edge frames and packed ``(l, m)`` Wigner-D used by DPA4 /
+EMFA, see :mod:`enerzyme.models.so3.wigner_quaternion`.
 """
 
 from __future__ import annotations

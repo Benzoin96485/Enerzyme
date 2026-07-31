@@ -29,6 +29,20 @@ class SmoothLeakyReLU(Module):
         return "negative_slope={}".format(self.alpha)
 
 
+class SwiGLU(Module):
+    """SwiGLU over the last dim: ``value * silu(gate)`` (DPA4 / SeZM order).
+
+    Distinct from :class:`~enerzyme.models.so3.activation_v3.SwiGLU`, which
+    applies ``silu`` to the first half (EquiformerV3 convention).
+    """
+
+    def forward(self, x: Tensor) -> Tensor:
+        if x.shape[-1] % 2:
+            raise ValueError("SwiGLU requires an even last dimension")
+        value, gate = x.chunk(2, dim=-1)
+        return value * F.silu(gate)
+
+
 class BaseScaledTemperedActivation(ABC, Module):
     def __init__(self, dim_feature: int=1, initial_alpha: float=1.0, initial_beta: float=1.0, learnable: bool=False) -> None:
         super().__init__()

@@ -67,7 +67,10 @@ def test_dpa4_shapes_and_geometry_autograd():
 
 
 def test_dpa4_wigner_blocks_are_orthogonal_and_differentiable():
-    from enerzyme.models.dpa4.wignerd import WignerDCalculator, quaternion_normalize
+    from enerzyme.models.so3.wigner_quaternion import (
+        WignerDCalculator,
+        quaternion_normalize,
+    )
 
     q = quaternion_normalize(torch.randn(5, 4, dtype=torch.float64, requires_grad=True))
     D, Dt = WignerDCalculator(2).double()(q)
