@@ -239,7 +239,7 @@ def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", mod
             model_str = get_model_str(FF_key, FF_params)
             model = build_model(FF_params.architecture, FF_params.layers, FF_params.build_params)
             model_path = get_pretrain_path(os.path.join(model_dir, model_str), "best")
-            model = model.to(device).type(dtype)
+            model = model.to(device=device, dtype=dtype)
             _load_state_dict(model, device, model_path, inference=True)
             model.eval()
             calculator = ASECalculator(
