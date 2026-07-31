@@ -91,6 +91,45 @@ def test_real_sh_and_l0_shapes():
     assert torch.isfinite(inv).all()
 
 
+def test_spookynet_d_layout_matches_legacy_closed_form():
+    """spookynet_d must match the historical chemistry-d closed form."""
+    import math
+
+    from enerzyme.models.so3 import spherical_harmonics
+
+    torch.manual_seed(0)
+    dtype = torch.float64
+    v = torch.randn(16, 3, dtype=dtype)
+    pij = v / v.norm(dim=-1, keepdim=True)
+    got = spherical_harmonics(
+        pij, degrees=[2], layout="spookynet_d", normalize_input=False
+    )
+    sqrt3 = math.sqrt(3.0)
+    sqrt3half = 0.5 * sqrt3
+    ref = torch.stack(
+        [
+            sqrt3 * pij[:, 0] * pij[:, 1],
+            sqrt3 * pij[:, 0] * pij[:, 2],
+            sqrt3 * pij[:, 1] * pij[:, 2],
+            0.5 * (3 * pij[:, 2] * pij[:, 2] - 1.0),
+            sqrt3half * (pij[:, 0] * pij[:, 0] - pij[:, 1] * pij[:, 1]),
+        ],
+        dim=-1,
+    )
+    assert torch.allclose(got, ref, atol=1e-12, rtol=1e-12)
+
+
+def test_spherical_harmonics_so3krates_matches_module():
+    from enerzyme.models.so3 import RealSphericalHarmonics, spherical_harmonics
+
+    torch.manual_seed(1)
+    degrees = [1, 2, 3]
+    vecs = torch.randn(5, 3, dtype=torch.float64)
+    mod = RealSphericalHarmonics(degrees)
+    y_fn = spherical_harmonics(vecs, degrees, layout="so3krates")
+    assert torch.allclose(y_fn, mod(vecs), atol=1e-12, rtol=1e-12)
+
+
 def test_l0_cg_rep_follows_degrees_list_order():
     """cg_rep must track caller degree order, not np.unique sorted order."""
     from enerzyme.models.so3 import L0Contraction

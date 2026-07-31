@@ -9,9 +9,25 @@ import torch
 sys.path.extend(["..", "."])
 
 
+def test_so3_import_does_not_require_layers_cycle():
+    """``so3`` package init must stay free of eager SphereSampleReadout import."""
+    import importlib
+
+    for name in list(sys.modules):
+        if name.startswith("enerzyme.models"):
+            del sys.modules[name]
+
+    so3 = importlib.import_module("enerzyme.models.so3")
+    assert "SphereSampleReadout" not in so3.__dict__
+    # Lazy export still works for callers / tests.
+    assert so3.SphereSampleReadout.__name__ == "SphereSampleReadout"
+    layers = importlib.import_module("enerzyme.models.layers")
+    assert layers.SphereSampleReadout is so3.SphereSampleReadout
+
+
 def test_sphere_sample_readout_scalar_shapes():
     from enerzyme.models.escn import eSCNCore
-    from enerzyme.models.layers import SphereSampleReadout
+    from enerzyme.models.so3 import SphereSampleReadout
 
     torch.manual_seed(0)
     core = eSCNCore(
@@ -40,7 +56,7 @@ def test_sphere_sample_readout_scalar_shapes():
 
 def test_sphere_sample_readout_vector_field():
     from enerzyme.models.escn import eSCNCore
-    from enerzyme.models.layers import SphereSampleReadout
+    from enerzyme.models.so3 import SphereSampleReadout
 
     torch.manual_seed(0)
     core = eSCNCore(
@@ -69,7 +85,7 @@ def test_sphere_sample_readout_vector_field():
 def test_sphere_sample_with_core_mmax_lt_lmax():
     """Core emits full (lmax+1)^2 node coeffs even when message SO2 uses mmax < lmax."""
     from enerzyme.models.escn import eSCNCore
-    from enerzyme.models.layers import SphereSampleReadout
+    from enerzyme.models.so3 import SphereSampleReadout
 
     torch.manual_seed(0)
     lmax, mmax = 2, 1
@@ -122,7 +138,7 @@ def test_sphere_sample_with_core_mmax_lt_lmax():
 def test_sphere_sample_with_core_energy_rotation_invariance():
     """Geometry rotation leaves SphereSampleReadout Ea approximately invariant."""
     from enerzyme.models.escn import eSCNCore
-    from enerzyme.models.layers import SphereSampleReadout
+    from enerzyme.models.so3 import SphereSampleReadout
 
     torch.manual_seed(0)
     core = eSCNCore(

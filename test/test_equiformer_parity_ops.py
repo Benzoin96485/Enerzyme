@@ -37,7 +37,7 @@ def test_exp_normal_smearing_parity():
 
 def test_linear_rs_parity():
     from nets.tensor_product_rescale import LinearRS as OfficialLinearRS
-    from enerzyme.models.equiformer.tensor_product import LinearRS
+    from enerzyme.models.e3nn_nn import LinearRS
 
     dtype = torch.float64
     torch.manual_seed(1)
@@ -52,7 +52,7 @@ def test_linear_rs_parity():
 
 def test_layer_norm_v2_parity():
     from nets.layer_norm import EquivariantLayerNormV2 as OfficialNorm
-    from enerzyme.models.equiformer.norms import EquivariantLayerNormV2
+    from enerzyme.models.e3nn_nn import EquivariantLayerNormV2
 
     dtype = torch.float64
     torch.manual_seed(2)
@@ -106,7 +106,7 @@ def test_edge_degree_embedding_parity():
 
 def test_trans_block_parity():
     from nets.graph_attention_transformer import TransBlock as OfficialTransBlock
-    from enerzyme.models.equiformer.attention import TransBlock
+    from enerzyme.models.equiformer.interaction import TransBlock
 
     hp = make_parity_hparams()
     dtype = torch.float64

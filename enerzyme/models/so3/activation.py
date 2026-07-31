@@ -1,23 +1,9 @@
 # Copyright (c) EquiformerV2 authors (Liao et al., ICLR 2024).
 # Ported from https://github.com/atomicarchitects/equiformer_v2 (MIT License).
-"""Activations used by EquiformerV2 attention / FFN blocks."""
+"""SH-array activations used by EquiformerV2 attention / FFN blocks."""
 
 import torch
 import torch.nn as nn
-
-
-class SmoothLeakyReLU(torch.nn.Module):
-    def __init__(self, negative_slope=0.2):
-        super().__init__()
-        self.alpha = negative_slope
-
-    def forward(self, x):
-        x1 = ((1 + self.alpha) / 2) * x
-        x2 = ((1 - self.alpha) / 2) * x * (2 * torch.sigmoid(x) - 1)
-        return x1 + x2
-
-    def extra_repr(self):
-        return "negative_slope={}".format(self.alpha)
 
 
 class GateActivation(torch.nn.Module):

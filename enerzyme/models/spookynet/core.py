@@ -109,8 +109,6 @@ class SpookyNetCore(BaseFFCore):
                 self.output = Linear(dim_embedding, 2, bias=False)
         self.use_irreps = use_irreps
         self._sqrt2 = math.sqrt(2.0)
-        self._sqrt3 = math.sqrt(3.0)
-        self._sqrt3half = 0.5 * self._sqrt3
         self.module_keep_prob = 1 - dropout_rate
         self.calculate_distance: DistanceLayer = None
         self.range_separation: RangeSeparationLayer = None
@@ -154,23 +152,16 @@ class SpookyNetCore(BaseFFCore):
 
     def _atomic_properties_static(self, Dij_sr: Tensor, vij_sr: Tensor, batch_seg: Optional[Tensor]=None) -> Tuple[Tensor, Tensor, Optional[Tensor], int]:
         pij = vij_sr / Dij_sr.unsqueeze(-1)
-        if self.use_irreps:  # irreducible representation
-            try:
-                from e3nn.o3 import spherical_harmonics as sh
-                # strictly reproduction
-                dij = sh(2, pij[:, [1,2,0]], normalize=True, normalization="norm")[:, [0,3,1,2,4]] 
-            except ImportError:
-                dij = torch.stack(
-                    [
-                        self._sqrt3 * pij[:, 0] * pij[:, 1],  # xy
-                        self._sqrt3 * pij[:, 0] * pij[:, 2],  # xz
-                        self._sqrt3 * pij[:, 1] * pij[:, 2],  # yz
-                        0.5 * (3 * pij[:, 2] * pij[:, 2] - 1.0),  # z2
-                        self._sqrt3half
-                        * (pij[:, 0] * pij[:, 0] - pij[:, 1] * pij[:, 1]),  # x2-y2
-                    ],
-                    dim=-1,
-                )
+        if self.use_irreps:  # irreducible representation (chemistry d-orbital order)
+            from ..so3 import spherical_harmonics
+
+            # Unit directions already; tesseral core + spookynet_d layout (no e3nn remap).
+            dij = spherical_harmonics(
+                pij,
+                degrees=[2],
+                layout="spookynet_d",
+                normalize_input=False,
+            )
         else:  # reducible Cartesian functions
             dij = torch.stack(
                 [

@@ -4,8 +4,8 @@ import math
 import copy
 
 from torch.nn import Linear
-from ..so3 import SO3_Embedding
-from .radial_function import RadialFunction
+from .embedding import SO3_Embedding
+from ..blocks.radial_mlp import RadialFunction
 
 
 class SO2_m_Convolution(torch.nn.Module):

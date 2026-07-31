@@ -27,6 +27,14 @@ Currently supported model architectures:
 | Equiformer | internal |             ✅             |              ✅              |       ✅       |   via readout   | [ICLR 2023, arXiv:2206.11990](https://arxiv.org/abs/2206.11990) | [Github](https://github.com/atomicarchitects/equiformer) |
 | EquiformerV2 | internal |             ✅             |         via readout         |       ✅       |   via readout   | [ICLR 2024, arXiv:2306.12059](https://arxiv.org/abs/2306.12059) | [Github](https://github.com/atomicarchitects/equiformer_v2) |
 
+Shared equivariant tooling (for developers):
+
+- `enerzyme.models.so3` — SH-array / SPHC primitives (EquiformerV2, So3krates, eSCN-style SO2), including unified `spherical_harmonics(..., layout=...)`, array dropout, and `SphereSampleReadout`.
+- `enerzyme.models.e3nn_nn` — flat e3nn Irreps helpers (Equiformer V1, MACE): TP rescale, Gate/Activation, irreps LayerNorm / dropout, `irreps_tools`.
+- Representation-agnostic blocks: `activation.SmoothLeakyReLU`, `blocks.drop` (`GraphDropPath`), `blocks.radial_mlp`.
+
+Architecture packages keep `core.py` + `interaction.py` (plus embedding / input blocks as needed). Equiformer-specific readouts live in each package's `interaction.py` and are re-exported from `layers` for YAML layer-stack discovery.
+
 ## Usage
 
 See the Documentation at [ReadTheDocs](https://enerzyme.readthedocs.io/en/latest/) for getting started, user guide, API reference, and developer guide!

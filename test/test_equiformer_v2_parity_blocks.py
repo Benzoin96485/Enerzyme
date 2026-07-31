@@ -19,7 +19,7 @@ from equiformer_v2_parity_utils import (  # noqa: E402
 
 
 def test_feedforward_network_matches_upstream():
-    from enerzyme.models.equiformer_v2.transformer_block import (
+    from enerzyme.models.equiformer_v2.interaction import (
         FeedForwardNetwork as EZFFN,
     )
     from enerzyme.models.so3 import SO3_Embedding as EZEmb
@@ -59,7 +59,7 @@ def test_feedforward_network_matches_upstream():
 
 
 def test_transblock_v2_matches_upstream():
-    from enerzyme.models.equiformer_v2.transformer_block import TransBlockV2 as EZBlock
+    from enerzyme.models.equiformer_v2.interaction import TransBlockV2 as EZBlock
     from enerzyme.models.so3 import CoefficientMapping as EZMap
     from enerzyme.models.so3 import SO3_Embedding as EZEmb
     from enerzyme.models.so3 import SO3_Rotation as EZRot

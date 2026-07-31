@@ -10,17 +10,21 @@ from e3nn import o3
 from e3nn.util.jit import compile_mode
 from e3nn.nn.models.v2106.gate_points_message_passing import tp_path_exists
 
-from .norms import EquivariantLayerNormV2
-from .radial_func import RadialProfile
-from .tensor_product import (
+from ..e3nn_nn import EquivariantLayerNormV2
+from ..blocks.radial_mlp import RadialProfile
+from ..e3nn_nn import (
     TensorProductRescale,
     LinearRS,
     FullyConnectedTensorProductRescale,
     irreps2gate,
     sort_irreps_even_first,
+    Activation,
+    Gate,
+    EquivariantDropout,
+    EquivariantScalarsDropout,
 )
-from .fast_activation import Activation, Gate
-from .drop import EquivariantDropout, EquivariantScalarsDropout, GraphDropPath
+from ..blocks.drop import GraphDropPath
+from ..activation import SmoothLeakyReLU
 
 _RESCALE = True
 _USE_BIAS = True
@@ -31,21 +35,6 @@ def get_norm_layer(norm_type):
         return EquivariantLayerNormV2
     raise ValueError('Norm type {} not supported in Enerzyme Equiformer port (use layer).'.format(norm_type))
 
-class SmoothLeakyReLU(torch.nn.Module):
-    def __init__(self, negative_slope=0.2):
-        super().__init__()
-        self.alpha = negative_slope
-        
-    
-    def forward(self, x):
-        x1 = ((1 + self.alpha) / 2) * x
-        x2 = ((1 - self.alpha) / 2) * x * (2 * torch.sigmoid(x) - 1)
-        return x1 + x2
-    
-    
-    def extra_repr(self):
-        return 'negative_slope={}'.format(self.alpha)
-            
 
 def get_mul_0(irreps):
     mul_0 = 0
@@ -645,5 +634,161 @@ class TransBlock(torch.nn.Module):
         node_output = node_output + node_features
         
         return node_output
-    
-        
+
+# --- architecture-specific readout (layer-stack discoverable via layers re-export) ---
+
+from typing import Dict, List, Optional, Set
+
+from torch import Tensor
+from torch.nn import Module
+
+from ..layers._base_layer import BaseFFLayer
+from ..layers.readout import _resolve_feature_irreps, split_readout_field_outputs
+
+
+class EquiformerGraphAttentionReadout(BaseFFLayer):
+    """Equivariant GraphAttention head mapping full irreps → atomic scalars.
+
+    Unlike :class:`SimpleReadout` (0e extract + MLP), this consumes the full
+    ``atom_feature`` irreps tensor and graph edges, producing one 0e channel
+    per ``output_fields`` entry (e.g. ``Ea``, ``Qa``). Requires
+    ``feature_irreps`` from a prior equivariant Core.
+
+    With ``shallow_ensemble_size > 1``, the final GraphAttention ``LinearRS``
+    proj is widened and fields keep a trailing ensemble axis.
+    """
+
+    def __init__(
+        self,
+        output_fields: Set[str],
+        built_layers: List[Module],
+        irreps_head: str = "16x0e+8x1o+4x2e",
+        num_heads: int = 2,
+        fc_neurons: Optional[List[int]] = None,
+        irreps_sh: str = "1x0e+1x1e+1x2e",
+        irreps_node_attr: str = "1x0e",
+        irreps_pre_attn: Optional[str] = None,
+        rescale_degree: bool = False,
+        nonlinear_message: bool = True,
+        alpha_drop: float = 0.0,
+        proj_drop: float = 0.0,
+        feature_irreps: Optional[str] = None,
+        num_rbf: Optional[int] = None,
+        shallow_ensemble_size: int = 1,
+        **kwargs,
+    ) -> None:
+        from e3nn import o3
+
+        ordered = sorted(list(output_fields))
+        super().__init__(
+            input_fields={
+                "atom_feature",
+                "idx_i_sr",
+                "idx_j_sr",
+                "vij_sr",
+                "rbf",
+                "batch_seg",
+            },
+            output_fields=set(ordered),
+        )
+        self.ordered_output_fields = ordered
+        self.dim_feature_out = len(ordered)
+        self.shallow_ensemble_size = int(shallow_ensemble_size)
+
+        irreps_str = (
+            feature_irreps
+            if feature_irreps is not None
+            else _resolve_feature_irreps(built_layers)
+        )
+        if irreps_str is None:
+            raise ValueError(
+                "EquiformerGraphAttentionReadout requires feature_irreps "
+                "(from an equivariant Core) or an explicit feature_irreps=..."
+            )
+        self.feature_irreps = o3.Irreps(irreps_str)
+        self.irreps_edge_attr = o3.Irreps(irreps_sh)
+        self.irreps_node_attr = o3.Irreps(irreps_node_attr)
+
+        if fc_neurons is None:
+            fc_neurons = [64, 64]
+        if num_rbf is None:
+            num_rbf = 16
+            for layer in reversed(built_layers):
+                if hasattr(layer, "num_rbf"):
+                    num_rbf = int(layer.num_rbf)
+                    break
+                if hasattr(layer, "fc_neurons") and isinstance(layer.fc_neurons, list) and layer.fc_neurons:
+                    num_rbf = int(layer.fc_neurons[0])
+                    break
+        self.fc_neurons = [num_rbf] + list(fc_neurons)
+
+        n_out = self.dim_feature_out * self.shallow_ensemble_size
+        self.head = GraphAttention(
+            irreps_node_input=self.feature_irreps,
+            irreps_node_attr=self.irreps_node_attr,
+            irreps_edge_attr=self.irreps_edge_attr,
+            irreps_node_output=o3.Irreps(f"{n_out}x0e"),
+            fc_neurons=self.fc_neurons,
+            irreps_head=o3.Irreps(irreps_head),
+            num_heads=num_heads,
+            irreps_pre_attn=irreps_pre_attn,
+            rescale_degree=rescale_degree,
+            nonlinear_message=nonlinear_message,
+            alpha_drop=alpha_drop,
+            proj_drop=proj_drop,
+        )
+
+    def get_output(
+        self,
+        atom_feature: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+        vij_sr: Tensor,
+        rbf: Tensor,
+        batch_seg: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        from e3nn import o3
+
+        if atom_feature.ndim != 2:
+            raise ValueError(
+                "EquiformerGraphAttentionReadout expects 2D atom_feature "
+                f"(N, irreps.dim); got shape {tuple(atom_feature.shape)}"
+            )
+        if atom_feature.shape[-1] != self.feature_irreps.dim:
+            raise ValueError(
+                f"atom_feature last dim {atom_feature.shape[-1]} != "
+                f"feature_irreps.dim {self.feature_irreps.dim}"
+            )
+        n_atoms = atom_feature.shape[0]
+        if batch_seg is None:
+            batch_seg = torch.zeros(n_atoms, dtype=torch.long, device=atom_feature.device)
+        # Enerzyme edge convention: edge_src = idx_j, edge_dst = idx_i
+        edge_src = idx_j_sr
+        edge_dst = idx_i_sr
+        node_attr = torch.ones_like(atom_feature.narrow(1, 0, 1))
+        edge_sh = o3.spherical_harmonics(
+            l=self.irreps_edge_attr,
+            x=vij_sr,
+            normalize=True,
+            normalization="component",
+        )
+        outputs = self.head(
+            node_input=atom_feature,
+            node_attr=node_attr,
+            edge_src=edge_src,
+            edge_dst=edge_dst,
+            edge_attr=edge_sh,
+            edge_scalars=rbf,
+            batch=batch_seg,
+        )
+        expected_last = self.dim_feature_out * self.shallow_ensemble_size
+        if outputs.ndim != 2 or outputs.shape[-1] != expected_last:
+            raise ValueError(
+                f"GraphAttention output shape {tuple(outputs.shape)} != "
+                f"(N, {expected_last})"
+            )
+        return split_readout_field_outputs(
+            outputs,
+            self.ordered_output_fields,
+            self.shallow_ensemble_size,
+        )

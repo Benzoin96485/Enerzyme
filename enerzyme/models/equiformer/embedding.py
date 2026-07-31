@@ -6,9 +6,9 @@ import torch
 from torch_scatter import scatter
 from e3nn import o3
 
-from .tensor_product import LinearRS
-from .radial_func import RadialProfile
-from .attention import DepthwiseTensorProduct, _RESCALE, _USE_BIAS
+from ..e3nn_nn import LinearRS
+from ..blocks.radial_mlp import RadialProfile
+from .interaction import DepthwiseTensorProduct, _RESCALE, _USE_BIAS
 
 _MAX_ATOM_TYPE = 87  # Enerzyme default covers Z up to 86
 _AVG_DEGREE = 15.57930850982666

@@ -29,10 +29,10 @@ from ..so3 import (
     SO3_Grid,
     SO3_Rotation,
     init_edge_rot_mat,
+    get_normalization_layer,
 )
 from .input_block import EdgeDegreeEmbedding
-from .layer_norm import get_normalization_layer
-from .transformer_block import TransBlockV2
+from .interaction import TransBlockV2
 
 # Typical MD17 / small-molecule average degree (same ballpark as Equiformer V1).
 _AVG_DEGREE = 15.57930850982666
