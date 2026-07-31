@@ -289,6 +289,7 @@ Tests live in :code:`test/`:
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
+- :code:`test_efa.py` — ERoPE / Lebedev / EFABlock, batch isolation, :code:`efa` / :code:`so3lr_efa` / SpookyNet :code:`use_efa` smoke tests
 - :code:`test_sphere_sample_readout.py` — SphereSampleReadout shapes / scalar invariance smoke
 - :code:`test_scatter_speed.py` — performance-oriented scatter checks
 
@@ -422,6 +423,16 @@ SO3LR (:code:`so3lr`)
 ^^^^^^^^^^^^^^^^^^^^
 
 Kabylda et al. (JACS 2025) is registered as :code:`architecture: so3lr` but **reuses** :code:`So3kratesCore`. Defaults and layers live in :code:`enerzyme/models/so3krates/so3lr.py`. Physics uses shared modules with SO3LR options: :code:`ZBLRepulsionEnergy` (:code:`switch_off`), :code:`ElectrostaticEnergy` (:code:`flavor: SO3LR`), :code:`TSQDODispersionEnergy` under :code:`enerzyme/models/layers/dispersion/`, plus :code:`SimpleReadout(Qa)` / :code:`AtomicAffine` / :code:`HirshfeldReadout` / :code:`ChargeSpinEmbedding`. Grimme D3/D4 remain for PhysNet/SpookyNet stacks. Cutoff alias :code:`phys` → polynomial. Tests: :code:`test/test_so3lr.py`. Enerzymette: :code:`architecture: so3lr` + resolved :code:`config.yaml` (see :code:`enerzyme/config/so3lr_layers_example.yaml`).
+
+EFA (:code:`efa` / :code:`so3lr_efa`) and SpookyNet :code:`use_efa`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Frank et al. (arXiv:2412.08541) — shared package :code:`enerzyme/models/efa/` (ERoPE + Lebedev linear attention; Lebedev tables vendored from e3x Apache-2.0).
+
+* Register :code:`efa` / :code:`so3lr_efa` in :code:`get_ff_core` (both use :code:`So3kratesCore` with :code:`era_use_in_iterations`).
+* SpookyNet: Core / :code:`InteractionModule` flag :code:`use_efa` swaps :code:`NonlocalInteraction` for :code:`EFABlock` (pass :code:`Ra`).
+* Adding EFA to a **new** Core: (1) include :code:`Ra` and :code:`batch_seg` in Core :code:`input_fields`; (2) :code:`build_efa_blocks(...)` or construct :code:`EFABlock`; (3) after a local layer, :code:`x = x + apply_efa_if_configured(x, Ra, batch_seg, block)`. Keep EFA inside the Core, not as a post-core YAML physics layer.
+* Tests: :code:`test/test_efa.py`. Examples: :code:`efa_layers_example.yaml`, :code:`so3lr_efa_layers_example.yaml`.
 
 AllScAIP (:code:`AllScAIP`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^

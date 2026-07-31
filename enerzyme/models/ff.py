@@ -90,6 +90,16 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .so3krates.core import So3kratesCore as Core
         from .so3krates.so3lr import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "efa":
+        # So3krates Core + Euclidean Fast Attention on selected layers.
+        from .so3krates.core import So3kratesCore as Core
+        from .so3krates.efa import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    elif architecture.lower() == "so3lr_efa":
+        # SO3LR layer stack with EFA enabled on So3kratesCore.
+        from .so3krates.core import So3kratesCore as Core
+        from .so3krates.so3lr_efa import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     else:
         raise NotImplementedError(f"Architecture {architecture} not implemented")
     LOSS_REGISTER.update(special_loss)

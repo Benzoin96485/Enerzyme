@@ -45,6 +45,13 @@ Internal architectures
 |                |          |        |        |             | transformer;     |
 |                |          |        |        |             | SPHC ``χ``       |
 +----------------+----------+--------+--------+-------------+------------------+
+| EFA            | via      | via    | yes    | via         | So3krates +      |
+|                | readout  | readout|        | readout     | Euclidean Fast   |
+|                |          |        |        |             | Attention        |
++----------------+----------+--------+--------+-------------+------------------+
+| SO3LR+EFA      | via      | via    | yes    | via         | SO3LR stack +    |
+|                | readout  | readout|        | readout     | EFA nonlocal     |
++----------------+----------+--------+--------+-------------+------------------+
 
 External wrappers
 -----------------
@@ -66,6 +73,14 @@ External models are declared under :code:`Modelhub.external_FFs` with the same :
 **So3krates** (:code:`architecture: so3krates`) is a native port of Frank et al. (NeurIPS 2022) under :code:`enerzyme/models/so3krates/`, following the So3krates-torch EuclideanTransformer (fused FeatureBlock + GeometricBlock + InteractionBlock). Shared :code:`RealSphericalHarmonics` and :code:`L0Contraction` live in :code:`enerzyme/models/so3/`. The Core emits :code:`atom_feature` (invariant stream ``x``, :code:`feature_irreps: "Fx0e"`) and :code:`atom_sphere_feature` (SPHC ``χ`` with shape ``[N, m_tot]``, **not** eSCN/EquiformerV2's ``[N, (lmax+1)^2, C]`` — :code:`SphereSampleReadout` does not apply). Default stacks use :code:`BernsteinRBF` + :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force`. Long-range physics (ZBL / electrostatics / dispersion) belong in post-core layers, not inside the Core. Example: :code:`enerzyme/config/so3krates_layers_example.yaml`. Parity: :code:`test/test_so3krates_parity_ops.py`.
 
 **SO3LR** (:code:`architecture: so3lr`) is a So3krates **variant** (Kabylda et al., JACS 2025): the same :code:`So3kratesCore` plus charge/spin embeds and shared physics layers configured for SO3LR — :code:`ZBLRepulsionEnergy` with :code:`switch_off: 1.5`, :code:`ElectrostaticEnergy` with :code:`flavor: SO3LR` (``erf(r/σ)/r``, pretrained ``σ=4``), and :code:`TSQDODispersionEnergy` (Hirshfeld-scaled TS + vdW-QDO; **not** Grimme D3/D4). Post-core heads: :code:`SimpleReadout(Qa)` + :code:`AtomicAffine` (unit scale; element shift), :code:`HirshfeldReadout` (``ha``). Defaults match the public pretrained hyperparams (``r_max=4.5``, ``L≤4``, ``H=128``, ``T=3``, phys cutoff). Example: :code:`enerzyme/config/so3lr_layers_example.yaml`. Tests: :code:`test/test_so3lr.py`. Enerzymette only needs :code:`architecture: so3lr` plus a resolved :code:`config.yaml`.
+
+**Euclidean Fast Attention (EFA)** is a linear-scaling geometry-aware nonlocal plug-in (Frank et al., arXiv:2412.08541) implemented under :code:`enerzyme/models/efa/` (PyTorch; no JAX). Three wiring modes:
+
+1. **SpookyNet** — set Core :code:`use_efa: true` to replace geometry-free :code:`NonlocalInteraction` with :code:`EFABlock` (needs absolute :code:`Ra`). Default remains :code:`false` for checkpoint compatibility.
+2. **So3krates lineage** — :code:`architecture: efa` (So3krates + EFA) and :code:`architecture: so3lr_efa` (SO3LR stack + EFA). Both reuse :code:`So3kratesCore` with :code:`era_use_in_iterations` (e.g. ``[0, 1]``). EFA updates the **invariant** stream only; SPHC stays local.
+3. **Other / future Cores** — call :code:`EFABlock` or :code:`apply_efa_if_configured` on invariant ``[N, F]`` features with :code:`Ra` and :code:`batch_seg` (see developer guide). Do not feed eSCN/EquiformerV2 ``atom_sphere_feature`` layouts into L=0 EFA.
+
+Examples: :code:`enerzyme/config/efa_layers_example.yaml`, :code:`so3lr_efa_layers_example.yaml`. Tests: :code:`test/test_efa.py`.
 
 **UMA** (:code:`architecture: uma_qs`) requires the :code:`fairchem` package. The Core wraps Meta's UMA / eSCN-MD backbone as an atom descriptor under :code:`enerzyme/models/esen/` (name is historical; this is **not** the 2023 paper eSCN). Shared layers such as :code:`SimpleReadout`, :code:`HierachicalReadout`, and :code:`SpinConservation` predict atomic or molecular charge/spin outside the Core. Pair with :code:`aselmdb` datasets that provide :code:`Q` / :code:`S` (and optionally :code:`Qa` / :code:`Sa`).
 

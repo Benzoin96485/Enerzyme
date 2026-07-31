@@ -26,10 +26,14 @@ Currently supported model architectures:
 |  SchNet  | internal |             ✅             |              ✅              |       ❌       |  ✅       |  [NeurIPS 2017, arXiv: 1706.08566](https://arxiv.org/abs/1706.08566) | [Github](https://github.com/pyg-team/pytorch_geometric/blob/master/torch_geometric/nn/models/schnet.py) |
 | Equiformer | internal |             ✅             |              ✅              |       ✅       |   via readout   | [ICLR 2023, arXiv:2206.11990](https://arxiv.org/abs/2206.11990) | [Github](https://github.com/atomicarchitects/equiformer) |
 | EquiformerV2 | internal |             ✅             |         via readout         |       ✅       |   via readout   | [ICLR 2024, arXiv:2306.12059](https://arxiv.org/abs/2306.12059) | [Github](https://github.com/atomicarchitects/equiformer_v2) |
+| So3krates | internal |             ✅             |         via readout         |       ✅       |   via readout   | [NeurIPS 2022](https://proceedings.neurips.cc/paper_files/paper/2022/hash/bdcbe343e1768256db0c6480abd226bb-Abstract-Conference.html) | [So3krates-torch](https://github.com/TCPUniLU/So3krates-torch) |
+|   SO3LR   | internal |             ✅             |              ✅              |       ✅       |   via readout   | [JACS 2025](https://pubs.acs.org/doi/10.1021/jacs.4c17015) | [so3lr](https://github.com/general-molecular-simulation/so3lr) |
+| EFA / SO3LR+EFA | internal |             ✅             |     via readout / SO3LR     |       ✅       |   via readout   | [arXiv:2412.08541](https://arxiv.org/abs/2412.08541) | [euclidean_fast_attention](https://github.com/thorben-frank/euclidean_fast_attention) |
 
 Shared equivariant tooling (for developers):
 
 - `enerzyme.models.so3` — SH-array / SPHC primitives (EquiformerV2, So3krates, eSCN-style SO2), including unified `spherical_harmonics(..., layout=...)`, array dropout, and `SphereSampleReadout`.
+- `enerzyme.models.efa` — Euclidean Fast Attention (ERoPE + Lebedev linear nonlocal): SpookyNet `use_efa`, architectures `efa` / `so3lr_efa`, or hook any Core via `EFABlock` / `apply_efa_if_configured` on invariant features + `Ra` + `batch_seg`.
 - `enerzyme.models.e3nn_nn` — flat e3nn Irreps helpers (Equiformer V1, MACE): TP rescale, Gate/Activation, irreps LayerNorm / dropout, `irreps_tools`.
 - Representation-agnostic blocks: `activation.SmoothLeakyReLU`, `blocks.drop` (`GraphDropPath`), `blocks.radial_mlp`.
 
