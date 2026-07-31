@@ -1,4 +1,4 @@
-"""Shared SO(3) / SO(2) primitives for equivariant GNNs (eSCN, EquiformerV2, So3krates, …).
+"""Shared SO(3) / SO(2) primitives for equivariant GNNs (eSCN, EquiformerV2, EquiformerV3, So3krates, …).
 
 These modules are adapted from fairchem v1 eSCN (Passaro & Zitnick, *Reducing SO(3)
 Convolutions to SO(2)*, 2023) with EquiformerV2 extensions (``get_rotate_inv_rescale``,
@@ -13,6 +13,29 @@ keep the fairchem ``eSCNMD*`` checkpoint path.
 """
 
 from .activation import GateActivation, S2Activation, SeparableS2Activation
+
+from .activation_v3 import (
+    get_activation,
+    check_activation_name,
+    has_scalars,
+    add_dropout,
+    prepare_activation_forward_param,
+    LinearSwiGLU,
+    LinearSquare,
+    SwiGLU,
+    SeparableGateS2Activation_SwiGLU_Merge,
+)
+from .envelope import PolynomialEnvelope
+from .softmax import GraphSoftmax, SoftCap
+from .so2_ops import SO2Linear, SO2MLinear
+from .linear import SO3Linear
+from .layer_norm import (
+    EquivariantMergeLayerNorm,
+    EquivariantSeparableLayerNorm,
+    RMSNorm,
+)
+from .rotation_fused import SO3RotationFused, CoefficientMappingModule
+from .grid_resolved import SO3GridResolved
 from .coefficient_mapping import CoefficientMapping
 from .drop import EquivariantDropoutArraySphericalHarmonics
 from .embedding import SO3_Embedding
@@ -61,6 +84,25 @@ __all__ = [
     "init_edge_rot_mat",
     "load_cgmatrix",
     "spherical_harmonics",
+    "PolynomialEnvelope",
+    "GraphSoftmax",
+    "SoftCap",
+    "SO2Linear",
+    "SO2MLinear",
+    "SO3Linear",
+    "EquivariantMergeLayerNorm",
+    "EquivariantSeparableLayerNorm",
+    "RMSNorm",
+    "SO3RotationFused",
+    "CoefficientMappingModule",
+    "SO3GridResolved",
+    "get_activation",
+    "check_activation_name",
+    "has_scalars",
+    "add_dropout",
+    "prepare_activation_forward_param",
+    "LinearSwiGLU",
+    "SwiGLU",
 ]
 
 

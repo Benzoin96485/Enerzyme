@@ -40,6 +40,11 @@ Internal architectures
 |                |          |        |        |             | higher ``lmax``  |
 |                |          |        |        |             | with ``mmax``    |
 +----------------+----------+--------+--------+-------------+------------------+
+| EquiformerV3   | via      | via    | yes    | via         | Merged LN +      |
+|                | readout  | readout|        | readout     | SwiGLU-S² +      |
+|                |          |        |        |             | smooth-cutoff    |
+|                |          |        |        |             | attention        |
++----------------+----------+--------+--------+-------------+------------------+
 | So3krates      | via      | via    | yes    | via         | Dual-stream      |
 |                | readout  | readout|        | readout     | Euclidean        |
 |                |          |        |        |             | transformer;     |
@@ -70,6 +75,8 @@ External models are declared under :code:`Modelhub.external_FFs` with the same :
 
 **EquiformerV2** (:code:`architecture: equiformer_v2`) is a native port of Liao et al. (ICLR 2024) under :code:`enerzyme/models/equiformer_v2/`. It reuses shared :code:`enerzyme/models/so3/` (with EquiformerV2 ``mmax`` rescale / component grids / :code:`SO3_LinearV2`) and implements SO(2) equivariant graph attention + S²/gate feed-forward blocks. The Core emits the same latent contract as eSCN (:code:`atom_feature` / :code:`atom_sphere_feature`). Default production stacks use :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout` wraps the paper energy FFN on :code:`atom_sphere_feature`. All external EquiformerV2 readouts accept :code:`shallow_ensemble_size` (widen last linear → :code:`ShallowEnsembleReduce`). Distinct from Equiformer V1 (e3nn TP attention) and from paper eSCN (message SO(2) without transformer attention). Examples: :code:`enerzyme/config/equiformer_v2_layers_example.yaml`, :code:`equiformer_v2_ffn_readout_example.yaml`, :code:`equiformer_v2_shallow_ensemble_example.yaml`. Parity vs vendored upstream nets: :code:`test/test_equiformer_v2_parity_*.py`.
 
+**EquiformerV3** (:code:`architecture: equiformer_v3`) is a native port of Liao et al. (2026, arXiv:2604.09130) under :code:`enerzyme/models/equiformer_v3/`. It extends shared :code:`so3/` with merged layer norm, SwiGLU-S² activations, fused SO(2) linears (:code:`SO2Linear`), polynomial attention envelopes, and asymmetric S² grids. The Core keeps the same :code:`atom_feature` / :code:`atom_sphere_feature` contract as eSCN/V2. Default stacks use :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force` (DeNS / stress / direct force heads stay outside the Core). Example: :code:`enerzyme/config/equiformer_v3_layers_example.yaml`. Parity: :code:`test/test_equiformer_v3_parity_*.py`. Enerzymette only needs :code:`architecture: equiformer_v3` plus a resolved :code:`config.yaml`.
+
 **So3krates** (:code:`architecture: so3krates`) is a native port of Frank et al. (NeurIPS 2022) under :code:`enerzyme/models/so3krates/`, following the So3krates-torch EuclideanTransformer (fused FeatureBlock + GeometricBlock + InteractionBlock). Shared :code:`RealSphericalHarmonics` and :code:`L0Contraction` live in :code:`enerzyme/models/so3/`. The Core emits :code:`atom_feature` (invariant stream ``x``, :code:`feature_irreps: "Fx0e"`) and :code:`atom_sphere_feature` (SPHC ``χ`` with shape ``[N, m_tot]``, **not** eSCN/EquiformerV2's ``[N, (lmax+1)^2, C]`` — :code:`SphereSampleReadout` does not apply). Default stacks use :code:`BernsteinRBF` + :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force`. Long-range physics (ZBL / electrostatics / dispersion) belong in post-core layers, not inside the Core. Example: :code:`enerzyme/config/so3krates_layers_example.yaml`. Parity: :code:`test/test_so3krates_parity_ops.py`.
 
 **SO3LR** (:code:`architecture: so3lr`) is a So3krates **variant** (Kabylda et al., JACS 2025): the same :code:`So3kratesCore` plus charge/spin embeds and shared physics layers configured for SO3LR — :code:`ZBLRepulsionEnergy` with :code:`switch_off: 1.5`, :code:`ElectrostaticEnergy` with :code:`flavor: SO3LR` (``erf(r/σ)/r``, pretrained ``σ=4``), and :code:`TSQDODispersionEnergy` (Hirshfeld-scaled TS + vdW-QDO; **not** Grimme D3/D4). Post-core heads: :code:`SimpleReadout(Qa)` + :code:`AtomicAffine` (unit scale; element shift), :code:`HirshfeldReadout` (``ha``). Defaults match the public pretrained hyperparams (``r_max=4.5``, ``L≤4``, ``H=128``, ``T=3``, phys cutoff). Example: :code:`enerzyme/config/so3lr_layers_example.yaml`. Tests: :code:`test/test_so3lr.py`. Enerzymette only needs :code:`architecture: so3lr` plus a resolved :code:`config.yaml`.
@@ -99,7 +106,7 @@ Selection guidelines
     PhysNet or SpookyNet — long-range electrostatics, optional dispersion layers.
 
 **Maximum accuracy on diverse geometries**
-    MACE, NequIP, Equiformer, EquiformerV2, or So3krates — equivariant message passing; tune cutoff and depth.
+    MACE, NequIP, Equiformer, EquiformerV2, EquiformerV3, or So3krates — equivariant message passing; tune cutoff and depth.
     Equiformer uses SO(3) graph attention (default MD17-style stack with ``ExpNormalSmearing``
     and :code:`output_mode: feature` emitting full irreps plus :code:`feature_irreps`;
     production default is :code:`SimpleReadout` with :code:`head_type: two_layer` after 0e
@@ -107,12 +114,16 @@ Selection guidelines
     fewer layers for enzyme-scale clusters. EquiformerV2 uses SO(2)-reduced attention
     (default :code:`GaussianSmearing` + :code:`atom_feature` / :code:`atom_sphere_feature`)
     and scales more easily to higher :code:`lmax` with truncated :code:`mmax`.
+    EquiformerV3 adds merged LN, SwiGLU-S², and smooth-cutoff attention on the same
+    latent contract (default :code:`norm_type: merge_layer_norm`,
+    :code:`attn/ffn_activation: sep-merge_gates2_swiglu`, :code:`use_envelope: true`).
     So3krates uses dual-stream geometric attention
     (invariants + SPHC; default :code:`BernsteinRBF` + :code:`architecture: so3krates`).
     Charge/dipole use shared readouts outside the Core. Numerical fidelity against the
     official Equiformer MD17 path is covered by :code:`test/test_equiformer_parity_*.py`
     (operator / latent / direct E·F / gradient checks — not the production SimpleReadout stack);
     EquiformerV2 ops/blocks by :code:`test/test_equiformer_v2_parity_*.py`;
+    EquiformerV3 ops/blocks by :code:`test/test_equiformer_v3_parity_*.py`;
     So3krates by :code:`test/test_so3krates_parity_ops.py`.
 
 **Active learning with force variance**

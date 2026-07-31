@@ -136,16 +136,18 @@ pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …); use
 direct vector path. See :code:`enerzyme/config/escn_sphere_readout_example.yaml`.
 Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`).
 
-EquiformerV2 and modular readouts
----------------------------------
+EquiformerV2 / EquiformerV3 and modular readouts
+-----------------------------------------------
 
-With :code:`architecture: equiformer_v2`, the Core returns the same latent pair as eSCN
+With :code:`architecture: equiformer_v2` or :code:`equiformer_v3`, the Core returns the same latent pair as eSCN
 (:code:`atom_feature` as :code:`l=0` scalars with :code:`feature_irreps: "Cx0e"`, plus
 :code:`atom_sphere_feature`). Default stacks use :code:`SimpleReadout` →
 :code:`EnergyReduce` → :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout`
 applies the paper sphere FFN energy head to :code:`atom_sphere_feature` (instead of
-:code:`SimpleReadout`). Shared :code:`so3` primitives provide component-normalized
-grids and :code:`mmax < lmax` rotate-back rescale used by SO(2) attention.
+:code:`SimpleReadout`; also usable after EquiformerV3 when the Core exposes the same
+sphere layout). Shared :code:`so3` primitives provide component-normalized
+grids, :code:`mmax < lmax` rotate-back rescale, and EquiformerV3 additions
+(merged LN, SwiGLU-S², :code:`PolynomialEnvelope` / :code:`GraphSoftmax`).
 All external Equiformer / EquiformerV2 readouts
 (:code:`SimpleReadout` including :code:`equiformer_linear_rs`,
 :code:`EquiformerGraphAttentionReadout`, :code:`EquiformerV2FeedForwardReadout`)
@@ -154,6 +156,7 @@ accept :code:`shallow_ensemble_size` on the last linear head; pair with
 :code:`enerzyme/config/equiformer_v2_layers_example.yaml`,
 :code:`equiformer_v2_ffn_readout_example.yaml`,
 :code:`equiformer_v2_shallow_ensemble_example.yaml`,
+:code:`equiformer_v3_layers_example.yaml`,
 :code:`equiformer_shallow_ensemble_example.yaml`.
 
 So3krates and modular readouts
