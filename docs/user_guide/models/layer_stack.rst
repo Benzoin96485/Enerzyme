@@ -139,7 +139,7 @@ Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`).
 EquiformerV2 / EquiformerV3 and modular readouts
 -----------------------------------------------
 
-With :code:`architecture: equiformer_v2` or :code:`equiformer_v3`, the Core returns the same latent pair as eSCN
+With :code:`architecture: equiformer_v2`, :code:`equiformer_v3`, or :code:`dpa4`, the Core returns the same latent pair as eSCN
 (:code:`atom_feature` as :code:`l=0` scalars with :code:`feature_irreps: "Cx0e"`, plus
 :code:`atom_sphere_feature`). Default stacks use :code:`SimpleReadout` →
 :code:`EnergyReduce` → :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout`
@@ -158,6 +158,7 @@ accept :code:`shallow_ensemble_size` on the last linear head; pair with
 :code:`equiformer_v2_ffn_readout_example.yaml`,
 :code:`equiformer_v2_shallow_ensemble_example.yaml`,
 :code:`equiformer_v3_layers_example.yaml`,
+:code:`dpa4_layers_example.yaml`,
 :code:`equiformer_shallow_ensemble_example.yaml`.
 
 So3krates and modular readouts
