@@ -56,10 +56,20 @@ Modelhub:
             cutoff_fn: phys
         - name: SimpleReadout
           params:
-            output_fields: [Ea]
+            output_fields: [Ea, Qa]
             head_type: dense
             keep_feature: true
-        - name: PartialChargeReadout
+        # Qa element bias ≡ SO3LR Emb(Za); leave Ea untouched (scale fixed at 1).
+        - name: AtomicAffine
+          params:
+            shifts:
+              Qa:
+                values: 0.0
+                learnable: true
+            scales:
+              Qa:
+                values: 1.0
+                learnable: false
         - name: ChargeConservation
         - name: HirshfeldReadout
         - name: ZBLRepulsionEnergy

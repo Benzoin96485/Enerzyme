@@ -32,7 +32,7 @@ from .readout import (
     VelocityReadout,
     EquiformerGraphAttentionReadout,
     EquiformerV2FeedForwardReadout,
+    HirshfeldReadout,
 )
 from .sphere_sample_readout import SphereSampleReadout
 from .charge_spin_embedding import ChargeSpinEmbeddingLayer
-from .so3lr_readout import PartialChargeReadout, HirshfeldReadout

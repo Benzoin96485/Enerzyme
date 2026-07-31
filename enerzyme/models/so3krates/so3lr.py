@@ -53,12 +53,19 @@ DEFAULT_LAYER_PARAMS = [
     {
         "name": "SimpleReadout",
         "params": {
-            "output_fields": ["Ea"],
+            "output_fields": ["Ea", "Qa"],
             "head_type": "dense",
             "keep_feature": True,
         },
     },
-    {"name": "PartialChargeReadout"},
+    # SO3LR partial charges ≡ Linear(x) + Emb(Za); AtomicAffine only shifts Qa (scale=1).
+    {
+        "name": "AtomicAffine",
+        "params": {
+            "shifts": {"Qa": {"values": 0.0, "learnable": True}},
+            "scales": {"Qa": {"values": 1.0, "learnable": False}},
+        },
+    },
     {"name": "ChargeConservation"},
     {"name": "HirshfeldReadout"},
     {"name": "ZBLRepulsionEnergy", "params": {"switch_off": 1.5}},

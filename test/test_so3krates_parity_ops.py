@@ -43,7 +43,7 @@ def test_l0_contraction_matches_upstream():
 
 
 def test_filternet_matches_upstream():
-    from enerzyme.models.so3krates.euclidean_transformer import FilterNet as EZFN
+    from enerzyme.models.so3krates.interaction import FilterNet as EZFN
     from upstream_blocks import FilterNet as OffFN
 
     torch.manual_seed(2)
@@ -57,7 +57,7 @@ def test_filternet_matches_upstream():
 
 
 def test_interaction_block_matches_upstream():
-    from enerzyme.models.so3krates.euclidean_transformer import (
+    from enerzyme.models.so3krates.interaction import (
         InteractionBlock as EZIB,
     )
     from upstream_blocks import InteractionBlock as OffIB
@@ -77,7 +77,7 @@ def test_interaction_block_matches_upstream():
 
 
 def test_attention_block_matches_upstream():
-    from enerzyme.models.so3krates.euclidean_transformer import (
+    from enerzyme.models.so3krates.interaction import (
         EuclideanAttentionBlock as EZAtt,
         FilterNet as EZFN,
     )

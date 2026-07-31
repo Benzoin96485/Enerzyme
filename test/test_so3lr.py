@@ -163,18 +163,48 @@ def test_tsqdo_rejects_za_beyond_table():
     assert e.shape == (2,)
 
 
-def test_hirshfeld_and_partial_charge_shapes():
-    from enerzyme.models.layers import HirshfeldReadout, PartialChargeReadout
+def test_hirshfeld_readout_shapes():
+    from enerzyme.models.layers import HirshfeldReadout
 
     F = 8
     N = 4
     za = torch.randint(1, 10, (N,))
     feat = torch.randn(N, F)
-    qa = PartialChargeReadout(dim_embedding=F).get_Qa(feat, za)
     ha = HirshfeldReadout(dim_embedding=F).get_ha(feat, za)
-    assert qa.shape == (N,)
     assert ha.shape == (N,)
     assert torch.all(ha >= 0)
+
+
+def test_so3lr_partial_charge_simple_readout_atomic_affine():
+    """SO3LR charge head: Qa = Linear(x) + shift[Za] via SimpleReadout + AtomicAffine."""
+    from enerzyme.models.layers import AtomicAffineLayer
+    from enerzyme.models.layers.readout import SimpleReadout
+
+    torch.manual_seed(0)
+    F, N, max_Za = 8, 6, 20
+    za = torch.randint(1, max_Za + 1, (N,))
+    feat = torch.randn(N, F)
+
+    readout = SimpleReadout(
+        output_fields={"Qa"},
+        built_layers=[],
+        dim_embedding=F,
+        head_type="dense",
+    )
+    affine = AtomicAffineLayer(
+        max_Za=max_Za,
+        shifts={"Qa": {"values": 0.0, "learnable": True}},
+        scales={"Qa": {"values": 1.0, "learnable": False}},
+    )
+
+    with torch.no_grad():
+        torch.nn.init.normal_(affine.shifts["Qa"], mean=0.0, std=1.0)
+        affine.scales["Qa"].fill_(1.0)
+
+    qa_ref = readout.get_output(feat)["Qa"] + affine.shifts["Qa"][za]
+    qa_out = affine.get_output(Za=za, Qa=readout.get_output(feat)["Qa"])["Qa"]
+    assert_allclose(qa_out.detach().numpy(), qa_ref.detach().numpy(), rtol=1e-6, atol=1e-6)
+
 
 
 def test_charge_spin_embedding_shapes():
@@ -248,12 +278,18 @@ def test_so3lr_build_model_energy_force_finite():
         {
             "name": "SimpleReadout",
             "params": {
-                "output_fields": ["Ea"],
+                "output_fields": ["Ea", "Qa"],
                 "head_type": "dense",
                 "keep_feature": True,
             },
         },
-        {"name": "PartialChargeReadout"},
+        {
+            "name": "AtomicAffine",
+            "params": {
+                "shifts": {"Qa": {"values": 0.0, "learnable": True}},
+                "scales": {"Qa": {"values": 1.0, "learnable": False}},
+            },
+        },
         {"name": "ChargeConservation"},
         {"name": "HirshfeldReadout"},
         {"name": "ZBLRepulsionEnergy", "params": {"switch_off": 1.5}},
