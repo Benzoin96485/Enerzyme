@@ -35,6 +35,9 @@ From :code:`enerzyme/models/layers/`:
     :code:`EquiformerGraphAttentionReadout` — separate GraphAttention head over full
     irreps + graph edges (not mixed into SimpleReadout); use when you want an
     attention-style multi-field atomic scalar head.
+    Equiformer-series external readouts (including LinearRS / GraphAttention /
+    :code:`EquiformerV2FeedForwardReadout`) accept :code:`shallow_ensemble_size`
+    by widening the last linear layer.
 
 Typical charge-aware stack
 --------------------------
@@ -130,13 +133,33 @@ pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …); use
 direct vector path. See :code:`enerzyme/config/escn_sphere_readout_example.yaml`.
 Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`).
 
+EquiformerV2 and modular readouts
+---------------------------------
+
+With :code:`architecture: equiformer_v2`, the Core returns the same latent pair as eSCN
+(:code:`atom_feature` as :code:`l=0` scalars with :code:`feature_irreps: "Cx0e"`, plus
+:code:`atom_sphere_feature`). Default stacks use :code:`SimpleReadout` →
+:code:`EnergyReduce` → :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout`
+applies the paper sphere FFN energy head to :code:`atom_sphere_feature` (instead of
+:code:`SimpleReadout`). Shared :code:`so3` primitives provide component-normalized
+grids and :code:`mmax < lmax` rotate-back rescale used by SO(2) attention.
+All external Equiformer / EquiformerV2 readouts
+(:code:`SimpleReadout` including :code:`equiformer_linear_rs`,
+:code:`EquiformerGraphAttentionReadout`, :code:`EquiformerV2FeedForwardReadout`)
+accept :code:`shallow_ensemble_size` on the last linear head; pair with
+:code:`ShallowEnsembleReduce`. Examples:
+:code:`enerzyme/config/equiformer_v2_layers_example.yaml`,
+:code:`equiformer_v2_ffn_readout_example.yaml`,
+:code:`equiformer_v2_shallow_ensemble_example.yaml`,
+:code:`equiformer_shallow_ensemble_example.yaml`.
+
 So3krates and modular readouts
 ------------------------------
 
 With :code:`architecture: so3krates`, the Core returns :code:`atom_feature` (invariant
 stream ``x``, :code:`feature_irreps: "Fx0e"`) and :code:`atom_sphere_feature` (SPHC
-``χ`` with shape :code:`[N, m_tot]`). This SPHC layout is **not** the eSCN
-:code:`[N, (lmax+1)^2, C]` tensor — do not attach :code:`SphereSampleReadout`.
+``χ`` with shape :code:`[N, m_tot]`). This SPHC layout is **not** the eSCN /
+EquiformerV2 :code:`[N, (lmax+1)^2, C]` tensor — do not attach :code:`SphereSampleReadout`.
 Default stacks use :code:`BernsteinRBF` + :code:`SimpleReadout` → :code:`EnergyReduce`
 → :code:`Force`. Optional ZBL / electrostatics / dispersion are post-core layers
 (same as PhysNet / SpookyNet), not part of the Core. Example:

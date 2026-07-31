@@ -1,0 +1,59 @@
+# Equiformer (V1) with shallow ensemble on SimpleReadout.
+# Use architecture: Equiformer under Modelhub.internal_FFs.
+#
+# Other heads also accept shallow_ensemble_size:
+#   head_type: equiformer_linear_rs
+#   or replace SimpleReadout with EquiformerGraphAttentionReadout
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: Equiformer
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 16
+        max_Za: 86
+        cutoff_sr: 5.0
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+        irreps_node_embedding: "32x0e+16x1e+8x2e"
+      layers:
+        - name: RangeSeparation
+          params:
+            cutoff_fn: polynomial
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: EquiformerNodeEmbedding
+          params:
+            irreps_node_embedding: "32x0e+16x1e+8x2e"
+        - name: Core
+          params:
+            irreps_node_embedding: "32x0e+16x1e+8x2e"
+            irreps_feature: "64x0e"
+            irreps_sh: "1x0e+1x1e+1x2e"
+            irreps_head: "16x0e+8x1o+4x2e"
+            irreps_mlp_mid: "32x0e+16x1e+8x2e"
+            num_layers: 2
+            num_heads: 2
+            fc_neurons: [64, 64]
+            nonlinear_message: true
+            output_mode: feature
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            activation_fn: swish
+            shallow_ensemble_size: 4
+            keep_feature: false
+        - name: EnergyReduce
+        - name: ShallowEnsembleReduce
+          params:
+            var: [E]
+            train_only: true
+        - name: Force
+        - name: ShallowEnsembleReduce
+          params:
+            var: [E, Fa]
+            eval_only: true

@@ -1,0 +1,50 @@
+# EquiformerV2 with shallow ensemble on SimpleReadout.
+# Use architecture: equiformer_v2 under Modelhub.internal_FFs.
+#
+# EquiformerV2FeedForwardReadout also accepts shallow_ensemble_size
+# (see equiformer_v2_ffn_readout_example.yaml).
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: equiformer_v2
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: GaussianSmearing
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            sphere_channels: 64
+            attn_hidden_channels: 64
+            num_heads: 4
+            attn_alpha_channels: 32
+            attn_value_channels: 16
+            ffn_hidden_channels: 128
+            lmax: 2
+            mmax: 2
+            num_layers: 2
+            edge_channels: 64
+            norm_type: rms_norm_sh
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            shallow_ensemble_size: 4
+            keep_feature: false
+        - name: EnergyReduce
+        - name: ShallowEnsembleReduce
+          params:
+            var: [E]
+            train_only: true
+        - name: Force
+        - name: ShallowEnsembleReduce
+          params:
+            var: [E, Fa]
+            eval_only: true

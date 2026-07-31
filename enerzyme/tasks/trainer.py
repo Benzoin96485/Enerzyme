@@ -36,23 +36,6 @@ DTYPE_MAPPING = {
 }
 
 
-def _to_device_and_dtype(module: Module, device: Optional[torch.device], dtype: torch.dtype) -> Module:
-    """Move module to device and convert floating-point params/buffers to dtype.
-
-    Preserves integer buffers (e.g. index tensors like expand_index) as-is.
-    model.type(dtype) would incorrectly convert them to float and break index_select.
-    """
-    if device is not None:
-        module = module.to(device)
-    for param in module.parameters():
-        if param.is_floating_point():
-            param.data = param.data.to(dtype)
-    for name, buf in module.named_buffers():
-        if buf.is_floating_point():
-            module._buffers[name] = buf.to(dtype)
-    return module
-
-
 def _modify_lightning_state_dict(lightning_ckpt_path: str, patience: int) -> None:
     '''
     Modify the patience of the EarlyStopping callback in the Lightning checkpoint.
@@ -445,7 +428,7 @@ class Trainer:
             logger.info("Using Lightning Trainer")
             from .lightning_utils import LightningModel
             lightning_model = LightningModel(
-                _to_device_and_dtype(model, None, self.dtype), loss_terms, dump_dir,
+                model.to(dtype=self.dtype), loss_terms, dump_dir,
                 optimizer, scheduler,
                 monitor=self.monitor,
                 transform=transform,
@@ -494,7 +477,7 @@ class Trainer:
                 )
                 self.lightning_trainer.test(model, test_dataloader)
         else:
-            model = _to_device_and_dtype(model, self.device, self.dtype)
+            model = model.to(device=self.device, dtype=self.dtype)
             if self.use_ema:
                 ema = ExponentialMovingAverage(
                     model.parameters(), 
@@ -679,7 +662,7 @@ class Trainer:
     
     def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None, test_mode: bool=False) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
         self._set_seed(self.seed)
-        model = _to_device_and_dtype(model, self.device, self.dtype)
+        model = model.to(device=self.device, dtype=self.dtype)
         if load_model == True:
             from ..models import get_pretrain_path
             pretrain_path = get_pretrain_path(dump_dir, "best", model_rank)

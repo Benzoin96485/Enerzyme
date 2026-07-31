@@ -31,5 +31,6 @@ from .readout import (
     HierachicalNSEReadout,
     VelocityReadout,
     EquiformerGraphAttentionReadout,
+    EquiformerV2FeedForwardReadout,
 )
 from .sphere_sample_readout import SphereSampleReadout
