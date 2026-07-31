@@ -43,7 +43,8 @@ class ChargeSpinEmbeddingLayer(BaseFFLayer):
         self.attribute = attribute
         self.dim_embedding = dim_embedding
         self.max_Za = max_Za
-        self.num_elements = max_Za + 1
+        # So3krates-torch / SO3LR: z_table = [1..num_elements], one-hot index = Za - 1.
+        self.num_elements = max_Za
         act = SiLU if activation_fn is None else activation_fn
 
         self.Wq = Linear(self.num_elements, dim_embedding, bias=False)
@@ -80,9 +81,9 @@ class ChargeSpinEmbeddingLayer(BaseFFLayer):
                 device=Za.device,
             )
         psi = psi.to(dtype=torch.get_default_dtype())
-        one_hot = F.one_hot(Za.long().clamp(min=0, max=self.max_Za), self.num_elements).to(
-            dtype=psi.dtype
-        )
+        # Index 0 ↔ Z=1 (H), matching So3krates-torch AtomicNumberTable([1..N]).
+        z_idx = (Za.long() - 1).clamp(min=0, max=self.num_elements - 1)
+        one_hot = F.one_hot(z_idx, self.num_elements).to(dtype=psi.dtype)
         q = self.Wq(one_hot)
         # Floor-div by +inf: 0 if psi >= 0, -1 if psi < 0 (indexes last Wk/Wv row).
         idx = torch.div(

@@ -125,9 +125,30 @@ def test_charge_spin_embedding_shapes():
     za = torch.randint(1, 8, (N,))
     batch = torch.tensor([0, 0, 0, 1, 1])
     q = torch.tensor([0.0, 1.0])
-    emb = ChargeSpinEmbeddingLayer(dim_embedding=F, attribute="charge")
+    emb = ChargeSpinEmbeddingLayer(dim_embedding=F, max_Za=118, attribute="charge")
     out = emb.get_output(Za=za, batch_seg=batch, Q=q)
     assert out["charge_embedding"].shape == (N, F)
+    assert emb.Wq.in_features == 118  # So3krates-torch num_elements, index Za-1
+
+
+def test_charge_spin_one_hot_matches_z_table_convention():
+    """Wq column for hydrogen must be index 0 (Za-1), not Za."""
+    from enerzyme.models.layers import ChargeSpinEmbeddingLayer
+
+    layer = ChargeSpinEmbeddingLayer(dim_embedding=4, max_Za=10, attribute="charge")
+    with torch.no_grad():
+        layer.Wq.weight.zero_()
+        layer.Wq.weight[:, 0] = 1.0  # H column
+        layer.Wk.zero_()
+        layer.Wv.zero_()
+        layer.Wv[0] = 1.0
+        for m in layer.mlp:
+            if hasattr(m, "weight"):
+                m.weight.zero_()
+    za = torch.tensor([1, 2])
+    batch = torch.zeros(2, dtype=torch.long)
+    out = layer.get_output(Za=za, batch_seg=batch, Q=torch.tensor([1.0]))
+    assert out["charge_embedding"].shape == (2, 4)
 
 
 def test_so3lr_build_model_energy_force_finite():
