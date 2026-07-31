@@ -833,12 +833,20 @@ class SingleDataHub:
         return FieldDataset({k: v for k, v in self.data.items() if k in self.target_types})
 
 
-def _coerce_dataset_params(dataset_params: Dict[str, Any]) -> Dict[str, Any]:
+def _coerce_dataset_params(
+    dataset_params: Dict[str, Any],
+    global_transforms: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Map YAML per-dataset ``transforms`` onto ``SingleDataHub.preprocessings``.
 
     Historical multi-dataset configs use ``transforms:`` under each dataset entry,
     but :class:`SingleDataHub` expects ``preprocessings``. Explicit ``preprocessings``
-    wins on key conflicts.
+    wins on key conflicts with remapped ``transforms``.
+
+    Keys already present in ``global_transforms`` are omitted from the remapped
+    preprocessings so overlapping AL configs (same dict under both) are not
+    applied twice. When values differ, ``global_transforms`` wins and a warning
+    is logged.
     """
     params = dict(dataset_params)
     transforms = params.pop("transforms", None)
@@ -849,7 +857,25 @@ def _coerce_dataset_params(dataset_params: Dict[str, Any]) -> Dict[str, Any]:
             merged.update(existing)
             params["preprocessings"] = merged
         else:
-            params["preprocessings"] = transforms
+            params["preprocessings"] = dict(transforms)
+    preprocessings = params.get("preprocessings")
+    if preprocessings and global_transforms:
+        kept = {}
+        for key, value in preprocessings.items():
+            if key in global_transforms:
+                if global_transforms[key] != value:
+                    logger.warning(
+                        "Dropping per-dataset preprocessing %r=%r because "
+                        "global_transforms already defines %r=%r; global wins "
+                        "to avoid double application.",
+                        key,
+                        value,
+                        key,
+                        global_transforms[key],
+                    )
+                continue
+            kept[key] = value
+        params["preprocessings"] = kept or None
     return params
 
 
@@ -869,20 +895,22 @@ class DataHub:
                 params["global_transforms"] = params.get("transforms", None)
             self.datahubs = {"default": SingleDataHub(dump_dir=dump_dir, **params)}
         elif isinstance(datasets, list):
+            global_transforms = params.get("global_transforms", None)
             self.datahubs = {
                 str(i): SingleDataHub(
                     dump_dir=dump_dir,
-                    global_transforms=params.get("global_transforms", None),
-                    **_coerce_dataset_params(dataset_params),
+                    global_transforms=global_transforms,
+                    **_coerce_dataset_params(dataset_params, global_transforms),
                 )
                 for i, dataset_params in enumerate(datasets)
             }
         elif isinstance(datasets, dict):
+            global_transforms = params.get("global_transforms", None)
             self.datahubs = {
                 name: SingleDataHub(
                     dump_dir=dump_dir,
-                    global_transforms=params.get("global_transforms", None),
-                    **_coerce_dataset_params(dataset_params),
+                    global_transforms=global_transforms,
+                    **_coerce_dataset_params(dataset_params, global_transforms),
                 )
                 for name, dataset_params in datasets.items()
             }
