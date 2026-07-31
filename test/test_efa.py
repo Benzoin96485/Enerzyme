@@ -396,3 +396,101 @@ def test_spookynet_use_efa_smoke():
         Ra=torch.randn(N, 3),
     )
     assert out["atom_feature"].shape == (N, F)
+
+
+def test_spookynet_default_checkpoint_layout_matches_pre_efa():
+    """use_efa=False must keep the pre-EFA submodule / state_dict key layout."""
+    from torch.nn import Module
+    from enerzyme.models.spookynet.interaction import (
+        InteractionModule,
+        LocalInteraction,
+        NonlocalInteraction,
+        ResidualMLP,
+        ResidualStack,
+    )
+    from enerzyme.models.spookynet.core import SpookyNetCore
+    from enerzyme.models.ff import build_model
+
+    class PreEFAInteractionModule(Module):
+        def __init__(self) -> None:
+            super().__init__()
+            dim_embedding, num_rbf = 16, 8
+            activation_fn = "swish"
+            self.local_interaction = LocalInteraction(
+                dim_embedding=dim_embedding,
+                num_rbf=num_rbf,
+                num_residual_x=1,
+                num_residual_s=1,
+                num_residual_p=1,
+                num_residual_d=1,
+                num_residual=1,
+                activation_fn=activation_fn,
+            )
+            self.nonlocal_interaction = NonlocalInteraction(
+                dim_embedding=dim_embedding,
+                num_residual_q=1,
+                num_residual_k=1,
+                num_residual_v=1,
+                activation_fn=activation_fn,
+            )
+            self.residual_pre = ResidualStack(dim_embedding, 1, activation_fn)
+            self.residual_post = ResidualStack(dim_embedding, 1, activation_fn)
+            self.resblock = ResidualMLP(
+                dim_embedding, 1, activation_fn=activation_fn
+            )
+
+    old = PreEFAInteractionModule()
+    new = InteractionModule(
+        dim_embedding=16,
+        num_rbf=8,
+        num_residual_pre=1,
+        num_residual_local_x=1,
+        num_residual_local_s=1,
+        num_residual_local_p=1,
+        num_residual_local_d=1,
+        num_residual_local=1,
+        num_residual_nonlocal_q=1,
+        num_residual_nonlocal_k=1,
+        num_residual_nonlocal_v=1,
+        num_residual_post=1,
+        num_residual_output=1,
+        use_efa=False,
+    )
+    assert [n for n, _ in new.named_children()] == [
+        n for n, _ in old.named_children()
+    ]
+    assert not hasattr(new, "efa_nonlocal")
+    assert list(old.state_dict().keys()) == list(new.state_dict().keys())
+    # Bidirectional strict load (old checkpoint <-> new default)
+    new.load_state_dict(old.state_dict(), strict=True)
+    old.load_state_dict(new.state_dict(), strict=True)
+
+    core_kwargs = dict(
+        dim_embedding=16,
+        num_rbf=8,
+        num_modules=2,
+        num_residual_pre=1,
+        num_residual_local_x=1,
+        num_residual_local_s=1,
+        num_residual_local_p=1,
+        num_residual_local_d=1,
+        num_residual_local=1,
+        num_residual_nonlocal_q=1,
+        num_residual_nonlocal_k=1,
+        num_residual_nonlocal_v=1,
+        num_residual_post=1,
+        num_residual_output=1,
+        activation_fn="swish",
+        use_irreps=True,
+    )
+    core = SpookyNetCore(**core_kwargs)  # default use_efa=False
+    assert all("efa" not in k.lower() for k in core.state_dict())
+    assert any("nonlocal_interaction" in k for k in core.state_dict())
+    SpookyNetCore(**core_kwargs).load_state_dict(core.state_dict(), strict=True)
+
+    model = build_model("spookynet", verbose=0)
+    assert all("efa" not in k.lower() for k in model.state_dict())
+    assert any("nonlocal_interaction" in k for k in model.state_dict())
+    build_model("spookynet", verbose=0).load_state_dict(
+        model.state_dict(), strict=True
+    )

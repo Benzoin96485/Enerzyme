@@ -277,7 +277,8 @@ class InteractionModule(Module):
             qk = efa_num_features_qk if efa_num_features_qk is not None else dim_embedding
             if qk % 2 != 0:
                 qk = qk + 1
-            self.nonlocal_interaction = None
+            # Do not register ``nonlocal_interaction`` so EFA mode has a distinct
+            # parameter tree; default ``use_efa=False`` keeps the pre-EFA layout.
             self.efa_nonlocal = EFABlock(
                 dim_embedding,
                 num_features_qk=qk,
@@ -288,7 +289,7 @@ class InteractionModule(Module):
                 as_delta=True,
             )
         else:
-            self.efa_nonlocal = None
+            # Exact pre-EFA submodule set / state_dict keys (checkpoint compatible).
             self.nonlocal_interaction = NonlocalInteraction(
                 dim_embedding=dim_embedding,
                 num_residual_q=num_residual_nonlocal_q,
