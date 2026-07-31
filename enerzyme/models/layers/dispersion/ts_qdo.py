@@ -5,6 +5,10 @@ Reference: DOI 10.1021/acs.jctc.3c00797; Kabylda et al., JACS 2025.
 
 Energies are converted with ``Hartree_in_E`` (same convention as Grimme D3/D4):
 Ha targets → ``Hartree_in_E=1``; eV → ``≈27.211``. Distances use ``Bohr_in_R``.
+
+Free-atom polarizability / C6 tables cover ``Z = 1 .. MAX_ZA_TSQDO`` (102),
+matching mlff / So3krates-torch. SO3LR embeddings may use ``max_Za=118``; atoms
+heavier than 102 cannot use this dispersion term.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ from .. import BaseFFLayer
 
 _FINE_STRUCTURE = 0.0072973525693
 
-# Free-atom polarizabilities and C6 (mlff / SO3LR), Z = 1..
+# Free-atom polarizabilities and C6 (mlff / SO3LR), Z = 1..MAX_ZA_TSQDO.
 _ALPHAS = [
     4.5, 1.38, 164.2, 38.0, 21.0, 12.0, 7.4, 5.4, 3.8, 2.67, 162.7, 71.0,
     60.0, 37.0, 25.0, 19.6, 15.0, 11.1, 292.9, 160.0, 120.0, 98.0, 84.0, 78.0,
@@ -47,6 +51,9 @@ _C6_COEF = [
     3102.12, 2820.47, 2794.0, 3150.95, 2756.0, 2702.57, 2626.59, 2548.62,
     2468.69, 2386.8,
 ]
+if len(_ALPHAS) != len(_C6_COEF):
+    raise RuntimeError("TS–QDO _ALPHAS and _C6_COEF must have equal length")
+MAX_ZA_TSQDO = len(_ALPHAS)  # Nobelium; no free-atom refs beyond this
 
 
 class TSQDODispersionEnergyLayer(BaseFFLayer):
@@ -88,9 +95,24 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
             "c6_coef", torch.tensor(_C6_COEF, dtype=torch.float64), persistent=False
         )
 
+    def _check_za(self, Za: Tensor) -> None:
+        """Reject Z outside free-atom table (avoids silent CUDA OOB)."""
+        if Za.numel() == 0:
+            return
+        z_min = int(Za.min().item())
+        z_max = int(Za.max().item())
+        if z_min < 1 or z_max > MAX_ZA_TSQDO:
+            raise ValueError(
+                f"TS–QDO free-atom tables cover Z=1..{MAX_ZA_TSQDO}; "
+                f"got Za in [{z_min}, {z_max}]. "
+                "SO3LR embeddings may use max_Za=118, but dispersion is "
+                "undefined for Z>102 without additional reference data."
+            )
+
     def _mixing(
         self, Za: Tensor, idx_i: Tensor, idx_j: Tensor, ha: Tensor
     ) -> tuple[Tensor, Tensor]:
+        self._check_za(Za)
         dtype = ha.dtype
         alphas = self.alphas.to(device=ha.device, dtype=dtype)
         c6 = self.c6_coef.to(device=ha.device, dtype=dtype)

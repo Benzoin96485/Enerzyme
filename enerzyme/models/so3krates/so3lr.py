@@ -15,6 +15,8 @@ _SO3LR_AVG_NUM_NEIGHBORS = 13.168995780096482
 DEFAULT_BUILD_PARAMS = {
     "dim_embedding": 128,
     "num_rbf": 32,
+    # Embeddings / readouts: full periodic table. TS–QDO free-atom α/C6 only
+    # cover Z≤102 (see enerzyme.models.layers.dispersion.ts_qdo.MAX_ZA_TSQDO).
     "max_Za": 118,
     "cutoff_sr": 4.5,
     "cutoff_fn": "phys",

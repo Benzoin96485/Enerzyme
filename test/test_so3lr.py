@@ -130,6 +130,39 @@ def test_tsqdo_scales_with_hartree_in_e():
     assert_allclose(out_ev.numpy(), (out_ha * _HARTREE_EV).numpy(), rtol=1e-6)
 
 
+def test_tsqdo_rejects_za_beyond_table():
+    """Free-atom α/C6 stop at Z=102; max_Za=118 must not silently OOB."""
+    from enerzyme.models.layers.dispersion.ts_qdo import (
+        MAX_ZA_TSQDO,
+        TSQDODispersionEnergyLayer,
+    )
+
+    assert MAX_ZA_TSQDO == 102
+    layer = TSQDODispersionEnergyLayer(
+        dispersion_energy_scale=1.2,
+        cutoff_lr=None,
+        neighborlist_format_lr="sparse",
+        Hartree_in_E=_HARTREE_EV,
+        Bohr_in_R=_BOHR,
+    )
+    za = torch.tensor([MAX_ZA_TSQDO + 1, 6], dtype=torch.long)
+    ha = torch.tensor([1.0, 1.0])
+    dij = torch.tensor([3.0, 3.0])
+    idx_i = torch.tensor([0, 1], dtype=torch.long)
+    idx_j = torch.tensor([1, 0], dtype=torch.long)
+    try:
+        layer.get_E_disp_a(za, ha, dij, idx_i, idx_j)
+    except ValueError as exc:
+        assert "Z=1..102" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for Za > MAX_ZA_TSQDO")
+
+    # Boundary Z=102 must still work.
+    za_ok = torch.tensor([MAX_ZA_TSQDO, 6], dtype=torch.long)
+    e = layer.get_E_disp_a(za_ok, ha, dij, idx_i, idx_j)
+    assert e.shape == (2,)
+
+
 def test_hirshfeld_and_partial_charge_shapes():
     from enerzyme.models.layers import HirshfeldReadout, PartialChargeReadout
 
