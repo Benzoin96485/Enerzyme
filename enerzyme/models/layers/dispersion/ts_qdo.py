@@ -67,6 +67,7 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
         neighborlist_format_lr: Literal["sparse", "ordered_sparse"] = "sparse",
         Hartree_in_E: float = 1,
         Bohr_in_R: float = 0.5291772105638411,
+        eps: float = 1e-8,
     ) -> None:
         super().__init__(
             input_fields={"Za", "ha", "Dij_lr", "idx_i", "idx_j"},
@@ -81,11 +82,15 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
                 "cutoff_lr_damping is required when cutoff_lr is set "
                 f"(got cutoff_lr={cutoff_lr})"
             )
+        if eps <= 0:
+            raise ValueError(f"eps must be positive, got {eps}")
         self.gamma_scale = float(dispersion_energy_scale)
         self.cutoff_lr = cutoff_lr
         self.cutoff_lr_damping = cutoff_lr_damping
         self.Hartree_in_E = float(Hartree_in_E)
         self.Bohr_in_R = float(Bohr_in_R)
+        # HirshfeldReadout uses abs (ha≥0) but not strict positivity; ha=0 → 0/0 in C6 mixing.
+        self.eps = float(eps)
         self.pair_factor = 0.5 if neighborlist_format_lr == "sparse" else 1.0
         self._switch = CUTOFF_REGISTER["smooth"]
         self.register_buffer(
@@ -114,6 +119,8 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
     ) -> tuple[Tensor, Tensor]:
         self._check_za(Za)
         dtype = ha.dtype
+        # Floor ha so C6 mixing denominator cannot vanish (abs readout can hit 0).
+        ha = ha.clamp_min(self.eps)
         alphas = self.alphas.to(device=ha.device, dtype=dtype)
         c6 = self.c6_coef.to(device=ha.device, dtype=dtype)
         zi = Za[idx_i] - 1
@@ -125,13 +132,9 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
         c6_i = c6[zi] * hi.square()
         c6_j = c6[zj] * hj.square()
         alpha_ij = 0.5 * (alpha_i + alpha_j)
+        den = alpha_i.square() * c6_j + alpha_j.square() * c6_i
         c6_ij = (
-            2.0
-            * c6_i
-            * c6_j
-            * alpha_i
-            * alpha_j
-            / (alpha_i.square() * c6_j + alpha_j.square() * c6_i)
+            2.0 * c6_i * c6_j * alpha_i * alpha_j / den.clamp_min(self.eps)
         )
         return alpha_ij, c6_ij
 

@@ -108,6 +108,26 @@ def test_tsqdo_dispersion_negative_attractive():
     assert torch.all(e < 0)
 
 
+def test_tsqdo_zero_hirshfeld_is_finite():
+    """Hirshfeld abs can hit 0; mixing must not emit NaN."""
+    from enerzyme.models.layers import TSQDODispersionEnergyLayer
+
+    layer = TSQDODispersionEnergyLayer(
+        dispersion_energy_scale=1.2,
+        cutoff_lr=None,
+        neighborlist_format_lr="sparse",
+        Hartree_in_E=_HARTREE_EV,
+        Bohr_in_R=_BOHR,
+    )
+    za = torch.tensor([6, 8], dtype=torch.long)
+    ha = torch.tensor([0.0, 0.0])
+    dij = torch.tensor([3.0, 3.0])
+    idx_i = torch.tensor([0, 1], dtype=torch.long)
+    idx_j = torch.tensor([1, 0], dtype=torch.long)
+    e = layer.get_E_disp_a(za, ha, dij, idx_i, idx_j)
+    assert torch.isfinite(e).all()
+
+
 def test_tsqdo_scales_with_hartree_in_e():
     """Dispersion must follow Hartree_in_E (not a hard-coded eV factor)."""
     from enerzyme.models.layers import TSQDODispersionEnergyLayer
