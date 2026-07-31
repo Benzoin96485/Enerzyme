@@ -28,7 +28,7 @@ from ..layers import (
     RangeSeparationLayer,
 )
 from ..so3 import RealSphericalHarmonics
-from .euclidean_transformer import EuclideanTransformer
+from .interaction import EuclideanTransformer
 
 # Typical MD17 / small-molecule average degree (shared ballpark with Equiformer).
 _AVG_NUM_NEIGHBORS = 15.57930850982666

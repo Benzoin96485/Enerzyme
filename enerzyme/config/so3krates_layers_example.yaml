@@ -3,8 +3,9 @@
 #
 # Core emits atom_feature (invariants) + atom_sphere_feature (SPHC χ,
 # shape [N, m_tot]). Energy uses SimpleReadout on atom_feature.
-# Optional physics (ZBL / electrostatics / dispersion) can be added as
-# post-core layers — same pattern as PhysNet / SpookyNet.
+# Optional physics: ZBLRepulsionEnergy / ElectrostaticEnergy / GrimmeD3|D4
+# (PhysNet/SpookyNet), or architecture: so3lr — see so3lr_layers_example.yaml
+# (ZBL with switch_off, ElectrostaticEnergy flavor=SO3LR, TSQDODispersion).
 
 Modelhub:
   internal_FFs:

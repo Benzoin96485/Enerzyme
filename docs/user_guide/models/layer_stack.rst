@@ -15,13 +15,13 @@ From :code:`enerzyme/models/layers/`:
     :code:`GaussianSmearing`, :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer`, :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
 
 **Embeddings**
-    :code:`RandomAtomEmbedding`, :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding`
+    :code:`RandomAtomEmbedding`, :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
 
 **Core**
     Architecture-specific message passing (:code:`Core` with :code:`architecture` in Modelhub)
 
 **Physics / post-processing**
-    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy`, :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`ZBLRepulsionEnergy`
+    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy` (flavors: SpookyNet / PhysNet / SO3LR), :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`TSQDODispersionEnergy` (SO3LR; not Grimme), :code:`ZBLRepulsionEnergy` (optional :code:`switch_off` for SO3LR)
 
 **Output**
     :code:`EnergyReduce`, :code:`Force`, :code:`ShallowEnsembleReduce`
@@ -35,6 +35,9 @@ From :code:`enerzyme/models/layers/`:
     :code:`EquiformerGraphAttentionReadout` — separate GraphAttention head over full
     irreps + graph edges (not mixed into SimpleReadout); use when you want an
     attention-style multi-field atomic scalar head.
+    :code:`HirshfeldReadout` — SO3LR Hirshfeld-ratio head (``ha`` for TS–QDO).
+    Partial charges use :code:`SimpleReadout(Qa)` + :code:`AtomicAffine` with
+    fixed unit scale (element shift ≡ SO3LR ``Emb(Za)`` bias).
     Equiformer-series external readouts (including LinearRS / GraphAttention /
     :code:`EquiformerV2FeedForwardReadout`) accept :code:`shallow_ensemble_size`
     by widening the last linear layer.
@@ -164,6 +167,17 @@ Default stacks use :code:`BernsteinRBF` + :code:`SimpleReadout` → :code:`Energ
 → :code:`Force`. Optional ZBL / electrostatics / dispersion are post-core layers
 (same as PhysNet / SpookyNet), not part of the Core. Example:
 :code:`enerzyme/config/so3krates_layers_example.yaml`.
+
+SO3LR (So3krates + universal pairwise FF)
+-----------------------------------------
+
+:code:`architecture: so3lr` reuses :code:`So3kratesCore` and composes SO3LR-specific
+layers: :code:`ChargeSpinEmbedding` + :code:`GatherAtomEmbedding(scale_by_sqrt_count=true)`,
+:code:`SimpleReadout(Qa)` / :code:`AtomicAffine` / :code:`ChargeConservation` / :code:`HirshfeldReadout`,
+then :code:`ZBLRepulsionEnergy(switch_off=1.5)`, :code:`ElectrostaticEnergy(flavor=SO3LR)`,
+and :code:`TSQDODispersionEnergy`. Do **not** substitute Grimme D3/D4 when targeting
+SO3LR dispersion. Example: :code:`enerzyme/config/so3lr_layers_example.yaml`. For
+Enerzymette, set :code:`architecture: so3lr` in the resolved :code:`config.yaml`.
 
 NSE readout layers
 ------------------

@@ -18,7 +18,7 @@ from .electrostatics import (
 from .gradient import ForceLayer, EnergyVarianceGradientLayer
 from .reduce import EnergyReduceLayer, ShallowEnsembleReduceLayer
 from .denormalize import AtomicAffineLayer
-from .dispersion import GrimmeD3EnergyLayer, GrimmeD4EnergyLayer
+from .dispersion import GrimmeD3EnergyLayer, GrimmeD4EnergyLayer, TSQDODispersionEnergyLayer
 from .zbl import ZBLRepulsionEnergyLayer
 from .gather_embedding import GatherAtomEmbedding
 from .scalar_embedding import ScalarDenseEmbedding, ScalarResidualMLPEmbedding, GraphScalarBroadcastEmbedding
@@ -32,5 +32,7 @@ from .readout import (
     VelocityReadout,
     EquiformerGraphAttentionReadout,
     EquiformerV2FeedForwardReadout,
+    HirshfeldReadout,
 )
 from .sphere_sample_readout import SphereSampleReadout
+from .charge_spin_embedding import ChargeSpinEmbeddingLayer

@@ -1,7 +1,7 @@
 from typing import Dict, Literal, Optional, Tuple
+import math
 import torch
 from torch import Tensor
-from torch.nn import Module
 from . import BaseFFLayer
 from ..functional import segment_sum_coo
 from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
@@ -82,55 +82,87 @@ class VelocityConservationLayer(BaseFFLayer):
 
 class ElectrostaticEnergyLayer(BaseFFLayer):
     def __init__(
-        self, cutoff_sr: float, cutoff_lr: Optional[float]=None, 
-        Bohr_in_R: float=0.5291772108, Hartree_in_E: float=1, dielectric_constant: float=1,
-        cutoff_fn: CUTOFF_KEY_TYPE="smooth", flavor: Literal["PhysNet", "SpookyNet"]="SpookyNet"
+        self,
+        cutoff_sr: Optional[float] = None,
+        cutoff_lr: Optional[float] = None,
+        Bohr_in_R: float = 0.5291772108,
+        Hartree_in_E: float = 1,
+        dielectric_constant: float = 1,
+        cutoff_fn: CUTOFF_KEY_TYPE = "smooth",
+        flavor: Literal["PhysNet", "SpookyNet", "SO3LR"] = "SpookyNet",
+        electrostatic_energy_scale: float = 4.0,
+        neighborlist_format_lr: Literal["sparse", "ordered_sparse"] = "sparse",
     ) -> None:
         r"""
-        Calculate the electrostatic energy from distributed multipoles and atomic positions
+        Pairwise electrostatic energy.
+
+        Flavors:
+        - ``PhysNet`` / ``SpookyNet``: shielded Coulomb with smooth SR blend [1].
+        - ``SO3LR``: erf-damped Coulomb ``erf(r/σ)/r`` (Kabylda et al., JACS 2025);
+          ``electrostatic_energy_scale`` is σ (pretrained SO3LR: 4.0). With
+          ``cutoff_lr``, blends energy- and force-shifted forms on
+          ``[0.45·Rc, Rc]``.
 
         Params:
         -----
-        bohr_in_Ra: the numerical value of one Bohr in the unit of atom positions.
+        Bohr_in_R / Hartree_in_E: unit conversion
+            (``kehalf = 0.5 * Bohr * Hartree``).
 
-        Hartree_in_Ea: the numerical value of one Hartree in the unit of energy.
+        cutoff_sr: short-range blend cutoff (required for PhysNet/SpookyNet).
 
-        short_range_cutoff: the cutoff of short range interaction, the Coulomb's law at long-range
-        and a damped term at short-range to avoid the singularity at r = 0 are smoothly interpolated by
-        \phi [1]:
-
-        \chi(r) = \phi(2r) + 1 / \sqrt{r^2 + 1} + (1 - \phi(2r)) / r
-
-        long_range_cutoff: the cutoff of long range interaction, outside which the electrostatics are ignored
+        cutoff_lr: long-range cutoff; ignored interactions beyond this distance.
 
         References:
         -----
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         """
         super().__init__(input_fields={"Dij_lr", "Qa", "idx_i", "idx_j"}, output_fields={"E_ele_a"})
+        self.flavor = flavor
+        self.cutoff_lr = cutoff_lr
+        self.dielectric_constant = dielectric_constant
         self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
+
+        if flavor == "SO3LR":
+            if neighborlist_format_lr not in {"sparse", "ordered_sparse"}:
+                raise ValueError(
+                    "neighborlist_format_lr must be 'sparse' or 'ordered_sparse'"
+                )
+            self.sigma = float(electrostatic_energy_scale)
+            # sparse bidirectional list → kehalf; ordered_sparse → full ke = 2*kehalf
+            self.pair_kehalf = (
+                self.kehalf
+                if neighborlist_format_lr == "sparse"
+                else 2.0 * self.kehalf
+            )
+            self._switch = CUTOFF_REGISTER["smooth"]
+            if cutoff_lr is not None and cutoff_lr > 0:
+                self.cuton = 0.45 * float(cutoff_lr)
+            return
+
+        if cutoff_sr is None:
+            raise TypeError("cutoff_sr is required for PhysNet/SpookyNet electrostatics")
         if flavor == "PhysNet":
             self.cutoff = cutoff_sr / 2
             self.cuton = 0
         elif flavor == "SpookyNet":
             self.cutoff = cutoff_sr * 0.75
             self.cuton = cutoff_sr * 0.25
-        self.cutoff_lr = cutoff_lr
+        else:
+            raise ValueError(f"Unknown electrostatic flavor: {flavor}")
         self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
-        self.dielectric_constant = dielectric_constant
-        
+
         if cutoff_lr is not None and cutoff_lr > 0:
             self.cutoff_lr2 = self.cutoff_lr * self.cutoff_lr
             self.two_div_cut = 2.0 / self.cutoff_lr
             if flavor == "PhysNet":
                 self.lr_shield = self._simple_lr_shield
-            elif flavor == "SpookyNet":
+            else:
                 self.rcutconstant = self.cutoff_lr / (self.cutoff_lr ** 2 + 1.0) ** 1.5
                 self.cutconstant = (2 * self.cutoff_lr ** 2 + 1.0) / (self.cutoff_lr** 2 + 1.0) ** 1.5
                 self.lr_shield = self._smooth_lr_shield
 
     def _lr_ordinary(self, Dij: Tensor) -> Tensor:
-        return 1.0 / Dij + Dij / self.lr_cutoff2 - self.two_div_cut
+        return 1.0 / Dij + Dij / self.cutoff_lr2 - self.two_div_cut
 
     def _shield(self, Dij: Tensor) -> Tensor:
         return torch.sqrt(Dij * Dij + 1.0)
@@ -154,6 +186,46 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             condition, zeros
         )
 
+    @staticmethod
+    def _erf_potential(r: Tensor, sigma: float) -> Tensor:
+        r = r.clamp_min(1e-12)
+        return torch.erf(r / sigma) / r
+
+    @staticmethod
+    def _erf_force(r: Tensor, sigma: float) -> Tensor:
+        r = r.clamp_min(1e-12)
+        return (
+            2.0 * r * torch.exp(-((r / sigma) ** 2)) / (math.sqrt(math.pi) * sigma)
+            - torch.erf(r / sigma)
+        ) / (r ** 2)
+
+    def _get_E_ele_a_so3lr(
+        self, Dij_lr: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor
+    ) -> Tensor:
+        if Qa.dim() > 1:
+            Qa = Qa.squeeze(-1)
+        r = Dij_lr.reshape(-1)
+        qi = Qa[idx_i]
+        qj = Qa[idx_j]
+        pairwise = self._erf_potential(r, self.sigma)
+        if self.cutoff_lr is None or self.cutoff_lr <= 0:
+            edge = self.pair_kehalf * qi * qj * pairwise / self.dielectric_constant
+        else:
+            cutoff = float(self.cutoff_lr)
+            f = self._switch(r, cutoff, self.cuton)
+            shift = self._erf_potential(
+                torch.tensor(cutoff, dtype=r.dtype, device=r.device), self.sigma
+            )
+            force_shift = self._erf_force(
+                torch.tensor(cutoff, dtype=r.dtype, device=r.device), self.sigma
+            )
+            energy_shifted = pairwise - shift
+            force_shifted = pairwise - shift - force_shift * (r - cutoff)
+            blended = f * energy_shifted + (1.0 - f) * force_shifted
+            edge = self.pair_kehalf * qi * qj * blended / self.dielectric_constant
+            edge = torch.where(r < cutoff, edge, torch.zeros_like(edge))
+        return segment_sum_coo(edge, idx_i, dim_size=len(Qa))
+
     def get_E_ele_a(self, Dij_lr: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:
         '''
         Compute the atomic electrostatic energy
@@ -172,6 +244,9 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         -----
         Ea: Float tensor of atomic electrostatic energy, shape [N * batch_size]
         '''
+        if self.flavor == "SO3LR":
+            return self._get_E_ele_a_so3lr(Dij_lr, Qa, idx_i, idx_j)
+
         if Qa.device.type == "cpu" or Qa.dim() > 1:
             fac = self.kehalf * Qa[idx_i] * Qa[idx_j] / self.dielectric_constant
         else:

@@ -7,6 +7,8 @@ __all__ = [
     "So3kratesCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
+    "SO3LR_DEFAULT_BUILD_PARAMS",
+    "SO3LR_DEFAULT_LAYER_PARAMS",
 ]
 
 
@@ -20,4 +22,12 @@ def __getattr__(name: str):
             "DEFAULT_LAYER_PARAMS": DEFAULT_LAYER_PARAMS,
         }
         return mapping[name]
+    if name == "SO3LR_DEFAULT_BUILD_PARAMS":
+        from .so3lr import DEFAULT_BUILD_PARAMS as SO3LR_DEFAULT_BUILD_PARAMS
+
+        return SO3LR_DEFAULT_BUILD_PARAMS
+    if name == "SO3LR_DEFAULT_LAYER_PARAMS":
+        from .so3lr import DEFAULT_LAYER_PARAMS as SO3LR_DEFAULT_LAYER_PARAMS
+
+        return SO3LR_DEFAULT_LAYER_PARAMS
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

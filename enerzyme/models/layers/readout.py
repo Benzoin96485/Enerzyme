@@ -1,10 +1,11 @@
-from typing import Set, Literal, Dict, Optional, List
+from typing import Set, Literal, Dict, Optional, List, Callable
 from . import BaseFFLayer
 from ..blocks.mlp import DenseLayer, ResidualMLP, ResidualLayer
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, POSITIVE_ACTIVATION_KEY_TYPE, get_positive_activation_fn
 from ..irreps_tools import extract_scalar_0e
+import math
 import torch
-from torch.nn import ModuleList, Module, Sequential
+from torch.nn import Embedding, Identity, Linear, ModuleList, Module, Sequential
 from torch import Tensor
 
 
@@ -107,6 +108,8 @@ class BaseReadout(BaseFFLayer):
         feature_irreps: Optional[str]=None,
         **head_params
     ) -> None:
+        if not isinstance(output_fields, set):
+            output_fields = set(output_fields)
         super().__init__(
             input_fields=["atom_feature"],
             output_fields=output_fields | {"atom_feature"} if keep_feature else output_fields
@@ -697,3 +700,77 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
                 offset_res = offset_res + int((lmax + 1) ** 2)
             result["atom_feature"] = torch.cat(features, dim=-1)
         return result
+
+
+class HirshfeldReadout(BaseFFLayer):
+    """Hirshfeld volume-ratio head (So3krates-torch ``HirshfeldOutputHead``).
+
+    Outputs ``ha = |v_shift + (q ⊙ k) / √d|`` for TS–QDO dispersion (SO3LR).
+    SO3LR partial charges use ``SimpleReadout(Qa)`` + ``AtomicAffine(scale=1)``
+    instead of a dedicated charge head.
+    """
+
+    def __init__(
+        self,
+        dim_embedding: Optional[int] = None,
+        built_layers: Optional[List[Module]] = None,
+        regression_dim: Optional[int] = None,
+        max_Za: int = 100,
+        activation_fn: Optional[Callable[[], Module]] = None,
+        **kwargs,
+    ) -> None:
+        del kwargs
+        if dim_embedding is None and built_layers:
+            for layer in reversed(built_layers):
+                if hasattr(layer, "dim_feature_out"):
+                    dim_embedding = int(layer.dim_feature_out)
+                    break
+                if hasattr(layer, "dim_embedding"):
+                    dim_embedding = int(layer.dim_embedding)
+                    break
+        if dim_embedding is None:
+            raise TypeError("dim_embedding value should be provided")
+        if dim_embedding % 2 != 0:
+            raise ValueError(
+                f"dim_embedding ({dim_embedding}) must be even for HirshfeldReadout"
+            )
+        super().__init__(
+            input_fields={"atom_feature", "Za"},
+            output_fields={"ha"},
+        )
+        half = dim_embedding // 2
+        self.v_shift_embedding = Embedding(max_Za + 1, 1)
+        self.q_embedding = Embedding(max_Za + 1, half)
+        act = Identity if activation_fn is None else activation_fn
+        if regression_dim is not None:
+            self.transform = Sequential(
+                Linear(dim_embedding, regression_dim // 2),
+                act(),
+                Linear(regression_dim // 2, half),
+            )
+        else:
+            self.transform = Linear(dim_embedding, half)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        for emb in (self.v_shift_embedding, self.q_embedding):
+            std = 1.0 / (emb.embedding_dim ** 0.5)
+            torch.nn.init.normal_(emb.weight, mean=0.0, std=std)
+        modules = (
+            self.transform
+            if isinstance(self.transform, Sequential)
+            else [self.transform]
+        )
+        for m in modules:
+            if isinstance(m, Linear):
+                std_m = 1.0 / (m.in_features ** 0.5)
+                torch.nn.init.normal_(m.weight, mean=0.0, std=std_m)
+                if m.bias is not None:
+                    torch.nn.init.zeros_(m.bias)
+
+    def get_ha(self, atom_feature: Tensor, Za: Tensor) -> Tensor:
+        v_shift = self.v_shift_embedding(Za.long()).squeeze(-1)
+        q = self.q_embedding(Za.long())
+        k = self.transform(atom_feature)
+        qk = (q * k * (1.0 / math.sqrt(k.shape[-1]))).sum(dim=-1)
+        return torch.abs(v_shift + qk)

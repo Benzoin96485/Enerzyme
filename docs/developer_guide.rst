@@ -288,6 +288,7 @@ Tests live in :code:`test/`:
 - :code:`test_equiformer_v2_parity_*.py` — numerical parity vs vendored EquiformerV2 upstream (SO2 conv / LinearV2 / norms / FFN / TransBlockV2)
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
+- :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
 - :code:`test_sphere_sample_readout.py` — SphereSampleReadout shapes / scalar invariance smoke
 - :code:`test_scatter_speed.py` — performance-oriented scatter checks
 
@@ -416,6 +417,11 @@ So3krates (:code:`so3krates`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Frank et al. (NeurIPS 2022) lives under :code:`enerzyme/models/so3krates/` with shared :code:`RealSphericalHarmonics` and :code:`L0Contraction` (:code:`cgmatrix.npz`) in :code:`enerzyme/models/so3/`. The Core emits invariant :code:`atom_feature` and SPHC :code:`atom_sphere_feature` (``[N, m_tot]``, not eSCN/EquiformerV2 channel layout). Compose :code:`SimpleReadout` + :code:`EnergyReduce` / :code:`Force` (and optional ZBL / electrostatics / dispersion) outside the Core. Offline parity vs So3krates-torch fixtures: :code:`test/test_so3krates_parity_ops.py`. Enerzymette only needs :code:`architecture: so3krates` plus a resolved :code:`config.yaml`.
+
+SO3LR (:code:`so3lr`)
+^^^^^^^^^^^^^^^^^^^^
+
+Kabylda et al. (JACS 2025) is registered as :code:`architecture: so3lr` but **reuses** :code:`So3kratesCore`. Defaults and layers live in :code:`enerzyme/models/so3krates/so3lr.py`. Physics uses shared modules with SO3LR options: :code:`ZBLRepulsionEnergy` (:code:`switch_off`), :code:`ElectrostaticEnergy` (:code:`flavor: SO3LR`), :code:`TSQDODispersionEnergy` under :code:`enerzyme/models/layers/dispersion/`, plus :code:`SimpleReadout(Qa)` / :code:`AtomicAffine` / :code:`HirshfeldReadout` / :code:`ChargeSpinEmbedding`. Grimme D3/D4 remain for PhysNet/SpookyNet stacks. Cutoff alias :code:`phys` → polynomial. Tests: :code:`test/test_so3lr.py`. Enerzymette: :code:`architecture: so3lr` + resolved :code:`config.yaml` (see :code:`enerzyme/config/so3lr_layers_example.yaml`).
 
 AllScAIP (:code:`AllScAIP`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^

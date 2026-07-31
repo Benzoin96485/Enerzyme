@@ -1,6 +1,7 @@
-"""Euclidean transformer blocks for So3krates (Frank et al., NeurIPS 2022).
+"""So3krates interaction layers (Frank et al., NeurIPS 2022).
 
-Adapted from So3krates-torch EuclideanTransformer
+Module path mirrors PhysNet/SpookyNet ``interaction.py``. Adapted from
+So3krates-torch EuclideanTransformer
 (https://github.com/TCPUniLU/So3krates-torch, MIT license): fused FeatureBlock +
 GeometricBlock attention with InteractionBlock coupling.
 """
