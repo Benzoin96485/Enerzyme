@@ -248,7 +248,11 @@ class SO3RotationFused(torch.nn.Module):
             start = end
         if self.use_rotation_mask:
             return wigner
-        return wigner.detach()
+        # Keep Wigner in the autograd graph so EnergyReduce+Force can form
+        # Fa = -dE/dRa through edge frames (same contract as SO3_Rotation /
+        # EquiformerV2). Upstream EquiformerV3 detaches here for direct force
+        # heads; Enerzyme's default stack uses energy gradients instead.
+        return wigner
 
     def extra_repr(self):
         return f"lmax={self.lmax}, mmax={self.mmax}"

@@ -286,7 +286,7 @@ class S2Activation_SwiGLU_MemoryEfficient(S2Activation_SwiGLU):
     def kernel(self, inputs):
         x_grid = self.so3_grid.to_grid(inputs)
         x_grid = self.act(x_grid)
-        outputs = self.so3_grid.from_grid(inputs)
+        outputs = self.so3_grid.from_grid(x_grid)
         return outputs
     
     
