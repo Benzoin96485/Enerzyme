@@ -30,9 +30,11 @@ from .readout import (
     NSEReadout,
     HierachicalNSEReadout,
     VelocityReadout,
-    EquiformerGraphAttentionReadout,
-    EquiformerV2FeedForwardReadout,
     HirshfeldReadout,
 )
-from .sphere_sample_readout import SphereSampleReadout
+# Architecture-specific readouts: defined next to interaction, re-exported for
+# layer-stack name discovery (``Layers.EquiformerGraphAttentionReadout``, …).
+from ..equiformer.interaction import EquiformerGraphAttentionReadout
+from ..equiformer_v2.interaction import EquiformerV2FeedForwardReadout
+from ..so3 import SphereSampleReadout
 from .charge_spin_embedding import ChargeSpinEmbeddingLayer

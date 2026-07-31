@@ -141,7 +141,7 @@ def test_equiformer_v2_build_model_energy_force_finite():
 
 
 def test_equiformer_v2_ffn_readout_keep_feature_false():
-    from enerzyme.models.layers import EquiformerV2FeedForwardReadout
+    from enerzyme.models.equiformer_v2.interaction import EquiformerV2FeedForwardReadout
 
     torch.manual_seed(0)
     core = _tiny_core()
@@ -161,7 +161,7 @@ def test_equiformer_v2_ffn_readout_keep_feature_false():
 
 
 def test_equiformer_v2_ffn_readout_keep_feature_true():
-    from enerzyme.models.layers import EquiformerV2FeedForwardReadout
+    from enerzyme.models.equiformer_v2.interaction import EquiformerV2FeedForwardReadout
 
     torch.manual_seed(0)
     core = _tiny_core()
@@ -182,7 +182,7 @@ def test_equiformer_v2_ffn_readout_keep_feature_true():
 
 
 def test_equiformer_v2_ffn_readout_shallow_ensemble():
-    from enerzyme.models.layers import EquiformerV2FeedForwardReadout
+    from enerzyme.models.equiformer_v2.interaction import EquiformerV2FeedForwardReadout
 
     torch.manual_seed(0)
     core = _tiny_core()

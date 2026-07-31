@@ -11,7 +11,7 @@ sys.path.extend(["..", "."])
 
 def test_sphere_sample_readout_scalar_shapes():
     from enerzyme.models.escn import eSCNCore
-    from enerzyme.models.layers import SphereSampleReadout
+    from enerzyme.models.so3 import SphereSampleReadout
 
     torch.manual_seed(0)
     core = eSCNCore(
@@ -40,7 +40,7 @@ def test_sphere_sample_readout_scalar_shapes():
 
 def test_sphere_sample_readout_vector_field():
     from enerzyme.models.escn import eSCNCore
-    from enerzyme.models.layers import SphereSampleReadout
+    from enerzyme.models.so3 import SphereSampleReadout
 
     torch.manual_seed(0)
     core = eSCNCore(
@@ -69,7 +69,7 @@ def test_sphere_sample_readout_vector_field():
 def test_sphere_sample_with_core_mmax_lt_lmax():
     """Core emits full (lmax+1)^2 node coeffs even when message SO2 uses mmax < lmax."""
     from enerzyme.models.escn import eSCNCore
-    from enerzyme.models.layers import SphereSampleReadout
+    from enerzyme.models.so3 import SphereSampleReadout
 
     torch.manual_seed(0)
     lmax, mmax = 2, 1
@@ -122,7 +122,7 @@ def test_sphere_sample_with_core_mmax_lt_lmax():
 def test_sphere_sample_with_core_energy_rotation_invariance():
     """Geometry rotation leaves SphereSampleReadout Ea approximately invariant."""
     from enerzyme.models.escn import eSCNCore
-    from enerzyme.models.layers import SphereSampleReadout
+    from enerzyme.models.so3 import SphereSampleReadout
 
     torch.manual_seed(0)
     core = eSCNCore(

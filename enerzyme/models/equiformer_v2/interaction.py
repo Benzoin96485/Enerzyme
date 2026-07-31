@@ -5,20 +5,19 @@ import math
 import torch_geometric
 import copy
 
-from .activation import (
-    SmoothLeakyReLU,
+from ..activation import SmoothLeakyReLU
+from ..so3 import (
     GateActivation,
     SeparableS2Activation,
     S2Activation,
-)
-from .layer_norm import get_normalization_layer
-from .so2_ops import SO2_Convolution
-from ..so3 import SO3_Embedding, SO3_LinearV2
-from .radial_function import RadialFunction
-from .drop import (
-    GraphDropPath,
+    get_normalization_layer,
+    SO2_Convolution,
+    SO3_Embedding,
+    SO3_LinearV2,
     EquivariantDropoutArraySphericalHarmonics,
 )
+from ..blocks.radial_mlp import RadialFunction
+from ..blocks.drop import GraphDropPath
 
 
 class SO2EquivariantGraphAttention(torch.nn.Module):
@@ -614,3 +613,110 @@ class TransBlockV2(torch.nn.Module):
         output_embedding.embedding = output_embedding.embedding + x_res
 
         return output_embedding
+
+# --- architecture-specific readout (layer-stack discoverable via layers re-export) ---
+
+from typing import Dict, List, Optional, Set
+
+from torch import Tensor
+from torch.nn import Module
+
+from ..layers._base_layer import BaseFFLayer
+from ..layers.readout import split_readout_field_outputs
+
+
+class EquiformerV2FeedForwardReadout(BaseFFLayer):
+    """Paper EquiformerV2 energy head: sphere FFN → per-atom scalars.
+
+    Consumes ``atom_sphere_feature`` and Core ``SO3_grid`` / FFN hyperparameters.
+    Default production stacks use ``SimpleReadout`` on ``atom_feature`` instead.
+
+    With ``shallow_ensemble_size > 1``, the final ``SO3_LinearV2`` is widened;
+    only l=0 channels are used as field × ensemble scalars.
+    """
+
+    def __init__(
+        self,
+        output_fields: Set[str],
+        built_layers: List[Module],
+        ffn_hidden_channels: Optional[int] = None,
+        keep_feature: bool = False,
+        shallow_ensemble_size: int = 1,
+        **_unused,
+    ) -> None:
+        out = set(output_fields)
+        if keep_feature:
+            out = out | {"atom_feature", "atom_sphere_feature"}
+        super().__init__(
+            input_fields={"atom_sphere_feature"},
+            output_fields=out,
+        )
+        self.ordered_output_fields = sorted(list(output_fields))
+        self.keep_feature = keep_feature
+        self.shallow_ensemble_size = int(shallow_ensemble_size)
+        self.dim_feature_out = len(self.ordered_output_fields)
+
+        core = None
+        for layer in reversed(built_layers):
+            if hasattr(layer, "SO3_grid") and hasattr(layer, "sphere_channels"):
+                core = layer
+                break
+        if core is None:
+            raise ValueError(
+                "EquiformerV2FeedForwardReadout requires a preceding EquiformerV2 Core"
+            )
+
+        from ..so3 import SO3_Embedding
+
+        self._SO3_Embedding = SO3_Embedding
+        n_out = self.dim_feature_out * self.shallow_ensemble_size
+        hidden = (
+            ffn_hidden_channels
+            if ffn_hidden_channels is not None
+            else core.ffn_hidden_channels
+        )
+        self.ffn = FeedForwardNetwork(
+            sphere_channels=core.sphere_channels,
+            hidden_channels=hidden,
+            output_channels=n_out,
+            lmax_list=list(core.lmax_list),
+            mmax_list=list(core.mmax_list),
+            SO3_grid=core.SO3_grid,
+            activation=getattr(core, "ffn_activation", "scaled_silu"),
+            use_gate_act=getattr(core, "use_gate_act", False),
+            use_grid_mlp=getattr(core, "use_grid_mlp", False),
+            use_sep_s2_act=getattr(core, "use_sep_s2_act", True),
+        )
+        self.lmax_list = list(core.lmax_list)
+        self.mmax_list = list(core.mmax_list)
+        self.sphere_channels = core.sphere_channels
+
+    def get_output(self, atom_sphere_feature: Tensor) -> Dict[str, Tensor]:
+        x = self._SO3_Embedding(
+            0,
+            self.lmax_list.copy(),
+            self.sphere_channels,
+            device=atom_sphere_feature.device,
+            dtype=atom_sphere_feature.dtype,
+        )
+        x.set_embedding(atom_sphere_feature)
+        # Node features after Core are full degree (mmax == lmax); match Core output.
+        x.set_lmax_mmax(self.lmax_list.copy(), self.lmax_list.copy())
+        node_out = self.ffn(x)
+        # l=0 channels only → (N, n_fields * ensemble)
+        scalars = node_out.embedding.narrow(1, 0, 1).squeeze(1)
+        result = split_readout_field_outputs(
+            scalars,
+            self.ordered_output_fields,
+            self.shallow_ensemble_size,
+        )
+        if self.keep_feature:
+            result["atom_sphere_feature"] = atom_sphere_feature
+            # Concatenate l=0,m=0 channels across resolutions (same as Core).
+            features = []
+            offset_res = 0
+            for i, lmax in enumerate(self.lmax_list):
+                features.append(atom_sphere_feature[:, offset_res, :])
+                offset_res = offset_res + int((lmax + 1) ** 2)
+            result["atom_feature"] = torch.cat(features, dim=-1)
+        return result

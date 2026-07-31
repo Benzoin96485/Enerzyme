@@ -7,6 +7,28 @@ from torch import Tensor
 from torch.nn import Module, Parameter
 
 
+class SmoothLeakyReLU(Module):
+    """Smooth leaky ReLU used for Equiformer attention scores.
+
+    .. math::
+
+        f(x) = \\frac{1+\\alpha}{2} x
+             + \\frac{1-\\alpha}{2} x \\,(2\\sigma(x)-1)
+    """
+
+    def __init__(self, negative_slope: float = 0.2) -> None:
+        super().__init__()
+        self.alpha = negative_slope
+
+    def forward(self, x: Tensor) -> Tensor:
+        x1 = ((1 + self.alpha) / 2) * x
+        x2 = ((1 - self.alpha) / 2) * x * (2 * torch.sigmoid(x) - 1)
+        return x1 + x2
+
+    def extra_repr(self) -> str:
+        return "negative_slope={}".format(self.alpha)
+
+
 class BaseScaledTemperedActivation(ABC, Module):
     def __init__(self, dim_feature: int=1, initial_alpha: float=1.0, initial_beta: float=1.0, learnable: bool=False) -> None:
         super().__init__()

@@ -23,7 +23,7 @@ from torch.nn import Module, ModuleList, Sequential, SiLU
 
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 from ..blocks.mlp import DenseLayer, ResidualLayer, ResidualMLP
-from . import BaseFFLayer
+from ..layers._base_layer import BaseFFLayer
 
 
 def calc_sphere_points(num_points: int, device=None, dtype=torch.float32) -> Tensor:

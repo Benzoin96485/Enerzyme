@@ -23,8 +23,8 @@ from e3nn import o3
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from enerzyme.models.blocks.mlp import DenseLayer
-from enerzyme.models.equiformer.fast_activation import Activation
-from enerzyme.models.equiformer.tensor_product import LinearRS
+from enerzyme.models.e3nn_nn import Activation
+from enerzyme.models.e3nn_nn import LinearRS
 from enerzyme.models.layers.readout import SimpleReadout
 
 

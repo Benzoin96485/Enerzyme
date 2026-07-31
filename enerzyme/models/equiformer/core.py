@@ -10,18 +10,17 @@ from e3nn import o3
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
-from ..irreps_tools import extract_scalar_0e, scalar_0e_dim
+from ..e3nn_nn import extract_scalar_0e, scalar_0e_dim
 from ..layers._base_layer import BaseFFCore
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.electrostatics import ChargeConservationLayer
 from ..layers.geometry import DistanceLayer, RangeSeparationLayer
 from ..layers.rbf import BaseRBF
-from .attention import GraphAttention, TransBlock, get_norm_layer, _RESCALE
-from .drop import EquivariantDropout
+from ..e3nn_nn import EquivariantDropout
 from .embedding import EdgeDegreeEmbeddingNetwork, ScaledScatter
-from .fast_activation import Activation
+from ..e3nn_nn import Activation, LinearRS
 from .node_embedding_layer import EquiformerNodeEmbedding
-from .tensor_product import LinearRS
+from .interaction import GraphAttention, TransBlock, get_norm_layer, _RESCALE
 
 # MD17-style statistics (cutoff ~5 A); used for ScaledScatter normalization.
 _AVG_DEGREE = 15.57930850982666

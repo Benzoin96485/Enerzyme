@@ -13,10 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from enerzyme.models.ff import build_model
 from enerzyme.models.irreps_tools import extract_scalar_0e, scalar_0e_dim
-from enerzyme.models.layers.readout import (
-    SimpleReadout,
-    EquiformerGraphAttentionReadout,
-)
+from enerzyme.models.equiformer.interaction import EquiformerGraphAttentionReadout
+from enerzyme.models.layers.readout import SimpleReadout
 
 
 def test_extract_scalar_0e_identity_without_irreps():

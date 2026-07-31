@@ -81,7 +81,7 @@ def copy_state_dict(dst: torch.nn.Module, src: torch.nn.Module) -> None:
 
 def build_so2_convolution_pair(extra_m0: int | None = None):
     """Enerzyme vs upstream SO2_Convolution with shared mapping."""
-    from enerzyme.models.equiformer_v2.so2_ops import SO2_Convolution as EZConv
+    from enerzyme.models.so3 import SO2_Convolution as EZConv
     from enerzyme.models.so3 import CoefficientMapping as EZMap
     from so2_ops import SO2_Convolution as OffConv
     from eqv2_so3 import CoefficientMappingModule as OffMap

@@ -30,7 +30,7 @@ from equiformer_parity_utils import (
     to_enerzyme_edges,
 )
 from enerzyme.models.irreps_tools import extract_scalar_0e, scalar_0e_dim
-from enerzyme.models.layers.readout import EquiformerGraphAttentionReadout
+from enerzyme.models.equiformer.interaction import EquiformerGraphAttentionReadout
 
 
 def test_feature_atom_feature_feeds_official_mlp_head():

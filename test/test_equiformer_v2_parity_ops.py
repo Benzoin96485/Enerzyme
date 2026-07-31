@@ -111,7 +111,7 @@ def test_so2_convolution_extra_m0_matches_upstream():
 
 
 def test_rms_norm_sh_matches_upstream():
-    from enerzyme.models.equiformer_v2.layer_norm import get_normalization_layer as ez_norm
+    from enerzyme.models.so3 import get_normalization_layer as ez_norm
     from layer_norm import get_normalization_layer as off_norm
 
     torch.manual_seed(3)
