@@ -34,7 +34,7 @@ from .euclidean_transformer import EuclideanTransformer
 _AVG_NUM_NEIGHBORS = 15.57930850982666
 
 DEFAULT_BUILD_PARAMS = {
-    "dim_embedding": 128,
+    "dim_embedding": 132,
     "num_rbf": 32,
     "max_Za": 94,
     "cutoff_sr": 5.0,
@@ -52,7 +52,7 @@ DEFAULT_LAYER_PARAMS = [
         "name": "Core",
         "params": {
             "degrees": [1, 2, 3],
-            "num_features": 128,
+            "num_features": 132,
             "num_heads": 4,
             "num_layers": 3,
             "message_normalization": "avg_num_neighbors",
@@ -89,7 +89,7 @@ class So3kratesCore(BaseFFCore):
         num_rbf: int,
         max_Za: int = 94,
         degrees: Optional[Sequence[int]] = None,
-        num_features: int = 128,
+        num_features: int = 132,
         num_heads: int = 4,
         num_layers: int = 3,
         cutoff_sr: float = 5.0,

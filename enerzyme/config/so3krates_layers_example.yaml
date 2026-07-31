@@ -12,7 +12,7 @@ Modelhub:
       architecture: so3krates
       active: true
       build_params:
-        dim_embedding: 128
+        dim_embedding: 132
         num_rbf: 32
         max_Za: 94
         cutoff_sr: 5.0
@@ -26,7 +26,7 @@ Modelhub:
         - name: Core
           params:
             degrees: [1, 2, 3]
-            num_features: 128
+            num_features: 132
             num_heads: 4
             num_layers: 3
             message_normalization: avg_num_neighbors

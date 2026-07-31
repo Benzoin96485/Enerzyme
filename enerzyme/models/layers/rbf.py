@@ -8,6 +8,7 @@ from torch.nn import Parameter
 import torch.nn.functional as F
 from . import BaseFFLayer
 from ..cutoff import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
+from ..functional import softplus_inverse
 
 
 class BaseRBF(BaseFFLayer):
