@@ -288,8 +288,8 @@ Tests live in :code:`test/`:
 - :code:`test_escn_parity_*.py` — numerical parity vs vendored fairchem v1 eSCN (SO3 ops / Message+Layer blocks; injected edge frames)
 - :code:`test_equiformer_v2_core.py` — EquiformerV2 shapes, SimpleReadout contract, build_model E/F, SO(3) scalar invariance
 - :code:`test_equiformer_v2_parity_*.py` — numerical parity vs vendored EquiformerV2 upstream (SO2 conv / LinearV2 / norms / FFN / TransBlockV2)
-- :code:`test_equiformer_v3_core.py` — EquiformerV3 shapes, SimpleReadout contract, build_model E/F, SO(3) scalar invariance, YAML smoke
-- :code:`test_equiformer_v3_parity_*.py` — numerical parity vs vendored EquiformerV3 upstream (MergeLN / SO2Linear / envelope / FFN / TransBlockV3)
+- :code:`test_equiformer_v3_core.py` — EquiformerV3 shapes, SimpleReadout contract, build_model E/F, SO(3) scalar invariance, YAML smoke, force finite-difference conservation / Wigner autograd
+- :code:`test_equiformer_v3_parity_*.py` — numerical parity vs vendored EquiformerV3 upstream (MergeLN / SO2Linear / envelope / FFN / TransBlockV3); SwiGLU-S² ``_mem`` vs eager consistency
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test

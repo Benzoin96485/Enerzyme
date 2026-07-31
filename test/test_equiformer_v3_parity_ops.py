@@ -98,3 +98,68 @@ def test_graph_softmax_envelope_matches_upstream():
         ez(src.clone(), index, num_nodes=3, exp_rescale=rescale.clone()),
         off(src.clone(), index, num_nodes=3, exp_rescale=rescale.clone()),
     )
+
+
+def test_swiglu_s2_mem_matches_eager():
+    """Memory-efficient SwiGLU-S² must match the eager path (from_grid on activated grid)."""
+    from enerzyme.models.so3.activation_v3 import get_activation
+
+    torch.manual_seed(5)
+    dtype = torch.float64
+    lmax, mmax = 2, 2
+    grid = [8, 8]
+    n, c = 4, 6
+    # Channel layout for S2 SwiGLU: act splits channels in half on the grid.
+    x = torch.randn(n, (lmax + 1) ** 2, 2 * c, dtype=dtype)
+
+    eager = get_activation(
+        "s2_swiglu", lmax=lmax, mmax=mmax, grid_resolution_list=grid, use_m_primary=False
+    ).to(dtype)
+    mem = get_activation(
+        "s2_swiglu_mem",
+        lmax=lmax,
+        mmax=mmax,
+        grid_resolution_list=grid,
+        use_m_primary=False,
+    ).to(dtype)
+    mem.load_state_dict(eager.state_dict())
+    eager.eval()
+    mem.eval()
+    assert_close(eager(x.clone()), mem(x.clone()), atol=1e-5, rtol=1e-5)
+
+
+def test_sep_merge_gates2_swiglu_mem_matches_eager():
+    """Default-family mem activation must apply grid nonlinearity (not skip via from_grid(inputs))."""
+    from enerzyme.models.so3.activation_v3 import get_activation
+
+    torch.manual_seed(6)
+    dtype = torch.float64
+    lmax, mmax = 2, 2
+    grid = [8, 8]
+    n, c = 4, 4
+    # inputs: 2C channels; scalars: 2C (SwiGLU) + C (gate) = 3C
+    inputs = torch.randn(n, (lmax + 1) ** 2, 2 * c, dtype=dtype)
+    scalars = torch.randn(n, 3 * c, dtype=dtype)
+
+    eager = get_activation(
+        "sep-merge_gates2_swiglu",
+        lmax=lmax,
+        mmax=mmax,
+        grid_resolution_list=grid,
+        use_m_primary=True,
+    ).to(dtype)
+    mem = get_activation(
+        "sep-merge_gates2_swiglu_mem",
+        lmax=lmax,
+        mmax=mmax,
+        grid_resolution_list=grid,
+        use_m_primary=True,
+    ).to(dtype)
+    mem.load_state_dict(eager.state_dict())
+    eager.eval()
+    mem.eval()
+    y_eager = eager(inputs=inputs.clone(), scalars=scalars.clone())
+    y_mem = mem(inputs=inputs.clone(), scalars=scalars.clone())
+    assert_close(y_eager, y_mem, atol=1e-5, rtol=1e-5)
+    # Sanity: output must differ from a pure linear from_grid(inputs)-style skip.
+    assert y_eager.abs().sum() > 0

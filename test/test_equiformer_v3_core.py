@@ -188,3 +188,82 @@ def test_equiformer_v3_yaml_example_builds():
         verbose=0,
     )
     assert model.__class__.__name__ == "EquiformerV3Core"
+
+
+def test_equiformer_v3_force_finite_difference_conservation():
+    """Fa from ForceLayer must match central finite differences of E.
+
+    Catches Wigner / edge-frame detach that still yields finite but wrong Fa.
+    """
+    from enerzyme.models.ff import build_model
+
+    torch.manual_seed(0)
+    model = build_model("equiformer_v3", verbose=0).double()
+    model.eval()
+    N = 4
+    Ra = (torch.randn(N, 3, dtype=torch.float64) * 0.4).requires_grad_(True)
+    Za = torch.tensor([1, 6, 8, 1])
+    batch_seg = torch.zeros(N, dtype=torch.long)
+    idx_i, idx_j = _complete_graph_edges(N)
+    batch = {
+        "Ra": Ra,
+        "Za": Za,
+        "batch_seg": batch_seg,
+        "idx_i": idx_i,
+        "idx_j": idx_j,
+    }
+    out = model(batch)
+    fa = out["Fa"].detach()
+    assert torch.isfinite(fa).all()
+    assert fa.abs().sum() > 0
+
+    eps = 1e-4
+    fd = torch.zeros_like(fa)
+    base = Ra.detach().clone()
+    for i in range(N):
+        for d in range(3):
+            rp = base.clone()
+            rm = base.clone()
+            rp[i, d] += eps
+            rm[i, d] -= eps
+            rp = rp.requires_grad_(True)
+            rm = rm.requires_grad_(True)
+            ep = model(
+                {
+                    "Ra": rp,
+                    "Za": Za,
+                    "batch_seg": batch_seg,
+                    "idx_i": idx_i,
+                    "idx_j": idx_j,
+                }
+            )["E"]
+            em = model(
+                {
+                    "Ra": rm,
+                    "Za": Za,
+                    "batch_seg": batch_seg,
+                    "idx_i": idx_i,
+                    "idx_j": idx_j,
+                }
+            )["E"]
+            fd[i, d] = -(ep.detach() - em.detach()).sum() / (2 * eps)
+
+    assert_allclose(fa.cpu().numpy(), fd.cpu().numpy(), atol=2e-3, rtol=2e-3)
+
+
+def test_equiformer_v3_wigner_stays_in_autograd_graph():
+    """SO3RotationFused Wigner must not be detached when use_rotation_mask=False."""
+    from enerzyme.models.so3 import SO3RotationFused, init_edge_rot_mat
+
+    torch.manual_seed(0)
+    dtype = torch.float64
+    vij = torch.randn(3, 3, dtype=dtype, requires_grad=True)
+    rot = SO3RotationFused(lmax=2, mmax=1, use_rotation_mask=False)
+    edge_rot = init_edge_rot_mat(vij)
+    rot.set_wigner(edge_rot)
+    assert rot.wigner.requires_grad
+    assert rot.wigner_inv.requires_grad
+    loss = rot.wigner.sum() + rot.wigner_inv.sum()
+    loss.backward()
+    assert vij.grad is not None
+    assert torch.isfinite(vij.grad).all()
