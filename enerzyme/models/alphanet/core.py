@@ -5,7 +5,7 @@
 
 import math
 from math import pi
-from typing import Dict, Literal, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -37,18 +37,8 @@ DEFAULT_LAYER_PARAMS = [
         "has_dropout_flag": True,
         "has_norm_before_flag": True,
         "has_norm_after_flag": False,
-        "reduce_mode": "sum",
-        "output_mode": "feature",
+        "reduce_mode": "sum"
     }},
-    {
-        "name": "SimpleReadout",
-        "params": {
-            "output_fields": {"Ea", "Qa"},
-            "head_type": "residual_mlp",
-            "num_residual": 2,
-            "dim_embedding": 128,
-        },
-    },
     {'name': 'AtomicAffine',
         'params': {
             'shifts': {
@@ -820,20 +810,13 @@ class AlphaNet(BaseFFCore):
             has_dropout_flag=True,
             has_norm_before_flag=True,
             has_norm_after_flag=False,
-            reduce_mode='sum',
-            output_mode: Literal["direct", "feature"] = "feature",
+            reduce_mode='sum'
     ):
-        self.output_mode: Literal["direct", "feature"] = output_mode
-        output_fields = {"Ea", "Qa"} if output_mode == "direct" else {"atom_feature"}
-        super(AlphaNet, self).__init__(
-            input_fields={"Ra", "Za", "batch_seg", "idx_i_sr", "idx_j_sr", "Dij_sr", "vij_sr"},
-            output_fields=output_fields,
-        )
+        super(AlphaNet, self).__init__(input_fields={"Ra", "Za", "batch_seg", "idx_i_sr", "idx_j_sr", "Dij_sr", "vij_sr"}, output_fields={"Ea", "Qa"})
 
         self.eps = float(eps)
         self.num_layers = num_layers
         self.hidden_channels = hidden_channels
-        self.dim_feature_out = hidden_channels
         self.cutoff = cutoff_sr
         self.chi1 = main_chi1
         self.pos_require_grad= True
@@ -881,10 +864,10 @@ class AlphaNet(BaseFFCore):
         self.kernels_imag = torch.nn.Parameter(torch.stack(self.kernels_imag)) 
 
         self.num_targets = 2
-        if output_mode == "direct":
-            # Pre-NSE AlphaNet heads (Linear on scalar + quantum features)
-            self.last_layer = nn.Linear(hidden_channels, self.num_targets)
-            self.last_layer_quantum = nn.Linear(self.chi1 * 2, self.num_targets)
+
+        self.last_layer = nn.Linear(hidden_channels, self.num_targets)
+        self.last_layer_quantum = nn.Linear(self.chi1 * 2, self.num_targets)
+        # self.out_forces = EquiOutput(hidden_channels)
 
         # for node-wise frame
         self.mean_neighbor_pos = aggregate_pos(aggr='mean')
@@ -908,9 +891,7 @@ class AlphaNet(BaseFFCore):
             layer.reset_parameters()
         for layer in self.FTEs:
             layer.reset_parameters()
-        if hasattr(self, "last_layer"):
-            self.last_layer.reset_parameters()
-            self.last_layer_quantum.reset_parameters()
+        self.last_layer.reset_parameters()
         for layer in self.radial_lin:
             if hasattr(layer, 'reset_parameters'):
                 layer.reset_parameters()
@@ -1001,7 +982,8 @@ class AlphaNet(BaseFFCore):
             s = s + ds
             vec = vec + dvec
 
-        return s, quantum
+        s = self.last_layer(s) + self.last_layer_quantum(torch.cat([quantum.real, quantum.imag], dim=-1)) / self.chi1
+        return s[:,0], s[:,1]
 
     def build(self, built_layers) -> None:
         calculate_distance = DistanceLayer()
@@ -1021,14 +1003,9 @@ class AlphaNet(BaseFFCore):
             else:
                 self.post_sequence.append(layer)
 
-    def get_output(self, Ra, Za, batch_seg, idx_i_sr, idx_j_sr, Dij_sr, vij_sr) -> Dict[str, torch.Tensor]:
-        atom_feature, quantum = self.__forward(Ra, batch_seg, Za, idx_i_sr, idx_j_sr, Dij_sr, vij_sr)
-        if self.output_mode == "feature":
-            return {"atom_feature": atom_feature}
-        out = self.last_layer(atom_feature) + self.last_layer_quantum(
-            torch.cat([quantum.real, quantum.imag], dim=-1)
-        ) / self.chi1
-        return {"Ea": out[:, 0], "Qa": out[:, 1]}
+    def get_output(self, Ra, Za, batch_seg, idx_i_sr, idx_j_sr, Dij_sr, vij_sr):
+        Ea, Qa = self.__forward(Ra, batch_seg, Za, idx_i_sr, idx_j_sr, Dij_sr, vij_sr)
+        return {"Ea": Ea, "Qa": Qa}
         
     @property
     def num_params(self):

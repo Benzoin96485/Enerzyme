@@ -3,7 +3,7 @@ Description:    Code is adapted from torch geometric implementation https://gith
 All rights reserved to original authors.
 """
 
-from typing import List, Literal
+from typing import List
 import torch
 from torch import Tensor
 from torch.nn import Linear, Module, ModuleList
@@ -61,12 +61,9 @@ class SchNetCore(BaseFFCore):
             cutoff_sr: float = 5.0,
             activation_fn: ACTIVATION_KEY_TYPE="shifted_softplus",   # activation function
             activation_params: ACTIVATION_PARAM_TYPE=dict(),
-            shallow_ensemble_size: int=1,
-            output_mode: Literal["direct", "feature"]="direct",
+            shallow_ensemble_size: int=1
     ):
-        self.output_mode: Literal["direct", "feature"] = output_mode
-        output_fields = {"Ea", "Qa"} if output_mode == "direct" else {"atom_feature"}
-        super().__init__(input_fields={"idx_i_sr", "idx_j_sr", "Dij_sr", "rbf", "atom_embedding"}, output_fields=output_fields)
+        super().__init__(input_fields={"idx_i_sr", "idx_j_sr", "Dij_sr", "rbf", "atom_embedding"}, output_fields={"Ea", "Qa"})
         
         self.hidden_channels = hidden_channels
         self.num_filters = dim_embedding
@@ -80,12 +77,11 @@ class SchNetCore(BaseFFCore):
                                      dim_embedding, cutoff_sr)
             self.interactions.append(block)
 
-        if self.output_mode == "direct":
-            self.lin1 = Linear(hidden_channels, hidden_channels // 2)
-            self.act = get_activation_fn(activation_fn, activation_params)
-            self.lin2 = DenseLayer(hidden_channels // 2, 2, initial_weight="xavier_uniform", initial_bias="zero", shallow_ensemble_size=shallow_ensemble_size)
-            self.shallow_ensemble_size = shallow_ensemble_size
-            self.reset_parameters()
+        self.lin1 = Linear(hidden_channels, hidden_channels // 2)
+        self.act = get_activation_fn(activation_fn, activation_params)
+        self.lin2 = DenseLayer(hidden_channels // 2, 2, initial_weight="xavier_uniform", initial_bias="zero", shallow_ensemble_size=shallow_ensemble_size)
+        self.shallow_ensemble_size = shallow_ensemble_size
+        self.reset_parameters()
 
     def __str__(self) -> str:
         return """
@@ -98,9 +94,8 @@ class SchNetCore(BaseFFCore):
         r"""Resets all learnable parameters of the module."""
         for interaction in self.interactions:
             interaction.reset_parameters()
-        if self.output_mode == "direct":
-            torch.nn.init.xavier_uniform_(self.lin1.weight)
-            self.lin1.bias.data.fill_(0)
+        torch.nn.init.xavier_uniform_(self.lin1.weight)
+        self.lin1.bias.data.fill_(0)
 
     def build(self, built_layers: List[Module]) -> None:
         # build necessary fixed pre-core layers
@@ -133,9 +128,6 @@ class SchNetCore(BaseFFCore):
 
         for interaction in self.interactions:
             atom_embedding = atom_embedding + interaction(atom_embedding, edge_index, Dij_sr, rbf)
-
-        if self.output_mode == "feature":
-            return {"atom_feature": atom_embedding}
 
         atom_embedding = self.lin1(atom_embedding)
         atom_embedding = self.act(atom_embedding)

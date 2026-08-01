@@ -13,19 +13,12 @@ Starting the server
 Arguments:
 
 - :code:`-c` — server config (minimal YAML; see below)
-- :code:`-m` — trained model directory (optional in external-calculator shell mode)
+- :code:`-m` — trained model directory
 - :code:`-mc` — model config (defaults to :code:`model_dir/config.yaml`)
 - :code:`-b` — bind address (host:port)
 - :code:`-o` — output directory for server logs and artifacts
-- :code:`-cp` — optional external calculator patch (:code:`.py`), same as :code:`simulate`
 
-External-calculator shell (no trained Enerzyme model):
-
-.. code-block:: bash
-
-    enerzyme listen -c enerzyme/config/server_uma.yaml -o server_out/ -b 0.0.0.0:5000 -cp /path/to/uma.py
-
-Set :code:`Server.internal_calculator_weight: 0` and omit :code:`uncertainty_calculator`. The server loads only the :code:`-cp` factory named by :code:`Server.external_calculator`.
+There is no separate :code:`listen.yaml` in the repository. Reuse a lightweight config derived from :code:`predict.yaml` or an empty :code:`Datahub`-only stub—the server loads active models from :code:`-mc`.
 
 Minimal server config
 ---------------------
@@ -35,7 +28,7 @@ Minimal server config
     Datahub:
         preload: true
 
-With an internal model, the listen process reads :code:`Modelhub` from the model config, loads all :code:`active: true` models, and exposes them via Flask/Waitress. Hybrid / shell keys live under :code:`Server:` — see :doc:`/user_guide/integrations/server_mode`.
+The listen process reads :code:`Modelhub` from the model config, loads all :code:`active: true` models, and exposes them via Flask/Waitress.
 
 Sending a request (client)
 --------------------------
@@ -92,9 +85,7 @@ Relevant launchers:
 | :code:`enerzymette enerzyme_active_learning` | PLUMED steered MD AL iterations    |
 +-----------------------------------+-----------------------------------------------+
 
-:code:`enerzyme_neb` and :code:`enerzyme_scan` start :code:`enerzyme listen` when needed; :code:`enerzyme_active_learning` invokes :code:`enerzyme simulate` directly.
-
-For NEB, :code:`-q` may be a TeraChem input or a YAML :code:`neb_config` (:code:`reference_pdb`, :code:`freeze_index_types`; optional :code:`charge`). In external-calculator shell mode, pass the same :code:`-cp` the launcher should forward to :code:`enerzyme listen` (and omit :code:`-m` when :code:`internal_calculator_weight` is 0). Optional :code:`-t` supplies an initial TS guess. See :doc:`enhanced_sampling` for PLUMED plugins, scan/neb YAML examples, and CLI details. End-to-end example: :code:`example/NNP4MTase`.
+:code:`enerzyme_neb` and :code:`enerzyme_scan` start :code:`enerzyme listen` when needed; :code:`enerzyme_active_learning` invokes :code:`enerzyme simulate` directly. See :doc:`enhanced_sampling` for PLUMED plugin details. End-to-end example: :code:`example/NNP4MTase`.
 
 Architecture sketch
 -------------------
@@ -104,8 +95,7 @@ Architecture sketch
     Client / Enerzymette  --POST /calculate-->  enerzyme listen
                                                       |
                                                       v
-                                              ASECalculator
-                                           (internal and/or -cp)
+                                              ASECalculator + model
 
 Related pages
 -------------

@@ -13,7 +13,7 @@ Datahub
 The :code:`Datahub` section connects your dataset to the model. At minimum specify:
 
 - :code:`data_path` — path to the dataset (relative paths are allowed)
-- :code:`data_format` — :code:`pickle`, :code:`npz`, :code:`hdf5`, or :code:`aselmdb`
+- :code:`data_format` — :code:`pickle`, :code:`npz`, or :code:`hdf5`
 
 Then define :code:`features` (model inputs) and :code:`targets` (quantities to fit). Each key is a **standard Enerzyme field name**; the value is the attribute name in your dataset (leave empty if they match).
 
@@ -95,11 +95,8 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |
 +----------------+------------------------------------------+---------------------------+
-| AllScAIP       | Research only (do not use as primary)   | Experimental 魔改 port;   |
-|                |                                          | see architecture catalog  |
-+----------------+------------------------------------------+---------------------------+
 
-Enable exactly one model (:code:`active: true`) when starting out. Prefer PhysNet / SpookyNet / MACE / UMA for production; AllScAIP remains experimental.
+Enable exactly one model (:code:`active: true`) when starting out.
 
 SchNet configuration
 ^^^^^^^^^^^^^^^^^^^^

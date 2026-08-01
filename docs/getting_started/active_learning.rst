@@ -309,36 +309,26 @@ Annotation template
 
 The annotation template should define the QM method. Leave :code:`Supplier.path` empty; Enerzymette fills it with the fragment SDF for the current round.
 
-Current Enerzyme annotate API (template-driven TeraChem). Keep :code:`pickle_name: fragments.pkl` and an Enerzymette :code:`pickle_fields` map until Enerzymette reads ASE LMDB:
-
 .. code-block:: yaml
 
     Supplier:
         path:
     QMDriver:
         engine: TeraChem
-        template_input_file: terachem_template.in
-        pickle_name: fragments.pkl
-        pickle_fields:
-            E: energy
-            Fa: grad
-            M2: dipole
-            Ra: coord
-            Za: atom_type
-            Q: total_chrg
-            S: total_spin
+        bs: 6-31gs
+        xc: b3lyp
+        pcm: cosmo
+        dftd: d3
+        pcm_radii_file: /path/to/pcm_radii
+        epsilon: 10
         keep_molden: false
-        keep_stdout: false
+        keep_output: false
         clean_tmp: true
-        dump_single_run: true   # cache single_run/<index>.pkl; skip finished QM on resume
+        pickle_name: fragments.pkl
+        dump_single_run: false
         n_processes: 8
 
-Put basis / XC / PCM (including a relative :code:`pcm_radii_file` next to the template) in :code:`terachem_template.in`. The driver resolves that path relative to the template and copies the radii file into the job scratch directory.
-
 In a generated round :code:`Supplier.path` points to the extracted SDF. The labeled :code:`fragments.pkl` is then merged into the next training set.
-
-A minimal end-to-end layout (repo-relative paths, vendored fixtures) lives under
-:code:`example/L3-COMT-aselmdb-smoke/` — see that directory's :code:`README.md`.
 
 Training template
 ^^^^^^^^^^^^^^^^^
@@ -404,7 +394,7 @@ Two patterns seed structures before or alongside AL:
 - Per-reaction subdirectories with :code:`reactant_opt.yaml`, :code:`scan.yaml`, :code:`product_opt.yaml`
 - :code:`local_minima/` and :code:`rate_determining_ts/` summaries
 
-For PLUMED CV scans, :code:`-pp` (plugin key) and :code:`-psc` (CV parameter YAML) are both required. For bond-distance scans, :code:`-q` accepts either a TeraChem input or a YAML scan config (optional :code:`charge` skips PDB charge derivation; see :doc:`enhanced_sampling`).
+For PLUMED CV scans, :code:`-pp` (plugin key) and :code:`-psc` (CV parameter YAML) are both required. For bond-distance scans, :code:`-q` accepts either a TeraChem input or a YAML scan config (see :doc:`enhanced_sampling`).
 
 Neither pattern replaces Enerzyme's internal :code:`Trainer.active_learning_params` dataset AL.
 

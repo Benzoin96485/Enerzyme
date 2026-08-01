@@ -134,17 +134,14 @@ def get_parser():
     parser_listen.add_argument('-c', '--config_path', type=str, default='', 
         help='listen config'
     )
-    parser_listen.add_argument('-m', '--model_dir', type=str, default=None,
-                    help='the directory of models (optional in external-calculator shell mode)')
+    parser_listen.add_argument('-m', '--model_dir', type=str,
+                    help='the directory of models')
     parser_listen.add_argument('-o', '--out_dir', type=str, default='../results',
         help='the output directory for saving artifact')
     parser_listen.add_argument('-b', '--bind', type=str, default='0.0.0.0:5000',
         help='the address to bind to')
     parser_listen.add_argument('-mc', '--model_config_path', type=str, default=None,
         help='the model configuration file'
-    )
-    parser_listen.add_argument('-cp', '--calculator_patch', type=str, default=None,
-        help='the external calculator patch path'
     )
 
     parser_request = subparsers.add_parser(
@@ -258,8 +255,7 @@ def listen(args):
         model_dir=args.model_dir, 
         out_dir=args.out_dir,
         bind=args.bind,
-        model_config_path=args.model_config_path,
-        calculator_patch=args.calculator_patch,
+        model_config_path=args.model_config_path
     ).listen()
 
 

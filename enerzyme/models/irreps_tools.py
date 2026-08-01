@@ -1,48 +1,12 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Tuple, Union
 from collections import namedtuple
 import torch
-from torch import Tensor
 import e3nn.o3 as o3
 from e3nn.util.jit import compile_mode
 from e3nn.o3 import Irreps
 
 _INPUT = namedtuple("_INPUT", "tensor, start, stop")
 _TP = namedtuple("_TP", "op, args")
-
-
-def scalar_0e_dim(irreps: Union[str, Irreps, None]) -> Optional[int]:
-    """Number of even scalar (0e) channels, or None if ``irreps`` is unset."""
-    if irreps is None:
-        return None
-    ir = Irreps(irreps)
-    return sum(mul for mul, irr in ir if irr.l == 0 and irr.p == 1)
-
-
-def extract_scalar_0e(
-    atom_feature: Tensor, irreps: Union[str, Irreps, None]
-) -> Tensor:
-    """Return even-scalar (0e) channels from a flat irreps feature.
-
-    If ``irreps`` is None, ``atom_feature`` is treated as already-scalar and
-    returned unchanged.
-    """
-    if irreps is None:
-        return atom_feature
-    ir = Irreps(irreps)
-    if atom_feature.shape[-1] != ir.dim:
-        raise ValueError(
-            f"atom_feature last dim {atom_feature.shape[-1]} != irreps.dim {ir.dim}"
-        )
-    pieces = []
-    offset = 0
-    for mul, irr in ir:
-        width = mul * irr.dim
-        if irr.l == 0 and irr.p == 1:
-            pieces.append(atom_feature[..., offset : offset + width])
-        offset += width
-    if not pieces:
-        raise ValueError(f"No scalar (0e) channels in irreps {ir}")
-    return torch.cat(pieces, dim=-1)
 
 
 def linear_out_irreps(irreps: Irreps, target_irreps: Irreps) -> Irreps:

@@ -33,7 +33,7 @@ class ASECalculator(Calculator):
 
     def __init__(
         self,
-        model: Optional[Module]=None,
+        model: Module,
         restart: Optional[str]=None,
         label: Optional[str]=None,
         atoms: Optional[ase.Atoms]=None,
@@ -71,19 +71,6 @@ class ASECalculator(Calculator):
             self.external_calculator_weight = external_calculator_config.get("weight", 0.0)
             self.use_external_calculator = True
         self.uncertainty_calculator_config = uncertainty_calculator_config
-        self.use_internal_calculator = (
-            self.internal_calculator_weight != 0 or self.uncertainty_calculator_config is not None
-        )
-        if self.use_internal_calculator and self.model is None:
-            raise ValueError(
-                "Internal calculator is required (non-zero internal_calculator_weight "
-                "or uncertainty_calculator) but model is None"
-            )
-        if not self.use_internal_calculator and not self.use_external_calculator:
-            raise ValueError(
-                "No calculator is active: set a non-zero internal_calculator_weight "
-                "and/or provide an external_calculator"
-            )
 
     def _calculate_UDD(self, output: Dict[str, Any], A: float, B: float, NM: Optional[int]=None) -> Dict[str, Any]:
         results, biases = dict(), dict()
@@ -164,35 +151,23 @@ class ASECalculator(Calculator):
 
     def calculate(self, atoms=None, properties=["energy", "forces", "dipole", "charges"], system_changes=all_changes) -> None:
         Calculator.calculate(self, atoms, properties, system_changes)
-        internal_results, biases = dict(), dict()
-        if self.use_internal_calculator:
+        if self.internal_calculator_weight != 0 or self.uncertainty_calculator_config is not None:
             internal_results, biases = self._calculate_internal(atoms)
-        # External ASE calculators often only implement energy/forces; do not
-        # pass dipole/charges even if the caller requested them.
-        external_calculator_properties = [
-            p for p in properties if p in ("energy", "forces")
-        ]
-        external_results = dict()
-        if self.use_external_calculator and external_calculator_properties:
-            self.external_calculator.calculate(
-                atoms,
-                properties=external_calculator_properties,
-                system_changes=system_changes,
-            )
+        if self.use_external_calculator:
+            external_calculator_properties = ['energy', 'forces']  
+            self.external_calculator.calculate(atoms, properties=properties, system_changes=system_changes)
+            external_results = dict()
             for property in external_calculator_properties:
                 external_results[property] = self.external_calculator.results[property]
-
+        
         for property in properties:
             if self.use_external_calculator and property in external_calculator_properties:
                 if self.internal_calculator_weight == 0:
                     self.results[property] = self.external_calculator_weight * external_results[property]
                 else:
                     self.results[property] = self.internal_calculator_weight * internal_results[property] + self.external_calculator_weight * external_results[property]
-            elif property in internal_results:
-                self.results[property] = self.internal_calculator_weight * internal_results[property]
             else:
-                # Fully external shell: skip properties the external calc does not provide
-                continue
+                self.results[property] = self.internal_calculator_weight * internal_results[property]
 
             if self.uncertainty_calculator_config is not None and property in ["energy", "forces"]:
                 self.results[property] += biases[property]
@@ -239,7 +214,7 @@ def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", mod
             model_str = get_model_str(FF_key, FF_params)
             model = build_model(FF_params.architecture, FF_params.layers, FF_params.build_params)
             model_path = get_pretrain_path(os.path.join(model_dir, model_str), "best")
-            model = model.to(device=device, dtype=dtype)
+            model = model.to(device).type(dtype)
             _load_state_dict(model, device, model_path, inference=True)
             model.eval()
             calculator = ASECalculator(

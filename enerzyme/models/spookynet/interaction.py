@@ -6,7 +6,6 @@ from ..activation import ACTIVATION_KEY_TYPE
 from ..layers.electron_embedding import ResidualMLP
 from ..blocks.mlp import ResidualStack as _ResidualStack
 from ..blocks.attention import Attention
-from ..efa import EFABlock
 
 
 def ResidualStack(
@@ -252,16 +251,9 @@ class InteractionModule(Module):
         num_residual_post: int,
         num_residual_output: int,
         activation_fn: ACTIVATION_KEY_TYPE="swish",
-        use_efa: bool = False,
-        efa_lebedev_num: int = 146,
-        efa_max_frequency: Optional[float] = None,
-        efa_max_length: float = 10.0,
-        efa_num_features_qk: Optional[int] = None,
-        efa_num_features_v: Optional[int] = None,
     ) -> None:
         """ Initializes the InteractionModule class. """
         super().__init__()
-        self.use_efa = bool(use_efa)
         # initialize modules
         self.local_interaction = LocalInteraction(
             dim_embedding=dim_embedding,
@@ -273,30 +265,13 @@ class InteractionModule(Module):
             num_residual=num_residual_local,
             activation_fn=activation_fn,
         )
-        if self.use_efa:
-            qk = efa_num_features_qk if efa_num_features_qk is not None else dim_embedding
-            if qk % 2 != 0:
-                qk = qk + 1
-            # Do not register ``nonlocal_interaction`` so EFA mode has a distinct
-            # parameter tree; default ``use_efa=False`` keeps the pre-EFA layout.
-            self.efa_nonlocal = EFABlock(
-                dim_embedding,
-                num_features_qk=qk,
-                num_features_v=efa_num_features_v or dim_embedding,
-                lebedev_num=efa_lebedev_num,
-                max_frequency=efa_max_frequency,
-                max_length=efa_max_length,
-                as_delta=True,
-            )
-        else:
-            # Exact pre-EFA submodule set / state_dict keys (checkpoint compatible).
-            self.nonlocal_interaction = NonlocalInteraction(
-                dim_embedding=dim_embedding,
-                num_residual_q=num_residual_nonlocal_q,
-                num_residual_k=num_residual_nonlocal_k,
-                num_residual_v=num_residual_nonlocal_v,
-                activation_fn=activation_fn,
-            )
+        self.nonlocal_interaction = NonlocalInteraction(
+            dim_embedding=dim_embedding,
+            num_residual_q=num_residual_nonlocal_q,
+            num_residual_k=num_residual_nonlocal_k,
+            num_residual_v=num_residual_nonlocal_v,
+            activation_fn=activation_fn,
+        )
         self.residual_pre = ResidualStack(dim_embedding, num_residual_pre, activation_fn)
         self.residual_post = ResidualStack(dim_embedding, num_residual_post, activation_fn)
         self.resblock = ResidualMLP(
@@ -314,7 +289,6 @@ class InteractionModule(Module):
         num_batch: int,
         batch_seg: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
-        Ra: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Evaluate all modules in the block.
@@ -337,8 +311,6 @@ class InteractionModule(Module):
             batch_seg (LongTensor [N]):
                 Index for each atom that specifies to which molecule in the
                 batch it belongs.
-            Ra (FloatTensor [N, 3], optional):
-                Absolute positions; required when ``use_efa=True``.
         Returns:
             x (FloatTensor [N, num_features]):
                 Updated latent atomic feature vectors.
@@ -348,13 +320,6 @@ class InteractionModule(Module):
         """
         x = self.residual_pre(x)
         l = self.local_interaction(x, rbf, pij, dij, idx_i, idx_j)
-        if self.use_efa:
-            if Ra is None:
-                raise ValueError("Ra (absolute positions) is required when use_efa=True")
-            if batch_seg is None:
-                batch_seg = torch.zeros(x.shape[0], dtype=torch.long, device=x.device)
-            n = self.efa_nonlocal(x, Ra, batch_seg)
-        else:
-            n = self.nonlocal_interaction(x, num_batch, batch_seg, mask)
+        n = self.nonlocal_interaction(x, num_batch, batch_seg, mask)
         x = self.residual_post(x + l + n)
         return x, self.resblock(x)

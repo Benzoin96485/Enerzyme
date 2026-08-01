@@ -1,46 +1,10 @@
 import math
 from abc import ABC, abstractmethod
-from typing import Literal, Dict, Union, Callable
+from typing import Literal, Dict, Union
 import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Module, Parameter
-
-
-class SmoothLeakyReLU(Module):
-    """Smooth leaky ReLU used for Equiformer attention scores.
-
-    .. math::
-
-        f(x) = \\frac{1+\\alpha}{2} x
-             + \\frac{1-\\alpha}{2} x \\,(2\\sigma(x)-1)
-    """
-
-    def __init__(self, negative_slope: float = 0.2) -> None:
-        super().__init__()
-        self.alpha = negative_slope
-
-    def forward(self, x: Tensor) -> Tensor:
-        x1 = ((1 + self.alpha) / 2) * x
-        x2 = ((1 - self.alpha) / 2) * x * (2 * torch.sigmoid(x) - 1)
-        return x1 + x2
-
-    def extra_repr(self) -> str:
-        return "negative_slope={}".format(self.alpha)
-
-
-class SwiGLU(Module):
-    """SwiGLU over the last dim: ``value * silu(gate)`` (DPA4 / SeZM order).
-
-    Distinct from :class:`~enerzyme.models.so3.activation_v3.SwiGLU`, which
-    applies ``silu`` to the first half (EquiformerV3 convention).
-    """
-
-    def forward(self, x: Tensor) -> Tensor:
-        if x.shape[-1] % 2:
-            raise ValueError("SwiGLU requires an even last dimension")
-        value, gate = x.chunk(2, dim=-1)
-        return value * F.silu(gate)
 
 
 class BaseScaledTemperedActivation(ABC, Module):
@@ -159,17 +123,3 @@ def get_activation_fn(
     activation_params: ACTIVATION_PARAM_TYPE=dict()
 ) -> BaseScaledTemperedActivation:
     return ACTIVATION_REGISTER[key](**activation_params)
-
-
-POSITIVE_ACTIVATION_REGISTER = {
-    "softplus": F.softplus,
-    "square": torch.square,
-    "exp": torch.exp,
-}
-POSITIVE_ACTIVATION_KEY_TYPE = Literal["softplus", "square", "exp"]
-
-
-def get_positive_activation_fn(
-    key: POSITIVE_ACTIVATION_KEY_TYPE,
-) -> Callable[[Tensor], Tensor]:
-    return POSITIVE_ACTIVATION_REGISTER[key]

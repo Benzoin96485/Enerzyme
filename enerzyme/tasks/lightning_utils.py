@@ -13,7 +13,6 @@ from .monitor import Monitor
 from ..data.transform import Transform
 from .metrics import Metrics
 from .batch import _decorate_batch_output
-from .generator_ode import generator_ode_predict_enabled, generator_predict_forward
 
 
 class CollectOutputCallback(L.Callback):
@@ -191,8 +190,7 @@ class LightningModel(L.LightningModule):
         use_ema: bool,
         ema_decay: float,
         ema_use_num_updates: int,
-        dump_interval: int,
-        generator_config: Optional[Dict[str, Any]] = None,
+        dump_interval: int
     ):
         super().__init__()
         self.model = model
@@ -210,7 +208,6 @@ class LightningModel(L.LightningModule):
         self.test_step_outputs = []
         self.test_result = None
         self.dump_interval = dump_interval
-        self.generator_config = generator_config
 
     def training_step(self, batch, batch_idx):
         net_input, net_target = batch      
@@ -224,15 +221,9 @@ class LightningModel(L.LightningModule):
     
     def _prediction_step(self, batch):
         net_input, net_target = batch
-        if generator_ode_predict_enabled(self.generator_config):
-            with torch.no_grad():
-                output = generator_predict_forward(
-                    self.model, net_input, self.generator_config
-                )
-        else:
-            with torch.enable_grad():
-                net_input["Ra"].requires_grad_(True)
-                output = self.model(net_input)
+        with torch.enable_grad():
+            net_input["Ra"].requires_grad_(True)
+            output = self.model(net_input)
         loss = 0
         with torch.no_grad():
             for loss_term in self.loss_terms.values():

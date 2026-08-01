@@ -11,7 +11,7 @@ from e3nn.nn import FullyConnectedNet, Activation
 from e3nn.o3 import Irreps, TensorProduct, FullyConnectedTensorProduct
 from e3nn.util.jit import compile_mode
 from torch_scatter import scatter_sum
-from ..e3nn_nn import tp_out_irreps_with_instructions, reshape_irreps, U_matrix_real, linear_out_irreps
+from ..irreps_tools import tp_out_irreps_with_instructions, reshape_irreps, U_matrix_real, linear_out_irreps
 
 
 BATCH_EXAMPLE = 10

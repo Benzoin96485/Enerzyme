@@ -1,25 +1,14 @@
 Supplier:
-  path: /your/molecules.sdf                         # SDF/XYZ/pickle; SDF must include total charge
+  path: /your/molecules.sdf                         # path to molecules, sdf format, containing total charge
 QMDriver:
-  engine: TeraChem                                  # quantum chemistry engine
-  template_input_file: /your/terachem_template.in   # TeraChem template (basis, xc, solvent, …)
-  # Output (mutually exclusive): default ASE DB; pickle if output_file ends with .pkl/.pickle
-  # or if pickle_name is set (Enerzymette AL still uses pickle_name: fragments.pkl).
-  output_file: dataset.aselmdb                      # .aselmdb → ASE DB; .pkl → pickle
-  # pickle_name: fragments.pkl                      # alternative to select pickle output
-  # pickle_fields:                                  # optional: rename standard → custom keys
-  #   E: energy                                     # default pickle uses E, Fa, M2, Ra, Za, Q, S
-  #   Fa: grad                                      # Fa→grad also stores −Fa (∇E) for Enerzymette
-  #   M2: dipole
-  #   Ra: coord
-  #   Za: atom_type
-  #   Q: total_chrg
-  #   S: total_spin
+  engine: TeraChem                                  # quantum chemistry engine: TeraChem
+  bs: 6-31gs                                        # basis set: 6-31gs
+  xc: b3lyp                                         # exchange-correlation functional: b3lyp
+  pcm: cosmo                                        # polarizable continuum model: cosmo
+  dftd: d3                                          # dispersion correction: d3
+  pcm_radii_file: /your/pcm_radii_file              # path to PCM radii file
+  epsilon: 10                                       # dielectric constant
   keep_molden: false                                # if molden file is saved
-  keep_stdout: false                                # if output log is saved
+  keep_output: false                                # if output log is saved
   clean_tmp: true                                   # if temporary files are cleaned
-  # dump_single_run: true                           # pickle: cache single_run/<index>.pkl for resume
-                                                    # aselmdb always skips completed rows by index
-  n_processes: 1                                    # parallel QM submissions
-  n_gpus: 1                                         # GPUs for TeraChem; <1 means use all
-  terachem_args: [terachem]                         # executable prefix
+  pickle_name: /your/annotated/dataset.pkl          # path to save the labeled clusters

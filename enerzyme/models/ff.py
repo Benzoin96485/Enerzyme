@@ -1,6 +1,6 @@
 import os
 import bisect
-from inspect import signature, Parameter
+from inspect import signature
 from typing import Dict, Tuple, List, Any, Callable, Literal, Optional, Iterable, Union
 from collections import OrderedDict
 from functools import partial
@@ -43,10 +43,6 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .mace import MACECore as Core
         from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
-    elif architecture.lower() == "allscaip":
-        from .allscaip import AllScAIPCore as Core
-        from .allscaip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
     elif architecture.lower() == "nequip":
         from .nequip import NequIPWrapper as Core
         from .nequip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
@@ -55,68 +51,12 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .xpainn import XPaiNNWrapper as Core
         from .xpainn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
-    elif architecture.lower() == "escn":
-        from .escn import eSCNCore as Core
-        from .escn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
-    elif architecture.lower() == "uma_qs":
-        from .esen import UMAWrapperQS as Core
-        DEFAULT_BUILD_PARAMS = {}
-        DEFAULT_LAYER_PARAMS = []
-        special_loss = {}
-    elif architecture.lower() == "uma_flow_qs":
-        from .esen import UMAFlowWrapperQS as Core
-
-        DEFAULT_BUILD_PARAMS = {
-            # Must match ``sphere_channels`` of the UMA checkpoint used in Core.
-            "dim_embedding": 128,
-        }
-        DEFAULT_LAYER_PARAMS = []
-        special_loss = {}
-    elif architecture.lower() == "equiformer":
-        from .equiformer.core import EquiformerCore as Core
-        from .equiformer.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
-    elif architecture.lower() == "equiformer_v2":
-        from .equiformer_v2.core import EquiformerV2Core as Core
-        from .equiformer_v2.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
-    elif architecture.lower() == "equiformer_v3":
-        from .equiformer_v3.core import EquiformerV3Core as Core
-        from .equiformer_v3.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
-    elif architecture.lower() == "dpa4":
-        from .dpa4.core import DPA4Core as Core
-        from .dpa4.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
-    elif architecture.lower() == "so3krates":
-        from .so3krates.core import So3kratesCore as Core
-        from .so3krates.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
-    elif architecture.lower() == "so3lr":
-        # SO3LR = So3krates Core + universal pairwise FF (ZBL / erf-Coulomb / TS–QDO).
-        from .so3krates.core import So3kratesCore as Core
-        from .so3krates.so3lr import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
-    elif architecture.lower() == "efa":
-        # So3krates Core + Euclidean Fast Attention on selected layers.
-        from .so3krates.core import So3kratesCore as Core
-        from .so3krates.efa import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
-    elif architecture.lower() == "so3lr_efa":
-        # SO3LR layer stack with EFA enabled on So3kratesCore.
-        from .so3krates.core import So3kratesCore as Core
-        from .so3krates.so3lr_efa import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-        special_loss = {}
-    else:
-        raise NotImplementedError(f"Architecture {architecture} not implemented")
     LOSS_REGISTER.update(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
 
 def build_layer(layer: Callable, layer_params: Dict[str, Any], build_params: Dict[str, Any], built_layers: Optional[Dict[str, Module]]=None) -> Module:
     final_params = dict()
-    var_keyword = False
     for name, attr in signature(layer).parameters.items():
         if name in layer_params:
             final_params[name] = layer_params[name]
@@ -124,15 +64,8 @@ def build_layer(layer: Callable, layer_params: Dict[str, Any], build_params: Dic
             final_params[name] = build_params[name]
         elif name == "built_layers" and built_layers is not None:
             final_params[name] = built_layers
-        else:
-            if attr.kind == Parameter.VAR_KEYWORD:
-                var_keyword = True
-            elif attr.default is attr.empty:
-                raise TypeError(f"{name} value should be provided")
-    if var_keyword:
-        for key, value in layer_params.items():
-            if key not in final_params:
-                final_params[key] = value
+        elif attr.default is attr.empty:
+            raise TypeError(f"{name} value should be provided")
     return layer(**final_params)
 
 

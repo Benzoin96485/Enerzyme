@@ -54,8 +54,7 @@ Some workflows need extra packages or external programs that are **not** install
 - **QM annotation with TeraChem** — TeraChem (licensed)
 - **Bond assignment** — QuantumPDB https://github.com/hjkgrp/quantumPDB (optional but recommended)
 - **Enerzymette launchers** — install from the Enerzymette repository https://github.com/Benzoin96485/Enerzymette with :code:`pip install -e .`
-- **fairchem** — install from the fairchem repository https://github.com/Benzoin96485/fairchem
-- **UMA flow matching** (:code:`architecture: uma_flow_qs`) — :code:`pip install -e ".[flow]"` (installs :code:`torchdiffeq`) and fairchem
+- **fairchem** — install from the fairchem repository https://github.com/Benzoin96485/fairchem 
 
 Verify the installation
 -----------------------
