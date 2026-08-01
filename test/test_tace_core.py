@@ -304,3 +304,96 @@ def test_tace_cartesian_identity_resnet():
     )
     assert out["atom_feature"].shape == (n, 8)
     assert torch.isfinite(out["atom_feature"]).all()
+
+
+def _forward_core(core, n=4):
+    idx_i, idx_j = _edges(n)
+    return core.get_output(
+        Za=torch.tensor([1, 6, 8, 1]),
+        vij_sr=torch.randn(idx_i.numel(), 3),
+        idx_i_sr=idx_i,
+        idx_j_sr=idx_j,
+        rbf=torch.randn(idx_i.numel(), 4),
+        atom_embedding=torch.randn(n, 8),
+    )
+
+
+def test_tace_shared_knobs_honored_on_both_backends():
+    """Contract: shared Core knobs must not be silently ignored by either backend."""
+    import pytest
+
+    for basis in ("spherical", "cartesian"):
+        with pytest.raises(ValueError, match="scatter_norm"):
+            _tiny_core(basis, scatter_norm="bogus")
+
+    # density scatter_norm wires modules and runs on both backends
+    for basis, mode in (
+        ("spherical", "density"),
+        ("spherical", "no_cutoff_density"),
+        ("cartesian", "density"),
+        ("cartesian", "no_cutoff_density"),
+    ):
+        core = _tiny_core(basis, scatter_norm=mode, num_layers=1)
+        if basis == "spherical":
+            assert hasattr(core.interactions[0], "edge_density")
+        else:
+            assert len(core.cartesian_stack.edge_densities) == 1
+        feat = _forward_core(core)["atom_feature"]
+        assert torch.isfinite(feat).all()
+
+    # non-BB resnet_type disables residuals on both backends
+    for basis in ("spherical", "cartesian"):
+        core = _tiny_core(
+            basis,
+            resnet_type="none",
+            use_first_resnet=True,
+            num_layers=2,
+        )
+        if basis == "spherical":
+            assert all(not hasattr(inter, "resnetBB") for inter in core.interactions)
+        else:
+            assert all(r is None for r in core.cartesian_stack.resnets)
+        assert torch.isfinite(_forward_core(core)["atom_feature"]).all()
+
+    # BB + use_first_resnet enables residuals on both backends
+    for basis in ("spherical", "cartesian"):
+        core = _tiny_core(
+            basis,
+            resnet_type="BB",
+            use_first_resnet=True,
+            num_layers=2,
+        )
+        if basis == "spherical":
+            assert hasattr(core.interactions[0], "resnetBB")
+            assert hasattr(core.interactions[1], "resnetBB")
+        else:
+            assert core.cartesian_stack.resnets[0] is not None
+            assert core.cartesian_stack.resnets[1] is not None
+        assert torch.isfinite(_forward_core(core)["atom_feature"]).all()
+
+
+def test_tace_cartesian_density_changes_features_vs_avg():
+    """density path must actually alter messages relative to avg_num_neighbors."""
+    torch.manual_seed(0)
+    n = 4
+    idx_i, idx_j = _edges(n)
+    kwargs = dict(
+        Za=torch.tensor([1, 6, 8, 1]),
+        vij_sr=torch.randn(idx_i.numel(), 3),
+        idx_i_sr=idx_i,
+        idx_j_sr=idx_j,
+        rbf=torch.randn(idx_i.numel(), 4),
+        atom_embedding=torch.randn(n, 8),
+    )
+    avg = _tiny_core("cartesian", scatter_norm="avg_num_neighbors", num_layers=1)
+    dens = _tiny_core("cartesian", scatter_norm="density", num_layers=1)
+    dens.load_state_dict(avg.state_dict(), strict=False)
+    # Force density MLP away from zero so normalization differs from constant avg.
+    with torch.no_grad():
+        for p in dens.cartesian_stack.edge_densities[0].parameters():
+            p.fill_(0.2)
+        dens.cartesian_stack.density_betas[0].fill_(1.0)
+    out_avg = avg.get_output(**kwargs)["atom_feature"]
+    out_dens = dens.get_output(**kwargs)["atom_feature"]
+    assert torch.isfinite(out_dens).all()
+    assert not torch.allclose(out_avg, out_dens)

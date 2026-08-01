@@ -117,6 +117,8 @@ EDGE_UPDATE = {
 # CgtpInteraction
 # ---------------------------------------------------------------------------
 
+_SCATTER_NORMS = ("avg_num_neighbors", "density", "no_cutoff_density")
+
 
 class CgtpInteraction(nn.Module):
     def __init__(
@@ -145,6 +147,10 @@ class CgtpInteraction(nn.Module):
         correlation: int = 2,
     ) -> None:
         super().__init__()
+        if scatter_norm not in _SCATTER_NORMS:
+            raise ValueError(
+                f"Unknown scatter_norm={scatter_norm!r}; expected one of {_SCATTER_NORMS}"
+            )
         self.layer = layer
         self.num_layers = num_layers
         self.num_elements = num_elements

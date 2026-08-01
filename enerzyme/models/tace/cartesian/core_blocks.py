@@ -385,6 +385,15 @@ class CartesianProduct(nn.Module):
         return outs
 
 
+_SCATTER_NORMS = ("avg_num_neighbors", "density", "no_cutoff_density")
+
+
+def _broadcast_node_div(tensor: Tensor, density: Tensor) -> Tensor:
+    """Divide per-node tensor features by ``density`` with rank-aware broadcast."""
+    view = density.reshape(density.shape[0], *([1] * (tensor.ndim - 1)))
+    return tensor / view
+
+
 class CartesianLayerStack(nn.Module):
     def __init__(
         self,
@@ -401,15 +410,22 @@ class CartesianLayerStack(nn.Module):
         radial_mlp: List[int],
         radial_bias: bool,
         use_first_resnet: bool,
+        resnet_type: str,
         resnet_linear_type: str,
         l1l2: Optional[str],
         bias: bool,
     ):
         super().__init__()
+        if scatter_norm not in _SCATTER_NORMS:
+            raise ValueError(
+                f"Unknown scatter_norm={scatter_norm!r}; expected one of {_SCATTER_NORMS}"
+            )
         self.num_layers = num_layers
         self.num_channel = num_channel
         self.lmax = lmax
         self.scatter_norm = scatter_norm
+        self.resnet_type = resnet_type
+        self.apply_density_cutoff = scatter_norm != "no_cutoff_density"
         self.register_buffer(
             "_avg", torch.tensor(float(avg_num_neighbors), dtype=torch.get_default_dtype())
         )
@@ -428,6 +444,10 @@ class CartesianLayerStack(nn.Module):
         self.contractions = nn.ModuleList()
         self.products = nn.ModuleList()
         self.resnets = nn.ModuleList()
+        self.edge_densities = nn.ModuleList()
+        self.density_alphas = nn.ParameterList()
+        self.density_betas = nn.ParameterList()
+        use_density = scatter_norm in ("density", "no_cutoff_density")
 
         for layer in range(num_layers):
             eu = EDGE_UPDATE[edge_update](
@@ -454,7 +474,21 @@ class CartesianLayerStack(nn.Module):
                     bias=radial_bias,
                 )
             )
-            if use_first_resnet or layer > 0:
+            if use_density:
+                self.edge_densities.append(
+                    RadialMLP(
+                        [eu.out_dim, 64, 1],
+                        use_layer_norm=False,
+                        use_offset=False,
+                        bias=radial_bias,
+                    )
+                )
+                self.density_alphas.append(
+                    nn.Parameter(torch.tensor(float(avg_num_neighbors)))
+                )
+                self.density_betas.append(nn.Parameter(torch.tensor(0.0)))
+            # Match spherical CgtpInteraction: only BB residuals are wired.
+            if (use_first_resnet or layer > 0) and resnet_type == "BB":
                 if resnet_linear_type == "identity":
                     self.resnets.append(DictSkipIdentity(ls_out, num_channel))
                 else:
@@ -488,6 +522,7 @@ class CartesianLayerStack(nn.Module):
         edge_emb: Tensor,
         edge_index: Tensor,
         edge_vec: Tensor,
+        cutoff: Optional[Tensor] = None,
     ) -> Tensor:
         feats: Dict[int, Tensor] = {0: node_feats}
         edge_attrs = _split_cartesian_harmonics(self.harmonics(edge_vec), self.lmax)
@@ -495,6 +530,8 @@ class CartesianLayerStack(nn.Module):
         for layer in range(self.num_layers):
             edge_feats = self.edge_updates[layer](node_attrs, edge_emb, edge_index)
             ws = self.radial_nets[layer](edge_feats)
+            if cutoff is not None:
+                ws = ws * cutoff
             res = self.resnets[layer]
             sc = None
             if res is not None:
@@ -502,7 +539,17 @@ class CartesianLayerStack(nn.Module):
 
             up = self.linear_ups[layer](feats)
             msg = self.contractions[layer](up, edge_attrs, ws, edge_index)
-            if self.scatter_norm == "avg_num_neighbors":
+            if self.scatter_norm in ("density", "no_cutoff_density"):
+                density = torch.tanh(self.edge_densities[layer](edge_feats) ** 2)
+                if cutoff is not None and self.apply_density_cutoff:
+                    density = density * cutoff
+                density = scatter_sum(
+                    density, edge_index[1], dim=0, dim_size=node_attrs.size(0)
+                )
+                density = density * self.density_betas[layer] + self.density_alphas[layer]
+                density = density.masked_fill(density == 0, 1e-9)
+                msg = {l: _broadcast_node_div(t, density) for l, t in msg.items()}
+            elif self.scatter_norm == "avg_num_neighbors":
                 msg = {l: t / self._avg for l, t in msg.items()}
             feats = self.products[layer](msg, node_attrs, sc=sc)
 

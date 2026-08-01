@@ -300,6 +300,7 @@ class TACECore(BaseFFCore):
             radial_mlp=kw["radial_mlp"],
             radial_bias=kw["radial_bias"],
             use_first_resnet=kw["use_first_resnet"],
+            resnet_type=kw["resnet_type"],
             resnet_linear_type=kw["resnet_linear_type"],
             l1l2=kw["l1l2"],
             bias=kw["bias"],
