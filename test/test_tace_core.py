@@ -306,9 +306,9 @@ def test_tace_cartesian_identity_resnet():
     assert torch.isfinite(out["atom_feature"]).all()
 
 
-def _forward_core(core, n=4):
+def _forward_core(core, n=4, cutoff=None):
     idx_i, idx_j = _edges(n)
-    return core.get_output(
+    kwargs = dict(
         Za=torch.tensor([1, 6, 8, 1]),
         vij_sr=torch.randn(idx_i.numel(), 3),
         idx_i_sr=idx_i,
@@ -316,6 +316,13 @@ def _forward_core(core, n=4):
         rbf=torch.randn(idx_i.numel(), 4),
         atom_embedding=torch.randn(n, 8),
     )
+    if cutoff is not None:
+        kwargs["cutoff_values_sr"] = (
+            torch.full((idx_i.numel(),), float(cutoff))
+            if isinstance(cutoff, (int, float))
+            else cutoff
+        )
+    return core.get_output(**kwargs)
 
 
 def test_tace_shared_knobs_honored_on_both_backends():
@@ -397,3 +404,50 @@ def test_tace_cartesian_density_changes_features_vs_avg():
     out_dens = dens.get_output(**kwargs)["atom_feature"]
     assert torch.isfinite(out_dens).all()
     assert not torch.allclose(out_avg, out_dens)
+
+
+def test_tace_element2_post_mlp_cutoff_kills_edge_messages():
+    """Regression: element2 embeds are not in RBF; post-MLP cutoff must zero messages."""
+    torch.manual_seed(0)
+    n = 4
+    idx_i, idx_j = _edges(n)
+    e = idx_i.numel()
+    Za = torch.tensor([1, 6, 8, 1])
+    atom_embedding = torch.randn(n, 8)
+    rbf = torch.randn(e, 4)  # nonzero even if envelope was forgotten upstream
+
+    for basis in ("spherical", "cartesian"):
+        core = _tiny_core(
+            basis,
+            num_layers=1,
+            edge_embedding="nonlinear" if basis == "spherical" else "identity",
+            edge_update="element2",
+            use_first_resnet=False,
+        )
+        base = dict(
+            Za=Za,
+            idx_i_sr=idx_i,
+            idx_j_sr=idx_j,
+            rbf=rbf,
+            atom_embedding=atom_embedding,
+        )
+        feat_a = core.get_output(
+            vij_sr=torch.randn(e, 3),
+            cutoff_values_sr=torch.zeros(e),
+            **base,
+        )["atom_feature"]
+        feat_b = core.get_output(
+            vij_sr=torch.randn(e, 3),
+            cutoff_values_sr=torch.zeros(e),
+            **base,
+        )["atom_feature"]
+        # Different edges/directions but cutoff=0 ⇒ identical node-only features
+        assert torch.allclose(feat_a, feat_b, atol=1e-6), basis
+
+        feat_on = core.get_output(
+            vij_sr=torch.randn(e, 3),
+            cutoff_values_sr=torch.ones(e),
+            **base,
+        )["atom_feature"]
+        assert not torch.allclose(feat_a, feat_on, atol=1e-5), basis
+        assert torch.isfinite(feat_on).all()

@@ -123,6 +123,7 @@ class TACECore(BaseFFCore):
                 "idx_i_sr",
                 "idx_j_sr",
                 "rbf",
+                "cutoff_values_sr",
                 "atom_embedding",
                 "charge_embedding",
                 "spin_embedding",
@@ -355,6 +356,7 @@ class TACECore(BaseFFCore):
         atom_embedding: Tensor,
         charge_embedding: Optional[Tensor] = None,
         spin_embedding: Optional[Tensor] = None,
+        cutoff_values_sr: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
         if charge_embedding is None:
             charge_embedding = torch.zeros_like(atom_embedding)
@@ -364,6 +366,11 @@ class TACECore(BaseFFCore):
         node_feats = self.node_proj(atom_embedding + charge_embedding + spin_embedding)
         node_attrs = F.one_hot(Za, num_classes=self.num_elements).to(dtype=node_feats.dtype)
         edge_index = torch.stack([idx_i_sr, idx_j_sr], dim=0)
+        # Post-MLP envelope (upstream apply_cutoff=false). Required with element2:
+        # RBF is already damped, but concatenated element embeddings are not.
+        cutoff = None
+        if cutoff_values_sr is not None:
+            cutoff = cutoff_values_sr.reshape(-1, 1).to(dtype=node_feats.dtype)
 
         edge_emb = self.edge_embedding_mod(node_attrs, rbf, edge_index)
 
@@ -377,7 +384,7 @@ class TACECore(BaseFFCore):
                     edge_feats=edge_feats,
                     edge_attrs=edge_attrs,
                     edge_index=edge_index,
-                    cutoff=None,
+                    cutoff=cutoff,
                 )
                 node_feats = prod(node_feats=node_feats, node_attrs=node_attrs, sc=sc)
             return {"atom_feature": node_feats}
@@ -388,5 +395,6 @@ class TACECore(BaseFFCore):
             edge_emb=edge_emb,
             edge_index=edge_index,
             edge_vec=vij_sr,
+            cutoff=cutoff,
         )
         return {"atom_feature": atom_feature}
