@@ -6,14 +6,22 @@ setup(
     install_requires=['numpy<2.4.0', 'h5py', 'tqdm', 'ase', 'joblib', 'addict', 
                       'pandas', 'torch', 'scikit-learn', 'transformers',
                       'torch-ema', 'pyyaml', 'torch-geometric', 'rdkit', 'e3nn',
-                      'lightning', "flask", "waitress"
+                      'lightning', "torch-scatter", "flask", "waitress",
                       ],
+    extras_require={
+        # ODE integration for architecture uma_flow_qs / Generator predict
+        "flow": ["torchdiffeq"],
+    },
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
     packages=find_packages(include=["enerzyme", "enerzyme.*"]),
     package_data={"enerzyme": [
         "data/periodic-table.csv", 
         "models/layers/dispersion/grimme_d3_tables/*.npy", 
-        "models/layers/dispersion/grimme_d4_tables/*.pth"
+        "models/layers/dispersion/grimme_d4_tables/*.pth",
+        "models/so3/Jd.pt",
+        "models/so3/cgmatrix.npz",
+        "models/so3/data/lebedev_grids.npz",
+        "models/efa/NOTICE",
     ]},
     auth='Benzoin96485',
     author_email='luowl7@mit.edu',

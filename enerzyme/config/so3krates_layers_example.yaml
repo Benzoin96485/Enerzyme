@@ -1,0 +1,41 @@
+# Minimal So3krates stack (Frank et al., NeurIPS 2022).
+# Use architecture: so3krates under Modelhub.internal_FFs.
+#
+# Core emits atom_feature (invariants) + atom_sphere_feature (SPHC χ,
+# shape [N, m_tot]). Energy uses SimpleReadout on atom_feature.
+# Optional physics: ZBLRepulsionEnergy / ElectrostaticEnergy / GrimmeD3|D4
+# (PhysNet/SpookyNet), or architecture: so3lr — see so3lr_layers_example.yaml
+# (ZBL with switch_off, ElectrostaticEnergy flavor=SO3LR, TSQDODispersion).
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: so3krates
+      active: true
+      build_params:
+        dim_embedding: 132
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: BernsteinRBF
+          params:
+            cutoff_fn: cosine
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            degrees: [1, 2, 3]
+            num_features: 132
+            num_heads: 4
+            num_layers: 3
+            message_normalization: avg_num_neighbors
+            initialize_ev_to_zeros: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

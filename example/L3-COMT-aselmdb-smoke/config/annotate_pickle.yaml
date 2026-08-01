@@ -1,0 +1,22 @@
+# Pickle output with Enerzymette field names (optional pickle_fields rename map).
+# Default pickle (no pickle_fields) uses standard names: E, Fa, M2, Ra, Za, Q, S, …
+Supplier:
+  path: fixtures/fragments_tiny.sdf
+QMDriver:
+  engine: TeraChem
+  template_input_file: fixtures/terachem_template.in
+  pickle_name: fragments.pkl
+  pickle_fields:
+    E: energy
+    Fa: grad
+    M2: dipole
+    Ra: coord
+    Za: atom_type
+    Q: total_chrg
+    S: total_spin
+  keep_molden: false
+  keep_stdout: false
+  clean_tmp: true
+  n_processes: 1
+  n_gpus: 1
+  terachem_args: [terachem]

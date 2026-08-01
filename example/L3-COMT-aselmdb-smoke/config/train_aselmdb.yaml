@@ -1,0 +1,98 @@
+# Minimal Datahub config for ASELMDB-labeled COMT fragments (smoke / collect).
+Datahub:
+  data_format: aselmdb
+  data_path: fixtures/fragments_tiny.aselmdb
+  preload: true
+  neighbor_list: ""
+  features:
+    N: null
+    Q: null
+    Ra: null
+    Za: null
+  targets:
+    E: null
+    Fa: null
+    Q: null
+  transforms:
+    atomic_energy: fixtures/atomic_energy.csv
+  global_transforms:
+    atomic_energy: fixtures/atomic_energy.csv
+Metric:
+  E:
+    rmse: 1
+  Fa:
+    rmse: 1
+Modelhub:
+  internal_FFs:
+    FF02:
+      active: true
+      architecture: SpookyNet
+      build_params:
+        Bohr_in_R: 0.5291772108
+        Hartree_in_E: 1
+        activation_fn: swish
+        activation_params:
+          learnable: true
+        cutoff_sr: 5.291772108
+        dim_embedding: 64
+        max_Za: 86
+        num_rbf: 8
+      layers:
+      - name: RangeSeparation
+        params:
+          cutoff_fn: bump
+      - name: ExponentialBernsteinRBF
+        params:
+          exp_weighting: false
+          init_alpha: 0.944863062918464
+          learnable_shape: true
+          no_basis_at_infinity: false
+      - name: NuclearEmbedding
+        params:
+          use_electron_config: true
+          zero_init: false
+      - name: ElectronicEmbedding
+        params:
+          attribute: charge
+          num_residual: 1
+      - name: ElectronicEmbedding
+        params:
+          attribute: spin
+          num_residual: 1
+      - name: Core
+        params:
+          dropout_rate: 0.0
+          num_modules: 1
+          num_residual_local: 1
+          num_residual_local_d: 1
+          num_residual_local_p: 1
+          num_residual_local_s: 1
+          num_residual_local_x: 1
+          num_residual_nonlocal_k: 1
+          num_residual_nonlocal_q: 1
+          num_residual_nonlocal_v: 1
+          num_residual_output: 1
+          num_residual_post: 1
+          num_residual_pre: 1
+          shallow_ensemble_size: 1
+          use_irreps: true
+      - name: AtomicAffine
+        params:
+          scales:
+            Ea: {learnable: true, values: 1}
+            Qa: {learnable: true, values: 1}
+          shifts:
+            Ea: {learnable: true, values: 0}
+            Qa: {learnable: true, values: 0}
+      - name: ChargeConservation
+      - name: EnergyReduce
+      - name: Force
+      loss:
+        mse:
+          E: 1
+          Fa: 1
+Trainer:
+  max_epochs: 1
+  batch_size: 1
+  num_workers: 0
+  accelerator: cpu

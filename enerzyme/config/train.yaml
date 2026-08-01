@@ -35,6 +35,9 @@ Datahub:
                                                 # summation of atomic reference energies in each frame will be deducted from the total energy
         negative_gradient: true                 # flip the sign of the gradient, use it when the Fa targets are gradients instead of forces
         total_energy_normalization: false       # normalize the total energy globally by substract the mean and divide the standard deviation
+        # uniform_qs_init: true                # optional: Q_init_a=Q/N, S_init_a=S/N (flow init).
+        #   Prefer Datahub.global_transforms, or per-dataset transforms (→ preprocessings).
+        #   Requires Q (and S for spin) in features.
 Modelhub:
   internal_FFs:                             # force fields built in enerzyme
     FF01:                                   # force field ID
@@ -277,6 +280,15 @@ Modelhub:
             has_norm_before_flag: true
             has_norm_after_flag: false
             reduce_mode: sum
+            output_mode: feature
+        - name: SimpleReadout
+          params:
+            output_fields:
+              - Ea
+              - Qa
+            head_type: residual_mlp
+            num_residual: 2
+            dim_embedding: 128
         - name: AtomicAffine
           params:
             shifts:
@@ -429,6 +441,117 @@ Modelhub:
             flavor: PhysNet
         - name: EnergyReduce
         - name: Force
+    FF08:
+      suffix:
+      # Experimental: Enerzyme-adapted (魔改) AllScAIP — not a recommended production model yet.
+      architecture: AllScAIP
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          M2: 1.8897261
+          Q: 1
+          Qa: 1
+          E: 1
+      build_params:
+        # --- Global (fairchem GlobalConfigs) ---
+        dim_embedding: 128
+        num_layers: 4
+        activation: silu
+        use_node_path: true
+        use_residual_scaling: true
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+        # --- Shared RBF / species (Enerzyme pre-core; num_rbf, cutoff_* for BesselRBF) ---
+        num_rbf: 8
+        max_Za: 86
+        cutoff_sr: 5.0
+        cutoff_fn: polynomial
+        # --- Molecular graph (fairchem MolecularGraphConfigs) ---
+        knn_k: 32
+        knn_pad_size: null
+        knn_soft: false
+        knn_sigmoid_scale: 0.2
+        knn_lse_scale: 0.1
+        knn_use_low_mem: false
+        use_envelope: true
+        distance_function: gaussian
+        edge_distance_expansion_size: 8
+        edge_direction_expansion_size: 3
+        node_direction_expansion_size: 3
+        preprocess_on_cpu: false
+        pbc: false
+        use_padding: false
+        max_atoms: null
+        max_batch_size: null
+        single_system_no_padding: false
+        # --- GNN / attention (fairchem GraphNeuralNetworksConfigs) ---
+        atten_num_heads: 4
+        ffn_hidden_layer_multiplier: 2
+        attn_num_freq: 32
+        freequency_list: null
+        use_freq_mask: true
+        use_sincx_mask: true
+        # --- Equivariant LAE (e3nn TP + irrep norms; forces use_freq_mask off in the core) ---
+        equivariant_mode: false
+        equivariant_tp_hidden: 32
+        equivariant_tp_mul: 8
+        # --- Regularization (fairchem RegularizationConfigs) ---
+        normalization: layer_norm
+        mlp_dropout: 0.0
+        atten_dropout: 0.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            trainable: false
+        - name: NuclearEmbedding
+          params:
+            zero_init: false
+            use_electron_config: true
+        - name: ElectronicEmbedding
+          params:
+            num_residual: 1
+            attribute: charge
+        - name: ElectronicEmbedding
+          params:
+            num_residual: 1
+            attribute: spin
+        - name: Core
+          params: {}
+        # Core only emits atom_feature; Ea/Qa come from SimpleReadout (see DEFAULT_LAYER_PARAMS).
+        - name: SimpleReadout
+          params:
+            output_fields:
+              - Ea
+              - Qa
+            head_type: residual_mlp
+            num_residual: 2
+            dim_embedding: 128
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: ElectrostaticEnergy
+          params:
+            flavor: PhysNet
+            cutoff_lr: null
+        - name: AtomicCharge2Dipole
+        - name: EnergyReduce
+        - name: Force
   external_FFs:
     FF05:
       suffix:
@@ -513,6 +636,230 @@ Modelhub:
             output_dim: 1
             node_average: false
             default_dtype: "float32"
+    FF09:
+      suffix:
+      architecture: Equiformer
+      active: false
+      loss:
+        rmse:
+          Qa: 1
+          Fa: 52.917721
+          E: 1
+          M2: 1.8897261
+      Metric:
+        Qa:
+          rmse: 1
+        Fa:
+          rmse: 52.917721
+        E:
+          rmse: 1
+        M2:
+          rmse: 1.8897261
+      build_params:
+        dim_embedding: 64
+        num_rbf: 16
+        max_Za: 86
+        cutoff_sr: 5.0
+        Hartree_in_E: 1
+        Bohr_in_R: 0.5291772108
+        irreps_node_embedding: "32x0e+16x1e+8x2e"
+      layers:
+        - name: RangeSeparation
+          params:
+            cutoff_fn: polynomial
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: EquiformerNodeEmbedding
+          params:
+            irreps_node_embedding: "32x0e+16x1e+8x2e"
+        - name: Core
+          params:
+            irreps_node_embedding: "32x0e+16x1e+8x2e"
+            irreps_feature: "64x0e"
+            irreps_sh: "1x0e+1x1e+1x2e"
+            irreps_head: "16x0e+8x1o+4x2e"
+            irreps_mlp_mid: "32x0e+16x1e+8x2e"
+            num_layers: 2
+            num_heads: 2
+            fc_neurons: [64, 64]
+            nonlinear_message: true
+            output_mode: feature
+        # Default: SimpleReadout extracts 0e from equivariant atom_feature, then MLP.
+        # Official LinearRS + normalize2mom(SiLU) energy head (parity with MD17 MLP):
+        #   head_type: equiformer_linear_rs
+        # To use GraphAttention readout instead, replace SimpleReadout with:
+        # - name: EquiformerGraphAttentionReadout
+        #   params:
+        #     output_fields: [Ea, Qa]
+        #     irreps_head: "16x0e+8x1o+4x2e"
+        #     num_heads: 2
+        #     fc_neurons: [64, 64]
+        #     nonlinear_message: true
+        - name: SimpleReadout
+          params:
+            output_fields:
+              - Ea
+              - Qa
+            head_type: two_layer
+            dim_embedding: 64
+            activation_fn: swish
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+              Qa:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+              Qa:
+                values: 1
+                learnable: true
+        - name: ChargeConservation
+        - name: AtomicCharge2Dipole
+        - name: EnergyReduce
+        - name: Force
+    FF10:
+      suffix:
+      # Native paper eSCN (Passaro & Zitnick 2023). Distinct from uma_qs (Meta UMA wrappers).
+      architecture: escn
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 64
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            cutoff_fn: polynomial
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            sphere_channels: 64
+            hidden_channels: 128
+            edge_channels: 64
+            lmax: 2
+            mmax: 2
+            num_layers: 2
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
+    FF11:
+      suffix:
+      # EquiformerV2 (Liao et al., ICLR 2024). SO(2) attention Core; distinct from Equiformer (V1) and escn.
+      architecture: equiformer_v2
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 64
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: GaussianSmearing
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            sphere_channels: 64
+            attn_hidden_channels: 64
+            num_heads: 4
+            attn_alpha_channels: 32
+            attn_value_channels: 16
+            ffn_hidden_channels: 128
+            lmax: 2
+            mmax: 2
+            num_layers: 2
+            edge_channels: 64
+            norm_type: rms_norm_sh
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
+    FF12:
+      suffix:
+      # EquiformerV3 (Liao et al., 2026). Merged LN + SwiGLU-S2 + envelope attention.
+      architecture: equiformer_v3
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 64
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: GaussianSmearing
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            sphere_channels: 64
+            attn_hidden_channels: 64
+            num_heads: 4
+            attn_alpha_channels: 32
+            attn_value_channels: 16
+            ffn_hidden_channels: 256
+            lmax: 2
+            mmax: 2
+            num_layers: 2
+            edge_channels: 64
+            norm_type: merge_layer_norm
+            use_envelope: true
+            attn_activation: sep-merge_gates2_swiglu
+            ffn_activation: sep-merge_gates2_swiglu
+            use_grid_mlp: true
+            attn_grid_resolution: [8, 8]
+            ffn_grid_resolution: [8, 8]
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

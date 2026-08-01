@@ -1,0 +1,19 @@
+# Campaign-style annotate keys (pre-#80). Prefer config/annotate_pickle.yaml + template.
+# pcm_radii lives in fixtures/; legacy drivers that still accept pcm_radii_file
+# should point here with a path relative to the repo root.
+Supplier:
+  path: fixtures/fragments_tiny.sdf
+QMDriver:
+  engine: TeraChem
+  bs: 6-31gs
+  xc: b3lyp
+  pcm: cosmo
+  dftd: d3
+  pcm_radii_file: fixtures/pcm_radii
+  epsilon: 10
+  keep_molden: false
+  keep_output: false
+  clean_tmp: true
+  pickle_name: fragments.pkl
+  dump_single_run: false
+  n_processes: 1

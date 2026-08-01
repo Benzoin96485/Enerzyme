@@ -1,0 +1,70 @@
+# Minimal uma_qs train (1 epoch) on tiny COMT fragments.
+# Checkpoint path is a placeholder: resolve UMA_CHECKPOINT from the environment
+# when launching (do not commit host-absolute paths).
+Datahub:
+  data_format: pickle
+  data_path: fixtures/fragments_tiny.pkl
+  preload: true
+  neighbor_list: ""
+  features:
+    N: null
+    Q: total_chrg
+    S: total_spin
+    Ra: coord
+    Za: atom_type
+  targets:
+    Q: total_chrg
+    S: total_spin
+Metric:
+  Q:
+    rmse: 1
+  S:
+    rmse: 1
+Modelhub:
+  internal_FFs:
+    FF_UMA_QS:
+      active: true
+      architecture: uma_qs
+      suffix: null
+      build_params:
+        checkpoint_path: UMA_CHECKPOINT
+        frozen_backbone: true
+        shallow_ensemble_size: 1
+      layers:
+      - name: Core
+      - name: SimpleReadout
+        params:
+          head_type: dense
+          output_fields:
+          - Qa
+          - Sa
+      - name: ChargeConservation
+      - name: SpinConservation
+      loss:
+        mse:
+          Q: 1
+          S: 1
+Trainer:
+  Splitter:
+    method: random
+    parts:
+    - training
+    - validation
+    ratios:
+    - 2
+    - 1
+    preload: false
+    save: true
+    seed: 114514
+  # >1 exercises OTF neighbor construction for every structure in a batch
+  batch_size: 2
+  # Trainer treats num_workers<=0 as "auto"; keep a small positive value for smoke.
+  num_workers: 1
+  max_epochs: 1
+  patience: 1
+  cuda: true
+  dtype: float32
+  learning_rate: 0.001
+  resume: 0
+  use_ema: false
+  seed: 114514

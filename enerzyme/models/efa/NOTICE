@@ -1,0 +1,11 @@
+Lebedev quadrature tables
+-------------------------
+``enerzyme/models/so3/data/lebedev_grids.npz`` is copied from Google e3x
+(https://github.com/google-research/e3x, file ``e3x/so3/_lebedev_grids.npz``)
+licensed under the Apache License, Version 2.0. EFA loads it via
+``enerzyme.models.so3.lebedev`` (also re-exported from the ``enerzyme.models.efa`` package).
+
+ERoPE / linear EFA aggregation
+------------------------------
+Algorithm and reference structure follow
+https://github.com/thorben-frank/euclidean_fast_attention (MIT License).

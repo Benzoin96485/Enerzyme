@@ -1,0 +1,42 @@
+# So3krates + Euclidean Fast Attention (architecture: efa).
+# Local dual-stream So3krates Core with EFA on selected layers.
+# Enerzymette: set architecture: efa under Modelhub.internal_FFs.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: efa
+      active: true
+      build_params:
+        dim_embedding: 132
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: BernsteinRBF
+          params:
+            cutoff_fn: cosine
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            degrees: [1, 2, 3]
+            num_features: 132
+            num_heads: 4
+            num_layers: 3
+            message_normalization: avg_num_neighbors
+            initialize_ev_to_zeros: true
+            era_use_in_iterations: [0, 1]
+            era_lebedev_num: 146
+            era_max_frequency: 9.42477796076938  # 3π
+            era_max_length: 10.0
+            era_qk_num_features: 32
+            era_v_num_features: 16
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

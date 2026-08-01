@@ -96,7 +96,7 @@ class ResidualLayer(NeuronLayer):
         initial_bias: INITIAL_BIAS_TYPE="zero",
         dropout_rate: float=0,
         use_bias: bool=True,
-        use_residual: bool=True
+        use_residual: bool=True,
     ) -> None:
         super().__init__(dim_feature_in, dim_feature_out, activation_fn, activation_params)
         self.use_residual = use_residual
@@ -143,7 +143,7 @@ class ResidualStack(NeuronLayer):
         initial_bias: INITIAL_BIAS_TYPE="zero",
         dropout_rate: float=0,
         use_bias: bool=True,
-        use_residual: bool=True
+        use_residual: bool=True,
     ) -> None:
         super().__init__(dim_feature, dim_feature)
         self.num_residual = num_residual

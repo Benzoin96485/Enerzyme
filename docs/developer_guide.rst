@@ -170,7 +170,7 @@ Checklist: new data field or transform
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 1. Register type in :code:`datatype.py` if it is a new standard name
-2. Ensure loader supports the source format (:code:`pickle`, :code:`npz`, or HDF5 cache)
+2. Ensure loader supports the source format (:code:`pickle`, :code:`npz`, :code:`aselmdb`, or HDF5 cache)
 3. Add transform logic in :code:`transform.py` if preprocessing is required
 4. Update :code:`train.yaml` example and :doc:`/user_guide/data/datahub_reference`
 5. Run :code:`enerzyme collect -c <yaml> -o <out>` to validate mapping without training
@@ -198,6 +198,19 @@ Adding an internal architecture
 4. Support required targets (:code:`E`, :code:`Fa`, optional :code:`Qa`, :code:`M2`) and loss/metric weights
 5. Add tests under :code:`test/` (layer parity or forward-pass smoke)
 6. Document in :doc:`/user_guide/models/architecture_catalog`
+
+Recent internal example: :code:`So3krates` under :code:`enerzyme/models/so3krates/`
+(scalar atom embedding + RBF as pre-core layers; Core emits invariant
+:code:`atom_feature` and SPHC :code:`atom_sphere_feature`; shared
+:code:`SimpleReadout` / physics layers after the Core). Also:
+:code:`EquiformerV2` under :code:`enerzyme/models/equiformer_v2/`
+(scalar atom embedding + RBF as pre-core layers; Core emits :code:`atom_feature` /
+:code:`atom_sphere_feature` with :code:`feature_irreps`; shared :code:`SimpleReadout`
+or optional :code:`EquiformerV2FeedForwardReadout` / physics layers after the Core),
+:code:`EquiformerV3` under :code:`enerzyme/models/equiformer_v3/`
+(same latent contract; merged LN + SwiGLU-S² + envelope attention via extended :code:`so3/`),
+:code:`Equiformer` (:code:`enerzyme/models/equiformer/`), and
+:code:`escn` (:code:`enerzyme/models/escn/`).
 
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -266,6 +279,26 @@ Tests live in :code:`test/`:
 - :code:`test_scatter.py` — :code:`torch_scatter` equivalence (CPU/GPU parametrized)
 - :code:`test_spookynet.py` — SpookyNet layer and forward tests
 - :code:`test_physnet.py` — PhysNet parity against reference TensorFlow implementation (heavy optional stack)
+- :code:`test_equiformer.py` — Equiformer forward smoke, feature mode, SO(3) energy/force checks
+- :code:`test_equiformer_readout.py` — 0e extract, :code:`two_layer` SimpleReadout, GraphAttention readout
+- :code:`test_equiformer_parity_*.py` — numerical parity vs vendored upstream Equiformer
+  (ops / Core latent incl. feature ``get_output`` / direct E·F / grads /
+  feature-mode + GraphAttention readout; no training loop; production
+  :code:`SimpleReadout` Dense MLP is not LinearRS-parity)
+- :code:`test_escn_parity_*.py` — numerical parity vs vendored fairchem v1 eSCN (SO3 ops / Message+Layer blocks; injected edge frames)
+- :code:`test_equiformer_v2_core.py` — EquiformerV2 shapes, SimpleReadout contract, build_model E/F, SO(3) scalar invariance
+- :code:`test_equiformer_v2_parity_*.py` — numerical parity vs vendored EquiformerV2 upstream (SO2 conv / LinearV2 / norms / FFN / TransBlockV2)
+- :code:`test_equiformer_v3_core.py` — EquiformerV3 shapes, SimpleReadout contract, build_model E/F, SO(3) scalar invariance, YAML smoke, force finite-difference conservation / Wigner autograd
+- :code:`test_equiformer_v3_parity_*.py` — numerical parity vs vendored EquiformerV3 upstream (MergeLN / SO2Linear / envelope / FFN / TransBlockV3); SwiGLU-S² ``_mem`` vs eager consistency
+- :code:`test_dpa4_core.py` — DPA4 shapes, registration / YAML smoke, geometry autograd, SO(3) scalar invariance, build_model E/F, force finite-difference conservation
+- :code:`test_dpa4_parity_ops.py` — DPA4 indexing / C³ envelope / SO2Linear / envelope-gated softmax algebraic checks (no runtime deepmd dependency)
+- :code:`test_so3_wigner_backend.py` — shared e3nn/Jd Wigner-D backend (packed orthogonality, SO3_Rotation / fused / DPA4 quaternion adapters, high-l smoke)
+- :code:`test_so3_grid.py` — unified flat lat–long :code:`SO3Grid` / :code:`S2GridProjector` protocol (roundtrip, Lebedev duck-type, grid table)
+- :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
+- :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
+- :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
+- :code:`test_efa.py` — ERoPE / Lebedev / EFABlock, batch isolation, :code:`efa` / :code:`so3lr_efa` / SpookyNet :code:`use_efa` smoke tests
+- :code:`test_sphere_sample_readout.py` — SphereSampleReadout shapes / scalar invariance smoke
 - :code:`test_scatter_speed.py` — performance-oriented scatter checks
 
 Suggested commands
@@ -373,3 +406,58 @@ When to split into sub-pages
 ----------------------------
 
 Keep this single page while the contributor surface is still evolving. Split into :code:`docs/developer_guide/` when any section grows past ~200 lines or needs its own deep dive (for example, a dedicated “Adding a new architecture” cookbook). The entry :code:`docs/developer_guide.rst` would then become a short overview plus layered toctree, mirroring :doc:`/user_guide`.
+
+External UMA (:code:`uma_qs`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Register in :code:`get_ff_core` like other architectures. Keep fairchem imports inside :code:`enerzyme/models/esen/` so non-UMA installs do not import it until selected. Prefer shared :code:`layers/readout.py` and :code:`layers/spin.py` for Q/S heads. Package name :code:`esen/` is historical (UMA / eSCN-MD lineage); it is **not** the 2023 paper eSCN.
+
+Native eSCN (:code:`escn`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Paper eSCN (Passaro & Zitnick, 2023) lives under :code:`enerzyme/models/escn/` with shared SO(2)/SO(3) primitives in :code:`enerzyme/models/so3/` (including :code:`Jd.pt` in package data). The Core emits :code:`atom_feature` (l=0 scalars with :code:`feature_irreps = "Cx0e"`) and :code:`atom_sphere_feature` (SH grid layout for :code:`SphereSampleReadout`); compose :code:`SimpleReadout` / :code:`SphereSampleReadout` / :code:`EnergyReduce` / :code:`Force` outside the Core. No fairchem dependency. Offline numerical parity against vendored fairchem :code:`fairchem_core-1.10.0` blocks is in :code:`test/test_escn_parity_*.py` (ops + Message/LayerBlock; injected edge frames; not OC20 E/F). Enerzymette and other YAML-driven workflows only need :code:`architecture: escn` plus a resolved :code:`config.yaml` — checkpoint layout is unchanged.
+
+EquiformerV2 (:code:`equiformer_v2`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Liao et al. (ICLR 2024) lives under :code:`enerzyme/models/equiformer_v2/` and extends shared :code:`so3/` (rotate-inv rescale, component grids, :code:`SO3_LinearV2`). The Core emits the same :code:`atom_feature` / :code:`atom_sphere_feature` contract as eSCN; compose :code:`SimpleReadout` or :code:`EquiformerV2FeedForwardReadout` plus :code:`EnergyReduce` / :code:`Force` outside the Core. Offline parity vs vendored :code:`atomicarchitects/equiformer_v2` nets is in :code:`test/test_equiformer_v2_parity_*.py`. Enerzymette only needs :code:`architecture: equiformer_v2` plus a resolved :code:`config.yaml`.
+
+EquiformerV3 (:code:`equiformer_v3`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Liao et al. (2026, arXiv:2604.09130) lives under :code:`enerzyme/models/equiformer_v3/` and further extends shared :code:`so3/` (merged LN, SwiGLU-S², :code:`SO2Linear`, :code:`PolynomialEnvelope` / :code:`GraphSoftmax`, fused :code:`SO3RotationFused`, flat lat–long :code:`SO3Grid`). The Core emits the same :code:`atom_feature` / :code:`atom_sphere_feature` contract as eSCN/V2; compose :code:`SimpleReadout` plus :code:`EnergyReduce` / :code:`Force` outside the Core. Offline parity vs vendored :code:`atomicarchitects/equiformer_v3` experimental nets is in :code:`test/test_equiformer_v3_parity_*.py`. Enerzymette only needs :code:`architecture: equiformer_v3` plus a resolved :code:`config.yaml`.
+
+DPA4 (:code:`dpa4`)
+^^^^^^^^^^^^^^^^^^^^^
+
+DPA4 (Li et al., 2026, arXiv:2606.02419) lives under :code:`enerzyme/models/dpa4/` as :code:`core.py` / :code:`interaction.py` / :code:`so2.py`. EMFA orchestration (:code:`SO2Convolution`, :code:`DynamicRadialDegreeMixer`, :code:`EdgeCache`) stays local. Shared pieces in :code:`enerzyme/models/so3/` include :code:`C3CutoffEnvelope`, Apache e3x Lebedev tables (:code:`lebedev_grids.npz`, also used by EFA) / :code:`S2LebedevProjector`, packed/m-major :code:`indexing`, :code:`FocusSO2Linear`, :code:`SO3FocusLinear`, :code:`SO3GatedActivation`, :code:`EquivariantDegreeRMSNorm`, :code:`BesselC3RadialBasis` / :code:`RadialMLP`, and quaternion edge frames (:code:`build_edge_quaternion`) that share the e3nn/:code:`Jd` Wigner-D backend (:code:`wigner_from_rotation_matrix`) with eSCN / EquiformerV2 / EquiformerV3. :code:`WignerDCalculator` maps :code:`R(q)` into DPA4's historical Cartesian basis (:code:`A R Aᵀ`) before that backend so SO(2) / GIE stay equivariant for any :code:`lmax` in :code:`Jd.pt`. Flat lat–long :code:`SO3Grid` and Lebedev :code:`S2LebedevProjector` share the :code:`S2GridProjector` contract (:code:`to_grid` / :code:`from_grid`); EquiformerV3 FFN uses :code:`SO3Grid`, DPA4 FFN defaults to Lebedev. The Core emits :code:`atom_feature` / :code:`atom_sphere_feature`; compose :code:`SimpleReadout`, :code:`EnergyReduce`, and :code:`Force` outside it. Tests: :code:`test/test_dpa4_core.py`, :code:`test/test_dpa4_parity_ops.py`, :code:`test/test_so3_wigner_backend.py`, :code:`test/test_so3_grid.py`. Enerzymette only needs :code:`architecture: dpa4` plus a resolved :code:`config.yaml`.
+
+So3krates (:code:`so3krates`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Frank et al. (NeurIPS 2022) lives under :code:`enerzyme/models/so3krates/` with shared :code:`RealSphericalHarmonics` and :code:`L0Contraction` (:code:`cgmatrix.npz`) in :code:`enerzyme/models/so3/`. The Core emits invariant :code:`atom_feature` and SPHC :code:`atom_sphere_feature` (``[N, m_tot]``, not eSCN/EquiformerV2 channel layout). Compose :code:`SimpleReadout` + :code:`EnergyReduce` / :code:`Force` (and optional ZBL / electrostatics / dispersion) outside the Core. Offline parity vs So3krates-torch fixtures: :code:`test/test_so3krates_parity_ops.py`. Enerzymette only needs :code:`architecture: so3krates` plus a resolved :code:`config.yaml`.
+
+SO3LR (:code:`so3lr`)
+^^^^^^^^^^^^^^^^^^^^
+
+Kabylda et al. (JACS 2025) is registered as :code:`architecture: so3lr` but **reuses** :code:`So3kratesCore`. Defaults and layers live in :code:`enerzyme/models/so3krates/so3lr.py`. Physics uses shared modules with SO3LR options: :code:`ZBLRepulsionEnergy` (:code:`switch_off`), :code:`ElectrostaticEnergy` (:code:`flavor: SO3LR`), :code:`TSQDODispersionEnergy` under :code:`enerzyme/models/layers/dispersion/`, plus :code:`SimpleReadout(Qa)` / :code:`AtomicAffine` / :code:`HirshfeldReadout` / :code:`ChargeSpinEmbedding`. Grimme D3/D4 remain for PhysNet/SpookyNet stacks. Cutoff alias :code:`phys` → polynomial. Tests: :code:`test/test_so3lr.py`. Enerzymette: :code:`architecture: so3lr` + resolved :code:`config.yaml` (see :code:`enerzyme/config/so3lr_layers_example.yaml`).
+
+EFA (:code:`efa` / :code:`so3lr_efa`) and SpookyNet :code:`use_efa`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Frank et al. (arXiv:2412.08541) — shared package :code:`enerzyme/models/efa/` (ERoPE + Lebedev linear attention). Lebedev point tables live in :code:`enerzyme/models/so3/data/lebedev_grids.npz` (e3x Apache-2.0) and are imported from :code:`enerzyme.models.so3.lebedev` (also re-exported on the :code:`efa` package).
+
+* Register :code:`efa` / :code:`so3lr_efa` in :code:`get_ff_core` (both use :code:`So3kratesCore` with :code:`era_use_in_iterations`).
+* SpookyNet: Core / :code:`InteractionModule` flag :code:`use_efa` swaps :code:`NonlocalInteraction` for :code:`EFABlock` (pass :code:`Ra`).
+* Adding EFA to a **new** Core: (1) include :code:`Ra` and :code:`batch_seg` in Core :code:`input_fields`; (2) :code:`build_efa_blocks(...)` or construct :code:`EFABlock`; (3) after a local layer, :code:`x = x + apply_efa_if_configured(x, Ra, batch_seg, block)`. Keep EFA inside the Core, not as a post-core YAML physics layer.
+* Tests: :code:`test/test_efa.py`. Examples: :code:`efa_layers_example.yaml`, :code:`so3lr_efa_layers_example.yaml`.
+
+AllScAIP (:code:`AllScAIP`)
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Enerzyme's AllScAIP is an **experimental, modified (魔改)** attention Core under :code:`enerzyme/models/allscaip/`. Do **not** treat it as the recommended production model; document regressions and keep example FF entries inactive unless deliberately testing. The Core returns :code:`atom_feature` only — YAML stacks must include :code:`SimpleReadout` / NSE heads (see :code:`DEFAULT_LAYER_PARAMS`).
+
+Flow matching (:code:`uma_flow_qs`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Requires optional :code:`torchdiffeq` (:code:`pip install -e ".[flow]"`) for ODE integration in :code:`enerzyme/tasks/generator_ode.py`. Keep ODE utilities in tasks/, not inside Core modules.

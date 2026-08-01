@@ -5,6 +5,8 @@ Enerzymette Integration
 
 Application: :code:`example/NNP4MTase` in the Enerzyme repository (methyltransferase active learning, scan, and NEB).
 
+For a **tiny** ASELMDB / annotate / Enerzymette AL smoke (vendored fixtures, repo-relative paths), see :code:`example/L3-COMT-aselmdb-smoke/`.
+
 Install
 -------
 
@@ -21,10 +23,10 @@ Main launchers
     Outer AL loop: simulate → predict/extract → annotate → train. Manages a per-task **structure pool** and rewrites YAML each round. See :doc:`/user_guide/workflows/active_learning`.
 
 :code:`enerzymette enerzyme_scan`
-    Chained reaction-coordinate scans (bond-distance or PLUMED CV). Reads system settings from a TeraChem input or a YAML **scan config** (:code:`-q`). PLUMED mode requires :code:`-pp` and :code:`-psc`.
+    Chained reaction-coordinate scans (bond-distance or PLUMED CV). Reads system settings from a TeraChem input or a YAML **scan config** (:code:`-q`: :code:`reference_pdb`, :code:`freeze_index_types`, scan bond; optional :code:`charge` skips :code:`enerzyme bond` charge derivation). PLUMED mode requires :code:`-pp` and :code:`-psc`.
 
 :code:`enerzymette enerzyme_neb`
-    NNP-driven NEB via ORCA ExtOpt and :code:`enerzyme listen`. See :doc:`/getting_started/server_and_enerzymette`.
+    NNP-driven NEB via ORCA ExtOpt and :code:`enerzyme listen`. :code:`-q` accepts a TeraChem reference **or** YAML **neb config** (same freeze/charge pattern as scan). Pass :code:`-cp` for external-calculator shell mode and optional :code:`-t` for an initial TS guess. See :doc:`/getting_started/enhanced_sampling` and :doc:`/getting_started/server_and_enerzymette`.
 
 PLUMED CV plugins
 -----------------
@@ -92,6 +94,12 @@ Boundary with Enerzyme
 +------------------+------------------------+---------------------------+
 | QM engines       | :code:`annotate`       | ORCA bridge utilities     |
 +------------------+------------------------+---------------------------+
+
+Architecture selection (e.g. :code:`Equiformer`, :code:`equiformer_v2`, :code:`equiformer_v3`, :code:`dpa4`, :code:`escn`) is entirely in the Enerzyme training /
+model YAML (:code:`Modelhub.*.architecture`). Enerzymette only rewrites dataset paths,
+suffixes, and pretrain paths — no Enerzymette code changes are required when adding a
+new Enerzyme Core. Future shallow-ensemble or larger-degree EquiformerV2 configs remain
+YAML-only as long as checkpoint paths stay stable.
 
 Recommended task directory
 --------------------------

@@ -15,16 +15,32 @@ From :code:`enerzyme/models/layers/`:
     :code:`GaussianSmearing`, :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer`, :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
 
 **Embeddings**
-    :code:`RandomAtomEmbedding`, :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding`
+    :code:`RandomAtomEmbedding`, :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
 
 **Core**
     Architecture-specific message passing (:code:`Core` with :code:`architecture` in Modelhub)
 
 **Physics / post-processing**
-    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy`, :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`ZBLRepulsionEnergy`
+    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy` (flavors: SpookyNet / PhysNet / SO3LR), :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`TSQDODispersionEnergy` (SO3LR; not Grimme), :code:`ZBLRepulsionEnergy` (optional :code:`switch_off` for SO3LR)
 
 **Output**
     :code:`EnergyReduce`, :code:`Force`, :code:`ShallowEnsembleReduce`
+
+**Readouts**
+    :code:`SimpleReadout` — per-atom MLP over scalar features. With equivariant Cores
+    that set :code:`feature_irreps`, it extracts even-scalar (:code:`0e`) channels first,
+    then applies :code:`dense` / :code:`residual_*` / :code:`two_layer` heads.
+    Use :code:`head_type: equiformer_linear_rs` for the official Equiformer MD17 scalar
+    energy MLP (:code:`LinearRS` → :code:`normalize2mom(SiLU)` → :code:`LinearRS`).
+    :code:`EquiformerGraphAttentionReadout` — separate GraphAttention head over full
+    irreps + graph edges (not mixed into SimpleReadout); use when you want an
+    attention-style multi-field atomic scalar head.
+    :code:`HirshfeldReadout` — SO3LR Hirshfeld-ratio head (``ha`` for TS–QDO).
+    Partial charges use :code:`SimpleReadout(Qa)` + :code:`AtomicAffine` with
+    fixed unit scale (element shift ≡ SO3LR ``Emb(Za)`` bias).
+    Equiformer-series external readouts (including LinearRS / GraphAttention /
+    :code:`EquiformerV2FeedForwardReadout`) accept :code:`shallow_ensemble_size`
+    by widening the last linear layer.
 
 Typical charge-aware stack
 --------------------------
@@ -87,3 +103,106 @@ Monitoring energy terms
 -----------------------
 
 Optional :code:`Trainer.Monitor` lists terms such as :code:`E_ele` (electrostatic), :code:`E_disp` (D3/D4), :code:`E_zbl` for debugging layer contributions during training.
+
+UMA and modular readouts
+------------------------
+
+With :code:`architecture: uma_qs`, the Core returns atom-level embeddings; attach :code:`SimpleReadout` / :code:`HierachicalReadout` and optional :code:`SpinConservation` in the Modelhub :code:`layers` list rather than embedding prediction heads inside the Core.
+
+Equivariant feature contract and Equiformer readouts
+----------------------------------------------------
+
+Equivariant Cores may emit a flat irreps tensor as :code:`atom_feature` and advertise
+layout via :code:`feature_irreps` (e.g. :code:`"64x0e+32x1e"`). :code:`dim_feature_out` is the
+**0e channel count** used by scalar MLP readouts. :code:`SimpleReadout` extracts those
+0e channels (identity when :code:`feature_irreps` is absent). For a GraphAttention
+energy/charge head, swap in :code:`EquiformerGraphAttentionReadout` (see FF09 comments
+in :code:`train.yaml`).
+
+eSCN and modular readouts
+-------------------------
+
+With :code:`architecture: escn`, the native paper eSCN Core returns :code:`atom_feature`
+as spherical :code:`l=0` scalars (advertised as :code:`feature_irreps: "Cx0e"`) and
+:code:`atom_sphere_feature` (full SH coefficients, shape :code:`(N, (lmax+1)^2, C)` —
+not e3nn-flat; reduced :code:`mmax` applies only inside edge SO(2) messages). Default
+stacks use :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` for
+energy-conserving forces, which needs differentiable edge frames / Wigner-D in
+:code:`enerzyme.models.so3.rotation` (unlike fairchem v1, which detached frames for a
+direct force head). Opt-in :code:`SphereSampleReadout` integrates
+:code:`atom_sphere_feature` over fixed S² samples (Passaro & Zitnick energy-head
+pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …); use
+:code:`vector_output_fields: [Fa]` (and omit :code:`Force`) for the paper-style
+direct vector path. See :code:`enerzyme/config/escn_sphere_readout_example.yaml`.
+Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`).
+
+EquiformerV2 / EquiformerV3 and modular readouts
+-----------------------------------------------
+
+With :code:`architecture: equiformer_v2`, :code:`equiformer_v3`, or :code:`dpa4`, the Core returns the same latent pair as eSCN
+(:code:`atom_feature` as :code:`l=0` scalars with :code:`feature_irreps: "Cx0e"`, plus
+:code:`atom_sphere_feature`). Default stacks use :code:`SimpleReadout` →
+:code:`EnergyReduce` → :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout`
+applies the paper sphere FFN energy head to :code:`atom_sphere_feature` after an
+**EquiformerV2** Core (it looks up :code:`SO3_grid` on that Core and is **not**
+wired for :code:`EquiformerV3Core`; use :code:`SimpleReadout` with V3 for now).
+Shared :code:`so3` primitives provide component-normalized
+grids, :code:`mmax < lmax` rotate-back rescale, and EquiformerV3 additions
+(merged LN, SwiGLU-S², :code:`PolynomialEnvelope` / :code:`GraphSoftmax`).
+All external Equiformer / EquiformerV2 readouts
+(:code:`SimpleReadout` including :code:`equiformer_linear_rs`,
+:code:`EquiformerGraphAttentionReadout`, :code:`EquiformerV2FeedForwardReadout`)
+accept :code:`shallow_ensemble_size` on the last linear head; pair with
+:code:`ShallowEnsembleReduce`. Examples:
+:code:`enerzyme/config/equiformer_v2_layers_example.yaml`,
+:code:`equiformer_v2_ffn_readout_example.yaml`,
+:code:`equiformer_v2_shallow_ensemble_example.yaml`,
+:code:`equiformer_v3_layers_example.yaml`,
+:code:`dpa4_layers_example.yaml`,
+:code:`equiformer_shallow_ensemble_example.yaml`.
+
+So3krates and modular readouts
+------------------------------
+
+With :code:`architecture: so3krates`, the Core returns :code:`atom_feature` (invariant
+stream ``x``, :code:`feature_irreps: "Fx0e"`) and :code:`atom_sphere_feature` (SPHC
+``χ`` with shape :code:`[N, m_tot]`). This SPHC layout is **not** the eSCN /
+EquiformerV2 :code:`[N, (lmax+1)^2, C]` tensor — do not attach :code:`SphereSampleReadout`.
+Default stacks use :code:`BernsteinRBF` + :code:`SimpleReadout` → :code:`EnergyReduce`
+→ :code:`Force`. Optional ZBL / electrostatics / dispersion are post-core layers
+(same as PhysNet / SpookyNet), not part of the Core. Example:
+:code:`enerzyme/config/so3krates_layers_example.yaml`.
+
+SO3LR (So3krates + universal pairwise FF)
+-----------------------------------------
+
+:code:`architecture: so3lr` reuses :code:`So3kratesCore` and composes SO3LR-specific
+layers: :code:`ChargeSpinEmbedding` + :code:`GatherAtomEmbedding(scale_by_sqrt_count=true)`,
+:code:`SimpleReadout(Qa)` / :code:`AtomicAffine` / :code:`ChargeConservation` / :code:`HirshfeldReadout`,
+then :code:`ZBLRepulsionEnergy(switch_off=1.5)`, :code:`ElectrostaticEnergy(flavor=SO3LR)`,
+and :code:`TSQDODispersionEnergy`. Do **not** substitute Grimme D3/D4 when targeting
+SO3LR dispersion. Example: :code:`enerzyme/config/so3lr_layers_example.yaml`. For
+Enerzymette, set :code:`architecture: so3lr` in the resolved :code:`config.yaml`.
+
+Euclidean Fast Attention (EFA)
+------------------------------
+
+EFA is a **Core-internal** nonlocal block (not a YAML physics layer). Shared
+implementation: :code:`enerzyme/models/efa/` (:code:`EFABlock`,
+:code:`apply_efa_if_configured`).
+
+* :code:`architecture: efa` — So3krates stack with :code:`era_use_in_iterations`
+  set (needs :code:`Ra` + :code:`batch_seg` in the Core). Example:
+  :code:`enerzyme/config/efa_layers_example.yaml`.
+* :code:`architecture: so3lr_efa` — SO3LR post-core physics with EFA on the Core.
+  Example: :code:`enerzyme/config/so3lr_efa_layers_example.yaml`.
+* SpookyNet — Core param :code:`use_efa: true` replaces Performer nonlocal;
+  default :code:`false`.
+* New Cores — declare :code:`Ra` / :code:`batch_seg` inputs, construct
+  :code:`EFABlock`, add its delta to invariant :code:`atom_feature` on selected
+  layers. Feed only ``[N, F]`` scalars (not eSCN/EquiformerV2 sphere layouts).
+
+NSE readout layers
+------------------
+
+:code:`NSEReadout` / :code:`HierachicalNSEReadout` and :code:`NeuralSpinChargeEquilibration` refine atomic charge and spin after the Core. Prefer :code:`output_mode: feature` on legacy Cores (PhysNet, SpookyNet, SchNet, MACE, AlphaNet) when stacking these heads. The experimental AllScAIP Core always emits :code:`atom_feature` and likewise needs an external readout (see the AllScAIP warning in :doc:`architecture_catalog`).
