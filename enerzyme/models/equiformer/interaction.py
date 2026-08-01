@@ -21,7 +21,6 @@ from ..e3nn_nn import (
     Activation,
     Gate,
     EquivariantDropout,
-    EquivariantScalarsDropout,
 )
 from ..blocks.drop import GraphDropPath
 from ..activation import SmoothLeakyReLU

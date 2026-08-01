@@ -26,8 +26,8 @@ from ..layers import (
 from ..so3 import (
     CoefficientMapping,
     SO3_Embedding,
-    SO3_Grid,
     SO3_Rotation,
+    build_so3_grid_table,
     init_edge_rot_mat,
     get_normalization_layer,
 )
@@ -177,20 +177,12 @@ class EquiformerV2Core(BaseFFCore):
             self.lmax_list, self.mmax_list, torch.device("cpu")
         )
 
-        self.SO3_grid = ModuleList()
-        for lval in range(max(self.lmax_list) + 1):
-            SO3_m_grid = ModuleList()
-            for mval in range(max(self.lmax_list) + 1):
-                SO3_m_grid.append(
-                    SO3_Grid(
-                        lval,
-                        mval,
-                        resolution=grid_resolution,
-                        normalization="component",
-                        rescale_by_mmax=True,
-                    )
-                )
-            self.SO3_grid.append(SO3_m_grid)
+        self.SO3_grid = build_so3_grid_table(
+            max(self.lmax_list),
+            normalization="component",
+            resolution=grid_resolution,
+            rescale_by_mmax=True,
+        )
 
         # edge_channels_list: [num_rbf, edge_channels, edge_channels]
         self.edge_channels_list = [num_rbf] + [edge_channels] * 2

@@ -46,14 +46,23 @@ def assert_close(a: Tensor, b: Tensor, atol: float = 1e-5, rtol: float = 1e-5) -
     )
 
 
+def _is_s2_grid_buffer(key: str) -> bool:
+    return key.endswith("to_grid_mat") or key.endswith("from_grid_mat")
+
+
 def copy_state_dict(dst: torch.nn.Module, src: torch.nn.Module) -> None:
+    """Copy overlapping parameters; skip S² grid mats when layouts diverge."""
     src_sd = src.state_dict()
     dst_sd = dst.state_dict()
-    missing_in_src = set(dst_sd) - set(src_sd)
+    missing_in_src = {
+        k for k in dst_sd if k not in src_sd and not _is_s2_grid_buffer(k)
+    }
     if missing_in_src:
         raise AssertionError(f"dst has keys missing from src: {missing_in_src}")
     with torch.no_grad():
         for k, dst_t in dst_sd.items():
+            if _is_s2_grid_buffer(k) or k not in src_sd:
+                continue
             src_t = src_sd[k]
             if dst_t.shape != src_t.shape:
                 raise AssertionError(

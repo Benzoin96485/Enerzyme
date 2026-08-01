@@ -1,23 +1,22 @@
 """Wigner-D rotations for spherical harmonic embeddings.
 
+Uses the shared e3nn / Jd backend in :mod:`enerzyme.models.so3.wigner_jd`.
 Adapted from fairchem v1 eSCN / e3nn 0.4.0 (MIT license).
+
+For quaternion edge frames (DPA4 / EMFA), see
+:mod:`enerzyme.models.so3.wigner_quaternion`.
 """
 
 from __future__ import annotations
 
-import os
-
 import torch
-from e3nn import o3
 
 from .coefficient_mapping import CoefficientMapping
-
-# Borrowed from e3nn @ 0.4.0:
-# https://github.com/e3nn/e3nn/blob/0.4.0/e3nn/o3/_wigner.py#L10
-_Jd = torch.load(
-    os.path.join(os.path.dirname(__file__), "Jd.pt"),
-    map_location="cpu",
-    weights_only=False,
+from .wigner_jd import (
+    max_wigner_lmax,
+    wigner_D,
+    wigner_from_rotation_matrix,
+    z_rot_mat,
 )
 
 
@@ -64,49 +63,15 @@ class SO3_Rotation:
     def RotationToWignerDMatrix(
         self, edge_rot_mat: torch.Tensor, start_lmax: int, end_lmax: int
     ) -> torch.Tensor:
-        x = edge_rot_mat @ edge_rot_mat.new_tensor([0.0, 1.0, 0.0])
-        alpha, beta = o3.xyz_to_angles(x)
-        R = (
-            o3.angles_to_matrix(alpha, beta, torch.zeros_like(alpha)).transpose(-1, -2)
-            @ edge_rot_mat
+        return wigner_from_rotation_matrix(
+            edge_rot_mat, end_lmax=end_lmax, start_lmax=start_lmax
         )
-        gamma = torch.atan2(R[..., 0, 2], R[..., 0, 0])
-
-        size = (end_lmax + 1) ** 2 - (start_lmax) ** 2
-        wigner = torch.zeros(
-            len(alpha), size, size, device=self.device, dtype=self.dtype
-        )
-        start = 0
-        for lmax in range(start_lmax, end_lmax + 1):
-            block = self.wigner_D(lmax, alpha, beta, gamma)
-            end = start + block.size()[1]
-            wigner[:, start:end, start:end] = block
-            start = end
-
-        return wigner
 
     def wigner_D(self, lval: int, alpha, beta, gamma) -> torch.Tensor:
-        if not lval < len(_Jd):
-            raise NotImplementedError(
-                f"wigner D maximum l implemented is {len(_Jd) - 1}"
-            )
-
-        alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-        J = _Jd[lval].to(dtype=alpha.dtype, device=alpha.device)
-        Xa = self._z_rot_mat(alpha, lval)
-        Xb = self._z_rot_mat(beta, lval)
-        Xc = self._z_rot_mat(gamma, lval)
-        return Xa @ J @ Xb @ J @ Xc
+        return wigner_D(lval, alpha, beta, gamma)
 
     def _z_rot_mat(self, angle: torch.Tensor, lv: int) -> torch.Tensor:
-        shape, device, dtype = angle.shape, angle.device, angle.dtype
-        M = angle.new_zeros((*shape, 2 * lv + 1, 2 * lv + 1))
-        inds = torch.arange(0, 2 * lv + 1, 1, device=device)
-        reversed_inds = torch.arange(2 * lv, -1, -1, device=device)
-        frequencies = torch.arange(lv, -lv - 1, -1, dtype=dtype, device=device)
-        M[..., inds, reversed_inds] = torch.sin(frequencies * angle[..., None])
-        M[..., inds, inds] = torch.cos(frequencies * angle[..., None])
-        return M
+        return z_rot_mat(angle, lv)
 
 
 def init_edge_rot_mat(edge_distance_vec: torch.Tensor) -> torch.Tensor:
@@ -140,3 +105,10 @@ def init_edge_rot_mat(edge_distance_vec: torch.Tensor) -> torch.Tensor:
     edge_rot_mat_inv = torch.cat([norm_z, norm_x, norm_y], dim=2)
     edge_rot_mat = torch.transpose(edge_rot_mat_inv, 1, 2)
     return edge_rot_mat
+
+
+__all__ = [
+    "SO3_Rotation",
+    "init_edge_rot_mat",
+    "max_wigner_lmax",
+]

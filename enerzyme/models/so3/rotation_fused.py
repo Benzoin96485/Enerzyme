@@ -3,48 +3,24 @@
 Merges ``._m_primary()`` into the Wigner-D matrices so SO(2) linears see
 layout ``(0,...), (1,...)`` without an extra permute. Distinct from
 ``SO3_Rotation`` used by eSCN / EquiformerV2.
+
+Packed Wigner blocks come from the shared :mod:`enerzyme.models.so3.wigner_jd`
+backend.
 """
 
 from __future__ import annotations
 
 import math
-import os
 
 import torch
-from e3nn import o3
 
-# Same Jd tables as so3.rotation / EquiformerV3
-_Jd = torch.load(
-    os.path.join(os.path.dirname(__file__), "Jd.pt"),
-    map_location="cpu",
-    weights_only=False,
+from .wigner_jd import (
+    rotation_matrix_to_euler,
+    wigner_D,
+    wigner_from_rotation_matrix,
 )
 
 _ROTATION_MASK_THRESHOLD = 0.999999
-
-
-def _z_rot_mat(angle, l):
-    shape, device, dtype = angle.shape, angle.device, angle.dtype
-    M = angle.new_zeros((*shape, 2 * l + 1, 2 * l + 1))
-    inds = torch.arange(0, 2 * l + 1, 1, device=device)
-    reversed_inds = torch.arange(2 * l, -1, -1, device=device)
-    frequencies = torch.arange(l, -l - 1, -1, dtype=dtype, device=device)
-    M[..., inds, reversed_inds] = torch.sin(frequencies * angle[..., None])
-    M[..., inds, inds] = torch.cos(frequencies * angle[..., None])
-    return M
-
-
-def wigner_D(l, alpha, beta, gamma):
-    if not l < len(_Jd):
-        raise NotImplementedError(
-            f"wigner D maximum l implemented is {len(_Jd) - 1}"
-        )
-    alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    J = _Jd[l].to(dtype=alpha.dtype, device=alpha.device)
-    Xa = _z_rot_mat(alpha, l)
-    Xb = _z_rot_mat(beta, l)
-    Xc = _z_rot_mat(gamma, l)
-    return Xa @ J @ Xb @ J @ Xc
 
 
 class CoefficientMappingModule(torch.nn.Module):
@@ -209,23 +185,24 @@ class SO3RotationFused(torch.nn.Module):
         return torch.bmm(self.wigner_inv, inputs)
 
     def _rotation_to_wigner_matrix(self, edge_rot_mat, start_lmax, end_lmax):
-        x = edge_rot_mat[:, :, 1]
-        alpha, beta = o3.xyz_to_angles(x)
-        R = o3.angles_to_matrix(alpha, beta, torch.zeros_like(alpha)).transpose(-1, -2)
-        R = torch.bmm(R, edge_rot_mat)
-        gamma = torch.atan2(R[..., 0, 2], R[..., 0, 0])
-
-        if self.use_rotation_mask:
-            yprod = (x @ x.new_tensor([0, 1, 0])).detach()
-            backprop_mask = (yprod > -_ROTATION_MASK_THRESHOLD) & (
-                yprod < _ROTATION_MASK_THRESHOLD
+        if not self.use_rotation_mask:
+            # Shared out-of-place assembly keeps Fa = -dE/dRa through edge frames.
+            return wigner_from_rotation_matrix(
+                edge_rot_mat, end_lmax=end_lmax, start_lmax=start_lmax
             )
-            alpha_detach = alpha[(~backprop_mask)].clone().detach()
-            gamma_detach = gamma[(~backprop_mask)].clone().detach()
-            beta_detach = beta.clone().detach()
-            beta_detach[yprod > _ROTATION_MASK_THRESHOLD] = 0.0
-            beta_detach[yprod < -_ROTATION_MASK_THRESHOLD] = math.pi
-            beta_detach = beta_detach[(~backprop_mask)]
+
+        alpha, beta, gamma = rotation_matrix_to_euler(edge_rot_mat)
+        x = edge_rot_mat[:, :, 1]
+        yprod = (x @ x.new_tensor([0, 1, 0])).detach()
+        backprop_mask = (yprod > -_ROTATION_MASK_THRESHOLD) & (
+            yprod < _ROTATION_MASK_THRESHOLD
+        )
+        alpha_detach = alpha[(~backprop_mask)].clone().detach()
+        gamma_detach = gamma[(~backprop_mask)].clone().detach()
+        beta_detach = beta.clone().detach()
+        beta_detach[yprod > _ROTATION_MASK_THRESHOLD] = 0.0
+        beta_detach[yprod < -_ROTATION_MASK_THRESHOLD] = math.pi
+        beta_detach = beta_detach[(~backprop_mask)]
 
         size = int((end_lmax + 1) ** 2) - int((start_lmax) ** 2)
         wigner = torch.zeros(
@@ -233,25 +210,14 @@ class SO3RotationFused(torch.nn.Module):
         )
         start = 0
         for lmax in range(start_lmax, end_lmax + 1):
-            if self.use_rotation_mask:
-                block = wigner_D(
-                    lmax, alpha[backprop_mask], beta[backprop_mask], gamma[backprop_mask]
-                )
-                block_detach = wigner_D(lmax, alpha_detach, beta_detach, gamma_detach)
-                end = start + block.size()[1]
-                wigner[backprop_mask, start:end, start:end] = block
-                wigner[(~backprop_mask), start:end, start:end] = block_detach
-            else:
-                block = wigner_D(lmax, alpha, beta, gamma)
-                end = start + block.size()[1]
-                wigner[:, start:end, start:end] = block
+            block = wigner_D(
+                lmax, alpha[backprop_mask], beta[backprop_mask], gamma[backprop_mask]
+            )
+            block_detach = wigner_D(lmax, alpha_detach, beta_detach, gamma_detach)
+            end = start + block.size()[1]
+            wigner[backprop_mask, start:end, start:end] = block
+            wigner[(~backprop_mask), start:end, start:end] = block_detach
             start = end
-        if self.use_rotation_mask:
-            return wigner
-        # Keep Wigner in the autograd graph so EnergyReduce+Force can form
-        # Fa = -dE/dRa through edge frames (same contract as SO3_Rotation /
-        # EquiformerV2). Upstream EquiformerV3 detaches here for direct force
-        # heads; Enerzyme's default stack uses energy gradients instead.
         return wigner
 
     def extra_repr(self):

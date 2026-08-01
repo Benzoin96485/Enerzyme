@@ -68,7 +68,7 @@ def test_equiformer_build_and_forward_shapes(equiformer_model):
 
 def test_equiformer_core_feature_mode_direct():
     from enerzyme.models.equiformer.core import EquiformerCore
-    from enerzyme.models.equiformer.node_embedding_layer import EquiformerNodeEmbedding
+    from enerzyme.models.equiformer.embedding import EquiformerNodeEmbedding
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
     torch.manual_seed(1)

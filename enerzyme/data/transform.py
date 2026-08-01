@@ -168,8 +168,11 @@ class UniformSplitQSTransform(BaseTransform):
         if self.n_key not in new_input:
             logger.warning("uniform_qs_init: missing N; skip Q_init_a / S_init_a")
             return
-        n_frames = len(new_input[self.n_key])
-        n_len = len(new_input[self.n_key])
+        if "Ra" not in new_input:
+            logger.warning("uniform_qs_init: missing Ra; skip Q_init_a / S_init_a")
+            return
+        # Ra is never compressed; N/Q/S may be shared across frames when compressed.
+        n_frames = len(new_input["Ra"])
         za = new_input["Za"]
         if len(za.shape) < 2:
             logger.warning("uniform_qs_init: unexpected Za shape; skip")

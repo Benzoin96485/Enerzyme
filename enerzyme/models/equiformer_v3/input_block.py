@@ -4,7 +4,7 @@ import torch
 import copy
 
 from ..blocks.radial_mlp import RadialFunctionExpand as RadialFunction
-from .utils import reduce_edge
+from ..functional import reduce_edge
 
 
 class EdgeDegreeEmbedding(torch.nn.Module):

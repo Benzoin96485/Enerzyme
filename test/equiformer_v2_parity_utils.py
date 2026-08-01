@@ -62,15 +62,23 @@ def deterministic_edge_rot_mat(edge_distance_vec: Tensor) -> Tensor:
     return init_edge_rot_mat(edge_distance_vec)
 
 
+def _is_s2_grid_buffer(key: str) -> bool:
+    return key.endswith("to_grid_mat") or key.endswith("from_grid_mat")
+
+
 def copy_state_dict(dst: torch.nn.Module, src: torch.nn.Module) -> None:
-    """Copy overlapping parameters (Enerzyme mapping/grids may not be nn buffers)."""
+    """Copy overlapping parameters; skip S² grid mats (flat vs lat-long layouts)."""
     src_sd = src.state_dict()
     dst_sd = dst.state_dict()
-    missing_in_src = set(dst_sd) - set(src_sd)
+    missing_in_src = {
+        k for k in dst_sd if k not in src_sd and not _is_s2_grid_buffer(k)
+    }
     if missing_in_src:
         raise AssertionError(f"dst has keys missing from src: {missing_in_src}")
     with torch.no_grad():
         for k, dst_t in dst_sd.items():
+            if _is_s2_grid_buffer(k) or k not in src_sd:
+                continue
             src_t = src_sd[k]
             if dst_t.shape != src_t.shape:
                 raise AssertionError(
@@ -108,24 +116,19 @@ def build_so2_convolution_pair(extra_m0: int | None = None):
 
 def build_so3_grids_v2(lmax: int, resolution: int | None = None):
     """Component-normalized grids with mmax rescale (EquiformerV2 style)."""
-    from enerzyme.models.so3 import SO3_Grid as EZ_Grid
+    from enerzyme.models.so3 import build_so3_grid_table
     from eqv2_so3 import SO3_Grid as Off_Grid
 
-    ez = torch.nn.ModuleList()
+    ez = build_so3_grid_table(
+        lmax,
+        normalization="component",
+        resolution=resolution,
+        rescale_by_mmax=True,
+    )
     off = torch.nn.ModuleList()
     for lval in range(lmax + 1):
-        ez_m = torch.nn.ModuleList()
         off_m = torch.nn.ModuleList()
         for mval in range(lmax + 1):
-            ez_m.append(
-                EZ_Grid(
-                    lval,
-                    mval,
-                    resolution=resolution,
-                    normalization="component",
-                    rescale_by_mmax=True,
-                )
-            )
             off_m.append(
                 Off_Grid(
                     lval,
@@ -134,6 +137,5 @@ def build_so3_grids_v2(lmax: int, resolution: int | None = None):
                     normalization="component",
                 )
             )
-        ez.append(ez_m)
         off.append(off_m)
     return ez, off

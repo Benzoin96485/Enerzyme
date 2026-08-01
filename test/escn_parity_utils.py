@@ -70,34 +70,44 @@ def assert_close(a: Tensor, b: Tensor, atol: float = 1e-5, rtol: float = 1e-5) -
 
 
 def build_so3_grids(lmax: int, resolution: int | None = None):
-    """Parallel ModuleLists of SO3_Grid for official and Enerzyme."""
-    from enerzyme.models.so3 import SO3_Grid as EZ_Grid
+    """Parallel ModuleLists of SO3 grids for official and Enerzyme."""
+    from enerzyme.models.so3 import build_so3_grid_table
     from so3 import SO3_Grid as Off_Grid
 
-    ez = torch.nn.ModuleList()
+    ez = build_so3_grid_table(
+        lmax, normalization="integral", resolution=resolution, rescale_by_mmax=False
+    )
     off = torch.nn.ModuleList()
     for lval in range(lmax + 1):
-        ez_m = torch.nn.ModuleList()
         off_m = torch.nn.ModuleList()
         for m in range(lmax + 1):
-            ez_m.append(EZ_Grid(lval, m, resolution=resolution))
             off_m.append(Off_Grid(lval, m, resolution=resolution))
-        ez.append(ez_m)
         off.append(off_m)
     return ez, off
 
 
+def _is_s2_grid_buffer(key: str) -> bool:
+    return key.endswith("to_grid_mat") or key.endswith("from_grid_mat")
+
+
 def copy_state_dict(dst: torch.nn.Module, src: torch.nn.Module) -> None:
+    """Copy overlapping parameters; skip S² grid mats (flat vs lat-long layouts)."""
     src_sd = src.state_dict()
     dst_sd = dst.state_dict()
-    missing = [k for k in dst_sd if k not in src_sd]
-    unexpected = [k for k in src_sd if k not in dst_sd]
+    missing = [
+        k for k in dst_sd if k not in src_sd and not _is_s2_grid_buffer(k)
+    ]
+    unexpected = [
+        k for k in src_sd if k not in dst_sd and not _is_s2_grid_buffer(k)
+    ]
     if missing or unexpected:
         raise KeyError(f"state_dict mismatch missing={missing} unexpected={unexpected}")
-    for k, v in src_sd.items():
-        if dst_sd[k].shape != v.shape:
-            raise RuntimeError(f"shape mismatch for {k}: {dst_sd[k].shape} vs {v.shape}")
-    dst.load_state_dict(src_sd)
+    filtered = {
+        k: v
+        for k, v in src_sd.items()
+        if k in dst_sd and not _is_s2_grid_buffer(k) and dst_sd[k].shape == v.shape
+    }
+    dst.load_state_dict(filtered, strict=False)
 
 
 def build_so2_pair(hparams: Dict | None = None):

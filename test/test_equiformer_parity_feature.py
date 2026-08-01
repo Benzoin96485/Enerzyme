@@ -29,7 +29,7 @@ from equiformer_parity_utils import (
     scaled_scatter_energy,
     to_enerzyme_edges,
 )
-from enerzyme.models.irreps_tools import extract_scalar_0e, scalar_0e_dim
+from enerzyme.models.e3nn_nn import extract_scalar_0e, scalar_0e_dim
 from enerzyme.models.equiformer.interaction import EquiformerGraphAttentionReadout
 
 

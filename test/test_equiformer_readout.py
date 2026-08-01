@@ -12,7 +12,7 @@ from e3nn import o3
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from enerzyme.models.ff import build_model
-from enerzyme.models.irreps_tools import extract_scalar_0e, scalar_0e_dim
+from enerzyme.models.e3nn_nn import extract_scalar_0e, scalar_0e_dim
 from enerzyme.models.equiformer.interaction import EquiformerGraphAttentionReadout
 from enerzyme.models.layers.readout import SimpleReadout
 
@@ -325,7 +325,7 @@ def test_equiformer_mixed_irreps_simple_readout_stack():
 
 def test_equiformer_core_emits_full_irreps_feature():
     from enerzyme.models.equiformer.core import EquiformerCore
-    from enerzyme.models.equiformer.node_embedding_layer import EquiformerNodeEmbedding
+    from enerzyme.models.equiformer.embedding import EquiformerNodeEmbedding
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
     torch.manual_seed(3)

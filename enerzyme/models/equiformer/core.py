@@ -17,9 +17,8 @@ from ..layers.electrostatics import ChargeConservationLayer
 from ..layers.geometry import DistanceLayer, RangeSeparationLayer
 from ..layers.rbf import BaseRBF
 from ..e3nn_nn import EquivariantDropout
-from .embedding import EdgeDegreeEmbeddingNetwork, ScaledScatter
+from .embedding import EdgeDegreeEmbeddingNetwork, ScaledScatter, EquiformerNodeEmbedding
 from ..e3nn_nn import Activation, LinearRS
-from .node_embedding_layer import EquiformerNodeEmbedding
 from .interaction import GraphAttention, TransBlock, get_norm_layer, _RESCALE
 
 # MD17-style statistics (cutoff ~5 A); used for ScaledScatter normalization.

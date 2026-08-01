@@ -3,7 +3,7 @@
 
 # Keep this import light so ``layers`` can re-export EquiformerNodeEmbedding
 # without circularly loading EquiformerCore.
-from .node_embedding_layer import EquiformerNodeEmbedding
+from .embedding import EquiformerNodeEmbedding
 
 __all__ = [
     "EquiformerCore",

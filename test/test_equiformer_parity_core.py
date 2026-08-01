@@ -21,7 +21,7 @@ from equiformer_parity_utils import (
     official_node_features_after_norm,
     to_enerzyme_edges,
 )
-from enerzyme.models.irreps_tools import extract_scalar_0e, scalar_0e_dim
+from enerzyme.models.e3nn_nn import extract_scalar_0e, scalar_0e_dim
 
 
 def _run_latent_parity(hp: dict, *, dtype: torch.dtype = torch.float64) -> None:

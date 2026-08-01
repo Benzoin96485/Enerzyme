@@ -8,7 +8,7 @@ import torch
 from torch import Tensor
 from torch.nn import Linear, Module
 
-from .lebedev import lebedev_tensors, recommend_max_frequency
+from ..so3.lebedev import lebedev_tensors, recommend_max_frequency
 from .rope import frequency_init, linear_efa_aggregate
 
 

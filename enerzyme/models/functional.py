@@ -57,3 +57,20 @@ def gather_nd(params: Tensor, indices: Tensor) -> Tensor:
     indices = indices.reshape((num_samples, m)).transpose(0, 1).tolist()
     output = params[indices]    # (num_samples, ...)
     return output.reshape(out_shape).contiguous()
+
+
+def reduce_edge(inputs: Tensor, edge_index: Tensor, output_shape) -> Tensor:
+    """Scatter-add ``inputs`` onto node slots indexed by ``edge_index``.
+
+    Args:
+        inputs: Edge features ``(E, ...)``.
+        edge_index: Destination node indices ``(E,)``.
+        output_shape: Full output shape starting with ``num_nodes``.
+    """
+    outputs = torch.zeros(
+        *output_shape,
+        device=inputs.device,
+        dtype=inputs.dtype,
+    )
+    outputs.index_add_(0, edge_index, inputs)
+    return outputs

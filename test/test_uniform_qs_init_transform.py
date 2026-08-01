@@ -32,6 +32,10 @@ def test_uniform_split_conserves_totals():
         with h5py.File(path, "w") as f:
             g = f.create_group("data")
             g.create_dataset("N", data=np.array([2, 3], dtype=np.int32))
+            g.create_dataset(
+                "Ra",
+                data=np.zeros((2, 3, 3), dtype=np.float64),
+            )
             g.create_dataset("Za", data=np.array([[6, 6, 0], [7, 7, 7]], dtype=np.int32))
             g.create_dataset("Q", data=np.array([4.0, -3.0], dtype=np.float64))
             g.create_dataset("S", data=np.array([1.0, 2.0], dtype=np.float64))
@@ -42,10 +46,33 @@ def test_uniform_split_conserves_totals():
 
             qia = np.asarray(g["Q_init_a"][:])
             sia = np.asarray(g["S_init_a"][:])
+            assert qia.shape[0] == 2
             for i, n in enumerate([2, 3]):
                 assert np.isclose(qia[i, :n].sum(), g["Q"][i])
                 assert np.isclose(sia[i, :n].sum(), g["S"][i])
             assert (qia[0, 2:] == 0).all() and (sia[0, 2:] == 0).all()
+
+
+def test_uniform_split_uses_ra_frame_count_when_n_compressed():
+    """Compressed N (len=1) must still emit one Q_init_a row per Ra frame."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "t.h5")
+        with h5py.File(path, "w") as f:
+            g = f.create_group("data")
+            g.create_dataset("N", data=np.array([3], dtype=np.int32))
+            g.create_dataset("Ra", data=np.zeros((4, 3, 3), dtype=np.float64))
+            g.create_dataset(
+                "Za", data=np.array([[6, 6, 6]] * 4, dtype=np.int32)
+            )
+            g.create_dataset("Q", data=np.array([3.0], dtype=np.float64))
+            g.create_dataset("S", data=np.array([0.0], dtype=np.float64))
+
+        with h5py.File(path, "a") as f:
+            g = f["data"]
+            UniformSplitQSTransform().transform(g)
+            qia = np.asarray(g["Q_init_a"][:])
+            assert qia.shape == (4, 3)
+            assert np.allclose(qia.sum(axis=1), 3.0)
 
 
 def test_transform_class_yaml_hook():

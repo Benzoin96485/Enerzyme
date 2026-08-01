@@ -6,7 +6,7 @@ and related nonlinearities from Liao et al. (2026).
 
 import torch
 import copy
-from .grid_resolved import SO3GridResolved as SO3Grid
+from .grid import SO3Grid
 
 
 def check_activation_name(act_name):

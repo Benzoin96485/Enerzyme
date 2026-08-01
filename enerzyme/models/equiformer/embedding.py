@@ -3,16 +3,19 @@
 # into Enerzyme with package-local imports.
 
 import torch
+from torch import Tensor
 from torch_scatter import scatter
 from e3nn import o3
 
 from ..e3nn_nn import LinearRS
 from ..blocks.radial_mlp import RadialProfile
+from ..layers._base_layer import BaseFFLayer
 from .interaction import DepthwiseTensorProduct, _RESCALE, _USE_BIAS
 
 _MAX_ATOM_TYPE = 87  # Enerzyme default covers Z up to 86
 _AVG_DEGREE = 15.57930850982666
 _AVG_NUM_NODES = 18.03065905448718
+
 
 class NodeEmbeddingNetwork(torch.nn.Module):
     
@@ -80,5 +83,31 @@ class EdgeDegreeEmbeddingNetwork(torch.nn.Module):
         node_features = self.scale_scatter(edge_features, edge_dst, dim=0, 
             dim_size=node_features.shape[0])
         return node_features
-    
+
+
+class EquiformerNodeEmbedding(BaseFFLayer):
+    """Map atomic numbers ``Za`` to Equiformer irreps node embeddings.
+
+    Unlike scalar :class:`~enerzyme.models.layers.atom_embedding.NuclearEmbedding`,
+    this produces an e3nn irreps feature used by :class:`EquiformerCore`.
+    """
+
+    def __init__(
+        self,
+        max_Za: int,
+        irreps_node_embedding: str = "128x0e+64x1e+32x2e",
+        bias: bool = True,
+    ) -> None:
+        super().__init__(input_fields={"Za"}, output_fields={"atom_embedding"})
+        self.max_Za = max_Za
+        self.irreps_node_embedding = irreps_node_embedding
+        self.embed = NodeEmbeddingNetwork(
+            irreps_node_embedding,
+            max_atom_type=max_Za + 1,
+            bias=bias,
+        )
+
+    def get_atom_embedding(self, Za: Tensor) -> Tensor:
+        embedding, _, _ = self.embed(Za.long())
+        return embedding
 
