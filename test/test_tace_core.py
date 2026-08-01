@@ -247,3 +247,60 @@ def test_tace_layer_stack_energy_and_force_cartesian():
     assert out["E"].shape == (1,)
     assert out["Fa"].shape == (n, 3)
     assert torch.isfinite(out["E"]).all() and torch.isfinite(out["Fa"]).all()
+
+
+def test_tace_spherical_parity_true_bb_residual():
+    """Regression: parity=True makes TP(node,SH) != TP(msg,msg); BB skip must match product."""
+    torch.manual_seed(0)
+    n = 4
+    idx_i, idx_j = _edges(n)
+    core = _tiny_core(
+        "spherical",
+        num_layers=3,
+        Lmax=2,
+        lmax=3,
+        parity=True,
+        use_first_resnet=True,
+        resnet_type="BB",
+        resnet_linear_type="aware",
+    )
+    for inter, prod in zip(core.interactions, core.products):
+        if hasattr(inter, "resnetBB"):
+            assert inter.irreps_sc == prod.irreps_out
+    out = core.get_output(
+        Za=torch.tensor([1, 6, 8, 1]),
+        vij_sr=torch.randn(idx_i.numel(), 3),
+        idx_i_sr=idx_i,
+        idx_j_sr=idx_j,
+        rbf=torch.randn(idx_i.numel(), 4),
+        atom_embedding=torch.randn(n, 8),
+    )
+    assert torch.isfinite(out["atom_feature"]).all()
+
+
+def test_tace_cartesian_identity_resnet():
+    """Regression: cartesian must honor resnet_linear_type='identity' (no learned skip)."""
+    from enerzyme.models.tace.cartesian.core_blocks import DictSkipIdentity
+
+    torch.manual_seed(0)
+    n = 4
+    idx_i, idx_j = _edges(n)
+    core = _tiny_core(
+        "cartesian",
+        num_layers=2,
+        use_first_resnet=True,
+        resnet_linear_type="identity",
+    )
+    resnets = [r for r in core.cartesian_stack.resnets if r is not None]
+    assert resnets, "expected residual modules"
+    assert all(isinstance(r, DictSkipIdentity) for r in resnets)
+    out = core.get_output(
+        Za=torch.tensor([1, 6, 8, 1]),
+        vij_sr=torch.randn(idx_i.numel(), 3),
+        idx_i_sr=idx_i,
+        idx_j_sr=idx_j,
+        rbf=torch.randn(idx_i.numel(), 4),
+        atom_embedding=torch.randn(n, 8),
+    )
+    assert out["atom_feature"].shape == (n, 8)
+    assert torch.isfinite(out["atom_feature"]).all()

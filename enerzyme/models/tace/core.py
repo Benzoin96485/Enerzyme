@@ -241,6 +241,7 @@ class TACECore(BaseFFCore):
                 parity=self.parity,
                 bias=kw["bias"],
                 target_irreps=target,
+                correlation=kw["correlation"][layer],
             )
             self.interactions.append(inter)
             prod = CgtpACE(
@@ -258,6 +259,11 @@ class TACECore(BaseFFCore):
                 bias=kw["bias"],
                 agnostic=kw["agnostic_product"],
             )
+            if hasattr(inter, "resnetBB") and inter.irreps_sc != prod.irreps_out:
+                raise ValueError(
+                    f"TACE BB residual irreps mismatch at layer {layer}: "
+                    f"skip={inter.irreps_sc} product={prod.irreps_out}"
+                )
             self.products.append(prod)
             irreps_in = prod.irreps_out
 

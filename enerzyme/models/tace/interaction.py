@@ -142,6 +142,7 @@ class CgtpInteraction(nn.Module):
         parity: bool = False,
         bias: bool = True,
         target_irreps: Optional[o3.Irreps] = None,
+        correlation: int = 2,
     ) -> None:
         super().__init__()
         self.layer = layer
@@ -153,6 +154,7 @@ class CgtpInteraction(nn.Module):
         self.scatter_norm = scatter_norm
         self.resnet_type = resnet_type
         self.resnet_linear_type = resnet_linear_type
+        self.correlation = int(correlation)
         self.avg_num_neighbors = float(avg_num_neighbors)
         self.register_buffer(
             "_avg_num_neighbors",
@@ -175,9 +177,16 @@ class CgtpInteraction(nn.Module):
         last = layer == num_layers - 1
         if last:
             self.irreps_sc = (o3.Irreps(target_irreps) * num_channel).regroup()
+        elif self.correlation == 1:
+            # Match CgtpACE correlation==1: keep message irreps with l <= Lmax.
+            self.irreps_sc = o3.Irreps(
+                [(num_channel, ir) for _, ir in self.irreps_out if ir.l <= Lmax]
+            )
         else:
+            # Match CgtpACE correlation>=2: TP(message, message) truncated to Lmax.
+            # TP(node, SH) is NOT equivalent under parity=True.
             sc_base = to_possible_tp_irreps(
-                self.irreps_in, self.irreps_sh, parity, lmax=Lmax
+                self.irreps_out, self.irreps_out, parity, lmax=Lmax
             )
             self.irreps_sc = (sc_base * num_channel).regroup()
 

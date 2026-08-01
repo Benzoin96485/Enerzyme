@@ -110,6 +110,31 @@ class SelfInteraction(nn.Module):
         return out
 
 
+class DictSkipIdentity(nn.Module):
+    """Cartesian analogue of ``SkipIdentity``: pass matching ranks, zero-pad missing ``l``."""
+
+    def __init__(self, ls_out: List[int], num_channel: int):
+        super().__init__()
+        self.ls_out = list(ls_out)
+        self.num_channel = num_channel
+        self.element_aware = False
+
+    def forward(
+        self, feats: Dict[int, Tensor], attrs: Optional[Tensor] = None
+    ) -> Dict[int, Tensor]:
+        del attrs
+        ref = next(iter(feats.values()))
+        n, dtype, device = ref.shape[0], ref.dtype, ref.device
+        out: Dict[int, Tensor] = {}
+        for l in self.ls_out:
+            if l in feats:
+                out[l] = feats[l]
+            else:
+                shape = (n, self.num_channel) + ((3,) * l if l > 0 else ())
+                out[l] = torch.zeros(shape, dtype=dtype, device=device)
+        return out
+
+
 def _satisfy(l1: int, l2: int, restriction: Optional[str]) -> bool:
     if restriction is None:
         return True
@@ -430,16 +455,19 @@ class CartesianLayerStack(nn.Module):
                 )
             )
             if use_first_resnet or layer > 0:
-                self.resnets.append(
-                    SelfInteraction(
-                        num_channel,
-                        num_channel,
-                        ls=ls_out,
-                        bias=bias,
-                        element_aware=(resnet_linear_type == "aware"),
-                        num_elements=num_elements,
+                if resnet_linear_type == "identity":
+                    self.resnets.append(DictSkipIdentity(ls_out, num_channel))
+                else:
+                    self.resnets.append(
+                        SelfInteraction(
+                            num_channel,
+                            num_channel,
+                            ls=ls_out,
+                            bias=bias,
+                            element_aware=(resnet_linear_type == "aware"),
+                            num_elements=num_elements,
+                        )
                     )
-                )
             else:
                 self.resnets.append(None)
             self.products.append(
