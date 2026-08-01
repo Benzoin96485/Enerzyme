@@ -9,8 +9,9 @@ EquiformerV2 SO(2) convolution lives in ``so2_ops`` alongside the eSCN-style
 ``SO2Block`` / ``SO2Conv`` (different parameterization — not interchangeable).
 DPA4 / EMFA contributes packed/m-major indexing, focus-stream gated activations,
 ``SO3FocusLinear``, ``FocusSO2Linear``, degree-balanced ``EquivariantDegreeRMSNorm``,
-``BesselC3RadialBasis``, quaternion Wigner-D (:mod:`wigner_quaternion`), and
-shared Lebedev tables / ``S2LebedevProjector`` (also used by EFA for points).
+``BesselC3RadialBasis``, quaternion edge frames (:mod:`wigner_quaternion`) that
+share the e3nn/``Jd`` Wigner-D backend (:mod:`wigner_jd`), and shared Lebedev
+tables / ``S2LebedevProjector`` (also used by EFA for points).
 
 They are **not** used by the Meta UMA wrappers under ``enerzyme.models.esen``, which
 keep the fairchem ``eSCNMD*`` checkpoint path.
@@ -86,6 +87,12 @@ from .rotation import SO3_Rotation, init_edge_rot_mat
 from .so2_conv import SO2Block, SO2Conv
 from .so2_ops import SO2_Convolution, SO2_m_Convolution
 from .spherical_harmonics import RealSphericalHarmonics, spherical_harmonics
+from .wigner_jd import (
+    max_wigner_lmax,
+    rotation_matrix_to_euler,
+    wigner_D,
+    wigner_from_rotation_matrix,
+)
 from .wigner_quaternion import (
     WignerDCalculator,
     build_edge_quaternion,
@@ -124,6 +131,10 @@ __all__ = [
     "get_l_to_all_m_expand_index",
     "get_normalization_layer",
     "init_edge_rot_mat",
+    "max_wigner_lmax",
+    "rotation_matrix_to_euler",
+    "wigner_D",
+    "wigner_from_rotation_matrix",
     "load_cgmatrix",
     "spherical_harmonics",
     "PolynomialEnvelope",

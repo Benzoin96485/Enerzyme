@@ -1,21 +1,33 @@
-"""Quaternion-based Wigner-D edge frames (DPA4 / SeZM).
+"""Quaternion edge frames for DPA4 / SeZM, with shared e3nn/Jd Wigner-D.
 
-Reimplemented in PyTorch from DPA4 concepts (Li et al., arXiv:2606.02419).
-Only the essential ``lmax <= 2`` path is implemented for the water-mini
-default; the generic polynomial path for higher ``l`` is omitted for v1
-but the API is forward-compatible.
+Edge frames stay quaternion-based (``build_edge_quaternion``, optional Z-roll).
+Packed Wigner-D matrices come from
+:func:`~enerzyme.models.so3.wigner_jd.wigner_from_rotation_matrix` after
+``quaternion_to_rotation_matrix``, supporting any ``lmax`` packaged in ``Jd.pt``.
 
-Complementary to :class:`~enerzyme.models.so3.rotation.SO3_Rotation`, which
-builds Wigner-D from 3×3 rotation matrices via e3nn Euler angles and ``Jd.pt``.
+DPA4's historical l=1 Wigner block used a signed permutation of the Cartesian
+rotation (``A R Aᵀ`` with ``A`` mapping ``(x,y,z) → (-y,-z,x)``). The shared
+e3nn/Jd backend returns ``D¹(R) = R``, so :class:`WignerDCalculator` evaluates
+Wigner-D on ``A R(q) Aᵀ`` to keep that DPA4 layout for every ``l`` (and restore
+SO(3) scalar invariance of the edge-frame stack).
 """
 
 from __future__ import annotations
 
-import math
-
 import torch
 import torch.nn as nn
 from torch import Tensor
+
+from .wigner_jd import max_wigner_lmax, wigner_from_rotation_matrix
+
+# Signed permutation: rows are -e_y, -e_z, +e_x (historical DPA4 l=1 basis).
+_DPA4_CARTESIAN_BASIS = torch.tensor(
+    [
+        [0.0, -1.0, 0.0],
+        [0.0, 0.0, -1.0],
+        [1.0, 0.0, 0.0],
+    ]
+)
 
 
 def safe_norm(x: Tensor, eps: float = 1e-7) -> Tensor:
@@ -93,36 +105,27 @@ def build_edge_quaternion(edge_vec: Tensor, edge_len: Tensor | None = None,
 
 
 class WignerDCalculator(nn.Module):
-    """Wigner-D calculator for lmax <= 2 using direct quaternion formulas.
+    """Packed e3nn Wigner-D from unit quaternions (shared Jd backend).
 
-    For lmax=2 (water-mini default), uses:
-    - l=0: identity (1x1)
-    - l=1: rotation matrix reordered to packed (l,m) basis
-    - l=2: degree-4 quaternion tensor contraction
+    Keeps DPA4's quaternion edge frame while supporting any ``lmax`` packaged
+    in ``Jd.pt`` (see :func:`~enerzyme.models.so3.wigner_jd.max_wigner_lmax`).
+    Evaluates Wigner-D on ``A R(q) Aᵀ`` so the packed layout matches DPA4's
+    historical Cartesian / SO(2) basis (not raw e3nn ``D(R) = R`` for ``l=1``).
     """
 
     def __init__(self, lmax: int, eps: float = 1e-7) -> None:
         super().__init__()
+        lmax = int(lmax)
+        if lmax < 0:
+            raise ValueError(f"`lmax` must be non-negative, got {lmax}")
+        if lmax > max_wigner_lmax():
+            raise NotImplementedError(
+                f"wigner D maximum l implemented is {max_wigner_lmax()}, got lmax={lmax}"
+            )
         self.lmax = lmax
         self.eps = eps
         self.dim_full = (lmax + 1) ** 2
-        # l=1 reorder: packed basis is (m=-1, m=0, m=+1) -> (y, z, x)
-        self.register_buffer("l1_perm", torch.tensor([1, 2, 0], dtype=torch.long))
-        l1_sign = torch.tensor([-1.0, -1.0, 1.0])
-        self.register_buffer("l1_sign_outer", torch.outer(l1_sign, l1_sign))
-
-        if lmax >= 2:
-            s2 = math.sqrt(2.0)
-            s6 = math.sqrt(6.0)
-            basis = torch.zeros(5, 3, 3)
-            basis[0, 0, 1] = basis[0, 1, 0] = 1.0 / s2
-            basis[1, 1, 2] = basis[1, 2, 1] = 1.0 / s2
-            basis[2, 0, 0] = basis[2, 1, 1] = -1.0 / s6
-            basis[2, 2, 2] = 2.0 / s6
-            basis[3, 0, 2] = basis[3, 2, 0] = 1.0 / s2
-            basis[4, 0, 0] = 1.0 / s2
-            basis[4, 1, 1] = -1.0 / s2
-            self.register_buffer("l2_basis", basis)
+        self.register_buffer("_basis_A", _DPA4_CARTESIAN_BASIS.clone(), persistent=False)
 
     def forward(self, edge_quaternion: Tensor) -> tuple[Tensor, Tensor]:
         """Build block-diagonal Wigner-D from quaternions.
@@ -134,52 +137,17 @@ class WignerDCalculator(nn.Module):
             (D_full, Dt_full) each with shape (E, D, D) where D=(lmax+1)^2.
         """
         q = quaternion_normalize(edge_quaternion, self.eps)
-        n_edge = q.shape[0]
-        device = q.device
-        dtype = q.dtype
-        dim = self.dim_full
-
-        # Build block-diagonal D out-of-place to preserve gradient graph
-        blocks = []
-
-        # l=0 block: (E, 1, 1) identity
-        l0_block = torch.ones(n_edge, 1, 1, device=device, dtype=dtype)
-        blocks.append(l0_block)
-
-        if self.lmax >= 1:
-            rot = quaternion_to_rotation_matrix(q)  # (E, 3, 3)
-            perm = self.l1_perm
-            D_l1 = rot[:, perm][:, :, perm] * self.l1_sign_outer.unsqueeze(0)
-            blocks.append(D_l1)  # (E, 3, 3)
-
-        if self.lmax >= 2:
-            basis = self.l2_basis.to(dtype=dtype)
-            rotated_basis = torch.einsum("eik,bkl,ejl->ebij", rot, basis, rot)
-            D_l2 = torch.einsum("aij,ebij->eab", basis, rotated_basis)
-            blocks.append(D_l2)  # (E, 5, 5)
-
-        # Construct block-diagonal without in-place ops
-        D_full = torch.zeros(n_edge, dim, dim, device=device, dtype=dtype)
-        offset = 0
-        for blk in blocks:
-            sz = blk.shape[1]
-            # Create a sparse mask and add
-            pad_before = offset
-            pad_after = dim - offset - sz
-            # Pad each block to (E, dim, dim) with zeros
-            blk_padded = torch.nn.functional.pad(
-                blk, (pad_before, pad_after, pad_before, pad_after)
-            )  # (E, dim, dim)
-            D_full = D_full + blk_padded
-            offset += sz
-
+        rot = quaternion_to_rotation_matrix(q)
+        A = self._basis_A.to(device=rot.device, dtype=rot.dtype)
+        # Conjugate into DPA4's Cartesian basis before the shared Jd backend.
+        rot = A @ rot @ A.transpose(-2, -1)
+        D_full = wigner_from_rotation_matrix(rot, end_lmax=self.lmax, start_lmax=0)
         Dt_full = D_full.transpose(-2, -1)
         return D_full, Dt_full
 
     def forward_zonal(self, edge_quaternion: Tensor, lmin: int = 1) -> Tensor:
         """Build local m=0 to global zonal coupling for GIE."""
         D_full, Dt_full = self.forward(edge_quaternion)
-        # Extract m=0 column for each l >= lmin
         zonal_parts = []
         for l in range(max(lmin, 1), self.lmax + 1):
             start = l * l

@@ -4,7 +4,7 @@ Native PyTorch reimplementation of the DPA4 EMFA SO(2) descriptor.
 Subclasses BaseFFCore; mirrors EquiformerV3Core registration style.
 
 v1 limitations:
-- lmax <= 2 (Wigner-D uses direct quaternion formulas)
+- Wigner-D via shared e3nn/Jd backend (``lmax`` up to packaged ``Jd.pt`` max)
 - message_node_so3=False (SO3GridNet message path not implemented)
 - n_focus=1 primary path; n_focus>1 API supported but less tested
 - No l_schedule, kmax>1, grid_mlp branches, InnerClamp/BridgingSwitch
