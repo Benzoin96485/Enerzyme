@@ -57,13 +57,8 @@ class S2Activation(torch.nn.Module):
         self.act = torch.nn.SiLU()
 
     def forward(self, inputs, SO3_grid):
-        to_grid_mat = SO3_grid[self.lmax][self.mmax].get_to_grid_mat(inputs.device)
-        from_grid_mat = SO3_grid[self.lmax][self.mmax].get_from_grid_mat(inputs.device)
-        to_grid_mat = to_grid_mat.to(dtype=inputs.dtype)
-        from_grid_mat = from_grid_mat.to(dtype=inputs.dtype)
-        x_grid = torch.einsum("bai, zic -> zbac", to_grid_mat, inputs)
-        x_grid = self.act(x_grid)
-        return torch.einsum("bai, zbac -> zic", from_grid_mat, x_grid)
+        grid = SO3_grid[self.lmax][self.mmax]
+        return grid.from_grid(self.act(grid.to_grid(inputs)))
 
 
 class SeparableS2Activation(torch.nn.Module):

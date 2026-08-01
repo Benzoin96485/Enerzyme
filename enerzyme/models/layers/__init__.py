@@ -7,7 +7,7 @@ from .rbf import (
     ExpNormalSmearing,
 )
 from .atom_embedding import BaseAtomEmbedding, RandomAtomEmbedding, NuclearEmbedding
-from ..equiformer.node_embedding_layer import EquiformerNodeEmbedding
+from ..equiformer.embedding import EquiformerNodeEmbedding
 from .electron_embedding import BaseElectronEmbedding, ElectronicEmbedding
 from .electrostatics import (
     ElectrostaticEnergyLayer,

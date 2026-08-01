@@ -208,7 +208,7 @@ def build_enerzyme_parts(
     dtype: torch.dtype = torch.float64,
 ):
     from enerzyme.models.equiformer.core import EquiformerCore
-    from enerzyme.models.equiformer.node_embedding_layer import EquiformerNodeEmbedding
+    from enerzyme.models.equiformer.embedding import EquiformerNodeEmbedding
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
     embed = EquiformerNodeEmbedding(

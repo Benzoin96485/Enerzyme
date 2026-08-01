@@ -24,10 +24,10 @@ from ..so3.layer_norm import get_normalization_layer, RMSNorm
 from ..blocks.radial_mlp import RadialFunctionExpand as RadialFunction
 from ..so3.so2_ops import SO2Linear
 from ..so3.linear import SO3Linear
-from ..so3.grid_resolved import SO3GridResolved as SO3Grid
-from .utils import reduce_edge
+from ..so3.grid import SO3Grid
+from ..functional import reduce_edge
 from ..blocks.drop import GraphDropPath
-from .drop import EquivariantDropout
+from ..so3.drop import EquivariantDegreeDropout
 from ..so3.softmax import GraphSoftmax
 
 
@@ -685,7 +685,7 @@ class TransBlockV3(torch.nn.Module):
                 self.ga.alpha_norm = RMSNorm(attn_alpha_channels)
 
         self.drop_path = GraphDropPath(drop_path_rate) if drop_path_rate > 0.0 else None
-        self.proj_drop = EquivariantDropout(lmax=lmax, mmax=lmax, drop_prob=proj_drop) if proj_drop > 0.0 else None
+        self.proj_drop = EquivariantDegreeDropout(lmax=lmax, mmax=lmax, drop_prob=proj_drop) if proj_drop > 0.0 else None
 
         self.norm_2 = get_normalization_layer(norm_type, lmax=lmax, num_channels=num_in_channels)
 

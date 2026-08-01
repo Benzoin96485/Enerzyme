@@ -10,8 +10,10 @@ EquiformerV2 SO(2) convolution lives in ``so2_ops`` alongside the eSCN-style
 DPA4 / EMFA contributes packed/m-major indexing, focus-stream gated activations,
 ``SO3FocusLinear``, ``FocusSO2Linear``, degree-balanced ``EquivariantDegreeRMSNorm``,
 ``BesselC3RadialBasis``, quaternion edge frames (:mod:`wigner_quaternion`) that
-share the e3nn/``Jd`` Wigner-D backend (:mod:`wigner_jd`), and shared Lebedev
-tables / ``S2LebedevProjector`` (also used by EFA for points).
+share the e3nn/``Jd`` Wigner-D backend (:mod:`wigner_jd`), flat lat–long
+:class:`SO3Grid` (eSCN / EquiformerV2 / V3) plus Lebedev
+:class:`S2LebedevProjector` behind :class:`S2GridProjector`, and shared Lebedev
+tables (also used by EFA for points).
 
 They are **not** used by the Meta UMA wrappers under ``enerzyme.models.esen``, which
 keep the fairchem ``eSCNMD*`` checkpoint path.
@@ -69,11 +71,11 @@ from .layer_norm import (
 )
 from .radial import BesselC3RadialBasis, RadialMLP
 from .rotation_fused import SO3RotationFused, CoefficientMappingModule
-from .grid_resolved import SO3GridResolved
 from .coefficient_mapping import CoefficientMapping
-from .drop import EquivariantDropoutArraySphericalHarmonics
+from .drop import EquivariantDropoutArraySphericalHarmonics, EquivariantDegreeDropout
 from .embedding import SO3_Embedding
-from .grid import SO3_Grid
+from .grid import SO3Grid, SO3_Grid, SO3GridResolved, build_so3_grid_table
+from .s2_projector import S2GridProjector
 from .l0_contraction import L0Contraction, load_cgmatrix
 from .layer_norm import (
     EquivariantLayerNormArray,
@@ -110,6 +112,7 @@ from .wigner_quaternion import (
 __all__ = [
     "CoefficientMapping",
     "EquivariantDropoutArraySphericalHarmonics",
+    "EquivariantDegreeDropout",
     "EquivariantLayerNormArray",
     "EquivariantLayerNormArraySphericalHarmonics",
     "EquivariantRMSNormArraySphericalHarmonicsV2",
@@ -123,6 +126,10 @@ __all__ = [
     "SO2Conv",
     "SO3_Embedding",
     "SO3_Grid",
+    "SO3Grid",
+    "SO3GridResolved",
+    "S2GridProjector",
+    "build_so3_grid_table",
     "SO3_LinearV2",
     "SO3_Rotation",
     "SeparableS2Activation",
@@ -185,7 +192,6 @@ __all__ = [
     "safe_norm",
     "SO3RotationFused",
     "CoefficientMappingModule",
-    "SO3GridResolved",
     "get_activation",
     "check_activation_name",
     "has_scalars",

@@ -10,7 +10,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from ..so3 import SO2Block, SO3_Grid
+from ..so3 import SO2Block, SO3Grid
 
 
 class EdgeBlock(torch.nn.Module):
@@ -60,7 +60,7 @@ class MessageBlock(torch.nn.Module):
         mmax_list: list[int],
         num_rbf: int,
         max_Za: int,
-        SO3_grid: SO3_Grid,
+        SO3_grid: SO3Grid,
         act,
     ) -> None:
         super().__init__()
@@ -141,7 +141,7 @@ class LayerBlock(torch.nn.Module):
         mmax_list: list[int],
         num_rbf: int,
         max_Za: int,
-        SO3_grid: SO3_Grid,
+        SO3_grid: SO3Grid,
         act,
     ) -> None:
         super().__init__()
@@ -196,7 +196,7 @@ class LayerBlock(torch.nn.Module):
         max_lmax = max(self.lmax_list)
         x_grid_message = x_message.to_grid(self.SO3_grid, lmax=max_lmax)
         x_grid = x.to_grid(self.SO3_grid, lmax=max_lmax)
-        x_grid = torch.cat([x_grid, x_grid_message], dim=3)
+        x_grid = torch.cat([x_grid, x_grid_message], dim=2)
 
         x_grid = self.act(self.fc1_sphere(x_grid))
         x_grid = self.act(self.fc2_sphere(x_grid))

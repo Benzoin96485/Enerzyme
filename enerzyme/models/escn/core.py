@@ -30,8 +30,8 @@ from ..layers import (
 from ..so3 import (
     CoefficientMapping,
     SO3_Embedding,
-    SO3_Grid,
     SO3_Rotation,
+    build_so3_grid_table,
     init_edge_rot_mat,
 )
 from .interaction import LayerBlock
@@ -131,12 +131,12 @@ class eSCNCore(BaseFFCore):
         self.act = SiLU()
         self.sphere_proj = torch.nn.Linear(dim_embedding, self.dim_feature_out)
 
-        self.SO3_grid = torch.nn.ModuleList()
-        for lval in range(max(self.lmax_list) + 1):
-            SO3_m_grid = torch.nn.ModuleList()
-            for m in range(max(self.lmax_list) + 1):
-                SO3_m_grid.append(SO3_Grid(lval, m, resolution=resolution))
-            self.SO3_grid.append(SO3_m_grid)
+        self.SO3_grid = build_so3_grid_table(
+            max(self.lmax_list),
+            normalization="integral",
+            resolution=resolution,
+            rescale_by_mmax=False,
+        )
 
         self.layer_blocks = torch.nn.ModuleList()
         for _ in range(self.num_layers):

@@ -16,6 +16,7 @@ from ..so3.gated import SO3GatedActivation
 from ..so3.layer_norm import EquivariantDegreeRMSNorm
 from ..so3.lebedev import S2LebedevProjector
 from ..so3.linear import SO3FocusLinear
+from ..so3.s2_projector import S2GridProjector
 from .so2 import EdgeCache, SO2Convolution
 
 
@@ -42,6 +43,7 @@ class EquivariantFFN(nn.Module):
         self.hidden_channels = hidden_channels
         self.glu_activation = glu_activation
         self.use_grid = ffn_so3_grid
+        self.grid_proj: S2GridProjector | None = None
 
         if self.use_grid:
             self.so3_linear_1 = SO3FocusLinear(

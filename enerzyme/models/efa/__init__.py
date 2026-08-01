@@ -16,7 +16,7 @@ Lebedev grids are the shared e3x Apache-2.0 tables under
 from .attention import EuclideanFastAttention
 from .block import EFABlock, parse_era_iterations
 from .hook import apply_efa_if_configured, build_efa_blocks, efa_input_fields
-from .lebedev import (
+from ..so3.lebedev import (
     LEBEDEV_FREQUENCY_LOOKUP,
     available_lebedev_nums,
     lebedev_quadrature,

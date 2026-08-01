@@ -149,24 +149,16 @@ class SO3_Embedding(torch.nn.Module):
         offset = 0
         for i in range(self.num_resolutions):
             num_coefficients = mappingReduced.res_size[i]
-
             x_res = self.embedding[:, offset : offset + num_coefficients].contiguous()
-            to_grid_mat = SO3_grid[self.lmax_list[i]][
-                self.mmax_list[i]
-            ].get_to_grid_mat(self.device)
-            from_grid_mat = SO3_grid[self.lmax_list[i]][
-                self.mmax_list[i]
-            ].get_from_grid_mat(self.device)
-            to_grid_mat = to_grid_mat.to(dtype=x_res.dtype)
-            from_grid_mat = from_grid_mat.to(dtype=x_res.dtype)
-            x_grid = torch.einsum("bai,zic->zbac", to_grid_mat, x_res)
-            x_grid = act(x_grid)
-            x_res = torch.einsum("bai,zbac->zic", from_grid_mat, x_grid)
-
-            self.embedding[:, offset : offset + num_coefficients] = x_res
+            grid_i = SO3_grid[self.lmax_list[i]][self.mmax_list[i]]
+            x_grid = act(grid_i.to_grid(x_res))
+            self.embedding[:, offset : offset + num_coefficients] = grid_i.from_grid(
+                x_grid
+            )
             offset = offset + num_coefficients
 
     def to_grid(self, SO3_grid, lmax: int = -1) -> torch.Tensor:
+        """Project multi-resolution coeffs to a flat S² grid ``(N, G, C_tot)``."""
         if lmax == -1:
             lmax = max(self.lmax_list)
 
@@ -174,23 +166,18 @@ class SO3_Embedding(torch.nn.Module):
         grid_mapping = SO3_grid[lmax][lmax].mapping
 
         offset = 0
-        x_grid = torch.tensor([], device=self.device, dtype=self.dtype)
-
+        parts = []
         for i in range(self.num_resolutions):
             num_coefficients = int((self.lmax_list[i] + 1) ** 2)
             x_res = self.embedding[:, offset : offset + num_coefficients].contiguous()
-            to_grid_mat = to_grid_mat_lmax[
-                :,
-                :,
-                grid_mapping.coefficient_idx(self.lmax_list[i], self.lmax_list[i]),
-            ].to(dtype=x_res.dtype)
-            x_grid = torch.cat(
-                [x_grid, torch.einsum("bai,zic->zbac", to_grid_mat, x_res)],
-                dim=3,
-            )
+            coeff_idx = grid_mapping.coefficient_idx(
+                self.lmax_list[i], self.lmax_list[i]
+            ).to(device=to_grid_mat_lmax.device)
+            to_grid_mat = to_grid_mat_lmax[:, coeff_idx].to(dtype=x_res.dtype)
+            parts.append(torch.einsum("aj,njc->nac", to_grid_mat, x_res))
             offset = offset + num_coefficients
 
-        return x_grid
+        return torch.cat(parts, dim=2)
 
     def _from_grid(self, x_grid: torch.Tensor, SO3_grid, lmax: int = -1) -> None:
         if lmax == -1:
@@ -202,16 +189,14 @@ class SO3_Embedding(torch.nn.Module):
         offset = 0
         offset_channel = 0
         for i in range(self.num_resolutions):
-            from_grid_mat = from_grid_mat_lmax[
-                :,
-                :,
-                grid_mapping.coefficient_idx(self.lmax_list[i], self.lmax_list[i]),
-            ].to(dtype=x_grid.dtype)
+            coeff_idx = grid_mapping.coefficient_idx(
+                self.lmax_list[i], self.lmax_list[i]
+            ).to(device=from_grid_mat_lmax.device)
+            from_grid_mat = from_grid_mat_lmax[coeff_idx, :].to(dtype=x_grid.dtype)
             x_res = torch.einsum(
-                "bai,zbac->zic",
+                "ja,nac->njc",
                 from_grid_mat,
                 x_grid[
-                    :,
                     :,
                     :,
                     offset_channel : offset_channel + self.num_channels,
