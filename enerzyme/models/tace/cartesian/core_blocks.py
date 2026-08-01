@@ -15,8 +15,8 @@ from torch import Tensor, nn
 from torch_scatter import scatter_sum
 
 from ..cartnn import ICTD, CartesianHarmonics
-from ..edge import EDGE_UPDATE
-from ..linear import ScalarMLP
+from ...blocks.radial_mlp import RadialMLP
+from ..interaction import EDGE_UPDATE
 
 
 def add_dict_to_left(t1: Dict[int, Tensor], t2: Dict[int, Tensor]) -> Dict[int, Tensor]:
@@ -422,10 +422,11 @@ class CartesianLayerStack(nn.Module):
             ctr = CartesianContraction(num_channel, lmax_in, lmax, l1l2=l1l2)
             self.contractions.append(ctr)
             self.radial_nets.append(
-                ScalarMLP(
+                RadialMLP(
                     [eu.out_dim] + list(radial_mlp) + [ctr.weight_numel],
+                    use_layer_norm=False,
+                    use_offset=False,
                     bias=radial_bias,
-                    act="silu",
                 )
             )
             if use_first_resnet or layer > 0:

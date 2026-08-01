@@ -3,9 +3,13 @@
 import torch
 from e3nn import o3
 
-from enerzyme.models.tace.paths import generate_paths, to_possible_tp_irreps
-from enerzyme.models.tace.spherical.product import CgtpACE
-from enerzyme.models.tace.tensor_product import O3ScatterTensorProduct, UUUTensorProduct
+from enerzyme.models.e3nn_nn import (
+    O3ScatterTensorProduct,
+    UUUTensorProduct,
+    generate_paths,
+    to_possible_tp_irreps,
+)
+from enerzyme.models.tace.interaction import CgtpACE
 
 
 def test_generate_paths_uvu_and_uuu():

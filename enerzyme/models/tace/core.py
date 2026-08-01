@@ -17,7 +17,7 @@ from e3nn.o3 import Irreps, SphericalHarmonics
 from torch import Tensor
 from torch.nn import ModuleList
 
-from ..e3nn_nn import scalar_0e_dim
+from ..e3nn_nn import IrrepsLinear, scalar_0e_dim
 from ..layers import (
     BaseAtomEmbedding,
     BaseElectronEmbedding,
@@ -27,8 +27,7 @@ from ..layers import (
     DistanceLayer,
     RangeSeparationLayer,
 )
-from .edge import EDGE_EMBEDDING, EDGE_UPDATE
-from .spherical import CgtpACE, CgtpInteraction
+from .interaction import EDGE_EMBEDDING, EDGE_UPDATE, CgtpACE, CgtpInteraction
 
 DEFAULT_BUILD_PARAMS = {
     "dim_embedding": 48,
@@ -182,8 +181,6 @@ class TACECore(BaseFFCore):
             raise ValueError(f"Unknown tensor_basis={tensor_basis}")
 
     def _build_spherical(self, **kw):
-        from .linear import IrrepsLinear
-
         target = _natural_parity_irreps(self.Lmax) if not self.parity else Irreps.spherical_harmonics(self.Lmax)
         self.target_irreps = target
         hidden0 = Irreps([(self.num_channel, (0, 1))])
@@ -269,7 +266,6 @@ class TACECore(BaseFFCore):
 
     def _build_cartesian(self, **kw):
         from .cartesian.core_blocks import CartesianLayerStack
-        from .linear import IrrepsLinear
 
         if self.dim_embedding != self.num_channel:
             self.node_proj = IrrepsLinear(

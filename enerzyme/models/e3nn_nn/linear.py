@@ -1,68 +1,12 @@
-"""Thin e3nn Linear / ElementLinear wrappers for TACE (no LoRA).
-
-Adapted from https://github.com/xvzemin/tace (MIT).
-"""
+"""Flat-Irreps linear maps shared by e3nn-stack architectures (TACE, …)."""
 
 from __future__ import annotations
 
-import math
-from typing import List, Optional, Union
+from typing import Literal, Union
 
 import torch
 from e3nn import o3
 from torch import Tensor, nn
-
-
-class MLPLinear(nn.Module):
-    """Scalar linear used inside radial MLPs."""
-
-    def __init__(self, in_dim: int, out_dim: int, alpha: float = 1.0, bias: bool = False):
-        super().__init__()
-        self.in_dim = in_dim
-        self.out_dim = out_dim
-        self.alpha = alpha
-        self.weight = nn.Parameter(torch.empty(in_dim, out_dim))
-        torch.nn.init.uniform_(self.weight, -math.sqrt(3), math.sqrt(3))
-        if bias:
-            self.bias = nn.Parameter(torch.zeros(out_dim))
-        else:
-            self.register_parameter("bias", None)
-
-    def forward(self, x: Tensor) -> Tensor:
-        w = self.weight * self.alpha
-        if self.bias is None:
-            return torch.mm(x, w)
-        return torch.addmm(self.bias, x, w)
-
-
-class ScalarMLP(nn.Module):
-    def __init__(
-        self,
-        channels: List[int],
-        bias: bool = False,
-        act: Optional[str] = "silu",
-        layer_norm: bool = False,
-    ):
-        super().__init__()
-        if len(channels) < 2:
-            raise ValueError("ScalarMLP needs at least 2 channel sizes")
-        layers: List[nn.Module] = []
-        for i, (h_in, h_out) in enumerate(zip(channels[:-1], channels[1:])):
-            gain = 1.0 if act is None or i == 0 else math.sqrt(2.0)
-            layers.append(MLPLinear(h_in, h_out, alpha=gain / math.sqrt(h_in), bias=bias))
-            if i < len(channels) - 2:
-                if layer_norm:
-                    layers.append(nn.LayerNorm(h_out))
-                if act == "silu":
-                    layers.append(nn.SiLU())
-                elif act == "sigmoid":
-                    layers.append(nn.Sigmoid())
-                elif act is not None:
-                    raise ValueError(f"Unsupported act={act}")
-        self.mlp = nn.Sequential(*layers)
-
-    def forward(self, x: Tensor) -> Tensor:
-        return self.mlp(x)
 
 
 class IrrepsLinear(nn.Module):
@@ -159,8 +103,8 @@ class ElementIrrepsLinear(nn.Module):
         out = self.linear(x, weight)
         if self.bias is not None:
             b = torch.einsum("ne,eb->nb", attrs, self.bias)
+            out = out.clone()
             for sl, bsl in zip(self._0e_slices, self._bias_slices):
-                out = out.clone()
                 out[:, sl] = out[:, sl] + b[:, bsl]
         return out
 
@@ -175,7 +119,6 @@ class SkipIdentity(nn.Module):
         if self.irreps_in == self.irreps_out:
             self._mode = "id"
             return
-        # Gather matching irrep slices
         in_slices = list(self.irreps_in.slices())
         out_slices = list(self.irreps_out.slices())
         pairs = []
@@ -198,3 +141,20 @@ class SkipIdentity(nn.Module):
         for isl, osl in self._pairs:
             out[:, osl] = x[:, isl]
         return out
+
+
+def get_resnet_layer(
+    irreps_in: o3.Irreps,
+    irreps_out: o3.Irreps,
+    bias: bool,
+    num_elements: int,
+    resnet_type: Literal["aware", "agnostic", "identity"] = "aware",
+):
+    """Element-aware / agnostic / identity residual map between irreps."""
+    if resnet_type == "agnostic":
+        return IrrepsLinear(irreps_in, irreps_out, bias=bias)
+    if resnet_type == "identity":
+        return SkipIdentity(irreps_in, irreps_out)
+    return ElementIrrepsLinear(
+        irreps_in, irreps_out, bias=bias, num_elements=num_elements
+    )
