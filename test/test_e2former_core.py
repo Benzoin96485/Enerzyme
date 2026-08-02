@@ -268,6 +268,110 @@ def test_center_positions_by_batch_is_shift_invariant():
         assert float(c0[batch == g].mean(dim=0).abs().max()) < 1e-5
 
 
+def test_select_closest_neighbors_truncates_by_distance():
+    """Regression: degree > max_neighbors must keep nearest edges, not crash.
+
+    Earlier CI only used N<=6 complete graphs with max_neighbors>=16, so the
+    hard ValueError path was never exercised.
+    """
+    from enerzyme.models.e2former.graph import (
+        build_topk_neighborhood,
+        select_closest_neighbors,
+    )
+
+    # Star: center 0 connected to 1..4 at increasing distances
+    src = torch.tensor([1, 2, 3, 4])
+    dst = torch.tensor([0, 0, 0, 0])
+    dist = torch.tensor([4.0, 1.0, 3.0, 2.0])
+    vij = torch.stack([dist, torch.zeros(4), torch.zeros(4)], dim=-1)
+    rbf = torch.randn(4, 3)
+    src_k, dst_k, dist_k, vij_k, rbf_k = select_closest_neighbors(
+        src, dst, dist, 2, 5, vij, rbf
+    )
+    assert src_k.tolist() == [2, 4]  # distances 1.0 then 2.0
+    assert dist_k.tolist() == [1.0, 2.0]
+    assert vij_k.shape == (2, 3) and rbf_k.shape == (2, 3)
+
+    # Full model path: complete graph N=8 => degree 7 > max_neighbors=3
+    n = 8
+    k = 3
+    idx_i, idx_j = _complete_graph_edges(n)
+    ra = torch.randn(n, 3)
+    vij = ra[idx_j] - ra[idx_i]
+    rbf = torch.randn(idx_i.shape[0], 4)
+    neigh = build_topk_neighborhood(
+        ra, idx_i, idx_j, vij, rbf, max_neighbors=k
+    )
+    assert neigh["f_sparse_idx_node"].shape == (n, k)
+    assert int(neigh["present"].sum(dim=-1).max().item()) == k
+    # Each kept neighbor is among the true k closest
+    for i in range(n):
+        true_dist = torch.linalg.norm(ra - ra[i], dim=-1)
+        true_dist[i] = float("inf")
+        true_topk = set(torch.topk(true_dist, k, largest=False).indices.tolist())
+        kept = neigh["f_sparse_idx_node"][i][neigh["present"][i]].tolist()
+        assert set(kept) == true_topk
+
+
+def test_e2former_dense_graph_respects_max_neighbors():
+    """Default-style Core must not crash when cutoff degree exceeds max_neighbors."""
+    from enerzyme.models.ff import build_model
+
+    torch.manual_seed(3)
+    n = 10  # complete-graph degree 9 > max_neighbors 4
+    model = build_model(
+        "e2former",
+        layer_params=[
+            {"name": "RangeSeparation"},
+            {"name": "GaussianSmearing"},
+            {"name": "RandomAtomEmbedding"},
+            {
+                "name": "Core",
+                "params": {
+                    "irreps_node_embedding": "8x0e+8x1e+8x2e",
+                    "irreps_head": "4x0e+4x1e+4x2e",
+                    "num_layers": 1,
+                    "num_attn_heads": 2,
+                    "attn_scalar_head": 4,
+                    "ffn_hidden_channels": 16,
+                    "max_neighbors": 4,
+                },
+            },
+            {
+                "name": "SimpleReadout",
+                "params": {
+                    "output_fields": ["Ea"],
+                    "head_type": "dense",
+                    "keep_feature": False,
+                },
+            },
+            {"name": "EnergyReduce"},
+        ],
+        build_params={
+            "dim_embedding": 8,
+            "num_rbf": 4,
+            "max_Za": 20,
+            "cutoff_sr": 20.0,  # keep all pairs so degree = N-1
+            "cutoff_fn": "polynomial",
+        },
+        verbose=0,
+    )
+    model.eval()
+    idx_i, idx_j = _complete_graph_edges(n)
+    with torch.no_grad():
+        out = model(
+            {
+                "Ra": torch.randn(n, 3) * 0.5,
+                "Za": torch.arange(1, n + 1),
+                "idx_i": idx_i,
+                "idx_j": idx_j,
+                "batch_seg": torch.zeros(n, dtype=torch.long),
+                "n_atoms": torch.tensor([n]),
+            }
+        )
+    assert torch.isfinite(out["E"]).all()
+
+
 def test_e2former_example_yaml_loads():
     import yaml
     from enerzyme.models.ff import build_model
