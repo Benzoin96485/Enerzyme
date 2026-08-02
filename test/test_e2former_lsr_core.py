@@ -368,6 +368,102 @@ def test_empty_long_neighbors_still_runs_fuse():
     assert torch.isfinite(out["atom_sphere_feature"]).all()
 
 
+def test_lsr_fuse_sees_prenorm_short_tower():
+    """Regression: short snapshot must not pass Core ``self.norm`` before fuse.
+
+    Shape / finite / SO(3) checks still pass under double RMSNorm, so this hooks
+    ``norm_fuse_short`` and compares against an explicit prenorm short encode.
+    """
+    torch.manual_seed(0)
+    n = 6
+    core = _tiny_lsr_core(fragment_mode="precomputed")
+    core.eval()
+    idx_i, idx_j = _complete_graph_edges(n)
+    atom_embedding = torch.randn(n, 16)
+    Za = torch.tensor([1, 6, 7, 8, 1, 6])
+    Ra = torch.randn(n, 3)
+    rbf = torch.randn(idx_i.shape[0], 8)
+    vij = torch.randn(idx_i.shape[0], 3)
+    cluster_ids = torch.tensor([0, 0, 1, 1, 2, 2])
+
+    with torch.no_grad():
+        short_pre = core.encode_sphere_short(
+            atom_embedding,
+            Za,
+            Ra,
+            rbf,
+            idx_i,
+            idx_j,
+            vij,
+            apply_final_norm=False,
+        )["node_irreps"]
+        short_post = core.norm(short_pre)
+    # Ensure the assertion is meaningful (affine RMSNorm moves the features).
+    assert not torch.allclose(short_pre, short_post, atol=1e-5, rtol=1e-5)
+
+    captured = {}
+
+    def _capture(_mod, inputs, _out):
+        captured["short"] = inputs[0].detach().clone()
+
+    handle = core.norm_fuse_short.register_forward_hook(_capture)
+    try:
+        with torch.no_grad():
+            core.encode_sphere_lsr(
+                atom_embedding,
+                Za,
+                Ra,
+                rbf,
+                idx_i,
+                idx_j,
+                vij,
+                cluster_ids=cluster_ids,
+            )
+    finally:
+        handle.remove()
+
+    assert "short" in captured, "late fuse did not call norm_fuse_short"
+    assert_allclose(
+        captured["short"].numpy(),
+        short_pre.numpy(),
+        rtol=1e-5,
+        atol=1e-5,
+    )
+    assert not torch.allclose(
+        captured["short"], short_post, atol=1e-5, rtol=1e-5
+    )
+
+
+def test_lsr_no_long_layers_applies_core_norm_once():
+    """Without a long tower, fall back to a single Core final norm (no fuse)."""
+    torch.manual_seed(0)
+    n = 4
+    core = _tiny_lsr_core(long_layers=0, fragment_mode="precomputed")
+    core.eval()
+    norm_calls = []
+    fuse_calls = []
+    core.norm.register_forward_hook(lambda *_a, **_k: norm_calls.append(True))
+    core.norm_fuse_short.register_forward_hook(
+        lambda *_a, **_k: fuse_calls.append(True)
+    )
+    idx_i, idx_j = _complete_graph_edges(n)
+    with torch.no_grad():
+        out = core.get_output(
+            atom_embedding=torch.randn(n, 16),
+            Za=torch.tensor([1, 6, 8, 1]),
+            Ra=torch.randn(n, 3),
+            rbf=torch.randn(idx_i.shape[0], 8),
+            idx_i_sr=idx_i,
+            idx_j_sr=idx_j,
+            vij_sr=torch.randn(idx_i.shape[0], 3),
+            cluster_ids=torch.zeros(n, dtype=torch.long),
+        )
+    assert len(norm_calls) == 1
+    assert not fuse_calls
+    assert out["atom_sphere_feature"].shape == (n, 9, 16)
+    assert torch.isfinite(out["atom_sphere_feature"]).all()
+
+
 def test_e2former_lsr_build_model_energy_force_finite():
     from enerzyme.models.ff import build_model
 
