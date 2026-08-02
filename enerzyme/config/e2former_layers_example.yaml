@@ -1,0 +1,40 @@
+# Minimal E2Former stack (enzyme-scale defaults).
+# Use architecture: e2former under Modelhub.internal_FFs.
+#
+# Core emits atom_feature / atom_sphere_feature (same latent contract as
+# EquiformerV2 / eSCN). Energy and forces stay in post-core layers.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: e2former
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: GaussianSmearing
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            irreps_node_embedding: "64x0e+64x1e+64x2e"
+            irreps_head: "16x0e+16x1e+16x2e"
+            num_layers: 2
+            num_attn_heads: 4
+            attn_scalar_head: 32
+            ffn_hidden_channels: 128
+            max_neighbors: 32
+            attn_type: first-order
+            tp_type: QK_alpha
+            norm_layer: rms_norm_sh
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

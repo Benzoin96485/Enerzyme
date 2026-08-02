@@ -93,6 +93,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .equiformer_v3.core import EquiformerV3Core as Core
         from .equiformer_v3.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "e2former":
+        from .e2former.core import E2FormerCore as Core
+        from .e2former.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "dpa4":
         from .dpa4.core import DPA4Core as Core
         from .dpa4.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
