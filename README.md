@@ -37,7 +37,7 @@ Shared equivariant tooling (for developers):
 - `enerzyme.models.so3` — SH-array / SPHC primitives (EquiformerV2, So3krates, eSCN-style SO2, TECE), including unified `spherical_harmonics(..., layout=...)`, recursive/direct `WignerD`, `uvSO2Linear` / `SO2Gate` / `ComplexProductBasis`, array dropout, and `SphereSampleReadout`.
 - `enerzyme.models.efa` — Euclidean Fast Attention (ERoPE + Lebedev linear nonlocal): SpookyNet `use_efa`, architectures `efa` / `so3lr_efa`, or hook any Core via `EFABlock` / `apply_efa_if_configured` on invariant features + `Ra` + `batch_seg`. Distinct from TECE Radial Rotary Attention.
 - `enerzyme.models.e3nn_nn` — flat e3nn Irreps helpers (Equiformer V1, MACE, TACE, TECE): TP rescale, Gate/Activation, irreps Linear / ElementLinear, path generation, scatter TP, tools.
-- Representation-agnostic blocks: `activation.SmoothLeakyReLU`, `blocks.drop` (`GraphDropPath`), `blocks.radial_mlp`.
+- Representation-agnostic blocks: `activation.SmoothLeakyReLU`, `activation.ScaledSigmoid` / `ScaledSiLU`, `blocks.drop` (`GraphDropPath`), `blocks.radial_mlp`.
 
 Architecture packages keep `core.py` + `interaction.py` (plus embedding / input blocks as needed). Equiformer-specific readouts live in each package's `interaction.py` and are re-exported from `layers` for YAML layer-stack discovery.
 

@@ -29,6 +29,43 @@ class SmoothLeakyReLU(Module):
         return "negative_slope={}".format(self.alpha)
 
 
+class ScaledSigmoid(Module):
+    """Sigmoid with e3nn ``Activation`` variance-preserving scale (TACE / TECE)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.scale_factor = 1.8467055342154763
+
+    def forward(self, x: Tensor) -> Tensor:
+        return torch.sigmoid(x) * self.scale_factor
+
+    def extra_repr(self) -> str:
+        return f"scale_factor={self.scale_factor}"
+
+
+class ScaledSiLU(Module):
+    """SiLU with e3nn ``Activation`` variance-preserving scale (TACE / TECE)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.scale_factor = 1.6791767923989418
+
+    def forward(self, x: Tensor) -> Tensor:
+        return F.silu(x) * self.scale_factor
+
+    def extra_repr(self) -> str:
+        return f"scale_factor={self.scale_factor}"
+
+
+def get_scaled_activation(name: str) -> Module:
+    """Return fixed-scale ``sigmoid`` / ``silu`` used by SO(2) gates."""
+    if name == "sigmoid":
+        return ScaledSigmoid()
+    if name == "silu":
+        return ScaledSiLU()
+    raise ValueError(f"Unknown scaled activation={name!r}; expected 'sigmoid' or 'silu'")
+
+
 class SwiGLU(Module):
     """SwiGLU over the last dim: ``value * silu(gate)`` (DPA4 / SeZM order).
 

@@ -15,8 +15,9 @@ from torch_scatter import scatter_sum
 
 from ..blocks.radial_mlp import RadialMLP
 from ..e3nn_nn import IrrepsLinear, get_gated_nonlinear, get_resnet_layer, to_possible_tp_irreps
+from ..activation import get_scaled_activation
 from ..so3 import LayoutTransform
-from .fused import UvSO2TensorProduct, _act_module
+from .fused import UvSO2TensorProduct
 
 _SCATTER_NORMS = ("avg_num_neighbors", "density", "no_cutoff_density")
 
@@ -129,8 +130,8 @@ class UvSO2Interaction(nn.Module):
             self.irreps_sc = (sc_base * num_channel).regroup()
 
         edge_act = edge_nonlinear.split("_")[1]
-        s_act = _act_module(scalar_act or edge_act)
-        t_act = _act_module(tensor_act or edge_act)
+        s_act = get_scaled_activation(scalar_act or edge_act)
+        t_act = get_scaled_activation(tensor_act or edge_act)
         self.edge_ace_hidden = edge_ace_hidden or num_channel
         self.edge_wise_hidden = edge_wise_hidden or num_channel
 

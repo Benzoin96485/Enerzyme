@@ -21,32 +21,6 @@ from ..so3 import (
 )
 
 
-class ScaledSigmoid(torch.nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.scale_factor = 1.8467055342154763
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.sigmoid(x) * self.scale_factor
-
-
-class ScaledSiLU(torch.nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.scale_factor = 1.6791767923989418
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.nn.functional.silu(x) * self.scale_factor
-
-
-def _act_module(name: str) -> torch.nn.Module:
-    if name == "sigmoid":
-        return ScaledSigmoid()
-    if name == "silu":
-        return ScaledSiLU()
-    raise ValueError(f"Unknown act={name!r}; expected 'sigmoid' or 'silu'")
-
-
 class UvSO2TensorProduct(torch.nn.Module):
     """Edge-frame SO(2) message with optional ECE and RRA."""
 
