@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import math
 import copy
+from typing import List, Optional
 
 from torch.nn import Linear
 from .embedding import SO3_Embedding
@@ -303,3 +304,145 @@ class SO2Linear(torch.nn.Module):
         if self.extra_m0_out_channels is not None:
             return outputs, x_m0_extra
         return outputs
+
+
+class uvSO2MLinear(torch.nn.Module):
+    """uv SO(2) linear on +-m (TECE / TACE). Supports w1_w2 / w1_w1 / w1."""
+
+    def __init__(
+        self,
+        m: int,
+        num_channel_in: int,
+        num_channel_out: int,
+        num_components_in: int,
+        num_components_out: int,
+        weight_type: str = "w1_w2",
+    ):
+        super().__init__()
+        self.m = m
+        self.num_channel_in = num_channel_in
+        self.num_channel_out = num_channel_out
+        self.num_components_in = num_components_in
+        self.num_components_out = num_components_out
+        self.weight_type = weight_type
+        assert self.num_components_in > 0
+        assert self.num_components_out > 0
+
+        in_f = self.num_components_in * self.num_channel_in
+        out_f = self.num_components_out * self.num_channel_out
+        if weight_type == "w1_w2":
+            self.fc = Linear(in_f, out_f * 2, bias=False)
+            self.fc.weight.data.mul_(1 / math.sqrt(2))
+        else:
+            self.fc = Linear(in_f, out_f, bias=False)
+            if weight_type == "w1_w1":
+                self.fc.weight.data.mul_(1 / math.sqrt(2))
+        self._Cout = out_f
+
+    def forward(self, x, concat_outputs=True):
+        if self.weight_type == "w1_w2":
+            return self._w1_w2_forward(x, concat_outputs)
+        if self.weight_type == "w1_w1":
+            return self._w1_w1_forward(x, concat_outputs)
+        return self._w1_forward(x, concat_outputs)
+
+    def _w1_w2_forward(self, x, concat_outputs=True):
+        x = self.fc(x)
+        w1_x = x.narrow(2, 0, self._Cout)
+        w2_x = x.narrow(2, self._Cout, self._Cout)
+        xr = w1_x.narrow(1, 0, 1) - w2_x.narrow(1, 1, 1)
+        xi = w1_x.narrow(1, 1, 1) + w2_x.narrow(1, 0, 1)
+        x_out = (xr, xi)
+        if concat_outputs:
+            return torch.cat(x_out, dim=1)
+        return x_out
+
+    def _w1_w1_forward(self, x, concat_outputs=True):
+        xr = x.narrow(1, 0, 1)
+        xi = x.narrow(1, 1, 1)
+        yr = self.fc(xr - xi)
+        yi = self.fc(xi + xr)
+        x_out = (yr, yi)
+        if concat_outputs:
+            return torch.cat(x_out, dim=1)
+        return x_out
+
+    def _w1_forward(self, x, concat_outputs=True):
+        x = self.fc(x)
+        if concat_outputs:
+            return x
+        return (x.narrow(1, 0, 1), x.narrow(1, 1, 1))
+
+
+class uvSO2Linear(torch.nn.Module):
+    """uv SO(2) linear over all m (TECE / TACE).
+
+    Distinct from EquiformerV3 :class:`SO2Linear` (extra_m0 API). Prefer this for
+    TECE ECE / RRA paths that need ``weight_type`` and custom component counts.
+    """
+
+    def __init__(
+        self,
+        mmax: int,
+        lmax: int,
+        num_channel_in: int,
+        num_channel_out: int,
+        num_components_in: Optional[List[int]] = None,
+        num_components_out: Optional[List[int]] = None,
+        weight_type: str = "w1_w2",
+    ):
+        super().__init__()
+        self.mmax = mmax
+        self.lmax = lmax
+        self.num_channel_in = num_channel_in
+        self.num_channel_out = num_channel_out
+        self.weight_type = weight_type
+
+        if num_components_in is None:
+            self.num_components_in = [lmax + 1 - m for m in range(mmax + 1)]
+        else:
+            self.num_components_in = num_components_in
+        if num_components_out is None:
+            self.num_components_out = [lmax + 1 - m for m in range(mmax + 1)]
+        else:
+            self.num_components_out = num_components_out
+
+        self.m0_rlinear = Linear(
+            self.num_channel_in * self.num_components_in[0],
+            self.num_channel_out * self.num_components_out[0],
+            bias=True,
+        )
+        self.ms_clinear = nn.ModuleList()
+        for m in range(1, self.mmax + 1):
+            self.ms_clinear.append(
+                uvSO2MLinear(
+                    m,
+                    self.num_channel_in,
+                    self.num_channel_out,
+                    self.num_components_in[m],
+                    self.num_components_out[m],
+                    weight_type=weight_type,
+                )
+            )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B = x.size(0)
+        Cout = self.num_channel_out
+        outputs = []
+
+        xm0 = x.narrow(1, 0, self.num_components_in[0])
+        xm0 = xm0.reshape(B, self.num_components_in[0] * self.num_channel_in)
+        xm0 = self.m0_rlinear(xm0)
+        xm0 = xm0.view(B, self.num_components_out[0], Cout)
+        outputs.append(xm0)
+
+        offset = self.lmax + 1
+        for m in range(1, self.mmax + 1):
+            xm = x.narrow(1, offset, 2 * self.num_components_in[m])
+            offset = offset + 2 * self.num_components_in[m]
+            xm = xm.reshape(B, 2, self.num_components_in[m] * self.num_channel_in)
+            xm = self.ms_clinear[m - 1](xm, concat_outputs=False)
+            xr, xi = xm[0], xm[1]
+            outputs.append(xr.view(B, self.num_components_out[m], Cout))
+            outputs.append(xi.view(B, self.num_components_out[m], Cout))
+        return torch.cat(outputs, dim=1)

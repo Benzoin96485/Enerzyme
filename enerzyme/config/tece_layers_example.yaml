@@ -1,0 +1,56 @@
+# Minimal TECE stack (ECE + Radial Rotary Attention).
+# Use architecture: tece under Modelhub.internal_FFs.
+#
+# Paper: arXiv:2607.10664
+# Upstream: https://github.com/xvzemin/tace (MIT). Requires Lmax == lmax.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: tece
+      active: true
+      build_params:
+        dim_embedding: 48
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            trainable: false
+        - name: NuclearEmbedding
+        - name: Core
+          params:
+            num_layers: 2
+            num_channel: 48
+            Lmax: 2
+            lmax: 2
+            mmax: 2
+            correlation: 2
+            avg_num_neighbors: 8.0
+            edge_embedding: nonlinear
+            edge_update: element2
+            scatter_norm: avg_num_neighbors
+            resnet_type: BB
+            resnet_linear_type: aware
+            use_first_resnet: false
+            nonlinear: sigmoid_gate
+            edge_nonlinear: so2_sigmoid_gate
+            radial_mlp: [64, 64]
+            use_so2_edge_ace: true
+            use_graph_softmax: true
+            use_radial_phase: true
+            use_temperature: true
+            num_head: 1
+            so2_linear_type: w1
+            gate_m0: false
+            wigner_type: recursive
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

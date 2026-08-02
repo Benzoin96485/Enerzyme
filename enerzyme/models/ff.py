@@ -47,6 +47,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .tace import TACECore as Core
         from .tace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "tece":
+        from .tece import TECECore as Core
+        from .tece import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "allscaip":
         from .allscaip import AllScAIPCore as Core
         from .allscaip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
