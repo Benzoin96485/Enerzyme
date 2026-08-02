@@ -2,11 +2,48 @@
 
 from __future__ import annotations
 
-from typing import Literal, Union
+from typing import List, Literal, Sequence, Union
 
 import torch
 from e3nn import o3
 from torch import Tensor, nn
+
+
+def _add_0e_bias(
+    out: Tensor,
+    bias: Tensor,
+    out_slices: Sequence[slice],
+    bias_slices: Sequence[slice],
+) -> Tensor:
+    """Add scalar (0e) bias without per-slice ``clone`` of ``out``.
+
+    ``bias`` is ``[bias_dim]`` (broadcast over batch) or ``[N, bias_dim]``.
+    """
+    if not out_slices:
+        return out
+    bias_full = out.new_zeros(out.shape)
+    if bias.ndim == 1:
+        for sl, bsl in zip(out_slices, bias_slices):
+            bias_full[:, sl] = bias[bsl]
+    else:
+        for sl, bsl in zip(out_slices, bias_slices):
+            bias_full[:, sl] = bias[:, bsl]
+    return out + bias_full
+
+
+def _collect_0e_slices(irreps_out: o3.Irreps) -> tuple[List[slice], List[slice], int]:
+    out_slices: List[slice] = []
+    bias_slices: List[slice] = []
+    bias_dim = 0
+    acc = 0
+    for mul, ir in irreps_out:
+        dim = mul * ir.dim
+        if ir.l == 0 and ir.p == 1:
+            out_slices.append(slice(acc, acc + dim))
+            bias_slices.append(slice(bias_dim, bias_dim + dim))
+            bias_dim += dim
+        acc += dim
+    return out_slices, bias_slices, bias_dim
 
 
 class IrrepsLinear(nn.Module):
@@ -32,17 +69,7 @@ class IrrepsLinear(nn.Module):
         self.weight = nn.Parameter(torch.empty(self.weight_numel))
         torch.nn.init.normal_(self.weight)
 
-        bias_dim = 0
-        self._0e_slices = []
-        self._bias_slices = []
-        acc = 0
-        for mul, ir in self.irreps_out:
-            dim = mul * ir.dim
-            if ir.l == 0 and ir.p == 1:
-                self._0e_slices.append(slice(acc, acc + dim))
-                self._bias_slices.append(slice(bias_dim, bias_dim + dim))
-                bias_dim += dim
-            acc += dim
+        self._0e_slices, self._bias_slices, bias_dim = _collect_0e_slices(self.irreps_out)
         if bias and bias_dim > 0:
             self.bias = nn.Parameter(torch.zeros(bias_dim))
         else:
@@ -51,9 +78,7 @@ class IrrepsLinear(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         out = self.linear(x, self.weight)
         if self.bias is not None:
-            out = out.clone()
-            for sl, bsl in zip(self._0e_slices, self._bias_slices):
-                out[:, sl] = out[:, sl] + self.bias[bsl].unsqueeze(0)
+            out = _add_0e_bias(out, self.bias, self._0e_slices, self._bias_slices)
         return out
 
 
@@ -81,17 +106,7 @@ class ElementIrrepsLinear(nn.Module):
         self.weight = nn.Parameter(torch.empty(num_elements, self.linear.weight_numel))
         torch.nn.init.normal_(self.weight)
 
-        bias_dim = 0
-        self._0e_slices = []
-        self._bias_slices = []
-        acc = 0
-        for mul, ir in self.irreps_out:
-            dim = mul * ir.dim
-            if ir.l == 0 and ir.p == 1:
-                self._0e_slices.append(slice(acc, acc + dim))
-                self._bias_slices.append(slice(bias_dim, bias_dim + dim))
-                bias_dim += dim
-            acc += dim
+        self._0e_slices, self._bias_slices, bias_dim = _collect_0e_slices(self.irreps_out)
         if bias and bias_dim > 0:
             self.bias = nn.Parameter(torch.zeros(num_elements, bias_dim))
         else:
@@ -103,9 +118,7 @@ class ElementIrrepsLinear(nn.Module):
         out = self.linear(x, weight)
         if self.bias is not None:
             b = torch.einsum("ne,eb->nb", attrs, self.bias)
-            out = out.clone()
-            for sl, bsl in zip(self._0e_slices, self._bias_slices):
-                out[:, sl] = out[:, sl] + b[:, bsl]
+            out = _add_0e_bias(out, b, self._0e_slices, self._bias_slices)
         return out
 
 

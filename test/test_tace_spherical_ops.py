@@ -16,9 +16,26 @@ def test_generate_paths_uvu_and_uuu():
     ir_in = o3.Irreps("2x0e+2x1o")
     ir_sh = o3.Irreps.spherical_harmonics(1)
     ir_out = to_possible_tp_irreps(ir_in, ir_sh, parity=False, lmax=1)
-    paths, actual = generate_paths(ir_out * 2, ir_in, ir_sh, e3nn_mode="uvu")
+    paths, actual = generate_paths(ir_out, ir_in, ir_sh, e3nn_mode="uvu")
     assert len(paths) > 0
     assert actual.dim > 0
+
+    # Within-block out-multiplicity is ignored (mul discarded in the ir_out loop).
+    paths_mul, actual_mul = generate_paths(
+        (ir_out * 2).regroup(), ir_in, ir_sh, e3nn_mode="uvu"
+    )
+    assert paths_mul == paths
+    assert str(actual_mul) == str(actual)
+
+    # Unregrouped repeated blocks are visited separately — a common footgun.
+    paths_dup, _ = generate_paths(ir_out * 2, ir_in, ir_sh, e3nn_mode="uvu")
+    assert len(paths_dup) == 2 * len(paths)
+
+    paths_uuu, actual_uuu = generate_paths(
+        ir_out, ir_in, ir_in, e3nn_mode="uuu", identical_inputs=True
+    )
+    assert len(paths_uuu) > 0
+    assert actual_uuu.dim > 0
 
 
 def test_o3_scatter_tp_shapes():
