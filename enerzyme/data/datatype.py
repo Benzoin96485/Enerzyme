@@ -25,7 +25,10 @@ DATA_TYPES = {
     "M2a": IS_ATOMIC | (TENSOR_RANK_BASE * 1) | IS_TARGET,
     "idx_i": IS_INT | IS_IDX,
     "idx_j": IS_INT | IS_IDX,
-    "N_pair": IS_INT | IS_IDX
+    "N_pair": IS_INT | IS_IDX,
+    # E2Former-LSR / BRICS fragment labels (optional Datahub fields)
+    "cluster_ids": IS_INT | IS_ATOMIC,
+    "cluster_centers": IS_ATOMIC | (TENSOR_RANK_BASE * 1),
 }
 
 def is_int(k):
