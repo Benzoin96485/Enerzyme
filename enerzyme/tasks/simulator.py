@@ -1,3 +1,4 @@
+import os
 import os.path as osp
 from typing import Dict, Optional
 import inspect
@@ -140,14 +141,42 @@ class Simulation:
             system.get_potential_energy()
             ase.io.write(osp.join(self.out_dir, f"sp.xyz"), system, append=True)
 
+    def _atoms_with_unbiased_energy(self, atoms):
+        """Snapshot whose stored energy/forces exclude PLUMED restraint bias."""
+        from ase.calculators.plumed import Plumed
+        from ase.calculators.singlepoint import SinglePointCalculator
+
+        snap = atoms.copy()
+        calc = atoms.calc
+        if isinstance(calc, Plumed):
+            base_calc = calc.calc
+            energy = float(base_calc.get_potential_energy(atoms))
+            forces = np.asarray(base_calc.get_forces(atoms), dtype=float)
+        else:
+            energy = float(atoms.get_potential_energy())
+            forces = np.asarray(atoms.get_forces(), dtype=float)
+        snap.calc = SinglePointCalculator(snap, energy=energy, forces=forces)
+        return snap
+
+    def _write_atoms_xyz(self, path: str, atoms, *, append: bool = True, unbiased: bool = False):
+        write_atoms = self._atoms_with_unbiased_energy(atoms) if unbiased else atoms
+        ase.io.write(path, write_atoms, append=append)
+
     def _run_opt(self):
         logger.info(f"Running optimization with {self.optimize_config.optimizer} optimizer")
+        traj_file = self.optimize_config.get("traj_file", "traj-opt.xyz")
+        traj_path = osp.join(self.out_dir, traj_file)
+        if osp.exists(traj_path):
+            os.remove(traj_path)
         optimizer = get_optimizer(self.optimize_config.optimizer)(self.system)
         def write_xyz(atoms=None):
-            ase.io.write(osp.join(self.out_dir, f"traj-opt.xyz"), atoms, append=True)
+            self._write_atoms_xyz(traj_path, atoms, append=True, unbiased=False)
         optimizer.attach(write_xyz, interval=1, atoms=self.system) 
         optimizer.run(fmax=self.optimize_config.get("fmax", 4.5e-4) / self.system.calc.Hartree_in_E * Hartree / Bohr, steps=self.optimize_config.get("max_steps", 1000))
-        ase.io.write(osp.join(self.out_dir, f"optim.xyz"), self.system, append=True)
+        optim_path = osp.join(self.out_dir, "optim.xyz")
+        if osp.exists(optim_path):
+            os.remove(optim_path)
+        self._write_atoms_xyz(optim_path, self.system, append=False, unbiased=False)
         logger.info(f"Final energy: {self.system.get_potential_energy()}")
 
     def _get_x_scan(self):
@@ -364,6 +393,9 @@ class Simulation:
         from ase.calculators.plumed import Plumed
 
         x_scan = self._get_x_scan()
+        scan_optim_path = osp.join(self.out_dir, "scan_optim.xyz")
+        if osp.exists(scan_optim_path):
+            os.remove(scan_optim_path)
         for i, x in enumerate(x_scan):
             plumed_config = self._get_plumed_config(target_value=x)
             plumed_calc = Plumed(
@@ -376,9 +408,13 @@ class Simulation:
             )
             self.system.calc = plumed_calc
             optimizer = get_optimizer(self.optimize_config.optimizer)(self.system)
+            traj_path = osp.join(self.out_dir, f"traj-{i}.xyz")
+            if osp.exists(traj_path):
+                os.remove(traj_path)
 
-            def write_xyz(atoms=None):
-                ase.io.write(osp.join(self.out_dir, f"traj-{i}.xyz"), atoms, append=True)
+            def write_xyz(atoms=None, traj_path=traj_path):
+                # PLUMED only constrains the CV; persist bare NNP energies.
+                self._write_atoms_xyz(traj_path, atoms, append=True, unbiased=True)
 
             optimizer.attach(write_xyz, interval=1, atoms=self.system)
             optimizer.run(
@@ -388,8 +424,9 @@ class Simulation:
                 / Bohr,
                 steps=self.optimize_config.get("max_steps", 1000),
             )
-            ase.io.write(osp.join(self.out_dir, "scan_optim.xyz"), self.system, append=True)
-            logger.info(f"Final energy: {self.system.get_potential_energy()}")
+            unbiased = self._atoms_with_unbiased_energy(self.system)
+            self._write_atoms_xyz(scan_optim_path, unbiased, append=True, unbiased=False)
+            logger.info(f"Final energy: {unbiased.get_potential_energy()}")
             logger.info(f"Target CV value: {x}")
 
     def run(self):
