@@ -1,4 +1,4 @@
-"""Shared SO(3) / SO(2) primitives for equivariant GNNs (eSCN, EquiformerV2, EquiformerV3, So3krates, DPA4, …).
+"""Shared SO(3) / SO(2) primitives for equivariant GNNs (eSCN, EquiformerV2, EquiformerV3, So3krates, DPA4, TECE, …).
 
 These modules are adapted from fairchem v1 eSCN (Passaro & Zitnick, *Reducing SO(3)
 Convolutions to SO(2)*, 2023) with EquiformerV2 extensions (``get_rotate_inv_rescale``,
@@ -14,6 +14,10 @@ share the e3nn/``Jd`` Wigner-D backend (:mod:`wigner_jd`), flat lat–long
 :class:`SO3Grid` (eSCN / EquiformerV2 / V3) plus Lebedev
 :class:`S2LebedevProjector` behind :class:`S2GridProjector`, and shared Lebedev
 tables (also used by EFA for points).
+
+TECE (Xu et al., arXiv:2607.10664) adds recursive/direct :class:`WignerD`,
+:class:`uvSO2Linear`, :class:`SO2Gate`, :class:`ComplexProductBasis`, and
+:class:`LayoutTransform` for edge-frame ECE + Radial Rotary Attention.
 
 They are **not** used by the Meta UMA wrappers under ``enerzyme.models.esen``, which
 keep the fairchem ``eSCNMD*`` checkpoint path.
@@ -61,7 +65,12 @@ from .lebedev import (
 )
 from .softmax import GraphSoftmax, SoftCap, segment_envelope_gated_softmax
 from .so2_focus import FocusSO2Linear
-from .so2_ops import SO2Linear, SO2MLinear
+from .so2_ops import SO2Linear, SO2MLinear, uvSO2Linear, uvSO2MLinear
+from .so2_gate import SO2Gate
+from .so2_utils import so2_expand_index, so3_expand_index, num_so2_components
+from .so2_product import ComplexProductBasis, UUUSo2TensorProduct
+from .layout import LayoutTransform
+from .wigner_cg import WignerD, init_edge_rot_mat_quaternion
 from .linear import SO3FocusLinear, SO3Linear
 from .layer_norm import (
     EquivariantDegreeRMSNorm,
@@ -161,6 +170,17 @@ __all__ = [
     "segment_envelope_gated_softmax",
     "SO2Linear",
     "SO2MLinear",
+    "uvSO2Linear",
+    "uvSO2MLinear",
+    "SO2Gate",
+    "so2_expand_index",
+    "so3_expand_index",
+    "num_so2_components",
+    "ComplexProductBasis",
+    "UUUSo2TensorProduct",
+    "LayoutTransform",
+    "WignerD",
+    "init_edge_rot_mat_quaternion",
     "FocusSO2Linear",
     "SO3Linear",
     "SO3FocusLinear",

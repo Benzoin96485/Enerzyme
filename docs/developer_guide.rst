@@ -295,6 +295,8 @@ Tests live in :code:`test/`:
 - :code:`test_tace_core.py` — TACE registration / YAML smoke, spherical+Cartesian feature shapes, build_model E/F
 - :code:`test_tace_spherical_ops.py` — CGTP path / scatter TP / CgtpACE smoke
 - :code:`test_tace_cartesian_ops.py` — cartnn ICTD / harmonics / Cartesian contraction smoke
+- :code:`test_tece_core.py` — TECE registration / YAML smoke, feature shapes, build_model E/F, ECE/RRA flag sensitivity
+- :code:`test_tece_ops.py` — WignerD / LayoutTransform / uvSO2Linear / SO2Gate / ComplexProductBasis / RRA path smoke
 - :code:`test_so3_wigner_backend.py` — shared e3nn/Jd Wigner-D backend (packed orthogonality, SO3_Rotation / fused / DPA4 quaternion adapters, high-l smoke)
 - :code:`test_so3_grid.py` — unified flat lat–long :code:`SO3Grid` / :code:`S2GridProjector` protocol (roundtrip, Lebedev duck-type, grid table)
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
@@ -438,7 +440,12 @@ DPA4 (Li et al., 2026, arXiv:2606.02419) lives under :code:`enerzyme/models/dpa4
 TACE (:code:`tace`)
 ^^^^^^^^^^^^^^^^^^^
 
-Xu et al. (arXiv:2509.14961; Cartesian-3j arXiv:2512.16882) lives under :code:`enerzyme/models/tace/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ (MIT). Shared flat-Irreps helpers (:code:`IrrepsLinear`, :code:`generate_paths`, :code:`O3ScatterTensorProduct`, :code:`get_gated_nonlinear`, …) live in :code:`enerzyme/models/e3nn_nn/`; radial channel MLPs use :code:`blocks.radial_mlp.RadialMLP`. Register via :code:`get_ff_core("tace")`. Core param :code:`tensor_basis` selects spherical e3nn CGTP or Cartesian ICT (:code:`cartnn` vendored from tace v0.1.0 + :code:`cartesian/`). Scope includes edge embedding/update, BB element-aware residual, and density/avg scatter-norm; TECE / SO2 / RRA / ZBL / LES / UIE stay out. Emit :code:`atom_feature` for :code:`SimpleReadout`. Examples: :code:`tace_layers_example.yaml`, :code:`tace_cartesian_layers_example.yaml`. Tests: :code:`test/test_tace_*.py`.
+Xu et al. (arXiv:2509.14961; Cartesian-3j arXiv:2512.16882) lives under :code:`enerzyme/models/tace/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ (MIT). Shared flat-Irreps helpers (:code:`IrrepsLinear`, :code:`generate_paths`, :code:`O3ScatterTensorProduct`, :code:`get_gated_nonlinear`, …) live in :code:`enerzyme/models/e3nn_nn/`; radial channel MLPs use :code:`blocks.radial_mlp.RadialMLP`. Register via :code:`get_ff_core("tace")`. Core param :code:`tensor_basis` selects spherical e3nn CGTP or Cartesian ICT (:code:`cartnn` vendored from tace v0.1.0 + :code:`cartesian/`). Scope includes edge embedding/update, BB element-aware residual, and density/avg scatter-norm; TECE / SO2 / RRA live under :code:`architecture: tece`; ZBL / LES / UIE stay out. Emit :code:`atom_feature` for :code:`SimpleReadout`. Examples: :code:`tace_layers_example.yaml`, :code:`tace_cartesian_layers_example.yaml`. Tests: :code:`test/test_tace_*.py`.
+
+TECE (:code:`tece`)
+^^^^^^^^^^^^^^^^^^^
+
+Xu et al. (arXiv:2607.10664) lives under :code:`enerzyme/models/tece/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ v0.2.0 (MIT). Register via :code:`get_ff_core("tece")`. The Core seeds equivariant features from scalar embeddings, then stacks uvSO2 interactions with Edge Cluster Expansion (:code:`ComplexProductBasis`) and Radial Rotary Attention, plus node-side :code:`CgtpACE` reused from TACE. Shared SO(2) primitives (:code:`WignerD` recursive/direct, :code:`uvSO2Linear`, :code:`SO2Gate`, :code:`LayoutTransform`) live in :code:`enerzyme/models/so3/`. Requires :code:`Lmax == lmax`. Do not conflate RRA with EFA Euclidean RoPE. Emit :code:`atom_feature` for :code:`SimpleReadout`. Example: :code:`tece_layers_example.yaml`. Tests: :code:`test/test_tece_*.py`. Enerzymette: :code:`architecture: tece` + resolved :code:`config.yaml`.
 
 So3krates (:code:`so3krates`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
