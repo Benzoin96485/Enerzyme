@@ -443,7 +443,8 @@ class CartesianLayerStack(nn.Module):
         self.linear_ups = nn.ModuleList()
         self.contractions = nn.ModuleList()
         self.products = nn.ModuleList()
-        self.resnets = nn.ModuleList()
+        # Optional per-layer residuals: plain list + add_module (avoid None in ModuleList).
+        self.resnets: List[Optional[nn.Module]] = []
         self.edge_densities = nn.ModuleList()
         self.density_alphas = nn.ParameterList()
         self.density_betas = nn.ParameterList()
@@ -490,18 +491,18 @@ class CartesianLayerStack(nn.Module):
             # Match spherical CgtpInteraction: only BB residuals are wired.
             if (use_first_resnet or layer > 0) and resnet_type == "BB":
                 if resnet_linear_type == "identity":
-                    self.resnets.append(DictSkipIdentity(ls_out, num_channel))
+                    resnet = DictSkipIdentity(ls_out, num_channel)
                 else:
-                    self.resnets.append(
-                        SelfInteraction(
-                            num_channel,
-                            num_channel,
-                            ls=ls_out,
-                            bias=bias,
-                            element_aware=(resnet_linear_type == "aware"),
-                            num_elements=num_elements,
-                        )
+                    resnet = SelfInteraction(
+                        num_channel,
+                        num_channel,
+                        ls=ls_out,
+                        bias=bias,
+                        element_aware=(resnet_linear_type == "aware"),
+                        num_elements=num_elements,
                     )
+                self.add_module(f"resnet_{layer}", resnet)
+                self.resnets.append(resnet)
             else:
                 self.resnets.append(None)
             self.products.append(

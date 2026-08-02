@@ -376,6 +376,9 @@ def test_tace_shared_knobs_honored_on_both_backends():
         else:
             assert core.cartesian_stack.resnets[0] is not None
             assert core.cartesian_stack.resnets[1] is not None
+            # Optional slots are registered modules, not None entries in ModuleList.
+            assert "resnet_0" in dict(core.cartesian_stack.named_children())
+            assert not isinstance(core.cartesian_stack.resnets, torch.nn.ModuleList)
         assert torch.isfinite(_forward_core(core)["atom_feature"]).all()
 
 
