@@ -27,6 +27,7 @@ from ..so3 import build_so3_grid_table, get_normalization_layer
 from .embedding import EdgeDegreeEmbeddingHigherOrder
 from .graph import build_topk_neighborhood
 from .interaction import TransBlock
+from .wigner_otf import build_so2_wigner_frames
 
 _AVG_DEGREE = 15.57930850982666
 
@@ -261,6 +262,20 @@ class E2FormerCore(BaseFFCore):
             neigh["attn_weight"],
             neigh["f_sparse_idx_node"],
         )
+
+        # E2Former-V2 SO2 path: on-the-fly Wigner-D frames (Huang et al. 2026).
+        if self.attn_type == "so2-first-order":
+            order_mod = self.blocks[0].ga.attention_order_module
+            l3_sequential = getattr(order_mod, "l3_sequential", None)
+            neigh.update(
+                build_so2_wigner_frames(
+                    ra_wigner,
+                    neigh["f_exp_node_pos"],
+                    self.lmax,
+                    l3_sequential=l3_sequential,
+                    training=self.training,
+                )
+            )
 
         attn_weight = neigh["attn_weight"]
         for blk in self.blocks:

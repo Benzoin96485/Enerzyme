@@ -96,7 +96,7 @@ Boundary with Enerzyme
 +------------------+------------------------+---------------------------+
 
 Architecture selection (e.g. :code:`Equiformer`, :code:`equiformer_v2`, :code:`equiformer_v3`,
-:code:`e2former`, :code:`dpa4`, :code:`escn`) is entirely in the Enerzyme training /
+:code:`e2former`, :code:`e2former_v2`, :code:`dpa4`, :code:`escn`) is entirely in the Enerzyme training /
 model YAML (:code:`Modelhub.*.architecture`). Enerzymette only rewrites dataset paths,
 suffixes, and pretrain paths — no Enerzymette code changes are required when adding a
 new Enerzyme Core. Future shallow-ensemble or larger-degree EquiformerV2 configs remain
