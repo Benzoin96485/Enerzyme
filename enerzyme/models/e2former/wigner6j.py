@@ -24,6 +24,7 @@ from opt_einsum_fx import optimize_einsums_full
 from sympy.physics.wigner import wigner_6j
 from torch import fx
 
+from ..so3.linear import SO3Linear as SO3_Linear_e2former
 from .tensor_product import Simple_TensorProduct_oTchannel, _sum_tensors, slices_basis
 
 
