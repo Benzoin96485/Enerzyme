@@ -248,7 +248,7 @@ class UvSO2TensorProduct(nn.Module):
         x: torch.Tensor,
         w: torch.Tensor,
         edge_index: torch.Tensor,
-        cutoff: torch.Tensor,
+        cutoff: Optional[torch.Tensor],
         wigner: torch.Tensor,
         wigner_inv: torch.Tensor,
         radial_basis: torch.Tensor,
