@@ -13,7 +13,7 @@ from enerzyme.models.so3 import (
     uvSO2Linear,
 )
 from enerzyme.models.activation import ScaledSigmoid
-from enerzyme.models.tece.fused import UvSO2TensorProduct
+from enerzyme.models.tece.interaction import UvSO2TensorProduct
 
 
 def test_so2_expand_index_shapes():
