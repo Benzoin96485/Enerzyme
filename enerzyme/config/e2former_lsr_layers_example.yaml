@@ -1,0 +1,48 @@
+# Minimal E2Former-LSR stack (enzyme-scale defaults).
+# Use architecture: e2former_lsr under Modelhub.internal_FFs.
+#
+# Core = short-range E2Former + atom–fragment long-range attention + late fuse.
+# Emits atom_feature / atom_sphere_feature. Energy/forces stay in post-core layers.
+# Default fragment_mode=kmeans (online). For BRICS paper path, set
+# fragment_mode=precomputed and supply cluster_ids (optional cluster_centers).
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: e2former_lsr
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_lr: 15.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: GaussianSmearing
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            irreps_node_embedding: "64x0e+64x1e+64x2e"
+            irreps_head: "16x0e+16x1e+16x2e"
+            num_layers: 4
+            long_layers: 2
+            num_attn_heads: 4
+            attn_scalar_head: 32
+            ffn_hidden_channels: 128
+            max_neighbors: 32
+            long_max_neighbors: 64
+            fragment_mode: kmeans
+            min_nodes_per_group: 24
+            cutoff_lr: 15.0
+            attn_type: first-order
+            tp_type: QK_alpha
+            norm_layer: rms_norm_sh
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

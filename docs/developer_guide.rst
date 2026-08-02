@@ -290,6 +290,9 @@ Tests live in :code:`test/`:
 - :code:`test_equiformer_v2_parity_*.py` — numerical parity vs vendored EquiformerV2 upstream (SO2 conv / LinearV2 / norms / FFN / TransBlockV2)
 - :code:`test_equiformer_v3_core.py` — EquiformerV3 shapes, SimpleReadout contract, build_model E/F, SO(3) scalar invariance, YAML smoke, force finite-difference conservation / Wigner autograd
 - :code:`test_equiformer_v3_parity_*.py` — numerical parity vs vendored EquiformerV3 upstream (MergeLN / SO2Linear / envelope / FFN / TransBlockV3); SwiGLU-S² ``_mem`` vs eager consistency
+- :code:`test_e2former_core.py` — E2Former shapes, build_model E/F, SO(3) / translation checks, top-K truncation
+- :code:`test_e2former_wigner6j.py` — Wigner-6j TP vs vanilla forward (orders 1–2)
+- :code:`test_e2former_lsr_core.py` — E2Former-LSR shapes, kmeans/precomputed fragments, bipartite graph batch isolation, build_model E/F, SO(3) / translation, YAML smoke
 - :code:`test_dpa4_core.py` — DPA4 shapes, registration / YAML smoke, geometry autograd, SO(3) scalar invariance, build_model E/F, force finite-difference conservation
 - :code:`test_dpa4_parity_ops.py` — DPA4 indexing / C³ envelope / SO2Linear / envelope-gated softmax algebraic checks (no runtime deepmd dependency)
 - :code:`test_tace_core.py` — TACE registration / YAML smoke, spherical+Cartesian feature shapes, build_model E/F
@@ -431,6 +434,16 @@ EquiformerV3 (:code:`equiformer_v3`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Liao et al. (2026, arXiv:2604.09130) lives under :code:`enerzyme/models/equiformer_v3/` and further extends shared :code:`so3/` (merged LN, SwiGLU-S², :code:`SO2Linear`, :code:`PolynomialEnvelope` / :code:`GraphSoftmax`, fused :code:`SO3RotationFused`, flat lat–long :code:`SO3Grid`). The Core emits the same :code:`atom_feature` / :code:`atom_sphere_feature` contract as eSCN/V2; compose :code:`SimpleReadout` plus :code:`EnergyReduce` / :code:`Force` outside the Core. Offline parity vs vendored :code:`atomicarchitects/equiformer_v3` experimental nets is in :code:`test/test_equiformer_v3_parity_*.py`. Enerzymette only needs :code:`architecture: equiformer_v3` plus a resolved :code:`config.yaml`.
+
+E2Former (:code:`e2former`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Li et al. (NeurIPS 2025, arXiv:2501.19216) lives under :code:`enerzyme/models/e2former/` (Wigner-6j attention, shared :code:`so3` norms / :code:`SO3Linear`, EquiformerV2 S² FFN). Emits :code:`atom_feature` / :code:`atom_sphere_feature`. Tests: :code:`test/test_e2former_core.py`, :code:`test/test_e2former_wigner6j.py`. Example: :code:`e2former_layers_example.yaml`.
+
+E2Former-LSR (:code:`e2former_lsr`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Wang et al. (arXiv:2601.03774) reuses the E2Former package with a separate Core (:code:`E2FormerLSRCore` in :code:`e2former/lsr.py`): short-range blocks, then atom–fragment bipartite long-range attention (:code:`cluster.py`, :code:`E2AttentionClusterSparse`), late :code:`SO3Linear` fuse. Default :code:`fragment_mode: kmeans`; BRICS via :code:`precomputed` + :code:`cluster_ids`. Not E2Former-V2 and not SO3LR physics. Tests: :code:`test/test_e2former_lsr_core.py`. Example: :code:`e2former_lsr_layers_example.yaml`. Enerzymette: :code:`architecture: e2former_lsr` + resolved :code:`config.yaml`.
 
 DPA4 (:code:`dpa4`)
 ^^^^^^^^^^^^^^^^^^^^^
