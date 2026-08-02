@@ -451,3 +451,15 @@ def test_tace_element2_post_mlp_cutoff_kills_edge_messages():
         )["atom_feature"]
         assert not torch.allclose(feat_a, feat_on, atol=1e-5), basis
         assert torch.isfinite(feat_on).all()
+
+
+def test_tace_correlation_list_length_validated():
+    """Mismatch between correlation list and num_layers must raise a clear error."""
+    import pytest
+
+    for basis in ("spherical", "cartesian"):
+        with pytest.raises(ValueError, match="correlation list length"):
+            _tiny_core(basis, num_layers=3, correlation=[2, 2])
+        # exact-length list still builds
+        core = _tiny_core(basis, num_layers=2, correlation=[2, 1])
+        assert torch.isfinite(_forward_core(core)["atom_feature"]).all()

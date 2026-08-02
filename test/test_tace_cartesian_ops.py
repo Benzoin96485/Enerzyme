@@ -1,5 +1,8 @@
 """Cartesian TACE / cartnn op smoke tests."""
 
+import subprocess
+import sys
+
 import torch
 
 from enerzyme.models.tace.cartesian.core_blocks import (
@@ -9,6 +12,17 @@ from enerzyme.models.tace.cartesian.core_blocks import (
     _split_cartesian_harmonics,
 )
 from enerzyme.models.tace.cartnn import ICTD, CartesianHarmonics
+
+
+def test_cartnn_eager_import_skips_product_basis():
+    """ICTD/CartesianHarmonics must not pull SymmetricContraction (opt_einsum_fx)."""
+    code = (
+        "import sys\n"
+        "from enerzyme.models.tace.cartnn import ICTD, CartesianHarmonics\n"
+        "assert 'enerzyme.models.tace.cartnn._product_basis' not in sys.modules\n"
+        "assert ICTD is not None and CartesianHarmonics is not None\n"
+    )
+    subprocess.check_call([sys.executable, "-c", code], cwd=".")
 
 
 def test_ictd_and_cartesian_harmonics():

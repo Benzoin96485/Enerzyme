@@ -134,6 +134,13 @@ class TACECore(BaseFFCore):
             radial_mlp = [64, 64, 64]
         if isinstance(correlation, int):
             correlation = [correlation] * num_layers
+        else:
+            correlation = list(correlation)
+            if len(correlation) != num_layers:
+                raise ValueError(
+                    f"correlation list length ({len(correlation)}) must equal "
+                    f"num_layers ({num_layers}); got {correlation!r}"
+                )
 
         self.tensor_basis = tensor_basis
         self.max_Za = max_Za
