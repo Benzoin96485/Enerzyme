@@ -27,6 +27,7 @@ from .core import (
     E2FormerCore,
 )
 from .interaction import ClusterTransBlock
+from .wigner_otf import build_so2_wigner_frames
 
 DEFAULT_BUILD_PARAMS = {
     **_E2_BUILD,
@@ -242,6 +243,20 @@ class E2FormerLSRCore(E2FormerCore):
         # Only skip when there is no long stack or no fragments at all.
         if self.long_layers == 0 or cluster_pos.shape[0] == 0:
             return node_irreps_short
+
+        # SO2 long-range path needs Wigner frames on atoms and fragments.
+        if self.attn_type == "so2-first-order":
+            order_mod = self.cluster_blocks[0].ga.attention_order_module
+            l3_sequential = getattr(order_mod, "l3_sequential", None)
+            long_graph.update(
+                build_so2_wigner_frames(
+                    ra_wigner,
+                    cluster_pos,
+                    self.lmax,
+                    l3_sequential=l3_sequential,
+                    training=self.training,
+                )
+            )
 
         for blk in self.cluster_blocks:
             cluster_irreps = pool_fragment_irreps(node_irreps, flat_ids)

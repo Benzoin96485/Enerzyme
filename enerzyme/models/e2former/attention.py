@@ -350,7 +350,9 @@ class So2FirstOrderAttention(BaseAttentionOrder):
         use_triton: bool = False,
         **kwargs,
     ):
-        f_n = value.shape[0]
+        # Alpha / x_edge are atom×K (query side). Value may be fragments
+        # (E2AttentionClusterSparse); never use value.shape[0] here.
+        f_n = alpha.shape[0]
         value = self.proj_value(value)
         inputhead = self.rad_func_intputhead(x_edge)
         alpha = alpha.reshape(f_n, -1, self.num_attn_heads) * inputhead.reshape(

@@ -225,6 +225,38 @@ def test_e2former_lsr_precomputed_cluster_ids():
     assert torch.isfinite(out["atom_sphere_feature"]).all()
 
 
+def test_e2former_lsr_so2_first_order_with_fewer_fragments():
+    """LSR + so2-first-order with N_atoms != N_frag (cluster value path).
+
+    Default LSR tests use first-order TP; V2 so2 tests use equal atom/value
+    batch sizes. This combo is the only place the alpha-batch bug surfaces.
+    """
+    torch.manual_seed(0)
+    n = 6
+    core = _tiny_lsr_core(
+        attn_type="so2-first-order",
+        fragment_mode="precomputed",
+        tp_type="QK_alpha",
+    )
+    idx_i, idx_j = _complete_graph_edges(n)
+    # 6 atoms → 3 fragments (strictly fewer values than alpha rows).
+    cluster_ids = torch.tensor([0, 0, 1, 1, 2, 2])
+    out = core.get_output(
+        atom_embedding=torch.randn(n, 16),
+        Za=torch.tensor([1, 6, 7, 8, 1, 6]),
+        Ra=torch.randn(n, 3),
+        rbf=torch.randn(idx_i.shape[0], 8),
+        idx_i_sr=idx_i,
+        idx_j_sr=idx_j,
+        vij_sr=torch.randn(idx_i.shape[0], 3),
+        cluster_ids=cluster_ids,
+    )
+    assert out["atom_feature"].shape == (n, 16)
+    assert out["atom_sphere_feature"].shape == (n, 9, 16)
+    assert torch.isfinite(out["atom_feature"]).all()
+    assert torch.isfinite(out["atom_sphere_feature"]).all()
+
+
 def test_resolve_fragments_ignores_absolute_cluster_centers():
     """Regression: absolute BRICS centers must not mix with COM-centered Ra."""
     from enerzyme.models.e2former.cluster import resolve_fragments

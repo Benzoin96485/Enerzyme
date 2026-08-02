@@ -130,3 +130,60 @@ def test_sparse_qk_v_pytorch_fallback():
     alpha = torch.softmax(scores, dim=1)
     out = sparse_v_agg(value, alpha, idx, use_triton=False)
     assert out.shape == (n, feat, h)
+
+
+def test_so2_first_order_attention_alpha_batch_is_atoms_not_fragments():
+    """Cluster path: alpha/x_edge are [N_atoms,K,*]; value is [N_frag,*].
+
+    Short-range V2 tests keep N_atoms == N_value, so ``f_n = value.shape[0]``
+    never diverges. Choose N_atoms * K divisible by N_frag so a buggy reshape
+    would *succeed* with a wrong layout instead of raising at reshape time.
+    """
+    from e3nn import o3
+
+    from enerzyme.models.e2former.attention import So2FirstOrderAttention
+    from enerzyme.models.e2former.wigner_otf import build_so2_wigner_frames
+
+    torch.manual_seed(0)
+    n_atoms, n_frag, k, heads = 6, 3, 4, 2
+    assert (n_atoms * k) % n_frag == 0
+    c, lmax = 8, 2
+    irreps = o3.Irreps(f"{c}x0e+{c}x1e+{c}x2e")
+    irreps_head = o3.Irreps(f"4x0e+4x1e+4x2e")
+    edge_channel_list = [32, 16, 16]
+    attn = So2FirstOrderAttention(
+        irreps, irreps_head, heads, edge_channel_list, lmax
+    )
+    attn.eval()
+
+    alpha = torch.rand(n_atoms, k, heads)
+    alpha = alpha / alpha.sum(dim=1, keepdim=True).clamp_min(1e-8)
+    value = torch.randn(n_frag, (lmax + 1) ** 2, c)
+    x_edge = torch.randn(n_atoms, k, edge_channel_list[0])
+    node_pos = torch.randn(n_atoms, 3) + 2.0
+    frag_pos = torch.randn(n_frag, 3) + 2.0
+    edge_dis = torch.rand(n_atoms, k) + 0.5
+    idx = torch.randint(0, n_frag, (n_atoms, k))
+    frames = build_so2_wigner_frames(
+        node_pos,
+        frag_pos,
+        lmax,
+        l3_sequential=attn.l3_sequential,
+        training=False,
+    )
+    # ClusterSparse wires fragment positions as f_exp_node_pos (≠ node_pos).
+    frames["f_exp_node_pos"] = frag_pos
+    frames["f_sparse_idx_expnode"] = idx
+
+    out = attn(
+        alpha=alpha,
+        value=value,
+        x_edge=x_edge,
+        node_pos=node_pos,
+        edge_dis=edge_dis,
+        batched_data=frames,
+        use_triton=False,
+    )
+    assert out.shape[0] == n_atoms
+    assert out.shape[1:] == ((lmax + 1) ** 2, c)
+    assert torch.isfinite(out).all()
