@@ -38,7 +38,8 @@ def init_edge_rot_euler_angles(
         )
 
     xyz = edge_vec_0 / edge_vec_0_distance.view(-1, 1)
-    mask = mask + xyz[:, 1].abs().isclose(xyz.new_ones(1))
+    # Boolean OR (not +): keep mask as bool for safe advanced indexing.
+    mask = mask | xyz[:, 1].abs().isclose(xyz.new_ones(1))
 
     beta = xyz.new_zeros(xyz.shape[0])
     beta[~mask] = torch.acos(xyz[~mask, 1])

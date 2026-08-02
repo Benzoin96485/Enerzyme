@@ -2,8 +2,11 @@
 
 Reuses :class:`~enerzyme.models.e2former.core.E2FormerCore` with SO2 / EAAS
 attention (:code:`attn_type: so2-first-order`) and optional Triton sparse
-kernels (:code:`tp_type: QK_alpha+triton`). Embeddings and property heads stay
-outside the Core. Distinct from E2Former-V1 (Wigner-6j ``first-order``).
+kernels (:code:`tp_type: QK_alpha+triton`). Without CUDA, kernels fall back to
+PyTorch automatically. CUDA numerical parity vs that fallback is covered by
+:code:`test/test_e2former_triton_parity.py` (skipped on CPU CI). Embeddings and
+property heads stay outside the Core. Distinct from E2Former-V1 (Wigner-6j
+``first-order``).
 
 Adapted from https://github.com/IQuestLab/UBio-MolFM (MIT).
 """

@@ -294,6 +294,7 @@ Tests live in :code:`test/`:
 - :code:`test_e2former_wigner6j.py` — Wigner-6j TP vs vanilla forward (orders 1–2)
 - :code:`test_e2former_v2_core.py` — E2Former-V2 SO2 attention shapes, build_model E/F, SO(3) / translation, YAML smoke
 - :code:`test_e2former_so2_tp.py` — EAAS / SO2 TP shapes, rotation equivariance, Triton PyTorch fallback
+- :code:`test_e2former_triton_parity.py` — QK index convention / CPU fallback guards; CUDA Triton vs PyTorch parity (skipped without GPU)
 - :code:`test_dpa4_core.py` — DPA4 shapes, registration / YAML smoke, geometry autograd, SO(3) scalar invariance, build_model E/F, force finite-difference conservation
 - :code:`test_dpa4_parity_ops.py` — DPA4 indexing / C³ envelope / SO2Linear / envelope-gated softmax algebraic checks (no runtime deepmd dependency)
 - :code:`test_tace_core.py` — TACE registration / YAML smoke, spherical+Cartesian feature shapes, build_model E/F

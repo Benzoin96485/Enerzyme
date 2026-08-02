@@ -517,20 +517,23 @@ class E2AttentionSparse(nn.Module):
             and self.tp_type == "QK_alpha"
             and isinstance(self.alpha_module, QKAlphaModule)
         ):
+            # Must match QKAlphaModule: gather with f_sparse_idx_node, no
+            # f_outcell_index remapping (PBC expansion is not wired here yet).
             query = self.alpha_module.query_linear(node_irreps_input).reshape(
                 f_n, self.num_attn_heads, -1
             )
             key = self.alpha_module.key_linear(node_irreps_input).reshape(
                 f_n, self.num_attn_heads, -1
             )
-            outcell = batched_data.get("f_outcell_index", None)
-            if outcell is not None:
-                key = key[outcell]
-            idx = batched_data.get("f_sparse_idx_expnode", f_sparse_idx_node)
             gate = self.alpha_module.fc_easy(x_edge)
             scale = 1.0 / math.sqrt(query.shape[-1])
             alpha = sparse_qk(
-                query, key, idx.contiguous(), gate, scale, use_triton=True
+                query,
+                key,
+                f_sparse_idx_node.contiguous(),
+                gate,
+                scale,
+                use_triton=True,
             )
             alpha = self.alpha_module.alpha_act(alpha)
         else:

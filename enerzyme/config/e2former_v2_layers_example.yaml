@@ -3,7 +3,8 @@
 #
 # Same latent contract as E2Former-V1 (atom_feature / atom_sphere_feature).
 # Core defaults to attn_type: so2-first-order and tp_type: QK_alpha+triton
-# (Triton falls back to PyTorch when CUDA is unavailable).
+# (Triton falls back to PyTorch when CUDA is unavailable; GPU vs fallback
+# parity: test/test_e2former_triton_parity.py).
 
 Modelhub:
   internal_FFs:
