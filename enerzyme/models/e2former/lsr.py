@@ -215,8 +215,7 @@ class E2FormerLSRCore(E2FormerCore):
             cluster_centers=cluster_centers,
             min_nodes_per_group=self.min_nodes_per_group,
         )
-        # Center fragment positions in the same COM frame as atoms.
-        # resolve_fragments already used ra_wigner, so cluster_pos is COM-centered.
+        # Centers are means of COM-centered atoms (same frame as ra_wigner).
 
         long_graph = build_atom_fragment_topk(
             atom_pos=ra_wigner,
@@ -231,11 +230,12 @@ class E2FormerLSRCore(E2FormerCore):
         edge_dis = long_graph["edge_dis"]
         edge_vec = long_graph["edge_vec"]
         attn_mask = long_graph["attn_mask"]
-        present = long_graph["present"]
         attn_weight = self.rbf_long(edge_dis)
         attn_weight = attn_weight.masked_fill(attn_mask, 0.0)
 
-        if self.long_layers == 0 or cluster_pos.shape[0] == 0 or not present.any():
+        # Empty neighbor lists still run long blocks (atom FFN) + late fuse.
+        # Only skip when there is no long stack or no fragments at all.
+        if self.long_layers == 0 or cluster_pos.shape[0] == 0:
             return node_irreps_short
 
         for blk in self.cluster_blocks:

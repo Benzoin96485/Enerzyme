@@ -443,7 +443,7 @@ Li et al. (NeurIPS 2025, arXiv:2501.19216) lives under :code:`enerzyme/models/e2
 E2Former-LSR (:code:`e2former_lsr`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Wang et al. (arXiv:2601.03774) reuses the E2Former package with a separate Core (:code:`E2FormerLSRCore` in :code:`e2former/lsr.py`): short-range blocks, then atom–fragment bipartite long-range attention (:code:`cluster.py`, :code:`E2AttentionClusterSparse`), late :code:`SO3Linear` fuse. Default :code:`fragment_mode: kmeans`; BRICS via :code:`precomputed` + :code:`cluster_ids`. Not E2Former-V2 and not SO3LR physics. Tests: :code:`test/test_e2former_lsr_core.py`. Example: :code:`e2former_lsr_layers_example.yaml`. Enerzymette: :code:`architecture: e2former_lsr` + resolved :code:`config.yaml`.
+Wang et al. (arXiv:2601.03774) reuses the E2Former package with a separate Core (:code:`E2FormerLSRCore` in :code:`e2former/lsr.py`): short-range blocks, then atom–fragment bipartite long-range attention (:code:`cluster.py`, :code:`E2AttentionClusterSparse`), late :code:`SO3Linear` fuse. Default :code:`fragment_mode: kmeans`; BRICS via :code:`precomputed` + :code:`cluster_ids` (centers always mean of current :code:`Ra`). Not E2Former-V2 and not SO3LR physics. Tests: :code:`test/test_e2former_lsr_core.py`. Example: :code:`e2former_lsr_layers_example.yaml`. Enerzymette: :code:`architecture: e2former_lsr` + resolved :code:`config.yaml`.
 
 DPA4 (:code:`dpa4`)
 ^^^^^^^^^^^^^^^^^^^^^

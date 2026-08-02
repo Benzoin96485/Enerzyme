@@ -4,7 +4,9 @@
 # Core = short-range E2Former + atom–fragment long-range attention + late fuse.
 # Emits atom_feature / atom_sphere_feature. Energy/forces stay in post-core layers.
 # Default fragment_mode=kmeans (online). For BRICS paper path, set
-# fragment_mode=precomputed and supply cluster_ids (optional cluster_centers).
+# fragment_mode=precomputed and supply cluster_ids (membership). Fragment
+# centers are always recomputed as means of current Ra (optional
+# cluster_centers are ignored for geometry to keep COM frames consistent).
 
 Modelhub:
   internal_FFs:

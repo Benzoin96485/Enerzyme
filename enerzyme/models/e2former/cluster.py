@@ -280,8 +280,13 @@ def resolve_fragments(
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Resolve fragment assignment for LSR.
 
+    Fragment centers are always the mean of member atom positions in ``Ra``'s
+    coordinate frame. Optional ``cluster_centers`` are ignored for geometry so
+    absolute BRICS centers cannot be mixed with COM-centered atom positions.
+
     Returns ``(flat_cluster_ids, cluster_pos, cluster_batch, local_cluster_ids)``.
     """
+    del cluster_centers  # membership from ids; centers always mean(Ra)
     mode = fragment_mode.lower()
     if mode == "precomputed":
         if cluster_ids is None:
@@ -289,23 +294,9 @@ def resolve_fragments(
                 "fragment_mode='precomputed' requires cluster_ids "
                 "(e.g. offline BRICS labels)"
             )
-        local_ids = cluster_ids.long()
-        if cluster_centers is not None:
-            # Assume centers are already flattened with matching batch layout via
-            # consecutive per-graph packing; rebuild batch from counts.
-            remapped, computed_pos, cluster_batch = centers_from_ids(
-                Ra, local_ids, batch_seg
-            )
-            # Prefer provided centers when shapes match; else fall back to means.
-            if cluster_centers.shape[0] == computed_pos.shape[0]:
-                cluster_pos = cluster_centers.to(dtype=Ra.dtype, device=Ra.device)
-            else:
-                cluster_pos = computed_pos
-            local_ids = remapped
-        else:
-            local_ids, cluster_pos, cluster_batch = centers_from_ids(
-                Ra, local_ids, batch_seg
-            )
+        local_ids, cluster_pos, cluster_batch = centers_from_ids(
+            Ra, cluster_ids.long(), batch_seg
+        )
     elif mode == "kmeans":
         local_ids, _km_pos, _km_batch = build_kmeans_fragments(
             Ra, batch_seg, min_nodes_per_group=min_nodes_per_group

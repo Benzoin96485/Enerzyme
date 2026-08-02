@@ -182,6 +182,117 @@ def test_e2former_lsr_precomputed_cluster_ids():
     assert torch.isfinite(out["atom_sphere_feature"]).all()
 
 
+def test_resolve_fragments_ignores_absolute_cluster_centers():
+    """Regression: absolute BRICS centers must not mix with COM-centered Ra."""
+    from enerzyme.models.e2former.cluster import resolve_fragments
+    from enerzyme.models.e2former.graph import center_positions_by_batch
+
+    torch.manual_seed(0)
+    ra = torch.randn(6, 3) + 50.0  # large COM
+    batch = torch.zeros(6, dtype=torch.long)
+    ids = torch.tensor([0, 0, 1, 1, 2, 2])
+    # Absolute means (wrong frame if used with COM-centered atoms)
+    abs_centers = torch.stack(
+        [ra[ids == g].mean(dim=0) for g in (0, 1, 2)], dim=0
+    )
+    ra_c = center_positions_by_batch(ra, batch)
+    _, cpos, _, _ = resolve_fragments(
+        ra_c,
+        batch,
+        fragment_mode="precomputed",
+        cluster_ids=ids,
+        cluster_centers=abs_centers,
+    )
+    expected = torch.stack(
+        [ra_c[ids == g].mean(dim=0) for g in (0, 1, 2)], dim=0
+    )
+    assert_allclose(cpos.detach().numpy(), expected.numpy(), rtol=1e-5, atol=1e-5)
+    # Absolute centers would be ~50 away from COM-centered means
+    assert float((cpos - abs_centers).norm()) > 1.0
+
+
+def test_e2former_lsr_absolute_centers_input_translation_invariant():
+    """Providing absolute cluster_centers must not break E(R)=E(R+t)."""
+    from enerzyme.models.ff import build_model
+
+    torch.manual_seed(3)
+    layers = _tiny_lsr_layer_params(fragment_mode="precomputed")
+    layers = [layer for layer in layers if layer.get("name") != "Force"]
+    model = build_model(
+        "e2former_lsr",
+        layer_params=layers,
+        build_params={
+            "dim_embedding": 16,
+            "num_rbf": 8,
+            "max_Za": 20,
+            "cutoff_sr": 5.0,
+            "cutoff_lr": 15.0,
+            "cutoff_fn": "polynomial",
+        },
+        verbose=0,
+    )
+    model.eval()
+    n = 6
+    idx_i, idx_j = _complete_graph_edges(n)
+    ra = torch.randn(n, 3)
+    za = torch.tensor([1, 6, 8, 1, 7, 6])
+    batch = torch.zeros(n, dtype=torch.long)
+    cluster_ids = torch.tensor([0, 0, 1, 1, 2, 2])
+    abs_centers = torch.stack(
+        [ra[cluster_ids == g].mean(dim=0) for g in (0, 1, 2)], dim=0
+    )
+    shift = torch.tensor([100.0, -70.0, 35.0])
+
+    def _energy(pos, centers):
+        with torch.no_grad():
+            out = model(
+                {
+                    "Ra": pos,
+                    "Za": za,
+                    "idx_i": idx_i,
+                    "idx_j": idx_j,
+                    "batch_seg": batch,
+                    "n_atoms": torch.tensor([n]),
+                    "cluster_ids": cluster_ids,
+                    "cluster_centers": centers,
+                }
+            )
+        return out["E"].sum().detach()
+
+    e0 = _energy(ra, abs_centers)
+    e1 = _energy(ra + shift, abs_centers + shift)
+    assert_allclose(e0.numpy(), e1.numpy(), rtol=1e-5, atol=1e-5)
+
+
+def test_empty_long_neighbors_still_runs_fuse():
+    """Regression: all-masked long graph must still apply FFN + late fuse."""
+    torch.manual_seed(0)
+    n = 4
+    # One fragment + tiny cutoff ⇒ remove_self leaves no long neighbors.
+    core = _tiny_lsr_core(
+        fragment_mode="precomputed",
+        cutoff_lr=1e-8,
+        long_layers=1,
+        min_nodes_per_group=100,
+    )
+    called = []
+    core.final_linear.register_forward_hook(lambda *_a, **_k: called.append(True))
+    idx_i, idx_j = _complete_graph_edges(n)
+    out = core.get_output(
+        atom_embedding=torch.randn(n, 16),
+        Za=torch.tensor([1, 6, 8, 1]),
+        Ra=torch.randn(n, 3),
+        rbf=torch.randn(idx_i.shape[0], 8),
+        idx_i_sr=idx_i,
+        idx_j_sr=idx_j,
+        vij_sr=torch.randn(idx_i.shape[0], 3),
+        cluster_ids=torch.zeros(n, dtype=torch.long),
+    )
+    assert called, "final_linear fuse was skipped on empty long neighborhood"
+    assert out["atom_sphere_feature"].shape == (n, 9, 16)
+    assert torch.isfinite(out["atom_sphere_feature"]).all()
+
+
 def test_e2former_lsr_build_model_energy_force_finite():
     from enerzyme.models.ff import build_model
 
