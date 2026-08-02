@@ -41,9 +41,12 @@ def init_edge_rot_euler_angles(
     # Boolean OR (not +): keep mask as bool for safe advanced indexing.
     mask = mask | xyz[:, 1].abs().isclose(xyz.new_ones(1))
 
+    # float32 normalize can leave |y| slightly outside [-1, 1]; clamp for acos.
+    y_clamped = xyz[:, 1].clamp(-1.0, 1.0)
+
     beta = xyz.new_zeros(xyz.shape[0])
-    beta[~mask] = torch.acos(xyz[~mask, 1])
-    beta[mask] = torch.acos(xyz[mask, 1]).detach()
+    beta[~mask] = torch.acos(y_clamped[~mask])
+    beta[mask] = torch.acos(y_clamped[mask]).detach()
 
     alpha = torch.zeros_like(beta)
     alpha[~mask] = torch.atan2(xyz[~mask, 0], xyz[~mask, 2])

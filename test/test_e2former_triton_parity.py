@@ -46,6 +46,25 @@ def test_euler_singularity_mask_stays_bool_and_includes_pole():
     assert float(beta[1].abs()) < 1e-4
 
 
+def test_euler_acos_clamps_float32_overshoot():
+    """float32 normalize can yield |y| > 1; acos must stay finite."""
+    from enerzyme.models.e2former.wigner_otf import init_edge_rot_euler_angles
+
+    # Construct unit-ish vectors then nudge y past ±1 in float32.
+    vec = torch.tensor(
+        [
+            [1e-8, 1.0 + 2e-7, 0.0],
+            [1e-8, -(1.0 + 2e-7), 0.0],
+            [0.3, 0.4, 0.5],
+        ],
+        dtype=torch.float32,
+    )
+    alpha, beta, gamma = init_edge_rot_euler_angles(vec, training=False)
+    assert torch.isfinite(alpha).all()
+    assert torch.isfinite(beta).all()
+    assert torch.isfinite(gamma).all()
+
+
 def test_sparse_qk_matches_qk_alpha_gather_convention():
     """PyTorch sparse_qk must match QKAlphaModule's gather (f_sparse_idx_node)."""
     from enerzyme.models.e2former.attention import QKAlphaModule
