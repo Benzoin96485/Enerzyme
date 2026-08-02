@@ -22,6 +22,7 @@ class RadialMLP(nn.Module):
         channels_list: Sequence[int],
         use_layer_norm: bool = True,
         use_offset: bool = False,
+        bias: bool = True,
     ) -> None:
         super().__init__()
         channels_list = list(channels_list)
@@ -31,7 +32,7 @@ class RadialMLP(nn.Module):
             if (i == len(channels_list) - 1) and use_offset:
                 use_biases = False
             else:
-                use_biases = True
+                use_biases = bias
             modules.append(nn.Linear(input_channels, channels_list[i], bias=use_biases))
             input_channels = channels_list[i]
 

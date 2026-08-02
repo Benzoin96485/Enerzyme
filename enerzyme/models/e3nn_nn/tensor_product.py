@@ -233,10 +233,97 @@ def sort_irreps_even_first(irreps):
     p = perm.inverse(inv)
     irreps = o3.Irreps([(mul, (l, -p)) for l, p, _, mul in out])
     return Ret(irreps, p, inv)
-        
 
-if __name__ == '__main__':
-    
+
+class UUUTensorProduct(torch.nn.Module):
+    """Channel-coupled (uuu) tensor product (TACE CgtpACE body-order recursion)."""
+
+    def __init__(
+        self,
+        irreps_in1: o3.Irreps,
+        irreps_in2: o3.Irreps,
+        irreps_out: o3.Irreps,
+        l1l2=None,
+        trainable: bool = False,
+        warning: bool = False,
+        identical_inputs: bool = False,
+    ) -> None:
+        super().__init__()
+        from .tools import generate_paths
+        import warnings
+
+        instructions, actual_out = generate_paths(
+            irreps_out=irreps_out,
+            irreps_in1=irreps_in1,
+            irreps_in2=irreps_in2,
+            l1l2=l1l2,
+            e3nn_mode="uuu",
+            trainable=trainable,
+            identical_inputs=identical_inputs,
+        )
+        self.tp = o3.TensorProduct(
+            irreps_in1,
+            irreps_in2,
+            actual_out,
+            instructions,
+            shared_weights=False,
+            internal_weights=False,
+        )
+        self.irreps_out = actual_out
+        self.weight_numel = self.tp.weight_numel
+        if warning:
+            warnings.warn(
+                "UUUTensorProduct correlation>=3 uses pure e3nn "
+                "(no fused backends). Prefer correlation=2 for faster iteration.",
+                stacklevel=2,
+            )
+
+    def forward(self, x, y, ws=None):
+        return self.tp(x, y, ws)
+
+
+class O3ScatterTensorProduct(torch.nn.Module):
+    """Weighted TP(node, Y_lm) followed by scatter to receivers."""
+
+    def __init__(
+        self,
+        irreps_in1: o3.Irreps,
+        irreps_in2: o3.Irreps,
+        irreps_out: o3.Irreps,
+        l1l2=None,
+    ) -> None:
+        super().__init__()
+        from .tools import generate_paths
+        from torch_scatter import scatter_sum
+
+        irreps_in1 = o3.Irreps(irreps_in1)
+        irreps_in2 = o3.Irreps(irreps_in2)
+        irreps_out = o3.Irreps(irreps_out)
+        instructions, actual_out = generate_paths(
+            irreps_out=irreps_out,
+            irreps_in1=irreps_in1,
+            irreps_in2=irreps_in2,
+            l1l2=l1l2,
+            e3nn_mode="uvu",
+        )
+        self.tp = o3.TensorProduct(
+            irreps_in1,
+            irreps_in2,
+            actual_out,
+            instructions,
+            shared_weights=False,
+            internal_weights=False,
+        )
+        self.irreps_out = actual_out
+        self.weight_numel = self.tp.weight_numel
+        self._scatter_sum = scatter_sum
+
+    def forward(self, x, y, w, edge_index):
+        msg = self.tp(x[edge_index[0]], y, w)
+        return self._scatter_sum(msg, edge_index[1], dim=0, dim_size=x.size(0))
+
+
+if __name__ == '__main__': 
 
     irreps_1 = o3.Irreps('32x0e+16x1o+8x2e')
     irreps_2 = o3.Irreps('4x0e+4x1o+4x2e')

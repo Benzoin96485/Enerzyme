@@ -292,6 +292,9 @@ Tests live in :code:`test/`:
 - :code:`test_equiformer_v3_parity_*.py` — numerical parity vs vendored EquiformerV3 upstream (MergeLN / SO2Linear / envelope / FFN / TransBlockV3); SwiGLU-S² ``_mem`` vs eager consistency
 - :code:`test_dpa4_core.py` — DPA4 shapes, registration / YAML smoke, geometry autograd, SO(3) scalar invariance, build_model E/F, force finite-difference conservation
 - :code:`test_dpa4_parity_ops.py` — DPA4 indexing / C³ envelope / SO2Linear / envelope-gated softmax algebraic checks (no runtime deepmd dependency)
+- :code:`test_tace_core.py` — TACE registration / YAML smoke, spherical+Cartesian feature shapes, build_model E/F
+- :code:`test_tace_spherical_ops.py` — CGTP path / scatter TP / CgtpACE smoke
+- :code:`test_tace_cartesian_ops.py` — cartnn ICTD / harmonics / Cartesian contraction smoke
 - :code:`test_so3_wigner_backend.py` — shared e3nn/Jd Wigner-D backend (packed orthogonality, SO3_Rotation / fused / DPA4 quaternion adapters, high-l smoke)
 - :code:`test_so3_grid.py` — unified flat lat–long :code:`SO3Grid` / :code:`S2GridProjector` protocol (roundtrip, Lebedev duck-type, grid table)
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
@@ -431,6 +434,11 @@ DPA4 (:code:`dpa4`)
 ^^^^^^^^^^^^^^^^^^^^^
 
 DPA4 (Li et al., 2026, arXiv:2606.02419) lives under :code:`enerzyme/models/dpa4/` as :code:`core.py` / :code:`interaction.py` / :code:`so2.py`. EMFA orchestration (:code:`SO2Convolution`, :code:`DynamicRadialDegreeMixer`, :code:`EdgeCache`) stays local. Shared pieces in :code:`enerzyme/models/so3/` include :code:`C3CutoffEnvelope`, Apache e3x Lebedev tables (:code:`lebedev_grids.npz`, also used by EFA) / :code:`S2LebedevProjector`, packed/m-major :code:`indexing`, :code:`FocusSO2Linear`, :code:`SO3FocusLinear`, :code:`SO3GatedActivation`, :code:`EquivariantDegreeRMSNorm`, :code:`BesselC3RadialBasis` / :code:`RadialMLP`, and quaternion edge frames (:code:`build_edge_quaternion`) that share the e3nn/:code:`Jd` Wigner-D backend (:code:`wigner_from_rotation_matrix`) with eSCN / EquiformerV2 / EquiformerV3. :code:`WignerDCalculator` maps :code:`R(q)` into DPA4's historical Cartesian basis (:code:`A R Aᵀ`) before that backend so SO(2) / GIE stay equivariant for any :code:`lmax` in :code:`Jd.pt`. Flat lat–long :code:`SO3Grid` and Lebedev :code:`S2LebedevProjector` share the :code:`S2GridProjector` contract (:code:`to_grid` / :code:`from_grid`); EquiformerV3 FFN uses :code:`SO3Grid`, DPA4 FFN defaults to Lebedev. The Core emits :code:`atom_feature` / :code:`atom_sphere_feature`; compose :code:`SimpleReadout`, :code:`EnergyReduce`, and :code:`Force` outside it. Tests: :code:`test/test_dpa4_core.py`, :code:`test/test_dpa4_parity_ops.py`, :code:`test/test_so3_wigner_backend.py`, :code:`test/test_so3_grid.py`. Enerzymette only needs :code:`architecture: dpa4` plus a resolved :code:`config.yaml`.
+
+TACE (:code:`tace`)
+^^^^^^^^^^^^^^^^^^^
+
+Xu et al. (arXiv:2509.14961; Cartesian-3j arXiv:2512.16882) lives under :code:`enerzyme/models/tace/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ (MIT). Shared flat-Irreps helpers (:code:`IrrepsLinear`, :code:`generate_paths`, :code:`O3ScatterTensorProduct`, :code:`get_gated_nonlinear`, …) live in :code:`enerzyme/models/e3nn_nn/`; radial channel MLPs use :code:`blocks.radial_mlp.RadialMLP`. Register via :code:`get_ff_core("tace")`. Core param :code:`tensor_basis` selects spherical e3nn CGTP or Cartesian ICT (:code:`cartnn` vendored from tace v0.1.0 + :code:`cartesian/`). Scope includes edge embedding/update, BB element-aware residual, and density/avg scatter-norm; TECE / SO2 / RRA / ZBL / LES / UIE stay out. Emit :code:`atom_feature` for :code:`SimpleReadout`. Examples: :code:`tace_layers_example.yaml`, :code:`tace_cartesian_layers_example.yaml`. Tests: :code:`test/test_tace_*.py`.
 
 So3krates (:code:`so3krates`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

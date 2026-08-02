@@ -162,3 +162,48 @@ class Gate(torch.nn.Module):
     def irreps_out(self):
         """Output representations."""
         return self._irreps_out
+
+def get_gated_nonlinear(
+    nonlinear,
+    irreps_mid: o3.Irreps,
+    irreps_out: o3.Irreps,
+    bias: bool = True,
+):
+    """Build (nonlinearity, post_linear, linear_down_irreps) for ACE-style gates.
+
+    ``nonlinear`` examples: ``None``, ``\"sigmoid_gate\"``, ``\"silu_gate\"``.
+    """
+    from .linear import IrrepsLinear
+
+    if nonlinear is None or nonlinear in ("null", "none", "identity"):
+        return torch.nn.Identity(), torch.nn.Identity(), irreps_mid
+
+    if nonlinear.endswith("_gate") or nonlinear == "gate":
+        act_name = nonlinear.split("_")[0] if "_" in nonlinear else "sigmoid"
+        act = torch.nn.Sigmoid() if act_name == "sigmoid" else torch.nn.SiLU()
+
+        even_scalar = o3.Irrep("0e")
+        irreps_scalars = o3.Irreps(
+            [(mul, ir) for mul, ir in irreps_mid if ir == even_scalar]
+        )
+        irreps_gated = o3.Irreps(
+            [(mul, ir) for mul, ir in irreps_mid if ir != even_scalar]
+        )
+        irreps_gates = o3.Irreps([(mul, "0e") for mul, _ in irreps_gated])
+
+        if len(irreps_gated) == 0:
+            nonlinearity = Activation(irreps_mid, [act] * len(irreps_mid))
+            post = IrrepsLinear(nonlinearity.irreps_out, irreps_out, bias=bias)
+            return nonlinearity, post, irreps_mid
+
+        nonlinearity = Gate(
+            irreps_scalars=irreps_scalars,
+            act_scalars=[act] * len(irreps_scalars),
+            irreps_gates=irreps_gates,
+            act_gates=[torch.nn.Sigmoid()] * len(irreps_gates),
+            irreps_gated=irreps_gated,
+        )
+        post = IrrepsLinear(nonlinearity.irreps_out, irreps_out, bias=bias)
+        return nonlinearity, post, nonlinearity.irreps_in.simplify()
+
+    raise ValueError(f"Unsupported nonlinear={nonlinear}")

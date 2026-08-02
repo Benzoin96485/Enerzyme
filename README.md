@@ -18,6 +18,7 @@ Currently supported model architectures:
 | SpookyNet | internal |             ✅             |              ✅              |       ✅       |        ✅        |          [Nat. Commun. 2021, 12(1), 7273](https://www.nature.com/articles/s41467-021-27504-0)          | [Github](https://github.com/OUnke/SpookyNet) |
 |  AlphaNet | internal |             ✅             |              ✅              |       ❌       |        ❌        |                   [arXiv:2501.07155](https://arxiv.org/abs/2501.07155)                   |  [Github](https://github.com/yuanqidu/M2Hub)  |
 |   MACE   | internal |             ✅             |              ✅              |       ❌       |        ✅        |                   [NeurIPS 2022, arXiv:2206.07697](https://arxiv.org/abs/2206.07697)                   |   [Github](https://github.com/ACEsuit/mace)   |
+|   TACE   | internal |             ✅             |         via readout         |       ✅       |   via readout   | [arXiv:2509.14961](https://arxiv.org/abs/2509.14961) / [Cartesian-3j](https://arxiv.org/abs/2512.16882) | [tace](https://github.com/xvzemin/tace) |
 |   eSCN   | internal |             ✅             |         via readout         |       ✅       |   via readout   | [NeurIPS 2023, arXiv:2302.03655](https://arxiv.org/abs/2302.03655) | [fairchem v1 escn](https://github.com/facebookresearch/fairchem/tree/fairchem_core-1.10.0/src/fairchem/core/models/escn) |
 |  NequIP  | external |             ✅             |              ❌              |       ❌       |        ❌        |          [Nat. Commun. 2022, 13(1), 2453](https://www.nature.com/articles/s41467-022-29939-5)          | [Github](https://github.com/mir-group/nequip) |
 |   UMA   | external |             ✅             |              ✅              |       ✅       |        ❌        | Meta UMA / eSCN-MD Core + shared Q/S readouts (`fairchem`; not paper eSCN) | [fairchem](https://github.com/FAIR-Chem/fairchem) |
@@ -34,7 +35,7 @@ Shared equivariant tooling (for developers):
 
 - `enerzyme.models.so3` — SH-array / SPHC primitives (EquiformerV2, So3krates, eSCN-style SO2), including unified `spherical_harmonics(..., layout=...)`, array dropout, and `SphereSampleReadout`.
 - `enerzyme.models.efa` — Euclidean Fast Attention (ERoPE + Lebedev linear nonlocal): SpookyNet `use_efa`, architectures `efa` / `so3lr_efa`, or hook any Core via `EFABlock` / `apply_efa_if_configured` on invariant features + `Ra` + `batch_seg`.
-- `enerzyme.models.e3nn_nn` — flat e3nn Irreps helpers (Equiformer V1, MACE): TP rescale, Gate/Activation, irreps LayerNorm / dropout, tools.
+- `enerzyme.models.e3nn_nn` — flat e3nn Irreps helpers (Equiformer V1, MACE, TACE): TP rescale, Gate/Activation, irreps Linear / ElementLinear, path generation, scatter TP, tools.
 - Representation-agnostic blocks: `activation.SmoothLeakyReLU`, `blocks.drop` (`GraphDropPath`), `blocks.radial_mlp`.
 
 Architecture packages keep `core.py` + `interaction.py` (plus embedding / input blocks as needed). Equiformer-specific readouts live in each package's `interaction.py` and are re-exported from `layers` for YAML layer-stack discovery.
