@@ -61,3 +61,25 @@ def test_inter_einsum_and_contraction():
     )
     msg = ctr(node, edge, w, edge_index)
     assert 0 in msg or 1 in msg
+
+
+def test_self_interaction_zero_pads_missing_ranks():
+    """Layer-0 BB residual must emit all ls_out even when feats only have l=0."""
+    from enerzyme.models.tace.cartesian.core_blocks import DictSkipIdentity, SelfInteraction
+
+    feats = {0: torch.randn(4, 8)}
+    attrs = torch.nn.functional.one_hot(torch.tensor([1, 2, 0, 3]), num_classes=5).float()
+    for element_aware in (False, True):
+        si = SelfInteraction(
+            8, 8, ls=[0, 1], bias=True, element_aware=element_aware, num_elements=5
+        )
+        out = si(feats, attrs if element_aware else None)
+        assert set(out) == {0, 1}
+        assert out[1].shape == (4, 8, 3)
+        assert torch.allclose(out[1], torch.zeros_like(out[1]))
+        assert torch.isfinite(out[0]).all()
+
+    skip = DictSkipIdentity([0, 1], 8)
+    out_id = skip(feats)
+    assert set(out_id) == {0, 1}
+    assert torch.allclose(out_id[1], torch.zeros_like(out_id[1]))

@@ -306,6 +306,32 @@ def test_tace_cartesian_identity_resnet():
     assert torch.isfinite(out["atom_feature"]).all()
 
 
+def test_tace_cartesian_first_resnet_emits_all_skip_ranks():
+    """Regression: use_first_resnet layer-0 aware/agnostic skip must cover Lmax ranks."""
+    torch.manual_seed(0)
+    n = 4
+    for linear_type in ("aware", "agnostic", "identity"):
+        core = _tiny_core(
+            "cartesian",
+            num_layers=2,
+            Lmax=1,
+            lmax=2,
+            use_first_resnet=True,
+            resnet_type="BB",
+            resnet_linear_type=linear_type,
+        )
+        res0 = core.cartesian_stack.resnets[0]
+        assert res0 is not None
+        feats0 = {0: torch.randn(n, 8)}
+        attrs = torch.nn.functional.one_hot(
+            torch.tensor([1, 6, 8, 1]), num_classes=core.num_elements
+        ).float()
+        sc = res0(feats0, attrs) if getattr(res0, "element_aware", False) else res0(feats0)
+        assert set(sc.keys()) == {0, 1}, linear_type
+        assert sc[1].shape == (n, 8, 3)
+        assert torch.isfinite(_forward_core(core)["atom_feature"]).all()
+
+
 def _forward_core(core, n=4, cutoff=None):
     idx_i, idx_j = _edges(n)
     kwargs = dict(

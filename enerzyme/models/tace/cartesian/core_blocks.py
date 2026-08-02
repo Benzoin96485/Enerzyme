@@ -91,6 +91,8 @@ class SelfInteraction(nn.Module):
     ):
         super().__init__()
         self.ls = list(ls)
+        self.in_c = int(in_c)
+        self.out_c = int(out_c)
         self.element_aware = element_aware
         mods = {}
         for l in self.ls:
@@ -100,13 +102,19 @@ class SelfInteraction(nn.Module):
                 mods[str(l)] = RankLinear(in_c, out_c, l, bias=bias)
         self.layers = nn.ModuleDict(mods)
 
+    def _missing_rank(self, l: int, ref: Tensor) -> Tensor:
+        shape = (ref.shape[0], self.in_c) + ((3,) * l if l > 0 else ())
+        return ref.new_zeros(shape)
+
     def forward(self, feats: Dict[int, Tensor], attrs: Optional[Tensor] = None) -> Dict[int, Tensor]:
+        # Zero-fill missing input ranks so ls_out residual / projection always
+        # emits every requested l (matches DictSkipIdentity / spherical SkipIdentity).
+        ref = next(iter(feats.values()))
         out: Dict[int, Tensor] = {}
         for l in self.ls:
-            if l not in feats:
-                continue
+            x = feats[l] if l in feats else self._missing_rank(l, ref)
             layer = self.layers[str(l)]
-            out[l] = layer(feats[l], attrs) if self.element_aware else layer(feats[l])
+            out[l] = layer(x, attrs) if self.element_aware else layer(x)
         return out
 
 
