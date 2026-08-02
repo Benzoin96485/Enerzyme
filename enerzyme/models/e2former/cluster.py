@@ -16,7 +16,9 @@ from .graph import map_neighbor_list, pad_neighbor_list, select_closest_neighbor
 def _num_clusters_for_graph(num_atoms: int, min_nodes_per_group: int) -> int:
     if num_atoms <= 0:
         return 0
-    denom = min(min_nodes_per_group, max(num_atoms // 2, 1) + 1)
+    # Guard against misconfigured YAML (0 / negative) so denom never hits 0.
+    min_nodes = max(int(min_nodes_per_group), 1)
+    denom = min(min_nodes, max(num_atoms // 2, 1) + 1)
     return int(num_atoms / denom) + 1
 
 
@@ -37,7 +39,14 @@ def build_kmeans_fragments(
     cluster_batch : LongTensor [U]
         Graph id for each cluster.
     """
-    from sklearn.cluster import KMeans
+    try:
+        from sklearn.cluster import KMeans
+    except ImportError as exc:
+        raise ImportError(
+            "fragment_mode='kmeans' requires scikit-learn "
+            "(pip install scikit-learn). For offline BRICS labels use "
+            "fragment_mode='precomputed' with cluster_ids instead."
+        ) from exc
 
     device = Ra.device
     dtype = Ra.dtype
@@ -277,6 +286,7 @@ def resolve_fragments(
     cluster_ids: Optional[Tensor] = None,
     cluster_centers: Optional[Tensor] = None,
     min_nodes_per_group: int = 24,
+    random_state: int = 0,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Resolve fragment assignment for LSR.
 
@@ -299,7 +309,10 @@ def resolve_fragments(
         )
     elif mode == "kmeans":
         local_ids, _km_pos, _km_batch = build_kmeans_fragments(
-            Ra, batch_seg, min_nodes_per_group=min_nodes_per_group
+            Ra,
+            batch_seg,
+            min_nodes_per_group=min_nodes_per_group,
+            random_state=random_state,
         )
         # Recompute centers from current Ra so long-range geometry stays in the
         # autograd graph (sklearn centroids are detached).

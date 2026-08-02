@@ -143,6 +143,49 @@ def test_pool_and_atom_fragment_topk_batch_isolation():
         assert ((nbrs >= 2) & (nbrs < 4)).all()
 
 
+def test_num_clusters_guards_nonpositive_min_nodes():
+    from enerzyme.models.e2former.cluster import (
+        _num_clusters_for_graph,
+        build_kmeans_fragments,
+    )
+
+    # Misconfigured YAML with 0 / negative must not divide by zero.
+    assert _num_clusters_for_graph(10, 0) == _num_clusters_for_graph(10, 1)
+    assert _num_clusters_for_graph(10, -3) == _num_clusters_for_graph(10, 1)
+    assert _num_clusters_for_graph(0, 24) == 0
+
+    torch.manual_seed(0)
+    ra = torch.randn(5, 3)
+    batch = torch.zeros(5, dtype=torch.long)
+    local, centers, cbatch = build_kmeans_fragments(
+        ra, batch, min_nodes_per_group=0, random_state=0
+    )
+    assert local.shape == (5,)
+    assert centers.shape[0] >= 1
+    assert cbatch.shape[0] == centers.shape[0]
+
+
+def test_e2former_lsr_single_atom_graph():
+    """Single-atom graphs have no short/long neighbors; fuse must still run."""
+    torch.manual_seed(0)
+    core = _tiny_lsr_core(min_nodes_per_group=0)
+    assert core.min_nodes_per_group == 1
+    empty_i = torch.zeros(0, dtype=torch.long)
+    empty_j = torch.zeros(0, dtype=torch.long)
+    out = core.get_output(
+        atom_embedding=torch.randn(1, 16),
+        Za=torch.tensor([6]),
+        Ra=torch.randn(1, 3),
+        rbf=torch.zeros(0, 8),
+        idx_i_sr=empty_i,
+        idx_j_sr=empty_j,
+        vij_sr=torch.zeros(0, 3),
+    )
+    assert out["atom_feature"].shape == (1, 16)
+    assert out["atom_sphere_feature"].shape == (1, 9, 16)
+    assert torch.isfinite(out["atom_feature"]).all()
+
+
 def test_e2former_lsr_core_atom_feature_shape():
     torch.manual_seed(0)
     n = 6

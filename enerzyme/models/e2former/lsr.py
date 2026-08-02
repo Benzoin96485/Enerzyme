@@ -44,6 +44,7 @@ for _layer in DEFAULT_LAYER_PARAMS:
             "long_max_neighbors": 64,
             "fragment_mode": "kmeans",
             "min_nodes_per_group": 24,
+            "kmeans_random_state": 0,
             "cutoff_lr": 15.0,
         }
         break
@@ -104,6 +105,7 @@ class E2FormerLSRCore(E2FormerCore):
         cutoff_lr: float = 15.0,
         fragment_mode: str = "kmeans",
         min_nodes_per_group: int = 24,
+        kmeans_random_state: int = 0,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -141,7 +143,8 @@ class E2FormerLSRCore(E2FormerCore):
         self.long_max_neighbors = int(long_max_neighbors)
         self.cutoff_lr = float(cutoff_lr)
         self.fragment_mode = fragment_mode
-        self.min_nodes_per_group = int(min_nodes_per_group)
+        self.min_nodes_per_group = max(int(min_nodes_per_group), 1)
+        self.kmeans_random_state = int(kmeans_random_state)
 
         self.rbf_long = _LongRangeGaussianRBF(num_rbf, self.cutoff_lr)
         self.cluster_blocks = ModuleList()
@@ -207,13 +210,15 @@ class E2FormerLSRCore(E2FormerCore):
         Za = short["Za"]
         node_irreps_short = node_irreps
 
-        flat_ids, cluster_pos, cluster_batch, _local = resolve_fragments(
+        # local_cluster_ids is unused here; flat_ids already remaps across graphs.
+        flat_ids, cluster_pos, cluster_batch, _ = resolve_fragments(
             ra_wigner,
             batch_seg,
             fragment_mode=self.fragment_mode,
             cluster_ids=cluster_ids,
             cluster_centers=cluster_centers,
             min_nodes_per_group=self.min_nodes_per_group,
+            random_state=self.kmeans_random_state,
         )
         # Centers are means of COM-centered atoms (same frame as ra_wigner).
 
