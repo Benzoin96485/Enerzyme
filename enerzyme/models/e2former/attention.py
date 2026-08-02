@@ -1,5 +1,6 @@
 # Adapted from liyy2/E2Former (MIT) https://github.com/liyy2/E2Former
-"""E2Former sparse equivariant attention (QK alpha + Wigner-6j orders)."""
+# SO2 / Triton paths adapted from IQuestLab/UBio-MolFM (MIT)
+"""E2Former sparse equivariant attention (QK alpha + Wigner-6j / SO2 orders)."""
 
 from __future__ import annotations
 
@@ -16,6 +17,12 @@ from ..activation import SmoothLeakyReLU
 from ..blocks.radial_mlp import RadialFunction
 from ..so3.linear import SO3Linear
 from .so3_ops import SO3Linear2Scalar
+from .so2_tensor_product import E2TensorProductSO2_FirstOrder
+from .triton_sparse import (
+    make_sparse_v_kernel,
+    sparse_qk,
+    triton_kernels_available,
+)
 from .wigner6j import E2TensorProductArbitraryOrder
 
 DEFAULT_ATOM_TYPE_COUNT = 256
@@ -305,6 +312,78 @@ class SecondOrderAttention(BaseAttentionOrder):
         )
 
 
+class So2FirstOrderAttention(BaseAttentionOrder):
+    """E2Former-V2 value path: EAAS / SO2 first-order TP + on-the-fly Wigner."""
+
+    def __init__(
+        self, irreps_node_input, irreps_head, num_attn_heads, edge_channel_list, lmax
+    ):
+        super().__init__(
+            irreps_node_input, irreps_head, num_attn_heads, edge_channel_list, lmax
+        )
+        self.rad_func_intputhead = RadialFunction(
+            edge_channel_list + [num_attn_heads]
+        )
+        self.proj_value = SO3Linear(self.scalar_dim, self.scalar_dim, lmax=lmax)
+        self.first_order_tp = E2TensorProductSO2_FirstOrder(
+            irreps_node_input,
+            (irreps_head * num_attn_heads).sort().irreps.simplify(),
+            order=1,
+            head=num_attn_heads,
+        )
+        self.proj_first = SO3Linear(
+            num_attn_heads * irreps_head[0][0], self.scalar_dim, lmax=lmax
+        )
+
+    @property
+    def l3_sequential(self):
+        return self.first_order_tp.so2_tp.l3_sequential
+
+    def forward(
+        self,
+        alpha,
+        value,
+        x_edge,
+        node_pos,
+        edge_dis,
+        batched_data,
+        use_triton: bool = False,
+        **kwargs,
+    ):
+        # Alpha / x_edge are atom×K (query side). Value may be fragments
+        # (E2AttentionClusterSparse); never use value.shape[0] here.
+        f_n = alpha.shape[0]
+        value = self.proj_value(value)
+        inputhead = self.rad_func_intputhead(x_edge)
+        alpha = alpha.reshape(f_n, -1, self.num_attn_heads) * inputhead.reshape(
+            f_n, -1, self.num_attn_heads
+        )
+
+        exp_node_pos = batched_data.get("f_exp_node_pos", node_pos)
+        outcell_index = batched_data.get("f_outcell_index", None)
+        f_sparse_idx_expnode = batched_data.get("f_sparse_idx_expnode", None)
+        exp_value = value if outcell_index is None else value[outcell_index]
+
+        triton_kernel = None
+        if use_triton and f_sparse_idx_expnode is not None:
+            triton_kernel = make_sparse_v_kernel(
+                f_sparse_idx_expnode.contiguous(), use_triton=True
+            )
+
+        return self.proj_first(
+            self.first_order_tp(
+                node_pos,
+                exp_node_pos,
+                None,
+                exp_value,
+                alpha / (edge_dis.unsqueeze(-1) + 1e-8),
+                triton_kernel=triton_kernel,
+                f_sparse_idx_expnode=f_sparse_idx_expnode,
+                batched_data=batched_data,
+            )
+        )
+
+
 def create_attention_order(
     attn_type: str,
     irreps_node_input: o3.Irreps,
@@ -326,9 +405,13 @@ def create_attention_order(
         return SecondOrderAttention(
             irreps_node_input, irreps_head, num_attn_heads, edge_channel_list, lmax
         )
+    if attn_type == "so2-first-order":
+        return So2FirstOrderAttention(
+            irreps_node_input, irreps_head, num_attn_heads, edge_channel_list, lmax
+        )
     raise ValueError(
         f"Unknown attention type: {attn_type}. "
-        "Supported: zero-order, first-order, second-order"
+        "Supported: zero-order, first-order, second-order, so2-first-order"
     )
 
 
@@ -362,7 +445,9 @@ class E2AttentionSparse(nn.Module):
         self.attn_scalar_head = attn_scalar_head
         self.attn_weight_input_dim = attn_weight_input_dim
         self.attn_type = attn_type
-        self.tp_type = tp_type.split("+")[0]
+        tp_parts = tp_type.split("+")
+        self.tp_type = tp_parts[0]
+        self.want_triton = "triton" in tp_parts[1:]
         self.scalar_dim = self.irreps_node_input[0][0]
         self.lmax = self.irreps_node_input[-1][1].l
         self.node_embed_dim = node_embed_dim
@@ -396,6 +481,9 @@ class E2AttentionSparse(nn.Module):
         )
         self.alpha_dropout = nn.Dropout(alpha_drop) if alpha_drop > 0 else None
 
+    def _use_triton(self) -> bool:
+        return bool(self.want_triton and triton_kernels_available())
+
     def forward(
         self,
         node_pos: Tensor,
@@ -412,6 +500,7 @@ class E2AttentionSparse(nn.Module):
         f_n = node_irreps_input.shape[0]
         top_k = attn_weight.shape[1]
         f_sparse_idx_node = batched_data["f_sparse_idx_node"]
+        use_triton = self._use_triton()
 
         attn_weight = attn_weight.masked_fill(attn_mask, 0)
         src_node = self.source_embedding(atomic_numbers)
@@ -425,12 +514,37 @@ class E2AttentionSparse(nn.Module):
             dim=-1,
         )
 
-        alpha = self.alpha_module(
-            x_edge=x_edge,
-            node_irreps_input=node_irreps_input,
-            edge_vec=edge_vec,
-            f_sparse_idx_node=f_sparse_idx_node,
-        )
+        if (
+            use_triton
+            and self.tp_type == "QK_alpha"
+            and isinstance(self.alpha_module, QKAlphaModule)
+        ):
+            # Must match QKAlphaModule: gather with f_sparse_idx_node, no
+            # f_outcell_index remapping (PBC expansion is not wired here yet).
+            query = self.alpha_module.query_linear(node_irreps_input).reshape(
+                f_n, self.num_attn_heads, -1
+            )
+            key = self.alpha_module.key_linear(node_irreps_input).reshape(
+                f_n, self.num_attn_heads, -1
+            )
+            gate = self.alpha_module.fc_easy(x_edge)
+            scale = 1.0 / math.sqrt(query.shape[-1])
+            alpha = sparse_qk(
+                query,
+                key,
+                f_sparse_idx_node.contiguous(),
+                gate,
+                scale,
+                use_triton=True,
+            )
+            alpha = self.alpha_module.alpha_act(alpha)
+        else:
+            alpha = self.alpha_module(
+                x_edge=x_edge,
+                node_irreps_input=node_irreps_input,
+                edge_vec=edge_vec,
+                f_sparse_idx_node=f_sparse_idx_node,
+            )
         alpha = alpha.masked_fill(attn_mask, -1e6)
         alpha = torch.nn.functional.softmax(alpha, dim=1)
         alpha = alpha.masked_fill(attn_mask, 0)
@@ -444,6 +558,7 @@ class E2AttentionSparse(nn.Module):
             node_pos=node_pos,
             edge_dis=edge_dis,
             batched_data=batched_data,
+            use_triton=use_triton,
         )
         return node_output, attn_weight
 

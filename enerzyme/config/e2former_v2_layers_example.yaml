@@ -1,0 +1,42 @@
+# Minimal E2Former-V2 stack (Huang et al. 2026).
+# Use architecture: e2former_v2 under Modelhub.internal_FFs.
+#
+# Same latent contract as E2Former-V1 (atom_feature / atom_sphere_feature).
+# Core defaults to attn_type: so2-first-order and tp_type: QK_alpha+triton
+# (Triton falls back to PyTorch when CUDA is unavailable; GPU vs fallback
+# parity: test/test_e2former_triton_parity.py).
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: e2former_v2
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: GaussianSmearing
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            irreps_node_embedding: "64x0e+64x1e+64x2e"
+            irreps_head: "16x0e+16x1e+16x2e"
+            num_layers: 2
+            num_attn_heads: 4
+            attn_scalar_head: 32
+            ffn_hidden_channels: 128
+            max_neighbors: 32
+            attn_type: so2-first-order
+            tp_type: QK_alpha+triton
+            norm_layer: rms_norm_sh
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

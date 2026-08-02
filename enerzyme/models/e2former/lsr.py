@@ -27,6 +27,7 @@ from .core import (
     E2FormerCore,
 )
 from .interaction import ClusterTransBlock
+from .wigner_otf import build_so2_wigner_frames
 
 DEFAULT_BUILD_PARAMS = {
     **_E2_BUILD,
@@ -193,6 +194,8 @@ class E2FormerLSRCore(E2FormerCore):
         cluster_ids: Optional[Tensor] = None,
         cluster_centers: Optional[Tensor] = None,
     ) -> Tensor:
+        # Skip Core ``self.norm`` here: late fuse applies ``norm_fuse_short`` /
+        # ``norm_fuse_long``. Applying both would double-normalize the short tower.
         short = self.encode_sphere_short(
             atom_embedding,
             Za,
@@ -202,7 +205,7 @@ class E2FormerLSRCore(E2FormerCore):
             idx_j_sr,
             vij_sr,
             batch_seg=batch_seg,
-            apply_final_norm=True,
+            apply_final_norm=False,
         )
         node_irreps = short["node_irreps"]
         ra_wigner = short["ra_wigner"]
@@ -238,10 +241,23 @@ class E2FormerLSRCore(E2FormerCore):
         attn_weight = self.rbf_long(edge_dis)
         attn_weight = attn_weight.masked_fill(attn_mask, 0.0)
 
-        # Empty neighbor lists still run long blocks (atom FFN) + late fuse.
-        # Only skip when there is no long stack or no fragments at all.
+        # No long stack / no fragments: match base Core (single final norm).
         if self.long_layers == 0 or cluster_pos.shape[0] == 0:
-            return node_irreps_short
+            return self.norm(node_irreps_short)
+
+        # SO2 long-range path needs Wigner frames on atoms and fragments.
+        if self.attn_type == "so2-first-order":
+            order_mod = self.cluster_blocks[0].ga.attention_order_module
+            l3_sequential = getattr(order_mod, "l3_sequential", None)
+            long_graph.update(
+                build_so2_wigner_frames(
+                    ra_wigner,
+                    cluster_pos,
+                    self.lmax,
+                    l3_sequential=l3_sequential,
+                    training=self.training,
+                )
+            )
 
         for blk in self.cluster_blocks:
             cluster_irreps = pool_fragment_irreps(node_irreps, flat_ids)
