@@ -219,7 +219,7 @@ class E2FormerCore(BaseFFCore):
             else:
                 self.post_sequence.append(layer)
 
-    def encode_sphere(
+    def encode_sphere_short(
         self,
         atom_embedding: Tensor,
         Za: Tensor,
@@ -229,7 +229,13 @@ class E2FormerCore(BaseFFCore):
         idx_j_sr: Tensor,
         vij_sr: Tensor,
         batch_seg: Optional[Tensor] = None,
-    ) -> Tensor:
+        apply_final_norm: bool = True,
+    ) -> Dict[str, Tensor]:
+        """Short-range E2Former encode (shared by base Core and E2Former-LSR).
+
+        Returns a dict with ``node_irreps`` ``[N,(L+1)^2,C]``, COM-centered
+        ``ra_wigner``, and the resolved ``batch_seg`` / ``Za``.
+        """
         device = atom_embedding.device
         dtype = atom_embedding.dtype
         num_atoms = atom_embedding.shape[0]
@@ -289,7 +295,37 @@ class E2FormerCore(BaseFFCore):
                 attn_mask=neigh["attn_mask"],
                 batched_data=neigh,
             )
-        return self.norm(node_irreps)
+        if apply_final_norm:
+            node_irreps = self.norm(node_irreps)
+        return {
+            "node_irreps": node_irreps,
+            "ra_wigner": ra_wigner,
+            "batch_seg": batch_seg,
+            "Za": Za,
+        }
+
+    def encode_sphere(
+        self,
+        atom_embedding: Tensor,
+        Za: Tensor,
+        Ra: Tensor,
+        rbf: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+        vij_sr: Tensor,
+        batch_seg: Optional[Tensor] = None,
+    ) -> Tensor:
+        return self.encode_sphere_short(
+            atom_embedding,
+            Za,
+            Ra,
+            rbf,
+            idx_i_sr,
+            idx_j_sr,
+            vij_sr,
+            batch_seg=batch_seg,
+            apply_final_norm=True,
+        )["node_irreps"]
 
     def get_output(
         self,

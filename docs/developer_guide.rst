@@ -292,14 +292,17 @@ Tests live in :code:`test/`:
 - :code:`test_equiformer_v3_parity_*.py` — numerical parity vs vendored EquiformerV3 upstream (MergeLN / SO2Linear / envelope / FFN / TransBlockV3); SwiGLU-S² ``_mem`` vs eager consistency
 - :code:`test_e2former_core.py` — E2Former shapes, build_model E/F, SO(3) / translation checks, top-K truncation
 - :code:`test_e2former_wigner6j.py` — Wigner-6j TP vs vanilla forward (orders 1–2)
+- :code:`test_e2former_parity_ops.py` — E2Former Wigner-6j / SO2 TP numerical parity vs vendored UBio-MolFM fixtures
 - :code:`test_e2former_v2_core.py` — E2Former-V2 SO2 attention shapes, build_model E/F, SO(3) / translation, YAML smoke
 - :code:`test_e2former_so2_tp.py` — EAAS / SO2 TP shapes, rotation equivariance, Triton PyTorch fallback
 - :code:`test_e2former_triton_parity.py` — QK index convention / CPU fallback guards; CUDA Triton vs PyTorch parity (skipped without GPU)
+- :code:`test_e2former_lsr_core.py` — E2Former-LSR shapes, kmeans/precomputed fragments, bipartite graph batch isolation, build_model E/F, SO(3) / translation, YAML smoke
 - :code:`test_dpa4_core.py` — DPA4 shapes, registration / YAML smoke, geometry autograd, SO(3) scalar invariance, build_model E/F, force finite-difference conservation
 - :code:`test_dpa4_parity_ops.py` — DPA4 indexing / C³ envelope / SO2Linear / envelope-gated softmax algebraic checks (no runtime deepmd dependency)
 - :code:`test_tace_core.py` — TACE registration / YAML smoke, spherical+Cartesian feature shapes, build_model E/F
 - :code:`test_tace_spherical_ops.py` — CGTP path / scatter TP / CgtpACE smoke
 - :code:`test_tace_cartesian_ops.py` — cartnn ICTD / harmonics / Cartesian contraction smoke
+- :code:`test_tace_parity_ops.py` — TACE spherical / Cartesian numerical parity vs vendored tace v0.1.0 fixtures
 - :code:`test_tece_core.py` — TECE registration / YAML smoke, feature shapes, build_model E/F, ECE/RRA flag sensitivity
 - :code:`test_tece_ops.py` — WignerD / LayoutTransform / uvSO2Linear / SO2Gate / ComplexProductBasis / RRA path smoke
 - :code:`test_so3_wigner_backend.py` — shared e3nn/Jd Wigner-D backend (packed orthogonality, SO3_Rotation / fused / DPA4 quaternion adapters, high-l smoke)
@@ -440,12 +443,11 @@ Liao et al. (2026, arXiv:2604.09130) lives under :code:`enerzyme/models/equiform
 E2Former (:code:`e2former`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Li et al. (NeurIPS 2025, arXiv:2501.19216) lives under :code:`enerzyme/models/e2former/` (Wigner-6j attention, shared :code:`so3` norms / :code:`SO3Linear`, EquiformerV2 S² FFN). Emits :code:`atom_feature` / :code:`atom_sphere_feature`. Tests: :code:`test_e2former_core.py`, :code:`test_e2former_wigner6j.py`. Example: :code:`e2former_layers_example.yaml`.
-
-E2Former-V2 (:code:`e2former_v2`)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Huang et al. (2026, arXiv:2601.16622) **reuses** :code:`E2FormerCore` with defaults in :code:`e2former/v2.py`: :code:`attn_type: so2-first-order` (EAAS / :code:`E2TensorProductSO2_FirstOrder` + on-the-fly Wigner in :code:`wigner_otf.py`) and :code:`tp_type: QK_alpha+triton` (optional kernels in :code:`triton_sparse/`; PyTorch fallback without CUDA). Same Core latent contract; compose :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force`. Tests: :code:`test_e2former_v2_core.py`, :code:`test_e2former_so2_tp.py`. Example: :code:`e2former_v2_layers_example.yaml`. Enerzymette: :code:`architecture: e2former_v2` + resolved :code:`config.yaml`.
+- :code:`test_e2former_parity_ops.py` — E2Former Wigner-6j / SO2 TP numerical parity vs vendored UBio-MolFM fixtures
+- :code:`test_e2former_v2_core.py` — E2Former-V2 SO2 attention shapes, build_model E/F, SO(3) / translation, YAML smoke
+- :code:`test_e2former_so2_tp.py` — EAAS / SO2 TP shapes, rotation equivariance, Triton PyTorch fallback
+- :code:`test_e2former_triton_parity.py` — QK index convention / CPU fallback guards; CUDA Triton vs PyTorch parity (skipped without GPU)
+- :code:`test_e2former_lsr_core.py` — E2Former-LSR shapes, kmeans/precomputed fragments, bipartite graph batch isolation, build_model E/F, SO(3) / translation, YAML smoke
 
 DPA4 (:code:`dpa4`)
 ^^^^^^^^^^^^^^^^^^^^^

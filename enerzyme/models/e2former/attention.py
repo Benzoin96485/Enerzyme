@@ -214,7 +214,7 @@ class ZeroOrderAttention(BaseAttentionOrder):
         self.proj_zero = SO3Linear(self.scalar_dim, self.scalar_dim, lmax=lmax)
 
     def forward(self, alpha, value, x_edge, node_pos, edge_dis, batched_data, **kwargs):
-        f_n = value.shape[0]
+        f_n = alpha.shape[0]
         f_sparse_idx_node = batched_data["f_sparse_idx_node"]
         inputhead = self.rad_func_intputhead(x_edge)
         alpha = alpha.reshape(f_n, -1, self.num_attn_heads, 1) * inputhead.reshape(
@@ -243,7 +243,7 @@ class FirstOrderAttention(BaseAttentionOrder):
         )
 
     def forward(self, alpha, value, x_edge, node_pos, edge_dis, batched_data, **kwargs):
-        f_n = value.shape[0]
+        f_n = alpha.shape[0]
         inputhead = self.rad_func_intputhead(x_edge)
         alpha = alpha.reshape(f_n, -1, self.num_attn_heads, 1) * inputhead.reshape(
             alpha.shape[:2] + (self.num_attn_heads, -1)
@@ -288,7 +288,7 @@ class SecondOrderAttention(BaseAttentionOrder):
         )
 
     def forward(self, alpha, value, x_edge, node_pos, edge_dis, batched_data, **kwargs):
-        f_n = value.shape[0]
+        f_n = alpha.shape[0]
         value = self.proj_value(value)
         inputhead = self.rad_func_intputhead(x_edge)
         alpha = alpha.reshape(f_n, -1, self.num_attn_heads, 1) * inputhead.reshape(
@@ -557,5 +557,163 @@ class E2AttentionSparse(nn.Module):
             edge_dis=edge_dis,
             batched_data=batched_data,
             use_triton=use_triton,
+        )
+        return node_output, attn_weight
+
+
+class E2AttentionClusterSparse(nn.Module):
+    """Atom→fragment sparse E2 attention (E2Former-LSR long-range block).
+
+    Queries come from atoms; keys/values come from fragment irreps indexed by
+    ``f_sparse_idx_expnode``. Edge channels mix RBF, target atom embed, and the
+    fragment ``l=0`` scalar (upstream ``*_forcluster``).
+    """
+
+    def __init__(
+        self,
+        irreps_node_input: str | o3.Irreps = "64x0e+64x1e+64x2e",
+        attn_weight_input_dim: int = 32,
+        num_attn_heads: int = 4,
+        attn_scalar_head: int = 32,
+        irreps_head: str | o3.Irreps = "16x0e+16x1e+16x2e",
+        alpha_drop: float = 0.0,
+        tp_type: str = "QK_alpha",
+        attn_type: str = "first-order",
+        atom_type_cnt: int = DEFAULT_ATOM_TYPE_COUNT,
+        node_embed_dim: int = DEFAULT_HIDDEN_DIM,
+        **kwargs,
+    ) -> None:
+        super().__init__()
+        self.irreps_node_input = (
+            o3.Irreps(irreps_node_input)
+            if isinstance(irreps_node_input, str)
+            else irreps_node_input
+        )
+        self.irreps_head = (
+            o3.Irreps(irreps_head) if isinstance(irreps_head, str) else irreps_head
+        )
+        self.num_attn_heads = num_attn_heads
+        self.attn_scalar_head = attn_scalar_head
+        self.attn_weight_input_dim = attn_weight_input_dim
+        self.attn_type = attn_type
+        self.tp_type = tp_type.split("+")[0]
+        self.scalar_dim = self.irreps_node_input[0][0]
+        self.lmax = self.irreps_node_input[-1][1].l
+        self.node_embed_dim = node_embed_dim
+
+        self.target_embedding = nn.Embedding(atom_type_cnt, node_embed_dim)
+        nn.init.uniform_(self.target_embedding.weight.data, *EMBEDDING_INIT_RANGE)
+
+        # rbf + target atom embed + fragment l=0 scalar
+        self.edge_channel_list = [
+            attn_weight_input_dim + node_embed_dim + self.scalar_dim,
+            min(DEFAULT_HIDDEN_DIM, max(attn_weight_input_dim // 2, 8)),
+            min(DEFAULT_HIDDEN_DIM, max(attn_weight_input_dim // 2, 8)),
+        ]
+        self.alpha_module = create_alpha_module(
+            self.tp_type,
+            self.irreps_node_input,
+            num_attn_heads,
+            attn_scalar_head,
+            attn_weight_input_dim,
+            self.edge_channel_list,
+            self.lmax,
+        )
+        self.attention_order_module = create_attention_order(
+            attn_type,
+            self.irreps_node_input,
+            self.irreps_head,
+            num_attn_heads,
+            self.edge_channel_list,
+            self.lmax,
+            attn_weight_input_dim,
+        )
+        self.alpha_dropout = nn.Dropout(alpha_drop) if alpha_drop > 0 else None
+
+    def forward(
+        self,
+        node_pos: Tensor,
+        node_irreps_input: Tensor,
+        edge_dis: Tensor,
+        edge_vec: Tensor,
+        attn_weight: Tensor,
+        atomic_numbers: Tensor,
+        attn_mask: Tensor,
+        batched_data: Dict[str, Tensor],
+        cluster_pos: Tensor,
+        cluster_irreps_input: Tensor,
+        poly_dist: Optional[Tensor] = None,
+        **kwargs,
+    ):
+        f_n = node_irreps_input.shape[0]
+        top_k = attn_weight.shape[1]
+        f_sparse_idx_expnode = batched_data["f_sparse_idx_expnode"]
+
+        attn_weight = attn_weight.masked_fill(attn_mask, 0)
+        tgt_node = self.target_embedding(atomic_numbers)
+        cluster_scalar = cluster_irreps_input[:, 0, :]
+        x_edge = torch.cat(
+            [
+                attn_weight,
+                tgt_node.reshape(f_n, 1, -1).expand(-1, top_k, -1),
+                cluster_scalar[f_sparse_idx_expnode],
+            ],
+            dim=-1,
+        )
+
+        # Alpha: Q from atoms, K from fragments.
+        if self.tp_type == "QK_alpha":
+            query = self.alpha_module.query_linear(node_irreps_input).reshape(
+                f_n, self.num_attn_heads, -1
+            )
+            key = self.alpha_module.key_linear(cluster_irreps_input).reshape(
+                cluster_irreps_input.shape[0], self.num_attn_heads, -1
+            )
+            key = key[f_sparse_idx_expnode]
+            alpha = self.alpha_module.alpha_act(
+                self.alpha_module.fc_easy(x_edge)
+                * torch.sum(query.unsqueeze(1) * key, dim=3)
+                / math.sqrt(query.shape[-1])
+            )
+        elif self.tp_type.startswith("dot_alpha"):
+            node_dot = self.alpha_module.dot_linear(node_irreps_input)
+            key_dot = self.alpha_module.dot_linear(cluster_irreps_input)
+            extras = []
+            for lval in range(self.lmax + 1):
+                rij_l = e3nn.o3.spherical_harmonics(
+                    lval, edge_vec, normalize=True
+                ).unsqueeze(-1)
+                node_l = node_dot[:, lval**2 : (lval + 1) ** 2]
+                key_l = key_dot[:, lval**2 : (lval + 1) ** 2]
+                extras.append(torch.sum(rij_l * node_l.unsqueeze(1), dim=-2))
+                extras.append(torch.sum(rij_l * key_l[f_sparse_idx_expnode], dim=-2))
+            x0 = self.alpha_module.fc_m0(
+                torch.cat(extras, dim=-1) * self.alpha_module.rad_func_m0(x_edge)
+            )
+            x0 = x0.reshape(f_n, -1, self.num_attn_heads, self.attn_scalar_head)
+            x0 = self.alpha_module.alpha_act(self.alpha_module.alpha_norm(x0))
+            alpha = torch.einsum("qeik, ik -> qei", x0, self.alpha_module.alpha_dot)
+        else:
+            raise ValueError(f"Unsupported tp_type for cluster attention: {self.tp_type}")
+
+        alpha = alpha.masked_fill(attn_mask, -1e6)
+        alpha = torch.nn.functional.softmax(alpha, dim=1)
+        alpha = alpha.masked_fill(attn_mask, 0)
+        if self.alpha_dropout is not None:
+            alpha = self.alpha_dropout(alpha)
+
+        cluster_data = dict(batched_data)
+        cluster_data["f_exp_node_pos"] = cluster_pos
+        cluster_data["f_sparse_idx_expnode"] = f_sparse_idx_expnode
+        cluster_data["f_sparse_idx_node"] = f_sparse_idx_expnode
+        cluster_data["f_outcell_index"] = None
+
+        node_output = self.attention_order_module(
+            alpha=alpha,
+            value=cluster_irreps_input,
+            x_edge=x_edge,
+            node_pos=node_pos,
+            edge_dis=edge_dis,
+            batched_data=cluster_data,
         )
         return node_output, attn_weight

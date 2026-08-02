@@ -102,6 +102,11 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .e2former.core import E2FormerCore as Core
         from .e2former.v2 import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "e2former_lsr":
+        # E2Former-LSR: same package, fragment bipartite long-range Core.
+        from .e2former.lsr import E2FormerLSRCore as Core
+        from .e2former.lsr import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "dpa4":
         from .dpa4.core import DPA4Core as Core
         from .dpa4.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

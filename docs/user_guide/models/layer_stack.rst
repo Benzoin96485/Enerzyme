@@ -140,7 +140,7 @@ EquiformerV2 / EquiformerV3 and modular readouts
 -----------------------------------------------
 
 With :code:`architecture: equiformer_v2`, :code:`equiformer_v3`, :code:`dpa4`,
-:code:`e2former`, or :code:`e2former_v2`, the Core returns the same latent pair as eSCN
+:code:`e2former`, :code:`e2former_v2`, or :code:`e2former_lsr`, the Core returns the same latent pair as eSCN
 (:code:`atom_feature` as :code:`l=0` scalars with :code:`feature_irreps: "Cx0e"`, plus
 :code:`atom_sphere_feature`). Default stacks use :code:`SimpleReadout` →
 :code:`EnergyReduce` → :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout`
@@ -156,6 +156,8 @@ E2Former additionally ports Wigner-6j tensor products under
 transformer blocks. E2Former-V2 keeps the same package and Core class, switching
 defaults to SO2/EAAS attention (:code:`attn_type: so2-first-order`) with optional
 Triton sparse kernels (:code:`tp_type: QK_alpha+triton`).
+:code:`e2former_lsr` extends that package with fragment bipartite long-range
+attention (see :doc:`architecture_catalog`).
 All external Equiformer / EquiformerV2 readouts
 (:code:`SimpleReadout` including :code:`equiformer_linear_rs`,
 :code:`EquiformerGraphAttentionReadout`, :code:`EquiformerV2FeedForwardReadout`)
@@ -168,6 +170,7 @@ accept :code:`shallow_ensemble_size` on the last linear head; pair with
 :code:`dpa4_layers_example.yaml`,
 :code:`e2former_layers_example.yaml`,
 :code:`e2former_v2_layers_example.yaml`,
+:code:`e2former_lsr_layers_example.yaml`,
 :code:`equiformer_shallow_ensemble_example.yaml`.
 
 So3krates and modular readouts
