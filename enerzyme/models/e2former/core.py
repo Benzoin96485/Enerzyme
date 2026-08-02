@@ -236,6 +236,8 @@ class E2FormerCore(BaseFFCore):
         if batch_seg is None:
             batch_seg = torch.zeros(num_atoms, dtype=torch.long, device=device)
 
+        # Relative edges for seed / distances; COM-centered abs positions for
+        # Wigner-6j solid harmonics (translation-stable, same relative geometry).
         neigh = build_topk_neighborhood(
             Ra.to(dtype=dtype),
             idx_i_sr,
@@ -243,7 +245,9 @@ class E2FormerCore(BaseFFCore):
             vij_sr.to(dtype=dtype),
             rbf.to(dtype=dtype),
             max_neighbors=self.max_neighbors,
+            batch_seg=batch_seg,
         )
+        ra_wigner = neigh["f_node_pos_wigner"]
 
         # Seed: scalar atom embed on l=0 + higher-order edge-degree features
         node_irreps = atom_embedding.new_zeros(
@@ -261,7 +265,7 @@ class E2FormerCore(BaseFFCore):
         attn_weight = neigh["attn_weight"]
         for blk in self.blocks:
             node_irreps, attn_weight = blk(
-                node_pos=Ra.to(dtype=dtype),
+                node_pos=ra_wigner,
                 node_irreps=node_irreps,
                 edge_dis=neigh["edge_dis"],
                 edge_vec=neigh["edge_vec"],

@@ -182,6 +182,92 @@ def test_e2former_energy_invariance_and_force_equivariance():
     assert_allclose(f1.numpy(), (f0 @ r.T).numpy(), rtol=5e-3, atol=5e-3)
 
 
+def test_e2former_energy_translation_invariance():
+    """Wigner-6j uses absolute solid harmonics; COM-centering must keep E(R+t)=E(R)."""
+    from enerzyme.models.ff import build_model
+
+    torch.manual_seed(2)
+    model = build_model(
+        "e2former",
+        layer_params=[
+            {"name": "RangeSeparation"},
+            {"name": "GaussianSmearing"},
+            {"name": "RandomAtomEmbedding"},
+            {
+                "name": "Core",
+                "params": {
+                    "irreps_node_embedding": "16x0e+16x1e+16x2e",
+                    "irreps_head": "8x0e+8x1e+8x2e",
+                    "num_layers": 2,
+                    "num_attn_heads": 2,
+                    "attn_scalar_head": 8,
+                    "ffn_hidden_channels": 32,
+                    "max_neighbors": 16,
+                    "attn_type": "first-order",
+                },
+            },
+            {
+                "name": "SimpleReadout",
+                "params": {
+                    "output_fields": ["Ea"],
+                    "head_type": "dense",
+                    "keep_feature": False,
+                },
+            },
+            {"name": "EnergyReduce"},
+        ],
+        build_params={
+            "dim_embedding": 16,
+            "num_rbf": 8,
+            "max_Za": 20,
+            "cutoff_sr": 5.0,
+            "cutoff_fn": "polynomial",
+        },
+        verbose=0,
+    )
+    model.eval()
+    n = 5
+    idx_i, idx_j = _complete_graph_edges(n)
+    ra = torch.randn(n, 3)
+    za = torch.tensor([1, 6, 8, 1, 7])
+    batch = torch.zeros(n, dtype=torch.long)
+    shift = torch.tensor([100.0, -70.0, 35.0])
+
+    def _energy(pos):
+        with torch.no_grad():
+            out = model(
+                {
+                    "Ra": pos,
+                    "Za": za,
+                    "idx_i": idx_i,
+                    "idx_j": idx_j,
+                    "batch_seg": batch,
+                    "n_atoms": torch.tensor([n]),
+                }
+            )
+        return out["E"].sum().detach()
+
+    e0 = _energy(ra)
+    e1 = _energy(ra + shift)
+    assert_allclose(e0.numpy(), e1.numpy(), rtol=1e-5, atol=1e-5)
+
+
+def test_center_positions_by_batch_is_shift_invariant():
+    from enerzyme.models.e2former.graph import center_positions_by_batch
+
+    torch.manual_seed(0)
+    ra = torch.randn(6, 3)
+    batch = torch.tensor([0, 0, 0, 1, 1, 1])
+    shift = torch.tensor([50.0, -20.0, 10.0])
+    c0 = center_positions_by_batch(ra, batch)
+    c1 = center_positions_by_batch(ra + shift, batch)
+    # Large |t| makes float32 COM subtraction slightly noisy.
+    assert_allclose(c0.numpy(), c1.numpy(), rtol=1e-4, atol=1e-5)
+    # Each graph COM near origin
+    for g in (0, 1):
+        assert float(c0[batch == g].mean(dim=0).abs().max()) < 1e-5
+
+
 def test_e2former_example_yaml_loads():
     import yaml
     from enerzyme.models.ff import build_model

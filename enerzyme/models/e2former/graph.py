@@ -9,6 +9,29 @@ import torch
 from torch import Tensor
 
 
+def center_positions_by_batch(Ra: Tensor, batch_seg: Tensor) -> Tensor:
+    """Subtract per-graph centers of mass from absolute coordinates.
+
+    Wigner-6j attention expands solid harmonics of absolute node positions. Those
+    harmonics are mathematically equivalent to relative-edge expansions after
+    recoupling, but are ill-conditioned when |R| is large. Centering each graph
+    restores stable translational invariance without changing relative geometry.
+    """
+    if batch_seg.numel() == 0:
+        return Ra
+    num_graphs = int(batch_seg.max().item()) + 1
+    com = Ra.new_zeros((num_graphs, 3))
+    counts = Ra.new_zeros((num_graphs, 1))
+    com.index_add_(0, batch_seg.long(), Ra)
+    counts.index_add_(
+        0,
+        batch_seg.long(),
+        torch.ones(Ra.shape[0], 1, device=Ra.device, dtype=Ra.dtype),
+    )
+    com = com / counts.clamp_min(1.0)
+    return Ra - com[batch_seg.long()]
+
+
 def convert_neighbor_list(
     edge_index: Tensor, max_neighbors: int, num_nodes: int
 ) -> Tuple[Tensor, Tensor, Tensor]:
@@ -78,15 +101,23 @@ def build_topk_neighborhood(
     vij_sr: Tensor,
     rbf: Tensor,
     max_neighbors: Optional[int] = None,
+    batch_seg: Optional[Tensor] = None,
 ) -> Dict[str, Tensor]:
     """Build E2Former-style dense neighborhood tensors from Enerzyme SR edges.
 
     Enerzyme convention: ``idx_i`` is the destination (center), ``idx_j`` source.
     ``vij_sr`` is the vector from ``i`` to ``j`` (``R_j - R_i`` in DistanceLayer).
+
+    Absolute positions stored for Wigner-6j (``f_exp_node_pos``) are COM-centered
+    per ``batch_seg``; relative ``edge_vec`` / ``edge_dis`` stay translation-free.
     """
     num_nodes = Ra.shape[0]
     device = Ra.device
     dtype = Ra.dtype
+
+    if batch_seg is None:
+        batch_seg = torch.zeros(num_nodes, dtype=torch.long, device=device)
+    ra_wigner = center_positions_by_batch(Ra.to(dtype=dtype), batch_seg)
 
     # edge_index[0]=src (j), edge_index[1]=dst (i) for convert_neighbor_list
     edge_index = torch.stack([idx_j_sr.long(), idx_i_sr.long()], dim=0)
@@ -113,7 +144,8 @@ def build_topk_neighborhood(
     return {
         "f_sparse_idx_node": safe_neighbors,
         "f_sparse_idx_expnode": safe_neighbors,
-        "f_exp_node_pos": Ra,
+        "f_exp_node_pos": ra_wigner,
+        "f_node_pos_wigner": ra_wigner,
         "f_outcell_index": torch.arange(num_nodes, device=device, dtype=torch.long),
         "edge_vec": edge_vec,
         "edge_dis": edge_dis,
