@@ -28,14 +28,51 @@ from .transform import (
 from ..utils import YamlHandler, logger
 
 
+def _atomic_charges_from_atoms(atoms: Atoms) -> Any:
+    """Qa from calculator ``charges`` when present, else ASE ``initial_charges``."""
+    if atoms.calc is not None:
+        results = getattr(atoms.calc, "results", None) or {}
+        if "charges" in results:
+            return atoms.get_charges()
+        try:
+            return atoms.get_charges()
+        except Exception:
+            pass
+    if atoms.has("initial_charges"):
+        return atoms.get_initial_charges()
+    raise AttributeError(
+        "No atomic charges: calculator charges / get_charges() and "
+        "initial_charges are all unavailable"
+    )
+
+
+def _atomic_magmoms_from_atoms(atoms: Atoms) -> Any:
+    """Sa from calculator ``magmoms`` when present, else ASE ``initial_magmoms``."""
+    if atoms.calc is not None:
+        results = getattr(atoms.calc, "results", None) or {}
+        if "magmoms" in results:
+            return atoms.get_magnetic_moments()
+        try:
+            return atoms.get_magnetic_moments()
+        except Exception:
+            pass
+    if atoms.has("initial_magmoms"):
+        return atoms.get_initial_magnetic_moments()
+    raise AttributeError(
+        "No atomic magmoms: calculator magmoms / get_magnetic_moments() and "
+        "initial_magmoms are all unavailable"
+    )
+
+
 # Standard Enerzyme names → ASE Atoms accessors (calculator results / geometry).
 # ASE itself still stores calculator keys as energy/forces/dipole/charges/magmoms
 # and fairchem-style info keys charge/spin; this adapter only exposes standard names.
+# Qa/Sa prefer calculator populations, then fall back to ASE initial_* arrays.
 ASE_PROPERTY_METHODS: Dict[str, Callable[[Atoms], Any]] = {
     "E": lambda atoms: atoms.get_potential_energy(),
     "Fa": lambda atoms: atoms.get_forces(),
-    "Qa": lambda atoms: atoms.get_charges(),
-    "Sa": lambda atoms: atoms.get_magnetic_moments(),
+    "Qa": _atomic_charges_from_atoms,
+    "Sa": _atomic_magmoms_from_atoms,
     "M2": lambda atoms: atoms.get_dipole_moment(),
 }
 
@@ -63,23 +100,28 @@ _ASELMDB_FIXED_KEYS = _ASELMDB_GEOMETRY_KEYS | frozenset(ASE_PROPERTY_METHODS)
 
 
 def _probe_calculator_properties(atoms: Atoms) -> set:
-    """Discover calculator-backed fields from ``calc.results`` (fallback: accessors)."""
+    """Discover ASE-backed fields from ``calc.results``, accessors, or initial_*."""
     found: set = set()
-    if atoms.calc is None:
-        return found
-    results = getattr(atoms.calc, "results", None) or {}
-    for ase_key, std_key in _ASE_RESULTS_KEY_TO_STANDARD.items():
-        if ase_key in results:
-            found.add(std_key)
-    for prop, method in ASE_PROPERTY_METHODS.items():
-        if prop in found:
-            continue
-        try:
-            method(atoms)
-        except Exception as e:
-            logger.warning(f"Failed to get {prop} directly from calculator: {e}")
-        else:
-            found.add(prop)
+    if atoms.calc is not None:
+        results = getattr(atoms.calc, "results", None) or {}
+        for ase_key, std_key in _ASE_RESULTS_KEY_TO_STANDARD.items():
+            if ase_key in results:
+                found.add(std_key)
+        for prop, method in ASE_PROPERTY_METHODS.items():
+            if prop in found:
+                continue
+            try:
+                method(atoms)
+            except Exception as e:
+                logger.warning(f"Failed to get {prop} directly from calculator: {e}")
+            else:
+                found.add(prop)
+    # DBs without a calculator (or lacking charges/magmoms) can still expose
+    # populations via ASE initial arrays, e.g. BOS-TMC aselmdb.
+    if "Qa" not in found and atoms.has("initial_charges"):
+        found.add("Qa")
+    if "Sa" not in found and atoms.has("initial_magmoms"):
+        found.add("Sa")
     return found
 
 
