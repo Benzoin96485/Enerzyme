@@ -22,15 +22,15 @@ Client request:
 
 .. code-block:: bash
 
-    enerzyme request -u http://127.0.0.1:5000 -f ORCA -i input.extinp.tmp -k FF02
+    enerzyme request -u 127.0.0.1:5000 -f ORCA -i input.extinp.tmp -k FF02
 
-In shell mode the default :code:`model_key` is :code:`external` (omit :code:`-k` or pass :code:`-k external`).
+Pass :code:`-u` as host:port only (the client prepends :code:`http://`). In shell mode the default :code:`model_key` is :code:`external` (omit :code:`-k` or pass :code:`-k external`).
 
 Shutdown:
 
 .. code-block:: bash
 
-    enerzyme kill -u http://127.0.0.1:5000
+    enerzyme kill -u 127.0.0.1:5000
 
 Implementation
 --------------

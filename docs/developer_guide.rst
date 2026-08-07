@@ -23,7 +23,7 @@ Environment files
 Three dependency contexts matter:
 
 - **Runtime** — :code:`setup.py` :code:`install_requires` (NumPy, PyTorch, ASE, RDKit, Lightning, etc.)
-- **Development** — :code:`requirements-dev.yaml` (conda env for day-to-day coding)
+- **Development** — :code:`requirements.yaml` at the repo root (conda env for day-to-day coding; see :doc:`/getting_started/installation`)
 - **Documentation** — :code:`docs/requirements.yaml` (Sphinx, pydata theme, editable install for autodoc)
 
 For a first-time contributor setup, follow :doc:`/getting_started/installation`, then install in editable mode as above.

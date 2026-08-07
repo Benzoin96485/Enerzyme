@@ -42,11 +42,11 @@ Sending a request (client)
 
 .. code-block:: bash
 
-    enerzyme request -u http://127.0.0.1:5000 -f ORCA -i input.extinp.tmp -k FF01
+    enerzyme request -u 127.0.0.1:5000 -f ORCA -i input.extinp.tmp -k FF01
 
 Arguments:
 
-- :code:`-u` — server URL
+- :code:`-u` — server host:port (scheme is added by the client; do not pass :code:`http://`)
 - :code:`-f` — input format (:code:`ORCA` for external optimizer workflows)
 - :code:`-i` — input file path
 - :code:`-k` — model key (must match an active :code:`FF` ID in the model config)
@@ -58,7 +58,7 @@ Shutting down the server
 
 .. code-block:: bash
 
-    enerzyme kill -u http://127.0.0.1:5000
+    enerzyme kill -u 127.0.0.1:5000
 
 Sends a shutdown signal to the listening process.
 
