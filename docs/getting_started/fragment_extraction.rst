@@ -69,11 +69,14 @@ Prerequisites
 Example with skip prediction
 ----------------------------
 
-After a prior :code:`predict` or :code:`extract` run saved pickles:
+Reuse the **same** :code:`-o` as a prior simple-predict run so pickles under
+:code:`processed_dataset_<hash>/` are found (fragments are also written under that
+:code:`output_dir`):
 
 .. code-block:: bash
 
-    enerzyme extract -c extract.yaml -o extract_out/ -m model_dir/ -mc train.yaml -s
+    enerzyme predict -c extract.yaml -o work/ -m model_dir/ -mc train.yaml -s
+    enerzyme extract -c extract.yaml -o work/ -m model_dir/ -mc train.yaml -s
 
 Outputs
 -------
