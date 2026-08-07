@@ -34,7 +34,7 @@ Training artifacts
 After :code:`enerzyme train -c train.yaml -o out/`:
 
 - :code:`out/config.yaml` — resolved configuration (use as :code:`-mc` for predict/simulate)
-- :code:`out/FFxx/` or :code:`out/FFxx_suffix/` — model checkpoints (:code:`best/`, :code:`last/`)
+- :code:`out/FFxx-<arch>[-suffix]/` — model checkpoints (:code:`model_best.pth`, :code:`model_last.pth`)
 - :code:`out/processed_dataset_<hash>/` — preprocessed HDF5 cache
 - :code:`out/logs/` — training logs
 

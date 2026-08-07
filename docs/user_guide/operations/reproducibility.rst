@@ -19,7 +19,7 @@ Archive with each model
 Minimum artifact set:
 
 - :code:`config.yaml` from training output
-- :code:`best/` and optionally :code:`last/` checkpoints
+- :code:`model_best.pth` and optionally :code:`model_last.pth` (committee: :code:`model0_best.pth`, …)
 - Training :code:`train.yaml` (or Enerzymette-generated :code:`train.yaml` per iteration)
 - :code:`processed_dataset_<hash>/` or instructions to rebuild from raw pickle
 - Split index files if :code:`Splitter.save: true`

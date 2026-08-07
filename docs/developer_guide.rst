@@ -265,7 +265,7 @@ Avoid renaming without strong reason:
 
 - :code:`out/config.yaml`
 - :code:`out/processed_dataset_<hash>/`
-- :code:`out/FF<id>-<arch>[-suffix]/best/` and :code:`last/`
+- :code:`out/FF<id>-<arch>[-suffix]/` — :code:`model_best.pth` / :code:`model_last.pth` (committee: :code:`model0_best.pth`, …)
 - Simulation outputs such as :code:`md.traj.xyz`, :code:`plumed.traj.xyz`, :code:`neb.xyz`
 
 Testing strategy
