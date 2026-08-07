@@ -15,7 +15,7 @@ Arguments:
 - :code:`-c` / :code:`--config_path` — prediction config (test :code:`Datahub`, optional :code:`Metric`)
 - :code:`-m` / :code:`--model_dir` — directory containing trained checkpoints (from :code:`enerzyme train -o`)
 - :code:`-mc` / :code:`--model_config_path` — training config used to build the model (defaults to :code:`model_dir/config.yaml` if omitted)
-- :code:`-o` / :code:`--output_dir` — where CSV summaries and per-model pickles are written
+- :code:`-o` / :code:`--output_dir` — Datahub dump directory and location of the metrics CSV (prediction pickles land under each dataset's :code:`processed_dataset_<hash>/` there)
 
 Configuration
 -------------
@@ -68,8 +68,10 @@ Outputs
 
 Enerzyme loads all **active** models from the model config, runs prediction, and writes:
 
-- Per-model prediction pickles under each model subfolder in :code:`output_dir`
-- A summary CSV in :code:`output_dir` with aggregated metrics when :code:`Metric` is defined
+- Per-model prediction pickles named :code:`{FF_ID}-prediction.pkl` under each dataset's
+  :code:`processed_dataset_<hash>/` directory inside :code:`output_dir` (the Datahub
+  :code:`preload_path`; this is also where :code:`enerzyme extract -s` expects them)
+- A summary CSV :code:`metric.csv` in :code:`output_dir` with aggregated metrics when :code:`Metric` is defined
 
 .. note::
     Uncertainty fields require a committee-trained model or another UQ-capable setup. See :doc:`active_learning`.

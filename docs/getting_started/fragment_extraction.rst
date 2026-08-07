@@ -12,7 +12,7 @@ Basic command
 
 Arguments match :code:`predict` plus:
 
-- :code:`-s` / :code:`--skip_prediction` — skip inference if prediction pickles already exist in :code:`output_dir`
+- :code:`-s` / :code:`--skip_prediction` — skip inference if prediction pickles already exist under each dataset's :code:`processed_dataset_<hash>/` in :code:`output_dir`
 
 Workflow
 --------

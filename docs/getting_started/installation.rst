@@ -21,7 +21,7 @@ We recommend creating a conda environment from :code:`requirements.yaml`:
     conda env create -f requirements.yaml
     conda activate enerzyme
 
-The file installs core dependencies. For a pinned release for reproducibility of paper results, install from the :code:`requirements.yaml` in the corresponding subdirectory of :code:`examples/`. The environment may have a different name from :code:`enerzyme`.
+The file installs core dependencies. For a pinned release for reproducibility of paper results, install from the :code:`requirements.yaml` in the corresponding subdirectory of :code:`example/` (for example :code:`example/NNP4MTase/requirements.yaml`). The environment may have a different name from :code:`enerzyme`.
 
 Install torch-scatter
 ---------------------

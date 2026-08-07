@@ -10,7 +10,7 @@ Command
 
     enerzyme extract -c extract.yaml -o out/ -m model_dir/ -mc config.yaml [-s]
 
-:code:`-s` skips prediction if pickles already exist in :code:`output_dir`.
+:code:`-s` skips prediction if pickles already exist under each dataset's :code:`processed_dataset_<hash>/` in :code:`output_dir`.
 
 Configuration
 -------------
