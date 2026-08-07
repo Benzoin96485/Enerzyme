@@ -13,12 +13,17 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 from .datatype import is_atomic, is_rounded, is_int, register_data_type
 from .transform import (
-    UniformSplitQSTransform,
-    parse_Za,
-    Transform,
-    wants_uniform_qs_init,
     EnergyUnitConversionTransform,
     NegativeGradientTransform,
+    PySCFNAOQSPriorTransform,
+    Transform,
+    UniformSplitQSTransform,
+    XTBQSPriorTransform,
+    parse_Za,
+    wants_pyscf_nao_qs_prior,
+    wants_qs_delta,
+    wants_uniform_qs_init,
+    wants_xtb_qs_prior,
 )
 from ..utils import YamlHandler, logger
 
@@ -471,9 +476,25 @@ class SingleDataHub:
         self._populate_uniform_qs_init = wants_uniform_qs_init(
             global_transforms
         ) or wants_uniform_qs_init(preprocessings)
+        self._populate_xtb_qs_prior = wants_xtb_qs_prior(
+            global_transforms
+        ) or wants_xtb_qs_prior(preprocessings)
+        self._populate_pyscf_nao_qs_prior = wants_pyscf_nao_qs_prior(
+            global_transforms
+        ) or wants_pyscf_nao_qs_prior(preprocessings)
         if self._populate_uniform_qs_init:
             self.feature_types = dict(self.feature_types)
             for _k in UniformSplitQSTransform.POPULATED_KEYS:
+                self.feature_types.setdefault(_k, _k)
+            self.data_types = self.feature_types | self.target_types
+        if self._populate_xtb_qs_prior:
+            self.feature_types = dict(self.feature_types)
+            for _k in XTBQSPriorTransform.POPULATED_KEYS:
+                self.feature_types.setdefault(_k, _k)
+            self.data_types = self.feature_types | self.target_types
+        if self._populate_pyscf_nao_qs_prior:
+            self.feature_types = dict(self.feature_types)
+            for _k in PySCFNAOQSPriorTransform.POPULATED_KEYS:
                 self.feature_types.setdefault(_k, _k)
             self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
@@ -495,6 +516,35 @@ class SingleDataHub:
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
         logger.info(f"Preload path {self.preload_path} is created")
+        _pre = preprocessings or {}
+        _glb = global_transforms or {}
+        _any_uniform = wants_uniform_qs_init(_pre) or wants_uniform_qs_init(_glb)
+        _any_xtb = wants_xtb_qs_prior(_pre) or wants_xtb_qs_prior(_glb)
+        _any_pyscf = wants_pyscf_nao_qs_prior(_pre) or wants_pyscf_nao_qs_prior(_glb)
+        _prior_slots = int(_any_uniform) + int(_any_xtb) + int(_any_pyscf)
+        if _prior_slots > 1:
+            raise ValueError(
+                "DataHub: do not combine uniform_qs_init, xtb_qs_prior, and pyscf_nao_qs_prior "
+                "across preprocessings and/or global_transforms; all populate Q_init_a / S_init_a "
+                "and a second HDF5 transform pass would overwrite the first."
+            )
+        if wants_qs_delta(_pre) and not (
+            wants_uniform_qs_init(_pre) or wants_xtb_qs_prior(_pre) or wants_pyscf_nao_qs_prior(_pre)
+        ):
+            raise ValueError(
+                "DataHub preprocessings: qs_delta is enabled but no Q/S prior transform "
+                "(uniform_qs_init, xtb_qs_prior, or pyscf_nao_qs_prior) in preprocessings. "
+                "Priors must be created in the same preprocessing pass before deltas "
+                "(preprocessing runs before global_transforms)."
+            )
+        if wants_qs_delta(_glb) and not (
+            wants_uniform_qs_init(_glb) or wants_xtb_qs_prior(_glb) or wants_pyscf_nao_qs_prior(_glb)
+        ):
+            raise ValueError(
+                "DataHub global_transforms: qs_delta requires a Q/S prior transform "
+                "(uniform_qs_init, xtb_qs_prior, or pyscf_nao_qs_prior) in the same "
+                "global_transforms block so Q_init_a / S_init_a exist before delta targets."
+            )
         self.preprocessing = Transform(preprocessings, self.preload_path)
         self.global_transform = Transform(global_transforms, self.preload_path)
         self.preprocessings = preprocessings
@@ -765,7 +815,11 @@ class SingleDataHub:
             elif (
                 is_atomic(k)
                 and k in UniformSplitQSTransform.POPULATED_KEYS
-                and self._populate_uniform_qs_init
+                and (
+                    self._populate_uniform_qs_init
+                    or self._populate_xtb_qs_prior
+                    or self._populate_pyscf_nao_qs_prior
+                )
             ):
                 continue
             elif is_atomic(k):

@@ -61,7 +61,7 @@ autosummary_ignore_module_all = False
 
 # Custom autosummary templates
 autosummary_template_path = ['_templates/autosummary']
-autosummary_mock_imports = ["nequip", "xequinet"]
+autosummary_mock_imports = ["nequip", "xequinet", "pyscf", "gpu4pyscf", "tblite"]
 napoleon_google_docstring = False
 napoleon_use_param = False
 napoleon_use_ivar = True
