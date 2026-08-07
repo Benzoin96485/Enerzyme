@@ -52,6 +52,7 @@ Internal architectures
 | E2Former-V2    | via      | via    | yes    | via         | SO2/EAAS +       |
 |                | readout  | readout|        | readout     | sparse Triton    |
 |                |          |        |        |             | attention        |
++----------------+----------+--------+--------+-------------+------------------+
 | E2Former-LSR   | via      | via    | yes    | via         | Fragment         |
 |                | readout  | readout|        | readout     | bipartite        |
 |                |          |        |        |             | long-range MP    |

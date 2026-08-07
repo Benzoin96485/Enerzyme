@@ -12,7 +12,7 @@ Basic command
 
 Arguments match :code:`predict` plus:
 
-- :code:`-s` / :code:`--skip_prediction` — skip inference if prediction pickles already exist under each dataset's :code:`processed_dataset_<hash>/` in :code:`output_dir`
+- :code:`-s` / :code:`--skip_prediction` — skip inference and load existing **simple-predict** pickles under each dataset's :code:`processed_dataset_<hash>/` in :code:`output_dir` (from a prior :code:`enerzyme predict ... -s`; metric-mode pickles are not compatible)
 
 Workflow
 --------

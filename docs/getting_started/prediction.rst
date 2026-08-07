@@ -70,8 +70,13 @@ Enerzyme loads all **active** models from the model config, runs prediction, and
 
 - Per-model prediction pickles named :code:`{FF_ID}-prediction.pkl` under each dataset's
   :code:`processed_dataset_<hash>/` directory inside :code:`output_dir` (the Datahub
-  :code:`preload_path`; this is also where :code:`enerzyme extract -s` expects them)
+  :code:`preload_path`)
 - A summary CSV :code:`metric.csv` in :code:`output_dir` with aggregated metrics when :code:`Metric` is defined
+
+Default (metric) pickles store evaluation columns such as :code:`predict_E` / :code:`predict_Fa`.
+:code:`enerzyme extract -s` instead expects **simple-predict** pickles (from
+:code:`enerzyme predict ... -s`), which keep raw prediction fields like :code:`Ra` for
+fragment building. Without :code:`-s`, :code:`extract` reruns simple prediction itself.
 
 .. note::
     Uncertainty fields require a committee-trained model or another UQ-capable setup. See :doc:`active_learning`.

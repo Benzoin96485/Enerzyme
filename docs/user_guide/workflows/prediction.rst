@@ -55,7 +55,9 @@ Outputs
 -------
 
 - Per-active-model prediction pickles :code:`{FF_ID}-prediction.pkl` under each dataset's
-  :code:`processed_dataset_<hash>/` inside :code:`output_dir` (Datahub :code:`preload_path`)
+  :code:`processed_dataset_<hash>/` inside :code:`output_dir` (Datahub :code:`preload_path`).
+  Metric mode writes evaluation columns; :code:`--simple_predict` / :code:`-s` writes the
+  raw :code:`y_pred` fields needed by :code:`enerzyme extract -s`
 - Summary CSV :code:`metric.csv` in :code:`output_dir` when :code:`Metric` is defined
 - Uncertainty columns when model supports them and :code:`non_target_features` is set
 
