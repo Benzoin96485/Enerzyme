@@ -10,4 +10,6 @@ class FFCollect(object):
         self.out_dir = out_dir
         self.datahub = DataHub(dump_dir=out_dir, **config.Datahub)
         self.splitter = Splitter(**config.Trainer.Splitter)
-        self.splitter.split(self.datahub.data, preload_path=self.datahub.preload_path)
+        # Match FF / train: Splitter.get_split operates on feature FieldDatasets keyed by dataset name.
+        # (Splitter.split is a defaultdict attribute, not a method.)
+        self.splitter.get_split(self.datahub.features, preload_path=self.datahub.preload_path)

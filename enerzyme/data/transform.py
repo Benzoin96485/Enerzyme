@@ -239,6 +239,8 @@ class XTBQSPriorTransform(BaseTransform):
         out_s: str = "S_init_a",
         max_scf_iter: int = 1,
         atomic_qs_fn: Optional[Callable[..., Tuple[Any, Any]]] = None,
+        preload_path: Optional[str] = None,
+        checkpoint_every: Optional[int] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -252,6 +254,10 @@ class XTBQSPriorTransform(BaseTransform):
         self.out_q = out_q
         self.out_s = out_s
         self.max_scf_iter = int(max_scf_iter)
+        self.preload_path = preload_path
+        if checkpoint_every is None:
+            checkpoint_every = int(os.environ.get("XTB_QS_PRIOR_CKPT_EVERY", "32"))
+        self.checkpoint_every = max(0, int(checkpoint_every))
         if atomic_qs_fn is not None:
             self._atomic_qs_fn = atomic_qs_fn
         else:
@@ -261,6 +267,68 @@ class XTBQSPriorTransform(BaseTransform):
             check_xtbml_dependencies()
             self._atomic_qs_fn = atomic_Q_and_S_from_xtbml
         self.transform_type = "feature"
+
+    def _checkpoint_path(self) -> Optional[pathlib.Path]:
+        if not self.preload_path:
+            return None
+        return pathlib.Path(self.preload_path) / "xtb_qs_prior_ckpt.npz"
+
+    def _load_checkpoint(
+        self, n_frames: int, max_n: int
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        q_block = np.zeros((n_frames, max_n), dtype=np.float64)
+        s_block = np.zeros((n_frames, max_n), dtype=np.float64)
+        done = np.zeros(n_frames, dtype=bool)
+        ckpt_path = self._checkpoint_path()
+        if ckpt_path is None or not ckpt_path.is_file():
+            return q_block, s_block, done
+        try:
+            with np.load(ckpt_path) as ckpt:
+                if int(ckpt["n_frames"]) != n_frames or int(ckpt["max_n"]) != max_n:
+                    raise ValueError(
+                        f"shape mismatch n_frames/max_n "
+                        f"({ckpt['n_frames']},{ckpt['max_n']}) vs ({n_frames},{max_n})"
+                    )
+                if int(ckpt["max_scf_iter"]) != self.max_scf_iter:
+                    raise ValueError(
+                        f"max_scf_iter mismatch {ckpt['max_scf_iter']} vs {self.max_scf_iter}"
+                    )
+                q_block = np.asarray(ckpt["q_block"], dtype=np.float64)
+                s_block = np.asarray(ckpt["s_block"], dtype=np.float64)
+                done = np.asarray(ckpt["done"], dtype=bool)
+            logger.info(
+                "xtb_qs_prior: resumed checkpoint %s (%d / %d frames done)",
+                ckpt_path,
+                int(done.sum()),
+                n_frames,
+            )
+        except Exception as exc:
+            logger.warning("xtb_qs_prior: ignoring unusable checkpoint %s (%s)", ckpt_path, exc)
+            q_block = np.zeros((n_frames, max_n), dtype=np.float64)
+            s_block = np.zeros((n_frames, max_n), dtype=np.float64)
+            done = np.zeros(n_frames, dtype=bool)
+        return q_block, s_block, done
+
+    def _save_checkpoint(
+        self, q_block: np.ndarray, s_block: np.ndarray, done: np.ndarray
+    ) -> None:
+        ckpt_path = self._checkpoint_path()
+        if ckpt_path is None or self.checkpoint_every <= 0:
+            return
+        ckpt_path.parent.mkdir(parents=True, exist_ok=True)
+        # np.savez_compressed appends ".npz" unless the path already ends with it.
+        # Do NOT use "*.npz.tmp" (becomes "*.npz.tmp.npz" and os.replace fails).
+        tmp_path = ckpt_path.with_name(f"{ckpt_path.stem}.tmp.npz")
+        np.savez_compressed(
+            tmp_path,
+            q_block=q_block,
+            s_block=s_block,
+            done=done,
+            n_frames=np.int64(q_block.shape[0]),
+            max_n=np.int64(q_block.shape[1]),
+            max_scf_iter=np.int64(self.max_scf_iter),
+        )
+        os.replace(tmp_path, ckpt_path)
 
     def transform(self, new_input: Dict[str, Iterable]) -> None:
         from ase import Atoms
@@ -283,12 +351,15 @@ class XTBQSPriorTransform(BaseTransform):
         s_flat = np.asarray(new_input[self.s_key][:], dtype=np.float64).ravel()
         q_len = max(len(q_flat), 1)
         s_len = max(len(s_flat), 1)
-        q_block = np.zeros((n_frames, max_n), dtype=np.float64)
-        s_block = np.zeros((n_frames, max_n), dtype=np.float64)
+        q_block, s_block, done = self._load_checkpoint(n_frames, max_n)
         failures: List[int] = []
+        computed_since_ckpt = 0
         for i in tqdm(range(n_frames), desc="xtb_qs_prior"):
+            if done[i]:
+                continue
             n_atoms = int(n_arr[i % len(n_arr)])
             if n_atoms <= 0:
+                done[i] = True
                 continue
             # Za may be compressed to a single stoichiometry row.
             za_row = za[i % len(za)]
@@ -308,10 +379,18 @@ class XTBQSPriorTransform(BaseTransform):
                 qa, sa = _conserve_atomic_totals(qa, sa, n_atoms, q_tot, s_tot)
                 q_block[i, :n_atoms] = qa
                 s_block[i, :n_atoms] = sa
+                done[i] = True
+                computed_since_ckpt += 1
+                if (
+                    self.checkpoint_every > 0
+                    and computed_since_ckpt % self.checkpoint_every == 0
+                ):
+                    self._save_checkpoint(q_block, s_block, done)
             except Exception as e:
                 failures.append(i)
                 logger.error(f"xtb_qs_prior: frame {i} failed: {e}")
         if failures:
+            self._save_checkpoint(q_block, s_block, done)
             raise RuntimeError(
                 f"xtb_qs_prior: {len(failures)} / {n_frames} frames failed (indices {failures[:20]}"
                 f"{'...' if len(failures) > 20 else ''}); no silent fallback."
@@ -322,6 +401,9 @@ class XTBQSPriorTransform(BaseTransform):
             del new_input[self.out_s]
         new_input.create_dataset(self.out_q, data=q_block)
         new_input.create_dataset(self.out_s, data=s_block)
+        ckpt_path = self._checkpoint_path()
+        if ckpt_path is not None and ckpt_path.is_file():
+            ckpt_path.unlink()
         logger.info("xtb_qs_prior: wrote Q_init_a and S_init_a from xTB")
 
     def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
@@ -747,6 +829,8 @@ class Transform:
                     continue
                 kwargs = {k2: v2 for k2, v2 in v.items()} if isinstance(v, dict) else {}
                 kwargs.pop("enabled", None)
+                # Frame-level npz checkpoints live under the DataHub preload dir.
+                kwargs.setdefault("preload_path", preload_path)
                 self.xtb_qs_priors.append(XTBQSPriorTransform(**kwargs))
             if k == "pyscf_nao_qs_prior":
                 if v is False or v is None:

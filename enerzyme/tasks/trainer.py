@@ -475,7 +475,13 @@ class Trainer:
                     pin_memory=True,
                     num_workers=max(1, self.num_workers)
                 )
-                self.lightning_trainer.test(model, test_dataloader)
+                self.lightning_trainer.test(lightning_model, test_dataloader)
+                return lightning_model.test_result or {
+                    "y_pred": None,
+                    "y_truth": None,
+                    "metric_score": None,
+                }
+            return {"y_pred": None, "y_truth": None, "metric_score": None}
         else:
             model = model.to(device=self.device, dtype=self.dtype)
             if self.use_ema:

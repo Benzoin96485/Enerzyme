@@ -6,7 +6,7 @@ This page covers Enerzyme CLI utilities and `Enerzymette <https://github.com/Ben
 Bond order assignment (:code:`enerzyme bond`)
 ---------------------------------------------
 
-Guess bond orders for enzymatic cluster structures from a PDB file. Compatible with `QuantumPDB <https://github.com/davidkastner/quantumPDB>`_ cluster outputs.
+Guess bond orders for enzymatic cluster structures from a PDB file. Compatible with `QuantumPDB <https://github.com/hjkgrp/quantumPDB>`_ cluster outputs.
 
 .. code-block:: bash
 
