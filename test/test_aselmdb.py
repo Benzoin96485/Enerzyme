@@ -92,6 +92,78 @@ def test_aselmdb_dataset_loads_dipole_as_m2(tmp_path):
     np.testing.assert_allclose(ds["M2"][0], dipole)
 
 
+def _write_toy_aselmdb_initial_qs(
+    db_path,
+    *,
+    initial_charges,
+    initial_magmoms,
+    charge,
+    spin,
+    index=0,
+):
+    """ASE DB with populations only on ``initial_*`` (no calculator)."""
+    atoms = Atoms("H2", positions=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
+    atoms.set_initial_charges(np.asarray(initial_charges, dtype=float))
+    atoms.set_initial_magnetic_moments(np.asarray(initial_magmoms, dtype=float))
+    with connect(str(db_path)) as db:
+        db.write(atoms, data={"charge": charge, "spin": spin, "index": index}, index=index)
+
+
+def test_aselmdb_dataset_loads_qa_sa_from_initial_arrays(tmp_path):
+    """DBs without a calculator still expose Qa/Sa via ASE initial_* arrays."""
+    db_path = tmp_path / "initial_qs.aselmdb"
+    qa = np.array([0.4, -0.4])
+    sa = np.array([0.7, 0.3])
+    charge, spin = 0, 2  # S = spin - 1 = 1
+    _write_toy_aselmdb_initial_qs(
+        db_path,
+        initial_charges=qa,
+        initial_magmoms=sa,
+        charge=charge,
+        spin=spin,
+    )
+
+    ds = ASELMDBDataset(str(db_path), new_energy_unit="Ha")
+    assert "Qa" in ds and "Sa" in ds
+    assert "Q" in ds and "S" in ds
+    assert "Qa" in ds.unique_properties_from_calculator
+    assert "Sa" in ds.unique_properties_from_calculator
+    np.testing.assert_allclose(ds["Qa"][0], qa)
+    np.testing.assert_allclose(ds["Sa"][0], sa)
+    assert ds["Q"][0] == charge
+    assert ds["S"][0] == spin - 1
+    assert float(np.sum(ds["Qa"][0])) == pytest.approx(ds["Q"][0], abs=1e-6)
+    assert float(np.sum(ds["Sa"][0])) == pytest.approx(ds["S"][0], abs=1e-6)
+
+
+def test_aselmdb_calculator_qs_wins_over_initial_arrays(tmp_path):
+    """Calculator charges/magmoms take priority over ASE initial_* arrays."""
+    db_path = tmp_path / "calc_over_initial.aselmdb"
+    initial_qa = np.array([0.9, -0.9])
+    initial_sa = np.array([2.0, 0.0])
+    calc_qa = np.array([0.25, -0.25])
+    calc_sa = np.array([0.6, 0.4])
+    atoms = Atoms("H2", positions=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
+    atoms.set_initial_charges(initial_qa)
+    atoms.set_initial_magnetic_moments(initial_sa)
+    atoms.calc = SinglePointCalculator(
+        atoms,
+        energy=-1.0,
+        forces=np.array([[0.1, 0.0, 0.0], [-0.1, 0.0, 0.0]]),
+        charges=calc_qa,
+        magmoms=calc_sa,
+    )
+    with connect(str(db_path)) as db:
+        db.write(atoms, data={"charge": 0, "spin": 2, "index": 0}, index=0)
+
+    ds = ASELMDBDataset(str(db_path), new_energy_unit="Ha")
+    assert "Qa" in ds and "Sa" in ds
+    np.testing.assert_allclose(ds["Qa"][0], calc_qa)
+    np.testing.assert_allclose(ds["Sa"][0], calc_sa)
+    assert not np.allclose(ds["Qa"][0], initial_qa)
+    assert not np.allclose(ds["Sa"][0], initial_sa)
+
+
 def test_aselmdb_declared_m2_when_first_row_lacks_dipole(tmp_path):
     """Declared / schema registration must not depend on the first row alone."""
     from enerzyme.data.datahub import ASELMDB_METADATA_PROPERTIES_KEY

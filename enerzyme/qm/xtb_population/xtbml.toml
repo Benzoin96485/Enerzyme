@@ -1,0 +1,11 @@
+# Minimal xTB-ML (xtbml) post-processing: density / Mulliken-based descriptors including q_A.
+# Schema matches upstream: https://github.com/tblite/tblite/blob/main/test/cli/test/xtbml.toml
+# Used as fallback when ``Calculator.add("xtbml")`` is unavailable but the library supports TOML.
+
+[post-processing.xtbml]
+geometry = false
+density = true
+orbital = false
+energy = false
+convolution = false
+tensorial-output = false

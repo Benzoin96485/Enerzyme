@@ -38,6 +38,20 @@ Datahub:
         # uniform_qs_init: true                # optional: Q_init_a=Q/N, S_init_a=S/N (flow init).
         #   Prefer Datahub.global_transforms, or per-dataset transforms (→ preprocessings).
         #   Requires Q (and S for spin) in features.
+        # xtb_qs_prior:                        # optional: GFN2-xTB + xtbml prior into Q_init_a / S_init_a
+        #   enabled: true                      #   (max_scf_iter default 1; requires tblite with xtbml)
+        #   max_scf_iter: 1
+        # pyscf_nao_qs_prior:                  # optional: GPU4PySCF/PySCF NAO prior; xc and basis required
+        #   enabled: true
+        #   xc: wb97m-v
+        #   basis: def2-svp
+        #   max_scf_iter: 1
+        #   conv_tol: 1.0e-6
+        #   density_fit: true
+        #   use_gpu: true
+        # qs_delta: true                       # optional: overwrite Qa/Sa with residual vs Q_init_a/S_init_a
+        #   # Enable only one of uniform_qs_init / xtb_qs_prior / pyscf_nao_qs_prior with qs_delta
+        #   # in the same preprocessings or global_transforms block.
 Modelhub:
   internal_FFs:                             # force fields built in enerzyme
     FF01:                                   # force field ID

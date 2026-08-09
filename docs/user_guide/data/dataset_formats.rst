@@ -63,11 +63,17 @@ a fallback for legacy databases without schema.
 TeraChem to pickle
 ------------------
 
-:code:`scripts/picklizer.py` groups TeraChem outputs:
+:code:`scripts/picklizer.py` groups TeraChem outputs. From the repository root, put
+:code:`scripts/` on :code:`sys.path` (it is not an installable package):
 
 .. code-block:: python
 
-    from scripts.picklizer import picklizer
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from picklizer import picklizer
+
     picklizer(file_lists, output="dataset.pkl", flavor="terachem", provide_Q=-1)
 
 Each :code:`file_lists` entry maps keys :code:`coord`, :code:`grad`, :code:`chrg`, :code:`dipole` to file paths. Gradients are converted from Ha/Bohr to Ha/Angstrom in the parser.

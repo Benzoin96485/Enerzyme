@@ -34,7 +34,7 @@ Training artifacts
 After :code:`enerzyme train -c train.yaml -o out/`:
 
 - :code:`out/config.yaml` — resolved configuration (use as :code:`-mc` for predict/simulate)
-- :code:`out/FFxx/` or :code:`out/FFxx_suffix/` — model checkpoints (:code:`best/`, :code:`last/`)
+- :code:`out/FFxx-<arch>[-suffix]/` — model checkpoints (:code:`model_best.pth`, :code:`model_last.pth`)
 - :code:`out/processed_dataset_<hash>/` — preprocessed HDF5 cache
 - :code:`out/logs/` — training logs
 
@@ -60,7 +60,11 @@ Override rules at inference
 Legacy vs current schema
 ------------------------
 
-Older configs use a flat :code:`Datahub` with :code:`compression:`; current configs use :code:`compressed:` and optional :code:`datasets:` for multi-dataset training. Both layouts are still accepted; new projects should follow :code:`enerzyme/config/train.yaml`.
+Older configs sometimes used a flat :code:`Datahub` with the legacy key :code:`compression:`.
+Current configs use :code:`compressed:` and optional :code:`datasets:` for multi-dataset training.
+Only :code:`compressed:` is read by :code:`SingleDataHub`; a bare :code:`compression:` key is
+ignored (and silently leaves the default :code:`compressed: true`). New projects should follow
+:code:`enerzyme/config/train.yaml`.
 
 Splitter configs similarly support:
 

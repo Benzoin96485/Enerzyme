@@ -48,10 +48,11 @@ Key fields
     Only active models are trained, loaded for predict/simulate, or served by :code:`listen`.
 
 :code:`suffix`
-    Appended to checkpoint directory names (:code:`FF02_19/`).
+    Appended to checkpoint directory names (e.g. :code:`FF02-SpookyNet-19/`).
 
 :code:`pretrain_path`
-    Directory with :code:`best/` or :code:`last/` weights to initialize training.
+    Previous run directory (or an explicit :code:`.pth` file) whose
+    :code:`model*_best.pth` / :code:`model*_last.pth` weights initialize training.
 
 :code:`build_params`
     Shared hyperparameters passed to all layers unless overridden in :code:`params`.
@@ -71,12 +72,13 @@ After training with :code:`-o out/`:
 
     out/
     ├── config.yaml
-    ├── FF02_19/
-    │   ├── best/model_best.pth
-    │   └── last/model_last.pth
+    ├── FF02-SpookyNet-19/
+    │   ├── model_best.pth
+    │   └── model_last.pth
     └── logs/
 
-For committees, expect :code:`model0`, :code:`model1`, ... under :code:`best/` and :code:`last/`.
+For committees, expect :code:`model0_best.pth`, :code:`model0_last.pth`, :code:`model1_best.pth`, …
+in the same model directory (no :code:`best/` / :code:`last/` subfolders).
 
 Multiple models
 ---------------

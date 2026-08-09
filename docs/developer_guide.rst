@@ -23,7 +23,7 @@ Environment files
 Three dependency contexts matter:
 
 - **Runtime** — :code:`setup.py` :code:`install_requires` (NumPy, PyTorch, ASE, RDKit, Lightning, etc.)
-- **Development** — :code:`requirements-dev.yaml` (conda env for day-to-day coding)
+- **Development** — :code:`requirements.yaml` at the repo root (conda env for day-to-day coding; see :doc:`/getting_started/installation`)
 - **Documentation** — :code:`docs/requirements.yaml` (Sphinx, pydata theme, editable install for autodoc)
 
 For a first-time contributor setup, follow :doc:`/getting_started/installation`, then install in editable mode as above.
@@ -265,7 +265,7 @@ Avoid renaming without strong reason:
 
 - :code:`out/config.yaml`
 - :code:`out/processed_dataset_<hash>/`
-- :code:`out/FF<id>-<arch>[-suffix]/best/` and :code:`last/`
+- :code:`out/FF<id>-<arch>[-suffix]/` — :code:`model_best.pth` / :code:`model_last.pth` (committee: :code:`model0_best.pth`, …)
 - Simulation outputs such as :code:`md.traj.xyz`, :code:`plumed.traj.xyz`, :code:`neb.xyz`
 
 Testing strategy
@@ -421,7 +421,7 @@ When to split into sub-pages
 Keep this single page while the contributor surface is still evolving. Split into :code:`docs/developer_guide/` when any section grows past ~200 lines or needs its own deep dive (for example, a dedicated “Adding a new architecture” cookbook). The entry :code:`docs/developer_guide.rst` would then become a short overview plus layered toctree, mirroring :doc:`/user_guide`.
 
 External UMA (:code:`uma_qs`)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Register in :code:`get_ff_core` like other architectures. Keep fairchem imports inside :code:`enerzyme/models/esen/` so non-UMA installs do not import it until selected. Prefer shared :code:`layers/readout.py` and :code:`layers/spin.py` for Q/S heads. Package name :code:`esen/` is historical (UMA / eSCN-MD lineage); it is **not** the 2023 paper eSCN.
 
@@ -443,11 +443,33 @@ Liao et al. (2026, arXiv:2604.09130) lives under :code:`enerzyme/models/equiform
 E2Former (:code:`e2former`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- :code:`test_e2former_parity_ops.py` — E2Former Wigner-6j / SO2 TP numerical parity vs vendored UBio-MolFM fixtures
-- :code:`test_e2former_v2_core.py` — E2Former-V2 SO2 attention shapes, build_model E/F, SO(3) / translation, YAML smoke
-- :code:`test_e2former_so2_tp.py` — EAAS / SO2 TP shapes, rotation equivariance, Triton PyTorch fallback
-- :code:`test_e2former_triton_parity.py` — QK index convention / CPU fallback guards; CUDA Triton vs PyTorch parity (skipped without GPU)
-- :code:`test_e2former_lsr_core.py` — E2Former-LSR shapes, kmeans/precomputed fragments, bipartite graph batch isolation, build_model E/F, SO(3) / translation, YAML smoke
+Li et al. (NeurIPS 2025 Spotlight, arXiv:2501.19216) lives under :code:`enerzyme/models/e2former/`,
+adapted from `liyy2/E2Former <https://github.com/liyy2/E2Former>`_ (MIT). Register via
+:code:`get_ff_core("e2former")`. The Core uses Wigner-6j factorization for equivariant
+attention, reuses shared :code:`so3` RMSNorm / :code:`SO3Linear` and EquiformerV2's S²
+:code:`FeedForwardNetwork`, and emits :code:`atom_feature` / :code:`atom_sphere_feature`.
+Compose :code:`SimpleReadout` + :code:`EnergyReduce` / :code:`Force` outside the Core.
+Requires equal channel multiplicity across degrees. Example:
+:code:`e2former_layers_example.yaml`. Tests: :code:`test/test_e2former_core.py`,
+:code:`test/test_e2former_wigner6j.py`, :code:`test/test_e2former_parity_ops.py`.
+
+E2Former-V2 (:code:`e2former_v2`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Huang et al. (2026, arXiv:2601.16622) **reuses** :code:`E2FormerCore` with defaults in
+:code:`e2former/v2.py` (:code:`attn_type: so2-first-order`, optional Triton sparse QK).
+Same latent contract and post-core stack as V1. Example:
+:code:`e2former_v2_layers_example.yaml`. Tests: :code:`test/test_e2former_v2_core.py`,
+:code:`test/test_e2former_so2_tp.py`, :code:`test/test_e2former_triton_parity.py`.
+
+E2Former-LSR (:code:`e2former_lsr`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Wang et al. (arXiv:2601.03774) adds atom–fragment bipartite long-range attention on top of
+the short-range E2Former package (:code:`cutoff_lr`, :code:`long_layers`, late fusion).
+Fragmentation defaults to online k-means; :code:`fragment_mode: precomputed` uses Datahub
+:code:`cluster_ids`. Still emits :code:`atom_feature` / :code:`atom_sphere_feature`.
+Example: :code:`e2former_lsr_layers_example.yaml`. Tests: :code:`test/test_e2former_lsr_core.py`.
 
 DPA4 (:code:`dpa4`)
 ^^^^^^^^^^^^^^^^^^^^^
@@ -465,17 +487,17 @@ TECE (:code:`tece`)
 Xu et al. (arXiv:2607.10664) lives under :code:`enerzyme/models/tece/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ v0.2.0 (MIT). Register via :code:`get_ff_core("tece")`. The Core seeds equivariant features from scalar embeddings, then stacks uvSO2 interactions with Edge Cluster Expansion (:code:`ComplexProductBasis`) and Radial Rotary Attention, plus node-side :code:`CgtpACE` reused from TACE. Shared SO(2) primitives (:code:`WignerD` recursive/direct, :code:`uvSO2Linear`, :code:`SO2Gate`, :code:`LayoutTransform`) live in :code:`enerzyme/models/so3/`. Requires :code:`Lmax == lmax`. Do not conflate RRA with EFA Euclidean RoPE. Emit :code:`atom_feature` for :code:`SimpleReadout`. Example: :code:`tece_layers_example.yaml`. Tests: :code:`test/test_tece_*.py`. Enerzymette: :code:`architecture: tece` + resolved :code:`config.yaml`.
 
 So3krates (:code:`so3krates`)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Frank et al. (NeurIPS 2022) lives under :code:`enerzyme/models/so3krates/` with shared :code:`RealSphericalHarmonics` and :code:`L0Contraction` (:code:`cgmatrix.npz`) in :code:`enerzyme/models/so3/`. The Core emits invariant :code:`atom_feature` and SPHC :code:`atom_sphere_feature` (``[N, m_tot]``, not eSCN/EquiformerV2 channel layout). Compose :code:`SimpleReadout` + :code:`EnergyReduce` / :code:`Force` (and optional ZBL / electrostatics / dispersion) outside the Core. Offline parity vs So3krates-torch fixtures: :code:`test/test_so3krates_parity_ops.py`. Enerzymette only needs :code:`architecture: so3krates` plus a resolved :code:`config.yaml`.
 
 SO3LR (:code:`so3lr`)
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
 
 Kabylda et al. (JACS 2025) is registered as :code:`architecture: so3lr` but **reuses** :code:`So3kratesCore`. Defaults and layers live in :code:`enerzyme/models/so3krates/so3lr.py`. Physics uses shared modules with SO3LR options: :code:`ZBLRepulsionEnergy` (:code:`switch_off`), :code:`ElectrostaticEnergy` (:code:`flavor: SO3LR`), :code:`TSQDODispersionEnergy` under :code:`enerzyme/models/layers/dispersion/`, plus :code:`SimpleReadout(Qa)` / :code:`AtomicAffine` / :code:`HirshfeldReadout` / :code:`ChargeSpinEmbedding`. Grimme D3/D4 remain for PhysNet/SpookyNet stacks. Cutoff alias :code:`phys` → polynomial. Tests: :code:`test/test_so3lr.py`. Enerzymette: :code:`architecture: so3lr` + resolved :code:`config.yaml` (see :code:`enerzyme/config/so3lr_layers_example.yaml`).
 
 EFA (:code:`efa` / :code:`so3lr_efa`) and SpookyNet :code:`use_efa`
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Frank et al. (arXiv:2412.08541) — shared package :code:`enerzyme/models/efa/` (ERoPE + Lebedev linear attention). Lebedev point tables live in :code:`enerzyme/models/so3/data/lebedev_grids.npz` (e3x Apache-2.0) and are imported from :code:`enerzyme.models.so3.lebedev` (also re-exported on the :code:`efa` package).
 
@@ -485,11 +507,11 @@ Frank et al. (arXiv:2412.08541) — shared package :code:`enerzyme/models/efa/` 
 * Tests: :code:`test/test_efa.py`. Examples: :code:`efa_layers_example.yaml`, :code:`so3lr_efa_layers_example.yaml`.
 
 AllScAIP (:code:`AllScAIP`)
-^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Enerzyme's AllScAIP is an **experimental, modified (魔改)** attention Core under :code:`enerzyme/models/allscaip/`. Do **not** treat it as the recommended production model; document regressions and keep example FF entries inactive unless deliberately testing. The Core returns :code:`atom_feature` only — YAML stacks must include :code:`SimpleReadout` / NSE heads (see :code:`DEFAULT_LAYER_PARAMS`).
 
 Flow matching (:code:`uma_flow_qs`)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Requires optional :code:`torchdiffeq` (:code:`pip install -e ".[flow]"`) for ODE integration in :code:`enerzyme/tasks/generator_ode.py`. Keep ODE utilities in tasks/, not inside Core modules.

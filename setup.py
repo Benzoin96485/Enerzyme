@@ -11,6 +11,9 @@ setup(
     extras_require={
         # ODE integration for architecture uma_flow_qs / Generator predict
         "flow": ["torchdiffeq"],
+        # Optional Q/S prior backends for Datahub transforms (runtime-checked in deps.py)
+        "xtb": ["tblite>=0.5"],
+        "pyscf_nao": ["pyscf"],
     },
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
     packages=find_packages(include=["enerzyme", "enerzyme.*"]),
@@ -22,6 +25,7 @@ setup(
         "models/so3/cgmatrix.npz",
         "models/so3/data/lebedev_grids.npz",
         "models/efa/NOTICE",
+        "qm/xtb_population/xtbml.toml",
     ]},
     auth='Benzoin96485',
     author_email='luowl7@mit.edu',

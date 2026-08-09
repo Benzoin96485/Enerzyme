@@ -241,6 +241,6 @@ After training, the output directory typically contains:
 - :code:`config.yaml` — resolved configuration (**keep this for predict/simulate**)
 - :code:`processed_dataset_<hash>/` — preprocessed HDF5 cache
 - :code:`logs/` — training logs, metrics, early-stopping traces
-- :code:`FF01/` (or your model ID) — :code:`best/` and :code:`last/` checkpoints
+- :code:`FF01-<arch>/` (or your model ID + architecture) — :code:`model_best.pth` and :code:`model_last.pth`
 
 Use :code:`enerzyme/config/train.yaml` when you need multi-dataset Datahub, external models, EMA, Lightning multi-GPU, or pretraining paths.

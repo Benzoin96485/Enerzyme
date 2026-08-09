@@ -1,6 +1,8 @@
 import os, pathlib
 from abc import ABC, abstractmethod
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from functools import partial
+from multiprocessing import get_context
 import joblib
 import pandas as pd
 import numpy as np
@@ -138,6 +140,529 @@ def wants_uniform_qs_init(transform_args: Optional[Dict]) -> bool:
     return True
 
 
+
+def wants_xtb_qs_prior(transform_args: Optional[Dict]) -> bool:
+    """True when ``xtb_qs_prior`` is enabled in a transforms dict."""
+    if not transform_args or "xtb_qs_prior" not in transform_args:
+        return False
+    v = transform_args["xtb_qs_prior"]
+    if v is False or v is None:
+        return False
+    if isinstance(v, dict) and v.get("enabled") is False:
+        return False
+    return True
+
+
+def wants_pyscf_nao_qs_prior(transform_args: Optional[Dict]) -> bool:
+    """True when ``pyscf_nao_qs_prior`` is enabled in a transforms dict."""
+    if not transform_args or "pyscf_nao_qs_prior" not in transform_args:
+        return False
+    v = transform_args["pyscf_nao_qs_prior"]
+    if v is False or v is None:
+        return False
+    if isinstance(v, dict) and v.get("enabled") is False:
+        return False
+    return True
+
+
+def wants_qs_delta(transform_args: Optional[Dict]) -> bool:
+    """True when ``qs_delta`` is enabled in a transforms dict."""
+    if not transform_args or "qs_delta" not in transform_args:
+        return False
+    v = transform_args["qs_delta"]
+    if v is False or v is None:
+        return False
+    if isinstance(v, dict) and v.get("enabled") is False:
+        return False
+    return True
+
+
+def _conserve_atomic_totals(
+    q_atom: np.ndarray,
+    s_atom: np.ndarray,
+    n_atoms: int,
+    q_tot: float,
+    s_tot: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    if n_atoms <= 0:
+        return q_atom, s_atom
+    q = np.asarray(q_atom[:n_atoms], dtype=np.float64).copy()
+    s = np.asarray(s_atom[:n_atoms], dtype=np.float64).copy()
+    dq = float(q_tot) - float(q.sum())
+    ds = float(s_tot) - float(s.sum())
+    inv = 1.0 / n_atoms
+    q += dq * inv
+    s += ds * inv
+    return q, s
+
+
+def _multiplicity_from_enerzyme_S(s_val: float) -> int:
+    """Dataset ``S`` is (multiplicity - 1); ASE/tblite use multiplicity in ``atoms.info['spin']``."""
+    return max(1, int(round(float(s_val) + 1.0)))
+
+
+def _pyscf_nao_qs_prior_worker(
+    task: Tuple[int, np.ndarray, np.ndarray, int, float, float, int, Callable[..., Tuple[Any, Any]]]
+) -> Tuple[int, Optional[np.ndarray], Optional[np.ndarray], Optional[str]]:
+    """Run one PySCF NAO prior task without touching parent HDF5 handles."""
+    from ase import Atoms
+
+    i, z_i, r_i, n_atoms, q_tot, s_tot, max_scf_iter, atomic_qs_fn = task
+    if n_atoms <= 0:
+        return i, np.zeros(0, dtype=np.float64), np.zeros(0, dtype=np.float64), None
+    try:
+        atoms = Atoms(numbers=np.asarray(z_i, dtype=int), positions=np.asarray(r_i, dtype=float))
+        atoms.info["charge"] = float(q_tot)
+        atoms.info["spin"] = _multiplicity_from_enerzyme_S(float(s_tot))
+        qa, sa = atomic_qs_fn(atoms, int(max_scf_iter))
+        qa = np.asarray(qa, dtype=np.float64).reshape(-1)
+        sa = np.asarray(sa, dtype=np.float64).reshape(-1)
+        if qa.size != n_atoms or sa.size != n_atoms:
+            raise ValueError(f"expected length {n_atoms}, got Qa {qa.size}, Sa {sa.size}")
+        qa, sa = _conserve_atomic_totals(qa, sa, n_atoms, q_tot, s_tot)
+        return i, qa, sa, None
+    except Exception as exc:
+        return i, None, None, repr(exc)
+
+
+class XTBQSPriorTransform(BaseTransform):
+    """xTB Mulliken-style per-atom Q/S prior into ``Q_init_a`` / ``S_init_a`` (HDF5 cache only)."""
+
+    POPULATED_KEYS = frozenset({"Q_init_a", "S_init_a"})
+
+    def __init__(
+        self,
+        q_key: str = "Q",
+        s_key: str = "S",
+        n_key: str = "N",
+        out_q: str = "Q_init_a",
+        out_s: str = "S_init_a",
+        max_scf_iter: int = 1,
+        atomic_qs_fn: Optional[Callable[..., Tuple[Any, Any]]] = None,
+        preload_path: Optional[str] = None,
+        checkpoint_every: Optional[int] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        kwargs.pop("module_path", None)
+        if kwargs:
+            logger.warning("XTBQSPriorTransform: ignoring unrecognized keys %s", sorted(kwargs))
+        super().__init__(major_key=out_q)
+        self.q_key = q_key
+        self.s_key = s_key
+        self.n_key = n_key
+        self.out_q = out_q
+        self.out_s = out_s
+        self.max_scf_iter = int(max_scf_iter)
+        self.preload_path = preload_path
+        if checkpoint_every is None:
+            checkpoint_every = int(os.environ.get("XTB_QS_PRIOR_CKPT_EVERY", "32"))
+        self.checkpoint_every = max(0, int(checkpoint_every))
+        if atomic_qs_fn is not None:
+            self._atomic_qs_fn = atomic_qs_fn
+        else:
+            from ..qm.xtb_population.deps import check_xtbml_dependencies
+            from ..qm.xtb_population.atomic_populations import atomic_Q_and_S_from_xtbml
+
+            check_xtbml_dependencies()
+            self._atomic_qs_fn = atomic_Q_and_S_from_xtbml
+        self.transform_type = "feature"
+
+    def _checkpoint_path(self) -> Optional[pathlib.Path]:
+        if not self.preload_path:
+            return None
+        return pathlib.Path(self.preload_path) / "xtb_qs_prior_ckpt.npz"
+
+    def _load_checkpoint(
+        self, n_frames: int, max_n: int
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        q_block = np.zeros((n_frames, max_n), dtype=np.float64)
+        s_block = np.zeros((n_frames, max_n), dtype=np.float64)
+        done = np.zeros(n_frames, dtype=bool)
+        ckpt_path = self._checkpoint_path()
+        if ckpt_path is None or not ckpt_path.is_file():
+            return q_block, s_block, done
+        try:
+            with np.load(ckpt_path) as ckpt:
+                if int(ckpt["n_frames"]) != n_frames or int(ckpt["max_n"]) != max_n:
+                    raise ValueError(
+                        f"shape mismatch n_frames/max_n "
+                        f"({ckpt['n_frames']},{ckpt['max_n']}) vs ({n_frames},{max_n})"
+                    )
+                if int(ckpt["max_scf_iter"]) != self.max_scf_iter:
+                    raise ValueError(
+                        f"max_scf_iter mismatch {ckpt['max_scf_iter']} vs {self.max_scf_iter}"
+                    )
+                q_block = np.asarray(ckpt["q_block"], dtype=np.float64)
+                s_block = np.asarray(ckpt["s_block"], dtype=np.float64)
+                done = np.asarray(ckpt["done"], dtype=bool)
+            logger.info(
+                "xtb_qs_prior: resumed checkpoint %s (%d / %d frames done)",
+                ckpt_path,
+                int(done.sum()),
+                n_frames,
+            )
+        except Exception as exc:
+            logger.warning("xtb_qs_prior: ignoring unusable checkpoint %s (%s)", ckpt_path, exc)
+            q_block = np.zeros((n_frames, max_n), dtype=np.float64)
+            s_block = np.zeros((n_frames, max_n), dtype=np.float64)
+            done = np.zeros(n_frames, dtype=bool)
+        return q_block, s_block, done
+
+    def _save_checkpoint(
+        self, q_block: np.ndarray, s_block: np.ndarray, done: np.ndarray
+    ) -> None:
+        ckpt_path = self._checkpoint_path()
+        if ckpt_path is None or self.checkpoint_every <= 0:
+            return
+        ckpt_path.parent.mkdir(parents=True, exist_ok=True)
+        # np.savez_compressed appends ".npz" unless the path already ends with it.
+        # Do NOT use "*.npz.tmp" (becomes "*.npz.tmp.npz" and os.replace fails).
+        tmp_path = ckpt_path.with_name(f"{ckpt_path.stem}.tmp.npz")
+        np.savez_compressed(
+            tmp_path,
+            q_block=q_block,
+            s_block=s_block,
+            done=done,
+            n_frames=np.int64(q_block.shape[0]),
+            max_n=np.int64(q_block.shape[1]),
+            max_scf_iter=np.int64(self.max_scf_iter),
+        )
+        os.replace(tmp_path, ckpt_path)
+
+    def transform(self, new_input: Dict[str, Iterable]) -> None:
+        from ase import Atoms
+
+        required = ("Ra", "Za", self.n_key, self.q_key, self.s_key)
+        for rk in required:
+            if rk not in new_input:
+                raise KeyError(f"xtb_qs_prior: missing required dataset '{rk}'")
+        za = np.asarray(new_input["Za"])
+        # Compressed datasets may store a single stoichiometry row (1-D or 2-D with one frame).
+        if za.ndim == 1:
+            za = za.reshape(1, -1)
+        elif za.ndim != 2:
+            raise ValueError(f"xtb_qs_prior: Za must be 1-D or 2-D, got shape {za.shape}")
+        # Ra is never compressed; N/Q/S may be shared across frames when compressed.
+        n_frames = len(new_input["Ra"])
+        max_n = int(za.shape[1])
+        n_arr = np.asarray(new_input[self.n_key][:], dtype=np.int64).ravel()
+        q_flat = np.asarray(new_input[self.q_key][:], dtype=np.float64).ravel()
+        s_flat = np.asarray(new_input[self.s_key][:], dtype=np.float64).ravel()
+        q_len = max(len(q_flat), 1)
+        s_len = max(len(s_flat), 1)
+        q_block, s_block, done = self._load_checkpoint(n_frames, max_n)
+        failures: List[int] = []
+        computed_since_ckpt = 0
+        for i in tqdm(range(n_frames), desc="xtb_qs_prior"):
+            if done[i]:
+                continue
+            n_atoms = int(n_arr[i % len(n_arr)])
+            if n_atoms <= 0:
+                done[i] = True
+                continue
+            # Za may be compressed to a single stoichiometry row.
+            za_row = za[i % len(za)]
+            z_i = np.asarray(za_row[:n_atoms], dtype=int)
+            r_i = np.asarray(new_input["Ra"][i, :n_atoms], dtype=float)
+            q_tot = float(q_flat[i % q_len])
+            s_tot = float(s_flat[i % s_len])
+            atoms = Atoms(numbers=z_i, positions=r_i)
+            atoms.info["charge"] = q_tot
+            atoms.info["spin"] = _multiplicity_from_enerzyme_S(s_tot)
+            try:
+                qa, sa = self._atomic_qs_fn(atoms, self.max_scf_iter)
+                qa = np.asarray(qa, dtype=np.float64).reshape(-1)
+                sa = np.asarray(sa, dtype=np.float64).reshape(-1)
+                if qa.size != n_atoms or sa.size != n_atoms:
+                    raise ValueError(f"expected length {n_atoms}, got Qa {qa.size}, Sa {sa.size}")
+                qa, sa = _conserve_atomic_totals(qa, sa, n_atoms, q_tot, s_tot)
+                q_block[i, :n_atoms] = qa
+                s_block[i, :n_atoms] = sa
+                done[i] = True
+                computed_since_ckpt += 1
+                if (
+                    self.checkpoint_every > 0
+                    and computed_since_ckpt % self.checkpoint_every == 0
+                ):
+                    self._save_checkpoint(q_block, s_block, done)
+            except Exception as e:
+                failures.append(i)
+                logger.error(f"xtb_qs_prior: frame {i} failed: {e}")
+        if failures:
+            self._save_checkpoint(q_block, s_block, done)
+            raise RuntimeError(
+                f"xtb_qs_prior: {len(failures)} / {n_frames} frames failed (indices {failures[:20]}"
+                f"{'...' if len(failures) > 20 else ''}); no silent fallback."
+            )
+        if self.out_q in new_input:
+            del new_input[self.out_q]
+        if self.out_s in new_input:
+            del new_input[self.out_s]
+        new_input.create_dataset(self.out_q, data=q_block)
+        new_input.create_dataset(self.out_s, data=s_block)
+        ckpt_path = self._checkpoint_path()
+        if ckpt_path is not None and ckpt_path.is_file():
+            ckpt_path.unlink()
+        logger.info("xtb_qs_prior: wrote Q_init_a and S_init_a from xTB")
+
+    def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
+        pass
+
+
+class PySCFNAOQSPriorTransform(BaseTransform):
+    """GPU4PySCF/PySCF NAO per-atom Q/S prior into ``Q_init_a`` / ``S_init_a`` (HDF5 cache only).
+
+    DFT settings are taken from YAML / constructor kwargs (no built-in xc or basis).
+    Required when not injecting ``atomic_qs_fn``: ``xc``, ``basis``.
+    Optional: ``max_scf_iter``, ``conv_tol``, ``density_fit``, ``use_gpu``, ``verbose``, ``n_processes``.
+    """
+
+    POPULATED_KEYS = frozenset({"Q_init_a", "S_init_a"})
+
+    def __init__(
+        self,
+        q_key: str = "Q",
+        s_key: str = "S",
+        n_key: str = "N",
+        out_q: str = "Q_init_a",
+        out_s: str = "S_init_a",
+        max_scf_iter: int = 1,
+        xc: Optional[str] = None,
+        basis: Optional[str] = None,
+        conv_tol: float = 1e-6,
+        density_fit: bool = True,
+        use_gpu: bool = True,
+        verbose: int = 0,
+        n_processes: int = 1,
+        atomic_qs_fn: Optional[Callable[..., Tuple[Any, Any]]] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        kwargs.pop("module_path", None)
+        if kwargs:
+            logger.warning("PySCFNAOQSPriorTransform: ignoring unrecognized keys %s", sorted(kwargs))
+        super().__init__(major_key=out_q)
+        self.q_key = q_key
+        self.s_key = s_key
+        self.n_key = n_key
+        self.out_q = out_q
+        self.out_s = out_s
+        self.max_scf_iter = int(max_scf_iter)
+        self.xc = xc
+        self.basis = basis
+        self.conv_tol = float(conv_tol)
+        self.density_fit = bool(density_fit)
+        self.use_gpu = bool(use_gpu)
+        self.verbose = int(verbose)
+        self.n_processes = int(n_processes)
+        if atomic_qs_fn is not None:
+            self._atomic_qs_fn = atomic_qs_fn
+        else:
+            if not xc or not basis:
+                raise ValueError(
+                    "pyscf_nao_qs_prior: 'xc' and 'basis' are required in YAML when "
+                    "atomic_qs_fn is not set (no default functional or basis group)."
+                )
+            from ..qm.pyscf_nao_population.deps import check_pyscf_nao_dependencies
+            from ..qm.pyscf_nao_population.atomic_populations import atomic_Q_and_S_from_pyscf_nao
+
+            check_pyscf_nao_dependencies(use_gpu=self.use_gpu)
+            self._atomic_qs_fn = partial(
+                atomic_Q_and_S_from_pyscf_nao,
+                xc=str(xc),
+                basis=str(basis),
+                conv_tol=self.conv_tol,
+                density_fit=self.density_fit,
+                use_gpu=self.use_gpu,
+                verbose=self.verbose,
+            )
+        self.transform_type = "feature"
+
+    def transform(self, new_input: Dict[str, Iterable]) -> None:
+        required = ("Ra", "Za", self.n_key, self.q_key, self.s_key)
+        for rk in required:
+            if rk not in new_input:
+                raise KeyError(f"pyscf_nao_qs_prior: missing required dataset '{rk}'")
+        za = np.asarray(new_input["Za"])
+        if za.ndim == 1:
+            za = za.reshape(1, -1)
+        elif za.ndim != 2:
+            raise ValueError(f"pyscf_nao_qs_prior: Za must be 1-D or 2-D, got shape {za.shape}")
+        # Ra is never compressed; N/Q/S may be shared across frames when compressed.
+        n_frames = len(new_input["Ra"])
+        max_n = int(za.shape[1])
+        n_arr = np.asarray(new_input[self.n_key][:], dtype=np.int64).ravel()
+        q_flat = np.asarray(new_input[self.q_key][:], dtype=np.float64).ravel()
+        s_flat = np.asarray(new_input[self.s_key][:], dtype=np.float64).ravel()
+        q_len = max(len(q_flat), 1)
+        s_len = max(len(s_flat), 1)
+        q_block = np.zeros((n_frames, max_n), dtype=np.float64)
+        s_block = np.zeros((n_frames, max_n), dtype=np.float64)
+        failures: List[int] = []
+        tasks = []
+        za_len = len(za)
+        for i in range(n_frames):
+            n_atoms = int(n_arr[i % len(n_arr)])
+            if n_atoms <= 0:
+                tasks.append(
+                    (
+                        i,
+                        np.zeros(0, dtype=int),
+                        np.zeros((0, 3), dtype=np.float64),
+                        n_atoms,
+                        0.0,
+                        0.0,
+                        self.max_scf_iter,
+                        self._atomic_qs_fn,
+                    )
+                )
+                continue
+            za_row = za[i % za_len]
+            z_i = np.asarray(za_row[:n_atoms], dtype=int)
+            r_i = np.asarray(new_input["Ra"][i, :n_atoms], dtype=float)
+            q_tot = float(q_flat[i % q_len])
+            s_tot = float(s_flat[i % s_len])
+            tasks.append((i, z_i, r_i, n_atoms, q_tot, s_tot, self.max_scf_iter, self._atomic_qs_fn))
+
+        n_processes = max(1, self.n_processes)
+        if n_processes == 1:
+            results = (
+                _pyscf_nao_qs_prior_worker(task)
+                for task in tqdm(tasks, desc="pyscf_nao_qs_prior")
+            )
+            for i, qa, sa, error in results:
+                if error is not None:
+                    failures.append(i)
+                    logger.error(f"pyscf_nao_qs_prior: frame {i} failed: {error}")
+                    continue
+                n_atoms = int(n_arr[i % len(n_arr)])
+                q_block[i, :n_atoms] = qa
+                s_block[i, :n_atoms] = sa
+        else:
+            logger.info(f"pyscf_nao_qs_prior: running with {n_processes} processes (spawn)")
+            # CUDA contexts are not fork-safe. Use spawn so each worker initializes
+            # GPU4PySCF/CuPy from a clean interpreter instead of inheriting parent GPU state.
+            ctx = get_context("spawn")
+            with ctx.Pool(n_processes) as pool:
+                results = pool.imap(_pyscf_nao_qs_prior_worker, tasks)
+                for i, qa, sa, error in tqdm(results, total=len(tasks), desc="pyscf_nao_qs_prior"):
+                    if error is not None:
+                        failures.append(i)
+                        logger.error(f"pyscf_nao_qs_prior: frame {i} failed: {error}")
+                        continue
+                    n_atoms = int(n_arr[i % len(n_arr)])
+                    q_block[i, :n_atoms] = qa
+                    s_block[i, :n_atoms] = sa
+        if failures:
+            raise RuntimeError(
+                f"pyscf_nao_qs_prior: {len(failures)} / {n_frames} frames failed (indices {failures[:20]}"
+                f"{'...' if len(failures) > 20 else ''}); no silent fallback."
+            )
+        if self.out_q in new_input:
+            del new_input[self.out_q]
+        if self.out_s in new_input:
+            del new_input[self.out_s]
+        new_input.create_dataset(self.out_q, data=q_block)
+        new_input.create_dataset(self.out_s, data=s_block)
+        logger.info("pyscf_nao_qs_prior: wrote Q_init_a and S_init_a from PySCF NAO")
+
+    def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
+        pass
+
+
+class QSDeltaTransform(BaseTransform):
+    """In-place atomic delta transform: ``Qa`` / ``Sa`` = target minus prior (HDF5 cache only).
+
+    Forward runs only after ``Q_init_a`` / ``S_init_a`` exist (``Transform.transform`` order:
+    all ``uniform_qs_init``, then all ``xtb_qs_prior`` / ``pyscf_nao_qs_prior``, then all
+    ``qs_delta`` — YAML key order within each group does not change this).
+
+    NSE heads still output ``Qa`` / ``Sa``. To keep loss computation aligned with those output
+    names, this transform overwrites the loaded ``Qa`` / ``Sa`` targets with residual labels.
+    ``single_inverse_transform`` maps predicted residuals back to full ``Qa`` / ``Sa`` in place by
+    adding the prior for metrics and comparison to NBO references. Requires ``Q_init_a`` /
+    ``S_init_a`` on the same dict (see ``_decorate_batch_output`` copying from batch features).
+    """
+
+    POPULATED_KEYS = frozenset()
+
+    def __init__(
+        self,
+        qa_key: str = "Qa",
+        sa_key: str = "Sa",
+        q_init_key: str = "Q_init_a",
+        s_init_key: str = "S_init_a",
+        n_key: str = "N",
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        kwargs.pop("out_q", None)
+        kwargs.pop("out_s", None)
+        if kwargs:
+            logger.warning("QSDeltaTransform: ignoring unrecognized keys %s", sorted(kwargs))
+        super().__init__(major_key=qa_key)
+        self.qa_key = qa_key
+        self.sa_key = sa_key
+        self.q_init_key = q_init_key
+        self.s_init_key = s_init_key
+        self.n_key = n_key
+        self.transform_type = "target"
+
+    def transform(self, new_input: Dict[str, Iterable]) -> None:
+        need = (self.qa_key, self.sa_key, self.q_init_key, self.s_init_key, self.n_key, "Ra", "Za")
+        for k in need:
+            if k not in new_input:
+                raise KeyError(f"qs_delta: missing '{k}'")
+        # Ra is never compressed; N may be shared across frames when compressed.
+        n_frames = len(new_input["Ra"])
+        za = np.asarray(new_input["Za"])
+        if za.ndim == 1:
+            max_n = int(za.shape[0])
+        else:
+            max_n = int(za.shape[1])
+        n_arr = np.asarray(new_input[self.n_key][:], dtype=np.int64).ravel()
+        dq = np.zeros((n_frames, max_n), dtype=np.float64)
+        ds = np.zeros((n_frames, max_n), dtype=np.float64)
+        for i in range(n_frames):
+            n_atoms = int(n_arr[i % len(n_arr)])
+            if n_atoms <= 0:
+                continue
+            qa = np.asarray(new_input[self.qa_key][i, :n_atoms], dtype=np.float64)
+            sa = np.asarray(new_input[self.sa_key][i, :n_atoms], dtype=np.float64)
+            q0 = np.asarray(new_input[self.q_init_key][i, :n_atoms], dtype=np.float64)
+            s0 = np.asarray(new_input[self.s_init_key][i, :n_atoms], dtype=np.float64)
+            dq[i, :n_atoms] = qa - q0
+            ds[i, :n_atoms] = sa - s0
+        del new_input[self.qa_key]
+        del new_input[self.sa_key]
+        new_input.create_dataset(self.qa_key, data=dq)
+        new_input.create_dataset(self.sa_key, data=ds)
+        logger.info("qs_delta: overwrote Qa and Sa with residual targets")
+
+    def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
+        if self.qa_key not in new_output or self.sa_key not in new_output:
+            return
+        if self.q_init_key not in new_output or self.s_init_key not in new_output:
+            raise KeyError(
+                f"qs_delta inverse_transform: need '{self.q_init_key}' and '{self.s_init_key}' "
+                f"alongside '{self.qa_key}' / '{self.sa_key}' (they are copied from batch features in "
+                "_decorate_batch_output when present)."
+            )
+        dq = np.asarray(new_output[self.qa_key][idx], dtype=np.float64).reshape(-1)
+        ds = np.asarray(new_output[self.sa_key][idx], dtype=np.float64).reshape(-1)
+        q0 = np.asarray(new_output[self.q_init_key][idx], dtype=np.float64).reshape(-1)
+        s0 = np.asarray(new_output[self.s_init_key][idx], dtype=np.float64).reshape(-1)
+        n = dq.shape[0]
+        if q0.shape[0] < n or s0.shape[0] < n:
+            raise ValueError(
+                f"qs_delta inverse: prior length {q0.shape[0]} / {s0.shape[0]} < delta length {n}"
+            )
+        new_output[self.qa_key][idx] = dq + q0[:n]
+        new_output[self.sa_key][idx] = ds + s0[:n]
+
+
+
 class UniformSplitQSTransform(BaseTransform):
     """Per-frame uniform split of total charge Q and spin S onto atoms: Q_init_a = Q/N, S_init_a = S/N.
 
@@ -263,6 +788,9 @@ class Transform:
         self.scales = []
         self.normalizations = []
         self.uniform_qs_inits: List[UniformSplitQSTransform] = []
+        self.xtb_qs_priors: List[XTBQSPriorTransform] = []
+        self.pyscf_nao_qs_priors: List[PySCFNAOQSPriorTransform] = []
+        self.qs_deltas: List[QSDeltaTransform] = []
         if transform_args is None:
             return
         for k, v in transform_args.items():
@@ -294,6 +822,44 @@ class Transform:
                 kwargs = {k2: v2 for k2, v2 in v.items()} if isinstance(v, dict) else {}
                 kwargs.pop("enabled", None)
                 self.uniform_qs_inits.append(UniformSplitQSTransform(**kwargs))
+            if k == "xtb_qs_prior":
+                if v is False or v is None:
+                    continue
+                if isinstance(v, dict) and v.get("enabled") is False:
+                    continue
+                kwargs = {k2: v2 for k2, v2 in v.items()} if isinstance(v, dict) else {}
+                kwargs.pop("enabled", None)
+                # Frame-level npz checkpoints live under the DataHub preload dir.
+                kwargs.setdefault("preload_path", preload_path)
+                self.xtb_qs_priors.append(XTBQSPriorTransform(**kwargs))
+            if k == "pyscf_nao_qs_prior":
+                if v is False or v is None:
+                    continue
+                if isinstance(v, dict) and v.get("enabled") is False:
+                    continue
+                kwargs = {k2: v2 for k2, v2 in v.items()} if isinstance(v, dict) else {}
+                kwargs.pop("enabled", None)
+                self.pyscf_nao_qs_priors.append(PySCFNAOQSPriorTransform(**kwargs))
+            if k == "qs_delta":
+                if v is False or v is None:
+                    continue
+                if isinstance(v, dict) and v.get("enabled") is False:
+                    continue
+                kwargs = {k2: v2 for k2, v2 in v.items()} if isinstance(v, dict) else {}
+                kwargs.pop("enabled", None)
+                self.qs_deltas.append(QSDeltaTransform(**kwargs))
+
+        _prior_count = (
+            bool(self.uniform_qs_inits)
+            + bool(self.xtb_qs_priors)
+            + bool(self.pyscf_nao_qs_priors)
+        )
+        if _prior_count > 1:
+            raise ValueError(
+                "Transform: enable only one of uniform_qs_init, xtb_qs_prior, or "
+                "pyscf_nao_qs_prior; all write Q_init_a / S_init_a and a later stage would "
+                "overwrite the earlier without warning."
+            )
 
     def transform(self, raw_input: Dict):
         for shift in self.shifts:
@@ -302,10 +868,26 @@ class Transform:
             scale.transform(raw_input)
         for normalization in self.normalizations:
             normalization.transform(raw_input)
+        # Q/S priors before deltas so Q_init_a / S_init_a exist when computing residuals
         for u in self.uniform_qs_inits:
             u.transform(raw_input)
+        for x in self.xtb_qs_priors:
+            x.transform(raw_input)
+        for p in self.pyscf_nao_qs_priors:
+            p.transform(raw_input)
+        for d in self.qs_deltas:
+            d.transform(raw_input)
 
     def inverse_transform(self, raw_output: Dict, selected_indices: Optional[Iterable[int]]=None):
+        # Reverse of forward: undo deltas first, then energy-related inverses
+        for d in reversed(self.qs_deltas):
+            d.inverse_transform(raw_output, selected_indices)
+        for x in reversed(self.xtb_qs_priors):
+            x.inverse_transform(raw_output, selected_indices)
+        for p in reversed(self.pyscf_nao_qs_priors):
+            p.inverse_transform(raw_output, selected_indices)
+        for u in reversed(self.uniform_qs_inits):
+            u.inverse_transform(raw_output, selected_indices)
         for normalization in self.normalizations:
             normalization.inverse_transform(raw_output, selected_indices)
         for scale in self.scales:

@@ -127,6 +127,11 @@ Defined under :code:`transforms`, :code:`global_transforms`, or (advanced)
 - :code:`total_energy_normalization` — global mean/std on :code:`E`
 - :code:`energy_unit_conversion` — convert energy/force units into the training convention
 - :code:`uniform_qs_init` — write per-atom :code:`Q_init_a` / :code:`S_init_a` as :code:`Q/N` and :code:`S/N` for flow-matching init (registers those fields as features automatically). Place under :code:`global_transforms` (single-dataset :code:`transforms:` is remapped there) or per-dataset :code:`transforms:` / :code:`preprocessings`
+- :code:`xtb_qs_prior` — GFN2-xTB + xtbml Mulliken-style prior into the same :code:`Q_init_a` / :code:`S_init_a` keys (optional; requires :code:`tblite` with xtbml, e.g. :code:`pip install 'enerzyme[xtb]'`). Mutually exclusive with :code:`uniform_qs_init` and :code:`pyscf_nao_qs_prior`
+- :code:`pyscf_nao_qs_prior` — GPU4PySCF/PySCF NAO prior into :code:`Q_init_a` / :code:`S_init_a`. YAML must set :code:`xc` and :code:`basis` (no defaults). Optional :code:`use_gpu` (default true) needs :code:`gpu4pyscf`; CPU path uses :code:`pyscf` only (:code:`pip install 'enerzyme[pyscf_nao]'`). Mutually exclusive with the other Q/S priors
+- :code:`qs_delta` — overwrite :code:`Qa` / :code:`Sa` targets with residuals vs :code:`Q_init_a` / :code:`S_init_a`. Must share the same :code:`preprocessings` or :code:`global_transforms` block as exactly one prior hook so the prior exists before deltas; prediction inverse adds the prior back
+
+Enable **only one** of :code:`uniform_qs_init`, :code:`xtb_qs_prior`, or :code:`pyscf_nao_qs_prior` across preprocessings and global transforms — they all write the same prior fields.
 
 Cache invalidation
 ------------------

@@ -6,15 +6,29 @@ Training lifecycle is controlled by :code:`Trainer` options and checkpoint files
 Checkpoint layout
 -----------------
 
+Checkpoints are written **directly** in each model directory (no :code:`best/` or
+:code:`last/` subfolders). Filenames encode the preference and optional committee rank:
+
 .. code-block:: text
 
-    FF02_suffix/
-    ├── best/
-    │   └── model_best.pth
-    └── last/
-        └── model_last.pth
+    FF02-SpookyNet/
+    ├── model_best.pth
+    ├── model_last.pth
+    └── model_epoch=10.pth          # optional, when dump_interval > 0
 
-Committee models use :code:`model0.pth`, :code:`model1.pth`, ... under :code:`best/` and :code:`last/`.
+Committee members use a numeric rank in the filename prefix:
+
+.. code-block:: text
+
+    FF02-SpookyNet/
+    ├── model0_best.pth
+    ├── model0_last.pth
+    ├── model1_best.pth
+    └── model1_last.pth
+
+Lightning may also emit versioned names such as :code:`model_best-v1.pth`;
+:code:`get_pretrain_path` prefers the appropriate :code:`best` / :code:`last` file
+in that directory.
 
 Resume modes
 ------------
@@ -30,7 +44,9 @@ Implementation: :code:`enerzyme/tasks/trainer.py`.
 Pretraining
 -----------
 
-:code:`Modelhub.internal_FFs.FFxx.pretrain_path` points to a previous run directory. Enerzyme resolves :code:`best/` or explicit paths via :code:`get_pretrain_path`.
+:code:`Modelhub.internal_FFs.FFxx.pretrain_path` points to a previous run directory (or an
+explicit :code:`.pth` file). Enerzyme resolves :code:`model*_best.pth` / :code:`model*_last.pth`
+in that directory via :code:`get_pretrain_path` (preference :code:`best` or :code:`last`).
 
 Typical in iterative AL:
 

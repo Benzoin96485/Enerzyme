@@ -1,7 +1,7 @@
 Bond Assignment
 ===============
 
-:code:`enerzyme bond` assigns chemical bonds to PDB cluster structures, typically from `QuantumPDB <https://github.com/davidkastner/quantumPDB>`_ workflows.
+:code:`enerzyme bond` assigns chemical bonds to PDB cluster structures, typically from `QuantumPDB <https://github.com/hjkgrp/quantumPDB>`_ workflows.
 
 Command
 -------

@@ -13,24 +13,66 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 from .datatype import is_atomic, is_rounded, is_int, register_data_type
 from .transform import (
-    UniformSplitQSTransform,
-    parse_Za,
-    Transform,
-    wants_uniform_qs_init,
     EnergyUnitConversionTransform,
     NegativeGradientTransform,
+    PySCFNAOQSPriorTransform,
+    Transform,
+    UniformSplitQSTransform,
+    XTBQSPriorTransform,
+    parse_Za,
+    wants_pyscf_nao_qs_prior,
+    wants_qs_delta,
+    wants_uniform_qs_init,
+    wants_xtb_qs_prior,
 )
 from ..utils import YamlHandler, logger
+
+
+def _atomic_charges_from_atoms(atoms: Atoms) -> Any:
+    """Qa from calculator ``charges`` when present, else ASE ``initial_charges``."""
+    if atoms.calc is not None:
+        results = getattr(atoms.calc, "results", None) or {}
+        if "charges" in results:
+            return atoms.get_charges()
+        try:
+            return atoms.get_charges()
+        except Exception:
+            pass
+    if atoms.has("initial_charges"):
+        return atoms.get_initial_charges()
+    raise AttributeError(
+        "No atomic charges: calculator charges / get_charges() and "
+        "initial_charges are all unavailable"
+    )
+
+
+def _atomic_magmoms_from_atoms(atoms: Atoms) -> Any:
+    """Sa from calculator ``magmoms`` when present, else ASE ``initial_magmoms``."""
+    if atoms.calc is not None:
+        results = getattr(atoms.calc, "results", None) or {}
+        if "magmoms" in results:
+            return atoms.get_magnetic_moments()
+        try:
+            return atoms.get_magnetic_moments()
+        except Exception:
+            pass
+    if atoms.has("initial_magmoms"):
+        return atoms.get_initial_magnetic_moments()
+    raise AttributeError(
+        "No atomic magmoms: calculator magmoms / get_magnetic_moments() and "
+        "initial_magmoms are all unavailable"
+    )
 
 
 # Standard Enerzyme names → ASE Atoms accessors (calculator results / geometry).
 # ASE itself still stores calculator keys as energy/forces/dipole/charges/magmoms
 # and fairchem-style info keys charge/spin; this adapter only exposes standard names.
+# Qa/Sa prefer calculator populations, then fall back to ASE initial_* arrays.
 ASE_PROPERTY_METHODS: Dict[str, Callable[[Atoms], Any]] = {
     "E": lambda atoms: atoms.get_potential_energy(),
     "Fa": lambda atoms: atoms.get_forces(),
-    "Qa": lambda atoms: atoms.get_charges(),
-    "Sa": lambda atoms: atoms.get_magnetic_moments(),
+    "Qa": _atomic_charges_from_atoms,
+    "Sa": _atomic_magmoms_from_atoms,
     "M2": lambda atoms: atoms.get_dipole_moment(),
 }
 
@@ -58,23 +100,28 @@ _ASELMDB_FIXED_KEYS = _ASELMDB_GEOMETRY_KEYS | frozenset(ASE_PROPERTY_METHODS)
 
 
 def _probe_calculator_properties(atoms: Atoms) -> set:
-    """Discover calculator-backed fields from ``calc.results`` (fallback: accessors)."""
+    """Discover ASE-backed fields from ``calc.results``, accessors, or initial_*."""
     found: set = set()
-    if atoms.calc is None:
-        return found
-    results = getattr(atoms.calc, "results", None) or {}
-    for ase_key, std_key in _ASE_RESULTS_KEY_TO_STANDARD.items():
-        if ase_key in results:
-            found.add(std_key)
-    for prop, method in ASE_PROPERTY_METHODS.items():
-        if prop in found:
-            continue
-        try:
-            method(atoms)
-        except Exception as e:
-            logger.warning(f"Failed to get {prop} directly from calculator: {e}")
-        else:
-            found.add(prop)
+    if atoms.calc is not None:
+        results = getattr(atoms.calc, "results", None) or {}
+        for ase_key, std_key in _ASE_RESULTS_KEY_TO_STANDARD.items():
+            if ase_key in results:
+                found.add(std_key)
+        for prop, method in ASE_PROPERTY_METHODS.items():
+            if prop in found:
+                continue
+            try:
+                method(atoms)
+            except Exception as e:
+                logger.warning(f"Failed to get {prop} directly from calculator: {e}")
+            else:
+                found.add(prop)
+    # DBs without a calculator (or lacking charges/magmoms) can still expose
+    # populations via ASE initial arrays, e.g. BOS-TMC aselmdb.
+    if "Qa" not in found and atoms.has("initial_charges"):
+        found.add("Qa")
+    if "Sa" not in found and atoms.has("initial_magmoms"):
+        found.add("Sa")
     return found
 
 
@@ -471,9 +518,25 @@ class SingleDataHub:
         self._populate_uniform_qs_init = wants_uniform_qs_init(
             global_transforms
         ) or wants_uniform_qs_init(preprocessings)
+        self._populate_xtb_qs_prior = wants_xtb_qs_prior(
+            global_transforms
+        ) or wants_xtb_qs_prior(preprocessings)
+        self._populate_pyscf_nao_qs_prior = wants_pyscf_nao_qs_prior(
+            global_transforms
+        ) or wants_pyscf_nao_qs_prior(preprocessings)
         if self._populate_uniform_qs_init:
             self.feature_types = dict(self.feature_types)
             for _k in UniformSplitQSTransform.POPULATED_KEYS:
+                self.feature_types.setdefault(_k, _k)
+            self.data_types = self.feature_types | self.target_types
+        if self._populate_xtb_qs_prior:
+            self.feature_types = dict(self.feature_types)
+            for _k in XTBQSPriorTransform.POPULATED_KEYS:
+                self.feature_types.setdefault(_k, _k)
+            self.data_types = self.feature_types | self.target_types
+        if self._populate_pyscf_nao_qs_prior:
+            self.feature_types = dict(self.feature_types)
+            for _k in PySCFNAOQSPriorTransform.POPULATED_KEYS:
                 self.feature_types.setdefault(_k, _k)
             self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
@@ -495,6 +558,35 @@ class SingleDataHub:
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
         self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
         logger.info(f"Preload path {self.preload_path} is created")
+        _pre = preprocessings or {}
+        _glb = global_transforms or {}
+        _any_uniform = wants_uniform_qs_init(_pre) or wants_uniform_qs_init(_glb)
+        _any_xtb = wants_xtb_qs_prior(_pre) or wants_xtb_qs_prior(_glb)
+        _any_pyscf = wants_pyscf_nao_qs_prior(_pre) or wants_pyscf_nao_qs_prior(_glb)
+        _prior_slots = int(_any_uniform) + int(_any_xtb) + int(_any_pyscf)
+        if _prior_slots > 1:
+            raise ValueError(
+                "DataHub: do not combine uniform_qs_init, xtb_qs_prior, and pyscf_nao_qs_prior "
+                "across preprocessings and/or global_transforms; all populate Q_init_a / S_init_a "
+                "and a second HDF5 transform pass would overwrite the first."
+            )
+        if wants_qs_delta(_pre) and not (
+            wants_uniform_qs_init(_pre) or wants_xtb_qs_prior(_pre) or wants_pyscf_nao_qs_prior(_pre)
+        ):
+            raise ValueError(
+                "DataHub preprocessings: qs_delta is enabled but no Q/S prior transform "
+                "(uniform_qs_init, xtb_qs_prior, or pyscf_nao_qs_prior) in preprocessings. "
+                "Priors must be created in the same preprocessing pass before deltas "
+                "(preprocessing runs before global_transforms)."
+            )
+        if wants_qs_delta(_glb) and not (
+            wants_uniform_qs_init(_glb) or wants_xtb_qs_prior(_glb) or wants_pyscf_nao_qs_prior(_glb)
+        ):
+            raise ValueError(
+                "DataHub global_transforms: qs_delta requires a Q/S prior transform "
+                "(uniform_qs_init, xtb_qs_prior, or pyscf_nao_qs_prior) in the same "
+                "global_transforms block so Q_init_a / S_init_a exist before delta targets."
+            )
         self.preprocessing = Transform(preprocessings, self.preload_path)
         self.global_transform = Transform(global_transforms, self.preload_path)
         self.preprocessings = preprocessings
@@ -765,7 +857,11 @@ class SingleDataHub:
             elif (
                 is_atomic(k)
                 and k in UniformSplitQSTransform.POPULATED_KEYS
-                and self._populate_uniform_qs_init
+                and (
+                    self._populate_uniform_qs_init
+                    or self._populate_xtb_qs_prior
+                    or self._populate_pyscf_nao_qs_prior
+                )
             ):
                 continue
             elif is_atomic(k):

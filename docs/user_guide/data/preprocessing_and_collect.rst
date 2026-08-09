@@ -50,3 +50,23 @@ Transform details
 
 :code:`total_energy_normalization`
     Global mean/variance normalization on total energy (use with care for relative energies).
+
+:code:`uniform_qs_init`
+    Splits total :code:`Q` / :code:`S` uniformly onto atoms as :code:`Q_init_a` / :code:`S_init_a` (flow or delta priors).
+
+:code:`xtb_qs_prior`
+    Runs GFN2-xTB + xtbml Mulliken populations per frame into :code:`Q_init_a` / :code:`S_init_a`.
+    Optional dependency: :code:`tblite` with xtbml (:code:`pip install 'enerzyme[xtb]'`).
+    Typical YAML: :code:`enabled: true`, optional :code:`max_scf_iter` (default 1).
+
+:code:`pyscf_nao_qs_prior`
+    Runs finite-step DFT + NAO populations into :code:`Q_init_a` / :code:`S_init_a`.
+    Requires :code:`xc` and :code:`basis` in YAML. Optional deps: :code:`pyscf` and, when
+    :code:`use_gpu: true`, :code:`gpu4pyscf` (install CUDA stack separately; core extra is
+    :code:`pip install 'enerzyme[pyscf_nao]'`).
+
+:code:`qs_delta`
+    Replaces :code:`Qa` / :code:`Sa` training targets with residuals against the prior.
+    Enable together with exactly one prior in the same transform block. At predict/metric
+    time, inverse transform restores full charges/spins using :code:`Q_init_a` / :code:`S_init_a`
+    copied from batch features.

@@ -332,6 +332,19 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
         y_truth["data_key"] = targets["data_key"]
     y_truth["Za"] = y_pred["Za"]
 
+    # Delta-learning inverse: priors must sit next to residual Qa / Sa on the metric dict
+    for _prior_key in ("Q_init_a", "S_init_a"):
+        if _prior_key in features and is_atomic(_prior_key):
+            split_prior = list(
+                map(
+                    lambda x: x.detach().cpu().numpy(),
+                    torch.split(features[_prior_key], features["N"]),
+                )
+            )
+            y_pred[_prior_key] = split_prior
+            if targets is not None:
+                y_truth[_prior_key] = split_prior
+
     # Graph-level Q / S targets with atomic-only model output (e.g. ODE flow returns Qa, Sa only).
     if targets is not None:
         if (
