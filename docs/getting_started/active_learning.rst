@@ -217,7 +217,9 @@ A practical task directory should contain only stable, human-authored inputs at 
     |-- FF02-SpookyNet-1/
     `-- ...
 
-The directory :code:`/home/gridsan/wlluo/multiscale/MLFF/enerzyme-new/spookynet/L3-COMT_2ZVJ-frag6-1` follows this pattern:
+The layout above is the portable pattern to follow. For a tiny ASELMDB / annotate /
+Enerzymette AL smoke with repo-relative paths, see :code:`example/L3-COMT-aselmdb-smoke/`
+(and that directory's :code:`README.md`). In a full AL task directory:
 
 - :code:`al.sh` is the batch launcher.
 - :code:`config/` stores the four templates passed to :code:`-sc`, :code:`-ac`, :code:`-ec`, and :code:`-tc`.

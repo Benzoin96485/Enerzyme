@@ -69,11 +69,15 @@ Units and gradients
 Building a dataset from TeraChem outputs
 ----------------------------------------
 
-The repository includes :code:`scripts/picklizer.py` for grouping TeraChem output files into a pickle. Each entry in :code:`file_lists` is a dict pointing to per-structure files:
+The repository includes :code:`scripts/picklizer.py` for grouping TeraChem output files into a pickle. Each entry in :code:`file_lists` is a dict pointing to per-structure files. Run from the **repository root** and put :code:`scripts/` on :code:`sys.path` (it is not an installable package):
 
 .. code-block:: python
 
-    from scripts.picklizer import picklizer
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from picklizer import picklizer
 
     file_lists = [
         {

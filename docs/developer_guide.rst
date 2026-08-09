@@ -443,11 +443,33 @@ Liao et al. (2026, arXiv:2604.09130) lives under :code:`enerzyme/models/equiform
 E2Former (:code:`e2former`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- :code:`test_e2former_parity_ops.py` — E2Former Wigner-6j / SO2 TP numerical parity vs vendored UBio-MolFM fixtures
-- :code:`test_e2former_v2_core.py` — E2Former-V2 SO2 attention shapes, build_model E/F, SO(3) / translation, YAML smoke
-- :code:`test_e2former_so2_tp.py` — EAAS / SO2 TP shapes, rotation equivariance, Triton PyTorch fallback
-- :code:`test_e2former_triton_parity.py` — QK index convention / CPU fallback guards; CUDA Triton vs PyTorch parity (skipped without GPU)
-- :code:`test_e2former_lsr_core.py` — E2Former-LSR shapes, kmeans/precomputed fragments, bipartite graph batch isolation, build_model E/F, SO(3) / translation, YAML smoke
+Li et al. (NeurIPS 2025 Spotlight, arXiv:2501.19216) lives under :code:`enerzyme/models/e2former/`,
+adapted from `liyy2/E2Former <https://github.com/liyy2/E2Former>`_ (MIT). Register via
+:code:`get_ff_core("e2former")`. The Core uses Wigner-6j factorization for equivariant
+attention, reuses shared :code:`so3` RMSNorm / :code:`SO3Linear` and EquiformerV2's S²
+:code:`FeedForwardNetwork`, and emits :code:`atom_feature` / :code:`atom_sphere_feature`.
+Compose :code:`SimpleReadout` + :code:`EnergyReduce` / :code:`Force` outside the Core.
+Requires equal channel multiplicity across degrees. Example:
+:code:`e2former_layers_example.yaml`. Tests: :code:`test/test_e2former_core.py`,
+:code:`test/test_e2former_wigner6j.py`, :code:`test/test_e2former_parity_ops.py`.
+
+E2Former-V2 (:code:`e2former_v2`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Huang et al. (2026, arXiv:2601.16622) **reuses** :code:`E2FormerCore` with defaults in
+:code:`e2former/v2.py` (:code:`attn_type: so2-first-order`, optional Triton sparse QK).
+Same latent contract and post-core stack as V1. Example:
+:code:`e2former_v2_layers_example.yaml`. Tests: :code:`test/test_e2former_v2_core.py`,
+:code:`test/test_e2former_so2_tp.py`, :code:`test/test_e2former_triton_parity.py`.
+
+E2Former-LSR (:code:`e2former_lsr`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Wang et al. (arXiv:2601.03774) adds atom–fragment bipartite long-range attention on top of
+the short-range E2Former package (:code:`cutoff_lr`, :code:`long_layers`, late fusion).
+Fragmentation defaults to online k-means; :code:`fragment_mode: precomputed` uses Datahub
+:code:`cluster_ids`. Still emits :code:`atom_feature` / :code:`atom_sphere_feature`.
+Example: :code:`e2former_lsr_layers_example.yaml`. Tests: :code:`test/test_e2former_lsr_core.py`.
 
 DPA4 (:code:`dpa4`)
 ^^^^^^^^^^^^^^^^^^^^^
