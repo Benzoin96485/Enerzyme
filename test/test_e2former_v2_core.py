@@ -92,7 +92,7 @@ def test_e2former_v2_build_model_energy_force_finite():
         "e2former_v2",
         layer_params=[
             {"name": "RangeSeparation"},
-            {"name": "GaussianSmearing"},
+            {"name": "GaussianRBF", "params": {"flavor": "SchNet", "apply_cutoff_fn": False}},
             {"name": "RandomAtomEmbedding"},
             {
                 "name": "Core",
@@ -158,7 +158,7 @@ def test_e2former_v2_energy_invariance_and_force_equivariance():
         "e2former_v2",
         layer_params=[
             {"name": "RangeSeparation"},
-            {"name": "GaussianSmearing"},
+            {"name": "GaussianRBF", "params": {"flavor": "SchNet", "apply_cutoff_fn": False}},
             {"name": "RandomAtomEmbedding"},
             {
                 "name": "Core",

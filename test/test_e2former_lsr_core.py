@@ -77,7 +77,7 @@ def _tiny_lsr_layer_params(**core_overrides):
     params.update(core_overrides)
     return [
         {"name": "RangeSeparation"},
-        {"name": "GaussianSmearing"},
+        {"name": "GaussianRBF", "params": {"flavor": "SchNet", "apply_cutoff_fn": False}},
         {"name": "RandomAtomEmbedding"},
         {"name": "Core", "params": params},
         {

@@ -418,9 +418,10 @@ Modelhub:
         Bohr_in_R: 0.5291772108
       layers:
         - name: RangeSeparation             
-        - name: GaussianSmearing            # Gaussian smearing radial basis function
+        - name: GaussianRBF                 # Gaussian RBF (SchNet width; no envelope on RBF)
           params:                           # num_rbf, cutoff_sr in build_params
-            cuton: 0.0                      # cuton distance of the Gaussian smearing function
+            flavor: SchNet
+            apply_cutoff_fn: false
         - name: RandomAtomEmbedding        
         - name: Core                        # SchNet Core
           params:                           # dim_embedding, num_rbf in build_params
@@ -802,7 +803,10 @@ Modelhub:
         cutoff_fn: polynomial
       layers:
         - name: RangeSeparation
-        - name: GaussianSmearing
+        - name: GaussianRBF
+          params:
+            flavor: SchNet
+            apply_cutoff_fn: false
         - name: RandomAtomEmbedding
         - name: Core
           params:
@@ -846,7 +850,10 @@ Modelhub:
         cutoff_fn: polynomial
       layers:
         - name: RangeSeparation
-        - name: GaussianSmearing
+        - name: GaussianRBF
+          params:
+            flavor: SchNet
+            apply_cutoff_fn: false
         - name: RandomAtomEmbedding
         - name: Core
           params:

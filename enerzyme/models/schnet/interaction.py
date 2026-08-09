@@ -1,9 +1,8 @@
-from math import pi as PI
-import torch
 from torch import Tensor
 from torch.nn import Module, Sequential, Linear, init
 from torch_geometric.nn import MessagePassing
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, get_activation_fn
+from ..cutoff import cosine_transition
 
 
 class InteractionBlock(Module):
@@ -66,7 +65,7 @@ class CFConv(MessagePassing):
 
     def forward(self, x: Tensor, edge_index: Tensor, edge_weight: Tensor,
                 edge_attr: Tensor) -> Tensor:
-        C = 0.5 * (torch.cos(edge_weight * PI / self.cutoff) + 1.0)
+        C = cosine_transition(edge_weight, cutoff=self.cutoff)
         W = self.nn(edge_attr) * C.view(-1, 1)
 
         x = self.lin1(x)

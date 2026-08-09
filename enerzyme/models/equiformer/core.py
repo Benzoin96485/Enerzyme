@@ -256,7 +256,6 @@ class EquiformerCore(BaseFFCore):
                 elif isinstance(layer, (EquiformerNodeEmbedding, BaseAtomEmbedding)):
                     self.atom_embedding = layer
                 elif isinstance(layer, BaseRBF) or layer.__class__.__name__ in {
-                    "GaussianSmearing",
                     "ExpNormalSmearing",
                 }:
                     self.radial_basis_function = layer
