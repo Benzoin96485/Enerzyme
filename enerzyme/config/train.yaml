@@ -892,11 +892,11 @@ Trainer:
       - name: validation
         sources:
           - dataset: my_dataset_1
-          - ratio: 0.1
+            ratio: 0.1
       - name: test
         sources:
           - dataset: my_dataset_1
-          - ratio: 0.2
+            ratio: 0.2
     preload: true                           # if saved splitting indices are loaded
     save: true                              # if splitting indices are saved
     seed: 114514                            # splitting random seed
@@ -912,7 +912,7 @@ Trainer:
       - min                                 # minimum value
       - max                                 # maximum value
   seed: 114514                              # trainer random seed: dataloader shuffling, pytorch random initialization, etc.
-  learning_rate: 0.001                      # learning rate, scientific notations like 1e-3 are supported, default 0.001
+  learning_rate: 0.001                      # learning rate, default 0.001
   schedule: constant                        # learning rate scheduler: default linear
                                             # (linear | cosine | cosine_with_restarts | polynomial | constant | constant_with_warmup | inverse_sqrt)
   warmup_ratio: 0.001                       # ratio of warmup epochs in total epochs, if applicable for the schedule
