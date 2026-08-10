@@ -771,7 +771,8 @@ class TotalEnergyNormalization(BaseTransform):
         logger.info(f"Total energy normalization: mean {self.shift}, std {self.scale}")
         for i in range(len(new_input["E"])):
             new_input["E"][i] = (new_input["E"][i] - self.shift) / self.scale
-            new_input["Fa"][i] /= self.scale
+            if "Fa" in new_input:
+                new_input["Fa"][i] /= self.scale
 
     def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
         if not self.loaded:
