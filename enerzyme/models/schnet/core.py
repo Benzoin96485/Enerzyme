@@ -22,12 +22,8 @@ DEFAULT_BUILD_PARAMS = {
     'Bohr_in_R': 0.5291772108
 }
 DEFAULT_LAYER_PARAMS = [{'name': 'RangeSeparation'},
- {'name': 'GaussianSmearing',
-  'params': {'no_basis_at_infinity': False,
-   'init_alpha': 1,
-   'exp_weighting': False,
-   'learnable_shape': True,
-   'init_width_flavor': 'PhysNet'}},
+ {'name': 'GaussianRBF',
+  'params': {'flavor': 'SchNet', 'apply_cutoff_fn': False}},
  {'name': 'RandomAtomEmbedding'},
  {'name': 'Core',
   'params': {'hidden_channels': 128,

@@ -16,17 +16,32 @@ class BaseRBF(BaseFFLayer):
         self,
         num_rbf: int,
         cutoff_sr: float,
-        cutoff_fn: CUTOFF_KEY_TYPE,
+        cutoff_fn: Optional[CUTOFF_KEY_TYPE] = None,
+        apply_cutoff_fn: bool = True,
     ) -> None:
-        super().__init__(input_fields={"Dij_sr", "cutoff_values_sr"}, output_fields={"rbf"})
+        input_fields = {"Dij_sr"}
+        if apply_cutoff_fn:
+            input_fields.add("cutoff_values_sr")
+        super().__init__(input_fields=input_fields, output_fields={"rbf"})
         self.num_rbf = num_rbf
         self.cutoff_sr = cutoff_sr
-        self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
+        self.apply_cutoff_fn = apply_cutoff_fn
+        if apply_cutoff_fn:
+            if cutoff_fn is None:
+                raise TypeError("cutoff_fn is required when apply_cutoff_fn=True")
+            self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
+        else:
+            self.cutoff_fn = (
+                CUTOFF_REGISTER[cutoff_fn] if cutoff_fn is not None else None
+            )
 
     def get_rbf(self, Dij_sr: Tensor, cutoff_values_sr: Optional[Tensor]=None, **kwargs) -> Tensor:
+        rbf = self._get_rbf(Dij_sr)
+        if not self.apply_cutoff_fn:
+            return rbf
         if cutoff_values_sr is None:
             cutoff_values_sr = self.cutoff_fn(Dij_sr, cutoff=self.cutoff_sr)
-        return cutoff_values_sr.view(-1, 1) * self._get_rbf(Dij_sr)
+        return cutoff_values_sr.view(-1, 1) * rbf
 
     @abstractmethod
     def _get_rbf(self, Dij: Tensor) -> Tensor:
@@ -37,35 +52,57 @@ class GaussianRBFLayer(BaseRBF):
     """
     Radial basis functions based on Gaussian functions:
 
-    .. math:: g_i(x) = \\exp(-\\mathtt{width}\\cdot(x-\\mathtt{center}_i)^2)
+    .. math:: g_i(x) = \\exp(\\mathtt{coeff}\\cdot(x-\\mathtt{center}_i)^2)
 
-    Here, :math:`i` takes values from :math:`0` to :math:`\\mathtt{num\\_rbf}-1`. The `center` is chosen
-    to optimally span the range :math:`x\\in (0,\\mathtt{cutoff}]` and the :math:`\\mathtt{width}` parameter is
-    selected to give optimal overlap between adjacent Gaussian functions.
+    Here, :math:`i` takes values from :math:`0` to :math:`\\mathtt{num\\_rbf}-1`.
+    Centers span :math:`[0, \\mathtt{cutoff}]`. ``flavor`` only selects how
+    ``coeff`` (Gaussian width) is initialized:
 
-    Arguments:
-        num_basis_functions (int):
-            Number of radial basis functions.
-        cutoff (float):
-            Cutoff radius.
+    * ``PhysNet`` (default): ``coeff = -num_rbf / cutoff``
+    * ``SchNet``: ``coeff = -0.5 / Δ²`` with ``Δ = cutoff / (num_rbf - 1)``
+      (PyG Gaussian smearing convention)
+
+    Cutoff envelope application is controlled separately by ``apply_cutoff_fn``.
     """
 
-    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: CUTOFF_KEY_TYPE = "bump") -> None:
-        """ Initializes the GaussianFunctions class. """
-        super().__init__(num_rbf, cutoff_sr, cutoff_fn)
-        self.register_buffer(
-            "center",
-            torch.linspace(0, cutoff_sr, num_rbf, dtype=torch.float64),
-        )
-        self.register_buffer(
-            "width", torch.tensor(num_rbf / cutoff_sr, dtype=torch.float64)
-        )
+    def __init__(
+        self,
+        num_rbf: int,
+        cutoff_sr: float,
+        cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "bump",
+        apply_cutoff_fn: bool = True,
+        flavor: Literal["PhysNet", "SchNet"] = "PhysNet",
+    ) -> None:
+        if apply_cutoff_fn and cutoff_fn is None:
+            cutoff_fn = "bump"
+        super().__init__(num_rbf, cutoff_sr, cutoff_fn, apply_cutoff_fn=apply_cutoff_fn)
+        self.flavor = flavor
+        if flavor == "PhysNet":
+            # float64 buffers match historical SpookyNet / PhysNet parity.
+            self.register_buffer(
+                "center",
+                torch.linspace(0, cutoff_sr, num_rbf, dtype=torch.float64),
+            )
+            width = torch.tensor(num_rbf / cutoff_sr, dtype=torch.float64)
+            self.register_buffer("width", width)
+            self.register_buffer("coeff", -width)
+        elif flavor == "SchNet":
+            # Default dtype matches PyG GaussianSmearing offsets / coeff.
+            center = torch.linspace(0, cutoff_sr, num_rbf)
+            self.register_buffer("center", center)
+            coeff = torch.tensor(
+                -0.5 / (center[1] - center[0]).item() ** 2
+            )
+            self.register_buffer("coeff", coeff)
+            self.register_buffer("width", -coeff)
+        else:
+            raise ValueError(
+                f"Unknown GaussianRBF flavor {flavor!r}; expected 'PhysNet' or 'SchNet'"
+            )
 
     def _get_rbf(self, Dij: Tensor) -> Tensor:
         """
-        Evaluates radial basis functions given distances and the corresponding
-        values of a cutoff function (must be consistent with cutoff value
-        passed at initialization).
+        Evaluates radial basis functions given distances.
         N: Number of input values.
         num_basis_functions: Number of radial basis functions.
 
@@ -77,9 +114,7 @@ class GaussianRBFLayer(BaseRBF):
             rbf (FloatTensor [N, num_basis_functions]):
                 Values of the radial basis functions for the distances r.
         """
-        return torch.exp(
-            -self.width * (Dij.view(-1, 1) - self.center) ** 2
-        )
+        return torch.exp(self.coeff * (Dij.view(-1, 1) - self.center) ** 2)
 
 
 class BernsteinRBFLayer(BaseRBF):
@@ -447,23 +482,6 @@ class BesselRBFLayer(BaseRBF):
     def _get_rbf(self, x: Tensor) -> Tensor:  # [..., 1]
         numerator = torch.sin(self.bessel_weights.view(1, -1) * x.view(-1, 1))  # [..., num_basis]
         return self.prefactor * (numerator / x.view(-1, 1))
-
-
-class GaussianSmearing(BaseFFLayer):
-    def __init__(
-        self,
-        num_rbf: int,
-        cutoff_sr: float,
-        cuton: float=0.0,
-    ):
-        super().__init__(input_fields={"Dij_sr"}, output_fields={"rbf"})
-        offset = torch.linspace(cuton, cutoff_sr, num_rbf)
-        self.coeff = -0.5 / (offset[1] - offset[0]).item() ** 2
-        self.register_buffer('offset', offset)
-
-    def get_rbf(self, Dij_sr: Tensor) -> Tensor:
-        dist = Dij_sr.view(-1, 1) - self.offset.view(1, -1)
-        return torch.exp(self.coeff * torch.pow(dist, 2))
 
 
 class ExpNormalSmearing(BaseFFLayer):

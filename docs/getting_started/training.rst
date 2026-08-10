@@ -135,7 +135,10 @@ Final Modelhub configuration
                     Bohr_in_R: 0.5291772108
                 layers:
                   - name: RangeSeparation
-                  - name: GaussianSmearing
+                  - name: GaussianRBF
+                    params:
+                        flavor: SchNet
+                        apply_cutoff_fn: false
                   - name: RandomAtomEmbedding
                   - name: Core
                     params:

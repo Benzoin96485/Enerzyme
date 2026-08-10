@@ -41,7 +41,7 @@ DEFAULT_BUILD_PARAMS = {
 
 DEFAULT_LAYER_PARAMS = [
     {"name": "RangeSeparation"},
-    {"name": "GaussianSmearing"},
+    {"name": "GaussianRBF", "params": {"flavor": "SchNet", "apply_cutoff_fn": False}},
     {"name": "RandomAtomEmbedding"},
     {
         "name": "Core",

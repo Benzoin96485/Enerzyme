@@ -141,7 +141,7 @@ Selection guidelines
     production default is :code:`SimpleReadout` with :code:`head_type: two_layer` after 0e
     extract, optional :code:`EquiformerGraphAttentionReadout`); prefer smaller irreps /
     fewer layers for enzyme-scale clusters. EquiformerV2 uses SO(2)-reduced attention
-    (default :code:`GaussianSmearing` + :code:`atom_feature` / :code:`atom_sphere_feature`)
+    (default :code:`GaussianRBF` with SchNet width / no RBF envelope + :code:`atom_feature` / :code:`atom_sphere_feature`)
     and scales more easily to higher :code:`lmax` with truncated :code:`mmax`.
     EquiformerV3 adds merged LN, SwiGLU-S², and smooth-cutoff attention on the same
     latent contract (default :code:`norm_type: merge_layer_norm`,

@@ -34,9 +34,10 @@ Modelhub:
         num_rbf: 8
       layers:
       - name: RangeSeparation
-      - name: GaussianSmearing
+      - name: GaussianRBF
         params:
-          cuton: 0.0
+          flavor: SchNet
+          apply_cutoff_fn: false
       - name: RandomAtomEmbedding
       - name: Core
         params:

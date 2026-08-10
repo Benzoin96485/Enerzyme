@@ -117,7 +117,7 @@ def test_e2former_energy_invariance_and_force_equivariance():
         "e2former",
         layer_params=[
             {"name": "RangeSeparation"},
-            {"name": "GaussianSmearing"},
+            {"name": "GaussianRBF", "params": {"flavor": "SchNet", "apply_cutoff_fn": False}},
             {"name": "RandomAtomEmbedding"},
             {
                 "name": "Core",
@@ -191,7 +191,7 @@ def test_e2former_energy_translation_invariance():
         "e2former",
         layer_params=[
             {"name": "RangeSeparation"},
-            {"name": "GaussianSmearing"},
+            {"name": "GaussianRBF", "params": {"flavor": "SchNet", "apply_cutoff_fn": False}},
             {"name": "RandomAtomEmbedding"},
             {
                 "name": "Core",
@@ -323,7 +323,7 @@ def test_e2former_dense_graph_respects_max_neighbors():
         "e2former",
         layer_params=[
             {"name": "RangeSeparation"},
-            {"name": "GaussianSmearing"},
+            {"name": "GaussianRBF", "params": {"flavor": "SchNet", "apply_cutoff_fn": False}},
             {"name": "RandomAtomEmbedding"},
             {
                 "name": "Core",
