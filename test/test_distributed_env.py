@@ -534,6 +534,22 @@ def test_bind_single_visible_gpu_keeps_already_single_id(monkeypatch):
     assert os.environ["NCCL_SHM_DISABLE"] == "1"
 
 
+def test_bind_single_visible_gpu_selects_from_visible_list(monkeypatch):
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "4,5,6,7")
+    monkeypatch.delenv("NCCL_P2P_DISABLE", raising=False)
+    monkeypatch.delenv("NCCL_SHM_DISABLE", raising=False)
+    launch = LaunchEnv(mode="torchrun", global_rank=2, local_rank=2, world_size=4, local_world_size=4)
+    bind_single_visible_gpu(launch, cuda=True)
+    assert os.environ["CUDA_VISIBLE_DEVICES"] == "6"
+
+
+def test_bind_single_visible_gpu_rejects_local_rank_past_visible_list(monkeypatch):
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0,1")
+    launch = LaunchEnv(mode="torchrun", global_rank=3, local_rank=3, world_size=4, local_world_size=4)
+    with pytest.raises(RuntimeError, match="local_rank=3 is out of range"):
+        bind_single_visible_gpu(launch, cuda=True)
+
+
 def test_init_process_group_skips_single_process():
     assert init_process_group(LaunchEnv(mode="single")) is False
     assert init_process_group(LaunchEnv(mode="slurm_unlaunched", world_size=4)) is False

@@ -69,6 +69,30 @@ def _unwrap_ddp(model: Module) -> Module:
     return model.module if isinstance(model, DistributedDataParallel) else model
 
 
+def _require_nonempty_train_loader(
+    n_batches: int,
+    n_samples: int,
+    batch_size: int,
+    world_size: int = 1,
+) -> None:
+    """Fail fast when drop_last would yield zero optimizer steps."""
+    if n_batches > 0:
+        return
+    if world_size > 1:
+        raise RuntimeError(
+            f"DDP training would run zero optimizer steps: {n_samples} train "
+            f"samples, world_size={world_size}, batch_size={batch_size}, "
+            f"drop_last=True. Need at least {batch_size * world_size} samples "
+            f"(one full batch per rank). Use a single GPU for tiny/smoke "
+            f"splits, or lower batch_size / GPU count."
+        )
+    raise RuntimeError(
+        f"Training would run zero optimizer steps: {n_samples} samples with "
+        f"batch_size={batch_size} and drop_last=True. Lower batch_size or "
+        f"add data."
+    )
+
+
 def _convert_lightning_model_state_dict(lightning_model_state_dict: Dict) -> Dict:
     model_state_dict = dict()
     for k, v in lightning_model_state_dict.items():
@@ -606,6 +630,12 @@ class Trainer:
                     pin_memory=pin_memory,
                     distributed=self._use_ddp,
                 ),
+            )
+            _require_nonempty_train_loader(
+                len(train_dataloader),
+                len(train_dataset),
+                self.batch_size,
+                world_size=self._launch.world_size if self._use_ddp else 1,
             )
             num_training_steps = len(train_dataloader) * self.max_epochs
             num_warmup_steps = int(num_training_steps * self.warmup_ratio)

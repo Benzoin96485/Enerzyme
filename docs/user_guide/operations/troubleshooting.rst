@@ -73,6 +73,13 @@ Distributed (torch DDP)
     Enerzyme disables NCCL P2P and SHM automatically. Override with
     :code:`NCCL_P2P_DISABLE=0` / :code:`NCCL_SHM_DISABLE=0` only if your
     site's NCCL can peer through remapped device ids.
+    :code:`CUDA_VISIBLE_DEVICES` shorter than :code:`local_rank` **fails
+    fast** instead of mapping several ranks onto one GPU.
+
+**DDP job runs but loss never moves / zero training steps**
+    :code:`drop_last=True` needs at least :code:`batch_size` samples per
+    rank (about :code:`batch_size × world_size`). Tiny smoke splits should
+    run on one GPU.
 
 **Unused-parameter / DDP deadlock on modular stacks**
     Keep :code:`find_unused_parameters: true` unless every parameter is in

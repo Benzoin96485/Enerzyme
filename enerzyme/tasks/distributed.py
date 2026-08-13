@@ -762,7 +762,14 @@ def bind_single_visible_gpu(launch: LaunchEnv, *, cuda: bool = True) -> None:
         if len(ids) == 1:
             prepare_nccl_for_single_visible_gpu()
             return
-        chosen = ids[min(max(0, launch.local_rank), len(ids) - 1)]
+        if launch.local_rank >= len(ids):
+            raise RuntimeError(
+                f"local_rank={launch.local_rank} is out of range for "
+                f"CUDA_VISIBLE_DEVICES={visible!r} ({len(ids)} GPU(s)). "
+                "Match torchrun --nproc_per_node (or srun tasks) to the "
+                "number of visible GPUs; several ranks must not share one GPU."
+            )
+        chosen = ids[launch.local_rank]
         os.environ["CUDA_VISIBLE_DEVICES"] = chosen
         prepare_nccl_for_single_visible_gpu()
         return

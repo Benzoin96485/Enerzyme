@@ -9,6 +9,7 @@ from enerzyme.tasks.metrics import Metrics
 from enerzyme.tasks.trainer import (
     _convert_lightning_state_dict,
     _load_state_dict,
+    _require_nonempty_train_loader,
     _unwrap_ddp,
 )
 
@@ -93,3 +94,17 @@ def test_monitor_summary_after_merging_shards():
     assert summary["E_ele"]["mean"] == pytest.approx(2.5)
     assert summary["E_ele"]["min"] == pytest.approx(1.0)
     assert summary["E_ele"]["max"] == pytest.approx(4.0)
+
+
+def test_require_nonempty_train_loader_passes_when_batches_exist():
+    _require_nonempty_train_loader(1, n_samples=128, batch_size=32, world_size=4)
+
+
+def test_require_nonempty_train_loader_fails_fast_for_ddp():
+    with pytest.raises(RuntimeError, match="zero optimizer steps"):
+        _require_nonempty_train_loader(0, n_samples=100, batch_size=32, world_size=4)
+
+
+def test_require_nonempty_train_loader_fails_fast_single_process():
+    with pytest.raises(RuntimeError, match="zero optimizer steps"):
+        _require_nonempty_train_loader(0, n_samples=8, batch_size=32, world_size=1)

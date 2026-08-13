@@ -230,6 +230,15 @@ Common hangs
 |                                      | (:code:`--gpus-per-task=1` or site   |
 |                                      | equivalent).                         |
 +--------------------------------------+--------------------------------------+
+| :code:`CUDA_VISIBLE_DEVICES` shorter | Fail fast. Match                     |
+| than :code:`local_rank`              | :code:`--nproc_per_node` / tasks to  |
+|                                      | the visible GPU count.               |
++--------------------------------------+--------------------------------------+
+| Train loader has 0 batches           | Need ≥ :code:`batch_size` samples    |
+|                                      | per rank (about :code:`batch_size` × |
+|                                      | world size). Smoke-test tiny splits  |
+|                                      | on one GPU.                          |
++--------------------------------------+--------------------------------------+
 | All ranks write HDF5 cache / split / | Rank 0 writes; others handshake then |
 | :code:`config.yaml` / shared log     | wait (no 30-minute cap on the HDF5   |
 |                                      | build itself). Delete a leftover     |
@@ -255,8 +264,9 @@ Debugging
 
 - Increase :code:`Trainer.ddp_timeout_minutes` if init or the first
   validation gather is slow on a shared filesystem.
-- Smoke-test with :code:`max_epochs: 2` (and a tiny split) before a full
-  run.
+- Smoke-test with :code:`max_epochs: 2` before a full run. Tiny splits
+  belong on one GPU; DDP needs at least one full :code:`batch_size` per
+  rank.
 - Confirm world size in the log: :code:`N` ranks, one :code:`model_best.pth`
   (or :code:`model{i}_best.pth` per committee member).
 
