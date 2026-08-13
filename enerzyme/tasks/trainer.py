@@ -419,6 +419,29 @@ class Trainer:
                 merged_truths[key].extend(values)
         return dict(merged_preds), dict(merged_truths)
 
+    def _summarize_monitor(self) -> None:
+        """Log Monitor stats over the full validation set (gather under DDP)."""
+        if self.monitor is None:
+            return
+        if is_distributed_runtime():
+            import torch.distributed as dist
+
+            gathered = [None] * dist.get_world_size()
+            dist.all_gather_object(gathered, self.monitor.collection)
+            if self._is_rank0:
+                merged = {key: [] for key in self.monitor.terms}
+                for shard in gathered:
+                    if not shard:
+                        continue
+                    for key, values in shard.items():
+                        merged.setdefault(key, []).extend(values)
+                self.monitor.collection = merged
+                self.monitor.summary()
+            else:
+                self.monitor._reset()
+            return
+        self.monitor.summary()
+
     def _open_tensorboard(self, dump_dir: str):
         if not self.tensorboard or not self._is_rank0:
             return None
@@ -885,8 +908,8 @@ class Trainer:
                 )
             batch_bar.update()
 
-        if self.monitor is not None and self._is_rank0:
-            self.monitor.summary()
+        if self.monitor is not None:
+            self._summarize_monitor()
 
         if transform is not None:
             transform.inverse_transform(y_preds)

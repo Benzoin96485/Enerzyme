@@ -235,22 +235,44 @@ def barrier(
     safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
     prefix = f".enerzyme_barrier_{launch.world_size}_{safe_name}"
     flag = sync_path / f"{prefix}.done"
+    gen_file = sync_path / f"{prefix}.gen"
     arrived = sync_path / f"{prefix}.r{launch.global_rank}"
-    arrived.touch()
+
+    def _read_text(path: Path) -> Optional[str]:
+        try:
+            return path.read_text()
+        except OSError:
+            return None
 
     if launch.is_global_zero():
-        # Rank 0 waits until every rank has checked in, then writes the done flag.
+        # New round: drop leftover .done / arrivals from a previous job in
+        # the same directory so non-zero ranks cannot short-circuit on them.
+        for path in sync_path.glob(f"{prefix}.r*"):
+            try:
+                path.unlink()
+            except OSError:
+                pass
+        if flag.exists():
+            try:
+                flag.unlink()
+            except OSError:
+                pass
+        token = f"{time.time_ns()}-{os.getpid()}-{launch.world_size}"
+        gen_file.write_text(token)
+        arrived.write_text(token)
         deadline = time.monotonic() + timeout_seconds
         while time.monotonic() < deadline:
             present = list(sync_path.glob(f"{prefix}.r*"))
             if len(present) >= launch.world_size:
-                flag.touch()
-                for path in present:
-                    try:
-                        path.unlink()
-                    except OSError:
-                        pass
-                return
+                tokens = [_read_text(path) for path in present]
+                if all(value == token for value in tokens):
+                    flag.write_text(token)
+                    for path in present:
+                        try:
+                            path.unlink()
+                        except OSError:
+                            pass
+                    return
             time.sleep(poll_interval)
         raise TimeoutError(
             f"barrier timed out after {timeout_seconds}s waiting for "
@@ -258,9 +280,20 @@ def barrier(
         )
 
     deadline = time.monotonic() + timeout_seconds
+    # Ignore a leftover completed round (same .gen/.done token) from a
+    # previous job in this directory; wait for rank 0 to start a new token.
+    initial_done = _read_text(flag) if flag.exists() else None
+    token: Optional[str] = None
     while time.monotonic() < deadline:
-        if flag.exists():
-            return
+        if gen_file.exists():
+            token = _read_text(gen_file)
+        if token and token != initial_done:
+            try:
+                arrived.write_text(token)
+            except OSError:
+                pass
+            if flag.exists() and _read_text(flag) == token:
+                return
         time.sleep(poll_interval)
     raise TimeoutError(
         f"barrier timed out after {timeout_seconds}s waiting for rank0 flag "

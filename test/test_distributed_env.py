@@ -291,6 +291,29 @@ def test_named_file_barriers_can_reuse_sync_dir(tmp_path):
         list(pool.map(_run, envs))
 
 
+def test_file_barrier_ignores_stale_done_flag(tmp_path):
+    """A leftover .done from a previous job must not let rank 1 skip check-in."""
+    prefix = ".enerzyme_barrier_2_stale"
+    (tmp_path / f"{prefix}.done").write_text("old-token")
+    (tmp_path / f"{prefix}.r0").write_text("old-token")
+    (tmp_path / f"{prefix}.r1").write_text("old-token")
+    (tmp_path / f"{prefix}.gen").write_text("old-token")
+
+    envs = [
+        LaunchEnv(mode="torchrun", global_rank=0, world_size=2, local_world_size=2),
+        LaunchEnv(mode="torchrun", global_rank=1, world_size=2, local_world_size=2),
+    ]
+
+    def _run(launch: LaunchEnv) -> None:
+        barrier(launch, sync_dir=str(tmp_path), name="stale", timeout_seconds=10.0)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(_run, envs))
+
+    done = (tmp_path / f"{prefix}.done").read_text()
+    assert done != "old-token"
+
+
 def test_bind_single_visible_gpu_torchrun_selects_local_rank(monkeypatch):
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
     monkeypatch.delenv("NCCL_P2P_DISABLE", raising=False)

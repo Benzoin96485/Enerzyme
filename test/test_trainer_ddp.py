@@ -81,3 +81,15 @@ def test_cal_metric_from_partials_matches_cal_metric():
     assert from_partials.keys() == direct.keys()
     for key in direct:
         assert from_partials[key] == pytest.approx(direct[key], rel=1e-6)
+
+
+def test_monitor_summary_after_merging_shards():
+    from enerzyme.tasks.monitor import Monitor
+
+    monitor = Monitor(E_ele=["mean", "min", "max"])
+    monitor.collection = {"E_ele": [1.0, 2.0]}
+    monitor.collection["E_ele"].extend([3.0, 4.0])
+    summary = monitor._summary()
+    assert summary["E_ele"]["mean"] == pytest.approx(2.5)
+    assert summary["E_ele"]["min"] == pytest.approx(1.0)
+    assert summary["E_ele"]["max"] == pytest.approx(4.0)

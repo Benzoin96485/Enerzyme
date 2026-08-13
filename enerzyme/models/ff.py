@@ -291,6 +291,9 @@ class MetaStateDict(dict):
             self.update(joblib.load(self.dump_path))
 
     def dump(self) -> None:
+        from ..tasks.distributed import is_global_zero
+        if not is_global_zero():
+            return
         joblib.dump({k: v for k, v in self.items()}, self.dump_path)
 
     def update(self, d: Dict) -> None:
@@ -385,6 +388,9 @@ class BaseFFLauncher(ABC):
         return self._evaluate(test_dataset)
 
     def dump(self, data: Any, dump_dir: str, name: str) -> None:
+        from ..tasks.distributed import is_global_zero
+        if not is_global_zero():
+            return
         path = os.path.join(dump_dir, name)
         if not os.path.exists(dump_dir):
             os.makedirs(dump_dir)
