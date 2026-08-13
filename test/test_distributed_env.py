@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -20,6 +21,7 @@ from enerzyme.tasks.distributed import (
     resolve_master_addr,
     resolve_master_port,
     resolve_world_size,
+    run_rank0_exclusive,
     validate_distributed_launch,
     world_size,
 )
@@ -371,6 +373,143 @@ def test_file_barrier_ignores_stale_done_flag(tmp_path):
 
     done = (tmp_path / f"{prefix}.done").read_text()
     assert done != "old-token"
+
+
+def test_file_barrier_ignores_stale_gen_without_done(tmp_path):
+    """Leftover .gen/.r0 with no .done must not look like a live round.
+
+    Rank 1 is started first so it would previously check in with the stale
+    token after seeing .done already gone.
+    """
+    prefix = ".enerzyme_barrier_2_stale_gen"
+    (tmp_path / f"{prefix}.gen").write_text("old-token")
+    (tmp_path / f"{prefix}.r0").write_text("old-token")
+    (tmp_path / f"{prefix}.r1").write_text("old-token")
+
+    envs = [
+        LaunchEnv(mode="torchrun", global_rank=0, world_size=2, local_world_size=2),
+        LaunchEnv(mode="torchrun", global_rank=1, world_size=2, local_world_size=2),
+    ]
+
+    def _run(launch: LaunchEnv) -> None:
+        if launch.global_rank == 0:
+            time.sleep(0.3)
+        barrier(launch, sync_dir=str(tmp_path), name="stale_gen", timeout_seconds=5.0)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(_run, envs))
+
+    done = (tmp_path / f"{prefix}.done").read_text()
+    assert done != "old-token"
+
+
+def test_rank0_exclusive_propagates_failure_to_peers(tmp_path):
+    """Peers must raise instead of proceeding to preload leftover artifacts."""
+    envs = [
+        LaunchEnv(mode="torchrun", global_rank=0, world_size=2, local_world_size=2),
+        LaunchEnv(mode="torchrun", global_rank=1, world_size=2, local_world_size=2),
+    ]
+    errors: list = [None, None]
+
+    def _run(launch: LaunchEnv) -> None:
+        def _work() -> None:
+            raise ValueError("hdf5 exploded")
+
+        try:
+            run_rank0_exclusive(
+                _work,
+                env=launch,
+                sync_dir=str(tmp_path),
+                name="boom",
+                handshake_timeout_seconds=5.0,
+                work_timeout_seconds=5.0,
+            )
+        except Exception as exc:
+            errors[launch.global_rank] = exc
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(_run, envs))
+
+    assert isinstance(errors[0], ValueError)
+    assert "hdf5 exploded" in str(errors[0])
+    assert isinstance(errors[1], RuntimeError)
+    assert "hdf5 exploded" in str(errors[1])
+
+
+def test_rank0_exclusive_work_exceeds_handshake_timeout(tmp_path):
+    """Non-zero ranks must not use the handshake timeout during rank-0 work.
+
+    DataHub HDF5 builds often take longer than the 30-minute handshake. The
+    old pattern (rank 0 works, then barrier) let peers TimeoutError first.
+    """
+    envs = [
+        LaunchEnv(mode="torchrun", global_rank=0, world_size=2, local_world_size=2),
+        LaunchEnv(mode="torchrun", global_rank=1, world_size=2, local_world_size=2),
+    ]
+    handshake = 1.0
+    work_seconds = 1.5
+
+    def _run(launch: LaunchEnv) -> None:
+        def _work() -> None:
+            time.sleep(work_seconds)
+
+        run_rank0_exclusive(
+            _work,
+            env=launch,
+            sync_dir=str(tmp_path),
+            name="slow_cache",
+            handshake_timeout_seconds=handshake,
+            work_timeout_seconds=5.0,
+            poll_interval=0.05,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(_run, envs))
+
+
+def test_rank0_exclusive_ignores_stale_done_flag(tmp_path):
+    prefix = ".enerzyme_barrier_2_slow_stale"
+    (tmp_path / f"{prefix}.done").write_text("old-token")
+    (tmp_path / f"{prefix}.r0").write_text("old-token")
+    (tmp_path / f"{prefix}.r1").write_text("old-token")
+    (tmp_path / f"{prefix}.gen").write_text("old-token")
+
+    envs = [
+        LaunchEnv(mode="torchrun", global_rank=0, world_size=2, local_world_size=2),
+        LaunchEnv(mode="torchrun", global_rank=1, world_size=2, local_world_size=2),
+    ]
+    marker = tmp_path / "built"
+
+    def _run(launch: LaunchEnv) -> None:
+        def _work() -> None:
+            marker.write_text("ok")
+
+        run_rank0_exclusive(
+            _work,
+            env=launch,
+            sync_dir=str(tmp_path),
+            name="slow_stale",
+            handshake_timeout_seconds=10.0,
+            work_timeout_seconds=10.0,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(_run, envs))
+
+    assert marker.read_text() == "ok"
+    done = (tmp_path / f"{prefix}.done").read_text()
+    assert done != "old-token"
+
+
+def test_rank0_exclusive_single_process_runs_fn(tmp_path):
+    ran = []
+    run_rank0_exclusive(
+        lambda: ran.append(1),
+        env=LaunchEnv(mode="single"),
+        sync_dir=str(tmp_path),
+        name="single",
+    )
+    assert ran == [1]
 
 
 def test_bind_single_visible_gpu_torchrun_selects_local_rank(monkeypatch):

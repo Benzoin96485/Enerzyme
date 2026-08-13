@@ -592,28 +592,37 @@ class SingleDataHub:
         self.global_transform = Transform(global_transforms, self.preload_path)
         self.preprocessings = preprocessings
         self.global_transforms = global_transforms
-        # Rank-safe cache write: only global rank 0 builds HDF5; others wait then read.
-        # Uses env ranks before torch.distributed init (see tasks.distributed).
-        from ..tasks.distributed import barrier, detect_launch_env, is_global_zero
+        # All ranks always join the exclusive section. Rank 0 no-ops on a
+        # cache hit; peers never skip the collective just because their local
+        # stat() already sees the directory.
+        from ..tasks.distributed import detect_launch_env, is_global_zero, run_rank0_exclusive
 
         launch = detect_launch_env()
         sync_dir = os.path.abspath(dump_dir)
-        if not self.preload or not self.preload_data():
-            if is_global_zero(launch):
-                self.get_handle("w")
-                self._init_data()
-                self._init_neighbor_list()
-                self.preprocessing.transform(self.data)
-                self.global_transform.transform(self.data)
-                self._save_config()
-                self.reset_handle()
-            barrier(launch, sync_dir=sync_dir, name=f"datahub_{self.hash}")
-            if not is_global_zero(launch):
-                if not self.preload_data():
-                    raise RuntimeError(
-                        f"Rank {launch.global_rank} failed to preload dataset from "
-                        f"{self.preload_path} after rank 0 finished writing"
-                    )
+
+        def _ensure_cache():
+            if self.preload and self.preload_data():
+                return
+            self.get_handle("w")
+            self._init_data()
+            self._init_neighbor_list()
+            self.preprocessing.transform(self.data)
+            self.global_transform.transform(self.data)
+            self._save_config()
+            self.reset_handle()
+
+        run_rank0_exclusive(
+            _ensure_cache,
+            env=launch,
+            sync_dir=sync_dir,
+            name=f"datahub_{self.hash}",
+        )
+        if not is_global_zero(launch):
+            if not self.preload_data():
+                raise RuntimeError(
+                    f"Rank {launch.global_rank} failed to preload dataset from "
+                    f"{self.preload_path} after rank 0 finished writing"
+                )
 
     def _preload_data(self, hdf5_path):
         loaded_file = h5py.File(hdf5_path, mode="r")

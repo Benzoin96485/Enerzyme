@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal, Mapping, MutableMapping, Optional, Union
+from typing import Callable, Literal, Mapping, MutableMapping, Optional, Union
 
 LaunchMode = Literal["single", "slurm_srun", "torchrun", "slurm_unlaunched"]
 
@@ -262,6 +262,210 @@ def global_rank(env: Optional[LaunchEnv] = None) -> int:
     return (env or detect_launch_env()).global_rank
 
 
+def _read_text(path: Path) -> Optional[str]:
+    try:
+        return path.read_text()
+    except OSError:
+        return None
+
+
+def _wait_until(
+    predicate: Callable[[], bool],
+    timeout_seconds: Optional[float],
+    poll_interval: float,
+    error_msg: str,
+) -> None:
+    if timeout_seconds is None:
+        while True:
+            if predicate():
+                return
+            time.sleep(poll_interval)
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        time.sleep(poll_interval)
+    raise TimeoutError(error_msg)
+
+
+def _unlink_quiet(path: Path) -> None:
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
+def _file_barrier_layout(sync_dir: str, name: str, launch: LaunchEnv):
+    sync_path = Path(sync_dir)
+    sync_path.mkdir(parents=True, exist_ok=True)
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
+    prefix = f".enerzyme_barrier_{launch.world_size}_{safe_name}"
+    return (
+        sync_path,
+        prefix,
+        sync_path / f"{prefix}.done",
+        sync_path / f"{prefix}.gen",
+        sync_path / f"{prefix}.r{launch.global_rank}",
+        sync_path / f"{prefix}.fail",
+        sync_path / f"{prefix}.r0",
+    )
+
+
+def _start_file_round(
+    launch: LaunchEnv,
+    sync_dir: str,
+    name: str,
+    timeout_seconds: float,
+    poll_interval: float,
+) -> None:
+    """Publish a generation token and check in. Rank 0 waits for all arrivals.
+
+    Does not write ``.done``; callers run rank-0 work then ``_finish_file_round``.
+
+    Non-zero ranks first write a hello flag. Rank 0 only publishes ``.gen``
+    after every rank has checked in that way, so leftover ``.gen`` cannot be
+    mistaken for the live round and nobody joins a token published before they
+    sampled leftovers.
+    """
+    sync_path, prefix, flag, gen_file, arrived, fail_file, r0_file = (
+        _file_barrier_layout(sync_dir, name, launch)
+    )
+    hello = sync_path / f"{prefix}.h{launch.global_rank}"
+
+    def _hellos_complete() -> bool:
+        return len(list(sync_path.glob(f"{prefix}.h*"))) >= launch.world_size
+
+    if launch.is_global_zero():
+        for path in sync_path.glob(f"{prefix}.*"):
+            _unlink_quiet(path)
+        hello.write_text("1")
+        _wait_until(
+            _hellos_complete,
+            timeout_seconds,
+            poll_interval,
+            f"barrier hello timed out after {timeout_seconds}s waiting for "
+            f"{launch.world_size} ranks under {sync_dir} (name={name!r})",
+        )
+        for path in sync_path.glob(f"{prefix}.r*"):
+            _unlink_quiet(path)
+        _unlink_quiet(fail_file)
+        _unlink_quiet(gen_file)
+        _unlink_quiet(flag)
+        token = f"{time.time_ns()}-{os.getpid()}-{launch.world_size}"
+        gen_file.write_text(token)
+        arrived.write_text(token)
+
+        def _all_arrived() -> bool:
+            present = list(sync_path.glob(f"{prefix}.r*"))
+            if len(present) < launch.world_size:
+                return False
+            tokens = [_read_text(path) for path in present]
+            return all(value == token for value in tokens)
+
+        _wait_until(
+            _all_arrived,
+            timeout_seconds,
+            poll_interval,
+            f"barrier handshake timed out after {timeout_seconds}s waiting for "
+            f"{launch.world_size} ranks under {sync_dir} (name={name!r})",
+        )
+        return
+
+    initial_gen = _read_text(gen_file) if gen_file.exists() else None
+    hello.write_text("1")
+
+    def _checked_in() -> bool:
+        if not hello.exists():
+            try:
+                hello.write_text("1")
+            except OSError:
+                pass
+            return False
+        token = _read_text(gen_file) if gen_file.exists() else None
+        r0_token = _read_text(r0_file) if r0_file.exists() else None
+        if not token or r0_token != token or token == initial_gen:
+            return False
+        try:
+            arrived.write_text(token)
+        except OSError:
+            return False
+        return (
+            _read_text(gen_file) == token and _read_text(r0_file) == token
+        )
+
+    _wait_until(
+        _checked_in,
+        timeout_seconds,
+        poll_interval,
+        f"barrier handshake timed out after {timeout_seconds}s waiting for rank0 "
+        f"generation under {sync_dir} (name={name!r})",
+    )
+
+
+def _finish_file_round(
+    launch: LaunchEnv,
+    sync_dir: str,
+    name: str,
+    timeout_seconds: Optional[float],
+    poll_interval: float,
+    *,
+    failed: bool = False,
+    error_text: Optional[str] = None,
+) -> None:
+    """Rank 0 writes ``.done`` (or ``.fail``); other ranks wait for either."""
+    sync_path, prefix, flag, gen_file, _arrived, fail_file, _r0_file = (
+        _file_barrier_layout(sync_dir, name, launch)
+    )
+    token = _read_text(gen_file)
+    if launch.is_global_zero():
+        if not token:
+            raise RuntimeError(
+                f"file barrier finish without generation token under {sync_dir} "
+                f"(name={name!r})"
+            )
+        if failed:
+            fail_file.write_text(error_text or "rank 0 work failed")
+        else:
+            _unlink_quiet(fail_file)
+        flag.write_text(token)
+        for path in sync_path.glob(f"{prefix}.r*"):
+            _unlink_quiet(path)
+        for path in sync_path.glob(f"{prefix}.h*"):
+            _unlink_quiet(path)
+        return
+
+    timeout_label = (
+        "no timeout" if timeout_seconds is None else f"{timeout_seconds}s"
+    )
+
+    def _terminal() -> bool:
+        if fail_file.exists():
+            return True
+        return bool(token) and flag.exists() and _read_text(flag) == token
+
+    _wait_until(
+        _terminal,
+        timeout_seconds,
+        poll_interval,
+        f"barrier timed out after {timeout_label} waiting for rank0 to finish "
+        f"under {sync_dir} (name={name!r})",
+    )
+    if fail_file.exists():
+        raise RuntimeError(
+            f"rank 0 failed during {name!r}: "
+            f"{_read_text(fail_file) or 'unknown error'}"
+        )
+
+
+def _require_sync_dir(sync_dir: Optional[str]) -> str:
+    if sync_dir is None:
+        raise RuntimeError(
+            "barrier() before torch.distributed init requires sync_dir on a "
+            "shared filesystem (e.g. the training output directory)."
+        )
+    return sync_dir
+
+
 def barrier(
     env: Optional[LaunchEnv] = None,
     *,
@@ -278,6 +482,10 @@ def barrier(
 
     ``name`` distinguishes successive file barriers that share the same
     ``sync_dir`` (e.g. ``datahub`` then ``splitter`` then ``config``).
+
+    For long rank-0 work (DataHub HDF5, split write) use
+    :func:`run_rank0_exclusive` so the handshake is not charged against the
+    work wait.
     """
     launch = env or detect_launch_env()
     if launch.world_size <= 1 or launch.mode in ("single", "slurm_unlaunched"):
@@ -292,82 +500,91 @@ def barrier(
     except ImportError:
         pass
 
-    if sync_dir is None:
-        raise RuntimeError(
-            "barrier() before torch.distributed init requires sync_dir on a "
-            "shared filesystem (e.g. the training output directory)."
-        )
+    path = _require_sync_dir(sync_dir)
+    _start_file_round(launch, path, name, timeout_seconds, poll_interval)
+    _finish_file_round(launch, path, name, timeout_seconds, poll_interval)
 
-    sync_path = Path(sync_dir)
-    sync_path.mkdir(parents=True, exist_ok=True)
-    # One flag file per named collective so callers can reuse sync_dir.
-    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
-    prefix = f".enerzyme_barrier_{launch.world_size}_{safe_name}"
-    flag = sync_path / f"{prefix}.done"
-    gen_file = sync_path / f"{prefix}.gen"
-    arrived = sync_path / f"{prefix}.r{launch.global_rank}"
 
-    def _read_text(path: Path) -> Optional[str]:
-        try:
-            return path.read_text()
-        except OSError:
-            return None
+def run_rank0_exclusive(
+    fn: Callable[[], None],
+    env: Optional[LaunchEnv] = None,
+    *,
+    sync_dir: Optional[str] = None,
+    name: str = "default",
+    handshake_timeout_seconds: float = 1800.0,
+    work_timeout_seconds: Optional[float] = None,
+    poll_interval: float = 0.1,
+) -> None:
+    """All ranks handshake, rank 0 runs ``fn``, then all ranks wait until it finishes.
 
-    if launch.is_global_zero():
-        # New round: drop leftover .done / arrivals from a previous job in
-        # the same directory so non-zero ranks cannot short-circuit on them.
-        for path in sync_path.glob(f"{prefix}.r*"):
+    File-barrier handshake uses ``handshake_timeout_seconds`` (default 30 min)
+    so hung peers fail fast. The wait after rank-0 work uses
+    ``work_timeout_seconds`` (default ``None`` = wait indefinitely) because
+    first-time DataHub HDF5 builds often exceed 30 minutes.
+
+    Every rank must call this. If ``fn`` raises, rank 0 writes a ``.fail``
+    flag so peers raise instead of treating leftover artifacts as success.
+    """
+    launch = env or detect_launch_env()
+    if launch.world_size <= 1 or launch.mode in ("single", "slurm_unlaunched"):
+        if launch.is_global_zero():
+            fn()
+        return
+
+    try:
+        import torch.distributed as dist
+
+        if dist.is_available() and dist.is_initialized():
+            dist.barrier()
+            rank0_error: Optional[BaseException] = None
             try:
-                path.unlink()
-            except OSError:
-                pass
-        if flag.exists():
-            try:
-                flag.unlink()
-            except OSError:
-                pass
-        token = f"{time.time_ns()}-{os.getpid()}-{launch.world_size}"
-        gen_file.write_text(token)
-        arrived.write_text(token)
-        deadline = time.monotonic() + timeout_seconds
-        while time.monotonic() < deadline:
-            present = list(sync_path.glob(f"{prefix}.r*"))
-            if len(present) >= launch.world_size:
-                tokens = [_read_text(path) for path in present]
-                if all(value == token for value in tokens):
-                    flag.write_text(token)
-                    for path in present:
-                        try:
-                            path.unlink()
-                        except OSError:
-                            pass
-                    return
-            time.sleep(poll_interval)
-        raise TimeoutError(
-            f"barrier timed out after {timeout_seconds}s waiting for "
-            f"{launch.world_size} ranks under {sync_dir} (name={name!r})"
-        )
+                if launch.is_global_zero():
+                    fn()
+            except Exception as exc:
+                rank0_error = exc
+            payload: list = [None]
+            if launch.is_global_zero():
+                payload[0] = (
+                    None
+                    if rank0_error is None
+                    else f"{type(rank0_error).__name__}: {rank0_error}"
+                )
+            dist.broadcast_object_list(payload, src=0)
+            if payload[0] is not None:
+                if rank0_error is not None:
+                    raise rank0_error
+                raise RuntimeError(
+                    f"rank 0 failed during {name!r}: {payload[0]}"
+                )
+            return
+    except ImportError:
+        pass
 
-    deadline = time.monotonic() + timeout_seconds
-    # Ignore a leftover completed round (same .gen/.done token) from a
-    # previous job in this directory; wait for rank 0 to start a new token.
-    initial_done = _read_text(flag) if flag.exists() else None
-    token: Optional[str] = None
-    while time.monotonic() < deadline:
-        if gen_file.exists():
-            token = _read_text(gen_file)
-        if token and token != initial_done:
-            try:
-                arrived.write_text(token)
-            except OSError:
-                pass
-            if flag.exists() and _read_text(flag) == token:
-                return
-        time.sleep(poll_interval)
-    raise TimeoutError(
-        f"barrier timed out after {timeout_seconds}s waiting for rank0 flag "
-        f"under {sync_dir} (name={name!r})"
+    path = _require_sync_dir(sync_dir)
+    _start_file_round(
+        launch, path, name, handshake_timeout_seconds, poll_interval
     )
+    rank0_error = None
+    try:
+        if launch.is_global_zero():
+            fn()
+    except Exception as exc:
+        rank0_error = exc
+    _finish_file_round(
+        launch,
+        path,
+        name,
+        work_timeout_seconds,
+        poll_interval,
+        failed=rank0_error is not None,
+        error_text=(
+            None
+            if rank0_error is None
+            else f"{type(rank0_error).__name__}: {rank0_error}"
+        ),
+    )
+    if rank0_error is not None:
+        raise rank0_error
 
 
 def validate_distributed_launch(env: Optional[LaunchEnv] = None) -> None:

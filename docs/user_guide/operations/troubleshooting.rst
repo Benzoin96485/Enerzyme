@@ -59,8 +59,12 @@ Distributed (torch DDP)
     per GPU — see :doc:`/user_guide/operations/distributed_training`.
 
 **Stall while writing HDF5 cache, split, or** :code:`config.yaml`
-    Only rank 0 may write shared artifacts. Delete a half-written
-    :code:`processed_dataset_<hash>/` and retry.
+    Only rank 0 writes shared artifacts. Peers check in first, then wait
+    for the cache without the 30-minute handshake cap (first-time HDF5
+    builds can take hours). Delete a half-written
+    :code:`processed_dataset_<hash>/` and retry. A handshake
+    :code:`TimeoutError` means a rank never checked in, not a slow
+    preprocess.
 
 **NCCL timeout / invalid device ordinal**
     Set :code:`NCCL_DEBUG=WARN`; raise :code:`Trainer.ddp_timeout_minutes`;

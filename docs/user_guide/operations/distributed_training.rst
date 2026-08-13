@@ -230,10 +230,10 @@ Common hangs
 |                                      | (:code:`--gpus-per-task=1` or site   |
 |                                      | equivalent).                         |
 +--------------------------------------+--------------------------------------+
-| All ranks write HDF5 cache / split / | Rank 0 writes; others wait then      |
-| :code:`config.yaml` / shared log     | read. If a previous run left a       |
-|                                      | half-written cache, delete it and    |
-|                                      | retry.                               |
+| All ranks write HDF5 cache / split / | Rank 0 writes; others handshake then |
+| :code:`config.yaml` / shared log     | wait (no 30-minute cap on the HDF5   |
+|                                      | build itself). Delete a leftover     |
+|                                      | half-written cache and retry.        |
 +--------------------------------------+--------------------------------------+
 | NCCL timeout / invalid device        | Raise :code:`ddp_timeout_minutes`;   |
 | ordinal / silent stall               | check GPU bind; with one visible GPU |
