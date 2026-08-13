@@ -556,6 +556,10 @@ class FF_single(BaseFFLauncher):
                 try:
                     self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
                 except FileNotFoundError:
+                    self.pretrain_path = None
+                # dump_dir may not exist yet: get_pretrain_path returns None (no raise).
+                # Fall back to YAML pretrain_path (e.g. legacy Lightning .pth).
+                if self.pretrain_path is None and self.base_pretrain_path is not None:
                     self.pretrain_path = get_pretrain_path(self.base_pretrain_path, "best", None)
             else:
                 self.pretrain_path = get_pretrain_path(base_pretrain_path, "last", None)

@@ -1,7 +1,32 @@
-from typing import Dict, Callable, Tuple, List, Union, Optional
+from typing import Dict, Callable, Tuple, List, Union, Optional, Iterable
 import numpy as np
 from ..data import is_atomic, get_tensor_rank
 from ..utils.base_logger import logger
+
+
+def _split_target_metric(target_metric: str) -> Tuple[str, str]:
+    """Split ``Ea_rmse`` → ``("Ea", "rmse")`` (metric is the last ``_`` segment)."""
+    target_name, metric_name = target_metric.rsplit("_", 1)
+    return target_name, metric_name
+
+
+def _arrays_for_metric(
+    label: Dict[str, Union[List, np.ndarray]],
+    prediction: Dict[str, Union[List, np.ndarray]],
+    target_name: str,
+) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """Flatten label/prediction lists into comparable arrays, or None if empty."""
+    y_true = label.get(target_name, [])
+    if not y_true:
+        return None
+    y_pred = prediction[target_name]
+    if is_atomic(target_name) or get_tensor_rank(target_name):
+        y_trues, y_preds = np.concatenate(y_true), np.concatenate(y_pred)
+    else:
+        y_trues, y_preds = np.array(y_true), np.array(y_pred)
+    if y_preds.ndim == y_trues.ndim + 1:
+        y_preds = np.mean(y_preds, axis=-1)
+    return y_trues, y_preds
 
 
 def build_single_metric(metric_str: str) -> Callable[[Dict[str, Union[List, np.ndarray]], Dict[str, Union[List, np.ndarray]], str], Optional[float]]:
@@ -20,23 +45,11 @@ def build_single_metric(metric_str: str) -> Callable[[Dict[str, Union[List, np.n
         raise ValueError(f"Unknown metric: {metric_str}")
     
     def metric(label: Dict[str, Union[List, np.ndarray]], prediction: Dict[str, Union[List, np.ndarray]], target_name: str) -> Optional[float]:
-        y_true = label.get(target_name, [])
-        if not y_true:
+        arrays = _arrays_for_metric(label, prediction, target_name)
+        if arrays is None:
             return 0
-        y_pred = prediction[target_name]
-        if is_atomic(target_name) or get_tensor_rank(target_name):
-            y_trues, y_preds = np.concatenate(y_true), np.concatenate(y_pred)
-            if y_preds.ndim == y_trues.ndim + 1:
-                score = metric_func(y_trues, np.mean(y_preds, axis=-1))
-            else:
-                score = metric_func(y_trues, y_preds)
-        else:
-            y_trues, y_preds = np.array(y_true), np.array(y_pred)
-            if y_preds.ndim == y_trues.ndim + 1:
-                score = metric_func(y_trues, np.mean(y_preds, axis=-1))
-            else:
-                score = metric_func(y_trues, y_preds)
-        return score
+        y_trues, y_preds = arrays
+        return metric_func(y_trues, y_preds)
     return metric
 
 
@@ -72,7 +85,75 @@ class Metrics(object):
     def cal_metric(self, label: Dict[str, Union[List, np.ndarray]], predict: Dict[str, Union[List, np.ndarray]]) -> Dict[str, float]:
         raw_metric_score = dict()
         for target_metric in self.metric_config:
-            raw_metric_score[target_metric] = self.cal_single_metric(label, predict, *target_metric.split("_"))
+            raw_metric_score[target_metric] = self.cal_single_metric(
+                label, predict, *_split_target_metric(target_metric)
+            )
+        raw_metric_score["_judge_score"] = self.cal_judge_score(raw_metric_score)
+        return raw_metric_score
+
+    def accumulate_partials(
+        self,
+        label: Dict[str, Union[List, np.ndarray]],
+        predict: Dict[str, Union[List, np.ndarray]],
+    ) -> Dict[str, Dict[str, float]]:
+        """Per-metric additive partials ``{error_sum, count}`` for DDP gather.
+
+        For ``rmse``, ``error_sum`` is SSE; for ``mae``, SAE. Global metrics are
+        recovered via :meth:`cal_metric_from_partials` after summing across ranks.
+        """
+        partials: Dict[str, Dict[str, float]] = {}
+        for target_metric in self.metric_config:
+            target_name, metric_name = _split_target_metric(target_metric)
+            arrays = _arrays_for_metric(label, predict, target_name)
+            if arrays is None:
+                partials[target_metric] = {"error_sum": 0.0, "count": 0.0}
+                continue
+            y_trues, y_preds = arrays
+            diff = y_trues.astype(np.float64) - y_preds.astype(np.float64)
+            if metric_name == "rmse":
+                error_sum = float(np.sum(diff * diff))
+            elif metric_name == "mae":
+                error_sum = float(np.sum(np.abs(diff)))
+            else:
+                raise ValueError(f"Unknown metric for partials: {metric_name}")
+            partials[target_metric] = {
+                "error_sum": error_sum,
+                "count": float(diff.size),
+            }
+        return partials
+
+    @staticmethod
+    def merge_partials(
+        partials_list: Iterable[Dict[str, Dict[str, float]]],
+    ) -> Dict[str, Dict[str, float]]:
+        """Sum ``error_sum`` / ``count`` across rank-local partial dicts."""
+        merged: Dict[str, Dict[str, float]] = {}
+        for partials in partials_list:
+            for key, stats in partials.items():
+                if key not in merged:
+                    merged[key] = {"error_sum": 0.0, "count": 0.0}
+                merged[key]["error_sum"] += float(stats["error_sum"])
+                merged[key]["count"] += float(stats["count"])
+        return merged
+
+    def cal_metric_from_partials(
+        self, partials: Dict[str, Dict[str, float]]
+    ) -> Dict[str, float]:
+        """Build metric scores from gathered ``{error_sum, count}`` partials."""
+        raw_metric_score: Dict[str, float] = {}
+        for target_metric in self.metric_config:
+            _, metric_name = _split_target_metric(target_metric)
+            stats = partials.get(target_metric, {"error_sum": 0.0, "count": 0.0})
+            count = float(stats["count"])
+            error_sum = float(stats["error_sum"])
+            if count <= 0:
+                raw_metric_score[target_metric] = 0.0
+            elif metric_name == "rmse":
+                raw_metric_score[target_metric] = float(np.sqrt(error_sum / count))
+            elif metric_name == "mae":
+                raw_metric_score[target_metric] = float(error_sum / count)
+            else:
+                raise ValueError(f"Unknown metric for partials: {metric_name}")
         raw_metric_score["_judge_score"] = self.cal_judge_score(raw_metric_score)
         return raw_metric_score
 

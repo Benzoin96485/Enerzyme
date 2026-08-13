@@ -25,7 +25,9 @@ Training
 --------
 
 :code:`batch_size`
-    Largest value that fits GPU memory.
+    Largest value that fits GPU memory. Under DDP this is **per GPU**;
+    global batch = :code:`batch_size * world_size`. Scale LR yourself if
+    you change world size.
 
 :code:`dtype: float32`
     Default for speed; :code:`float64` for numerical experiments.
@@ -33,8 +35,10 @@ Training
 :code:`neighbor_list: full` (precomputed)
     Faster epochs if memory allows; otherwise on-the-fly lists.
 
-:code:`lightning: true`
-    Multi-GPU training when single-process :code:`cuda` is insufficient.
+Multi-GPU / multi-node
+    Launch with :code:`srun` / :code:`torchrun` (**one process per GPU**).
+    Enerzyme wraps torch DDP automatically; it does not spawn. See
+    :doc:`/user_guide/operations/distributed_training`.
 
 Simulation
 ----------

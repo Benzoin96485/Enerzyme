@@ -556,6 +556,7 @@ class SingleDataHub:
         if self.select_args:
             datahub_str += str(sorted(self.select_args.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
+        self.dump_dir = dump_dir
         self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
         logger.info(f"Preload path {self.preload_path} is created")
         _pre = preprocessings or {}
@@ -591,14 +592,28 @@ class SingleDataHub:
         self.global_transform = Transform(global_transforms, self.preload_path)
         self.preprocessings = preprocessings
         self.global_transforms = global_transforms
+        # Rank-safe cache write: only global rank 0 builds HDF5; others wait then read.
+        # Uses env ranks before torch.distributed init (see tasks.distributed).
+        from ..tasks.distributed import barrier, detect_launch_env, is_global_zero
+
+        launch = detect_launch_env()
+        sync_dir = os.path.abspath(dump_dir)
         if not self.preload or not self.preload_data():
-            self.get_handle("w")
-            self._init_data()
-            self._init_neighbor_list()
-            self.preprocessing.transform(self.data)
-            self.global_transform.transform(self.data)
-            self._save_config()
-            self.reset_handle()
+            if is_global_zero(launch):
+                self.get_handle("w")
+                self._init_data()
+                self._init_neighbor_list()
+                self.preprocessing.transform(self.data)
+                self.global_transform.transform(self.data)
+                self._save_config()
+                self.reset_handle()
+            barrier(launch, sync_dir=sync_dir, name=f"datahub_{self.hash}")
+            if not is_global_zero(launch):
+                if not self.preload_data():
+                    raise RuntimeError(
+                        f"Rank {launch.global_rank} failed to preload dataset from "
+                        f"{self.preload_path} after rank 0 finished writing"
+                    )
 
     def _preload_data(self, hdf5_path):
         loaded_file = h5py.File(hdf5_path, mode="r")

@@ -27,13 +27,26 @@ class Logger(object):
         self.log_path = os.path.join(cwd_path, "logs")
 
         if not os.path.exists(self.log_path):
-            os.makedirs(self.log_path)
+            os.makedirs(self.log_path, exist_ok=True)
         self.backup_count = 5
 
         self.console_output_level = 'INFO'
         self.file_output_level = 'INFO'
         self.DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
         self.formatter = logging.Formatter("%(asctime)s | %(relativepath)s:%(lineno)s | %(levelname)s | %(name)s | %(message)s", self.DATE_FORMAT)
+
+    def _file_log_name(self) -> str:
+        """Shared rotating file on rank 0; per-rank files elsewhere to avoid FS races."""
+        try:
+            from enerzyme.tasks.distributed import detect_launch_env, is_global_zero
+
+            launch = detect_launch_env()
+            if is_global_zero(launch):
+                return self.log_file_name
+            stem, ext = os.path.splitext(self.log_file_name)
+            return f"{stem}_rank{launch.global_rank}{ext or '.log'}"
+        except Exception:
+            return self.log_file_name
 
     def get_logger(self):
         if not self.logger.handlers:
@@ -43,12 +56,19 @@ class Logger(object):
             console_handler.addFilter(PackagePathFilter())
             self.logger.addHandler(console_handler)
 
-            file_handler = TimedRotatingFileHandler(filename=os.path.join(self.log_path, self.log_file_name), when='D',
-                        interval=1, backupCount=self.backup_count, delay=True, encoding='utf-8')
+            os.makedirs(self.log_path, exist_ok=True)
+            file_handler = TimedRotatingFileHandler(
+                filename=os.path.join(self.log_path, self._file_log_name()),
+                when='D',
+                interval=1,
+                backupCount=self.backup_count,
+                delay=True,
+                encoding='utf-8',
+            )
             file_handler.setFormatter(self.formatter)
             file_handler.setLevel(self.file_output_level)
             self.logger.addHandler(file_handler)
-            # Avoid duplicate lines on stdout when root (e.g. Lightning) also has a StreamHandler.
+            # Avoid duplicate lines on stdout when root also has a StreamHandler.
             self.logger.propagate = False
         return self.logger
 

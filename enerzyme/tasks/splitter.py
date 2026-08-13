@@ -212,8 +212,37 @@ class Splitter:
         self.split = self.splitter._get_empty_split(data)
         if self.preload and self.preload_split(preload_path):
             return self.split
-        else:
+
+        # Only rank 0 writes split artifacts; other ranks barrier then preload.
+        from .distributed import barrier, detect_launch_env, is_global_zero
+
+        launch = detect_launch_env()
+        if is_global_zero(launch):
             self.split = self.splitter.split(data)
             if self.save:
                 self._save(preload_path)
+        elif not self.save:
+            # No shared file: every rank computes the same seeded split.
+            self.split = self.splitter.split(data)
             return self.split
+
+        if self.save and launch.world_size > 1:
+            sync_dir = _sync_dir_from_preload(preload_path)
+            barrier(launch, sync_dir=sync_dir, name=f"splitter_{self.splitter.hash}")
+            if not is_global_zero(launch):
+                if not self.preload_split(preload_path):
+                    raise RuntimeError(
+                        f"Rank {launch.global_rank} failed to preload split from "
+                        f"{preload_path} after rank 0 finished writing"
+                    )
+        return self.split
+
+
+def _sync_dir_from_preload(preload_path: Optional[Dict[str, str]]) -> str:
+    """Parent of the first dataset preload path (typically the training out_dir)."""
+    if preload_path:
+        first = next(iter(preload_path.values()))
+        parent = os.path.dirname(os.path.abspath(first))
+        if parent:
+            return parent
+    return os.path.abspath(".")

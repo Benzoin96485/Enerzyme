@@ -22,7 +22,7 @@ Environment files
 
 Three dependency contexts matter:
 
-- **Runtime** — :code:`setup.py` :code:`install_requires` (NumPy, PyTorch, ASE, RDKit, Lightning, etc.)
+- **Runtime** — :code:`setup.py` :code:`install_requires` (NumPy, PyTorch, ASE, RDKit, TensorBoard, etc.)
 - **Development** — :code:`requirements.yaml` at the repo root (conda env for day-to-day coding; see :doc:`/getting_started/installation`)
 - **Documentation** — :code:`docs/requirements.yaml` (Sphinx, pydata theme, editable install for autodoc)
 
@@ -241,7 +241,8 @@ Adding or changing a subcommand
 Task modules
 ^^^^^^^^^^^^
 
-- :code:`trainer.py` — training loop, resume, EMA, Lightning multi-GPU, active learning hooks
+- :code:`trainer.py` — training loop, resume, EMA, native torch DDP (external :code:`srun` / :code:`torchrun` launch; see :doc:`/user_guide/operations/distributed_training`), active learning hooks
+- :code:`distributed.py` — launch detection, rank-0 I/O primitives, GPU bind, ``init_process_group``
 - :code:`simulator.py` — ASE tasks (:code:`sp`, :code:`opt`, :code:`scan`, :code:`md`, :code:`neb`, :code:`plumed`, :code:`plumed_scan`)
 - :code:`extractor.py` — uncertainty-based fragment picking
 - :code:`server.py` — HTTP prediction server used by :code:`listen`
