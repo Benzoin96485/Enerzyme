@@ -65,6 +65,74 @@ def _env_int(environ: Mapping[str, str], key: str, default: int) -> int:
     return int(value)
 
 
+def _parse_positive_int(value: Optional[str]) -> Optional[int]:
+    """Leading integer from a Slurm env value (``4``, ``4(x2)``, ``gpu:4``)."""
+    if value is None:
+        return None
+    digits: list[str] = []
+    for ch in str(value).strip():
+        if ch.isdigit():
+            digits.append(ch)
+        elif digits:
+            break
+    if not digits:
+        return None
+    parsed = int("".join(digits))
+    return parsed if parsed > 0 else None
+
+
+def _slurm_local_world_size(environ: Mapping[str, str]) -> int:
+    for key in (
+        "SLURM_NTASKS_PER_NODE",
+        "SLURM_STEP_NUM_TASKS_PER_NODE",
+        "SLURM_STEP_TASKS_PER_NODE",
+        "SLURM_TASKS_PER_NODE",
+    ):
+        parsed = _parse_positive_int(environ.get(key))
+        if parsed:
+            return parsed
+    return 0
+
+
+def _slurm_world_size(
+    environ: Mapping[str, str],
+    num_nodes: int,
+    local_world_size: int,
+    *,
+    srun: bool,
+) -> tuple[int, int]:
+    """Task counts for a SLURM allocation or srun step.
+
+    ``SLURM_NTASKS`` is often unset when the script only specifies
+    ``--ntasks-per-node``. Prefer step-level counts, then
+    ``ntasks_per_node * nnodes``. For ``srun``, also lower-bound by
+    ``SLURM_PROCID + 1`` so a multi-task step cannot look like world_size=1.
+    """
+    world = 0
+    for key in ("SLURM_NTASKS", "SLURM_NPROCS", "SLURM_STEP_NUM_TASKS"):
+        parsed = _parse_positive_int(environ.get(key))
+        if parsed:
+            world = parsed
+            break
+    if world <= 0 and local_world_size > 0:
+        world = local_world_size * max(1, num_nodes)
+    world = max(1, world)
+    local = local_world_size
+    if srun:
+        procid = _env_int(environ, "SLURM_PROCID", 0)
+        localid = _env_int(environ, "SLURM_LOCALID", 0)
+        world = max(world, procid + 1)
+        if local <= 0:
+            local = max(
+                1,
+                localid + 1,
+                (world + max(1, num_nodes) - 1) // max(1, num_nodes),
+            )
+    if local <= 0:
+        local = max(1, world // max(1, num_nodes))
+    return world, max(1, local)
+
+
 def _has_torchrun_env(environ: Mapping[str, str]) -> bool:
     return all(key in environ for key in _TORCHRUN_KEYS)
 
@@ -148,18 +216,19 @@ def detect_launch_env(
 
     if _in_slurm_job(env):
         num_nodes = max(1, _env_int(env, "SLURM_NNODES", 1))
-        world_size = max(1, _env_int(env, "SLURM_NTASKS", 1))
-        local_world_size = _env_int(env, "SLURM_NTASKS_PER_NODE", 0)
-        if local_world_size <= 0:
-            local_world_size = max(1, world_size // num_nodes)
+        local_world_size = _slurm_local_world_size(env)
+        srun = _is_srun_step(env)
+        world_size, local_world_size = _slurm_world_size(
+            env, num_nodes, local_world_size, srun=srun
+        )
 
-        if _is_srun_step(env):
+        if srun:
             return LaunchEnv(
                 mode="slurm_srun",
                 global_rank=_env_int(env, "SLURM_PROCID", 0),
                 local_rank=_env_int(env, "SLURM_LOCALID", 0),
                 world_size=world_size,
-                local_world_size=max(1, local_world_size),
+                local_world_size=local_world_size,
                 num_nodes=num_nodes,
                 allocated_gpus=allocated_gpus,
             )
@@ -169,7 +238,7 @@ def detect_launch_env(
             global_rank=0,
             local_rank=0,
             world_size=world_size,
-            local_world_size=max(1, local_world_size),
+            local_world_size=local_world_size,
             num_nodes=num_nodes,
             allocated_gpus=allocated_gpus,
         )
@@ -395,7 +464,7 @@ def resolve_world_size(
 ) -> int:
     """DDP world size for external launch.
 
-    Prefer ``LaunchEnv.world_size`` (``WORLD_SIZE`` / ``SLURM_NTASKS``).
+    Prefer ``LaunchEnv.world_size`` (``WORLD_SIZE`` / SLURM task counts).
     Optional ``num_nodes`` only fills a missing world size as
     ``num_nodes * local_world_size``.
     """

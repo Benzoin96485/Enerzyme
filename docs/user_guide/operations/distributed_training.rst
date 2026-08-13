@@ -148,7 +148,8 @@ per GPU.
 
 Under :code:`srun` Enerzyme exports torchrun-style vars
 (:code:`RANK` ← :code:`SLURM_PROCID`, :code:`WORLD_SIZE` ←
-:code:`SLURM_NTASKS`, :code:`MASTER_ADDR` = :code:`127.0.0.1` on
+:code:`SLURM_NTASKS` / :code:`SLURM_STEP_NUM_TASKS` /
+:code:`ntasks-per-node * nnodes`, :code:`MASTER_ADDR` = :code:`127.0.0.1` on
 single-node jobs, otherwise the first host in :code:`SLURM_NODELIST`;
 do **not** rely on :code:`SLURM_LAUNCH_NODE_IPADDR`, which is often the
 login/submit host under interactive :code:`salloc`) and binds one

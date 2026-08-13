@@ -69,6 +69,65 @@ def test_detect_slurm_srun():
     assert env.num_nodes == 2
 
 
+def test_detect_slurm_srun_without_slurm_ntasks():
+    """sbatch --ntasks-per-node without global -n often leaves SLURM_NTASKS unset."""
+    environ = {
+        "SLURM_JOB_ID": "12345",
+        "SLURM_STEP_ID": "1",
+        "SLURM_PROCID": "5",
+        "SLURM_LOCALID": "1",
+        "SLURM_NTASKS_PER_NODE": "4",
+        "SLURM_NNODES": "2",
+    }
+    env = detect_launch_env(environ)
+    assert env.mode == "slurm_srun"
+    assert env.world_size == 8
+    assert env.local_world_size == 4
+    assert env.global_rank == 5
+    assert env.local_rank == 1
+
+
+def test_detect_slurm_srun_step_num_tasks():
+    environ = {
+        "SLURM_JOB_ID": "12345",
+        "SLURM_STEP_ID": "1",
+        "SLURM_PROCID": "2",
+        "SLURM_LOCALID": "2",
+        "SLURM_STEP_NUM_TASKS": "4",
+        "SLURM_NNODES": "1",
+    }
+    env = detect_launch_env(environ)
+    assert env.mode == "slurm_srun"
+    assert env.world_size == 4
+    assert env.local_world_size == 4
+
+
+def test_detect_slurm_srun_procid_lower_bounds_world_size():
+    environ = {
+        "SLURM_JOB_ID": "12345",
+        "SLURM_STEP_ID": "1",
+        "SLURM_PROCID": "3",
+        "SLURM_LOCALID": "3",
+        "SLURM_NNODES": "1",
+    }
+    env = detect_launch_env(environ)
+    assert env.mode == "slurm_srun"
+    assert env.world_size == 4
+    assert env.local_world_size == 4
+
+
+def test_detect_slurm_unlaunched_from_ntasks_per_node_only():
+    environ = {
+        "SLURM_JOB_ID": "12345",
+        "SLURM_NTASKS_PER_NODE": "4",
+        "SLURM_NNODES": "1",
+    }
+    env = detect_launch_env(environ)
+    assert env.mode == "slurm_unlaunched"
+    assert env.world_size == 4
+    assert env.local_world_size == 4
+
+
 def test_detect_slurm_unlaunched_without_step():
     environ = {
         "SLURM_JOB_ID": "12345",
