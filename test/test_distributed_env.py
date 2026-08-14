@@ -104,6 +104,25 @@ def test_detect_slurm_srun_step_num_tasks():
     assert env.local_world_size == 4
 
 
+def test_detect_slurm_srun_prefers_step_over_job_ntasks():
+    """A smaller srun inside a larger allocation must use the step size."""
+    environ = {
+        "SLURM_JOB_ID": "12345",
+        "SLURM_STEP_ID": "1",
+        "SLURM_PROCID": "0",
+        "SLURM_LOCALID": "0",
+        "SLURM_NTASKS": "4",
+        "SLURM_NTASKS_PER_NODE": "4",
+        "SLURM_STEP_NUM_TASKS": "1",
+        "SLURM_STEP_NUM_TASKS_PER_NODE": "1",
+        "SLURM_NNODES": "1",
+    }
+    env = detect_launch_env(environ)
+    assert env.mode == "slurm_srun"
+    assert env.world_size == 1
+    assert env.local_world_size == 1
+
+
 def test_detect_slurm_srun_procid_lower_bounds_world_size():
     environ = {
         "SLURM_JOB_ID": "12345",

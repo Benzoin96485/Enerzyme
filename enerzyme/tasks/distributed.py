@@ -83,9 +83,9 @@ def _parse_positive_int(value: Optional[str]) -> Optional[int]:
 
 def _slurm_local_world_size(environ: Mapping[str, str]) -> int:
     for key in (
-        "SLURM_NTASKS_PER_NODE",
         "SLURM_STEP_NUM_TASKS_PER_NODE",
         "SLURM_STEP_TASKS_PER_NODE",
+        "SLURM_NTASKS_PER_NODE",
         "SLURM_TASKS_PER_NODE",
     ):
         parsed = _parse_positive_int(environ.get(key))
@@ -104,12 +104,14 @@ def _slurm_world_size(
     """Task counts for a SLURM allocation or srun step.
 
     ``SLURM_NTASKS`` is often unset when the script only specifies
-    ``--ntasks-per-node``. Prefer step-level counts, then
-    ``ntasks_per_node * nnodes``. For ``srun``, also lower-bound by
-    ``SLURM_PROCID + 1`` so a multi-task step cannot look like world_size=1.
+    ``--ntasks-per-node``. Prefer step-level counts over job-level
+    ``SLURM_NTASKS`` so a smaller ``srun`` inside a larger allocation
+    does not wait for missing ranks, then ``ntasks_per_node * nnodes``.
+    For ``srun``, also lower-bound by ``SLURM_PROCID + 1`` so a
+    multi-task step cannot look like world_size=1.
     """
     world = 0
-    for key in ("SLURM_NTASKS", "SLURM_NPROCS", "SLURM_STEP_NUM_TASKS"):
+    for key in ("SLURM_STEP_NUM_TASKS", "SLURM_NTASKS", "SLURM_NPROCS"):
         parsed = _parse_positive_int(environ.get(key))
         if parsed:
             world = parsed
