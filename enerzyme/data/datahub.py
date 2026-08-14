@@ -623,6 +623,11 @@ class SingleDataHub:
                     f"Rank {launch.global_rank} failed to preload dataset from "
                     f"{self.preload_path} after rank 0 finished writing"
                 )
+        # HDF5 already holds transformed arrays; reload only fitted inverse
+        # state (e.g. total_energy_normalization statistics.data). Stateless
+        # transforms were fully specified from YAML at construction.
+        self.preprocessing.reload_fitted_state()
+        self.global_transform.reload_fitted_state()
 
     def _preload_data(self, hdf5_path):
         loaded_file = h5py.File(hdf5_path, mode="r")
