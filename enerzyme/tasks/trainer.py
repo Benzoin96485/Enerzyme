@@ -69,6 +69,57 @@ def _unwrap_ddp(model: Module) -> Module:
     return model.module if isinstance(model, DistributedDataParallel) else model
 
 
+def _strided_shard_indices(rank: int, world_size: int, n_samples: int) -> List[int]:
+    """Dataset indices owned by ``rank`` under ``range(rank, n, world_size)`` sharding."""
+    return list(range(rank, n_samples, world_size))
+
+
+def _merge_sharded_prediction_dicts(
+    gathered_preds: List[Dict[str, List]],
+    gathered_truths: List[Dict[str, List]],
+    gathered_indices: List[List[int]],
+) -> tuple:
+    """Restore original dataset order after rank-strided eval sharding.
+
+    Concatenating rank-order lists would scramble ``test.data`` row alignment
+    even though pooled metrics stay correct.
+    """
+    order = []
+    for rank, indices in enumerate(gathered_indices):
+        if not indices:
+            continue
+        for local_i, global_i in enumerate(indices):
+            order.append((global_i, rank, local_i))
+    order.sort(key=lambda item: item[0])
+
+    pred_keys: List[str] = []
+    truth_keys: List[str] = []
+    seen_pred = set()
+    seen_truth = set()
+    for rank_preds, rank_truths in zip(gathered_preds, gathered_truths):
+        if rank_preds:
+            for key in rank_preds:
+                if key not in seen_pred:
+                    seen_pred.add(key)
+                    pred_keys.append(key)
+        if rank_truths:
+            for key in rank_truths:
+                if key not in seen_truth:
+                    seen_truth.add(key)
+                    truth_keys.append(key)
+
+    merged_preds = {key: [] for key in pred_keys}
+    merged_truths = {key: [] for key in truth_keys}
+    for _, rank, local_i in order:
+        rank_preds = gathered_preds[rank]
+        rank_truths = gathered_truths[rank]
+        for key in pred_keys:
+            merged_preds[key].append(rank_preds[key][local_i])
+        for key in truth_keys:
+            merged_truths[key].append(rank_truths[key][local_i])
+    return merged_preds, merged_truths
+
+
 def _require_nonempty_train_loader(
     n_batches: int,
     n_samples: int,
@@ -420,23 +471,23 @@ class Trainer:
         self,
         y_preds: Dict[str, List],
         y_truths: Dict[str, List],
+        shard_indices: List[int],
     ) -> tuple:
         if not is_distributed_runtime():
             return y_preds, y_truths
         import torch.distributed as dist
 
-        gathered_preds = [None] * dist.get_world_size()
-        gathered_truths = [None] * dist.get_world_size()
-        dist.all_gather_object(gathered_preds, dict(y_preds))
-        dist.all_gather_object(gathered_truths, dict(y_truths))
-        merged_preds = defaultdict(list)
-        merged_truths = defaultdict(list)
-        for rank_preds, rank_truths in zip(gathered_preds, gathered_truths):
-            for key, values in rank_preds.items():
-                merged_preds[key].extend(values)
-            for key, values in rank_truths.items():
-                merged_truths[key].extend(values)
-        return dict(merged_preds), dict(merged_truths)
+        gathered = [None] * dist.get_world_size()
+        dist.all_gather_object(
+            gathered,
+            (dict(y_preds), dict(y_truths), list(shard_indices)),
+        )
+        gathered_preds = [item[0] for item in gathered]
+        gathered_truths = [item[1] for item in gathered]
+        gathered_indices = [item[2] for item in gathered]
+        return _merge_sharded_prediction_dicts(
+            gathered_preds, gathered_truths, gathered_indices
+        )
 
     def _summarize_monitor(self) -> None:
         """Log Monitor stats over the full validation set (gather under DDP)."""
@@ -880,8 +931,11 @@ class Trainer:
                     logger.warning(f"Pretrained model not found at {dump_dir}, using random weights")
             
         use_ddp = is_distributed_runtime()
+        shard_indices: List[int] = []
         if use_ddp:
-            shard_indices = list(range(self._launch.global_rank, len(dataset), self._launch.world_size))
+            shard_indices = _strided_shard_indices(
+                self._launch.global_rank, self._launch.world_size, len(dataset)
+            )
             eval_dataset = Subset(dataset, shard_indices) if shard_indices else Subset(dataset, [])
         else:
             eval_dataset = dataset
@@ -948,7 +1002,9 @@ class Trainer:
                 total_val_loss = self._reduce_mean_scalar(local_mean, local_count)
                 val_loss = [total_val_loss]
             if load_model:
-                y_preds, y_truths = self._gather_prediction_dicts(y_preds, y_truths)
+                y_preds, y_truths = self._gather_prediction_dicts(
+                    y_preds, y_truths, shard_indices
+                )
         else:
             metric_score = self.metrics.cal_metric(y_truths, y_preds)
         if load_model and "_judge_score" in metric_score:

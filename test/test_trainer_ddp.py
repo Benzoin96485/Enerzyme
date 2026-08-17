@@ -9,7 +9,9 @@ from enerzyme.tasks.metrics import Metrics
 from enerzyme.tasks.trainer import (
     _convert_lightning_state_dict,
     _load_state_dict,
+    _merge_sharded_prediction_dicts,
     _require_nonempty_train_loader,
+    _strided_shard_indices,
     _unwrap_ddp,
 )
 
@@ -94,6 +96,56 @@ def test_monitor_summary_after_merging_shards():
     assert summary["E_ele"]["mean"] == pytest.approx(2.5)
     assert summary["E_ele"]["min"] == pytest.approx(1.0)
     assert summary["E_ele"]["max"] == pytest.approx(4.0)
+
+
+def test_merge_sharded_prediction_dicts_restores_dataset_order():
+    n_samples = 10
+    world_size = 4
+    gathered_preds = []
+    gathered_truths = []
+    gathered_indices = []
+    for rank in range(world_size):
+        indices = _strided_shard_indices(rank, world_size, n_samples)
+        gathered_indices.append(indices)
+        gathered_preds.append(
+            {
+                "Ea": [float(i) for i in indices],
+                "data_key": [f"s{i}" for i in indices],
+            }
+        )
+        gathered_truths.append({"Ea": [10.0 + i for i in indices]})
+
+    preds, truths = _merge_sharded_prediction_dicts(
+        gathered_preds, gathered_truths, gathered_indices
+    )
+    assert preds["Ea"] == [float(i) for i in range(n_samples)]
+    assert preds["data_key"] == [f"s{i}" for i in range(n_samples)]
+    assert truths["Ea"] == [10.0 + i for i in range(n_samples)]
+    rank_concat = [v for shard in gathered_preds for v in shard["Ea"]]
+    assert preds["Ea"] != rank_concat
+
+
+def test_merge_sharded_prediction_dicts_skips_empty_ranks():
+    n_samples = 2
+    world_size = 4
+    gathered_preds = []
+    gathered_truths = []
+    gathered_indices = []
+    for rank in range(world_size):
+        indices = _strided_shard_indices(rank, world_size, n_samples)
+        gathered_indices.append(indices)
+        if indices:
+            gathered_preds.append({"Ea": [float(i) for i in indices]})
+            gathered_truths.append({"Ea": [100.0 + i for i in indices]})
+        else:
+            gathered_preds.append({})
+            gathered_truths.append({})
+
+    preds, truths = _merge_sharded_prediction_dicts(
+        gathered_preds, gathered_truths, gathered_indices
+    )
+    assert preds["Ea"] == [0.0, 1.0]
+    assert truths["Ea"] == [100.0, 101.0]
 
 
 def test_require_nonempty_train_loader_passes_when_batches_exist():
