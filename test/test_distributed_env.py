@@ -355,6 +355,9 @@ def test_file_barrier_two_ranks(tmp_path):
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(_run, envs))
 
+    leftover = list(tmp_path.glob(".enerzyme_barrier_2_test.*"))
+    assert leftover == []
+
 
 def test_named_file_barriers_can_reuse_sync_dir(tmp_path):
     """Successive barriers must not short-circuit on a previous .done flag."""
@@ -369,6 +372,9 @@ def test_named_file_barriers_can_reuse_sync_dir(tmp_path):
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(_run, envs))
+
+    leftover = list(tmp_path.glob(".enerzyme_barrier_2_*"))
+    assert leftover == []
 
 
 def test_file_barrier_ignores_stale_done_flag(tmp_path):
@@ -390,8 +396,8 @@ def test_file_barrier_ignores_stale_done_flag(tmp_path):
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(_run, envs))
 
-    done = (tmp_path / f"{prefix}.done").read_text()
-    assert done != "old-token"
+    leftover = list(tmp_path.glob(f"{prefix}.*"))
+    assert leftover == []
 
 
 def test_file_barrier_ignores_stale_gen_without_done(tmp_path):
@@ -418,8 +424,8 @@ def test_file_barrier_ignores_stale_gen_without_done(tmp_path):
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(_run, envs))
 
-    done = (tmp_path / f"{prefix}.done").read_text()
-    assert done != "old-token"
+    leftover = list(tmp_path.glob(f"{prefix}.*"))
+    assert leftover == []
 
 
 def test_rank0_exclusive_propagates_failure_to_peers(tmp_path):
@@ -516,8 +522,8 @@ def test_rank0_exclusive_ignores_stale_done_flag(tmp_path):
         list(pool.map(_run, envs))
 
     assert marker.read_text() == "ok"
-    done = (tmp_path / f"{prefix}.done").read_text()
-    assert done != "old-token"
+    leftover = list(tmp_path.glob(f"{prefix}.*"))
+    assert leftover == []
 
 
 def test_rank0_exclusive_single_process_runs_fn(tmp_path):
@@ -574,7 +580,7 @@ def test_init_process_group_skips_single_process():
     assert init_process_group(LaunchEnv(mode="slurm_unlaunched", world_size=4)) is False
 
 
-def test_logger_uses_per_rank_file(monkeypatch, tmp_path):
+def test_logger_uses_shared_file_name_on_all_ranks(monkeypatch, tmp_path):
     monkeypatch.setenv("RANK", "1")
     monkeypatch.setenv("LOCAL_RANK", "1")
     monkeypatch.setenv("WORLD_SIZE", "2")
@@ -584,4 +590,11 @@ def test_logger_uses_per_rank_file(monkeypatch, tmp_path):
 
     log = Logger("enerzyme-rank-io-test")
     log.log_path = str(tmp_path)
-    assert log._file_log_name().endswith("_rank1.log")
+    log.log_file_name = "Enerzyme_shared.log"
+    assert log._file_log_name() == "Enerzyme_shared.log"
+    assert "_rank" not in log._file_log_name()
+
+    logger = log.get_logger()
+    logger.info("peer info should not create a rank file")
+    created = list(tmp_path.glob("*.log"))
+    assert created == []

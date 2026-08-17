@@ -20,7 +20,7 @@ except:
 from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
-from .batch import _decorate_batch_input, _decorate_batch_output, _to_device, _decorate_pyg_batch_input, _pyg_to_device
+from .batch import CollateBatch, _decorate_batch_output, _to_device, _pyg_to_device
 from .generator_ode import generator_ode_predict_enabled, generator_predict_forward
 from .monitor import Monitor
 from .optimizer import get_optimizer, get_optimizer_config
@@ -253,7 +253,7 @@ class Trainer:
         self.generator_config = params.get("Generator")
         non_target_features = params.get("non_target_features", [])
         self.reset_parameters = params.get("reset_parameters", False)
-        self.find_unused_parameters = params.get("find_unused_parameters", True)
+        self.find_unused_parameters = params.get("find_unused_parameters", False)
         self.ddp_timeout_minutes = params.get("ddp_timeout_minutes", 30)
         self.tensorboard = params.get("tensorboard", True)
         self.tensorboard_log_interval = max(1, int(params.get("tensorboard_log_interval", 1)))
@@ -305,24 +305,18 @@ class Trainer:
                 logger.info("GPU not found, turn to CPU!")
             self.device = torch.device("cpu")
 
-    def _decorate_batch_input_impl(self, batch, generator_training: bool):
-        if self.pyg:
-            return _decorate_pyg_batch_input(
-                batch,
-                self.dtype,
-                self.device,
-                self.otf_graph,
-                self.generator_config,
-                generator_training,
-            )
-        return _decorate_batch_input(
-            batch,
-            self.dtype,
-            self.device,
-            self.otf_graph,
-            self.generator_config,
-            generator_training,
+    def _collate_batch(self, *, generator_training: bool) -> CollateBatch:
+        return CollateBatch(
+            pyg=self.pyg,
+            dtype=self.dtype,
+            device=self.device,
+            otf_graph=self.otf_graph,
+            generator_config=self.generator_config,
+            generator_training=generator_training,
         )
+
+    def _decorate_batch_input_impl(self, batch, generator_training: bool):
+        return self._collate_batch(generator_training=generator_training)(batch)
 
     def decorate_batch_input(self, batch):
         """Training collate: random ``flow_t`` and linear interpolation for CFM."""
@@ -362,7 +356,8 @@ class Trainer:
         if pin_memory:
             kwargs["pin_memory"] = True
         if num_workers > 0 and (pin_memory or distributed):
-            # HDF5: avoid fork workers sharing open handles under DDP.
+            # fork copies open HDF5 handles into workers (unsafe). forkserver
+            # pickles dataset/collate into a fresh interpreter instead.
             kwargs["persistent_workers"] = True
             kwargs["multiprocessing_context"] = "forkserver"
         return kwargs
@@ -623,7 +618,7 @@ class Trainer:
                 batch_size=self.batch_size,
                 shuffle=(train_sampler is None),
                 sampler=train_sampler,
-                collate_fn=self.decorate_batch_input,
+                collate_fn=self._collate_batch(generator_training=True),
                 drop_last=True,
                 **self._dataloader_kwargs(
                     self.num_workers,
@@ -895,7 +890,7 @@ class Trainer:
             dataset=eval_dataset,
             batch_size=self.inference_batch_size,
             shuffle=False,
-            collate_fn=self.decorate_eval_batch_input,
+            collate_fn=self._collate_batch(generator_training=False),
             **self._dataloader_kwargs(
                 self.num_workers,
                 pin_memory=pin_memory,

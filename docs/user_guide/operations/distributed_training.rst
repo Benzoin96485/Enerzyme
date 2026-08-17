@@ -54,7 +54,7 @@ YAML (DDP is enabled by the launcher, not a :code:`lightning:` flag):
 .. code-block:: yaml
 
     Trainer:
-        find_unused_parameters: true
+        find_unused_parameters: false     # true only if some params skip the loss
         ddp_timeout_minutes: 30
         tensorboard: true                 # rank0 writes dump_dir/tb
         tensorboard_log_interval: 1       # batch train_loss/lr every N optimizer steps
@@ -250,9 +250,8 @@ Common hangs
 |                                      | and :code:`NCCL_SHM_DISABLE`.        |
 |                                      | Use :code:`NCCL_DEBUG=WARN`.         |
 +--------------------------------------+--------------------------------------+
-| Hang or unused-parameter error on    | Keep :code:`find_unused_parameters:  |
-| modular layer stacks                 | true` unless you know every          |
-|                                      | parameter is in the loss.            |
+| Unused-parameter DDP error on        | Set :code:`find_unused_parameters:   |
+| modular / gated stacks               | true` (default is :code:`false`).    |
 +--------------------------------------+--------------------------------------+
 
 Debugging

@@ -447,9 +447,51 @@ class FieldDataset(Dataset):
     def __init__(self, data: Dict[str, Iterable]) -> None:
         self.data = data
         self.compressed_keys = set()
+        self._h5_file = None
         for k, v in self.data.items():
             if len(v) == 1:
                 self.compressed_keys.add(k)
+
+    def __getstate__(self):
+        """Pickle numpy arrays; reopen HDF5 datasets by filename in workers."""
+        arrays = {}
+        h5_filename = None
+        h5_names = {}
+        for k, v in self.data.items():
+            if isinstance(v, h5py.Dataset):
+                filename = v.file.filename
+                if isinstance(filename, bytes):
+                    filename = filename.decode()
+                h5_filename = filename
+                h5_names[k] = v.name
+            else:
+                arrays[k] = v
+        return {
+            "compressed_keys": set(self.compressed_keys),
+            "arrays": arrays,
+            "h5_filename": h5_filename,
+            "h5_names": h5_names,
+        }
+
+    def __setstate__(self, state):
+        self.compressed_keys = state["compressed_keys"]
+        self.data = dict(state.get("arrays") or {})
+        self._h5_file = None
+        filename = state.get("h5_filename")
+        names = state.get("h5_names") or {}
+        if filename and names:
+            self._h5_file = h5py.File(filename, "r")
+            for k, name in names.items():
+                self.data[k] = self._h5_file[name]
+
+    def __del__(self):
+        handle = getattr(self, "_h5_file", None)
+        if handle is not None:
+            try:
+                handle.close()
+            except Exception:
+                pass
+            self._h5_file = None
 
     def __getitem__(self, k) -> Iterable:
         return self.data[k]

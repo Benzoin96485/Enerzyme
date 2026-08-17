@@ -82,8 +82,10 @@ Distributed (torch DDP)
     run on one GPU.
 
 **Unused-parameter / DDP deadlock on modular stacks**
-    Keep :code:`find_unused_parameters: true` unless every parameter is in
-    the loss.
+    Default is :code:`find_unused_parameters: false`. Set it :code:`true`
+    only if some parameters are skipped in the loss (conditional heads).
+    Leaving it :code:`true` when nothing is unused adds an autograd walk
+    every step and prints a PyTorch warning.
 
 **TensorBoard missing / looking for** :code:`lightning_logs/`
     Logs go to :code:`<model_dir>/tb/`. View with

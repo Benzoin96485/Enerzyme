@@ -934,7 +934,7 @@ Trainer:
                                             # 1: try to load model checkpoint (and ema state if available), last-first unless specified, resume epoch counting
                                             # 2: try to load model checkpoint (and ema state if available), last-first unless specified, resume scheduler, optimizer, epoch counting and earlystopping
   num_workers: -1                           # number of workers for dataloader, default -1 (automatically adjusted)
-  find_unused_parameters: true              # DDP find_unused_parameters (modular stacks may leave unused params)
+  find_unused_parameters: false             # DDP: true only if some parameters are skipped in the loss (extra autograd walk)
   ddp_timeout_minutes: 30                   # NCCL/DDP timeout in minutes
   tensorboard: true                         # rank0 writes dump_dir/tb (train_loss/lr per step; val metrics per epoch)
   tensorboard_log_interval: 1               # write batch train_loss/lr every N optimizer steps

@@ -30,27 +30,36 @@ def _arrays_for_metric(
 
 
 def build_single_metric(metric_str: str) -> Callable[[Dict[str, Union[List, np.ndarray]], Dict[str, Union[List, np.ndarray]], str], Optional[float]]:
-    if metric_str == "rmse":
-        try:
-            from sklearn.metrics import root_mean_squared_error
-        except ImportError:
-            from sklearn.metrics import mean_squared_error
-            metric_func = lambda x, y: mean_squared_error(x, y, squared=False)
-        else:
-            metric_func = lambda x, y: root_mean_squared_error(x, y)
-    elif metric_str == "mae":
-        from sklearn.metrics import mean_absolute_error
-        metric_func = lambda x, y: mean_absolute_error(x, y)
-    else:
-        raise ValueError(f"Unknown metric: {metric_str}")
-    
-    def metric(label: Dict[str, Union[List, np.ndarray]], prediction: Dict[str, Union[List, np.ndarray]], target_name: str) -> Optional[float]:
+    return _ArrayMetric(metric_str)
+
+
+class _ArrayMetric:
+    """Top-level callable so Metrics survives forkserver pickle (no nested locals)."""
+
+    def __init__(self, metric_str: str) -> None:
+        if metric_str not in ("rmse", "mae"):
+            raise ValueError(f"Unknown metric: {metric_str}")
+        self.metric_str = metric_str
+
+    def __call__(
+        self,
+        label: Dict[str, Union[List, np.ndarray]],
+        prediction: Dict[str, Union[List, np.ndarray]],
+        target_name: str,
+    ) -> Optional[float]:
         arrays = _arrays_for_metric(label, prediction, target_name)
         if arrays is None:
             return 0
         y_trues, y_preds = arrays
-        return metric_func(y_trues, y_preds)
-    return metric
+        if self.metric_str == "rmse":
+            try:
+                from sklearn.metrics import root_mean_squared_error
+            except ImportError:
+                from sklearn.metrics import mean_squared_error
+                return mean_squared_error(y_trues, y_preds, squared=False)
+            return root_mean_squared_error(y_trues, y_preds)
+        from sklearn.metrics import mean_absolute_error
+        return mean_absolute_error(y_trues, y_preds)
 
 
 class Metrics(object):

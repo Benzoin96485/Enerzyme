@@ -226,6 +226,14 @@ class FFDataset(Dataset):
         self.raw_indices = OrderedDict((data_key, np.array(data_indices)) for data_key, data_indices in indices.items() if len(data_indices) > 0)
         self._update_indices_map()
 
+    def __getstate__(self):
+        # forkserver workers only need the indexed subset for __getitem__.
+        # Keep live HDF5 handles (full_*) out of the pickle.
+        state = dict(self.__dict__)
+        state["full_features"] = {}
+        state["full_targets"] = {}
+        return state
+
     def _update_indices_map(self) -> None:
         self.prefix_sum = np.cumsum([len(data_indices) for data_indices in self.indices.values()])
         self.indices_map = np.concatenate([[i] * len(data_indices) for i, data_indices in enumerate(self.indices.values())])

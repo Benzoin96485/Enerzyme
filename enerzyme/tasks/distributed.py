@@ -414,7 +414,11 @@ def _finish_file_round(
     failed: bool = False,
     error_text: Optional[str] = None,
 ) -> None:
-    """Rank 0 writes ``.done`` (or ``.fail``); other ranks wait for either."""
+    """Rank 0 writes ``.done`` (or ``.fail``); other ranks wait for either.
+
+    After peers observe the terminal flag they write ``.fin{rank}``. Rank 0
+    then deletes every ``prefix.*`` flag for this round.
+    """
     sync_path, prefix, flag, gen_file, _arrived, fail_file, _r0_file = (
         _file_barrier_layout(sync_dir, name, launch)
     )
@@ -434,6 +438,26 @@ def _finish_file_round(
             _unlink_quiet(path)
         for path in sync_path.glob(f"{prefix}.h*"):
             _unlink_quiet(path)
+
+        def _peers_finished() -> bool:
+            return len(list(sync_path.glob(f"{prefix}.fin*"))) >= max(
+                0, launch.world_size - 1
+            )
+
+        fin_timeout = 60.0 if timeout_seconds is None else float(timeout_seconds)
+        try:
+            if launch.world_size > 1:
+                _wait_until(
+                    _peers_finished,
+                    fin_timeout,
+                    poll_interval,
+                    f"barrier cleanup timed out waiting for peer finish flags "
+                    f"under {sync_dir} (name={name!r})",
+                )
+        except TimeoutError:
+            pass
+        for path in list(sync_path.glob(f"{prefix}.*")):
+            _unlink_quiet(path)
         return
 
     timeout_label = (
@@ -452,6 +476,11 @@ def _finish_file_round(
         f"barrier timed out after {timeout_label} waiting for rank0 to finish "
         f"under {sync_dir} (name={name!r})",
     )
+    fin = sync_path / f"{prefix}.fin{launch.global_rank}"
+    try:
+        fin.write_text("1")
+    except OSError:
+        pass
     if fail_file.exists():
         raise RuntimeError(
             f"rank 0 failed during {name!r}: "

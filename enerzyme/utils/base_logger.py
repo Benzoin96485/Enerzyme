@@ -36,38 +36,39 @@ class Logger(object):
         self.formatter = logging.Formatter("%(asctime)s | %(relativepath)s:%(lineno)s | %(levelname)s | %(name)s | %(message)s", self.DATE_FORMAT)
 
     def _file_log_name(self) -> str:
-        """Shared rotating file on rank 0; per-rank files elsewhere to avoid FS races."""
-        try:
-            from enerzyme.tasks.distributed import detect_launch_env, is_global_zero
-
-            launch = detect_launch_env()
-            if is_global_zero(launch):
-                return self.log_file_name
-            stem, ext = os.path.splitext(self.log_file_name)
-            return f"{stem}_rank{launch.global_rank}{ext or '.log'}"
-        except Exception:
-            return self.log_file_name
+        """Single shared rotating file name; only rank 0 attaches a handler."""
+        return self.log_file_name
 
     def get_logger(self):
         if not self.logger.handlers:
+            rank0 = True
+            try:
+                from enerzyme.tasks.distributed import is_global_zero
+                rank0 = bool(is_global_zero())
+            except Exception:
+                rank0 = True
+
             console_handler = logging.StreamHandler()
             console_handler.setFormatter(self.formatter)
-            console_handler.setLevel(self.console_output_level)
+            console_handler.setLevel(
+                self.console_output_level if rank0 else "WARNING"
+            )
             console_handler.addFilter(PackagePathFilter())
             self.logger.addHandler(console_handler)
 
             os.makedirs(self.log_path, exist_ok=True)
-            file_handler = TimedRotatingFileHandler(
-                filename=os.path.join(self.log_path, self._file_log_name()),
-                when='D',
-                interval=1,
-                backupCount=self.backup_count,
-                delay=True,
-                encoding='utf-8',
-            )
-            file_handler.setFormatter(self.formatter)
-            file_handler.setLevel(self.file_output_level)
-            self.logger.addHandler(file_handler)
+            if rank0:
+                file_handler = TimedRotatingFileHandler(
+                    filename=os.path.join(self.log_path, self._file_log_name()),
+                    when='D',
+                    interval=1,
+                    backupCount=self.backup_count,
+                    delay=True,
+                    encoding='utf-8',
+                )
+                file_handler.setFormatter(self.formatter)
+                file_handler.setLevel(self.file_output_level)
+                self.logger.addHandler(file_handler)
             # Avoid duplicate lines on stdout when root also has a StreamHandler.
             self.logger.propagate = False
         return self.logger
