@@ -224,6 +224,40 @@ def test_validate_distributed_launch_allows_supported_modes():
         validate_distributed_launch(LaunchEnv(mode=mode))
 
 
+def test_ffpredict_validates_launch_before_datahub(monkeypatch):
+    from enerzyme.predict import FFPredict
+
+    calls = []
+
+    monkeypatch.setattr(
+        "enerzyme.predict.validate_distributed_launch",
+        lambda: calls.append("validate"),
+    )
+
+    class _DataHub:
+        def __init__(self, *args, **kwargs):
+            calls.append("datahub")
+
+    class _Trainer:
+        def __init__(self, *args, **kwargs):
+            calls.append("trainer")
+            self.metrics = object()
+
+    class _ModelHub:
+        def __init__(self, *args, **kwargs):
+            calls.append("modelhub")
+
+    monkeypatch.setattr("enerzyme.predict.DataHub", _DataHub)
+    monkeypatch.setattr("enerzyme.predict.Trainer", _Trainer)
+    monkeypatch.setattr("enerzyme.predict.ModelHub", _ModelHub)
+
+    pred = FFPredict.__new__(FFPredict)
+    pred.output_dir = "/tmp/out"
+    pred.model_dir = "/tmp/model"
+    pred.load_from_ckp(Datahub={}, Metric={}, Trainer={}, Modelhub={})
+    assert calls[:2] == ["validate", "datahub"]
+
+
 def test_resolve_master_addr_from_nodelist():
     assert resolve_master_addr({"SLURM_NODELIST": "nid[0001-0004]", "SLURM_NNODES": "2"}) == "nid0001"
     assert resolve_master_addr({"SLURM_NODELIST": "host0,host1", "SLURM_NNODES": "2"}) == "host0"
