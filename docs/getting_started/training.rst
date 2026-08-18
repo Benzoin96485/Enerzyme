@@ -232,9 +232,15 @@ Final Trainer configuration
 Running the training job
 ------------------------
 
+Single-GPU (default native loop):
+
 .. code-block:: bash
 
     enerzyme train -c train.yaml -o .
+
+Multi-GPU / multi-node torch DDP requires an **external** launcher
+(:code:`srun` or :code:`torchrun`, one process per GPU). Enerzyme will not
+spawn workers. See :doc:`/user_guide/operations/distributed_training`.
 
 Output artifacts
 ----------------
@@ -244,6 +250,6 @@ After training, the output directory typically contains:
 - :code:`config.yaml` — resolved configuration (**keep this for predict/simulate**)
 - :code:`processed_dataset_<hash>/` — preprocessed HDF5 cache
 - :code:`logs/` — training logs, metrics, early-stopping traces
-- :code:`FF01-<arch>/` (or your model ID + architecture) — :code:`model_best.pth` and :code:`model_last.pth`
+- :code:`FF01-<arch>/` (or your model ID + architecture) — :code:`model_best.pth`, :code:`model_last.pth`, and :code:`tb/` (TensorBoard)
 
-Use :code:`enerzyme/config/train.yaml` when you need multi-dataset Datahub, external models, EMA, Lightning multi-GPU, or pretraining paths.
+Use :code:`enerzyme/config/train.yaml` when you need multi-dataset Datahub, external models, EMA, multi-GPU DDP (:doc:`/user_guide/operations/distributed_training`), or pretraining paths.

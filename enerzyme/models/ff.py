@@ -226,6 +226,14 @@ class FFDataset(Dataset):
         self.raw_indices = OrderedDict((data_key, np.array(data_indices)) for data_key, data_indices in indices.items() if len(data_indices) > 0)
         self._update_indices_map()
 
+    def __getstate__(self):
+        # forkserver workers only need the indexed subset for __getitem__.
+        # Keep live HDF5 handles (full_*) out of the pickle.
+        state = dict(self.__dict__)
+        state["full_features"] = {}
+        state["full_targets"] = {}
+        return state
+
     def _update_indices_map(self) -> None:
         self.prefix_sum = np.cumsum([len(data_indices) for data_indices in self.indices.values()])
         self.indices_map = np.concatenate([[i] * len(data_indices) for i, data_indices in enumerate(self.indices.values())])
@@ -291,6 +299,9 @@ class MetaStateDict(dict):
             self.update(joblib.load(self.dump_path))
 
     def dump(self) -> None:
+        from ..tasks.distributed import is_global_zero
+        if not is_global_zero():
+            return
         joblib.dump({k: v for k, v in self.items()}, self.dump_path)
 
     def update(self, d: Dict) -> None:
@@ -385,6 +396,9 @@ class BaseFFLauncher(ABC):
         return self._evaluate(test_dataset)
 
     def dump(self, data: Any, dump_dir: str, name: str) -> None:
+        from ..tasks.distributed import is_global_zero
+        if not is_global_zero():
+            return
         path = os.path.join(dump_dir, name)
         if not os.path.exists(dump_dir):
             os.makedirs(dump_dir)
@@ -556,6 +570,10 @@ class FF_single(BaseFFLauncher):
                 try:
                     self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
                 except FileNotFoundError:
+                    self.pretrain_path = None
+                # dump_dir may not exist yet: get_pretrain_path returns None (no raise).
+                # Fall back to YAML pretrain_path (e.g. legacy Lightning .pth).
+                if self.pretrain_path is None and self.base_pretrain_path is not None:
                     self.pretrain_path = get_pretrain_path(self.base_pretrain_path, "best", None)
             else:
                 self.pretrain_path = get_pretrain_path(base_pretrain_path, "last", None)

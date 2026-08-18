@@ -210,10 +210,42 @@ class Splitter:
     def get_split(self, data: Dict[str, FieldDataset], preload_path: Optional[Dict[str, str]]=None) -> Dict[str, Dict[str, List[int]]]: 
         self._set_seed()
         self.split = self.splitter._get_empty_split(data)
-        if self.preload and self.preload_split(preload_path):
-            return self.split
-        else:
+        # Rank 0 writes split artifacts; all ranks always join the exclusive
+        # section so a local cache hit cannot skip the collective. When save
+        # is False every rank computes the same seeded split.
+        from .distributed import detect_launch_env, is_global_zero, run_rank0_exclusive
+
+        launch = detect_launch_env()
+        if not self.save:
             self.split = self.splitter.split(data)
-            if self.save:
-                self._save(preload_path)
             return self.split
+
+        def _ensure_split():
+            if self.preload and self.preload_split(preload_path):
+                return
+            self.split = self.splitter.split(data)
+            self._save(preload_path)
+
+        run_rank0_exclusive(
+            _ensure_split,
+            env=launch,
+            sync_dir=_sync_dir_from_preload(preload_path),
+            name=f"splitter_{self.splitter.hash}",
+        )
+        if not is_global_zero(launch):
+            if not self.preload_split(preload_path):
+                raise RuntimeError(
+                    f"Rank {launch.global_rank} failed to preload split from "
+                    f"{preload_path} after rank 0 finished writing"
+                )
+        return self.split
+
+
+def _sync_dir_from_preload(preload_path: Optional[Dict[str, str]]) -> str:
+    """Parent of the first dataset preload path (typically the training out_dir)."""
+    if preload_path:
+        first = next(iter(preload_path.values()))
+        parent = os.path.dirname(os.path.abspath(first))
+        if parent:
+            return parent
+    return os.path.abspath(".")

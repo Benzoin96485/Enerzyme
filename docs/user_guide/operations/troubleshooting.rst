@@ -39,6 +39,62 @@ Training
 **Early stopping too aggressive**
     Increase :code:`patience`; align :code:`Metric` weights with :code:`loss`.
 
+Distributed (torch DDP)
+-----------------------
+
+**Job hangs under SLURM**
+    Almost always a launch-contract error, not the model. Do **not** run
+    bare :code:`enerzyme train` inside a **multi-task** or **multi-GPU**
+    :code:`sbatch` / :code:`salloc`. Use :code:`srun` (or
+    :code:`torchrun`), one process per GPU. Unlaunched multi-task /
+    multi-GPU SLURM should **fail fast** with an :code:`srun` example.
+
+**Each process sees multiple GPUs / world size is wrong**
+    Bind one GPU per task (:code:`--gpus-per-task=1` or site equivalent).
+    Enerzyme binds a single visible GPU per process; it does not spawn.
+
+**Copied a Lightning SLURM tutorial with** :code:`devices` **= GPUs per node**
+    Enerzyme does **not** use Lightning. YAML :code:`devices` /
+    :code:`strategy` / :code:`num_nodes` are ignored. Launch one process
+    per GPU — see :doc:`/user_guide/operations/distributed_training`.
+
+**Stall while writing HDF5 cache, split, or** :code:`config.yaml`
+    Only rank 0 writes shared artifacts. Peers check in first, then wait
+    for the cache without the 30-minute handshake cap (first-time HDF5
+    builds can take hours). Delete a half-written
+    :code:`processed_dataset_<hash>/` and retry. A handshake
+    :code:`TimeoutError` means a rank never checked in, not a slow
+    preprocess.
+
+**NCCL timeout / invalid device ordinal**
+    Set :code:`NCCL_DEBUG=WARN`; raise :code:`Trainer.ddp_timeout_minutes`;
+    confirm GPU bind and that you are not nesting :code:`srun`.
+    With :code:`--gpus-per-task=1` (each rank sees only :code:`cuda:0`),
+    Enerzyme disables NCCL P2P and SHM automatically. Override with
+    :code:`NCCL_P2P_DISABLE=0` / :code:`NCCL_SHM_DISABLE=0` only if your
+    site's NCCL can peer through remapped device ids.
+    :code:`CUDA_VISIBLE_DEVICES` shorter than :code:`local_rank` **fails
+    fast** instead of mapping several ranks onto one GPU.
+
+**DDP job runs but loss never moves / zero training steps**
+    :code:`drop_last=True` needs at least :code:`batch_size` samples per
+    rank (about :code:`batch_size × world_size`). Tiny smoke splits should
+    run on one GPU.
+
+**Unused-parameter / DDP deadlock on modular stacks**
+    Default is :code:`find_unused_parameters: false`. Set it :code:`true`
+    only if some parameters are skipped in the loss (conditional heads).
+    Leaving it :code:`true` when nothing is unused adds an autograd walk
+    every step and prints a PyTorch warning.
+
+**TensorBoard missing / looking for** :code:`lightning_logs/`
+    Logs go to :code:`<model_dir>/tb/`. View with
+    :code:`tensorboard --logdir <model_dir>/tb`. Disable with
+    :code:`Trainer.tensorboard: false`.
+
+Full launch contract, templates, and hang table:
+:doc:`/user_guide/operations/distributed_training`.
+
 Simulation
 ----------
 
