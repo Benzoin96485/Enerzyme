@@ -337,10 +337,35 @@ def test_infer_num_workers_prefers_cpus_per_task():
     assert infer_num_workers(-1, env=env, environ=environ) == 7
 
 
+def test_infer_num_workers_caps_cpus_per_task():
+    environ = {"SLURM_CPUS_PER_TASK": "32"}
+    env = LaunchEnv(mode="slurm_srun", world_size=4, local_world_size=4)
+    assert infer_num_workers(-1, env=env, environ=environ) == 8
+
+
+def test_infer_num_workers_one_cpu_per_task_still_uses_one_worker():
+    environ = {"SLURM_CPUS_PER_TASK": "1"}
+    env = LaunchEnv(mode="slurm_srun", world_size=1, local_world_size=1)
+    assert infer_num_workers(-1, env=env, environ=environ) == 1
+
+
 def test_infer_num_workers_cpu_count_fallback(monkeypatch):
     monkeypatch.setattr(os, "cpu_count", lambda: 16)
     env = LaunchEnv(mode="torchrun", world_size=4, local_world_size=4)
-    assert infer_num_workers(-1, env=env, environ={}) == 4
+    # 16 CPUs / 4 ranks → 4 per rank, leave one for the trainer.
+    assert infer_num_workers(-1, env=env, environ={}) == 3
+
+
+def test_infer_num_workers_cpu_count_single_process_is_capped(monkeypatch):
+    monkeypatch.setattr(os, "cpu_count", lambda: 16)
+    env = LaunchEnv(mode="single", world_size=1, local_world_size=1)
+    assert infer_num_workers(-1, env=env, environ={}) == 8
+
+
+def test_infer_num_workers_cpu_count_does_not_use_all_cores(monkeypatch):
+    monkeypatch.setattr(os, "cpu_count", lambda: 128)
+    env = LaunchEnv(mode="single", world_size=1, local_world_size=1)
+    assert infer_num_workers(-1, env=env, environ={}) == 8
 
 
 def test_file_barrier_two_ranks(tmp_path):

@@ -746,6 +746,12 @@ def export_torchrun_env(
     return launch
 
 
+# Auto workers overlap HDF5/collate with GPU compute. Past a handful, extra
+# processes mostly cost RAM and forkserver startup; HPC GPU nodes often expose
+# 32–128 CPUs that are not meant to each host a DataLoader worker.
+_AUTO_NUM_WORKERS_CAP = 8
+
+
 def infer_num_workers(
     requested: int = -1,
     *,
@@ -754,11 +760,13 @@ def infer_num_workers(
 ) -> int:
     """Resolve DataLoader ``num_workers``.
 
-    Prefer ``SLURM_CPUS_PER_TASK`` (minus one for the main process). Otherwise
-    use ``os.cpu_count() // local_world_size``. Never uses ``SLURM_NTASKS``.
+    Auto (``requested < 0``) leaves one CPU for the training process when
+    possible, then clamps to ``[1, _AUTO_NUM_WORKERS_CAP]``. Prefer
+    ``SLURM_CPUS_PER_TASK`` as the per-rank budget; otherwise share
+    ``os.cpu_count()`` across local ranks. Never uses ``SLURM_NTASKS``.
 
     ``requested > 0`` is returned unchanged. ``requested == 0`` is an explicit
-    in-process loader (no workers). ``requested < 0`` means auto.
+    in-process loader (no worker subprocesses). Auto never returns 0.
     """
     if requested == 0:
         return 0
@@ -770,10 +778,12 @@ def infer_num_workers(
 
     cpus_per_task = env_map.get("SLURM_CPUS_PER_TASK")
     if cpus_per_task is not None and cpus_per_task != "":
-        return max(0, int(cpus_per_task) - 1)
-
-    cpu_count = os.cpu_count() or 1
-    return max(0, cpu_count // max(1, launch.local_world_size))
+        budget = max(0, int(cpus_per_task) - 1)
+    else:
+        cpu_count = os.cpu_count() or 1
+        per_rank = max(1, cpu_count // max(1, launch.local_world_size))
+        budget = max(0, per_rank - 1)
+    return max(1, min(_AUTO_NUM_WORKERS_CAP, budget))
 
 
 def bind_single_visible_gpu(launch: LaunchEnv, *, cuda: bool = True) -> None:

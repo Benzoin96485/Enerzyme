@@ -933,7 +933,7 @@ Trainer:
   resume: 0                                 # 0: start from scratch. If pretrained model is given, load its ema averaged weights, best-first unless specified
                                             # 1: try to load model checkpoint (and ema state if available), last-first unless specified, resume epoch counting
                                             # 2: try to load model checkpoint (and ema state if available), last-first unless specified, resume scheduler, optimizer, epoch counting and earlystopping
-  num_workers: -1                           # number of workers for dataloader, default -1 (automatically adjusted)
+  num_workers: -1                           # dataloader workers; -1 auto (1–8; YAML 0 = in-process, no workers)
   find_unused_parameters: false             # DDP: true only if some parameters are skipped in the loss (extra autograd walk)
   ddp_timeout_minutes: 30                   # NCCL/DDP timeout in minutes
   tensorboard: true                         # rank0 writes dump_dir/tb (train_loss/lr per step; val metrics per epoch)
