@@ -23,6 +23,7 @@ where optional deps may be missing.
 """
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Mapping, cast
 
 import numpy as np
@@ -33,6 +34,8 @@ from .xtbml_charges import register_xtbml
 
 if TYPE_CHECKING:
     from ase import Atoms
+
+logger = logging.getLogger(__name__)
 
 
 def _atoms_to_tblite_inputs(atoms: Atoms) -> tuple[np.ndarray, np.ndarray]:
@@ -62,6 +65,20 @@ def _post_processing_dict(res: Result) -> Mapping[str, Any]:
     if not isinstance(raw, Mapping):
         raise TypeError("Result has no post-processing-dict mapping")
     return cast(Mapping[str, Any], raw)
+
+
+def _charges_from_result(res: Result, n_atoms: int) -> np.ndarray | None:
+    raw = res.get("charges")
+    if raw is None:
+        return None
+    charges = np.asarray(raw, dtype=float).reshape(-1)
+    if charges.size != n_atoms:
+        return None
+    return charges
+
+
+def _uniform_spin_proxy(n_atoms: int) -> np.ndarray:
+    return np.zeros(n_atoms, dtype=float)
 
 
 def atomic_Q_and_S_from_xtbml(
@@ -115,15 +132,31 @@ def atomic_Q_and_S_from_xtbml(
         sa = q_alpha - q_beta
         return qa, sa
 
+    if q_merged is not None and q_merged.size == n:
+        if multiplicity != 1:
+            logger.warning(
+                "xtbml: multiplicity=%d without spin-split keys; using merged q_A "
+                "(per-atom S will be uniform after total conservation)",
+                multiplicity,
+            )
+        return q_merged, _uniform_spin_proxy(n)
+
+    charges = _charges_from_result(res, n)
+    if charges is not None:
+        logger.warning(
+            "xtbml: no q_A keys in post-processing-dict (mult=%d); "
+            "falling back to Result.charges",
+            multiplicity,
+        )
+        return charges, _uniform_spin_proxy(n)
+
     if multiplicity != 1:
         raise RuntimeError(
             "Expected xtbml spin-split keys q_A_alpha and q_A_beta for multiplicity != 1; "
             f"got keys containing q_A: {[k for k in pp if 'q_A' in k]!r}"
         )
 
-    if q_merged is None or q_merged.size != n:
-        raise RuntimeError(
-            "Singlet run expected merged q_A in post-processing-dict; "
-            f"q_A-related keys: {[k for k in pp if 'q_A' in k]!r}"
-        )
-    return q_merged, np.zeros(n, dtype=float)
+    raise RuntimeError(
+        "Singlet run expected merged q_A in post-processing-dict; "
+        f"q_A-related keys: {[k for k in pp if 'q_A' in k]!r}"
+    )

@@ -5,9 +5,14 @@ node channels before edge_degree_embedding and interaction blocks.
 
 The parent forward is reproduced from fairchem (eSCNMDBackbone) so we can inject
 at the early invariant fusion point; keep in sync when upgrading fairchem.
+
+Graph-parallel scatter uses ``scatter_target`` / ``gp_ctx`` (fairchem >= GP all-to-all
+refactor; ``gp_node_offset`` was removed from ``AtomicData``).
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import torch
 from fairchem.core.common.utils import conditional_grad
@@ -15,6 +20,9 @@ from fairchem.core.datasets.atomic_data import AtomicData
 from fairchem.core.models.uma.escn_md import eSCNMDBackbone
 from fairchem.core.models.uma.escn_moe import eSCNMDMoeBackbone
 from torch.profiler import record_function
+
+if TYPE_CHECKING:
+    from fairchem.core.common.parallelism.graph_parallel_a2a import GPContext
 
 
 def _escnmd_flow_forward(
@@ -39,9 +47,11 @@ def _escnmd_flow_forward(
     )
 
     if not self.regress_config.direct_forces:
-        if self.regress_config.forces or self.regress_config.stress:
+        if (
+            self.regress_config.forces or self.regress_config.stress
+        ) and not data_dict["pos"].requires_grad:
             data_dict["pos"].requires_grad_(True)
-        if self.regress_config.stress:
+        if self.regress_config.stress and not data_dict["cell"].requires_grad:
             data_dict["cell"].requires_grad_(True)
 
     with record_function("generate_graph"):
@@ -91,6 +101,10 @@ def _escnmd_flow_forward(
     )
     self.log_MOLE_stats()
 
+    gp_ctx: GPContext | None = data_dict.get("gp_ctx", None)
+    if "scatter_target" not in data_dict:
+        data_dict["scatter_target"] = graph_dict["edge_index"][1]
+
     with record_function("edge embedding"):
         dist_scaled = graph_dict["edge_distance"] / self.cutoff
         edge_envelope = self.envelope(dist_scaled).reshape(-1, 1, 1)
@@ -113,9 +127,8 @@ def _escnmd_flow_forward(
         x_message = self.edge_degree_embedding(
             x_message,
             x_edge,
-            graph_dict["edge_index"],
+            data_dict["scatter_target"],
             wigner_inv_envelope,
-            data_dict["gp_node_offset"],
         )
 
     with record_function("layer_radial_emb"):
@@ -133,7 +146,8 @@ def _escnmd_flow_forward(
                     0
                 ],
                 sys_node_embedding=sys_node_embedding,
-                node_offset=data_dict["gp_node_offset"],
+                scatter_target=data_dict["scatter_target"],
+                gp_ctx=gp_ctx,
             )
             x_message = self.balance_channels(
                 x_message,
