@@ -423,6 +423,7 @@ class QMDriver(ABC):
                 molden_src if self.keep_molden else None,
             )
             if self.multiwfn.enabled:
+                self._clear_chg(index)
                 staged = self._stage_molden(index, molden_src)
                 if staged is not None:
                     result_package["molden_file"] = staged
@@ -649,12 +650,23 @@ class QMDriver(ABC):
     def _molden_path(self, index: int) -> Path:
         return self.molden_dir / f"{int(index)}.molden"
 
+    def _clear_chg(self, index: int) -> None:
+        """Remove a stale ``.chg`` after a fresh TeraChem run for this index."""
+        path = self._chg_path(index)
+        if not path.is_file():
+            return
+        try:
+            path.unlink()
+            logger.info(f"Removed stale Multiwfn charge file {path}")
+        except OSError as e:
+            logger.warning(f"Could not remove stale charge file {path}: {e}")
+
     def _stage_molden(self, index: int, molden_src: Optional[Path]) -> Optional[Path]:
         """Copy a TeraChem molden to the persistent moldens/ dir if it is valid."""
         dest = self._molden_path(index)
-        if dest.is_file() and dest.stat().st_size > 0:
-            return dest
         if molden_src is None:
+            if dest.is_file() and dest.stat().st_size > 0:
+                return dest
             return None
         src = Path(molden_src)
         if not src.is_file() or src.stat().st_size <= 0:

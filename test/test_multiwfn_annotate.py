@@ -386,3 +386,50 @@ def test_pickle_resume_uses_existing_chg_without_rerunning_qm(tmp_path: Path, fa
         data = pickle.load(fh)
     expected = parse_chg_file(chg_files[0])
     np.testing.assert_allclose(data[0]["Qa"], expected)
+
+
+def test_stale_chg_cleared_when_terachem_reruns(tmp_path: Path, fake_multiwfn):
+    """A leftover .chg must not survive a fresh TeraChem run for the same index."""
+    import pickle
+
+    from enerzyme.data.supplier import SDFSupplier
+
+    sdf = FIXTURES / "fragments_tiny.sdf"
+    common = dict(
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(tmp_path / "annot_out"),
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        pickle_name="fragments.pkl",
+        dump_single_run=True,
+        n_processes=1,
+        clean_tmp=True,
+        keep_molden=False,
+        multiwfn_config=_mw_cfg(),
+    )
+    driver = MoldenFakeQMDriver(
+        supplier=SDFSupplier(str(sdf), start=0, end=1),
+        **common,
+    )
+    driver.run()
+
+    out_root = tmp_path / "annot_out" / "fragments_tiny_0_1"
+    chg_path = out_root / "chrg-12CM5" / "0.chg"
+    assert chg_path.is_file()
+    n_atoms = len(SDFSupplier(str(sdf), start=0, end=1).suppl().__next__())
+    stale = np.full(n_atoms, 9.99)
+    with open(chg_path, "w") as fh:
+        for i, q in enumerate(stale):
+            fh.write(f"H  0.0  0.0  {float(i):.6f}  {q:.10f}\n")
+
+    for path in out_root.rglob("single_run/*.pkl"):
+        path.unlink()
+    for path in out_root.rglob("moldens/*.molden"):
+        path.unlink()
+
+    MoldenFakeQMDriver(supplier=SDFSupplier(str(sdf), start=0, end=1), **common).run()
+    pkl = list(out_root.rglob("fragments.pkl"))
+    with open(pkl[0], "rb") as fh:
+        data = pickle.load(fh)
+    qa = np.asarray(data[0]["Qa"], dtype=float)
+    assert not np.allclose(qa, 9.99), "stale .chg must not be merged after TeraChem rerun"
+    np.testing.assert_allclose(qa[0], 0.01)
