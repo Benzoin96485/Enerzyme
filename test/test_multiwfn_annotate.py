@@ -332,3 +332,57 @@ def test_disabled_multiwfn_does_not_require_binary(tmp_path: Path):
     with connect(str(db_files[0])) as db:
         atoms = db.get(index=0).toatoms()
         assert "charges" not in (atoms.calc.results or {})
+    assert not list((tmp_path / "annot_out").rglob("moldens/*.molden")), (
+        "keep_molden=false and Multiwfn off must not stage moldens"
+    )
+
+
+def test_pickle_resume_uses_existing_chg_without_rerunning_qm(tmp_path: Path, fake_multiwfn):
+    """If Multiwfn wrote .chg but pickle merge never ran, resume must not re-run TeraChem."""
+    import pickle
+
+    from enerzyme.data.supplier import SDFSupplier
+
+    sdf = FIXTURES / "fragments_tiny.sdf"
+    call_count = {"n": 0}
+
+    class CountingDriver(MoldenFakeQMDriver):
+        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+            call_count["n"] += 1
+            return super().collect_results(input_file, atoms, tmp_dir)
+
+    common = dict(
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(tmp_path / "annot_out"),
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        pickle_name="fragments.pkl",
+        dump_single_run=True,
+        n_processes=1,
+        clean_tmp=True,
+        keep_molden=False,
+        multiwfn_config=_mw_cfg(),
+    )
+    CountingDriver(supplier=SDFSupplier(str(sdf), start=0, end=1), **common).run()
+    assert call_count["n"] == 1
+
+    single_runs = list((tmp_path / "annot_out").rglob("single_run/0.pkl"))
+    assert single_runs
+    with open(single_runs[0], "rb") as fh:
+        cached = pickle.load(fh)
+    cached.pop("Qa", None)
+    with open(single_runs[0], "wb") as fh:
+        pickle.dump(cached, fh)
+    for molden in (tmp_path / "annot_out").rglob("moldens/*.molden"):
+        molden.unlink()
+    chg_files = list((tmp_path / "annot_out").rglob("chrg-12CM5/0.chg"))
+    assert chg_files, "resume fixture requires the Multiwfn .chg to survive"
+
+    call_count["n"] = 0
+    CountingDriver(supplier=SDFSupplier(str(sdf), start=0, end=1), **common).run()
+    assert call_count["n"] == 0, "existing .chg must skip TeraChem even without a molden"
+
+    pkl = list((tmp_path / "annot_out").rglob("fragments.pkl"))
+    with open(pkl[0], "rb") as fh:
+        data = pickle.load(fh)
+    expected = parse_chg_file(chg_files[0])
+    np.testing.assert_allclose(data[0]["Qa"], expected)

@@ -422,16 +422,15 @@ class QMDriver(ABC):
                 output_file,
                 molden_src if self.keep_molden else None,
             )
-            staged = self._stage_molden(index, molden_src)
-            if staged is not None:
-                result_package["molden_file"] = staged
             if self.multiwfn.enabled:
-                if staged is None:
+                staged = self._stage_molden(index, molden_src)
+                if staged is not None:
+                    result_package["molden_file"] = staged
+                    self._enqueue_multiwfn(index, staged, n_atoms=len(atoms))
+                else:
                     logger.warning(
                         f"No valid molden for structure {index}; skipping Multiwfn"
                     )
-                else:
-                    self._enqueue_multiwfn(index, staged, n_atoms=len(atoms))
         except Exception as e:
             logger.warning(f"Calculation of structure {index} failed: {e}")
             if self.clean_tmp and tmp_dir.exists():
@@ -495,6 +494,10 @@ class QMDriver(ABC):
         cached = self.load_pickle_single_run(index)
         if cached is not None:
             if self.multiwfn.enabled and not self._datapoint_has_qa(cached):
+                if self._chg_is_ready(index):
+                    # Charges already on disk (crash between Multiwfn and pickle merge).
+                    # Keep the cached TeraChem result; parent merge will attach Qa.
+                    return cached
                 molden = self._molden_path(index)
                 if molden.is_file() and molden.stat().st_size > 0:
                     self._enqueue_multiwfn_from_existing_molden(index, n_atoms=len(atoms))
@@ -639,6 +642,10 @@ class QMDriver(ABC):
     def _chg_path(self, index: int) -> Path:
         return self.chg_dir / f"{int(index)}.chg"
 
+    def _chg_is_ready(self, index: int) -> bool:
+        path = self._chg_path(index)
+        return path.is_file() and path.stat().st_size > 0
+
     def _molden_path(self, index: int) -> Path:
         return self.molden_dir / f"{int(index)}.molden"
 
@@ -660,7 +667,7 @@ class QMDriver(ABC):
     def _enqueue_multiwfn(self, index: int, molden: Path, n_atoms: int) -> None:
         if not self.multiwfn.enabled:
             return
-        if self._chg_path(index).is_file() and self._chg_path(index).stat().st_size > 0:
+        if self._chg_is_ready(index):
             return
         job = {
             "index": int(index),
@@ -825,10 +832,7 @@ class QMDriver(ABC):
                     f"System {index} already completed in {self.output_path}. Skipping..."
                 )
                 continue
-            has_chg = (
-                self._chg_path(index).is_file() and self._chg_path(index).stat().st_size > 0
-            )
-            if any(_aselmdb_row_has_charges(row) for row in complete) or has_chg:
+            if any(_aselmdb_row_has_charges(row) for row in complete) or self._chg_is_ready(index):
                 logger.info(
                     f"System {index} already completed with charges. Skipping..."
                 )
