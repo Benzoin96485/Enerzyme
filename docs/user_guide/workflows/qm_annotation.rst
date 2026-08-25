@@ -28,6 +28,11 @@ Configuration
         keep_stdout: false
         clean_tmp: true
         n_processes: 8
+    Multiwfn:
+        enabled: false
+        charge_method: 1.2cm5
+        n_threads: 12
+        n_processes: 1
 
 Suppliers
 ---------
@@ -52,6 +57,17 @@ QMDriver options
 - :code:`keep_stdout` / :code:`keep_molden` — retain QC logs (:code:`keep_output` is a deprecated alias for :code:`keep_stdout`)
 - :code:`clean_tmp` — remove scratch after success
 
+Multiwfn (optional)
+-------------------
+
+Top-level :code:`Multiwfn` is independent of :code:`QMDriver` so unused keys are not swallowed by the TeraChem kwargs warning. When :code:`enabled: true`:
+
+- Each finished TeraChem job stages ``moldens/<index>.molden`` and **enqueues** Multiwfn without blocking the GPU worker.
+- :code:`n_processes` Multiwfn workers run concurrently; each uses :code:`n_threads` OpenMP threads (``-nt`` and ``OMP_NUM_THREADS``). Default is one worker.
+- Workers write ``chrg-<method>/<index>.chg`` only. After TeraChem **and** Multiwfn finish, the parent merges charges into the ASE LMDB / pickle as :code:`Qa`.
+- :code:`charge_method` (default :code:`1.2cm5`): :code:`hirshfeld`, :code:`vdd`, :code:`mulliken`, :code:`lowdin`, :code:`scpa`, :code:`adch`, :code:`cm5`, :code:`1.2cm5`, :code:`mbis`. Override the whole menu with :code:`menu_inputs`.
+- Resume: energy-complete rows skip TeraChem; missing :code:`Qa` with a surviving molden runs Multiwfn only. Load a noGUI Multiwfn module in the Slurm script (Enerzyme does not call :code:`module load`). Keep :code:`n_threads * n_processes` at or below the node's CPU count.
+
 Legacy template keys (:code:`bs`, :code:`xc`, :code:`pcm`, …) are ignored with a warning — put them in :code:`template_input_file`. Unknown YAML keys are also warned (they used to be swallowed by :code:`**kwargs`).
 
 For PCM, put :code:`pcm_radii_file <name>` in the template (path relative to the template file is fine). :code:`TeraChemDriver` copies that file into the per-job tmp directory so host absolute paths are not required in committed configs.
@@ -61,13 +77,14 @@ Resume / skip completed
 
 - **Pickle** with :code:`dump_single_run: true` (default): each finished structure is written to :code:`<out>/<supplier>/single_run/<index>.pkl`. A later :code:`annotate` run loads those files instead of re-running QM, then rewrites the aggregate :code:`.pkl`.
 - **ASE LMDB**: rows are keyed by structure :code:`index`. If a completed row (calculator energy present) already exists, that structure is skipped. Orphan reserved rows without energy are cleared so a crashed job can continue.
+- **Multiwfn**: if energy is present but :code:`Qa` is missing, TeraChem is skipped and the existing molden is enqueued. If both energy and a ``.chg`` / calculator charges are present, the structure is skipped entirely.
 
 Output schema
 -------------
 
 **ASE LMDB (default):** each structure is an ASE :code:`Atoms` row with calculator energy/forces/(charges/dipole) and :code:`data` fields :code:`charge`, :code:`spin`, :code:`index`. Load with :code:`Datahub.data_format: aselmdb` and **identity** maps (:code:`E`, :code:`Fa`, :code:`M2`, …); see :doc:`/user_guide/data/dataset_formats`.
 
-**Pickle (default):** list of dicts with standard names :code:`E` / :code:`Fa` (Hartree), :code:`M2`, :code:`Ra`, :code:`Za`, :code:`Q`, :code:`S`, :code:`N`, :code:`index`. With :code:`pickle_fields`, keys are renamed for Enerzymette (:code:`energy` / :code:`grad` / :code:`dipole` / …).
+**Pickle (default):** list of dicts with standard names :code:`E` / :code:`Fa` (Hartree), :code:`M2`, :code:`Ra`, :code:`Za`, :code:`Q`, :code:`S`, :code:`N`, :code:`index`, and :code:`Qa` when Multiwfn is enabled. With :code:`pickle_fields`, keys are renamed for Enerzymette (:code:`energy` / :code:`grad` / :code:`dipole` / …); add :code:`Qa: chrg` to keep the NNP4MTase charge key.
 
 Merging into training
 ---------------------
@@ -80,6 +97,7 @@ Environment
 -----------
 
 - :code:`terachem` on :code:`PATH` with valid license
+- :code:`Multiwfn_noGUI` on :code:`PATH` when :code:`Multiwfn.enabled` is true (cluster: ``module load multiwfn/v260410-noGui`` or ``multiwfn/v3.8-noGui-dev``)
 - PCM radius file when the template uses :code:`pcm_radii read` (prefer a file next to the template; see above)
 - RDKit for SDF parsing
 
