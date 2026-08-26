@@ -388,6 +388,35 @@ def test_pickle_resume_uses_existing_chg_without_rerunning_qm(tmp_path: Path, fa
     np.testing.assert_allclose(data[0]["Qa"], expected)
 
 
+def test_invoke_multiwfn_rejects_stale_workdir_chg(tmp_path: Path, fake_multiwfn):
+    """Leftover workdir .chg must not count as success when Multiwfn fails."""
+    from enerzyme.qm.multiwfn import invoke_multiwfn
+
+    molden = tmp_path / "0.molden"
+    molden.write_text("NATOMS 2\n[Molden Format]\nfake\n")
+    workdir = tmp_path / "multiwfn_tmp" / "0"
+    workdir.mkdir(parents=True)
+    stale = workdir / "0.chg"
+    stale.write_text("H  0.0  0.0  0.0  9.9900000000\nH  0.0  0.0  1.0  9.9900000000\n")
+
+    fail_exe = tmp_path / "mwbin" / "Multiwfn_fail"
+    fail_exe.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "sys.exit(1)\n"
+    )
+    fail_exe.chmod(fail_exe.stat().st_mode | stat.S_IEXEC)
+
+    with pytest.raises(RuntimeError, match="exited with code 1"):
+        invoke_multiwfn(
+            molden=molden,
+            workdir=workdir,
+            n_threads=1,
+            executable=str(fail_exe),
+        )
+    assert not stale.exists(), "stale workdir .chg must be cleared before Multiwfn runs"
+
+
 def test_stale_chg_cleared_when_terachem_reruns(tmp_path: Path, fake_multiwfn):
     """A leftover .chg must not survive a fresh TeraChem run for the same index."""
     import pickle

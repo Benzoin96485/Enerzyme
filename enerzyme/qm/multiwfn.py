@@ -138,12 +138,21 @@ def invoke_multiwfn(
     charge_method: str = "1.2cm5",
     menu_inputs: Optional[Sequence[str]] = None,
 ) -> Path:
-    """Run Multiwfn on one molden in ``workdir``; return the written ``.chg`` path."""
+    """Run Multiwfn on one molden in ``workdir``; return the written ``.chg`` path.
+
+    Clears any leftover ``*.chg`` in ``workdir`` before launching so a failed or
+    skipped Multiwfn run cannot reuse charges from a previous geometry.
+    """
     molden = Path(molden).resolve()
     if not molden.is_file() or molden.stat().st_size <= 0:
         raise FileNotFoundError(f"Invalid molden for Multiwfn: {molden}")
     workdir = Path(workdir)
     workdir.mkdir(parents=True, exist_ok=True)
+    for stale in workdir.glob("*.chg"):
+        try:
+            stale.unlink()
+        except OSError as e:
+            logger.warning(f"Could not remove stale workdir charge file {stale}: {e}")
     if settings_ini is not None:
         src = Path(settings_ini).expanduser().resolve()
         if not src.is_file():
@@ -157,9 +166,10 @@ def invoke_multiwfn(
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = str(n_threads)
     log_path = workdir / "multiwfn.log"
+    chg = workdir / f"{molden.stem}.chg"
     with open(log_path, "w") as log:
         try:
-            subprocess.run(
+            completed = subprocess.run(
                 cmd,
                 input=stdin,
                 stdout=log,
@@ -175,8 +185,12 @@ def invoke_multiwfn(
                 f"Multiwfn timed out after {timeout}s on {molden}"
             ) from e
 
-    chg = workdir / f"{molden.stem}.chg"
-    if not chg.is_file():
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"Multiwfn exited with code {completed.returncode} on {molden}. "
+            f"See {log_path}"
+        )
+    if not chg.is_file() or chg.stat().st_size <= 0:
         raise FileNotFoundError(
             f"Multiwfn did not write {chg}. See {log_path}"
         )
