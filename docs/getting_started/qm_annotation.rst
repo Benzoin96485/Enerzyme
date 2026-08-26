@@ -12,7 +12,7 @@ Basic command
 
 Arguments:
 
-- :code:`-c` — annotation config (:code:`Supplier` + :code:`QMDriver`)
+- :code:`-c` — annotation config (:code:`Supplier` + :code:`QMDriver` + optional :code:`Multiwfn`)
 - :code:`-o` — output directory
 - :code:`-t` — scratch directory for QM jobs
 - :code:`-s`, :code:`-e` — slice of molecules from the supplier (0-based start, exclusive end; :code:`-1` for all)
@@ -32,6 +32,12 @@ Configuration
         keep_stdout: false
         clean_tmp: true
         n_processes: 1
+    Multiwfn:
+        enabled: false
+        executable: Multiwfn_noGUI
+        charge_method: 1.2cm5
+        n_threads: 12
+        n_processes: 1
 
 Supplier
 ^^^^^^^^
@@ -49,8 +55,15 @@ The reference driver targets **TeraChem**. Basis, functional, and solvent live i
 
 Results are stored with ASE :code:`SinglePointCalculator` plus :code:`charge` / :code:`spin` / :code:`index` in row data so Datahub can reload them as :code:`aselmdb`. Re-running annotate **skips** completed :code:`index` rows (and retries incomplete reservations). For pickle output, set :code:`dump_single_run: true` (default) to cache :code:`single_run/<index>.pkl` and skip finished structures the same way.
 
+Multiwfn atomic charges (optional)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Set top-level :code:`Multiwfn.enabled: true` to compute atomic charges from each TeraChem molden **asynchronously**. GPU TeraChem workers copy a valid molden and immediately take the next structure; a separate CPU process pool runs :code:`Multiwfn_noGUI`. Charges (``.chg`` column 5) are stored as :code:`Qa` (ASE calculator :code:`charges`; pickle key :code:`Qa`, or a :code:`pickle_fields.Qa` rename such as :code:`chrg`).
+
+The job script must :code:`module load` a noGUI Multiwfn build **and** TeraChem. GPU nodes are assumed to have enough CPUs for both. Keep :code:`n_threads * n_processes` within the node CPU budget. Default :code:`charge_method` is :code:`1.2cm5` (menu :code:`7 / -16 / 1 / y`). Hirshfeld-I, RESP, CHELPG, and AIM need extra prompts — pass :code:`menu_inputs`.
+
 .. caution::
-    Prepare TeraChem and RDKit before running :code:`annotate`. These are not part of the core Enerzyme install.
+    Prepare TeraChem, Multiwfn (if enabled), and RDKit before running :code:`annotate`. These are not part of the core Enerzyme install.
 
 Integrating labeled data into training
 --------------------------------------
