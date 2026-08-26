@@ -495,7 +495,7 @@ class QMDriver(ABC):
         cached = self.load_pickle_single_run(index)
         if cached is not None:
             if self.multiwfn.enabled and not self._datapoint_has_qa(cached):
-                if self._chg_is_ready(index):
+                if self._chg_is_ready(index, n_atoms=len(atoms)):
                     # Charges already on disk (crash between Multiwfn and pickle merge).
                     # Keep the cached TeraChem result; parent merge will attach Qa.
                     return cached
@@ -643,9 +643,24 @@ class QMDriver(ABC):
     def _chg_path(self, index: int) -> Path:
         return self.chg_dir / f"{int(index)}.chg"
 
-    def _chg_is_ready(self, index: int) -> bool:
+    def _chg_is_ready(self, index: int, n_atoms: Optional[int] = None) -> bool:
+        """True when ``chrg-*/<index>.chg`` exists and parses as atomic charges.
+
+        Corrupt / truncated files are deleted so a later resume can re-enqueue
+        Multiwfn (or TeraChem) instead of permanently skipping charge recovery.
+        """
         path = self._chg_path(index)
-        return path.is_file() and path.stat().st_size > 0
+        if not path.is_file() or path.stat().st_size <= 0:
+            return False
+        try:
+            parse_chg_file(path, n_atoms=n_atoms)
+        except Exception as e:
+            logger.warning(
+                f"Corrupt Multiwfn charge file for {index} ({path}): {e}; removing"
+            )
+            self._clear_chg(index)
+            return False
+        return True
 
     def _molden_path(self, index: int) -> Path:
         return self.molden_dir / f"{int(index)}.molden"
@@ -685,7 +700,7 @@ class QMDriver(ABC):
     def _enqueue_multiwfn(self, index: int, molden: Path, n_atoms: int) -> None:
         if not self.multiwfn.enabled:
             return
-        if self._chg_is_ready(index):
+        if self._chg_is_ready(index, n_atoms=n_atoms):
             return
         job = {
             "index": int(index),
@@ -780,6 +795,7 @@ class QMDriver(ABC):
                 qa = parse_chg_file(path, n_atoms=n_atoms)
             except Exception as e:
                 logger.warning(f"Could not parse Multiwfn charges for {index}: {e}")
+                self._clear_chg(index)
                 continue
             self._set_qa_on_datapoint(datapoint, qa)
             if self.dump_single_run:
@@ -811,6 +827,7 @@ class QMDriver(ABC):
                 qa = parse_chg_file(path, n_atoms=len(atoms))
             except Exception as e:
                 logger.warning(f"Could not parse Multiwfn charges for {index}: {e}")
+                self._clear_chg(int(index))
                 continue
             results = dict(getattr(atoms.calc, "results", {}) or {})
             results["charges"] = qa
@@ -850,7 +867,9 @@ class QMDriver(ABC):
                     f"System {index} already completed in {self.output_path}. Skipping..."
                 )
                 continue
-            if any(_aselmdb_row_has_charges(row) for row in complete) or self._chg_is_ready(index):
+            if any(_aselmdb_row_has_charges(row) for row in complete) or self._chg_is_ready(
+                index, n_atoms=len(atoms)
+            ):
                 logger.info(
                     f"System {index} already completed with charges. Skipping..."
                 )

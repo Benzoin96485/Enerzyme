@@ -417,6 +417,55 @@ def test_invoke_multiwfn_rejects_stale_workdir_chg(tmp_path: Path, fake_multiwfn
     assert not stale.exists(), "stale workdir .chg must be cleared before Multiwfn runs"
 
 
+def test_corrupt_chg_resume_reenqueues_multiwfn(tmp_path: Path, fake_multiwfn):
+    """A truncated/corrupt .chg must not permanently block charge recovery."""
+    from enerzyme.data.supplier import get_supplier
+
+    sdf = FIXTURES / "fragments_tiny.sdf"
+    common = dict(
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(tmp_path / "annot_out"),
+        output_file="fragments.aselmdb",
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        n_processes=1,
+        clean_tmp=True,
+        keep_molden=True,
+        multiwfn_config=_mw_cfg(),
+    )
+    call_count = {"n": 0}
+
+    class CountingDriver(MoldenFakeQMDriver):
+        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+            call_count["n"] += 1
+            return super().collect_results(input_file, atoms, tmp_dir)
+
+    CountingDriver(supplier=get_supplier(str(sdf), start=0, end=1), **common).run()
+    assert call_count["n"] == 1
+
+    db_files = list((tmp_path / "annot_out").rglob("*.aselmdb"))
+    with connect(str(db_files[0])) as db:
+        atoms = db.get(index=0).toatoms()
+        results = dict(atoms.calc.results)
+        results.pop("charges", None)
+        from ase.calculators.singlepoint import SinglePointCalculator
+
+        atoms.calc = SinglePointCalculator(atoms=atoms, **results)
+        row = db.get(index=0)
+        db.write(atoms, id=row.id, data=dict(row.data), index=0)
+
+    chg_path = next((tmp_path / "annot_out").rglob("chrg-12CM5/0.chg"))
+    chg_path.write_text("not a valid charge file\n")
+    assert list((tmp_path / "annot_out").rglob("moldens/0.molden"))
+
+    call_count["n"] = 0
+    CountingDriver(supplier=get_supplier(str(sdf), start=0, end=1), **common).run()
+    assert call_count["n"] == 0, "corrupt .chg with molden must not re-run TeraChem"
+    with connect(str(db_files[0])) as db:
+        qa = db.get(index=0).toatoms().get_charges()
+        assert qa is not None
+        np.testing.assert_allclose(qa[0], 0.01)
+
+
 def test_stale_chg_cleared_when_terachem_reruns(tmp_path: Path, fake_multiwfn):
     """A leftover .chg must not survive a fresh TeraChem run for the same index."""
     import pickle

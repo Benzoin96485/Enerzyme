@@ -287,9 +287,20 @@ def _multiwfn_process_main(
             break
         index = int(job["index"])
         dest = chg_root / f"{index}.chg"
+        n_atoms = job.get("n_atoms")
         if dest.is_file() and dest.stat().st_size > 0:
-            logger.info(f"Multiwfn .chg for {index} already exists at {dest}; skipping")
-            continue
+            try:
+                parse_chg_file(dest, n_atoms=n_atoms)
+                logger.info(f"Multiwfn .chg for {index} already exists at {dest}; skipping")
+                continue
+            except Exception as e:
+                logger.warning(
+                    f"Corrupt Multiwfn .chg for {index} at {dest}: {e}; recomputing"
+                )
+                try:
+                    dest.unlink()
+                except OSError:
+                    pass
         workdir = tmp_root / str(index)
         try:
             chg = invoke_multiwfn(
@@ -302,7 +313,6 @@ def _multiwfn_process_main(
                 charge_method=str(config_dict["charge_method"]),
                 menu_inputs=config_dict.get("menu_inputs"),
             )
-            n_atoms = job.get("n_atoms")
             parse_chg_file(chg, n_atoms=n_atoms)
             if chg.resolve() != dest.resolve():
                 copy(chg, dest)
