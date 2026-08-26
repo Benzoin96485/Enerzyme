@@ -447,6 +447,7 @@ class QMDriver(ABC):
         # Prefer a parent-assigned id (multiprocess); otherwise claim by structure index.
         # Bare reserve() is wrong: with no key-value pairs ASE treats any existing row as a
         # hit and returns None after the first insert.
+        preserve_on_failure = bool(atoms.info.pop("aselmdb_preserve_on_failure", False))
         if "aselmdb_row_id" in atoms.info:
             system_id = atoms.info["aselmdb_row_id"]
             if system_id is None:
@@ -456,8 +457,9 @@ class QMDriver(ABC):
             if system_id is None:
                 return
 
-        # Always release the reservation unless the row is successfully written;
-        # otherwise orphaned reserved rows block later runs of the same index.
+        # Release fresh reservations on failure so orphaned reserved rows do not
+        # block later runs. When overwriting a previously complete energy row
+        # (Multiwfn molden-missing resume), keep that row if the rerun fails.
         wrote = False
         try:
             result_package = self._run_qm(atoms)
@@ -481,7 +483,7 @@ class QMDriver(ABC):
                 f"Failed to store ASE LMDB row for structure {index} (id={system_id}): {e}"
             )
         finally:
-            if not wrote:
+            if not wrote and not preserve_on_failure:
                 try:
                     db.delete([system_id])
                 except Exception as e:
@@ -489,6 +491,11 @@ class QMDriver(ABC):
                         f"Could not delete reserved ASE LMDB id {system_id} "
                         f"for structure {index}: {e}"
                     )
+            elif not wrote and preserve_on_failure:
+                logger.warning(
+                    f"Keeping existing ASE LMDB row id={system_id} for structure {index} "
+                    "after failed TeraChem rerun"
+                )
 
     def single_run_pickle(self, atoms: Atoms) -> Optional[Dict[str, Any]]:
         index = int(atoms.info["index"])
@@ -887,6 +894,7 @@ class QMDriver(ABC):
                     "re-running TeraChem"
                 )
                 atoms.info["aselmdb_row_id"] = complete[0].id
+                atoms.info["aselmdb_preserve_on_failure"] = True
                 to_qm.append(atoms)
         return to_qm, to_mw
 

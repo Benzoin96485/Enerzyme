@@ -466,6 +466,48 @@ def test_corrupt_chg_resume_reenqueues_multiwfn(tmp_path: Path, fake_multiwfn):
         np.testing.assert_allclose(qa[0], 0.01)
 
 
+def test_failed_terachem_rerun_preserves_existing_aselmdb_row(tmp_path: Path, fake_multiwfn):
+    """Molden-missing Multiwfn resume must not delete a good energy row if QM fails."""
+    from enerzyme.data.supplier import get_supplier
+
+    sdf = FIXTURES / "fragments_tiny.sdf"
+    common = dict(
+        tmp_dir=str(tmp_path / "annot_tmp"),
+        output_dir=str(tmp_path / "annot_out"),
+        output_file="fragments.aselmdb",
+        template_input_file=str(FIXTURES / "terachem_template.in"),
+        n_processes=1,
+        clean_tmp=True,
+        keep_molden=True,
+        multiwfn_config={"enabled": False},
+    )
+    MoldenFakeQMDriver(supplier=get_supplier(str(sdf), start=0, end=1), **common).run()
+    db_files = list((tmp_path / "annot_out").rglob("*.aselmdb"))
+    with connect(str(db_files[0])) as db:
+        assert db.count() == 1
+        energy0 = db.get(index=0).toatoms().get_potential_energy()
+
+    for molden in (tmp_path / "annot_out").rglob("moldens/*.molden"):
+        molden.unlink()
+
+    class FailingDriver(MoldenFakeQMDriver):
+        def collect_results(self, input_file, atoms: Atoms, tmp_dir: Path):
+            raise FileNotFoundError("simulated TeraChem failure")
+
+    FailingDriver(
+        supplier=get_supplier(str(sdf), start=0, end=1),
+        **{**common, "multiwfn_config": _mw_cfg()},
+    ).run()
+
+    with connect(str(db_files[0])) as db:
+        assert db.count() == 1, "failed overwrite must keep the previous energy row"
+        row = db.get(index=0)
+        atoms = row.toatoms()
+        assert atoms.calc.results.get("energy") is not None
+        np.testing.assert_allclose(atoms.get_potential_energy(), energy0)
+        assert "charges" not in (atoms.calc.results or {})
+
+
 def test_stale_chg_cleared_when_terachem_reruns(tmp_path: Path, fake_multiwfn):
     """A leftover .chg must not survive a fresh TeraChem run for the same index."""
     import pickle
