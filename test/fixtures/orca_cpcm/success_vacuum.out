@@ -1,0 +1,33 @@
+                                 Program Version 6.1.1  -  RELEASE   -
+
+                              SCF CONVERGED AFTER  12 CYCLES
+
+------------------------
+LOEWDIN ATOMIC CHARGES
+------------------------
+   0 O :   -0.512345
+   1 H :    0.256172
+   2 H :    0.256173
+
+-------------
+DIPOLE MOMENT
+-------------
+                                 X             Y             Z
+Electronic contribution:      0.100000      0.000000      0.000000
+Nuclear contribution   :      0.000000      0.000000      0.000000
+Total Dipole Moment    :      0.100000      0.000000      0.000000
+Magnitude (a.u.)       :      0.100000
+Magnitude (Debye)      :      0.254200
+
+-------------
+CARTESIAN GRADIENT
+-------------
+   1   O   :    0.010000000    0.000000000    0.000000000
+   2   H   :   -0.005000000    0.000000000    0.000000000
+   3   H   :   -0.005000000    0.000000000    0.000000000
+
+**** ENERGY GRADIENT DONE ****
+
+FINAL SINGLE POINT ENERGY        -76.123456789012
+
+****ORCA TERMINATED NORMALLY****

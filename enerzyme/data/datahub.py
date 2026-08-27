@@ -11,7 +11,15 @@ from ase.db import connect
 from addict import Dict
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from .datatype import is_atomic, is_rounded, is_int, register_data_type
+from .datatype import (
+    DIELECTRIC_FIELD,
+    dielectric_from_atoms,
+    is_atomic,
+    is_rounded,
+    is_int,
+    register_data_type,
+    validate_dielectric_array,
+)
 from .transform import (
     EnergyUnitConversionTransform,
     NegativeGradientTransform,
@@ -90,6 +98,9 @@ ASELMDB_METADATA_PROPERTIES_KEY = "enerzyme_properties"
 
 # ASE info keys that are remapped to standard names (not exposed as Datahub keys).
 _ASE_INFO_STANDARD_KEYS = frozenset({"charge", "spin"})
+
+# Graph-level info fields with dedicated accessors (validated, no silent defaults).
+_ASELMDB_VALIDATED_INFO_KEYS = frozenset({DIELECTRIC_FIELD})
 
 # Always available geometry / charge fields (no calculator required).
 _ASELMDB_GEOMETRY_KEYS = frozenset({"Ra", "Za", "N", "Q", "S"})
@@ -346,6 +357,12 @@ class ASELMDBDataset:
         schema_calc = properties_from_schema & set(ASE_PROPERTY_METHODS)
         schema_info = properties_from_schema - _ASELMDB_FIXED_KEYS
         declared_calc = declared & set(ASE_PROPERTY_METHODS)
+        # Only promote declared info keys that are present on the row/schema, or
+        # have a dedicated validator (dielectric). Unknown custom names stay
+        # absent so SingleDataHub still raises KeyError.
+        declared_info = (
+            declared - set(ASE_PROPERTY_METHODS) - _ASELMDB_GEOMETRY_KEYS
+        ) & (raw_info_keys | schema_info | _ASELMDB_VALIDATED_INFO_KEYS)
 
         calculator_backed = properties_from_calculator | schema_calc | declared_calc
         # Priority: calculator accessors for ASE_PROPERTY_METHODS; info only for
@@ -355,7 +372,7 @@ class ASELMDBDataset:
             ignored_fixed_in_row_data = (
                 set(row_data) & _ASELMDB_FIXED_KEYS & calculator_backed
             )
-        self.properties_from_info = raw_info_keys | schema_info
+        self.properties_from_info = raw_info_keys | schema_info | declared_info
         self.unique_properties_from_calculator = calculator_backed - self.properties_from_info
         overlapped_properties = calculator_backed & self.properties_from_info
 
@@ -405,6 +422,8 @@ class ASELMDBDataset:
             get_property_method = lambda atoms: atoms.info.get("charge", 0)
         elif k == "S":
             get_property_method = lambda atoms: atoms.info.get("spin", 1) - 1
+        elif k == DIELECTRIC_FIELD:
+            get_property_method = dielectric_from_atoms
         elif k in ASE_PROPERTY_METHODS and k in self.unique_properties_from_calculator:
             if k in {"E", "Fa"}:
                 get_property_method = lambda atoms, p=k: ASE_PROPERTY_METHODS[p](atoms) * self.energy_unit_conversion_factor
@@ -868,6 +887,12 @@ class SingleDataHub:
                 self._load_atomic_data(k, raw_data)
             else:
                 self._load_molecular_data(k, raw_data)
+
+        if DIELECTRIC_FIELD in self.data:
+            validate_dielectric_array(
+                self.data[DIELECTRIC_FIELD],
+                source=f"{self.data_path}:{DIELECTRIC_FIELD}",
+            )
         
         if self.data_format in ["hdf5", "npz"]:
             raw_data.close()

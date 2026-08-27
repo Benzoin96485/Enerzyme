@@ -1,0 +1,12 @@
+# Minimal ``architecture: uma_omol`` stack: frozen UMA-s-1p2 OMol energy/forces.
+# Resolve ``checkpoint_path`` from ``UMA_CHECKPOINT`` (do not commit host-absolute paths).
+
+build_params:
+  checkpoint_path: UMA_CHECKPOINT
+  task_name: omol
+  frozen: true
+  use_ema: true
+  inference_settings: batch
+
+layers:
+  - name: Core

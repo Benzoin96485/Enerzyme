@@ -4,8 +4,17 @@ from torch import Tensor
 from torch_geometric.data import Data, Batch
 import numpy as np
 from ..data import is_atomic, is_int, is_idx, requires_grad, is_target, is_target_uq, get_tensor_rank, is_grad
+from ..data.datatype import DIELECTRIC_FIELD, validate_dielectric_tensor
 from ..data.neighbor_list import full_neighbor_list
 from ..utils import logger
+
+
+def _validate_batch_dielectric(store) -> None:
+    if store is None:
+        return
+    if DIELECTRIC_FIELD not in store:
+        return
+    validate_dielectric_tensor(store[DIELECTRIC_FIELD], source="batch dielectric")
 
 
 def _generator_is_enabled(generator_config: Optional[Dict[str, Any]]) -> bool:
@@ -206,6 +215,7 @@ def _decorate_pyg_batch_input(
         _inject_generator_flow_pyg(
             batch_features, batch_targets, generator_config, dtype, generator_training
         )
+    _validate_batch_dielectric(batch_features)
     return batch_features, batch_targets
 
 
@@ -289,6 +299,7 @@ def _decorate_batch_input(
         _inject_generator_flow_dict(
             batch_features, batch_targets, generator_config, dtype, generator_training
         )
+    _validate_batch_dielectric(batch_features)
     return batch_features, batch_targets
 
 

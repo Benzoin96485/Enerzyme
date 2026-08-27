@@ -1,0 +1,15 @@
+                                 Program Version 6.1.1  -  RELEASE   -
+
+                         ----------------
+                         CPCM SOLVATION MODEL
+                         ----------------
+CPCM parameters:
+  Epsilon                                         ...       1.5000
+  Surface type                                    ... GAUSSIAN VDW
+  Epsilon function type                           ...         CPCM
+  SMD                                             ...            0
+
+ERROR *** SCF NOT CONVERGED EVEN AFTER  300 CYCLES
+                         MaxIter limit reached
+
+FINAL SINGLE POINT ENERGY        -75.000000000000

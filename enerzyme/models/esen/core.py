@@ -1,7 +1,18 @@
 import copy
-from typing import Dict
+from contextlib import nullcontext
+from typing import Dict, Optional
 import torch
 from torch import Tensor
+from torch import nn
+
+from .runtime import (
+    OMOL_TASK_NAME,
+    ensure_pinned_fairchem,
+    prepend_pinned_src_to_sys_path,
+    resolve_uma_checkpoint,
+)
+
+prepend_pinned_src_to_sys_path()
 import fairchem.core.models.base
 import fairchem.core.models.uma.escn_md
 import fairchem.core.models.uma.escn_moe
@@ -24,6 +35,7 @@ def _fields_to_atomic_data(
     device: torch.device | None = None,
     charge: Tensor | None = None,
     spin: Tensor | None = None,
+    vacuum_pbc: bool = True,
 ) -> AtomicData:
     """Convert Enerzyme format (Ra, Za, batch_seg) to UMA AtomicData format.
 
@@ -39,6 +51,9 @@ def _fields_to_atomic_data(
         charge: Total charge per graph, shape (num_graphs,) or scalar. Default 0.
         spin: Spin multiplicity minus 1 per graph (S = mult - 1), shape (num_graphs,) or scalar.
             UMA expects multiplicity, so we pass spin = S + 1. Default 0 (multiplicity 1) for non-omol, 1 for omol.
+        vacuum_pbc: If True (default, used by ``UMAWrapperQS``), build a cubic
+            vacuum box with PBC. If False, match ``AtomicData.from_ase`` for
+            isolated molecules (pbc all False, completed identity cell).
 
     Returns:
         AtomicData with empty edge_index; backbone builds graph internally via otf_graph.
@@ -64,19 +79,30 @@ def _fields_to_atomic_data(
         device=device,
     )
 
-    # Build cell for each graph: cubic box enclosing atoms + vacuum padding
-    # UMA with PBC expects a cell per graph for neighbor search
-    cells = []
-    for i in range(num_graphs):
-        mask = batch_seg == i
-        pos_i = Ra[mask]
-        min_pos = pos_i.min(dim=0).values
-        max_pos = pos_i.max(dim=0).values
-        span = (max_pos - min_pos).max().item() + vacuum
-        cell = torch.eye(3, dtype=dtype, device=device) * span
-        cells.append(cell)
-    cell = torch.stack(cells)  # (num_graphs, 3, 3)
-    pbc = torch.ones(num_graphs, 3, dtype=torch.bool, device=device)
+    if vacuum_pbc:
+        # Cubic box enclosing atoms + vacuum padding. UMAWrapperQS uses this
+        # so PBC neighbor search never sees periodic images of small molecules.
+        cells = []
+        for i in range(num_graphs):
+            mask = batch_seg == i
+            pos_i = Ra[mask]
+            min_pos = pos_i.min(dim=0).values
+            max_pos = pos_i.max(dim=0).values
+            span = (max_pos - min_pos).max().item() + vacuum
+            cell = torch.eye(3, dtype=dtype, device=device) * span
+            cells.append(cell)
+        cell = torch.stack(cells)  # (num_graphs, 3, 3)
+        pbc = torch.ones(num_graphs, 3, dtype=torch.bool, device=device)
+    else:
+        # FAIRChemCalculator / AtomicData.from_ase for isolated molecules:
+        # pbc all False; ASE get_cell(complete=True) on a missing cell is identity.
+        cell = (
+            torch.eye(3, dtype=dtype, device=device)
+            .unsqueeze(0)
+            .expand(num_graphs, 3, 3)
+            .contiguous()
+        )
+        pbc = torch.zeros(num_graphs, 3, dtype=torch.bool, device=device)
 
     if charge is not None:
         charge = charge.to(device=device)
@@ -270,3 +296,260 @@ class UMAFlowWrapperQS(BaseFFCore):
         input_data = _fields_to_atomic_data(Ra, Za, batch_seg, charge=Q, spin=S)
         emb = self.backbone(input_data, atom_embedding=atom_embedding)
         return {"atom_feature": emb["node_embedding"][:, 0, :]}
+
+
+def _enable_energy_gradients(backbone, data: AtomicData) -> None:
+    """Match ``MLIPPredictUnit._prepare_inference_gradients`` for autograd forces."""
+    regress_config = getattr(backbone, "regress_config", None)
+    if regress_config is None or regress_config.direct_forces:
+        return
+    if regress_config.forces or regress_config.stress:
+        data["pos"].requires_grad_(True)
+    if regress_config.stress:
+        data["cell"].requires_grad_(True)
+
+
+def _unwrap_task_tensor(output: dict, task_name: str, property_name: str) -> Tensor:
+    raw = output[task_name]
+    if isinstance(raw, dict):
+        if property_name in raw:
+            return raw[property_name]
+        if task_name in raw:
+            return raw[task_name]
+    return raw
+
+
+class UMAOmolWrapper(BaseFFCore):
+    """Full UMA-s-1p2 OMol energy/force wrapper.
+
+    Loads the complete ``HydraModel`` (backbone, DatasetSpecificMoEWrapper /
+    MLP_EFS_Head, all checkpoint tasks, OMol normalizer and element
+    references) via ``load_inference_model(..., use_ema=True)``. Each forward
+    runs the backbone once and sends the same ``emb["node_embedding"]`` into
+    the frozen OMol EFS head. Outputs are denormalized and have element
+    references restored as in ``MLIPPredictUnit._process_outputs``.
+
+    ``uma-s-1p2`` has ``direct_forces=False``, so forces are energy gradients.
+    """
+
+    def __init__(
+        self,
+        checkpoint_path: str | None = None,
+        task_name: str = OMOL_TASK_NAME,
+        frozen: bool = True,
+        use_ema: bool = True,
+        inference_settings: str = "batch",
+        add_untrained_stress: bool = True,
+        strict: bool = True,
+    ):
+        super().__init__(
+            input_fields={"Ra", "Za", "batch_seg", "Q", "S"},
+            output_fields={"E", "Fa"},
+        )
+        ensure_pinned_fairchem()
+        from fairchem.core.units.mlip_unit.api.inference import guess_inference_settings
+        from fairchem.core.units.mlip_unit.utils import (
+            get_backbone_class_from_checkpoint,
+            load_inference_model,
+            tf32_context_manager,
+        )
+
+        ckpt_path = str(resolve_uma_checkpoint(checkpoint_path))
+        settings = guess_inference_settings(inference_settings)
+        if settings.tf32:
+            raise ValueError(
+                "UMAOmolWrapper requires eager FP32 (tf32=False). "
+                f"Got inference_settings={inference_settings!r}."
+            )
+
+        checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        backbone_cls = get_backbone_class_from_checkpoint(checkpoint)
+        overrides = {"backbone": backbone_cls.build_inference_settings(settings)}
+        self.uma, checkpoint = load_inference_model(
+            ckpt_path,
+            overrides=overrides,
+            use_ema=use_ema,
+            return_checkpoint=True,
+            strict=strict,
+            preloaded_checkpoint=checkpoint,
+        )
+        hydra_model = self.uma.module if hasattr(self.uma, "module") else self.uma
+        hydra_model.setup_tasks(checkpoint.tasks_config)
+        if add_untrained_stress and hasattr(hydra_model.backbone, "get_default_untrained_tasks"):
+            extra_tasks = hydra_model.backbone.get_default_untrained_tasks(
+                hydra_model.tasks, settings
+            )
+            if extra_tasks:
+                hydra_model.add_tasks(extra_tasks)
+
+        regress = hydra_model.backbone.regress_config
+        if getattr(regress, "direct_forces", False):
+            raise ValueError(
+                "UMAOmolWrapper requires energy-conserving forces "
+                "(direct_forces=False); uma-s-1p2 must not use direct forces."
+            )
+
+        self.hydra = hydra_model
+        self.task_name = task_name
+        self.inference_settings = settings
+        self._tf32_context_manager = tf32_context_manager
+        self._prepared = False
+        self.checkpoint_path = ckpt_path
+        self.dim_feature_out = hydra_model.backbone.sphere_channels
+
+        energy_name = f"{task_name}_energy"
+        forces_name = f"{task_name}_forces"
+        if energy_name not in hydra_model.tasks:
+            raise KeyError(
+                f"Checkpoint is missing task {energy_name!r}. "
+                f"Available: {sorted(hydra_model.tasks)}"
+            )
+        if forces_name not in hydra_model.tasks:
+            from fairchem.core.units.mlip_unit.mlip_unit import OutputSpec, Task
+
+            energy_task = hydra_model.tasks[energy_name]
+            hydra_model.add_tasks(
+                [
+                    Task(
+                        name=forces_name,
+                        level="atom",
+                        property="forces",
+                        out_spec=OutputSpec(
+                            dim=[3], dtype=settings.base_precision_dtype
+                        ),
+                        normalizer=energy_task.normalizer,
+                        datasets=[task_name],
+                        loss_fn=None,
+                        element_references=None,
+                        metrics=[],
+                        train_on_free_atoms=True,
+                        eval_on_free_atoms=True,
+                        inference_only=True,
+                    )
+                ]
+            )
+        self._energy_task_name = energy_name
+        self._forces_task_name = forces_name
+        self._efs_head_names = self._discover_omol_efs_heads(task_name)
+
+        # Keep OMol normalizers / element references on this module so .to(device)
+        # moves them; they are not registered under HydraModel.
+        self.task_normalizers = nn.ModuleDict()
+        self.task_element_references = nn.ModuleDict()
+        for name, task in hydra_model.tasks.items():
+            if task_name not in getattr(task, "datasets", []):
+                continue
+            self.task_normalizers[name] = task.normalizer
+            if task.element_references is not None:
+                self.task_element_references[name] = task.element_references
+
+        hydra_model.backbone.otf_graph = True
+        hydra_model.eval()
+        self.uma.eval()
+        if frozen:
+            for param in self.uma.parameters():
+                param.requires_grad = False
+
+    def _discover_omol_efs_heads(self, task_name: str) -> list[str]:
+        names: list[str] = []
+        for head_name, head in self.hydra.output_heads.items():
+            dataset_names = getattr(head, "dataset_names", None)
+            dataset_map = getattr(head, "dataset_name_to_exp", None)
+            if dataset_names is not None and task_name in dataset_names:
+                names.append(head_name)
+            elif dataset_map is not None and task_name in dataset_map:
+                names.append(head_name)
+        if not names:
+            names = list(self.hydra.output_heads.keys())
+        return names
+
+    def __str__(self) -> str:
+        return """
+##############################################################
+# Wrapped UMA-s-1p2 OMol energy/forces (frozen HydraModel)   #
+##############################################################
+"""
+
+    def build(self, built_layers) -> None:
+        pre_core = True
+        for layer in built_layers:
+            if layer is self:
+                pre_core = False
+                continue
+            if pre_core:
+                self.pre_sequence.append(layer)
+            else:
+                self.post_sequence.append(layer)
+
+    def _prepare_if_needed(self, data: AtomicData) -> None:
+        if self._prepared:
+            return
+        self.hydra.prepare_for_inference(data, self.inference_settings)
+        self.uma.requires_grad_(False)
+        self._prepared = True
+
+    def _process_omol_outputs(self, data: AtomicData, output: dict) -> Dict[str, Tensor]:
+        """Denormalize and restore element references (MLIPPredictUnit._process_outputs)."""
+        processed: dict[str, Tensor] = {}
+        for task_name in (self._energy_task_name, self._forces_task_name):
+            task = self.hydra.tasks[task_name]
+            tensor = _unwrap_task_tensor(output, task_name, task.property)
+            pred = task.normalizer.denorm(tensor)
+            if task.element_references is not None:
+                pred = task.element_references.undo_refs(data, pred)
+            processed[task.property] = pred
+        energy = processed["energy"]
+        if energy.ndim > 1:
+            energy = energy.reshape(energy.shape[0])
+        return {"E": energy, "Fa": processed["forces"]}
+
+    def predict_from_atomic_data(self, data: AtomicData) -> Dict[str, Tensor]:
+        """OMol energy/forces from a fairchem ``AtomicData`` batch (eager FP32)."""
+        self.uma.eval()
+        self.hydra.eval()
+        param = next(self.uma.parameters())
+        dtype = self.inference_settings.base_precision_dtype
+        data = data.to(param.device).clone()
+        for key, val in data:
+            if torch.is_tensor(val) and val.is_floating_point():
+                data[key] = val.to(dtype)
+        self._prepare_if_needed(data)
+        self.hydra.on_predict_check(data)
+        backbone = self.hydra.backbone
+        _enable_energy_gradients(backbone, data)
+        inference_context = (
+            torch.no_grad() if backbone.regress_config.direct_forces else nullcontext()
+        )
+        with inference_context, self._tf32_context_manager(False):
+            emb = backbone(data)
+            out: dict = {}
+            for head_name in self._efs_head_names:
+                head_out = self.hydra.output_heads[head_name](data, emb)
+                if self.hydra.pass_through_head_outputs or any(
+                    isinstance(key, str) and ("energy" in key or "forces" in key)
+                    for key in head_out
+                ):
+                    out.update(head_out)
+                else:
+                    out[head_name] = head_out
+            return self._process_omol_outputs(data, out)
+
+    def get_output(
+        self,
+        Ra: Tensor,
+        Za: Tensor,
+        batch_seg: Tensor,
+        Q: Optional[Tensor] = None,
+        S: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        data = _fields_to_atomic_data(
+            Ra,
+            Za,
+            batch_seg,
+            task_name=self.task_name,
+            charge=Q,
+            spin=S,
+            vacuum_pbc=False,
+        )
+        return self.predict_from_atomic_data(data)
+

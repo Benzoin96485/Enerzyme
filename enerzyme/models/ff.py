@@ -81,6 +81,30 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         }
         DEFAULT_LAYER_PARAMS = []
         special_loss = {}
+    elif architecture.lower() == "uma_omol":
+        from .esen import UMAOmolWrapper as Core
+        DEFAULT_BUILD_PARAMS = {
+            "checkpoint_path": "UMA_CHECKPOINT",
+            "task_name": "omol",
+            "frozen": True,
+            "use_ema": True,
+            "inference_settings": "batch",
+        }
+        DEFAULT_LAYER_PARAMS = [{"name": "Core"}]
+        special_loss = {}
+    elif architecture.lower() == "dc_uma_cpcm":
+        from .esen import DCUMACPCMWrapper as Core
+        DEFAULT_BUILD_PARAMS = {
+            "checkpoint_path": "UMA_CHECKPOINT",
+            "task_name": "omol",
+            "frozen": True,
+            "use_ema": True,
+            "inference_settings": "batch",
+            "adapter_hidden": [256, 128],
+            "adapter_mode": "stage_a",
+        }
+        DEFAULT_LAYER_PARAMS = [{"name": "Core"}]
+        special_loss = {}
     elif architecture.lower() == "equiformer":
         from .equiformer.core import EquiformerCore as Core
         from .equiformer.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

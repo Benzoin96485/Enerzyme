@@ -9,6 +9,27 @@ def test_ff_registers_uma_qs_string():
     assert "from .esen import UMAWrapperQS" in src
 
 
+def test_ff_registers_uma_omol_string():
+    src = Path("enerzyme/models/ff.py").read_text()
+    assert 'architecture.lower() == "uma_omol"' in src
+    assert "from .esen import UMAOmolWrapper" in src
+
+
+def test_ff_registers_dc_uma_cpcm_string():
+    src = Path("enerzyme/models/ff.py").read_text()
+    assert 'architecture.lower() == "dc_uma_cpcm"' in src
+    assert "from .esen import DCUMACPCMWrapper" in src
+
+
+def test_esen_exports_uma_omol_wrapper_symbol():
+    init_src = Path("enerzyme/models/esen/__init__.py").read_text()
+    assert "UMAOmolWrapper" in init_src
+    assert "DCUMACPCMWrapper" in init_src
+    assert "StageASolvationAdapter" in init_src
+    assert "StageBSolvationAdapter" in init_src
+    assert "ADAPTER_MODES" in init_src
+
+
 def test_esen_exports_uma_wrapper_symbol():
     init_src = Path("enerzyme/models/esen/__init__.py").read_text()
     assert "UMAWrapperQS" in init_src

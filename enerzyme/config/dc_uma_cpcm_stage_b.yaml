@@ -1,0 +1,37 @@
+# Frozen UMA-s-1p2 OMol + Stage B C-PCM adapter (local MLP + full-pair GB).
+# Resolve ``checkpoint_path`` from ``UMA_CHECKPOINT`` and warm-start from
+# ``STAGE_A_ADAPTER`` (do not commit host-absolute paths).
+# Residual training is physical eV; eval totals are ``E = E_vac + ΔE``.
+# Lowdin aux loss (weight 0.05) is applied only when ``lowdin_charges`` exist.
+
+build_params:
+  checkpoint_path: UMA_CHECKPOINT
+  task_name: omol
+  frozen: true
+  use_ema: true
+  inference_settings: batch
+  adapter_hidden: [256, 128]
+  adapter_mode: stage_b
+
+layers:
+  - name: Core
+
+trainer:
+  seed: 20260818
+  warm_start: STAGE_A_ADAPTER
+  dtype: float32
+  cuda: true
+  learning_rate: 0.001
+  batch_size: 1
+  accumulate_grad_batches: 1
+  max_epochs: 200
+  patience: 20
+  lowdin_aux_weight: 0.05
+  loss:
+    residual_huber:
+      delta: 0.01
+      dE: 1.0
+      dFa: 1.0
+  gate:
+    charged_energy_improve: 0.10
+    force_degrade_max: 0.05

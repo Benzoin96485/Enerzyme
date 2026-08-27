@@ -1,7 +1,7 @@
 from functools import partial
 from typing import Iterable, Optional, Callable, Dict, Any, Literal
 from collections import defaultdict
-import time, os, logging, contextlib
+import math, time, os, logging, contextlib
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -165,6 +165,7 @@ class Trainer:
         
         '''
         self.batch_size = params.get('batch_size', 8)
+        self.accumulate_grad_batches = max(1, int(params.get("accumulate_grad_batches", 1)))
         self.pyg = params.get("pyg", False)
         self.lightning = params.get("lightning", False)
         self.patience = params.get('patience', 50)
@@ -241,7 +242,8 @@ class Trainer:
                 strategy="auto",
                 gradient_clip_val=self.max_norm if self.max_norm > 0 else None,
                 inference_mode=False,
-                max_epochs=self.max_epochs
+                max_epochs=self.max_epochs,
+                accumulate_grad_batches=self.accumulate_grad_batches,
             )
         else:
             if torch.cuda.is_available():
@@ -409,10 +411,12 @@ class Trainer:
             num_workers=self.num_workers,
             drop_last=True 
         )
+        accum = self.accumulate_grad_batches
+        opt_steps_per_epoch = math.ceil(len(train_dataloader) / accum)
         if self.lightning:
-            num_training_steps = len(train_dataloader) * self.max_epochs // self.lightning_trainer.world_size
+            num_training_steps = opt_steps_per_epoch * self.max_epochs // self.lightning_trainer.world_size
         else:
-            num_training_steps = len(train_dataloader) * self.max_epochs
+            num_training_steps = opt_steps_per_epoch * self.max_epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
 
         optimizer = get_optimizer(self.optimizer_name, model, self.optimizer_hyper_params)
@@ -558,6 +562,8 @@ class Trainer:
                     desc='Train', ncols=5
                 ) 
                 trn_loss = []
+                n_micro = len(train_dataloader)
+                accum = self.accumulate_grad_batches
                 
                 for i, batch in enumerate(train_dataloader):
                     net_input, net_target = self.to_device(batch)
@@ -576,18 +582,21 @@ class Trainer:
                     )
 
                     # see https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#use-parameter-grad-none-instead-of-model-zero-grad-or-optimizer-zero-grad
-                    optimizer.zero_grad(set_to_none=True)
-                    loss.backward()
+                    if i % accum == 0:
+                        optimizer.zero_grad(set_to_none=True)
+                    (loss / accum).backward()
 
-                    if self.max_norm > 0:
-                        clip_grad_norm_(model.parameters(), self.max_norm)
+                    is_accum_boundary = ((i + 1) % accum == 0) or ((i + 1) == n_micro)
+                    if is_accum_boundary:
+                        if self.max_norm > 0:
+                            clip_grad_norm_(model.parameters(), self.max_norm)
 
-                    optimizer.step()
+                        optimizer.step()
 
-                    if self.use_ema:
-                        ema.update()
-                    
-                    scheduler.step()
+                        if self.use_ema:
+                            ema.update()
+                        
+                        scheduler.step()
                     batch_bar.update()
 
                 batch_bar.close()

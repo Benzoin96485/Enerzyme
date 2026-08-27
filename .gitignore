@@ -131,4 +131,5 @@ requirements-dev.yaml
 experiments/
 references/
 paper/
+plan/
 So3krates-torch/

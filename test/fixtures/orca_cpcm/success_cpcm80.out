@@ -1,0 +1,44 @@
+                                 Program Version 6.1.1  -  RELEASE   -
+
+                         ----------------
+                         CPCM SOLVATION MODEL
+                         ----------------
+CPCM parameters:
+  Epsilon                                         ...      80.0000
+  Refrac                                          ...       1.3300
+  Rsolv                                           ...       1.3000
+  Surface type                                    ... GAUSSIAN VDW
+  Epsilon function type                           ...         CPCM
+  SMD                                             ...            0
+  DRACO                                           ...            0
+
+                              SCF CONVERGED AFTER   9 CYCLES
+
+------------------------
+LOEWDIN ATOMIC CHARGES
+------------------------
+   0 O :   -0.600000
+   1 H :    0.300000
+   2 H :    0.300000
+
+-------------
+DIPOLE MOMENT
+-------------
+Total Dipole Moment    :      0.200000      0.010000     -0.005000
+Magnitude (a.u.)       :      0.200312
+Magnitude (Debye)      :      0.509000
+
+-------------
+CARTESIAN GRADIENT
+-------------
+   1   O   :    0.012000000    0.000000000    0.000000000
+   2   H   :   -0.006000000    0.000000000    0.000000000
+   3   H   :   -0.006000000    0.000000000    0.000000000
+
+CPCM contribution to the gradient was evaluated analytically
+
+**** ENERGY GRADIENT DONE ****
+
+FINAL SINGLE POINT ENERGY        -76.200000000000
+
+****ORCA TERMINATED NORMALLY****

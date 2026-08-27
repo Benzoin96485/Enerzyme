@@ -1,0 +1,16 @@
+# Minimal ``architecture: dc_uma_cpcm`` stack: frozen UMA-s-1p2 OMol + Stage A adapter.
+# Resolve ``checkpoint_path`` from ``UMA_CHECKPOINT`` (do not commit host-absolute paths).
+# Training fits residual ``dE`` / ``dFa`` in physical eV; eval/inference emits totals
+# as ``E`` / ``Fa`` from one backbone forward fanned out to the vacuum head and adapter.
+
+build_params:
+  checkpoint_path: UMA_CHECKPOINT
+  task_name: omol
+  frozen: true
+  use_ema: true
+  inference_settings: batch
+  adapter_hidden: [256, 128]
+  adapter_mode: stage_a
+
+layers:
+  - name: Core

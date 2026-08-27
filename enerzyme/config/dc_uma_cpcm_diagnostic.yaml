@@ -1,0 +1,34 @@
+# Diagnostic 240-job residual training: frozen UMA + Stage A / x-only / zero.
+# Resolve checkpoint_path from UMA_CHECKPOINT. Do not commit host-absolute paths.
+# max_epochs / steps are upper bounds; early-stop on validation residual joint MAE.
+# accumulate_grad_batches must come from the GPU microbenchmark, not a preset 32.
+
+build_params:
+  checkpoint_path: UMA_CHECKPOINT
+  task_name: omol
+  frozen: true
+  use_ema: true
+  inference_settings: batch
+  adapter_hidden: [256, 128]
+  adapter_mode: stage_a
+
+layers:
+  - name: Core
+
+trainer:
+  seed: 20260817
+  seeds: [20260817, 20260818, 20260819]
+  baselines: [zero, x_only, stage_a]
+  eval_slices: [train_epsilon, held_out_epsilon, held_out_parent]
+  dtype: float32
+  cuda: true
+  learning_rate: 0.001
+  batch_size: 1
+  accumulate_grad_batches: 1
+  max_epochs: 200
+  patience: 20
+  loss:
+    residual_huber:
+      delta: 0.01
+      dE: 1.0
+      dFa: 1.0

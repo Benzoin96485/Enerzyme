@@ -7,6 +7,7 @@ import torch
 from ase.calculators.calculator import Calculator, all_changes
 from ase.units import Hartree
 from ..data.transform import Transform
+from ..data.datatype import dielectric_from_atoms
 from ..data.neighbor_list import full_neighbor_list
 from .trainer import _decorate_batch_output, _decorate_batch_input, _to_device
 
@@ -128,6 +129,9 @@ class ASECalculator(Calculator):
             "Za": atoms.numbers,
             "N": len(atoms)
         }
+        model_fields = getattr(self.model, "_input_fields", None) or set()
+        if "dielectric" in model_fields or "dielectric" in atoms.info:
+            features["dielectric"] = dielectric_from_atoms(atoms)
         if self.neighbor_list_type == "full":
             idx_i, idx_j = full_neighbor_list(features["N"])
             features["idx_i"] = idx_i
