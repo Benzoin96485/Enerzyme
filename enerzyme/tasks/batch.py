@@ -148,13 +148,30 @@ def _decorate_pyg_batch_input(
                     v,
                     dtype=torch.long if is_int(k) else dtype,
                 )
+                # Graph-level tensors with rank > 0 (e.g. (3,3) cell) need an
+                # explicit leading batch dim, or PyG's default dim-0 concat in
+                # Batch.from_data_list flattens them instead of stacking them
+                # (mirrors the same unsqueeze already done for targets below).
+                if get_tensor_rank(k) > 0:
+                    data_dict[k] = data_dict[k].unsqueeze(0)
             data_dict["N"] = feature["N"]
         if "idx_i" in feature and "idx_j" in feature:
-            data_dict["idx_i"] = torch.tensor(feature["idx_i"], dtype=torch.long)
-            data_dict["idx_j"] = torch.tensor(feature["idx_j"], dtype=torch.long)
+            n_pair = feature["N_pair"] if "N_pair" in feature else len(feature["idx_i"])
+            data_dict["idx_i"] = torch.tensor(feature["idx_i"][:n_pair], dtype=torch.long)
+            data_dict["idx_j"] = torch.tensor(feature["idx_j"][:n_pair], dtype=torch.long)
             edge_index = torch.stack([data_dict["idx_i"], data_dict["idx_j"]], dim=0)
+            if "offsets" in feature:
+                data_dict["offsets"] = torch.tensor(feature["offsets"][:n_pair], dtype=dtype)
             n_with_edges += 1
         elif otf_graph:
+            if "cell" in feature or "pbc" in feature:
+                raise ValueError(
+                    "Sample carries 'cell'/'pbc' (a periodic system) but has no "
+                    "precomputed 'idx_i'/'idx_j'. The open-boundary on-the-fly "
+                    "fallback (full_neighbor_list) is not valid under periodic "
+                    "boundary conditions; precompute a periodic-aware neighbor "
+                    "list via Datahub neighbor_list='cutoff' instead."
+                )
             idx_i, idx_j = full_neighbor_list(feature["N"])
             data_dict["idx_i"] = torch.tensor(idx_i, dtype=torch.long)
             data_dict["idx_j"] = torch.tensor(idx_j, dtype=torch.long)
@@ -240,9 +257,11 @@ def _decorate_batch_input(
 
     batch_idx_i = []
     batch_idx_j = []
+    batch_offsets = []
     batch_seg = []
     count = 0
     n_with_edges = 0
+    n_with_offsets = 0
 
     # Build neighbor indices per structure. A batch-wide "built" flag must not
     # skip later molecules when otf_graph is enabled (trainer default).
@@ -252,7 +271,19 @@ def _decorate_batch_input(
             batch_idx_i.append(np.asarray(feature["idx_i"][:n_pair]) + count)
             batch_idx_j.append(np.asarray(feature["idx_j"][:n_pair]) + count)
             n_with_edges += 1
+            if "offsets" in feature:
+                # Cartesian shift vector, not a node index: never offset by count.
+                batch_offsets.append(np.asarray(feature["offsets"][:n_pair]))
+                n_with_offsets += 1
         elif otf_graph:
+            if "cell" in feature or "pbc" in feature:
+                raise ValueError(
+                    "Sample carries 'cell'/'pbc' (a periodic system) but has no "
+                    "precomputed 'idx_i'/'idx_j'. The open-boundary on-the-fly "
+                    "fallback (full_neighbor_list) is not valid under periodic "
+                    "boundary conditions; precompute a periodic-aware neighbor "
+                    "list via Datahub neighbor_list='cutoff' instead."
+                )
             idx_i, idx_j = full_neighbor_list(feature["N"])
             batch_idx_i.append(idx_i + count)
             batch_idx_j.append(idx_j + count)
@@ -265,6 +296,16 @@ def _decorate_batch_input(
     if n_with_edges == n_structures:
         batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long)
         batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long)
+        if n_with_offsets == n_structures:
+            batch_features["offsets"] = torch.tensor(
+                np.concatenate(batch_offsets), dtype=dtype
+            )
+        elif n_with_offsets > 0:
+            raise ValueError(
+                f"Incomplete offsets in batch: {n_with_offsets}/{n_structures} "
+                "structures have 'offsets'. Precompute a periodic-aware neighbor "
+                "list (Datahub neighbor_list='cutoff') for every sample."
+            )
     elif n_with_edges > 0:
         raise ValueError(
             f"Incomplete neighbor lists in batch: {n_with_edges}/{n_structures} "
