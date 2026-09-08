@@ -38,4 +38,4 @@ def semi_orthogonal_matrix(N, M, seed=None):
 def semi_orthogonal_glorot_weights(n_in: int, n_out: int, scale: float=2.0) -> Tensor:
     W = semi_orthogonal_matrix(n_in, n_out)
     W *= np.sqrt(scale / ((n_in + n_out) * W.var())) 
-    return torch.tensor(W.T, requires_grad=True)
+    return torch.tensor(W.T, dtype=torch.get_default_dtype(), requires_grad=True)

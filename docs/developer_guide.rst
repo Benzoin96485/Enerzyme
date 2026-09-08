@@ -199,7 +199,10 @@ Adding an internal architecture
 5. Add tests under :code:`test/` (layer parity or forward-pass smoke)
 6. Document in :doc:`/user_guide/models/architecture_catalog`
 
-Recent internal example: :code:`So3krates` under :code:`enerzyme/models/so3krates/`
+Recent internal example: :code:`DimeNet` under :code:`enerzyme/models/dimenet/`
+(Bessel RBF + atom embedding as pre-core layers; Core emits hierarchical
+:code:`atom_feature`; shared :code:`HierachicalReadout` / physics layers after
+the Core). Also :code:`So3krates` under :code:`enerzyme/models/so3krates/`
 (scalar atom embedding + RBF as pre-core layers; Core emits invariant
 :code:`atom_feature` and SPHC :code:`atom_sphere_feature`; shared
 :code:`SimpleReadout` / physics layers after the Core). Also:
@@ -307,6 +310,8 @@ Tests live in :code:`test/`:
 - :code:`test_tece_ops.py` — WignerD / LayoutTransform / uvSO2Linear / SO2Gate / ComplexProductBasis / RRA path smoke
 - :code:`test_so3_wigner_backend.py` — shared e3nn/Jd Wigner-D backend (packed orthogonality, SO3_Rotation / fused / DPA4 quaternion adapters, high-l smoke)
 - :code:`test_so3_grid.py` — unified flat lat–long :code:`SO3Grid` / :code:`S2GridProjector` protocol (roundtrip, Lebedev duck-type, grid table)
+- :code:`test_dimenet_ops.py` — DimeNet envelope / Bessel flavor / SBF / triplets / bilinear interaction
+- :code:`test_dimenet_core.py` — DimeNet registration / YAML smoke, hierarchical features, SO(3) invariance, build_model E/F conservation
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
@@ -419,6 +424,20 @@ When to split into sub-pages
 ----------------------------
 
 Keep this single page while the contributor surface is still evolving. Split into :code:`docs/developer_guide/` when any section grows past ~200 lines or needs its own deep dive (for example, a dedicated “Adding a new architecture” cookbook). The entry :code:`docs/developer_guide.rst` would then become a short overview plus layered toctree, mirroring :doc:`/user_guide`.
+
+DimeNet (:code:`dimenet`)
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Gasteiger et al. (ICLR 2020) lives under :code:`enerzyme/models/dimenet/`
+(:code:`core.py`, :code:`interaction.py`, :code:`basis.py`, :code:`triplets.py`),
+adapted from `gasteigerjo/dimenet <https://github.com/gasteigerjo/dimenet>`_ (MIT).
+This is **original DimeNet** (bilinear SBF), not DimeNet++. Shared
+:code:`DimeNetEnvelope` lives in :code:`so3/envelope.py`; YAML
+:code:`BesselRBF` uses :code:`flavor: dimenet`. The Core emits hierarchical
+:code:`atom_feature`; compose :code:`HierachicalReadout` (:code:`head_type: mlp`)
++ :code:`EnergyReduce` / :code:`Force` outside the Core. Do not add sympy/scipy
+deps — SBF zeros use numpy bisection. Enerzymette only needs
+:code:`architecture: dimenet` plus a resolved :code:`config.yaml`.
 
 External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

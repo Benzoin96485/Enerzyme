@@ -12,7 +12,7 @@ From :code:`enerzyme/models/layers/`:
     :code:`DistanceLayer`, :code:`RangeSeparationLayer`, :code:`RadiusGraphLayer`
 
 **Radial basis**
-    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer`, :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
+    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
 
 **Embeddings**
     :code:`RandomAtomEmbedding`, :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
@@ -29,7 +29,9 @@ From :code:`enerzyme/models/layers/`:
 **Readouts**
     :code:`SimpleReadout` — per-atom MLP over scalar features. With equivariant Cores
     that set :code:`feature_irreps`, it extracts even-scalar (:code:`0e`) channels first,
-    then applies :code:`dense` / :code:`residual_*` / :code:`two_layer` heads.
+    then applies :code:`dense` / :code:`residual_*` / :code:`two_layer` / :code:`mlp` heads.
+    :code:`head_type: mlp` is a stack of dense hidden layers plus a linear property
+    head (DimeNet output blocks; :code:`num_hidden_layers`, optional :code:`use_bias_out: false`).
     Use :code:`head_type: equiformer_linear_rs` for the official Equiformer MD17 scalar
     energy MLP (:code:`LinearRS` → :code:`normalize2mom(SiLU)` → :code:`LinearRS`).
     :code:`EquiformerGraphAttentionReadout` — separate GraphAttention head over full
@@ -172,6 +174,19 @@ accept :code:`shallow_ensemble_size` on the last linear head; pair with
 :code:`e2former_v2_layers_example.yaml`,
 :code:`e2former_lsr_layers_example.yaml`,
 :code:`equiformer_shallow_ensemble_example.yaml`.
+
+DimeNet and modular readouts
+----------------------------
+
+With :code:`architecture: dimenet`, the Core is original DimeNet directional
+message passing (bilinear SBF — not DimeNet++). Pre-core :code:`BesselRBF`
+must use :code:`flavor: dimenet`. The Core emits hierarchical
+:code:`atom_feature` of shape :code:`(N, F, num_blocks+1)` (embedding block plus
+each interaction). Default stacks use :code:`HierachicalReadout` with
+:code:`head_type: mlp` (inferred :code:`num_blocks` from Core
+:code:`num_output_blocks`). :code:`SimpleReadout` still works: it uses the last
+block. Charge/dipole use the same readout fields plus post-core physics layers.
+Example: :code:`enerzyme/config/dimenet_layers_example.yaml`.
 
 So3krates and modular readouts
 ------------------------------

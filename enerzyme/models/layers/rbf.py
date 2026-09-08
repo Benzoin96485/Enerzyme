@@ -457,31 +457,88 @@ class ExponentialBernsteinRBFLayer(ExponentialRBF):
     
 
 class BesselRBFLayer(BaseRBF):
-    def __init__(self, num_rbf: int, cutoff_sr: float, cutoff_fn: Literal["polynomial", "bump"]="polynomial", trainable: bool=False) -> None:
-        super().__init__(num_rbf, cutoff_sr, cutoff_fn)
-        bessel_weights = (
-            np.pi
-            / cutoff_sr
-            * torch.linspace(
-                start=1.0,
-                end=num_rbf,
-                steps=num_rbf,
-                dtype=torch.get_default_dtype(),
-            )
-        )
-        if trainable:
-            self.bessel_weights = torch.nn.Parameter(bessel_weights)
-        else:
-            self.register_buffer("bessel_weights", bessel_weights)
+    """Spherical Bessel radial basis (``l = 0``).
 
-        self.register_buffer(
-            "prefactor",
-            torch.tensor(np.sqrt(2.0 / cutoff_sr), dtype=torch.get_default_dtype()),
+    ``flavor="default"`` (TACE / eSCN / EquiformerV3 stacks):
+
+    .. math:: e_n(r) = \\sqrt{2/c}\\,\\sin(n\\pi r / c) / r
+
+    optionally multiplied by :code:`cutoff_fn` (PhysNet polynomial by default).
+
+    ``flavor="dimenet"`` matches Gasteiger et al. / ``gasteigerjo/dimenet``:
+    frequencies live on scaled distance ``x = r/c``, are trainable by default,
+    and the DimeNet ``u(x)/x`` envelope replaces a separate cutoff::
+
+        e_n(r) = Envelope(x) * sin(ω_n x),   ω_n = n π
+    """
+
+    def __init__(
+        self,
+        num_rbf: int,
+        cutoff_sr: float,
+        cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "polynomial",
+        trainable: Optional[bool] = None,
+        flavor: Literal["default", "dimenet"] = "default",
+        envelope_exponent: int = 5,
+        apply_cutoff_fn: Optional[bool] = None,
+    ) -> None:
+        self.flavor = flavor
+        if flavor not in ("default", "dimenet"):
+            raise ValueError(
+                f"Unknown BesselRBF flavor {flavor!r}; expected 'default' or 'dimenet'"
+            )
+        if trainable is None:
+            trainable = flavor == "dimenet"
+        if apply_cutoff_fn is None:
+            apply_cutoff_fn = flavor != "dimenet"
+        if flavor == "dimenet":
+            apply_cutoff_fn = False
+            cutoff_fn = None
+        super().__init__(
+            num_rbf, cutoff_sr, cutoff_fn, apply_cutoff_fn=apply_cutoff_fn
         )
+        self.envelope_exponent = int(envelope_exponent)
+        dtype = torch.get_default_dtype()
+        if flavor == "dimenet":
+            from ..so3.envelope import DimeNetEnvelope
+
+            self.envelope = DimeNetEnvelope(self.envelope_exponent)
+            frequencies = math.pi * torch.arange(
+                1, num_rbf + 1, dtype=dtype
+            )
+            if trainable:
+                self.bessel_weights = torch.nn.Parameter(frequencies)
+            else:
+                self.register_buffer("bessel_weights", frequencies)
+            self.register_buffer("prefactor", torch.tensor(1.0, dtype=dtype))
+        else:
+            self.envelope = None
+            bessel_weights = (
+                np.pi
+                / cutoff_sr
+                * torch.linspace(
+                    start=1.0,
+                    end=num_rbf,
+                    steps=num_rbf,
+                    dtype=dtype,
+                )
+            )
+            if trainable:
+                self.bessel_weights = torch.nn.Parameter(bessel_weights)
+            else:
+                self.register_buffer("bessel_weights", bessel_weights)
+            self.register_buffer(
+                "prefactor",
+                torch.tensor(np.sqrt(2.0 / cutoff_sr), dtype=dtype),
+            )
 
     def _get_rbf(self, x: Tensor) -> Tensor:  # [..., 1]
-        numerator = torch.sin(self.bessel_weights.view(1, -1) * x.view(-1, 1))  # [..., num_basis]
-        return self.prefactor * (numerator / x.view(-1, 1))
+        dist = x.view(-1, 1)
+        if self.flavor == "dimenet":
+            d_scaled = dist / self.cutoff_sr
+            return self.envelope(d_scaled) * torch.sin(self.bessel_weights * d_scaled)
+        numerator = torch.sin(self.bessel_weights.view(1, -1) * dist)
+        return self.prefactor * (numerator / dist)
 
 
 class ExpNormalSmearing(BaseFFLayer):

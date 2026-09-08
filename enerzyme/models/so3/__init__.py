@@ -36,7 +36,7 @@ from .activation_v3 import (
     SwiGLU,
     SeparableGateS2Activation_SwiGLU_Merge,
 )
-from .envelope import C3CutoffEnvelope, PolynomialEnvelope
+from .envelope import C3CutoffEnvelope, DimeNetEnvelope, PolynomialEnvelope
 from .gated import FocusLinear, SO3GatedActivation
 from .indexing import (
     build_gie_zonal_index,
@@ -154,6 +154,7 @@ __all__ = [
     "load_cgmatrix",
     "spherical_harmonics",
     "PolynomialEnvelope",
+    "DimeNetEnvelope",
     "C3CutoffEnvelope",
     "LEBEDEV_PRECISION_TO_NPOINTS",
     "LEBEDEV_FREQUENCY_LOOKUP",

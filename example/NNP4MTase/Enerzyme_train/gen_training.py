@@ -3,7 +3,7 @@ import os
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("-m", "--model_type", required=True, help="Type of the model", type=str, choices=["spookynet", "physnet", "mace"])
+    parser.add_argument("-m", "--model_type", required=True, help="Type of the model", type=str, choices=["spookynet", "physnet", "mace", "dimenet"])
     parser.add_argument("-d", "--data_path", required=True, help="Path to the data file", type=str)
     parser.add_argument("-e", "--dielectric_constant", required=False, help="Dielectric constant", type=float, default=10.0)
     parser.add_argument("-q", "--qa_weight", required=False, help="Weight of the charge attribute", type=float, default=100.0)
