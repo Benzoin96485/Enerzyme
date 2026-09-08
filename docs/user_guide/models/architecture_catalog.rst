@@ -11,6 +11,10 @@ Internal architectures
 +================+==========+========+========+=============+==================+
 | SchNet         | yes      | yes    | partial| yes         | Good baseline    |
 +----------------+----------+--------+--------+-------------+------------------+
+| DimeNet        | via      | via    | yes    | via         | Directional      |
+|                | readout  | readout|        | readout     | messages + SBF;  |
+|                |          |        |        |             | not DimeNet++    |
++----------------+----------+--------+--------+-------------+------------------+
 | PhysNet        | yes      | yes    | yes    | yes         | Electrostatics,  |
 |                |          |        |        |             | D3/D4 optional   |
 +----------------+----------+--------+--------+-------------+------------------+
@@ -89,6 +93,8 @@ External wrappers
 
 External models are declared under :code:`Modelhub.external_FFs` with the same :code:`active` / :code:`layers` pattern where supported.
 
+**DimeNet** (:code:`architecture: dimenet`) is a native port of Gasteiger et al. (ICLR 2020, arXiv:2003.03123) under :code:`enerzyme/models/dimenet/`, following `gasteigerjo/dimenet <https://github.com/gasteigerjo/dimenet>`_ (MIT) **original DimeNet** (bilinear spherical Fourier–Bessel interaction — **not** DimeNet++). Shared pieces: :code:`DimeNetEnvelope` in :code:`enerzyme/models/cutoff.py`, :code:`BesselRBF` with :code:`flavor: dimenet` (trainable frequencies × ``u(x)/x``), and :code:`HierachicalReadout` with :code:`head_type: mlp` for the paper output MLPs. The Core owns embedding-block messages, directional MP, SBF, and RBF-gated atom scatter; it emits hierarchical :code:`atom_feature` ``(N, F, num_blocks+1)``. Default stacks use :code:`HierachicalReadout` + :code:`EnergyReduce` + :code:`Force`. Angles use the paper / DimeNet++ convention at atom ``j`` (not the official TF pretrained bug at atom ``i``). Example: :code:`enerzyme/config/dimenet_layers_example.yaml`. Tests: :code:`test/test_dimenet_ops.py`, :code:`test/test_dimenet_core.py`, :code:`test/test_dimenet_parity_ops.py` (PyG original DimeNet). Enerzymette only needs :code:`architecture: dimenet` plus a resolved :code:`config.yaml`.
+
 **eSCN** (:code:`architecture: escn`) is a native port of Passaro & Zitnick (2023) SO(3)→SO(2) convolutions under :code:`enerzyme/models/escn/`, backed by shared primitives in :code:`enerzyme/models/so3/`. The Core emits scalar :code:`atom_feature` (spherical :code:`l=0`, with :code:`feature_irreps: "Cx0e"` and :code:`dim_feature_out = C`) and :code:`atom_sphere_feature` (full :code:`(lmax+1)^2` SH coefficients after message :code:`rotate_inv`; :code:`mmax` only reduces edge-frame SO(2)). Default stacks use :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force` (energy-conserving :code:`Fa=-∇E`, so edge frames stay in the autograd graph). Opt-in :code:`SphereSampleReadout` applies the paper's S² sampling head to any atomic property fields in :code:`output_fields`; :code:`vector_output_fields: [Fa]` is the paper-style direct-force alternative. Examples: :code:`enerzyme/config/escn_layers_example.yaml`, :code:`escn_sphere_readout_example.yaml`. No fairchem dependency. Ops/block numerical parity vs vendored fairchem v1 lives in :code:`test/test_escn_parity_*.py` (forward only; force conservation is covered by unit tests).
 
 **EquiformerV2** (:code:`architecture: equiformer_v2`) is a native port of Liao et al. (ICLR 2024) under :code:`enerzyme/models/equiformer_v2/`. It reuses shared :code:`enerzyme/models/so3/` (with EquiformerV2 ``mmax`` rescale / component grids / :code:`SO3_LinearV2`) and implements SO(2) equivariant graph attention + S²/gate feed-forward blocks. The Core emits the same latent contract as eSCN (:code:`atom_feature` / :code:`atom_sphere_feature`). Default production stacks use :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout` wraps the paper energy FFN on :code:`atom_sphere_feature`. All external EquiformerV2 readouts accept :code:`shallow_ensemble_size` (widen last linear → :code:`ShallowEnsembleReduce`). Distinct from Equiformer V1 (e3nn TP attention) and from paper eSCN (message SO(2) without transformer attention). Examples: :code:`enerzyme/config/equiformer_v2_layers_example.yaml`, :code:`equiformer_v2_ffn_readout_example.yaml`, :code:`equiformer_v2_shallow_ensemble_example.yaml`. Parity vs vendored upstream nets: :code:`test/test_equiformer_v2_parity_*.py`.
@@ -130,6 +136,7 @@ Selection guidelines
 
 **Baseline / tutorial**
     SchNet — minimal dependencies, charge-aware stacks available.
+    DimeNet — directional messages with Bessel RBF; still invariant (not SO(3) equivariant).
 
 **Production QM-labeled clusters with charge and solvent**
     PhysNet or SpookyNet — long-range electrostatics, optional dispersion layers.

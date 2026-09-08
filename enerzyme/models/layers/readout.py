@@ -14,6 +14,7 @@ HEAD_TYPE = Literal[
     "residual_layer",
     "residual_mlp",
     "two_layer",
+    "mlp",
     "equiformer_linear_rs",
 ]
 
@@ -194,6 +195,33 @@ class BaseReadout(BaseFFLayer):
                     **self.head_params,
                 ),
             )
+        elif self.head_type == "mlp":
+            # DimeNet-style stacked dense hidden layers + linear property head.
+            head_params = dict(self.head_params)
+            num_hidden_layers = int(head_params.pop("num_hidden_layers", 3))
+            use_bias_out = bool(head_params.pop("use_bias_out", False))
+            act = self.activation_fn if self.activation_fn is not None else "swish"
+            layers = []
+            for _ in range(num_hidden_layers):
+                layers.append(
+                    DenseLayer(
+                        dim_feature_in=self.dim_feature_in,
+                        dim_feature_out=self.dim_feature_in,
+                        activation_fn=act,
+                        activation_params=self.activation_params,
+                        **head_params,
+                    )
+                )
+            layers.append(
+                DenseLayer(
+                    dim_feature_in=self.dim_feature_in,
+                    dim_feature_out=self.dim_feature_out,
+                    use_bias=use_bias_out,
+                    shallow_ensemble_size=self.shallow_ensemble_size,
+                    **head_params,
+                )
+            )
+            return Sequential(*layers)
         elif self.head_type == "equiformer_linear_rs":
             # Official Equiformer MD17 scalar energy MLP:
             # LinearRS → Activation(normalize2mom(SiLU)) → LinearRS.
@@ -318,8 +346,29 @@ class NSEReadout(BaseReadout):
 
 
 class HierachicalReadout(BaseReadout):
-    def __init__(self, use_nhloss: bool=False, **kwargs) -> None:
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        use_nhloss: bool = False,
+        num_blocks: Optional[int] = None,
+        built_layers: Optional[List[Module]] = None,
+        **kwargs,
+    ) -> None:
+        if built_layers is None:
+            built_layers = kwargs.pop("built_layers", [])
+        if num_blocks is None:
+            for layer in reversed(built_layers):
+                inferred = getattr(layer, "num_output_blocks", None)
+                if inferred is not None:
+                    num_blocks = int(inferred)
+                    break
+        if num_blocks is None:
+            raise TypeError(
+                "HierachicalReadout needs num_blocks or a prior Core with "
+                "num_output_blocks"
+            )
+        super().__init__(
+            num_blocks=num_blocks, built_layers=built_layers, **kwargs
+        )
         self.heads = ModuleList([self._get_head() for _ in range(self.num_blocks)])
         self.use_nhloss = use_nhloss
 

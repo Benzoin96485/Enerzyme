@@ -85,6 +85,8 @@ Choosing an architecture
 +================+==========================================+===========================+
 | SchNet         | First tutorial / baseline                | Charge + dipole capable   |
 +----------------+------------------------------------------+---------------------------+
+| DimeNet        | Directional messages + Bessel SBF        | Original DimeNet, not ++  |
++----------------+------------------------------------------+---------------------------+
 | PhysNet        | Production charge-aware PES              | Electrostatics, D3 layers |
 +----------------+------------------------------------------+---------------------------+
 | SpookyNet      | Large organic / mixed systems            | Similar feature set       |

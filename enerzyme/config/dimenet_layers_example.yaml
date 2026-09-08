@@ -1,0 +1,56 @@
+# Original DimeNet (Gasteiger et al., ICLR 2020) — not DimeNet++.
+# Core is directional message passing only. Bessel RBF uses flavor: dimenet
+# (trainable frequencies + u(x)/x envelope). HierarchicalReadout sums the
+# paper output-block MLPs over embedding + interaction blocks.
+#
+# Enerzymette: set architecture: dimenet in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: dimenet
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 6
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: polynomial
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: dimenet
+            trainable: true
+            envelope_exponent: 5
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_blocks: 6
+            num_bilinear: 8
+            num_spherical: 7
+            num_before_skip: 1
+            num_after_skip: 2
+            envelope_exponent: 5
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+        - name: HierachicalReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            num_hidden_layers: 3
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            initial_weight: semi_orthogonal_glorot
+            use_bias_out: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

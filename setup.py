@@ -4,7 +4,7 @@ setup(
     name='enerzyme',
     version='0.6.0',
     install_requires=['numpy<2.4.0', 'h5py', 'tqdm', 'ase', 'joblib', 'addict', 
-                      'pandas', 'torch', 'scikit-learn', 'transformers',
+                      'pandas', 'scipy', 'torch', 'scikit-learn', 'transformers',
                       'torch-ema', 'pyyaml', 'torch-geometric', 'rdkit', 'e3nn',
                       'lightning', "torch-scatter", "flask", "waitress",
                       ],

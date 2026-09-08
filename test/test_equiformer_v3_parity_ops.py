@@ -72,7 +72,7 @@ def test_so2_linear_matches_upstream():
 
 
 def test_polynomial_envelope_matches_upstream():
-    from enerzyme.models.so3.envelope import PolynomialEnvelope as EZEnv
+    from enerzyme.models.cutoff import PolynomialEnvelope as EZEnv
     from envelope import PolynomialEnvelope as OffEnv
 
     torch.manual_seed(3)
