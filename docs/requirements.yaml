@@ -15,6 +15,7 @@ dependencies:
     # Pip-only installs
   - pip:
     - numpy<2.4.0
+    - scipy
     - h5py
     - tqdm
     - ase

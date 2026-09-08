@@ -154,7 +154,7 @@ bash train_physnet/train.sh
 
 ### config_template/
 
-YAML templates (`train_physnet.yaml`, `train_mace.yaml`, `train_spookynet.yaml`, `train_dimenet.yaml`) with placeholders for data path, dielectric constant, atomic charge loss weight, and atomic energy reference.
+YAML templates (`train_physnet.yaml`, `train_mace.yaml`, `train_spookynet.yaml`) with placeholders for data path, dielectric constant, atomic charge loss weight, and atomic energy reference.
 
 ### atomic_energy.csv
 

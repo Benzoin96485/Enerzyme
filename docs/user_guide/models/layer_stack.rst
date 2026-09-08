@@ -11,6 +11,11 @@ From :code:`enerzyme/models/layers/`:
 **Geometry**
     :code:`DistanceLayer`, :code:`RangeSeparationLayer`, :code:`RadiusGraphLayer`
 
+**Cutoff / envelopes**
+    Transition functions and :code:`PolynomialEnvelope` / :code:`DimeNetEnvelope` /
+    :code:`C3CutoffEnvelope` in :code:`enerzyme/models/cutoff.py` (also re-exported
+    from :code:`enerzyme.models.so3` for equivariant cores).
+
 **Radial basis**
     :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
 

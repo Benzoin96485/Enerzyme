@@ -500,7 +500,7 @@ class BesselRBFLayer(BaseRBF):
         self.envelope_exponent = int(envelope_exponent)
         dtype = torch.get_default_dtype()
         if flavor == "dimenet":
-            from ..so3.envelope import DimeNetEnvelope
+            from ..cutoff import DimeNetEnvelope
 
             self.envelope = DimeNetEnvelope(self.envelope_exponent)
             frequencies = math.pi * torch.arange(

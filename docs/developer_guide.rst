@@ -433,11 +433,12 @@ Gasteiger et al. (ICLR 2020) lives under :code:`enerzyme/models/dimenet/`
 (:code:`core.py`, :code:`interaction.py`, :code:`basis.py`, :code:`triplets.py`),
 adapted from `gasteigerjo/dimenet <https://github.com/gasteigerjo/dimenet>`_ (MIT).
 This is **original DimeNet** (bilinear SBF), not DimeNet++. Shared
-:code:`DimeNetEnvelope` lives in :code:`so3/envelope.py`; YAML
-:code:`BesselRBF` uses :code:`flavor: dimenet`. The Core emits hierarchical
-:code:`atom_feature`; compose :code:`HierachicalReadout` (:code:`head_type: mlp`)
-+ :code:`EnergyReduce` / :code:`Force` outside the Core. Do not add sympy/scipy
-as production deps — SBF zeros use numpy bisection. PyG parity
+:code:`DimeNetEnvelope` lives in :code:`enerzyme/models/cutoff.py` with the
+other radial envelopes. YAML :code:`BesselRBF` uses :code:`flavor: dimenet`.
+The Core emits hierarchical :code:`atom_feature`; compose
+:code:`HierachicalReadout` (:code:`head_type: mlp`) + :code:`EnergyReduce` /
+:code:`Force` outside the Core. SBF zeros / normalizers use :code:`scipy`
+(:code:`scipy.special.spherical_jn` + Brent). PyG parity
 (:code:`test/test_dimenet_parity_ops.py`) uses optional
 :code:`torch_geometric` (numpy 2 ``np.math`` shim in the test helper;
 ``DimeNet.forward`` is not called — no torch-sparse / torch-cluster).

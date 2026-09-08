@@ -14,13 +14,17 @@ from enerzyme.models.dimenet.basis import (
     spherical_jn,
 )
 from enerzyme.models.dimenet.triplets import directed_triplets, triplet_angles
-from enerzyme.models.so3.envelope import DimeNetEnvelope
+from enerzyme.models.cutoff import DimeNetEnvelope
 
 
 def test_spherical_bessel_j0_zeros_are_n_pi():
-    zeros = spherical_bessel_zeros(1, 6)
+    from scipy.special import spherical_jn as scipy_jn
+
+    zeros = spherical_bessel_zeros(3, 6)
     expected = math.pi * torch.arange(1, 7).double().numpy()
     assert_allclose(zeros[0], expected, rtol=0, atol=1e-12)
+    for ell in range(zeros.shape[0]):
+        assert_allclose(scipy_jn(ell, zeros[ell]), 0.0, atol=1e-10)
 
 
 def test_dimenet_envelope_matches_closed_form():

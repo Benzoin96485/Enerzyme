@@ -36,7 +36,7 @@ from .activation_v3 import (
     SwiGLU,
     SeparableGateS2Activation_SwiGLU_Merge,
 )
-from .envelope import C3CutoffEnvelope, DimeNetEnvelope, PolynomialEnvelope
+from ..cutoff import C3CutoffEnvelope, DimeNetEnvelope, PolynomialEnvelope
 from .gated import FocusLinear, SO3GatedActivation
 from .indexing import (
     build_gie_zonal_index,

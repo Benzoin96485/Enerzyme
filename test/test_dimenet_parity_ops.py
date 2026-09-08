@@ -42,7 +42,7 @@ def pyg_dimenet():
 def test_envelope_matches_pyg():
     from torch_geometric.nn.models.dimenet import Envelope as PygEnvelope
 
-    from enerzyme.models.so3.envelope import DimeNetEnvelope
+    from enerzyme.models.cutoff import DimeNetEnvelope
 
     dtype = torch.float64
     x = torch.linspace(1e-3, 1.2, 64, dtype=dtype)

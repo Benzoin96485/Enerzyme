@@ -8,7 +8,7 @@ from typing import List, Optional, Sequence
 import torch
 from torch import Tensor, nn
 
-from .envelope import C3CutoffEnvelope
+from ..cutoff import C3CutoffEnvelope
 
 
 class BesselC3RadialBasis(nn.Module):
