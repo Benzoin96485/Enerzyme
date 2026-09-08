@@ -312,6 +312,7 @@ Tests live in :code:`test/`:
 - :code:`test_so3_grid.py` — unified flat lat–long :code:`SO3Grid` / :code:`S2GridProjector` protocol (roundtrip, Lebedev duck-type, grid table)
 - :code:`test_dimenet_ops.py` — DimeNet envelope / Bessel flavor / SBF / triplets / bilinear interaction
 - :code:`test_dimenet_core.py` — DimeNet registration / YAML smoke, hierarchical features, SO(3) invariance, build_model E/F conservation
+- :code:`test_dimenet_parity_ops.py` — numerical parity vs PyG original DimeNet (not ++); energy uses PyG angles at atom ``i``; production Core uses paper angles at ``j``
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
@@ -436,8 +437,12 @@ This is **original DimeNet** (bilinear SBF), not DimeNet++. Shared
 :code:`BesselRBF` uses :code:`flavor: dimenet`. The Core emits hierarchical
 :code:`atom_feature`; compose :code:`HierachicalReadout` (:code:`head_type: mlp`)
 + :code:`EnergyReduce` / :code:`Force` outside the Core. Do not add sympy/scipy
-deps — SBF zeros use numpy bisection. Enerzymette only needs
-:code:`architecture: dimenet` plus a resolved :code:`config.yaml`.
+as production deps — SBF zeros use numpy bisection. PyG parity
+(:code:`test/test_dimenet_parity_ops.py`) uses optional
+:code:`torch_geometric` (numpy 2 ``np.math`` shim in the test helper;
+``DimeNet.forward`` is not called — no torch-sparse / torch-cluster).
+Enerzymette only needs :code:`architecture: dimenet` plus a resolved
+:code:`config.yaml`.
 
 External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
