@@ -93,6 +93,7 @@ class LocalInteraction(Module):
         dij: torch.Tensor,
         idx_i: torch.Tensor,
         idx_j: torch.Tensor,
+        csr_offsets: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Evaluate interaction block.
@@ -108,7 +109,12 @@ class LocalInteraction(Module):
             specified as both ij and ji.
         idx_j (LongTensor [P]):
             Same as idx_i, but for atom j.
+        csr_offsets (LongTensor [N + 1]):
+            If given, pairs are sorted by idx_i with these row offsets and the
+            fused inference kernel is used (no double backward).
         """
+        if csr_offsets is not None:
+            return self._fused_forward(x, rbf, pij, dij, idx_j, csr_offsets)
         # interaction functions
         gs = self.radial_s(rbf)
         gp = self.radial_p(rbf).unsqueeze(-2) * pij.unsqueeze(-1)
@@ -134,6 +140,24 @@ class LocalInteraction(Module):
         p = segment_sum_coo(gp * xp.unsqueeze(-2), idx_i, dim_size=N)
         d = segment_sum_coo(gd * xd.unsqueeze(-2), idx_i, dim_size=N)
         # project tensorial features to scalars
+        pa, pb = torch.split(self.projection_p(p), p.shape[-1], dim=-1)
+        da, db = torch.split(self.projection_d(d), d.shape[-1], dim=-1)
+        return self.resblock(s + (pa * pb).sum(-2) + (da * db).sum(-2))
+
+    def _fused_forward(
+        self, x: torch.Tensor, rbf: torch.Tensor, pij: torch.Tensor, dij: torch.Tensor,
+        idx_j: torch.Tensor, csr_offsets: torch.Tensor
+    ) -> torch.Tensor:
+        from .fused import fused_local_message
+        radial_weight = torch.cat([self.radial_s.weight, self.radial_p.weight, self.radial_d.weight], dim=0)
+        xx = self.resblock_x(x)
+        xs = self.resblock_s(x)
+        xp = self.resblock_p(x)
+        xd = self.resblock_d(x)
+        ms, p, d = fused_local_message(
+            torch.nn.functional.linear(rbf, radial_weight), pij, dij, xs, xp, xd, idx_j, csr_offsets
+        )
+        s = xx + ms
         pa, pb = torch.split(self.projection_p(p), p.shape[-1], dim=-1)
         da, db = torch.split(self.projection_d(d), d.shape[-1], dim=-1)
         return self.resblock(s + (pa * pb).sum(-2) + (da * db).sum(-2))
@@ -289,6 +313,7 @@ class InteractionModule(Module):
         num_batch: int,
         batch_seg: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
+        csr_offsets: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Evaluate all modules in the block.
@@ -319,7 +344,7 @@ class InteractionModule(Module):
                 descriptors).
         """
         x = self.residual_pre(x)
-        l = self.local_interaction(x, rbf, pij, dij, idx_i, idx_j)
+        l = self.local_interaction(x, rbf, pij, dij, idx_i, idx_j, csr_offsets)
         n = self.nonlocal_interaction(x, num_batch, batch_seg, mask)
         x = self.residual_post(x + l + n)
         return x, self.resblock(x)

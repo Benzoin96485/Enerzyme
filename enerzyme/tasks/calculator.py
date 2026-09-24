@@ -82,6 +82,7 @@ class ASECalculator(Calculator):
         uncertainty_calculator_config: Optional[Dict[str, Any]]=None,
         external_calculator: Optional[Calculator]=None,
         external_calculator_config: Optional[Dict[str, Any]]=None,
+        use_fused_kernels: bool=True,
         **params: Dict[str, Any]
     ) -> None:
         '''
@@ -94,6 +95,9 @@ class ASECalculator(Calculator):
         neighbor_list_skin:
             Verlet skin (in units of positions) of the short-range pair list; 0 rebuilds
             the list at every call.
+        use_fused_kernels:
+            Use fused Triton kernels (CUDA only) where available, e.g. SpookyNet local
+            interactions, with the "full" and "full_pairs" neighbor lists.
         '''
         Calculator.__init__(
             self, restart=restart, label=label, atoms=atoms, **params
@@ -107,6 +111,7 @@ class ASECalculator(Calculator):
         self.dtype = dtype
         self.neighbor_list_type = neighbor_list_type
         self.neighbor_list_skin = neighbor_list_skin
+        self.use_fused_kernels = use_fused_kernels
         self.transform = transform
         self.Hartree_in_E = Hartree_in_E
         self.E_conversion_factor = Hartree / self.Hartree_in_E
@@ -146,6 +151,7 @@ class ASECalculator(Calculator):
         self.model.requires_grad_(False)
         self._electrostatic_layers = [m for m in self.model.modules() if isinstance(m, ElectrostaticEnergyLayer)]
         self._force_layers = [m for m in self.model.modules() if isinstance(m, ForceLayer)]
+        self._fusable_modules = [m for m in self.model.modules() if hasattr(m, "use_fused_kernel")]
         if self.neighbor_list_type == "full":
             dense_lr_cutoff = get_dense_lr_cutoff(self.model)
             if dense_lr_cutoff is not None:
@@ -162,6 +168,9 @@ class ASECalculator(Calculator):
             layer.lr_mode = self.lr_mode
         for layer in self._force_layers:
             layer.ensemble_mean_only = self.uncertainty_calculator_config is None
+        # pair lists built here are sorted by idx_i, as the fused kernels require
+        for module in self._fusable_modules:
+            module.use_fused_kernel = self.use_fused_kernels and self.lr_mode is not None
 
     def _get_net_input(self, atoms: ase.Atoms) -> Dict[str, Any]:
         N = len(atoms)
@@ -318,7 +327,7 @@ def get_patched_calculator(calculator_patch_module: object, external_calculator_
     return external_calculator
 
 
-def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", model_config_path: Optional[str] = None, calculator_patch: Optional[str] = None, neighbor_list_type: Optional[str]="full", Hartree_in_E: float=1, internal_calculator_weight: float=1.0, uncertainty_calculator_config: Optional[Dict[str, Any]]=None, external_calculator: Optional[Calculator]=None, external_calculator_config: Optional[Dict[str, Any]]=None, neighbor_list_skin: float=0.0):
+def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", model_config_path: Optional[str] = None, calculator_patch: Optional[str] = None, neighbor_list_type: Optional[str]="full", Hartree_in_E: float=1, internal_calculator_weight: float=1.0, uncertainty_calculator_config: Optional[Dict[str, Any]]=None, external_calculator: Optional[Calculator]=None, external_calculator_config: Optional[Dict[str, Any]]=None, neighbor_list_skin: float=0.0, use_fused_kernels: bool=True):
     from ..models import get_model_str, build_model, get_pretrain_path
     from ..utils import YamlHandler, logger
     from .trainer import DTYPE_MAPPING, _load_state_dict
@@ -355,6 +364,7 @@ def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", mod
                 transform=transform,
                 neighbor_list_type=neighbor_list_type,
                 neighbor_list_skin=neighbor_list_skin,
+                use_fused_kernels=use_fused_kernels,
                 Hartree_in_E=Hartree_in_E,
                 internal_calculator_weight=internal_calculator_weight,
                 uncertainty_calculator_config=uncertainty_calculator_config,

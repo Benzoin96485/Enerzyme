@@ -90,6 +90,8 @@ class Swish(BaseScaledTemperedActivation):
     ) -> None:
         """ Initializes the Swish class. """
         super().__init__(dim_feature, initial_alpha, initial_beta, learnable)
+        # inference-only fused kernel, used when alpha and beta are frozen
+        self.use_fused_kernel = False
 
     def simple_activation_fn(self, x: Tensor) -> Tensor:
         return F.silu(x)
@@ -107,6 +109,10 @@ class Swish(BaseScaledTemperedActivation):
             y (FloatTensor [:, num_features]):
                 Activated features.
         """
+        if self.use_fused_kernel and not self.training:
+            from .fused_activation import can_fuse_swish, fused_swish
+            if can_fuse_swish(x, self.alpha, self.beta):
+                return fused_swish(x, self.alpha, self.beta)
         return self.alpha * x * torch.sigmoid(self.beta * x)
 
 

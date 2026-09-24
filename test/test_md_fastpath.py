@@ -202,6 +202,77 @@ def test_calculator_fast_path_matches_full_pairs():
             np.testing.assert_allclose(results[key][prop], ref[prop], rtol=1e-10, atol=1e-10)
 
 
+requires_cuda = pytest.mark.skipif(not torch.cuda.is_available(), reason="fused kernels need CUDA")
+
+
+@requires_cuda
+@pytest.mark.parametrize("dtype", [torch.float64, torch.float32])
+@pytest.mark.parametrize("F", [32, 128, 40])
+def test_fused_local_interaction_matches_torch(dtype, F):
+    from enerzyme.models.spookynet.interaction import LocalInteraction
+    from enerzyme.models.spookynet.fused import csr_offsets
+    N, K = 150, 16
+    R = torch.tensor(random_positions(N), dtype=dtype, device=DEVICE)
+    idx_i, idx_j = radius_neighbor_list(R, 5.0)
+    gen = torch.Generator(device="cpu").manual_seed(4)
+    torch.manual_seed(4)
+    layer = LocalInteraction(F, K, 1, 1, 1, 1, 1).to(DEVICE).type(dtype).eval()
+    x0 = torch.randn(N, F, generator=gen, dtype=dtype).to(DEVICE)
+    rbf0 = torch.rand(len(idx_i), K, generator=gen, dtype=dtype).to(DEVICE)
+    v = R[idx_j] - R[idx_i]
+    pij0 = v / v.norm(dim=-1, keepdim=True)
+    dij0 = torch.randn(len(idx_i), 5, generator=gen, dtype=dtype).to(DEVICE)
+    G = torch.randn(N, F, generator=gen, dtype=dtype).to(DEVICE)
+    results = []
+    for offsets in (None, csr_offsets(idx_i, N)):
+        x, rbf, pij, dij = (t.clone().requires_grad_(True) for t in (x0, rbf0, pij0, dij0))
+        out = layer(x, rbf, pij, dij, idx_i, idx_j, offsets)
+        grads = torch.autograd.grad((out * G).sum(), (x, rbf, pij, dij))
+        results.append((out.detach(), *grads))
+    tol = dict(rtol=1e-10, atol=1e-10) if dtype == torch.float64 else dict(rtol=2e-4, atol=2e-4)
+    for ref, got in zip(*results):
+        torch.testing.assert_close(got, ref, **tol)
+
+
+@requires_cuda
+@pytest.mark.parametrize("dtype", [torch.float64, torch.float32])
+def test_fused_swish_matches_torch(dtype):
+    from enerzyme.models.activation import Swish
+    act = Swish(48, initial_alpha=1.3, initial_beta=0.7, learnable=True).to(DEVICE).type(dtype).eval()
+    with torch.no_grad():
+        act.alpha.uniform_(0.5, 1.5)
+        act.beta.uniform_(-2.0, 2.0)
+    act.requires_grad_(False)
+    gen = torch.Generator(device="cpu").manual_seed(6)
+    x0 = (4 * torch.randn(333, 48, generator=gen, dtype=dtype)).to(DEVICE)
+    G = torch.randn(333, 48, generator=gen, dtype=dtype).to(DEVICE)
+    results = []
+    for fused in (False, True):
+        act.use_fused_kernel = fused
+        x = x0.clone().requires_grad_(True)
+        y = act(x)
+        results.append((y.detach(), torch.autograd.grad((y * G).sum(), x)[0]))
+    tol = dict(rtol=1e-12, atol=1e-12) if dtype == torch.float64 else dict(rtol=1e-5, atol=1e-5)
+    for ref, got in zip(*results):
+        torch.testing.assert_close(got, ref, **tol)
+
+
+@requires_cuda
+def test_calculator_fused_matches_unfused():
+    R = random_positions(120, box=13.0, min_dist=0.9)
+    Z = np.random.default_rng(5).choice([1, 6, 7, 8], size=len(R))
+    model = small_spookynet()
+    results = {}
+    for fused in (False, True):
+        calc = ASECalculator(model=model, device=DEVICE, dtype=DTYPE, transform=Transform(None), use_fused_kernels=fused)
+        atoms = Atoms(numbers=Z, positions=R)
+        atoms.info.update({"charge": 0, "spin": 1})
+        calc.calculate(atoms, properties=["energy", "forces", "dipole", "charges"])
+        results[fused] = {k: np.array(v) for k, v in calc.results.items()}
+    for prop in ("energy", "forces", "dipole", "charges"):
+        np.testing.assert_allclose(results[True][prop], results[False][prop], rtol=1e-10, atol=1e-10)
+
+
 def test_mean_force_equals_mean_of_member_forces():
     model = small_spookynet()
     force_layer = [m for m in model.modules() if type(m).__name__ == "ForceLayer"][0]

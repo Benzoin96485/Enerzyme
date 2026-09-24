@@ -64,16 +64,17 @@ class RangeSeparationLayer(BaseFFLayer):
     def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor, vij_lr: Optional[Tensor]=None) -> Dict[
         Literal["Dij_sr", "idx_i_sr", "idx_j_sr", "vij_sr", "cutoff_values_sr"], Tensor
     ]:
-        cutmask = Dij_lr < self.cutoff_sr
+        # one nonzero (host sync) instead of one per boolean-mask indexing
+        sr = (Dij_lr < self.cutoff_sr).nonzero().squeeze(-1)
         relevant_output = {
-            "Dij_sr": Dij_lr[cutmask],
-            "idx_i_sr": idx_i_lr[cutmask],
-            "idx_j_sr": idx_j_lr[cutmask],
+            "Dij_sr": Dij_lr.index_select(0, sr),
+            "idx_i_sr": idx_i_lr.index_select(0, sr),
+            "idx_j_sr": idx_j_lr.index_select(0, sr),
         }
         if self.cutoff_fn is not None:
             relevant_output["cutoff_values_sr"] = self.cutoff_fn(relevant_output["Dij_sr"], self.cutoff_sr)
         if vij_lr is not None:
-            relevant_output["vij_sr"] = vij_lr[cutmask]
+            relevant_output["vij_sr"] = vij_lr.index_select(0, sr)
         return relevant_output
 
 

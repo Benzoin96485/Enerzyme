@@ -108,6 +108,8 @@ class SpookyNetCore(BaseFFCore):
         self.calculate_distance: DistanceLayer = None
         self.range_separation: RangeSeparationLayer = None
         self.shallow_ensemble_size = shallow_ensemble_size
+        # set by callers that guarantee short-range pairs sorted by idx_i (inference only)
+        self.use_fused_kernel = False
 
     def build(self, built_layers: List[Module]) -> None:
         # build necessary fixed pre-core layers
@@ -145,7 +147,7 @@ class SpookyNetCore(BaseFFCore):
         self.gather_embedding = GatherAtomEmbedding()
         self.pre_sequence.append(self.gather_embedding)
 
-    def _atomic_properties_static(self, Dij_sr: Tensor, vij_sr: Tensor, batch_seg: Optional[Tensor]=None) -> Tuple[Tensor, Tensor, Tensor, int]:
+    def _atomic_properties_static(self, Dij_sr: Tensor, vij_sr: Tensor, batch_seg: Optional[Tensor]=None, N: Optional[List[int]]=None) -> Tuple[Tensor, Tensor, Tensor, int]:
         pij = vij_sr / Dij_sr.unsqueeze(-1)
         if self.use_irreps:  # irreducible representation
             try:
@@ -178,8 +180,10 @@ class SpookyNetCore(BaseFFCore):
             )
         if batch_seg is None:
             num_batch = 1
+        elif isinstance(N, (list, tuple)):
+            num_batch = len(N)
         else:
-            num_batch = batch_seg[-1] + 1
+            num_batch = int(batch_seg[-1]) + 1
         if num_batch > 1:
             one_hot = F.one_hot(batch_seg).to(
                 dtype=Dij_sr.dtype, device=Dij_sr.device
@@ -195,9 +199,14 @@ class SpookyNetCore(BaseFFCore):
         x = atom_embedding
         dropout_mask = torch.ones((num_batch, 1), dtype=x.dtype, device=x.device)
         f = x.new_zeros(x.size())
+        csr_offsets = None
+        if self.use_fused_kernel and not self.training and x.is_cuda:
+            from .fused import TRITON_AVAILABLE, csr_offsets as get_csr_offsets
+            if TRITON_AVAILABLE:
+                csr_offsets = get_csr_offsets(idx_i_sr, x.shape[0])
         for module in self.interaction:
             x, y = module(
-                x, rbf, pij, dij, idx_i_sr, idx_j_sr, num_batch, batch_seg, mask
+                x, rbf, pij, dij, idx_i_sr, idx_j_sr, num_batch, batch_seg, mask, csr_offsets
             )
             # apply dropout mask
             if self.training and self.module_keep_prob < 1.0:
@@ -211,9 +220,9 @@ class SpookyNetCore(BaseFFCore):
 
     def get_output(
         self, Dij_sr: Tensor, vij_sr: Tensor, idx_i_sr: Tensor, idx_j_sr: Tensor, 
-        rbf: Tensor, atom_embedding: Tensor, batch_seg: Optional[Tensor]=None
+        rbf: Tensor, atom_embedding: Tensor, batch_seg: Optional[Tensor]=None, N: Optional[List[int]]=None
     ) -> Dict[Literal["Ea", "Qa"], Tensor]:
-        pij, dij, mask, num_batch = self._atomic_properties_static(Dij_sr, vij_sr, batch_seg)
+        pij, dij, mask, num_batch = self._atomic_properties_static(Dij_sr, vij_sr, batch_seg, N)
         ea, qa = self._atomic_properties_dynamic(
             atom_embedding, num_batch, rbf, pij, dij, idx_i_sr, idx_j_sr, mask, batch_seg
         )

@@ -28,6 +28,7 @@ class Server:
     ):
         self.neighbor_list_type = config.Server.get("neighbor_list", "full")
         self.neighbor_list_skin = config.Server.get("neighbor_list_skin", 0.0)
+        self.use_fused_kernels = config.Server.get("fused_kernels", True)
         self.cuda = config.Server.get("cuda", False)
         self.dtype = DTYPE_MAPPING[config.Server.get("dtype", "float64")]
         self.Hartree_in_E = config.Server.get("Hartree_in_E", 1)
@@ -60,6 +61,7 @@ class Server:
             transform=self.transform,
             neighbor_list_type=self.neighbor_list_type,
             neighbor_list_skin=self.neighbor_list_skin,
+            use_fused_kernels=self.use_fused_kernels,
             Hartree_in_E=self.Hartree_in_E,
             internal_calculator_weight=self.internal_calculator_weight,
             uncertainty_calculator_config=self.uncertainty_calculator_config,
