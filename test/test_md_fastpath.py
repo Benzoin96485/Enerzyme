@@ -174,6 +174,10 @@ def small_spookynet(extra_layers=(), shallow_ensemble_size=4):
     ]
     torch.manual_seed(0)
     model = build_model("SpookyNet", layers, build_params, verbose=0).to(DEVICE).type(DTYPE)
+    # SpookyNet zero-initializes output branches; perturb all parameters so every path contributes
+    with torch.no_grad():
+        for p in model.parameters():
+            p.add_(0.1 * torch.randn_like(p))
     model.eval()
     return model
 
@@ -197,6 +201,7 @@ def test_calculator_fast_path_matches_full_pairs():
         results[(nl_type, skin)] = {k: np.array(v) for k, v in calc.results.items()}
         assert calc.lr_mode == ("pairs" if nl_type == "full_pairs" else "dense")
     ref = results[("full_pairs", 0.0)]
+    assert np.abs(ref["forces"]).max() > 1e-3
     for key in (("full", 0.0), ("full", 1.0)):
         for prop in ("energy", "forces", "dipole", "charges"):
             np.testing.assert_allclose(results[key][prop], ref[prop], rtol=1e-10, atol=1e-10)
@@ -269,8 +274,34 @@ def test_calculator_fused_matches_unfused():
         atoms.info.update({"charge": 0, "spin": 1})
         calc.calculate(atoms, properties=["energy", "forces", "dipole", "charges"])
         results[fused] = {k: np.array(v) for k, v in calc.results.items()}
+    assert np.abs(results[False]["forces"]).max() > 1e-3
     for prop in ("energy", "forces", "dipole", "charges"):
         np.testing.assert_allclose(results[True][prop], results[False][prop], rtol=1e-10, atol=1e-10)
+
+
+def test_training_path_still_supports_double_backward():
+    model = small_spookynet().train()
+    model.requires_grad_(True)
+    R = random_positions(40, box=9.0, min_dist=0.9)
+    N = len(R)
+    idx_i, idx_j = full_neighbor_list_torch(N, DEVICE)
+    net_input = {
+        "Ra": torch.tensor(R, dtype=DTYPE, device=DEVICE, requires_grad=True),
+        "Za": torch.tensor(np.full(N, 8), device=DEVICE),
+        "Q": torch.zeros(1, dtype=DTYPE, device=DEVICE),
+        "S": torch.zeros(1, dtype=DTYPE, device=DEVICE),
+        "N": [N], "batch_seg": torch.zeros(N, dtype=torch.long, device=DEVICE),
+        "idx_i": idx_i, "idx_j": idx_j,
+    }
+    output = model(net_input)
+    # the train_only ShallowEnsembleReduce averages E before the Force layer
+    assert output["Fa"].shape == (N, 3) and "E_var" in output
+    loss = output["E"].square().sum() + output["Fa"].square().sum() + output["E_var"].sum()
+    loss.backward()
+    grads = [p.grad for p in model.parameters() if p.requires_grad]
+    assert all(torch.isfinite(g).all() for g in grads if g is not None)
+    nonzero = sum(1 for g in grads if g is not None and g.abs().sum() > 0)
+    assert nonzero > len(grads) // 2, (nonzero, len(grads), output["E"], output["Fa"].abs().max())
 
 
 def test_mean_force_equals_mean_of_member_forces():
@@ -291,6 +322,7 @@ def test_mean_force_equals_mean_of_member_forces():
             "idx_i": idx_i, "idx_j": idx_j,
         }
         outputs[mean_only] = model(net_input)
+    assert outputs[False]["Fa_var"].max() > 0
     torch.testing.assert_close(outputs[True]["Fa"], outputs[False]["Fa"], rtol=1e-10, atol=1e-12)
     torch.testing.assert_close(outputs[True]["E"], outputs[False]["E"], rtol=1e-12, atol=1e-12)
     assert "Fa_var" in outputs[False] and "Fa_var" not in outputs[True]

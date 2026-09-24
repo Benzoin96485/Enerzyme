@@ -28,7 +28,12 @@ Shared Simulation keys
 - :code:`environment: ase`
 - :code:`dtype` — :code:`float64` recommended for optimization
 - :code:`cuda`
-- :code:`neighbor_list` — match training
+- :code:`neighbor_list` — match training. With :code:`full`, SpookyNet models whose long-range terms are
+  only electrostatics (no :code:`cutoff_lr`) and ZBL are evaluated with a GPU short-range pair list plus
+  dense all-pairs Coulomb, which gives the same energies and forces as the explicit all-pairs list;
+  other models fall back to the explicit list. :code:`full_pairs` always uses the explicit list.
+- :code:`neighbor_list_skin` — Verlet skin (Å) of the short-range pair list, default :code:`0` (rebuild every step)
+- :code:`fused_kernels` — fused CUDA kernels for inference (default :code:`true`)
 - :code:`idx_start_from` — 1 (1-based) or 0 (0-based) for constraints and scans
 - :code:`Hartree_in_E`, :code:`fs_in_t` — unit conversion for integrators
 

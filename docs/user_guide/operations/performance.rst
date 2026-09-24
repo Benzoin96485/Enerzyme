@@ -48,6 +48,12 @@ Simulation
 :code:`log_interval`
     Reduce trajectory I/O frequency for long MD.
 
+:code:`neighbor_list: full` for large systems
+    Supported SpookyNet models avoid the :math:`O(N^2)` pair list: short-range pairs are found on the GPU and
+    the all-pairs Coulomb term is summed densely in blocks. With shallow ensembles and no
+    :code:`uncertainty_calculator`, forces of the ensemble-mean energy are obtained in a single backward pass.
+    Use :code:`neighbor_list: full_pairs` to reproduce the explicit all-pairs evaluation.
+
 Neighbor list memory
 --------------------
 
