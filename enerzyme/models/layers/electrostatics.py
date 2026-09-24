@@ -2,9 +2,73 @@ from typing import Dict, Literal, Optional, Tuple
 import torch
 from torch import Tensor
 from torch.nn import Module
+from torch.autograd.function import once_differentiable
 from . import BaseFFLayer
 from ..functional import segment_sum_coo
 from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
+
+
+def _inverse_distance_block(Ra: Tensor, start: int, end: int, batch_seg: Optional[Tensor]) -> Tuple[Tensor, Tensor]:
+    '''
+    Rows start:end of the all-pairs inverse distance matrix (zero on the diagonal and
+    between different batch segments), together with the displacements R_i - R_j.
+    '''
+    diff = Ra[start:end].unsqueeze(1) - Ra.unsqueeze(0)
+    inv_r = diff.square().sum(-1).rsqrt_()
+    rows = torch.arange(end - start, device=Ra.device)
+    inv_r[rows, rows + start] = 0
+    if batch_seg is not None:
+        inv_r.masked_fill_(batch_seg[start:end].unsqueeze(1) != batch_seg.unsqueeze(0), 0)
+    return inv_r, diff
+
+
+class DenseCoulombPotential(torch.autograd.Function):
+    '''
+    V_i = sum_{j != i} Q_j / |R_i - R_j| over all atom pairs (within the same batch
+    segment), evaluated in row blocks so that memory is O(block * N) instead of
+    materializing a pair list. Q may carry trailing channels, e.g. [N, M] for a
+    shallow ensemble.
+    '''
+    @staticmethod
+    def forward(ctx, Ra: Tensor, Q: Tensor, batch_seg: Optional[Tensor], block_size: int) -> Tensor:
+        Q2 = Q.reshape(Q.shape[0], -1)
+        V = torch.empty_like(Q2)
+        N = Ra.shape[0]
+        for start in range(0, N, block_size):
+            end = min(N, start + block_size)
+            inv_r, _ = _inverse_distance_block(Ra, start, end, batch_seg)
+            V[start:end] = inv_r @ Q2
+        ctx.save_for_backward(Ra, Q2, batch_seg)
+        ctx.block_size = block_size
+        ctx.q_shape = Q.shape
+        return V.view(Q.shape)
+
+    @staticmethod
+    @once_differentiable
+    def backward(ctx, grad_V: Tensor):
+        Ra, Q2, batch_seg = ctx.saved_tensors
+        G = grad_V.reshape(Q2.shape)
+        N = Ra.shape[0]
+        grad_R = torch.zeros_like(Ra) if ctx.needs_input_grad[0] else None
+        grad_Q = torch.empty_like(Q2) if ctx.needs_input_grad[1] else None
+        for start in range(0, N, ctx.block_size):
+            end = min(N, start + ctx.block_size)
+            inv_r, diff = _inverse_distance_block(Ra, start, end, batch_seg)
+            if grad_Q is not None:
+                # the inverse distance matrix is symmetric
+                grad_Q[start:end] = inv_r @ G
+            if grad_R is not None:
+                # L = sum_ij G_i w_ij Q_j, dw_ij/dR_i = -w_ij^3 (R_i - R_j)
+                A = G[start:end] @ Q2.T + Q2[start:end] @ G.T
+                B = A.mul_(inv_r.pow(3))
+                grad_R[start:end] = torch.einsum("ij,ijc->ic", B, diff).neg_()
+        return grad_R, (grad_Q.view(ctx.q_shape) if grad_Q is not None else None), None, None
+
+
+def dense_coulomb_potential(Ra: Tensor, Q: Tensor, batch_seg: Optional[Tensor]=None, max_block_elements: int=1 << 24) -> Tensor:
+    N = Ra.shape[0]
+    block_size = max(1, min(N, max_block_elements // max(N, 1)))
+    return DenseCoulombPotential.apply(Ra, Q, batch_seg, block_size)
 
 
 class ChargeConservationLayer(BaseFFLayer):
@@ -85,8 +149,12 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         -----
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         """
-        super().__init__(input_fields={"Dij_lr", "Qa", "idx_i", "idx_j"}, output_fields={"E_ele_a"})
+        super().__init__(input_fields={"Dij_lr", "Qa", "idx_i", "idx_j", "Ra", "batch_seg"}, output_fields={"E_ele_a"})
         self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
+        # "pairs": sum over the provided (long-range) pair list
+        # "dense": 1/r over all atom pairs + short-range shielding correction over the provided pair list,
+        # which must contain every pair closer than `self.cutoff`; inference only and requires no cutoff_lr
+        self.lr_mode: Literal["pairs", "dense"] = "pairs"
         if flavor == "PhysNet":
             self.cutoff = cutoff_sr / 2
             self.cuton = 0
@@ -132,7 +200,36 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             condition, zeros
         )
 
-    def get_E_ele_a(self, Dij_lr: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:
+    @property
+    def supports_dense_lr(self) -> bool:
+        return self.cutoff_lr is None or self.cutoff_lr <= 0
+
+    def _get_dense_E_ele_a(
+        self, Dij_lr: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor, Ra: Tensor, batch_seg: Optional[Tensor]
+    ) -> Tensor:
+        '''
+        Same energy as the "pairs" mode with a full pair list, using
+        switch * shielded + (1 - switch) * ordinary = ordinary + switch * (shielded - ordinary),
+        where the switch vanishes beyond `self.cutoff`.
+        '''
+        if self.training:
+            raise RuntimeError("Dense long-range electrostatics is an inference-only path")
+        if not self.supports_dense_lr:
+            raise RuntimeError("Dense long-range electrostatics does not support cutoff_lr")
+        view_shape = (-1, 1) if Qa.dim() > 1 else (-1,)
+        if Qa.device.type == "cpu" or Qa.dim() > 1:
+            Qj = Qa[idx_j]
+        else:
+            Qj = Qa.gather(0, idx_j)
+        switch = self.cutoff_fn(Dij_lr, self.cutoff, self.cuton)
+        correction = (switch * (1.0 / self._shield(Dij_lr) - 1.0 / Dij_lr)).view(view_shape) * Qj
+        V = dense_coulomb_potential(Ra, Qa, batch_seg) + segment_sum_coo(correction, idx_i, dim_size=len(Qa))
+        return self.kehalf / self.dielectric_constant * Qa * V
+
+    def get_E_ele_a(
+        self, Dij_lr: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor,
+        Ra: Optional[Tensor]=None, batch_seg: Optional[Tensor]=None
+    ) -> Tensor:
         '''
         Compute the atomic electrostatic energy
 
@@ -146,10 +243,16 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
 
         idx_j: Long tensor of the second indices of pairs, shape [N_pair * batch_size]
 
+        Ra: Float tensor of atom positions, shape [N * batch_size, 3], only used in the "dense" mode
+
+        batch_seg: Long tensor of batch indices, shape [N * batch_size], only used in the "dense" mode
+
         Returns:
         -----
         Ea: Float tensor of atomic electrostatic energy, shape [N * batch_size]
         '''
+        if self.lr_mode == "dense":
+            return self._get_dense_E_ele_a(Dij_lr, Qa, idx_i, idx_j, Ra, batch_seg)
         if Qa.device.type == "cpu" or Qa.dim() > 1:
             fac = self.kehalf * Qa[idx_i] * Qa[idx_j] / self.dielectric_constant
         else:

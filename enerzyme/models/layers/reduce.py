@@ -59,11 +59,16 @@ class ShallowEnsembleReduceLayer(BaseFFLayer):
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output = dict()
         for name in self.var:
+            if relevant_input[name].shape[-1] == 1:
+                # already reduced to the ensemble mean (e.g. ForceLayer.ensemble_mean_only)
+                continue
             if self.relative_energy and name.startswith("E"):
                 output[name + "_var"] = (relevant_input[name] - relevant_input[name].mean(dim=0)).var(dim=-1, unbiased=True)
             else:
                 output[name + "_var"] = relevant_input[name].var(dim=-1, unbiased=True)
         for name in self.std:
+            if relevant_input[name].shape[-1] == 1:
+                continue
             if self.relative_energy and name.startswith("E"):
                 output[name + "_std"] = (relevant_input[name] - relevant_input[name].mean(dim=0)).std(dim=-1, unbiased=True)
             else:

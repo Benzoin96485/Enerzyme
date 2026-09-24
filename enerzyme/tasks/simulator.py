@@ -76,6 +76,7 @@ class Simulation:
         self.fs_in_t = config.Simulation.get("fs_in_t", 1)
         self.log_interval = config.Simulation.get("log_interval", 20)
         self.neighbor_list_type = config.Simulation.get("neighbor_list", "full")
+        self.neighbor_list_skin = config.Simulation.get("neighbor_list_skin", 0.0)
         self.cuda = config.Simulation.get('cuda', False)
         self.dtype = DTYPE_MAPPING[config.Simulation.get("dtype", "float64")]
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.cuda else "cpu")
@@ -106,6 +107,7 @@ class Simulation:
             device=self.device,
             dtype=self.dtype,
             neighbor_list_type=self.neighbor_list_type,
+            neighbor_list_skin=self.neighbor_list_skin,
             transform=self.transform,
             internal_calculator_weight=self.internal_calculator_weight,
             external_calculator=self.external_calculator,

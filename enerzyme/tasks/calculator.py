@@ -7,8 +7,43 @@ import torch
 from ase.calculators.calculator import Calculator, all_changes
 from ase.units import Hartree
 from ..data.transform import Transform
-from ..data.neighbor_list import full_neighbor_list
+from ..data.neighbor_list import full_neighbor_list_torch, VerletNeighborList
 from .trainer import _decorate_batch_output, _decorate_batch_input, _to_device
+
+
+LR_PAIR_FIELDS = {"idx_i", "idx_j", "Dij_lr", "vij_lr"}
+
+
+def _as_float64(x: Any) -> Any:
+    if isinstance(x, list):
+        return [_as_float64(v) for v in x]
+    if isinstance(x, np.ndarray) and np.issubdtype(x.dtype, np.floating):
+        return x.astype(np.float64, copy=False)
+    return x
+
+
+def get_dense_lr_cutoff(model: Module) -> Optional[float]:
+    '''
+    If every layer of `model` that consumes the full (long-range) pair list is known to
+    work with a short-range pair list plus dense all-pairs electrostatics, return the
+    pair-list cutoff that keeps the model output unchanged; otherwise return None.
+    '''
+    from ..models.spookynet import SpookyNetCore
+    from ..models.layers import DistanceLayer, RangeSeparationLayer, ElectrostaticEnergyLayer
+    if not isinstance(model, SpookyNetCore) or model.range_separation is None:
+        return None
+    cutoff = model.range_separation.cutoff_sr
+    for layer in list(model.pre_sequence) + list(model.post_sequence):
+        fields = {layer._name_mapping.get(k, k) for k in layer._input_fields}
+        if not fields & LR_PAIR_FIELDS:
+            continue
+        if isinstance(layer, (DistanceLayer, RangeSeparationLayer)):
+            continue
+        if isinstance(layer, ElectrostaticEnergyLayer) and layer.supports_dense_lr:
+            cutoff = max(cutoff, layer.cutoff)
+            continue
+        return None
+    return cutoff
 
 
 def _init_patch_module(patch_path: str) -> None:
@@ -41,6 +76,7 @@ class ASECalculator(Calculator):
         dtype: Optional[torch.dtype]=None,
         transform: Optional[Transform]=None,
         neighbor_list_type: Optional[str]="full",
+        neighbor_list_skin: float=0.0,
         Hartree_in_E: float=1,
         internal_calculator_weight: float=1.0,
         uncertainty_calculator_config: Optional[Dict[str, Any]]=None,
@@ -48,6 +84,17 @@ class ASECalculator(Calculator):
         external_calculator_config: Optional[Dict[str, Any]]=None,
         **params: Dict[str, Any]
     ) -> None:
+        '''
+        neighbor_list_type:
+            "full": all atom pairs. Models whose long-range pair consumers support it
+            (see `get_dense_lr_cutoff`) are evaluated with a GPU short-range pair list and
+            dense all-pairs electrostatics, which gives the same result; other models use
+            the explicit all-pairs list.
+            "full_pairs": always use the explicit all-pairs list.
+        neighbor_list_skin:
+            Verlet skin (in units of positions) of the short-range pair list; 0 rebuilds
+            the list at every call.
+        '''
         Calculator.__init__(
             self, restart=restart, label=label, atoms=atoms, **params
         )
@@ -59,6 +106,7 @@ class ASECalculator(Calculator):
         self.cell_offsets = None
         self.dtype = dtype
         self.neighbor_list_type = neighbor_list_type
+        self.neighbor_list_skin = neighbor_list_skin
         self.transform = transform
         self.Hartree_in_E = Hartree_in_E
         self.E_conversion_factor = Hartree / self.Hartree_in_E
@@ -84,6 +132,63 @@ class ASECalculator(Calculator):
                 "No calculator is active: set a non-zero internal_calculator_weight "
                 "and/or provide an external_calculator"
             )
+        self._static_key = None
+        self._static_input = None
+        self._full_pairs = None
+        self._verlet = None
+        self.lr_mode = None
+        if self.model is not None:
+            self._prepare_model()
+
+    def _prepare_model(self) -> None:
+        from ..models.layers import ElectrostaticEnergyLayer, ForceLayer
+        # forces only need gradients w.r.t. positions
+        self.model.requires_grad_(False)
+        self._electrostatic_layers = [m for m in self.model.modules() if isinstance(m, ElectrostaticEnergyLayer)]
+        self._force_layers = [m for m in self.model.modules() if isinstance(m, ForceLayer)]
+        if self.neighbor_list_type == "full":
+            dense_lr_cutoff = get_dense_lr_cutoff(self.model)
+            if dense_lr_cutoff is not None:
+                self.lr_mode = "dense"
+                self._verlet = VerletNeighborList(dense_lr_cutoff, self.neighbor_list_skin)
+            else:
+                self.lr_mode = "pairs"
+        elif self.neighbor_list_type == "full_pairs":
+            self.lr_mode = "pairs"
+
+    def _configure_model(self) -> None:
+        # the model may be shared by calculators with different settings
+        for layer in self._electrostatic_layers:
+            layer.lr_mode = self.lr_mode
+        for layer in self._force_layers:
+            layer.ensemble_mean_only = self.uncertainty_calculator_config is None
+
+    def _get_net_input(self, atoms: ase.Atoms) -> Dict[str, Any]:
+        N = len(atoms)
+        charge = atoms.info.get("charge", 0)
+        spin = atoms.info.get("spin", 0) - 1
+        key = (N, atoms.numbers.tobytes(), charge, spin)
+        if key != self._static_key:
+            self._static_input = {
+                "Za": torch.tensor(atoms.numbers, dtype=torch.long, device=self.device),
+                "Q": torch.tensor([charge], dtype=self.dtype, device=self.device),
+                "S": torch.tensor([spin], dtype=self.dtype, device=self.device),
+                "batch_seg": torch.zeros(N, dtype=torch.long, device=self.device),
+            }
+            self._static_key = key
+        net_input = dict(self._static_input)
+        net_input["N"] = [N]
+        Ra = torch.tensor(atoms.positions, dtype=self.dtype, device=self.device, requires_grad=True)
+        net_input["Ra"] = Ra
+        if self.lr_mode == "dense":
+            idx_i, idx_j = self._verlet(Ra)
+        else:
+            if self._full_pairs is None or self._full_pairs[0] != N:
+                self._full_pairs = (N, *full_neighbor_list_torch(N, self.device))
+            idx_i, idx_j = self._full_pairs[1:]
+        net_input["idx_i"] = idx_i
+        net_input["idx_j"] = idx_j
+        return net_input
 
     def _calculate_UDD(self, output: Dict[str, Any], A: float, B: float, NM: Optional[int]=None) -> Dict[str, Any]:
         results, biases = dict(), dict()
@@ -121,30 +226,31 @@ class ASECalculator(Calculator):
 
     def _calculate_internal(self, atoms: ase.Atoms) -> None:
         results = dict()
-        features = {
-            "Q": atoms.info.get("charge", 0),
-            "S": atoms.info.get("spin", 0) - 1,
-            "Ra": atoms.positions,
-            "Za": atoms.numbers,
-            "N": len(atoms)
-        }
-        if self.neighbor_list_type == "full":
-            idx_i, idx_j = full_neighbor_list(features["N"])
-            features["idx_i"] = idx_i
-            features["idx_j"] = idx_j
-            features["N_pair"] = len(idx_i)
-        net_input, _ = _decorate_batch_input(
-            batch=[(features, None)],
-            device=self.device,
-            dtype=self.dtype
-        )
-        net_input, _ = _to_device((net_input, {}), self.device)
+        self._configure_model()
+        if self.lr_mode is not None:
+            net_input = self._get_net_input(atoms)
+        else:
+            features = {
+                "Q": atoms.info.get("charge", 0),
+                "S": atoms.info.get("spin", 0) - 1,
+                "Ra": atoms.positions,
+                "Za": atoms.numbers,
+                "N": len(atoms)
+            }
+            net_input, _ = _decorate_batch_input(
+                batch=[(features, None)],
+                device=self.device,
+                dtype=self.dtype
+            )
+            net_input, _ = _to_device((net_input, {}), self.device)
         net_output = self.model(net_input)
         output, _ = _decorate_batch_output(
             output=net_output,
             features=net_input,
             targets=None
         )
+        # atomic energy shifts of large systems are not representable in float32
+        output = {k: _as_float64(v) for k, v in output.items()}
         self.transform.inverse_transform(output)
         if self.uncertainty_calculator_config is None:
             results["energy"] = output["E"][0] * self.E_conversion_factor
@@ -212,7 +318,7 @@ def get_patched_calculator(calculator_patch_module: object, external_calculator_
     return external_calculator
 
 
-def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", model_config_path: Optional[str] = None, calculator_patch: Optional[str] = None, neighbor_list_type: Optional[str]="full", Hartree_in_E: float=1, internal_calculator_weight: float=1.0, uncertainty_calculator_config: Optional[Dict[str, Any]]=None, external_calculator: Optional[Calculator]=None, external_calculator_config: Optional[Dict[str, Any]]=None):
+def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", model_config_path: Optional[str] = None, calculator_patch: Optional[str] = None, neighbor_list_type: Optional[str]="full", Hartree_in_E: float=1, internal_calculator_weight: float=1.0, uncertainty_calculator_config: Optional[Dict[str, Any]]=None, external_calculator: Optional[Calculator]=None, external_calculator_config: Optional[Dict[str, Any]]=None, neighbor_list_skin: float=0.0):
     from ..models import get_model_str, build_model, get_pretrain_path
     from ..utils import YamlHandler, logger
     from .trainer import DTYPE_MAPPING, _load_state_dict
@@ -248,6 +354,7 @@ def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", mod
                 dtype=dtype,
                 transform=transform,
                 neighbor_list_type=neighbor_list_type,
+                neighbor_list_skin=neighbor_list_skin,
                 Hartree_in_E=Hartree_in_E,
                 internal_calculator_weight=internal_calculator_weight,
                 uncertainty_calculator_config=uncertainty_calculator_config,
