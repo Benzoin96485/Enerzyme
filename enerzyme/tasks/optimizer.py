@@ -10,7 +10,7 @@ HYPER_PARAM_KEYS = {
     "Muon": {
         "learning_rate", "weight_decay", 
         "muon_learning_rate", "momentum", "muon_weight_decay", 
-        "aux_learning_rate", "betas", "eps", "aux_weight_decay"
+        "aux_learning_rate", "betas", "eps", "aux_weight_decay", "batched"
     },
 }
 MODEL_HEAD_NAMES = {
@@ -240,6 +240,8 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
         try:
             if dist.is_initialized():
                 from muon import MuonWithAuxAdam as Muon
+            elif hyper_params.get("batched", True):
+                from .muon_batched import BatchedSingleDeviceMuonWithAuxAdam as Muon
             else:
                 from muon import SingleDeviceMuonWithAuxAdam as Muon
         except ImportError:

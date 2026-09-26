@@ -279,6 +279,53 @@ def test_calculator_fused_matches_unfused():
         np.testing.assert_allclose(results[True][prop], results[False][prop], rtol=1e-10, atol=1e-10)
 
 
+def test_ensemble_mean_forces_context_restores_flags():
+    from enerzyme.models.layers.gradient import ensemble_mean_forces
+    model = small_spookynet()
+    force_layer = [m for m in model.modules() if type(m).__name__ == "ForceLayer"][0]
+    with ensemble_mean_forces(model):
+        assert force_layer.ensemble_mean_only
+    assert not force_layer.ensemble_mean_only
+    with ensemble_mean_forces(model, enabled=False):
+        assert not force_layer.ensemble_mean_only
+
+
+@requires_cuda
+def test_batched_muon_matches_reference():
+    muon = pytest.importorskip("muon")
+    from enerzyme.tasks.optimizer import get_optimizer
+    hp = {"learning_rate": 3e-3, "weight_decay": 0.01}
+    models, optimizers = [], []
+    for batched in (False, True):
+        model = small_spookynet().train().float()
+        model.requires_grad_(True)
+        models.append(model)
+        optimizers.append(get_optimizer("Muon", model, {**hp, "batched": batched}))
+    assert type(optimizers[0]) is muon.SingleDeviceMuonWithAuxAdam
+    assert type(optimizers[1]).__name__ == "BatchedSingleDeviceMuonWithAuxAdam"
+    gen = torch.Generator(device="cpu").manual_seed(7)
+    params = [list(m.parameters()) for m in models]
+    for _ in range(3):
+        grads = [torch.randn(p.shape, generator=gen).to(DEVICE) for p in params[0]]
+        for ps, opt in zip(params, optimizers):
+            for p, g in zip(ps, grads):
+                p.grad = g.clone()
+            opt.step()
+    muon_params = {id(p) for p in optimizers[0].param_groups[0]["params"]}
+    for p_ref, p_new in zip(*params):
+        if id(p_ref) in muon_params:
+            # bf16 Newton-Schulz in batched vs single matmuls
+            torch.testing.assert_close(p_new, p_ref, rtol=0, atol=2e-5)
+        else:
+            torch.testing.assert_close(p_new, p_ref, rtol=1e-6, atol=1e-7)
+    # identical optimizer state layout, loadable in both directions
+    sd_ref, sd_new = optimizers[0].state_dict(), optimizers[1].state_dict()
+    assert sd_ref["param_groups"] == sd_new["param_groups"]
+    assert {k: sorted(v) for k, v in sd_ref["state"].items()} == {k: sorted(v) for k, v in sd_new["state"].items()}
+    optimizers[0].load_state_dict(sd_new)
+    optimizers[1].load_state_dict(sd_ref)
+
+
 def test_training_path_still_supports_double_backward():
     model = small_spookynet().train()
     model.requires_grad_(True)

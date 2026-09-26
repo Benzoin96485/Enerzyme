@@ -1,5 +1,7 @@
+from contextlib import contextmanager
 import torch
 from torch import Tensor
+from torch.nn import Module
 from torch.autograd import grad
 from torch.autograd.functional import jacobian
 from ..layers import BaseFFLayer
@@ -19,6 +21,22 @@ class ForceLayer(BaseFFLayer):
             return torch.stack([-grad(torch.sum(E[:,i]), Ra, retain_graph=True, create_graph=self.training)[0] for i in range(E.shape[-1])], dim=-1)
         else:
             return -grad(torch.sum(E), Ra, retain_graph=True, create_graph=self.training)[0]
+
+@contextmanager
+def ensemble_mean_forces(model: Module, enabled: bool=True):
+    '''
+    Temporarily set `ensemble_mean_only` on every ForceLayer of `model` (eval mode only).
+    '''
+    layers = [m for m in model.modules() if isinstance(m, ForceLayer)] if enabled else []
+    previous = [m.ensemble_mean_only for m in layers]
+    for m in layers:
+        m.ensemble_mean_only = True
+    try:
+        yield
+    finally:
+        for m, value in zip(layers, previous):
+            m.ensemble_mean_only = value
+
 
 class EnergyVarianceGradientLayer(BaseFFLayer):
     def __init__(self) -> None:

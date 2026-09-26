@@ -115,10 +115,10 @@ class LocalInteraction(Module):
         """
         if csr_offsets is not None:
             return self._fused_forward(x, rbf, pij, dij, idx_j, csr_offsets)
-        # interaction functions
-        gs = self.radial_s(rbf)
-        gp = self.radial_p(rbf).unsqueeze(-2) * pij.unsqueeze(-1)
-        gd = self.radial_d(rbf).unsqueeze(-2) * dij.unsqueeze(-1)
+        # radial parts of the interaction functions (one GEMM for s, p, d)
+        gs, gp, gd = torch.split(
+            torch.nn.functional.linear(rbf, self._radial_weight()), x.shape[-1], dim=-1
+        )
         # atom featurizations
         xx = self.resblock_x(x)
         xs = self.resblock_s(x)
@@ -134,22 +134,26 @@ class LocalInteraction(Module):
             xs = torch.gather(xs, 0, j)  # L=0
             xp = torch.gather(xp, 0, j)  # L=1
             xd = torch.gather(xd, 0, j)  # L=2
-        # sum over neighbors
+        # sum over neighbors; radial and neighbor features are multiplied before the
+        # angular outer product so that only one [P, 3|5, F] tensor is formed per channel
         N = len(x)
         s = xx + segment_sum_coo(gs * xs, idx_i, dim_size=N)
-        p = segment_sum_coo(gp * xp.unsqueeze(-2), idx_i, dim_size=N)
-        d = segment_sum_coo(gd * xd.unsqueeze(-2), idx_i, dim_size=N)
+        p = segment_sum_coo(pij.unsqueeze(-1) * (gp * xp).unsqueeze(-2), idx_i, dim_size=N)
+        d = segment_sum_coo(dij.unsqueeze(-1) * (gd * xd).unsqueeze(-2), idx_i, dim_size=N)
         # project tensorial features to scalars
         pa, pb = torch.split(self.projection_p(p), p.shape[-1], dim=-1)
         da, db = torch.split(self.projection_d(d), d.shape[-1], dim=-1)
         return self.resblock(s + (pa * pb).sum(-2) + (da * db).sum(-2))
+
+    def _radial_weight(self) -> torch.Tensor:
+        return torch.cat([self.radial_s.weight, self.radial_p.weight, self.radial_d.weight], dim=0)
 
     def _fused_forward(
         self, x: torch.Tensor, rbf: torch.Tensor, pij: torch.Tensor, dij: torch.Tensor,
         idx_j: torch.Tensor, csr_offsets: torch.Tensor
     ) -> torch.Tensor:
         from .fused import fused_local_message
-        radial_weight = torch.cat([self.radial_s.weight, self.radial_p.weight, self.radial_d.weight], dim=0)
+        radial_weight = self._radial_weight()
         xx = self.resblock_x(x)
         xs = self.resblock_s(x)
         xp = self.resblock_p(x)

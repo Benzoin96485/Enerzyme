@@ -200,6 +200,8 @@ class Trainer:
         self.refresh_best_score = params.get("refresh_best_score", None)
         self.refresh_patience = params.get("refresh_patience", None)
         self.freeze_pretrain_weights = params.get("freeze_pretrain_weights", False)
+        # validation during fitting with forces of the ensemble-mean energy only
+        self.fast_validation = params.get("fast_validation", True)
         non_target_features = params.get("non_target_features", [])
         self.num_workers = params.get("num_workers", 0)
         self.reset_parameters = params.get("reset_parameters", False)
@@ -510,6 +512,7 @@ class Trainer:
             else:
                 best_epoch = None
 
+            fast_validation = self.fast_validation and not self._validation_needs_member_forces(loss_terms)
             epoch = start_epoch
             epoch_in_iter = meta_state_dict.get("epoch_in_iter", 0)
             if start_epoch > 0:
@@ -578,6 +581,7 @@ class Trainer:
                             transform=transform, 
                             epoch=epoch, 
                             load_model=False,
+                            ensemble_mean_forces=fast_validation,
                         )
                         val_loss = predict_result["val_loss"]
                         metric_score = predict_result["metric_score"]
@@ -632,10 +636,28 @@ class Trainer:
                 metric_score = None
             return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": metric_score}
     
+    def _validation_needs_member_forces(self, loss_terms: Dict[str, Callable]) -> bool:
+        from ..models.loss import NLLLoss, NLLLossVarOnly, CRPSLoss
+        for term in loss_terms.values():
+            if isinstance(term, (NLLLoss, NLLLossVarOnly, CRPSLoss)) and any(k.startswith("Fa") for k in term.weights):
+                return True
+        if self.monitor is not None and any(k.startswith("Fa_") for k in self.monitor.terms):
+            return True
+        return False
+
     def _early_stop_choice(self, wait, min_loss, metric_score, save_handle, patience, epoch):
         return self.metrics._early_stop_choice(wait, min_loss, metric_score, save_handle, patience, epoch)
     
-    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None, test_mode: bool=False) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
+    def predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None, test_mode: bool=False, ensemble_mean_forces: bool=False) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
+        '''
+        ensemble_mean_forces: for shallow ensembles, only compute forces of the ensemble-mean
+        energy (one backward pass); per-member forces and force variances are not returned.
+        '''
+        from ..models.layers.gradient import ensemble_mean_forces as mean_forces_context
+        with mean_forces_context(model, ensemble_mean_forces):
+            return self._predict(model, dataset, loss_terms, dump_dir, transform, epoch, load_model, model_rank, test_mode)
+
+    def _predict(self, model: Module, dataset: Dataset, loss_terms: Iterable[Callable], dump_dir: str, transform: Transform, epoch: int=1, load_model: bool=False, model_rank: Optional[str]=None, test_mode: bool=False) -> Dict[Literal["y_pred", "y_truth", "val_loss", "metric_score"], Any]:
         self._set_seed(self.seed)
         model = model.to(self.device).type(self.dtype)
         if load_model == True:

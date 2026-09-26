@@ -36,6 +36,28 @@ Training
 :code:`lightning: true`
     Multi-GPU training when single-process :code:`cuda` is insufficient.
 
+:code:`fast_validation: true` (default)
+    For shallow ensembles, validation during fitting computes forces of the ensemble-mean energy in one
+    backward pass instead of one per member. It is disabled automatically when a variance-based loss
+    (:code:`nll`, :code:`nll_var_only`, :code:`crps`) acts on :code:`Fa` or the :code:`Monitor` collects
+    :code:`Fa_*` terms; test-set and active-learning predictions always keep per-member forces.
+
+:code:`Optimizer.batched: true` (default for :code:`name: Muon` on a single device)
+    Same update and optimizer state as muon-optimizer's :code:`SingleDeviceMuonWithAuxAdam`, with
+    Newton-Schulz batched over equally shaped weights and foreach AdamW updates. Checkpointed optimizer
+    states are interchangeable; set :code:`batched: false` to use the original implementation.
+
+:code:`fast_validation: true` (default)
+    For shallow ensembles, validation during fitting computes forces of the ensemble-mean energy in one
+    backward pass instead of one per member. It is disabled automatically when a variance-based loss
+    (:code:`nll`, :code:`nll_var_only`, :code:`crps`) acts on :code:`Fa` or the :code:`Monitor` collects
+    :code:`Fa_*` terms; test-set and active-learning predictions always keep per-member forces.
+
+:code:`Optimizer.batched: true` (default for :code:`name: Muon` on a single device)
+    Same update and optimizer state as muon-optimizer's :code:`SingleDeviceMuonWithAuxAdam`, with
+    Newton-Schulz batched over equally shaped weights and foreach AdamW updates. Checkpointed optimizer
+    states are interchangeable; set :code:`batched: false` to use the original implementation.
+
 Simulation
 ----------
 
