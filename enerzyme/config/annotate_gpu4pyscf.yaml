@@ -1,0 +1,13 @@
+Supplier:
+  path: /your/molecules.sdf
+QMDriver:
+  engine: gpu4pyscf
+  # Theory, grids, SCF, optional C-PCM, and default Electrolites flag.
+  template_input_file: enerzyme/qm/templates/gpu4pyscf_wb97mv.yaml
+  # template_input_file: enerzyme/qm/templates/gpu4pyscf_wb97mv_cpcm.yaml
+  # electrolites: false                    # true / all, or a module list: [fastk, fastj]
+  # n_gpus: 1                              # with n_processes > 1, binds CUDA_VISIBLE_DEVICES
+  output_file: dataset.aselmdb
+  keep_stdout: false
+  clean_tmp: true
+  n_processes: 1                           # one GPU4PySCF process per GPU

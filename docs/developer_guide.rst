@@ -36,7 +36,7 @@ Not every contributor needs all optional stacks. Install only what your change t
 - **PhysNet parity tests** — TensorFlow 1.x compatibility mode and the reference PhysNet package
 - **NequIP / XPaiNN** — :code:`nequip`, :code:`XequiNet` and their transitive deps
 - **PLUMED workflows** — :code:`py-plumed` and a PLUMED-enabled build
-- **QM annotation** — TeraChem executable/license, RDKit formal charges
+- **QM annotation** — TeraChem executable/license, or GPU4PySCF plus optional Electrolites; RDKit formal charges
 - **Bond assignment** — QuantumPDB-style PDB inputs and template SDFs
 - **Server mode** — Flask/Waitress (already in core :code:`install_requires`)
 

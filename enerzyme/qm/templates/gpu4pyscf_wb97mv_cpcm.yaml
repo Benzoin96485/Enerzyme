@@ -1,0 +1,29 @@
+# Same direct SCF as gpu4pyscf_wb97mv.yaml, plus stock C-PCM.
+# atoms.info["epsilon"] replaces eps. A vacuum token on the structure skips PCM.
+xc: wb97m-v
+basis: def2-tzvpd
+cart: false
+grids_level: 3
+nlcgrids_level: 3
+conv_tol: 1.0e-10
+direct_scf_tol: 1.0e-13
+max_cycle: 128
+level_shift: 0.0
+init_guess: minao
+gradients: true
+verbose: 0
+density_fit: false
+pcm:
+  method: C-PCM
+  eps: 80.0
+  lebedev_order: 29
+  vdw_scale: 1.2
+  r_probe: 0.0
+  surface_discretization_method: SWIG
+  equilibrium_solvation: false
+electrolites: false
+precision_env:
+  FASTNLC_MODE: plain
+  FASTNLC_BUDGET: "0"
+  FASTNLC_RCP: "0"
+  FASTNLC_RCUT: inf

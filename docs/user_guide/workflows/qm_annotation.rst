@@ -38,17 +38,21 @@ Implemented in :code:`enerzyme/data/supplier.py`:
 - :code:`PickleSupplier` — pre-built datapoint lists
 - :code:`XYZSupplier` — XYZ trajectories with optional default :code:`Q` / :code:`S`
 
-:code:`annotate.py` currently wires **TeraChem** only (:code:`enerzyme/qm/qm_driver.py`). Other engines (ORCA, PySCF, Psi4) may exist as stubs — verify before use.
+:code:`annotate.py` dispatches :code:`engine: terachem` and :code:`engine: gpu4pyscf` (:code:`enerzyme/qm/qm_driver.py`). Unknown engines raise immediately. ORCA, CPU PySCF, and Psi4 remain stubs.
+
+GPU4PySCF reads a YAML template (:code:`enerzyme/qm/templates/gpu4pyscf_wb97mv.yaml`, or the C-PCM variant). The driver injects geometry, charge, and multiplicity. :code:`QMDriver.electrolites: true` (or a module list) applies the Electrolites plugin in that process before the DFT kernel; there is no unpatch, so a stock run and a patched run must be separate processes. A structure :code:`info['epsilon']` overrides the template dielectric; a vacuum token skips PCM. Copy :code:`enerzyme/config/annotate_gpu4pyscf.yaml`. GPU4PySCF and Electrolites are imported only when a job runs. On Perlmutter, source :code:`scripts/dc_uma_cpcm/gpu4pyscf_cuda.sh` in the GPU4PySCF job so CuPy loads CUDA 12.9; leave the shared Fairchem :code:`env.sh` on the default toolkit.
 
 QMDriver options
 ----------------
 
-- :code:`template_input_file` — TeraChem settings (basis, XC, solvent); run/charge/spin/coords are injected per structure
+- :code:`template_input_file` — engine settings (basis, XC / functional, solvent); run/charge/spin/coords are injected per structure
 - :code:`output_file` — under the supplier output directory; :code:`.aselmdb` (default) or :code:`.pkl` / :code:`.pickle`
 - :code:`pickle_name` — if set, write pickle only (Enerzymette AL); mutually exclusive with ASE DB output
 - :code:`pickle_fields` — optional map from **standard** names (:code:`E`, :code:`Fa`, :code:`M2`, …) to custom pickle keys; omit for identity. Enerzymette smoke uses :code:`E→energy`, :code:`Fa→grad` (stores :math:`-\mathbf{F}`), :code:`M2→dipole`, …
 - :code:`dump_single_run` — pickle only (default :code:`true`): cache each success under :code:`single_run/<index>.pkl` and **skip QM** for those indices on resume. ASE LMDB always resumes via the structure :code:`index` key (incomplete reserved rows are deleted and retried); this flag is ignored for :code:`.aselmdb`
-- :code:`n_processes` — parallel QM submissions
+- :code:`n_processes` — parallel QM submissions. For GPU4PySCF, use one process per GPU
+- :code:`n_gpus` — GPU4PySCF: devices in the worker pool. Each worker pins one device when :code:`CUDA_VISIBLE_DEVICES` is unset
+- :code:`electrolites` — GPU4PySCF: overrides the template plugin (:code:`true` / :code:`all`, or a module list). Stock and patched runs are separate processes
 - :code:`keep_stdout` / :code:`keep_molden` — retain QC logs (:code:`keep_output` is a deprecated alias for :code:`keep_stdout`)
 - :code:`clean_tmp` — remove scratch after success
 
@@ -79,7 +83,8 @@ Merging into training
 Environment
 -----------
 
-- :code:`terachem` on :code:`PATH` with valid license
+- :code:`terachem` on :code:`PATH` with valid license (TeraChem engine)
+- GPU4PySCF 1.8.1, PySCF, and CuPy, plus optional Electrolites, imported only at job time
 - PCM radius file when the template uses :code:`pcm_radii read` (prefer a file next to the template; see above)
 - RDKit for SDF parsing
 

@@ -361,6 +361,14 @@ class QMDriver(ABC):
             self.copy_files(output_file, result_package.get("molden_file", None))
         except Exception as e:
             logger.warning(f"Calculation of structure {index} failed: {e}")
+            if self.keep_stdout:
+                stdout_dir = self.output_dir / "stdout"
+                os.makedirs(stdout_dir, exist_ok=True)
+                for candidate in tmp_dir.glob("*.out"):
+                    try:
+                        copy(candidate, stdout_dir)
+                    except OSError as copy_err:
+                        logger.warning(f"Could not keep stdout {candidate}: {copy_err}")
             if self.clean_tmp and tmp_dir.exists():
                 rmtree(tmp_dir)
             return None
@@ -645,6 +653,107 @@ class TeraChemDriver(QMDriver):
 
 class ORCADriver(QMDriver):
     pass
+
+
+class GPU4PySCFDriver(QMDriver):
+    """In-process GPU4PySCF EnGrad. Electrolites, if enabled, patches this process.
+
+    ``electrolites`` on the driver overrides the template. Stock and patched
+    annotate runs must be separate processes. When ``n_gpus`` > 1 and
+    ``CUDA_VISIBLE_DEVICES`` is unset, each worker process pins itself to one
+    device before GPU4PySCF is imported. Set the variable yourself to override.
+    """
+
+    def __init__(
+        self,
+        n_gpus: int = 1,
+        electrolites: Any = None,
+        runner: Any = None,
+        **kwargs,
+    ):
+        self.n_gpus = int(n_gpus)
+        self.electrolites_override = electrolites
+        self.runner = runner
+        super().__init__(**kwargs)
+        from .electrolites_plugin import parse_electrolites
+        from .gpu4pyscf import load_gpu4pyscf_settings
+
+        self.settings = load_gpu4pyscf_settings(self.template_input_file)
+        if self.electrolites_override is None:
+            self.plugin = self.settings.electrolites
+        else:
+            self.plugin = parse_electrolites(self.electrolites_override)
+        if self.n_gpus > 1 and self.n_processes > self.n_gpus:
+            logger.warning(
+                f"GPU4PySCF n_processes={self.n_processes} exceeds n_gpus={self.n_gpus}; "
+                "workers will share devices."
+            )
+
+    def make_input(self, atoms: Atoms, tmp_dir: Path) -> Path:
+        import json
+
+        from .gpu4pyscf import build_job_spec
+
+        spec = build_job_spec(atoms, self.settings, self.plugin)
+        input_file = tmp_dir / f"{spec['index']}.json"
+        input_file.write_text(json.dumps(spec, indent=2), encoding="utf-8")
+        return input_file
+
+    def invoke_qm(self, input_file: Path, atoms: Atoms, tmp_dir: Path) -> Path:
+        import json
+
+        from .gpu4pyscf import result_log, run_gpu4pyscf_job
+
+        input_file = Path(input_file)
+        spec = json.loads(input_file.read_text(encoding="utf-8"))
+        self._pin_visible_gpu()
+        runner = self.runner or run_gpu4pyscf_job
+        result = dict(runner(spec))
+        input_file.with_suffix(".result.json").write_text(
+            json.dumps(result),
+            encoding="utf-8",
+        )
+        out_path = input_file.with_suffix(".out")
+        out_path.write_text(result_log(spec, result), encoding="utf-8")
+        return out_path
+
+    def collect_results(self, input_file: Path, atoms: Atoms, tmp_dir: Path) -> Dict[str, Any]:
+        import json
+
+        from .gpu4pyscf import (
+            dipole_au_to_e_angstrom,
+            energy_ha_to_ev,
+            grad_ha_bohr_to_forces_ev_a,
+        )
+
+        input_file = Path(input_file)
+        result_path = input_file.with_suffix(".result.json")
+        if not result_path.is_file():
+            raise FileNotFoundError(f"GPU4PySCF result missing: {result_path}")
+        spec = json.loads(input_file.read_text(encoding="utf-8"))
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        if not result.get("scf_converged") or result.get("energy_ha") is None:
+            raise RuntimeError(result.get("error") or f"GPU4PySCF SCF failed for {input_file}")
+        package: Dict[str, Any] = {"E": energy_ha_to_ev(float(result["energy_ha"]))}
+        if result.get("grad_ha_bohr") is not None:
+            package["Fa"] = grad_ha_bohr_to_forces_ev_a(result["grad_ha_bohr"])
+        elif spec.get("gradients", True):
+            raise FileNotFoundError(f"GPU4PySCF gradient missing in {result_path}")
+        dipole = result.get("dipole_au")
+        if dipole is None:
+            package["M2"] = np.zeros(3, dtype=float)
+        else:
+            package["M2"] = dipole_au_to_e_angstrom(dipole)
+        return package
+
+    def _pin_visible_gpu(self) -> None:
+        if self.n_gpus <= 1 or os.environ.get("CUDA_VISIBLE_DEVICES"):
+            return
+        from multiprocessing import current_process
+
+        identity = current_process()._identity
+        slot = (identity[0] - 1) if identity else 0
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(int(slot) % self.n_gpus)
 
 
 class PySCFDriver(QMDriver):
