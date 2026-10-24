@@ -85,7 +85,12 @@ class ASECalculator(Calculator):
                 "and/or provide an external_calculator"
             )
 
-    def _calculate_UDD(self, output: Dict[str, Any], A: float, B: float, NM: Optional[int]=None) -> Dict[str, Any]:
+    def _calculate_UDD(self, output: Dict[str, Any], A: float, B: float) -> Dict[str, Any]:
+        '''
+        E_bias = A * (exp(-E_var / (2 * NA * B)) - 1) and F_bias = -dE_bias/dR, where E_var is
+        the unbiased ensemble variance of the total energy and NA is the number of atoms.
+        B is the squared width of the per-atom uncertainty sqrt(E_var / NA).
+        '''
         results, biases = dict(), dict()
         
         if "E_var_grad" in output:
@@ -93,21 +98,20 @@ class ASECalculator(Calculator):
             E_var_grad = output["E_var_grad"][0]
             E_mean = output["E"][0]
             F_mean = output["Fa"][0]
-            NM = self.model.shallow_ensemble_size
         else:
             NM = output["E"][0].shape[-1]
             E_mean = np.mean(output["E"][0], axis=-1, keepdims=True) # shape: (1, 1)
             E_dev = output["E"][0] - E_mean # shape: (1, NM)
-            E_var = np.mean(E_dev**2, axis=-1, keepdims=True).squeeze()
+            E_var = (np.sum(E_dev**2, axis=-1) / (NM - 1)).squeeze()
             F_mean = np.mean(output["Fa"][0], axis=-1, keepdims=True) # shape: (NA, 3, 1)
             F_dev = output["Fa"][0] - F_mean # shape: (NA, 3, NM)
-            E_var_grad = -np.sum(F_dev * E_dev, axis=-1) # shape: (NA, 3)
+            E_var_grad = -2 * np.sum(F_dev * E_dev, axis=-1) / (NM - 1) # shape: (NA, 3)
+        NA = E_var_grad.shape[0]
 
-        scale = 1 / (2 * NM * B)
-        neg_scaled_var = -E_var * scale
-        exp_neg_scaled_var = np.exp(neg_scaled_var)
+        scale = 1 / (2 * NA * B)
+        exp_neg_scaled_var = np.exp(-E_var * scale)
         E_bias = A * (exp_neg_scaled_var - 1)
-        F_bias = A / scale * exp_neg_scaled_var * E_var_grad # shape: (NA, 3)
+        F_bias = A * scale * exp_neg_scaled_var * E_var_grad # shape: (NA, 3)
 
         results["energy"] = E_mean.squeeze() * self.E_conversion_factor
         biases["energy"] = E_bias * self.E_conversion_factor
