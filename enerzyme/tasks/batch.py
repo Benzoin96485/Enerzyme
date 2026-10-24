@@ -292,6 +292,46 @@ def _decorate_batch_input(
     return batch_features, batch_targets
 
 
+class CollateBatch:
+    """Picklable DataLoader collate. Bound Trainer methods are not forkserver-safe."""
+
+    def __init__(
+        self,
+        *,
+        pyg: bool,
+        dtype,
+        device,
+        otf_graph: bool,
+        generator_config: Optional[Dict[str, Any]],
+        generator_training: bool,
+    ) -> None:
+        self.pyg = pyg
+        self.dtype = dtype
+        self.device = device
+        self.otf_graph = otf_graph
+        self.generator_config = generator_config
+        self.generator_training = generator_training
+
+    def __call__(self, batch):
+        if self.pyg:
+            return _decorate_pyg_batch_input(
+                batch,
+                self.dtype,
+                self.device,
+                self.otf_graph,
+                self.generator_config,
+                self.generator_training,
+            )
+        return _decorate_batch_input(
+            batch,
+            self.dtype,
+            self.device,
+            self.otf_graph,
+            self.generator_config,
+            self.generator_training,
+        )
+
+
 def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], targets: Optional[Dict[str, Any]], non_target_features: List[str]=[]) -> Tuple[Dict[str, Union[np.ndarray, List]], Optional[Dict[str, Union[np.ndarray, List]]]]:
     y_pred = dict()
     y_truth = dict()

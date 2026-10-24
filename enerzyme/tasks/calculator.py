@@ -8,7 +8,7 @@ from ase.calculators.calculator import Calculator, all_changes
 from ase.units import Hartree
 from ..data.transform import Transform
 from ..data.neighbor_list import full_neighbor_list
-from .trainer import _decorate_batch_output, _decorate_batch_input, _to_device
+from .batch import _decorate_batch_output, _decorate_batch_input, _to_device
 
 
 def _init_patch_module(patch_path: str) -> None:

@@ -751,13 +751,18 @@ class TotalEnergyNormalization(BaseTransform):
             self.shift = shift
         if scale is None and shift is None:
             self.loaded = False
-            if os.path.isfile(self.statistics):
-                stat = joblib.load(self.statistics)
-                self.scale = stat["scale"]
-                self.shift = stat["shift"]
-                self.loaded = True
+            self.reload_from_disk()
         else:
             joblib.dump({"shift": self.shift, "scale": self.scale}, self.statistics)
+
+    def reload_from_disk(self) -> None:
+        """Load mean/std written by a previous ``transform`` (DDP cache-miss peers)."""
+        if not os.path.isfile(self.statistics):
+            return
+        stat = joblib.load(self.statistics)
+        self.scale = stat["scale"]
+        self.shift = stat["shift"]
+        self.loaded = True
 
     def transform(self, new_input):
         if "E" not in new_input:
@@ -775,6 +780,8 @@ class TotalEnergyNormalization(BaseTransform):
                 new_input["Fa"][i] /= self.scale
 
     def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
+        if not self.loaded:
+            self.reload_from_disk()
         if not self.loaded:
             raise RuntimeError("Shift and scale parameters not loaded")
         new_output["E"][idx] = new_output["E"][idx] * self.scale + self.shift
@@ -861,6 +868,19 @@ class Transform:
                 "pyscf_nao_qs_prior; all write Q_init_a / S_init_a and a later stage would "
                 "overwrite the earlier without warning."
             )
+
+    def reload_fitted_state(self) -> None:
+        """Reload disk-backed fitted stats after rank 0 finishes a cache miss.
+
+        ``TotalEnergyNormalization`` writes ``statistics.data`` during
+        ``transform``. Peer ranks construct this object before that file
+        exists, then only ``preload_data`` the HDF5; call this so
+        ``inverse_transform`` sees the same mean/std as rank 0.
+        """
+        for normalization in self.normalizations:
+            reload = getattr(normalization, "reload_from_disk", None)
+            if callable(reload):
+                reload()
 
     def transform(self, raw_input: Dict):
         for shift in self.shifts:

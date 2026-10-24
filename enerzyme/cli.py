@@ -174,6 +174,9 @@ def get_parser():
 
 
 def train(args):
+    # Before importing torch/NCCL: --gpus-per-task=1 remaps every rank to cuda:0.
+    from .tasks.distributed import prepare_nccl_for_single_visible_gpu
+    prepare_nccl_for_single_visible_gpu()
     from .train import FFTrain
     moltrain = FFTrain(
         out_dir=args.output_dir,

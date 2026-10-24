@@ -11,6 +11,8 @@ Enerzyme trains neural network potentials (NNPs) for enzymatic and molecular sys
 
 Optional `Enerzymette <https://github.com/Benzoin96485/Enerzymette>`_ tools assist with PLUMED scans, NEB path building, ORCA/TeraChem bridges, and workflow launchers.
 
+After a working single-GPU :doc:`getting_started/training` config, multi-GPU / multi-node torch DDP uses an external launcher (:code:`srun` / :code:`torchrun`), not automatic spawn. See :doc:`/user_guide/operations/distributed_training`.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

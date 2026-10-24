@@ -25,5 +25,5 @@ dependencies:
     - torch_geometric
     - rdkit
     - e3nn
-    - lightning
+    - tensorboard
     - .

@@ -4,6 +4,7 @@ import pandas as pd
 from .utils import YamlHandler, logger
 from .data.datahub import DataHub
 from .tasks.trainer import Trainer
+from .tasks.distributed import validate_distributed_launch
 from .models import ModelHub
 from .models import BaseFFLauncher
 
@@ -48,6 +49,8 @@ class FFPredict:
 
     def load_from_ckp(self, **params) -> None:
         ## load test data
+        # Fail fast before any DataHub I/O if a multi-task SLURM job lacks srun/torchrun.
+        validate_distributed_launch()
         self.datahub = DataHub(
             dump_dir=self.output_dir, 
             **params['Datahub']
