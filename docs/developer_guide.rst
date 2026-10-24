@@ -318,6 +318,7 @@ Tests live in :code:`test/`:
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
 - :code:`test_efa.py` — ERoPE / Lebedev / EFABlock, batch isolation, :code:`efa` / :code:`so3lr_efa` / SpookyNet :code:`use_efa` smoke tests
 - :code:`test_sphere_sample_readout.py` — SphereSampleReadout shapes / scalar invariance smoke
+- :code:`test_extractor.py` — fragment extraction: single C–C bonds stay capped when the search reaches a carbon by two routes (e.g. around a ring)
 - :code:`test_scatter_speed.py` — performance-oriented scatter checks
 
 Suggested commands

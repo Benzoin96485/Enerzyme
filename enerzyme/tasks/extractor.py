@@ -111,7 +111,11 @@ def extract_submol(
                         old_bond_idx = mol.GetBondBetweenAtoms(old_internal_atom_idx, external_atom_idx).GetIdx()
                         searched.add(old_bond_idx)
                         cappings[external_atom_idx] = -1
-                    searched.add(bond_idx)            
+                    searched.add(bond_idx)
+                else:
+                    # same C-C bond queued again (its internal atom was reached by a second route, e.g. around
+                    # a ring): keep the planned cap rather than expanding the external atom
+                    capping_flag = True
             # add C-X bond and put X's other bonds into queue
             else:
                 searched.add(bond_idx)
