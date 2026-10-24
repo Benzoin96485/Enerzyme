@@ -26,9 +26,17 @@ DATA_TYPES = {
     "idx_i": IS_INT | IS_IDX,
     "idx_j": IS_INT | IS_IDX,
     "N_pair": IS_INT | IS_IDX,
+    # Per-pair Cartesian shift vector (cutoff_neighbor_list); float, but IS_IDX so
+    # the generic per-key batch dispatch skips it (variable length, like idx_i/idx_j)
+    # and leaves it to the dedicated pair-list handling in enerzyme/tasks/batch.py.
+    "offsets": IS_IDX,
     # E2Former-LSR / BRICS fragment labels (optional Datahub fields)
     "cluster_ids": IS_INT | IS_ATOMIC,
     "cluster_centers": IS_ATOMIC | (TENSOR_RANK_BASE * 1),
+    # Periodic boundary conditions: molecular (one per datapoint, not atomic),
+    # consumed by the "cutoff" neighbor list builder and DistanceLayer's offsets.
+    "cell": TENSOR_RANK_BASE * 2,
+    "pbc": IS_INT | (TENSOR_RANK_BASE * 1),
 }
 
 def is_int(k):

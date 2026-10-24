@@ -266,6 +266,163 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         return segment_sum_coo(Eele, idx_i, dim_size=len(Qa))
 
 
+class EwaldElectrostaticEnergyLayer(BaseFFLayer):
+    def __init__(
+        self,
+        cutoff_real: float,
+        k_cutoff: float,
+        alpha: Optional[float] = None,
+        Bohr_in_R: float = 0.5291772108,
+        Hartree_in_E: float = 1,
+        dielectric_constant: float = 1,
+    ) -> None:
+        r"""
+        Point-charge Ewald-summation electrostatic energy for periodic (PBC) systems:
+        an erfc-damped real-space Coulomb sum over the cutoff-limited pair list, plus
+        a Gaussian-screened reciprocal-space sum and a self-energy correction. A
+        drop-in alternative to :class:`ElectrostaticEnergyLayer` for periodic
+        datasets (same ``E_ele_a`` output field; swap the YAML layer name).
+
+        Real space, self-energy correction and the atomic bookkeeping (spreading the
+        per-graph reciprocal energy over atoms weighted by q^2) follow SpookyNet's
+        Ewald summation [2], which assumes an orthorhombic cell. Reciprocal space is
+        generalized here to an arbitrary triclinic cell using the reciprocal-lattice
+        construction (``G = 2*pi*cell^-1^T``) of LES [3]. Each graph in a batch may
+        have its own cell, so the reciprocal sum loops once per graph (same reason
+        LES's own Ewald module loops per graph); the real-space sum needs no such
+        loop since it is a plain scatter-sum over the (already batch-global)
+        ``idx_i``/``idx_j`` pair list, like every other layer in this module.
+
+        Params
+        -----
+        cutoff_real: real-space damping cutoff. Pairs with ``Dij_lr >= cutoff_real``
+            are dropped from the real-space sum (their contribution is captured by
+            the reciprocal sum instead). Should not exceed the search radius used to
+            build ``idx_i``/``idx_j`` (Datahub ``neighbor_list_cutoff``).
+
+        k_cutoff: reciprocal-space cutoff radius (1/Angstrom).
+
+        alpha: real/reciprocal-space split (Ewald damping parameter). Defaults to
+            SpookyNet's heuristic ``4 / cutoff_real + 1e-3``.
+
+        References
+        -----
+        [1] P. P. Ewald, Ann. Phys. 1921, 369, 253-287.
+        [2] O. T. Unke et al., Nat. Commun. 2021, 12, 7273 (SpookyNet),
+            https://github.com/OUnke/SpookyNet
+        [3] B. Cheng et al., "Latent Ewald Summation" (LES),
+            https://github.com/ChengUCB/les
+        """
+        super().__init__(
+            input_fields={"Ra", "Qa", "idx_i", "idx_j", "Dij_lr", "cell", "batch_seg"},
+            output_fields={"E_ele_a"},
+        )
+        self.cutoff_real = float(cutoff_real)
+        self.k_cutoff = float(k_cutoff)
+        self.dielectric_constant = dielectric_constant
+        self.kehalf = 0.5 * Bohr_in_R * Hartree_in_E
+        self.ke = Bohr_in_R * Hartree_in_E
+        if alpha is None:
+            alpha = 4.0 / self.cutoff_real + 1e-3
+        self.alpha = float(alpha)
+        self.alpha2 = self.alpha * self.alpha
+        if self.alpha * self.cutoff_real < 4.0:  # erfc(4.0) ~ 1e-8
+            import warnings
+            warnings.warn(
+                f"EwaldElectrostaticEnergy: alpha={self.alpha} may be too small "
+                f"for cutoff_real={self.cutoff_real}; consider alpha >= "
+                f"{4.0 / self.cutoff_real:.4g}, or reciprocal-space error may leak "
+                "into the damped real-space term."
+            )
+
+    def _real_space(self, Qa: Tensor, idx_i: Tensor, idx_j: Tensor, Dij_lr: Tensor) -> Tensor:
+        r = Dij_lr.clamp_min(1e-12)
+        fac = self.kehalf * Qa[idx_i] * Qa[idx_j] / self.dielectric_constant
+        pairwise = fac * torch.erfc(self.alpha * r) / r
+        pairwise = torch.where(Dij_lr < self.cutoff_real, pairwise, torch.zeros_like(pairwise))
+        return segment_sum_coo(pairwise, idx_i, dim_size=Qa.shape[0])
+
+    def _reciprocal_space(self, Ra: Tensor, Qa: Tensor, cell: Tensor, batch_seg: Tensor) -> Tensor:
+        device, dtype = Ra.device, Ra.dtype
+        E_recip_a = torch.zeros_like(Qa)
+        eps = 1e-8
+        num_graphs = int(batch_seg.max().item()) + 1
+        for g in range(num_graphs):
+            mask = batch_seg == g
+            if not torch.any(mask):
+                continue
+            cell_g = cell[g].to(dtype)
+            volume = torch.det(cell_g)
+            if volume.abs() < 1e-6:
+                continue  # degenerate/absent cell: this graph is not periodic
+            r = Ra[mask]
+            q = Qa[mask]
+            G = 2.0 * math.pi * torch.linalg.inv(cell_g).T
+            recip_norms = torch.linalg.norm(G, dim=1).clamp_min(1e-12)
+            n_max = torch.clamp(torch.ceil(self.k_cutoff / recip_norms), min=1).long().tolist()
+            n1 = torch.arange(-n_max[0], n_max[0] + 1, device=device, dtype=dtype)
+            n2 = torch.arange(-n_max[1], n_max[1] + 1, device=device, dtype=dtype)
+            n3 = torch.arange(-n_max[2], n_max[2] + 1, device=device, dtype=dtype)
+            kvec = torch.cartesian_prod(n1, n2, n3) @ G
+            k2 = (kvec * kvec).sum(-1)
+            keep = (k2 > 1e-12) & (k2 <= self.k_cutoff ** 2)
+            kvec, k2 = kvec[keep], k2[keep]
+            if kvec.shape[0] == 0:
+                continue
+            kr = r @ kvec.T  # [n_atoms_g, M]
+            S_real = (q.unsqueeze(-1) * torch.cos(kr)).sum(0)  # [M]
+            S_imag = (q.unsqueeze(-1) * torch.sin(kr)).sum(0)
+            kfac = torch.exp(-0.25 * k2 / self.alpha2) / k2
+            e_total = (2.0 * math.pi / volume) * torch.sum(kfac * (S_real ** 2 + S_imag ** 2))
+            # Spread the per-graph reciprocal energy over its atoms, weighted by
+            # q^2 (SpookyNet's atomic bookkeeping trick), so the layer's output
+            # stays atomic like every other energy layer feeding EnergyReduce.
+            w = q * q + eps
+            E_recip_a[mask] = (w / w.sum()) * e_total
+        e_self = self.alpha / math.sqrt(math.pi) * Qa * Qa
+        return self.ke / self.dielectric_constant * (E_recip_a - e_self)
+
+    def get_E_ele_a(
+        self, Ra: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor, Dij_lr: Tensor,
+        cell: Optional[Tensor] = None, batch_seg: Optional[Tensor] = None,
+    ) -> Tensor:
+        '''
+        Compute the atomic Ewald electrostatic energy.
+
+        Params
+        -----
+        Ra: Float tensor of atom positions, shape [N * batch_size, 3]
+
+        Qa: Float tensor of atomic charges, shape [N * batch_size]
+
+        idx_i, idx_j: Long tensors of pair indices, shape [N_pair * batch_size]
+
+        Dij_lr: Float tensor of pair distances, shape [N_pair * batch_size]
+
+        cell: Float tensor of lattice vectors, shape [batch_size, 3, 3]
+
+        batch_seg: Long tensor of batch indices, shape [N * batch_size]
+
+        Returns
+        -----
+        E_ele_a: Float tensor of atomic electrostatic energy, shape [N * batch_size]
+        '''
+        if Qa.dim() > 1:
+            Qa = Qa.squeeze(-1)
+        if cell is None:
+            raise ValueError(
+                "EwaldElectrostaticEnergy requires a 'cell' input (periodic "
+                "systems); for non-periodic data use ElectrostaticEnergy instead."
+            )
+        if cell.dim() == 2:
+            cell = cell.unsqueeze(0)
+        if batch_seg is None:
+            batch_seg = torch.zeros(Qa.shape[0], dtype=torch.long, device=Qa.device)
+        E_real = self._real_space(Qa, idx_i, idx_j, Dij_lr)
+        E_recip = self._reciprocal_space(Ra, Qa, cell, batch_seg)
+        return E_real + E_recip
+
+
 class AtomicCharge2DipoleLayer(BaseFFLayer):
     def __init__(self) -> None:
         super().__init__(input_fields={"Qa", "Ra", "batch_seg"}, output_fields={"M2"})

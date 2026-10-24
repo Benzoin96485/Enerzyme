@@ -106,6 +106,23 @@ Preprocessing flags
 
 :code:`neighbor_list`
     :code:`full` precomputes all-pairs edges. Empty string computes on the fly during training (higher cost, flexible).
+    :code:`cutoff` precomputes a short-range, cutoff-limited neighbor list (O(N) linked-cell-list
+    search, not :code:`full`'s O(N^2) all-pairs scan) and requires :code:`neighbor_list_cutoff`
+    (the search radius). Periodic boundary conditions are supported by also including
+    :code:`cell` (3x3 lattice vectors) and :code:`pbc` (length-3 booleans) in :code:`features`
+    -- when present, the returned edges include periodic images and an :code:`offsets`
+    Cartesian shift is cached alongside :code:`idx_i`/:code:`idx_j` (consumed by
+    :code:`DistanceLayer`, added to :code:`Rj` before computing distances). Without
+    :code:`cell`/:code:`pbc`, :code:`cutoff` is simply an O(N) open-boundary radius graph.
+    :code:`cutoff` has no on-the-fly fallback for periodic samples: a periodic sample without
+    a precomputed neighbor list raises an error instead of silently building an (incorrect,
+    unbounded) open-boundary graph.
+
+:code:`neighbor_list_cutoff`
+    Search radius for :code:`neighbor_list: cutoff`. Should be at least as large as the
+    largest cutoff used by any downstream layer (message-passing :code:`cutoff_sr`,
+    electrostatics :code:`cutoff_real`/:code:`cutoff_lr`, ...), since those layers only
+    ever narrow this precomputed pair list further, never extend it.
 
 :code:`compressed`
     Share :code:`Za`, :code:`N`, :code:`Q`, and neighbor lists across frames with identical stoichiometry and atom order.
