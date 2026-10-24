@@ -7,9 +7,16 @@ class QMAnnotate:
         self.driver_config = config["QMDriver"]
         self.supplier_config = config["Supplier"]
         supplier = get_supplier(**self.supplier_config, start=start, end=end)
+        multiwfn_config = config["Multiwfn"] if "Multiwfn" in config else None
         if self.driver_config["engine"].lower() == "terachem":
             from .qm.qm_driver import TeraChemDriver
-            self.driver = TeraChemDriver(supplier=supplier, tmp_dir=tmp_dir, output_dir=out_dir, **self.driver_config)
+            self.driver = TeraChemDriver(
+                supplier=supplier,
+                tmp_dir=tmp_dir,
+                output_dir=out_dir,
+                multiwfn_config=multiwfn_config,
+                **self.driver_config,
+            )
 
     def drive(self):
         self.driver.run()

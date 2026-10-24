@@ -23,3 +23,21 @@ QMDriver:
   n_processes: 1                                    # parallel QM submissions
   n_gpus: 1                                         # GPUs for TeraChem; <1 means use all
   terachem_args: [terachem]                         # executable prefix
+
+# Optional CPU post-process: atomic charges from TeraChem moldens via Multiwfn.
+# TeraChem GPU workers enqueue a molden as soon as it is valid; Multiwfn runs
+# concurrently and never occupies a GPU worker. Load a noGUI Multiwfn module in
+# the job script (e.g. module load multiwfn/v260410-noGui) alongside TeraChem.
+# Keep n_threads * n_processes within the node's CPU budget.
+Multiwfn:
+  enabled: false
+  executable: Multiwfn_noGUI
+  charge_method: 1.2cm5                             # hirshfeld, vdd, mulliken, lowdin, scpa, adch, cm5, 1.2cm5, mbis
+  n_threads: 12                                     # OpenMP threads per Multiwfn process (-nt / OMP_NUM_THREADS)
+  n_processes: 1                                    # concurrent Multiwfn jobs
+  # timeout: 3600                                   # seconds per structure; omit for no limit
+  keep_chg: true                                    # keep chrg-*/<index>.chg after merging Qa
+  # menu_inputs: ["7", "-16", "1", "y", "0", "q"]   # override stdin after the wavefunction is loaded
+  # settings_ini: /path/to/settings.ini
+  # pickle_fields may map Qa (e.g. Qa: chrg) for Enerzymette-style pickles
+

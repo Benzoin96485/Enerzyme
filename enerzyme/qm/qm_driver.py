@@ -3,7 +3,7 @@ from shutil import copy, rmtree
 import os
 import subprocess
 from pickle import dump, load
-from typing import Any, Dict, Literal, Optional, List
+from typing import Any, Dict, Literal, Optional, List, Mapping
 from pathlib import Path
 from abc import ABC, abstractmethod
 import ase.io
@@ -13,9 +13,26 @@ from ase import Atoms
 from ase.db import connect
 from ase.calculators.singlepoint import SinglePointCalculator
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool, Process, Queue, cpu_count
 from ..utils import logger
 from ..data.supplier import Supplier
+from .multiwfn import (
+    MultiwfnConfig,
+    chg_dirname,
+    parse_chg_file,
+    parse_multiwfn_config,
+    resolve_multiwfn_executable,
+    _multiwfn_process_main,
+)
+
+
+# Injected into TeraChem Pool workers so they share the parent's Multiwfn job queue.
+_MW_JOB_QUEUE = None
+
+
+def _init_mw_job_queue(queue) -> None:
+    global _MW_JOB_QUEUE
+    _MW_JOB_QUEUE = queue
 
 
 QM_CALCULATED_TO_ASE_PROPERTY = {
@@ -122,6 +139,21 @@ def _aselmdb_row_is_complete(row) -> bool:
     return energy is not None
 
 
+def _aselmdb_row_has_charges(row) -> bool:
+    """True when a completed ASE DB row already stores calculator charges."""
+    try:
+        atoms = row.toatoms()
+    except Exception:
+        return False
+    if atoms.calc is None:
+        return False
+    try:
+        charges = atoms.calc.results.get("charges", None)
+    except Exception:
+        return False
+    return charges is not None
+
+
 def _build_standard_pickle_datapoint(
     atoms: Atoms,
     result_package: Dict[str, Any],
@@ -129,7 +161,7 @@ def _build_standard_pickle_datapoint(
     """Driver results (E/Fa in eV) → standard Enerzyme pickle fields (E/Fa in Ha / Ha·Å⁻¹)."""
     energy_ev = float(result_package["E"])
     forces_ev = np.asarray(result_package["Fa"], dtype=float)
-    return {
+    datapoint = {
         "E": energy_ev / Ha,
         "Fa": forces_ev / Ha,
         "M2": np.asarray(result_package.get("M2", np.zeros(3)), dtype=float),
@@ -140,6 +172,9 @@ def _build_standard_pickle_datapoint(
         "S": int(atoms.info.get("spin", 1)) - 1,
         "index": int(atoms.info["index"]),
     }
+    if "Qa" in result_package:
+        datapoint["Qa"] = np.asarray(result_package["Qa"], dtype=float)
+    return datapoint
 
 
 def _apply_pickle_fields(
@@ -195,6 +230,7 @@ class QMDriver(ABC):
         n_processes: int = 1,
         timeout: Optional[float] = None,
         dump_single_run: bool = True,
+        multiwfn_config: Optional[Mapping[str, Any]] = None,
         **kwargs,
     ):
         '''
@@ -226,14 +262,26 @@ class QMDriver(ABC):
         os.makedirs(self.output_dir, exist_ok=True)
         self.template_input_file = template_input_file
         self.keep_molden = keep_molden
-        if keep_molden:
-            os.makedirs(self.output_dir / "moldens", exist_ok=True)
         self.keep_stdout = _resolve_keep_stdout(keep_stdout, kwargs)
         if self.keep_stdout:
             os.makedirs(self.output_dir / "stdout", exist_ok=True)
         self.clean_tmp = clean_tmp
         self.n_processes = n_processes if n_processes > 0 else cpu_count()
         self.timeout = timeout
+        self.multiwfn = parse_multiwfn_config(multiwfn_config, keep_molden=keep_molden)
+        self._mw_job_queue = None
+        self._mw_procs: List[Process] = []
+        self._mw_pool_started = False
+        if self.keep_molden or self.multiwfn.enabled:
+            os.makedirs(self.output_dir / "moldens", exist_ok=True)
+        if self.multiwfn.enabled:
+            os.makedirs(self.chg_dir, exist_ok=True)
+            logger.info(
+                f"Multiwfn charges enabled: method={self.multiwfn.charge_method}, "
+                f"n_threads={self.multiwfn.n_threads}, "
+                f"n_processes={self.multiwfn.n_processes}, "
+                f"chg_dir={self.chg_dir}"
+            )
         if self.output_format == "pickle" and self.dump_single_run:
             os.makedirs(self.single_run_dir, exist_ok=True)
         elif self.output_format == "aselmdb" and not self.dump_single_run:
@@ -251,6 +299,14 @@ class QMDriver(ABC):
     @property
     def single_run_dir(self) -> Path:
         return self.output_dir / "single_run"
+
+    @property
+    def chg_dir(self) -> Path:
+        return self.output_dir / chg_dirname(self.multiwfn.charge_method)
+
+    @property
+    def molden_dir(self) -> Path:
+        return self.output_dir / "moldens"
 
     @abstractmethod
     def make_input(self, atoms: Atoms, tmp_dir: Path) -> None:
@@ -299,8 +355,11 @@ class QMDriver(ABC):
 
     def aselmdb_schema_properties(self) -> List[str]:
         """Standard names written into ASE LMDB metadata for Datahub discovery."""
-        # Geometry/charge always; E/Fa/M2 from successful QM (Qa/Sa only if a driver adds them).
-        return list(_ASELMDB_SCHEMA_GEOMETRY) + ["E", "Fa", "M2"]
+        # Geometry/charge always; E/Fa/M2 from successful QM (Qa when Multiwfn is enabled).
+        props = list(_ASELMDB_SCHEMA_GEOMETRY) + ["E", "Fa", "M2"]
+        if self.multiwfn.enabled:
+            props.append("Qa")
+        return props
 
     def _ensure_aselmdb_schema(self) -> None:
         """Persist property schema so readers need not rely on the first row alone."""
@@ -358,7 +417,21 @@ class QMDriver(ABC):
             input_file = self.make_input(atoms, tmp_dir)
             output_file = self.invoke_qm(input_file, atoms, tmp_dir)
             result_package = self.collect_results(input_file, atoms, tmp_dir)
-            self.copy_files(output_file, result_package.get("molden_file", None))
+            molden_src = result_package.get("molden_file", None)
+            self.copy_files(
+                output_file,
+                molden_src if self.keep_molden else None,
+            )
+            if self.multiwfn.enabled:
+                self._clear_chg(index)
+                staged = self._stage_molden(index, molden_src)
+                if staged is not None:
+                    result_package["molden_file"] = staged
+                    self._enqueue_multiwfn(index, staged, n_atoms=len(atoms))
+                else:
+                    logger.warning(
+                        f"No valid molden for structure {index}; skipping Multiwfn"
+                    )
         except Exception as e:
             logger.warning(f"Calculation of structure {index} failed: {e}")
             if self.clean_tmp and tmp_dir.exists():
@@ -374,6 +447,7 @@ class QMDriver(ABC):
         # Prefer a parent-assigned id (multiprocess); otherwise claim by structure index.
         # Bare reserve() is wrong: with no key-value pairs ASE treats any existing row as a
         # hit and returns None after the first insert.
+        preserve_on_failure = bool(atoms.info.pop("aselmdb_preserve_on_failure", False))
         if "aselmdb_row_id" in atoms.info:
             system_id = atoms.info["aselmdb_row_id"]
             if system_id is None:
@@ -383,8 +457,9 @@ class QMDriver(ABC):
             if system_id is None:
                 return
 
-        # Always release the reservation unless the row is successfully written;
-        # otherwise orphaned reserved rows block later runs of the same index.
+        # Release fresh reservations on failure so orphaned reserved rows do not
+        # block later runs. When overwriting a previously complete energy row
+        # (Multiwfn molden-missing resume), keep that row if the rerun fails.
         wrote = False
         try:
             result_package = self._run_qm(atoms)
@@ -408,7 +483,7 @@ class QMDriver(ABC):
                 f"Failed to store ASE LMDB row for structure {index} (id={system_id}): {e}"
             )
         finally:
-            if not wrote:
+            if not wrote and not preserve_on_failure:
                 try:
                     db.delete([system_id])
                 except Exception as e:
@@ -416,12 +491,31 @@ class QMDriver(ABC):
                         f"Could not delete reserved ASE LMDB id {system_id} "
                         f"for structure {index}: {e}"
                     )
+            elif not wrote and preserve_on_failure:
+                logger.warning(
+                    f"Keeping existing ASE LMDB row id={system_id} for structure {index} "
+                    "after failed TeraChem rerun"
+                )
 
     def single_run_pickle(self, atoms: Atoms) -> Optional[Dict[str, Any]]:
         index = int(atoms.info["index"])
         cached = self.load_pickle_single_run(index)
         if cached is not None:
-            return cached
+            if self.multiwfn.enabled and not self._datapoint_has_qa(cached):
+                if self._chg_is_ready(index, n_atoms=len(atoms)):
+                    # Charges already on disk (crash between Multiwfn and pickle merge).
+                    # Keep the cached TeraChem result; parent merge will attach Qa.
+                    return cached
+                molden = self._molden_path(index)
+                if molden.is_file() and molden.stat().st_size > 0:
+                    self._enqueue_multiwfn_from_existing_molden(index, n_atoms=len(atoms))
+                    return cached
+                logger.warning(
+                    f"Structure {index} is missing Multiwfn charges and molden; "
+                    "re-running TeraChem"
+                )
+            else:
+                return cached
         result_package = self._run_qm(atoms)
         if result_package is None:
             return None
@@ -438,10 +532,15 @@ class QMDriver(ABC):
         return self.single_run_aselmdb(atoms)
 
     def run(self):
-        if self.output_format == "pickle":
-            self._run_pickle()
-        else:
-            self._run_aselmdb()
+        try:
+            if self.multiwfn.enabled:
+                self._start_multiwfn_pool()
+            if self.output_format == "pickle":
+                self._run_pickle()
+            else:
+                self._run_aselmdb()
+        finally:
+            self._stop_multiwfn_pool()
 
     def _reserve_aselmdb_ids(self, atoms_list: List[Atoms]) -> List[Atoms]:
         """Serially claim unique ASE row ids keyed by structure ``index``.
@@ -455,6 +554,9 @@ class QMDriver(ABC):
         db = connect(self.output_path, **self.default_connect_args)
         to_run: List[Atoms] = []
         for atoms in atoms_list:
+            if atoms.info.get("aselmdb_row_id") is not None:
+                to_run.append(atoms)
+                continue
             index = int(atoms.info["index"])
             system_id = self._claim_aselmdb_row_id(db, index)
             if system_id is None:
@@ -470,9 +572,20 @@ class QMDriver(ABC):
         ``SDMolSupplier``) in the pickled driver fails for SDF inputs.
         """
         supplier = self.supplier
+        mw_queue = self._mw_job_queue
+        mw_procs = self._mw_procs
         self.supplier = None
+        # Pool pickles the bound worker (and thus ``self``). Drop the job queue
+        # so workers receive it only via initializer (avoids Manager auth errors).
+        self._mw_job_queue = None
+        self._mw_procs = []
+        initializer = None
+        initargs = ()
+        if self.multiwfn.enabled and mw_queue is not None:
+            initializer = _init_mw_job_queue
+            initargs = (mw_queue,)
         try:
-            with Pool(self.n_processes) as p:
+            with Pool(self.n_processes, initializer=initializer, initargs=initargs) as p:
                 return list(tqdm(
                     p.imap(worker, items),
                     desc="Running QM",
@@ -483,20 +596,33 @@ class QMDriver(ABC):
                 ))
         finally:
             self.supplier = supplier
+            self._mw_job_queue = mw_queue
+            self._mw_procs = mw_procs
 
     def _run_aselmdb(self) -> None:
         self._ensure_aselmdb_schema()
-        if self.n_processes == 1:
-            for atoms in tqdm(self.supplier.suppl(), desc="Running QM", dynamic_ncols=True, leave=False, position=0):
+        atoms_list = list(self.supplier.suppl())
+        to_qm, to_mw_only = self._partition_aselmdb_work(atoms_list)
+        for atoms in to_mw_only:
+            self._enqueue_multiwfn_from_existing_molden(
+                int(atoms.info["index"]), n_atoms=len(atoms)
+            )
+        if not to_qm:
+            pass
+        elif self.n_processes == 1:
+            for atoms in tqdm(to_qm, desc="Running QM", dynamic_ncols=True, leave=False, position=0):
                 self.single_run_aselmdb(atoms)
         else:
             logger.info(f"Running QM calculations with {self.n_processes} processes")
-            atoms_list = self._reserve_aselmdb_ids(list(self.supplier.suppl()))
+            reserved = self._reserve_aselmdb_ids(to_qm)
             self._pool_imap(
                 self.single_run_aselmdb,
-                atoms_list,
-                total=len(atoms_list),
+                reserved,
+                total=len(reserved),
             )
+        self._stop_multiwfn_pool()
+        if self.multiwfn.enabled:
+            self._merge_qa_aselmdb()
         logger.info(f"QM calculations finished. ASE LMDB saved to {self.output_path}")
 
     def _run_pickle(self) -> None:
@@ -514,9 +640,263 @@ class QMDriver(ABC):
                 total=len(atoms_list),
             )
         datapoints = [r for r in result_packages if r]
+        self._stop_multiwfn_pool()
+        if self.multiwfn.enabled:
+            self._merge_qa_pickle(datapoints)
         with open(self.output_path, "wb") as f:
             dump(datapoints, f)
         logger.info(f"QM calculations finished. Pickle saved to {self.output_path} ({len(datapoints)} structures)")
+
+    def _chg_path(self, index: int) -> Path:
+        return self.chg_dir / f"{int(index)}.chg"
+
+    def _chg_is_ready(self, index: int, n_atoms: Optional[int] = None) -> bool:
+        """True when ``chrg-*/<index>.chg`` exists and parses as atomic charges.
+
+        Corrupt / truncated files are deleted so a later resume can re-enqueue
+        Multiwfn (or TeraChem) instead of permanently skipping charge recovery.
+        """
+        path = self._chg_path(index)
+        if not path.is_file() or path.stat().st_size <= 0:
+            return False
+        try:
+            parse_chg_file(path, n_atoms=n_atoms)
+        except Exception as e:
+            logger.warning(
+                f"Corrupt Multiwfn charge file for {index} ({path}): {e}; removing"
+            )
+            self._clear_chg(index)
+            return False
+        return True
+
+    def _molden_path(self, index: int) -> Path:
+        return self.molden_dir / f"{int(index)}.molden"
+
+    def _clear_chg(self, index: int) -> None:
+        """Remove stale charge files after a fresh TeraChem run for this index."""
+        path = self._chg_path(index)
+        if path.is_file():
+            try:
+                path.unlink()
+                logger.info(f"Removed stale Multiwfn charge file {path}")
+            except OSError as e:
+                logger.warning(f"Could not remove stale charge file {path}: {e}")
+        workdir = self.output_dir / "multiwfn_tmp" / str(int(index))
+        if workdir.is_dir():
+            for stale in workdir.glob("*.chg"):
+                try:
+                    stale.unlink()
+                except OSError as e:
+                    logger.warning(f"Could not remove stale workdir charge file {stale}: {e}")
+
+    def _stage_molden(self, index: int, molden_src: Optional[Path]) -> Optional[Path]:
+        """Copy a TeraChem molden to the persistent moldens/ dir if it is valid."""
+        dest = self._molden_path(index)
+        if molden_src is None:
+            if dest.is_file() and dest.stat().st_size > 0:
+                return dest
+            return None
+        src = Path(molden_src)
+        if not src.is_file() or src.stat().st_size <= 0:
+            return None
+        os.makedirs(dest.parent, exist_ok=True)
+        if src.resolve() != dest.resolve():
+            copy(src, dest)
+        return dest
+
+    def _enqueue_multiwfn(self, index: int, molden: Path, n_atoms: int) -> None:
+        if not self.multiwfn.enabled:
+            return
+        if self._chg_is_ready(index, n_atoms=n_atoms):
+            return
+        job = {
+            "index": int(index),
+            "molden": str(Path(molden).resolve()),
+            "n_atoms": int(n_atoms),
+        }
+        queue = _MW_JOB_QUEUE if _MW_JOB_QUEUE is not None else self._mw_job_queue
+        if queue is None:
+            logger.warning(
+                f"Multiwfn job queue is not running; cannot enqueue structure {index}"
+            )
+            return
+        queue.put(job)
+
+    def _enqueue_multiwfn_from_existing_molden(self, index: int, n_atoms: int) -> None:
+        staged = self._stage_molden(index, None)
+        if staged is None:
+            logger.warning(
+                f"Structure {index} needs Multiwfn charges but {self._molden_path(index)} "
+                "is missing; re-run TeraChem with a template that writes molden."
+            )
+            return
+        self._enqueue_multiwfn(index, staged, n_atoms=n_atoms)
+
+    def _start_multiwfn_pool(self) -> None:
+        if self._mw_pool_started or not self.multiwfn.enabled:
+            return
+        resolve_multiwfn_executable(self.multiwfn.executable)
+        self._mw_job_queue = Queue()
+        cfg = self.multiwfn.to_dict()
+        tmp_base = str(self.output_dir / "multiwfn_tmp")
+        self._mw_procs = []
+        for _ in range(self.multiwfn.n_processes):
+            proc = Process(
+                target=_multiwfn_process_main,
+                args=(self._mw_job_queue, cfg, str(self.chg_dir), tmp_base),
+            )
+            proc.start()
+            self._mw_procs.append(proc)
+        self._mw_pool_started = True
+        logger.info(
+            f"Started {len(self._mw_procs)} Multiwfn worker(s) "
+            f"({self.multiwfn.n_threads} threads each)"
+        )
+
+    def _stop_multiwfn_pool(self) -> None:
+        if not self._mw_pool_started:
+            return
+        n = len(self._mw_procs)
+        if self._mw_job_queue is not None:
+            for _ in range(n):
+                self._mw_job_queue.put(None)
+        for proc in self._mw_procs:
+            proc.join()
+            if proc.exitcode not in (0, None):
+                logger.warning(
+                    f"Multiwfn worker pid={proc.pid} exited with code {proc.exitcode}"
+                )
+        self._mw_procs = []
+        self._mw_job_queue = None
+        self._mw_pool_started = False
+        logger.info("Multiwfn workers finished")
+
+    def _qa_pickle_key(self) -> str:
+        if not self.pickle_fields:
+            return "Qa"
+        if "Qa" in self.pickle_fields:
+            custom = self.pickle_fields["Qa"]
+            return "Qa" if custom is None else str(custom)
+        return "Qa"
+
+    def _datapoint_has_qa(self, datapoint: Dict[str, Any]) -> bool:
+        keys = {"Qa", "chrg", self._qa_pickle_key()}
+        return any(datapoint.get(key) is not None for key in keys)
+
+    def _set_qa_on_datapoint(self, datapoint: Dict[str, Any], qa: np.ndarray) -> None:
+        if self.pickle_fields and "Qa" not in self.pickle_fields:
+            logger.warning(
+                "Multiwfn Qa is present but pickle_fields has no Qa mapping; storing as 'Qa'"
+            )
+        datapoint[self._qa_pickle_key()] = qa
+
+    def _merge_qa_pickle(self, datapoints: List[Dict[str, Any]]) -> None:
+        n_ok = 0
+        for datapoint in datapoints:
+            index = int(datapoint["index"])
+            path = self._chg_path(index)
+            if not path.is_file():
+                continue
+            try:
+                n_atoms = datapoint.get("N")
+                qa = parse_chg_file(path, n_atoms=n_atoms)
+            except Exception as e:
+                logger.warning(f"Could not parse Multiwfn charges for {index}: {e}")
+                self._clear_chg(index)
+                continue
+            self._set_qa_on_datapoint(datapoint, qa)
+            if self.dump_single_run:
+                self.dump_pickle_single_run(datapoint)
+            n_ok += 1
+            if not self.multiwfn.keep_chg:
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+        logger.info(f"Merged Multiwfn Qa into {n_ok}/{len(datapoints)} pickle datapoints")
+
+    def _merge_qa_aselmdb(self) -> None:
+        if not self.output_path.exists():
+            return
+        db = connect(self.output_path, **self.default_connect_args)
+        n_ok = 0
+        n_rows = 0
+        for row in db.select():
+            n_rows += 1
+            index = row.get("index")
+            if index is None:
+                continue
+            path = self._chg_path(int(index))
+            if not path.is_file():
+                continue
+            try:
+                atoms = row.toatoms()
+                qa = parse_chg_file(path, n_atoms=len(atoms))
+            except Exception as e:
+                logger.warning(f"Could not parse Multiwfn charges for {index}: {e}")
+                self._clear_chg(int(index))
+                continue
+            results = dict(getattr(atoms.calc, "results", {}) or {})
+            results["charges"] = qa
+            atoms.calc = SinglePointCalculator(atoms=atoms, **results)
+            data = dict(row.data or {})
+            data.setdefault("charge", atoms.info.get("charge", 0))
+            data.setdefault("spin", atoms.info.get("spin", 1))
+            data.setdefault("index", int(index))
+            db.write(atoms, id=row.id, data=data, index=int(index))
+            n_ok += 1
+            if not self.multiwfn.keep_chg:
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+        self._ensure_aselmdb_schema()
+        logger.info(f"Merged Multiwfn Qa into {n_ok}/{n_rows} ASE LMDB rows")
+
+    def _partition_aselmdb_work(
+        self, atoms_list: List[Atoms]
+    ) -> tuple[List[Atoms], List[Atoms]]:
+        """Split structures into TeraChem work vs Multiwfn-only resume."""
+        if not self.output_path.exists():
+            return list(atoms_list), []
+        db = connect(self.output_path, **self.default_connect_args)
+        to_qm: List[Atoms] = []
+        to_mw: List[Atoms] = []
+        for atoms in atoms_list:
+            index = int(atoms.info["index"])
+            existing = list(db.select(index=index))
+            complete = [row for row in existing if _aselmdb_row_is_complete(row)]
+            if not complete:
+                to_qm.append(atoms)
+                continue
+            if not self.multiwfn.enabled:
+                logger.info(
+                    f"System {index} already completed in {self.output_path}. Skipping..."
+                )
+                continue
+            if any(_aselmdb_row_has_charges(row) for row in complete) or self._chg_is_ready(
+                index, n_atoms=len(atoms)
+            ):
+                logger.info(
+                    f"System {index} already completed with charges. Skipping..."
+                )
+                continue
+            molden = self._molden_path(index)
+            if molden.is_file() and molden.stat().st_size > 0:
+                logger.info(
+                    f"System {index} has energy but no Multiwfn charges; "
+                    "skipping TeraChem and enqueueing Multiwfn"
+                )
+                to_mw.append(atoms)
+            else:
+                logger.warning(
+                    f"System {index} has energy but no Multiwfn charges or molden; "
+                    "re-running TeraChem"
+                )
+                atoms.info["aselmdb_row_id"] = complete[0].id
+                atoms.info["aselmdb_preserve_on_failure"] = True
+                to_qm.append(atoms)
+        return to_qm, to_mw
 
 
 class TeraChemDriver(QMDriver):
