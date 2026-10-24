@@ -91,6 +91,14 @@ Hybrid calculators and UDD
 
 Supply :code:`-cp` pointing to a module that implements the external calculator factory. UDD debiases or adjusts forces using ML uncertainty estimates when an internal model remains loaded.
 
+UDD (uncertainty-driven dynamics; Kulichenko et al., *Nat. Comput. Sci.* 2023, 3, 230) adds the bias
+
+.. math::
+
+    E_\mathrm{bias} = A\left[\exp\left(-\frac{\sigma_E^2}{2 N_\mathrm{A} B}\right) - 1\right]
+
+to the energy and its negative gradient to the forces, where :math:`\sigma_E^2` is the unbiased ensemble variance of the total energy predicted by the internal model and :math:`N_\mathrm{A}` is the number of atoms. :code:`A` is the bias depth in the energy unit of the model. :code:`B` is the squared width of the per-atom uncertainty :math:`\sigma_E/\sqrt{N_\mathrm{A}}`, i.e., the square of :math:`B` in Eq. 4 of the paper, and the bias force is strongest where :math:`\sigma_E^2/N_\mathrm{A} \approx B`.
+
 OPES / proton transfer
 ----------------------
 
