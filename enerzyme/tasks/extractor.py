@@ -274,7 +274,9 @@ class Extractor:
                 local_uncertainty = []
                 for i in range(len(neighbors)):
                     local_uncertainty.append(np.mean(Fa_std[neighbors[i]]))
-                sorted_atom_idx = np.argsort(local_uncertainty[::-1])
+                # Highest neighbourhood uncertainty first. Reversing the values
+                # before argsort mirrors the indices instead of ranking them.
+                sorted_atom_idx = np.argsort(local_uncertainty)[::-1]
 
                 coord = mol.GetConformer().GetPositions()
                 reference_mol.GetConformer().SetPositions(coord)
