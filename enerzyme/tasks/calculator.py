@@ -29,7 +29,7 @@ def _init_patch_module(patch_path: str) -> None:
     return module
 
 class ASECalculator(Calculator):
-    implemented_properties = ["energy", "forces", "dipole", "charges"]
+    implemented_properties = ["energy", "forces", "dipole", "charges", "polarizability"]
 
     def __init__(
         self,
@@ -121,6 +121,8 @@ class ASECalculator(Calculator):
             results["dipole"] = output["M2"][0]
         if "Qa" in output:
             results["charges"] = output["Qa"][0]
+        if "polarizability" in output:
+            results["polarizability"] = output["polarizability"][0]
         return results, biases
 
     def _calculate_internal(self, atoms: ase.Atoms) -> None:
@@ -157,6 +159,8 @@ class ASECalculator(Calculator):
                 results["dipole"] = output["M2"][0]
             if "Qa" in output:
                 results["charges"] = output["Qa"][0]
+            if "polarizability" in output:
+                results["polarizability"] = output["polarizability"][0]
             biases = dict()
         else:
             uncertainty_calculator_name = self.uncertainty_calculator_config.get("name", None)

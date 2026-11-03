@@ -470,6 +470,13 @@ class BesselRBFLayer(BaseRBF):
     and the DimeNet ``u(x)/x`` envelope replaces a separate cutoff::
 
         e_n(r) = Envelope(x) * sin(ω_n x),   ω_n = n π
+
+    ``flavor="painn"`` is the PaiNN / SchNetPack Bessel basis (no
+    :math:`\\sqrt{2/c}` prefactor). The cosine cutoff belongs on the
+    continuous-filter, not on this expansion, so ``apply_cutoff_fn`` defaults
+    to false::
+
+        e_n(r) = sin(n π r / c) / r
     """
 
     def __init__(
@@ -478,19 +485,21 @@ class BesselRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "polynomial",
         trainable: Optional[bool] = None,
-        flavor: Literal["default", "dimenet"] = "default",
+        flavor: Literal["default", "dimenet", "painn"] = "default",
         envelope_exponent: int = 5,
         apply_cutoff_fn: Optional[bool] = None,
     ) -> None:
         self.flavor = flavor
-        if flavor not in ("default", "dimenet"):
+        if flavor not in ("default", "dimenet", "painn"):
             raise ValueError(
-                f"Unknown BesselRBF flavor {flavor!r}; expected 'default' or 'dimenet'"
+                "Unknown BesselRBF flavor "
+                f"{flavor!r}; expected 'default', 'dimenet', or 'painn'"
             )
         if trainable is None:
             trainable = flavor == "dimenet"
         if apply_cutoff_fn is None:
-            apply_cutoff_fn = flavor != "dimenet"
+            # DimeNet envelope and PaiNN filters own the radial window.
+            apply_cutoff_fn = flavor == "default"
         if flavor == "dimenet":
             apply_cutoff_fn = False
             cutoff_fn = None
@@ -527,9 +536,10 @@ class BesselRBFLayer(BaseRBF):
                 self.bessel_weights = torch.nn.Parameter(bessel_weights)
             else:
                 self.register_buffer("bessel_weights", bessel_weights)
+            prefactor = 1.0 if flavor == "painn" else np.sqrt(2.0 / cutoff_sr)
             self.register_buffer(
                 "prefactor",
-                torch.tensor(np.sqrt(2.0 / cutoff_sr), dtype=dtype),
+                torch.tensor(prefactor, dtype=dtype),
             )
 
     def _get_rbf(self, x: Tensor) -> Tensor:  # [..., 1]
@@ -537,6 +547,11 @@ class BesselRBFLayer(BaseRBF):
         if self.flavor == "dimenet":
             d_scaled = dist / self.cutoff_sr
             return self.envelope(d_scaled) * torch.sin(self.bessel_weights * d_scaled)
+        if self.flavor == "painn":
+            # SchNetPack BesselRBF: r = 0 contributes 0 (divide by 1).
+            flat = dist.view(-1)
+            norm = torch.where(flat == 0, torch.ones_like(flat), flat).unsqueeze(-1)
+            return torch.sin(flat.unsqueeze(-1) * self.bessel_weights) / norm
         numerator = torch.sin(self.bessel_weights.view(1, -1) * dist)
         return self.prefactor * (numerator / dist)
 

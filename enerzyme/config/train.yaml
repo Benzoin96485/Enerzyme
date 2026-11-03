@@ -1001,6 +1001,54 @@ Modelhub:
             keep_feature: false
         - name: EnergyReduce
         - name: Force
+    FF15:
+      suffix:
+      # PaiNN (Schütt et al., ICML 2021). Cartesian scalar + vector Core.
+      # Tensor heads: enerzyme/config/painn_spectra_layers_example.yaml.
+      architecture: painn
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 128
+        num_rbf: 20
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: painn
+            trainable: false
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_interactions: 3
+            shared_interactions: false
+            shared_filters: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

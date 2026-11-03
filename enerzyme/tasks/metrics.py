@@ -4,6 +4,21 @@ from ..data import is_atomic, get_tensor_rank
 from ..utils.base_logger import logger
 
 
+def _score_arrays(metric_func: Callable, y_trues: np.ndarray, y_preds: np.ndarray) -> float:
+    """Score arrays, averaging a trailing ensemble axis and flattening rank > 1.
+
+    Rank-2 targets such as polarizability arrive as ``[N, 3, 3]``. sklearn
+    metrics expect ``[n_samples]`` or ``[n_samples, n_outputs]``, so those
+    tensors are reshaped to ``[N, 9]`` after any ensemble reduction.
+    """
+    if y_preds.ndim == y_trues.ndim + 1:
+        y_preds = np.mean(y_preds, axis=-1)
+    if y_trues.ndim > 2:
+        y_trues = np.reshape(y_trues, (y_trues.shape[0], -1))
+        y_preds = np.reshape(y_preds, (y_preds.shape[0], -1))
+    return metric_func(y_trues, y_preds)
+
+
 def build_single_metric(metric_str: str) -> Callable[[Dict[str, Union[List, np.ndarray]], Dict[str, Union[List, np.ndarray]], str], Optional[float]]:
     if metric_str == "rmse":
         try:
@@ -26,17 +41,9 @@ def build_single_metric(metric_str: str) -> Callable[[Dict[str, Union[List, np.n
         y_pred = prediction[target_name]
         if is_atomic(target_name) or get_tensor_rank(target_name):
             y_trues, y_preds = np.concatenate(y_true), np.concatenate(y_pred)
-            if y_preds.ndim == y_trues.ndim + 1:
-                score = metric_func(y_trues, np.mean(y_preds, axis=-1))
-            else:
-                score = metric_func(y_trues, y_preds)
         else:
             y_trues, y_preds = np.array(y_true), np.array(y_pred)
-            if y_preds.ndim == y_trues.ndim + 1:
-                score = metric_func(y_trues, np.mean(y_preds, axis=-1))
-            else:
-                score = metric_func(y_trues, y_preds)
-        return score
+        return _score_arrays(metric_func, y_trues, y_preds)
     return metric
 
 

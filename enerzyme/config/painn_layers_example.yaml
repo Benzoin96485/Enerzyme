@@ -1,0 +1,47 @@
+# PaiNN (Schütt, Unke, Gastegger, ICML 2021, arXiv:2102.03150).
+# Core: Cartesian equivariant message passing only.
+# Embedding, Bessel basis (flavor painn), and the scalar energy head stay outside.
+# Cosine cutoff is applied to the continuous-filter inside the Core.
+#
+# Dipoles and polarizabilities: painn_spectra_layers_example.yaml.
+# Enerzymette: set architecture: painn in the resolved config.yaml.
+# This is not the external XPaiNN / XequiNet wrapper.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: painn
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 20
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: painn
+            trainable: false
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_interactions: 3
+            shared_interactions: false
+            shared_filters: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

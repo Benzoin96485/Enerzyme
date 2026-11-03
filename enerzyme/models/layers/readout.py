@@ -180,19 +180,35 @@ class BaseReadout(BaseFFLayer):
             )
         elif self.head_type == "two_layer":
             # Dense MLP morphologically like the official energy head (not LinearRS).
+            # ``pyramidal: true`` uses one hidden width max(n_out, F // 2), the
+            # SchNetPack ``Atomwise(n_layers=2)`` schedule. ``dim_hidden`` sets
+            # that width explicitly. The default keeps the hidden width at F.
+            head_params = dict(self.head_params)
+            pyramidal = bool(head_params.pop("pyramidal", False))
+            dim_hidden = head_params.pop("dim_hidden", None)
+            if pyramidal and dim_hidden is not None:
+                raise ValueError(
+                    "SimpleReadout two_layer accepts pyramidal or dim_hidden, not both"
+                )
+            if pyramidal:
+                dim_hidden = max(self.dim_feature_out, self.dim_feature_in // 2)
+            elif dim_hidden is None:
+                dim_hidden = self.dim_feature_in
+            else:
+                dim_hidden = int(dim_hidden)
             act = self.activation_fn if self.activation_fn is not None else "swish"
             return Sequential(
                 DenseLayer(
                     dim_feature_in=self.dim_feature_in,
-                    dim_feature_out=self.dim_feature_in,
+                    dim_feature_out=dim_hidden,
                     activation_fn=act,
                     activation_params=self.activation_params,
                 ),
                 DenseLayer(
-                    dim_feature_in=self.dim_feature_in,
+                    dim_feature_in=dim_hidden,
                     dim_feature_out=self.dim_feature_out,
                     shallow_ensemble_size=self.shallow_ensemble_size,
-                    **self.head_params,
+                    **head_params,
                 ),
             )
         elif self.head_type == "mlp":

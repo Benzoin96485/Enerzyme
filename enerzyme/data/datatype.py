@@ -23,6 +23,11 @@ DATA_TYPES = {
     "Fa": IS_ATOMIC | (TENSOR_RANK_BASE * 1) | IS_TARGET | IS_GRAD,
     "M2": TENSOR_RANK_BASE * 1 | IS_TARGET,
     "M2a": IS_ATOMIC | (TENSOR_RANK_BASE * 1) | IS_TARGET,
+    # ||M2|| from EquivariantDipole(predict_magnitude=true). Scalar, so metric
+    # keys such as M2mag_mae split into one target name.
+    "M2mag": IS_TARGET,
+    # Molecular polarizability [3, 3] from EquivariantPolarizability.
+    "polarizability": TENSOR_RANK_BASE * 2 | IS_TARGET,
     "idx_i": IS_INT | IS_IDX,
     "idx_j": IS_INT | IS_IDX,
     "N_pair": IS_INT | IS_IDX,

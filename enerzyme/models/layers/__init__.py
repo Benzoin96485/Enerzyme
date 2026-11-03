@@ -32,6 +32,7 @@ from .readout import (
     VelocityReadout,
     HirshfeldReadout,
 )
+from .tensorial import EquivariantDipoleLayer, EquivariantPolarizabilityLayer
 # Architecture-specific readouts: defined next to interaction / so3 readout,
 # re-exported for layer-stack name discovery (``Layers.EquiformerGraphAttentionReadout``, …).
 # Import SphereSampleReadout from the submodule (not ``so3`` package) to avoid a
