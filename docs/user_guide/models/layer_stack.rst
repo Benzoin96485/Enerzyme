@@ -17,7 +17,7 @@ From :code:`enerzyme/models/layers/`:
     from :code:`enerzyme.models.so3` for equivariant cores).
 
 **Radial basis**
-    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
+    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
 
 **Embeddings**
     :code:`RandomAtomEmbedding`, :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
@@ -32,7 +32,7 @@ From :code:`enerzyme/models/layers/`:
     :code:`EnergyReduce`, :code:`Force`, :code:`ShallowEnsembleReduce`
 
 **Readouts**
-    :code:`SimpleReadout` — per-atom MLP over scalar features. With equivariant Cores
+    :code:`SimpleReadout` — per-atom MLP over scalar features. :code:`head_type: two_layer` accepts :code:`pyramidal: true` (hidden width ``max(n_out, F // 2)``) or :code:`dim_hidden`. With equivariant Cores
     that set :code:`feature_irreps`, it extracts even-scalar (:code:`0e`) channels first,
     then applies :code:`dense` / :code:`residual_*` / :code:`two_layer` / :code:`mlp` heads.
     :code:`head_type: mlp` is a stack of dense hidden layers plus a linear property
@@ -179,6 +179,11 @@ accept :code:`shallow_ensemble_size` on the last linear head; pair with
 :code:`e2former_v2_layers_example.yaml`,
 :code:`e2former_lsr_layers_example.yaml`,
 :code:`equiformer_shallow_ensemble_example.yaml`.
+
+PaiNN and Cartesian tensor heads
+--------------------------------
+
+With :code:`architecture: painn`, pre-core layers are :code:`BesselRBF` (``flavor: painn``, ``apply_cutoff_fn: false``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: cosine` supplies the filter window. The Core returns :code:`atom_feature` ``[N, F]`` and :code:`atom_vector_feature` ``[N, 3, F]``. Energy uses :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force`. Dipole and polarizability are post-core layers :code:`EquivariantDipole` and :code:`EquivariantPolarizability`; they read the same latents and :code:`Ra`. Charge-only dipoles remain :code:`SimpleReadout(Qa)` + :code:`AtomicCharge2Dipole`. Center coordinates in the dataset when the tensor reference frame should be the center of mass. Examples: :code:`enerzyme/config/painn_layers_example.yaml`, :code:`painn_spectra_layers_example.yaml`.
 
 DimeNet and modular readouts
 ----------------------------

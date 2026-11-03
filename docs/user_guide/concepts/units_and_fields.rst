@@ -16,6 +16,8 @@ Defined in :code:`enerzyme/data/datatype.py`:
 - :code:`Qa` (atomic) — Atomic partial charges
 - :code:`Q` (global) — Total charge
 - :code:`M2` (global) — Dipole moment (3-vector)
+- :code:`M2mag` (global) — Dipole magnitude from :code:`EquivariantDipole(predict_magnitude=true)`
+- :code:`polarizability` (global) — Polarizability tensor, shape ``[3, 3]`` per molecule
 - :code:`S` (global) — Spin multiplicity (spin-aware models)
 
 Custom fields can be registered under :code:`Datahub.fields` with :code:`is_atomic: true` (see :doc:`/user_guide/data/datahub_reference`).

@@ -11,6 +11,9 @@ Internal architectures
 +================+==========+========+========+=============+==================+
 | SchNet         | yes      | yes    | partial| yes         | Good baseline    |
 +----------------+----------+--------+--------+-------------+------------------+
+| PaiNN          | via      | tensor | yes    | via         | Cartesian        |
+|                | readout  | head   |        | readout     | scalar + vector  |
++----------------+----------+--------+--------+-------------+------------------+
 | DimeNet        | via      | via    | yes    | via         | Directional      |
 |                | readout  | readout|        | readout     | messages + SBF;  |
 |                |          |        |        |             | bilinear, not ++ |
@@ -100,6 +103,8 @@ External models are declared under :code:`Modelhub.external_FFs` with the same :
 
 **DimeNet++** (:code:`architecture: dimenet++` or :code:`dimenetpp`) is the fast variant from the same repository (arXiv:2011.14115). It reuses the DimeNet triplets, spherical basis, embedding block, residual layers, Bessel flavor, and :code:`HierachicalReadout`. The Core replaces the bilinear tensor with Hadamard products plus a down/up bottleneck (:code:`int_emb_size`, :code:`basis_emb_size`) and a bias-free projection to :code:`out_emb_size`, so :code:`atom_feature` is ``(N, out_emb_size, num_blocks+1)`` and the readout MLP runs at that width (:code:`num_hidden_layers: 3` matches the paper output block after the projection). Defaults follow ``config_pp.yaml`` (4 blocks, emb 128, out 256, int 64, basis 8, 7 spherical, 6 radial, cutoff 5). The radial filter and Swish down-projection run on every edge (so the gathered source message still sees ``d_kj``); the spherical basis is applied after the triplet gather. Example: :code:`enerzyme/config/dimenetpp_layers_example.yaml`. Tests: :code:`test/test_dimenetpp_core.py`, :code:`test/test_dimenetpp_parity_ops.py`. Enerzymette only needs :code:`architecture: dimenet++` in the resolved :code:`config.yaml`.
 
+**PaiNN** (:code:`architecture: painn`) is a native port of Schütt, Unke, and Gastegger (ICML 2021, arXiv:2102.03150) under :code:`enerzyme/models/painn/`, adapted from `atomistic-machine-learning/schnetpack <https://github.com/atomistic-machine-learning/schnetpack>`_ 2.0.4 (MIT). The Core is the equivariant message/update stack only. It reads :code:`RandomAtomEmbedding` and :code:`BesselRBF` with :code:`flavor: painn` (``sin(nπr/c) / r``, cutoff left on the filter) and emits :code:`atom_feature` ``[N, F]`` plus channel-last Cartesian :code:`atom_vector_feature` ``[N, 3, F]``. This vector layout is separate from :code:`atom_sphere_feature`. The scalar energy head is the shared :code:`SimpleReadout` (:code:`head_type: two_layer`, :code:`pyramidal: true`, exact SiLU). Dipoles and polarizabilities use the shared Cartesian heads :code:`EquivariantDipole` and :code:`EquivariantPolarizability` in :code:`enerzyme/models/layers/tensorial.py` (gated blocks in :code:`layers/gated_equivariant.py`). Those heads are reusable by any later Core with the same latent pair. The external :code:`xpainn` wrapper is a different model (XequiNet). Examples: :code:`enerzyme/config/painn_layers_example.yaml`, :code:`painn_spectra_layers_example.yaml`. Tests: :code:`test/test_painn_core.py`, :code:`test/test_painn_parity_ops.py`. Enerzymette only needs :code:`architecture: painn` plus a resolved :code:`config.yaml`.
+
 **eSCN** (:code:`architecture: escn`) is a native port of Passaro & Zitnick (2023) SO(3)→SO(2) convolutions under :code:`enerzyme/models/escn/`, backed by shared primitives in :code:`enerzyme/models/so3/`. The Core emits scalar :code:`atom_feature` (spherical :code:`l=0`, with :code:`feature_irreps: "Cx0e"` and :code:`dim_feature_out = C`) and :code:`atom_sphere_feature` (full :code:`(lmax+1)^2` SH coefficients after message :code:`rotate_inv`; :code:`mmax` only reduces edge-frame SO(2)). Default stacks use :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force` (energy-conserving :code:`Fa=-∇E`, so edge frames stay in the autograd graph). Opt-in :code:`SphereSampleReadout` applies the paper's S² sampling head to any atomic property fields in :code:`output_fields`; :code:`vector_output_fields: [Fa]` is the paper-style direct-force alternative. Examples: :code:`enerzyme/config/escn_layers_example.yaml`, :code:`escn_sphere_readout_example.yaml`. No fairchem dependency. Ops/block numerical parity vs vendored fairchem v1 lives in :code:`test/test_escn_parity_*.py` (forward only; force conservation is covered by unit tests).
 
 **EquiformerV2** (:code:`architecture: equiformer_v2`) is a native port of Liao et al. (ICLR 2024) under :code:`enerzyme/models/equiformer_v2/`. It reuses shared :code:`enerzyme/models/so3/` (with EquiformerV2 ``mmax`` rescale / component grids / :code:`SO3_LinearV2`) and implements SO(2) equivariant graph attention + S²/gate feed-forward blocks. The Core emits the same latent contract as eSCN (:code:`atom_feature` / :code:`atom_sphere_feature`). Default production stacks use :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force`. Opt-in :code:`EquiformerV2FeedForwardReadout` wraps the paper energy FFN on :code:`atom_sphere_feature`. All external EquiformerV2 readouts accept :code:`shallow_ensemble_size` (widen last linear → :code:`ShallowEnsembleReduce`). Distinct from Equiformer V1 (e3nn TP attention) and from paper eSCN (message SO(2) without transformer attention). Examples: :code:`enerzyme/config/equiformer_v2_layers_example.yaml`, :code:`equiformer_v2_ffn_readout_example.yaml`, :code:`equiformer_v2_shallow_ensemble_example.yaml`. Parity vs vendored upstream nets: :code:`test/test_equiformer_v2_parity_*.py`.
@@ -141,14 +146,16 @@ Selection guidelines
 
 **Baseline / tutorial**
     SchNet — minimal dependencies, charge-aware stacks available.
-    DimeNet — directional messages with Bessel RBF; still invariant (not SO(3) equivariant).
-    DimeNet++ — same stack with the Hadamard bottleneck; prefer it when the bilinear tensor is too expensive.
+    PaiNN — Cartesian scalar and vector features; energy from :code:`SimpleReadout`, dipole and polarizability from the shared tensor heads.
+    DimeNet — directional messages with Bessel RBF; invariant node states.
+    DimeNet++ — same stack with the Hadamard bottleneck when the bilinear tensor is expensive.
 
 **Production QM-labeled clusters with charge and solvent**
     PhysNet or SpookyNet — long-range electrostatics, optional dispersion layers.
 
 **Maximum accuracy on diverse geometries**
-    MACE, NequIP, Equiformer, EquiformerV2, EquiformerV3, E2Former, E2Former-V2, E2Former-LSR, or So3krates — equivariant message passing; tune cutoff and depth.
+    MACE, NequIP, Equiformer, EquiformerV2, EquiformerV3, E2Former, E2Former-V2, E2Former-LSR, So3krates, or PaiNN — equivariant message passing; tune cutoff and depth.
+    PaiNN keeps equivariance in Cartesian vectors (cutoff 5 Å, 3 interactions, 20 Bessel functions in the paper) and is the path for dipole and polarizability spectra.
     Equiformer uses SO(3) graph attention (default MD17-style stack with ``ExpNormalSmearing``
     and :code:`output_mode: feature` emitting full irreps plus :code:`feature_irreps`;
     production default is :code:`SimpleReadout` with :code:`head_type: two_layer` after 0e

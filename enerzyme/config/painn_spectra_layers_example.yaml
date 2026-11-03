@@ -1,0 +1,76 @@
+# PaiNN energy, forces, dipole, and polarizability (paper Sec. IV.2 / spectra).
+# EquivariantDipole and EquivariantPolarizability are shared Cartesian heads:
+# any Core that emits atom_feature [N, F] and atom_vector_feature [N, 3, F]
+# can use them. They are not inside the PaiNN Core.
+#
+# M2 uses latent charges plus atomic dipoles. Those charges are not written
+# to Qa unless return_charges: true, so a separate electrostatic Qa head
+# can stay on the stack.
+# Center Ra on the molecular center of mass in the dataset when the tensor
+# frame should match SchNetPack's SubtractCenterOfMass transform.
+# predict_magnitude: true also emits scalar M2mag (QM9-style ||dipole||).
+#
+# Paper training used Adam weight decay 0.01. Set that on Trainer, not here.
+# Enerzymette: architecture: painn plus this layer list in config.yaml.
+# The ASE calculator and enerzyme listen expose polarizability when present.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: painn
+      active: true
+      loss:
+        mae:
+          E: 1
+          Fa: 52.917721
+          M2: 1
+          polarizability: 1
+      Metric:
+        E:
+          mae: 1
+        Fa:
+          mae: 52.917721
+        M2:
+          mae: 1
+        polarizability:
+          mae: 1
+      build_params:
+        dim_embedding: 128
+        num_rbf: 20
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: painn
+            trainable: false
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_interactions: 3
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EquivariantDipole
+          params:
+            n_layers: 2
+            correct_charges: true
+            return_charges: false
+            predict_magnitude: false
+        - name: EquivariantPolarizability
+          params:
+            n_layers: 2
+        - name: EnergyReduce
+        - name: Force

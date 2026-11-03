@@ -27,6 +27,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .schnet import SchNetCore as Core
         from .schnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "painn":
+        from .painn import PaiNNCore as Core
+        from .painn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "dimenet":
         from .dimenet import DimeNetCore as Core
         from .dimenet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

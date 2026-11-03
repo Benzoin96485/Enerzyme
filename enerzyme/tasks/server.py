@@ -81,7 +81,7 @@ class Server:
 
         self.calculator.calculate(
             atoms,
-            properties=["energy", "forces", "dipole", "charges"],
+            properties=["energy", "forces", "dipole", "charges", "polarizability"],
         )
         results = self.calculator.results
         inv = self.Hartree_in_E / Hartree
@@ -94,4 +94,6 @@ class Server:
             output["M2"] = [np.asarray(results["dipole"])]
         if "charges" in results:
             output["Qa"] = [np.asarray(results["charges"])]
+        if "polarizability" in results:
+            output["polarizability"] = [np.asarray(results["polarizability"])]
         return output

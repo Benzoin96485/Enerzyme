@@ -514,6 +514,11 @@ TECE (:code:`tece`)
 
 Xu et al. (arXiv:2607.10664) lives under :code:`enerzyme/models/tece/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ v0.2.0 (MIT). Register via :code:`get_ff_core("tece")`. The Core seeds equivariant features from scalar embeddings, then stacks uvSO2 interactions with Edge Cluster Expansion (:code:`ComplexProductBasis`) and Radial Rotary Attention, plus node-side :code:`CgtpACE` reused from TACE. Shared SO(2) primitives (:code:`WignerD` recursive/direct, :code:`uvSO2Linear`, :code:`SO2Gate`, :code:`LayoutTransform`) live in :code:`enerzyme/models/so3/`. Requires :code:`Lmax == lmax`. Do not conflate RRA with EFA Euclidean RoPE. Emit :code:`atom_feature` for :code:`SimpleReadout`. Example: :code:`tece_layers_example.yaml`. Tests: :code:`test/test_tece_*.py`. Enerzymette: :code:`architecture: tece` + resolved :code:`config.yaml`.
 
+PaiNN (:code:`painn`)
+^^^^^^^^^^^^^^^^^^^^^
+
+Schütt, Unke, and Gastegger (ICML 2021, arXiv:2102.03150) live under :code:`enerzyme/models/painn/` (:code:`core.py`, :code:`interaction.py`), adapted from SchNetPack 2.0.4 (MIT). Register via :code:`get_ff_core("painn")`. Reuse :code:`BesselRBF(flavor="painn")`, :code:`cosine` cutoff values from :code:`RangeSeparation`, and :code:`RandomAtomEmbedding`. The Core emits :code:`atom_feature` and Cartesian :code:`atom_vector_feature` ``[N, 3, F]``. Scalar properties use :code:`SimpleReadout` (:code:`two_layer` + :code:`pyramidal: true` matches the SchNetPack two-layer width schedule; pass SiLU as ``swish`` with ``alpha=beta=1``, ``learnable: false``). Dipole and polarizability use :code:`EquivariantDipole` / :code:`EquivariantPolarizability`. The gated block itself is :code:`enerzyme.models.layers.gated_equivariant` so later Cartesian cores can share it. Distinct from external :code:`xpainn`. Examples: :code:`painn_layers_example.yaml`, :code:`painn_spectra_layers_example.yaml`. Tests: :code:`test/test_painn_*.py`. Enerzymette: :code:`architecture: painn` + resolved :code:`config.yaml`. The ASE calculator and :code:`enerzyme listen` copy :code:`polarizability` when the stack emits it.
+
 So3krates (:code:`so3krates`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
