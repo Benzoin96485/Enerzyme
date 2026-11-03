@@ -447,9 +447,51 @@ class FieldDataset(Dataset):
     def __init__(self, data: Dict[str, Iterable]) -> None:
         self.data = data
         self.compressed_keys = set()
+        self._h5_file = None
         for k, v in self.data.items():
             if len(v) == 1:
                 self.compressed_keys.add(k)
+
+    def __getstate__(self):
+        """Pickle numpy arrays; reopen HDF5 datasets by filename in workers."""
+        arrays = {}
+        h5_filename = None
+        h5_names = {}
+        for k, v in self.data.items():
+            if isinstance(v, h5py.Dataset):
+                filename = v.file.filename
+                if isinstance(filename, bytes):
+                    filename = filename.decode()
+                h5_filename = filename
+                h5_names[k] = v.name
+            else:
+                arrays[k] = v
+        return {
+            "compressed_keys": set(self.compressed_keys),
+            "arrays": arrays,
+            "h5_filename": h5_filename,
+            "h5_names": h5_names,
+        }
+
+    def __setstate__(self, state):
+        self.compressed_keys = state["compressed_keys"]
+        self.data = dict(state.get("arrays") or {})
+        self._h5_file = None
+        filename = state.get("h5_filename")
+        names = state.get("h5_names") or {}
+        if filename and names:
+            self._h5_file = h5py.File(filename, "r")
+            for k, name in names.items():
+                self.data[k] = self._h5_file[name]
+
+    def __del__(self):
+        handle = getattr(self, "_h5_file", None)
+        if handle is not None:
+            try:
+                handle.close()
+            except Exception:
+                pass
+            self._h5_file = None
 
     def __getitem__(self, k) -> Iterable:
         return self.data[k]
@@ -556,6 +598,7 @@ class SingleDataHub:
         if self.select_args:
             datahub_str += str(sorted(self.select_args.items()))
         self.hash = md5(datahub_str.encode("utf-8")).hexdigest()[:hash_length]
+        self.dump_dir = dump_dir
         self.preload_path = os.path.join(dump_dir, f"processed_dataset_{self.hash}")
         logger.info(f"Preload path {self.preload_path} is created")
         _pre = preprocessings or {}
@@ -591,7 +634,17 @@ class SingleDataHub:
         self.global_transform = Transform(global_transforms, self.preload_path)
         self.preprocessings = preprocessings
         self.global_transforms = global_transforms
-        if not self.preload or not self.preload_data():
+        # All ranks always join the exclusive section. Rank 0 no-ops on a
+        # cache hit; peers never skip the collective just because their local
+        # stat() already sees the directory.
+        from ..tasks.distributed import detect_launch_env, is_global_zero, run_rank0_exclusive
+
+        launch = detect_launch_env()
+        sync_dir = os.path.abspath(dump_dir)
+
+        def _ensure_cache():
+            if self.preload and self.preload_data():
+                return
             self.get_handle("w")
             self._init_data()
             self._init_neighbor_list()
@@ -599,6 +652,24 @@ class SingleDataHub:
             self.global_transform.transform(self.data)
             self._save_config()
             self.reset_handle()
+
+        run_rank0_exclusive(
+            _ensure_cache,
+            env=launch,
+            sync_dir=sync_dir,
+            name=f"datahub_{self.hash}",
+        )
+        if not is_global_zero(launch):
+            if not self.preload_data():
+                raise RuntimeError(
+                    f"Rank {launch.global_rank} failed to preload dataset from "
+                    f"{self.preload_path} after rank 0 finished writing"
+                )
+        # HDF5 already holds transformed arrays; reload only fitted inverse
+        # state (e.g. total_energy_normalization statistics.data). Stateless
+        # transforms were fully specified from YAML at construction.
+        self.preprocessing.reload_fitted_state()
+        self.global_transform.reload_fitted_state()
 
     def _preload_data(self, hdf5_path):
         loaded_file = h5py.File(hdf5_path, mode="r")

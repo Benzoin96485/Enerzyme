@@ -34,7 +34,7 @@ class EquivariantLayerNormV2(nn.Module):
     def __repr__(self):
         return f"{self.__class__.__name__}({self.irreps}, eps={self.eps})"
 
-    @torch.cuda.amp.autocast(enabled=False)
+    @torch.amp.autocast("cuda", enabled=False)
     def forward(self, node_input, **kwargs):
         dim = node_input.shape[-1]
 

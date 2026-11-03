@@ -56,4 +56,5 @@ This guide is the in-depth reference for Enerzyme. It explains configuration sch
 
    user_guide/operations/troubleshooting
    user_guide/operations/performance
+   user_guide/operations/distributed_training
    user_guide/operations/reproducibility

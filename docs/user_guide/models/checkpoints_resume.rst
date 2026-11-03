@@ -26,9 +26,9 @@ Committee members use a numeric rank in the filename prefix:
     ├── model1_best.pth
     └── model1_last.pth
 
-Lightning may also emit versioned names such as :code:`model_best-v1.pth`;
-:code:`get_pretrain_path` prefers the appropriate :code:`best` / :code:`last` file
-in that directory.
+Legacy Lightning runs may also have versioned names such as
+:code:`model_best-v1.pth`; :code:`get_pretrain_path` prefers the appropriate
+:code:`best` / :code:`last` file in that directory.
 
 Resume modes
 ------------
@@ -64,10 +64,26 @@ EMA
 
 Exponential moving average weights can stabilize late training. Check whether your evaluation uses EMA weights in the saved checkpoint.
 
-Lightning multi-GPU
--------------------
+Distributed DDP
+---------------
 
-:code:`Trainer.lightning: true` enables PyTorch Lightning training (:code:`lightning_utils.py`). Use for multi-GPU scaling; verify batch size and learning rate relative to single-GPU runs.
+Launch with :code:`srun` / :code:`torchrun` (one process per GPU). Enerzyme
+wraps torch DDP; it does not spawn. Only **rank 0** writes checkpoints,
+:code:`config.yaml`, TensorBoard (:code:`<model_dir>/tb/`), and the shared
+log.
+
+:code:`resume: 2` still means full resume (optimizer, scheduler,
+early-stop state, epoch). Patience comes from the current YAML, not from
+editing checkpoint files on disk.
+
+Old Lightning :code:`.pth` files (key :code:`pytorch-lightning_version`)
+are converted on load. You do **not** need the Lightning package to resume
+or use them as :code:`pretrain_path`.
+
+Committee members train **serially**, each using the full DDP world.
+Filenames stay :code:`model{i}_best.pth` / :code:`model{i}_last.pth`.
+
+:code:`batch_size` is per GPU. See :doc:`/user_guide/operations/distributed_training`.
 
 Logs and config snapshot
 ------------------------
