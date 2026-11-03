@@ -87,6 +87,8 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | DimeNet        | Directional messages + Bessel SBF        | Original DimeNet, not ++  |
 +----------------+------------------------------------------+---------------------------+
+| DimeNet++      | Faster directional messages              | Hadamard bottleneck       |
++----------------+------------------------------------------+---------------------------+
 | PhysNet        | Production charge-aware PES              | Electrostatics, D3 layers |
 +----------------+------------------------------------------+---------------------------+
 | SpookyNet      | Large organic / mixed systems            | Similar feature set       |

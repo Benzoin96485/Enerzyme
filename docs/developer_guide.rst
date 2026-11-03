@@ -313,6 +313,8 @@ Tests live in :code:`test/`:
 - :code:`test_dimenet_ops.py` — DimeNet envelope / Bessel flavor / SBF / triplets / bilinear interaction
 - :code:`test_dimenet_core.py` — DimeNet registration / YAML smoke, hierarchical features, SO(3) invariance, build_model E/F conservation
 - :code:`test_dimenet_parity_ops.py` — numerical parity vs PyG original DimeNet (not ++); energy uses PyG angles at atom ``i``; production Core uses paper angles at ``j``
+- :code:`test_dimenetpp_core.py` — DimeNet++ registration / YAML smoke, hierarchical features at ``out_emb_size``, SO(3) invariance, build_model E/F, pair graph with no triplets
+- :code:`test_dimenetpp_parity_ops.py` — numerical parity of ``DimeNetPPInteractionBlock`` vs PyG ``InteractionPPBlock`` (all-edge down-projection, then triplet gather), including an empty triplet list
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
