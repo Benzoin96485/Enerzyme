@@ -225,10 +225,10 @@ class DimeNetAtomReadout(Module):
 class DimeNetPPInteractionBlock(Module):
     """DimeNet++ interaction: Hadamard basis products and a down/up bottleneck.
 
-    Matches ``InteractionPPBlock`` in ``gasteigerjo/dimenet``. The radial
-    filter multiplies the gathered source message ``m_kj`` (distance ``d_kj``)
-    before the bottleneck, as in the released block. Basis projections are
-    bias-free and linear; message and residual layers use Swish.
+    Matches ``InteractionPPBlock`` in PyG / ``gasteigerjo/dimenet``. The radial
+    filter and the Swish down-projection run on every edge; triplets are
+    gathered only for the spherical Hadamard product, the scatter, and the
+    up-projection. Basis projections are bias-free and linear.
     """
 
     def __init__(
@@ -286,14 +286,14 @@ class DimeNetPPInteractionBlock(Module):
         idx_ji: Tensor,
     ) -> Tensor:
         x_ji = self.dense_ji(x)
+        rbf_h = self.dense_rbf2(self.dense_rbf1(rbf))
+        x_kj = self.down(self.dense_kj(x) * rbf_h)
         if idx_kj.numel() == 0:
-            x_kj_sum = x.new_zeros(x.shape[0], self.up.dim_feature_in)
+            x_kj_sum = x.new_zeros(x.shape[0], x_kj.shape[-1])
         else:
-            rbf_filter = self.dense_rbf2(self.dense_rbf1(rbf))
-            x_kj = self.down(self.dense_kj(x)[idx_kj] * rbf_filter[idx_kj])
-            sbf_filter = self.dense_sbf2(self.dense_sbf1(sbf))
+            sbf_h = self.dense_sbf2(self.dense_sbf1(sbf))
             x_kj_sum = segment_sum_coo(
-                x_kj * sbf_filter, idx_ji, dim_size=x.shape[0]
+                x_kj[idx_kj] * sbf_h, idx_ji, dim_size=x.shape[0]
             )
         hidden = x_ji + self.up(x_kj_sum)
         for layer in self.layers_before_skip:

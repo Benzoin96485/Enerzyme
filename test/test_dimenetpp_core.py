@@ -304,4 +304,4 @@ def test_dimenet_defaults_unchanged():
     core = next(layer for layer in layers if layer["name"] == "Core")
     assert core["params"]["num_bilinear"] == 8
     assert "out_emb_size" not in core["params"]
-    assert DEFAULT_LAYER_PARAMS is layers or DEFAULT_LAYER_PARAMS == layers
+    assert layers is DEFAULT_LAYER_PARAMS
