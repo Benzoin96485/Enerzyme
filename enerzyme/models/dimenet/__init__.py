@@ -1,12 +1,17 @@
-"""DimeNet (Gasteiger et al., ICLR 2020) — original directional MPNN.
+"""Directional message passing: original DimeNet and DimeNet++.
 
-Not DimeNet++ (bilinear SBF interaction, not Hadamard down-projection).
+``DimeNetCore`` is the bilinear SBF model (ICLR 2020). ``DimeNetPPCore`` is
+the Hadamard bottleneck (arXiv:2011.14115). Package-level
+``DEFAULT_BUILD_PARAMS`` / ``DEFAULT_LAYER_PARAMS`` stay the original DimeNet
+stack; DimeNet++ defaults live on :mod:`enerzyme.models.dimenet.core_pp`.
 """
 
-from .core import DimeNetCore, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+from .core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS, DimeNetCore
+from .core_pp import DimeNetPPCore
 
 __all__ = [
     "DimeNetCore",
+    "DimeNetPPCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
 ]

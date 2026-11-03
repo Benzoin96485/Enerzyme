@@ -193,6 +193,13 @@ each interaction). Default stacks use :code:`HierachicalReadout` with
 block. Charge/dipole use the same readout fields plus post-core physics layers.
 Example: :code:`enerzyme/config/dimenet_layers_example.yaml`.
 
+With :code:`architecture: dimenet++` (alias :code:`dimenetpp`), the same pre-core
+Bessel flavor and post-core :code:`HierachicalReadout` are used. The Core is
+:class:`~enerzyme.models.dimenet.core_pp.DimeNetPPCore`: Hadamard interaction
+and a bias-free map to :code:`out_emb_size`, which becomes
+:code:`dim_feature_out`. Example:
+:code:`enerzyme/config/dimenetpp_layers_example.yaml`.
+
 So3krates and modular readouts
 ------------------------------
 

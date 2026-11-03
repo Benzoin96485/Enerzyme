@@ -1,7 +1,9 @@
 """DimeNet embedding, residual, interaction, and atom-side RBF readout.
 
-Directional message passing (Eq. 4 / Fig. 4) lives here. Property MLPs stay
-in shared :class:`~enerzyme.models.layers.readout.HierachicalReadout`.
+Directional message passing lives here. Property MLPs stay in shared
+:class:`~enerzyme.models.layers.readout.HierachicalReadout`.
+``DimeNetPP*`` blocks are the DimeNet++ Hadamard bottleneck (arXiv:2011.14115);
+the bilinear blocks are original DimeNet.
 """
 
 from __future__ import annotations
@@ -218,3 +220,128 @@ class DimeNetAtomReadout(Module):
     ) -> Tensor:
         gated = self.dense_rbf(rbf) * messages
         return segment_sum_coo(gated, idx_i, dim_size=num_nodes)
+
+
+class DimeNetPPInteractionBlock(Module):
+    """DimeNet++ interaction: Hadamard basis products and a down/up bottleneck.
+
+    Matches ``InteractionPPBlock`` in ``gasteigerjo/dimenet``. The radial
+    filter multiplies the gathered source message ``m_kj`` (distance ``d_kj``)
+    before the bottleneck, as in the released block. Basis projections are
+    bias-free and linear; message and residual layers use Swish.
+    """
+
+    def __init__(
+        self,
+        dim_embedding: int,
+        num_rbf: int,
+        num_sbf: int,
+        int_emb_size: int,
+        basis_emb_size: int,
+        num_before_skip: int,
+        num_after_skip: int,
+        activation_fn: ACTIVATION_KEY_TYPE = "swish",
+        activation_params: Optional[ACTIVATION_PARAM_TYPE] = None,
+    ) -> None:
+        super().__init__()
+        params = _act_params(activation_params)
+        linear = dict(use_bias=False, initial_weight="semi_orthogonal_glorot")
+        activated = dict(
+            activation_fn=activation_fn,
+            activation_params=params,
+            initial_weight="semi_orthogonal_glorot",
+        )
+        self.dense_rbf1 = DenseLayer(num_rbf, basis_emb_size, **linear)
+        self.dense_rbf2 = DenseLayer(basis_emb_size, dim_embedding, **linear)
+        self.dense_sbf1 = DenseLayer(num_sbf, basis_emb_size, **linear)
+        self.dense_sbf2 = DenseLayer(basis_emb_size, int_emb_size, **linear)
+        self.dense_ji = DenseLayer(dim_embedding, dim_embedding, **activated)
+        self.dense_kj = DenseLayer(dim_embedding, dim_embedding, **activated)
+        self.down = DenseLayer(
+            dim_embedding, int_emb_size, use_bias=False, **activated
+        )
+        self.up = DenseLayer(
+            int_emb_size, dim_embedding, use_bias=False, **activated
+        )
+        self.layers_before_skip = ModuleList(
+            [
+                DimeNetResidualLayer(dim_embedding, activation_fn, params)
+                for _ in range(num_before_skip)
+            ]
+        )
+        self.final_before_skip = DenseLayer(dim_embedding, dim_embedding, **activated)
+        self.layers_after_skip = ModuleList(
+            [
+                DimeNetResidualLayer(dim_embedding, activation_fn, params)
+                for _ in range(num_after_skip)
+            ]
+        )
+
+    def forward(
+        self,
+        x: Tensor,
+        rbf: Tensor,
+        sbf: Tensor,
+        idx_kj: Tensor,
+        idx_ji: Tensor,
+    ) -> Tensor:
+        x_ji = self.dense_ji(x)
+        if idx_kj.numel() == 0:
+            x_kj_sum = x.new_zeros(x.shape[0], self.up.dim_feature_in)
+        else:
+            rbf_filter = self.dense_rbf2(self.dense_rbf1(rbf))
+            x_kj = self.down(self.dense_kj(x)[idx_kj] * rbf_filter[idx_kj])
+            sbf_filter = self.dense_sbf2(self.dense_sbf1(sbf))
+            x_kj_sum = segment_sum_coo(
+                x_kj * sbf_filter, idx_ji, dim_size=x.shape[0]
+            )
+        hidden = x_ji + self.up(x_kj_sum)
+        for layer in self.layers_before_skip:
+            hidden = layer(hidden)
+        hidden = self.final_before_skip(hidden) + x
+        for layer in self.layers_after_skip:
+            hidden = layer(hidden)
+        return hidden
+
+
+class DimeNetPPAtomReadout(Module):
+    """RBF-gated atom scatter plus the bias-free DimeNet++ up-projection.
+
+    Official ``OutputPPBlock`` maps ``emb_size → out_emb_size`` with no bias
+    and no activation, then hands the wider features to the property MLP.
+    That MLP is :class:`~enerzyme.models.layers.readout.HierachicalReadout`.
+    """
+
+    def __init__(
+        self, num_rbf: int, dim_embedding: int, out_emb_size: int
+    ) -> None:
+        super().__init__()
+        self.dim_embedding = dim_embedding
+        self.out_emb_size = out_emb_size
+        self.dense_rbf = DenseLayer(
+            num_rbf,
+            dim_embedding,
+            use_bias=False,
+            initial_weight="semi_orthogonal_glorot",
+        )
+        self.up = DenseLayer(
+            dim_embedding,
+            out_emb_size,
+            use_bias=False,
+            initial_weight="semi_orthogonal_glorot",
+        )
+
+    def forward(
+        self,
+        messages: Tensor,
+        rbf: Tensor,
+        idx_i: Tensor,
+        num_nodes: int,
+    ) -> Tensor:
+        if messages.shape[0] == 0:
+            hidden = messages.new_zeros(num_nodes, self.dim_embedding)
+        else:
+            hidden = segment_sum_coo(
+                self.dense_rbf(rbf) * messages, idx_i, dim_size=num_nodes
+            )
+        return self.up(hidden)
