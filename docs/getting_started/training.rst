@@ -95,6 +95,8 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | MACE           | Equivariant accuracy                     | Higher compute cost       |
 +----------------+------------------------------------------+---------------------------+
+| GRACE          | Graph ACE foundation potentials          | Internal; presets 1L/2L   |
++----------------+------------------------------------------+---------------------------+
 | NequIP         | External equivariant model               | Requires :code:`nequip`   |
 +----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |
