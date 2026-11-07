@@ -39,5 +39,6 @@ from .tensorial import EquivariantDipoleLayer, EquivariantPolarizabilityLayer
 # cycle with ``so3.__init__`` lazy-exporting the same symbol.
 from ..equiformer.interaction import EquiformerGraphAttentionReadout
 from ..equiformer_v2.interaction import EquiformerV2FeedForwardReadout
+from ..grace.readout import GRACEEnergyReadout
 from ..so3.sphere_sample_readout import SphereSampleReadout
 from .charge_spin_embedding import ChargeSpinEmbeddingLayer

@@ -1,0 +1,31 @@
+# GRACE (Lysogorskiy, Bochkarev, Drautz, 2025). The Core is the recursive
+# ACE map from a chemical embedding to invariant densities. RandomAtomEmbedding
+# is the embedding. GRACEEnergyReadout is the foundation head (first density
+# plus an MLP of the rest). ZBL, electrostatics, and dispersion stay optional
+# post-core layers. Enerzymette only needs architecture: grace in the resolved
+# config.
+#
+# Paper backbones: Core preset 1L, 1L-M, 1L-L, 2L, 2L-M, 2L-L (6 Å, embedding
+# 128). 1L-latest / 2L-latest follow the current public preset defaults. FS is
+# the Finnis-Sinclair student (embedding 64, cutoff 7 Å). This file is a tiny
+# custom stack for smoke tests. It is not weight-compatible with TensorPotential.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: grace
+      active: true
+      build_params:
+        max_Za: 94
+        dim_embedding: 8
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            preset: custom
+        - name: GRACEEnergyReadout
+        - name: EnergyReduce
+        - name: Force
