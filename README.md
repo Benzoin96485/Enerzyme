@@ -21,7 +21,7 @@ Currently supported model architectures:
 |   TACE   | internal |             ✅             |         via readout         |       ✅       |   via readout   | [arXiv:2509.14961](https://arxiv.org/abs/2509.14961) / [Cartesian-3j](https://arxiv.org/abs/2512.16882) | [tace](https://github.com/xvzemin/tace) |
 |   TECE   | internal |             ✅             |         via readout         |       ✅       |   via readout   | [arXiv:2607.10664](https://arxiv.org/abs/2607.10664) | [tace](https://github.com/xvzemin/tace) |
 |   eSCN   | internal |             ✅             |         via readout         |       ✅       |   via readout   | [NeurIPS 2023, arXiv:2302.03655](https://arxiv.org/abs/2302.03655) | [fairchem v1 escn](https://github.com/facebookresearch/fairchem/tree/fairchem_core-1.10.0/src/fairchem/core/models/escn) |
-|  NequIP  | external |             ✅             |              ❌              |       ❌       |        ❌        |          [Nat. Commun. 2022, 13(1), 2453](https://www.nature.com/articles/s41467-022-29939-5)          | [Github](https://github.com/mir-group/nequip) |
+|  NequIP  | internal |             ✅             |         via readout         |       ✅       |   via readout   |          [Nat. Commun. 2022, 13(1), 2453](https://www.nature.com/articles/s41467-022-29939-5)          | [Github](https://github.com/mir-group/nequip) |
 |   UMA   | external |             ✅             |              ✅              |       ✅       |        ❌        | Meta UMA / eSCN-MD Core + shared Q/S readouts (`fairchem`; not paper eSCN) | [fairchem](https://github.com/FAIR-Chem/fairchem) |
 | AllScAIP | internal |             ✅             |              ✅              |       ✅       |        ❌        | **Experimental 魔改** — not recommended as a primary model yet | fairchem-inspired |
 |  XPaiNN  | external |             ✅             |              ❌              |       ❌       |        ❌        | [J. Chem. Theory Comput. 2024, 20, 21, 9500–9511](https://pubs.acs.org/doi/10.1021/acs.jctc.4c01151) | [Github](https://github.com/X1X1010/XequiNet) |
@@ -40,7 +40,7 @@ Shared equivariant tooling (for developers):
 
 - `enerzyme.models.so3` — SH-array / SPHC primitives (EquiformerV2, So3krates, eSCN-style SO2, TECE), including unified `spherical_harmonics(..., layout=...)`, recursive/direct `WignerD`, `uvSO2Linear` / `SO2Gate` / `ComplexProductBasis`, array dropout, and `SphereSampleReadout`.
 - `enerzyme.models.efa` — Euclidean Fast Attention (ERoPE + Lebedev linear nonlocal): SpookyNet `use_efa`, architectures `efa` / `so3lr_efa`, or hook any Core via `EFABlock` / `apply_efa_if_configured` on invariant features + `Ra` + `batch_seg`. Distinct from TECE Radial Rotary Attention.
-- `enerzyme.models.e3nn_nn` — flat e3nn Irreps helpers (Equiformer V1, MACE, TACE, TECE): TP rescale, Gate/Activation, irreps Linear / ElementLinear, path generation, scatter TP, tools.
+- `enerzyme.models.e3nn_nn` — flat e3nn Irreps helpers (Equiformer V1, MACE, TACE, TECE, NequIP): TP rescale, Gate/Activation, irreps Linear / ElementLinear, path generation, scatter TP, tools.
 - Representation-agnostic blocks: `activation.SmoothLeakyReLU`, `activation.ScaledSigmoid` / `ScaledSiLU`, `blocks.drop` (`GraphDropPath`), `blocks.radial_mlp`.
 - `enerzyme.models.layers.gated_equivariant` — Cartesian gated equivariant blocks for tensor heads. PaiNN stores vectors as `atom_vector_feature` with shape `[N, 3, F]`. `EquivariantDipole` and `EquivariantPolarizability` consume that pair.
 
@@ -83,12 +83,6 @@ To test PhysNet, you also need
 tensorflow==2.13.0
 ```
 
-
-To invoke NequIP, you need
-
-```
-nequip==0.6.1
-```
 
 To invoke XPaiNN, you need
 

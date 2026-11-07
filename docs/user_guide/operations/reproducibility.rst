@@ -30,7 +30,7 @@ Document environment
 Record:
 
 - Python, PyTorch, torch-scatter, Enerzyme commit hash
-- Optional: NequIP, PLUMED, TeraChem versions
+- Optional: XPaiNN / XequiNet, PLUMED, TeraChem versions
 - Conda export or :code:`requirements.yaml` used
 
 Enerzymette task archives

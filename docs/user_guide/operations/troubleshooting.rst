@@ -10,7 +10,7 @@ Installation
     Install the wheel matching your PyTorch, CUDA, Python, and platform from https://data.pyg.org/whl/
 
 **Optional model fails to import**
-    Install NequIP, XequiNet, py-plumed, etc. per :doc:`/getting_started/installation`.
+    Install XequiNet, py-plumed, etc. per :doc:`/getting_started/installation`. NequIP is built in.
 
 Data
 ----
