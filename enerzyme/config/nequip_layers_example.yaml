@@ -1,0 +1,57 @@
+# NequIP (Batzner et al., Nat. Commun. 2022, 13, 2453).
+# Core: E(3)-equivariant tensor-product convolutions only.
+# Species embedding, sinc-Bessel × polynomial edge basis, the scalar energy
+# head, and the per-element shift stay outside the Core.
+#
+# Set avg_num_neighbors to the mean number of neighbors inside cutoff_sr.
+# Foundation sizes: Core preset S, M, L, or XL (dim_embedding stays 32).
+# Paper radial MLP: preset paper (depth 2, width 64, parity on).
+# Enerzymette: architecture: nequip in the resolved config.yaml.
+# This does not load checkpoints from mir-group/nequip.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: nequip
+      active: true
+      build_params:
+        dim_embedding: 32
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: nequip
+            trainable: false
+            polynomial_p: 6
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 4
+            l_max: 1
+            parity: true
+            num_features: 32
+            radial_mlp_depth: 1
+            radial_mlp_width: 128
+            use_sc: true
+            sc_first: false
+            avg_num_neighbors: 1.0
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            use_bias: false
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+        - name: EnergyReduce
+        - name: Force

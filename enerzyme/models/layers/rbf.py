@@ -477,6 +477,17 @@ class BesselRBFLayer(BaseRBF):
     to false::
 
         e_n(r) = sin(n π r / c) / r
+
+    ``flavor="nequip"`` is the maintained `mir-group/nequip` edge embedding:
+    normalized sinc Bessel functions, the DimeNet / NequIP polynomial envelope
+    of order ``polynomial_p`` (default 6), and the constant
+    :math:`2\\pi/c^2` applied in ``FullNequIPGNNModel``. Frequencies are the
+    integers :math:`n = 1\\ldots N` and are trainable when ``trainable`` is
+    true. The envelope is inside this layer, so ``apply_cutoff_fn`` is forced
+    off::
+
+        x = r / c
+        e_n(r) = (2π / c²) · n · sinc(n x) · u_p(x)
     """
 
     def __init__(
@@ -485,24 +496,30 @@ class BesselRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "polynomial",
         trainable: Optional[bool] = None,
-        flavor: Literal["default", "dimenet", "painn"] = "default",
+        flavor: Literal["default", "dimenet", "painn", "nequip"] = "default",
         envelope_exponent: int = 5,
         apply_cutoff_fn: Optional[bool] = None,
+        polynomial_p: int = 6,
     ) -> None:
         self.flavor = flavor
-        if flavor not in ("default", "dimenet", "painn"):
+        if flavor not in ("default", "dimenet", "painn", "nequip"):
             raise ValueError(
                 "Unknown BesselRBF flavor "
-                f"{flavor!r}; expected 'default', 'dimenet', or 'painn'"
+                f"{flavor!r}; expected 'default', 'dimenet', 'painn', or 'nequip'"
             )
         if trainable is None:
             trainable = flavor == "dimenet"
         if apply_cutoff_fn is None:
-            # DimeNet envelope and PaiNN filters own the radial window.
+            # DimeNet, PaiNN, and NequIP each own their radial window.
             apply_cutoff_fn = flavor == "default"
-        if flavor == "dimenet":
+        if flavor in ("dimenet", "nequip"):
             apply_cutoff_fn = False
             cutoff_fn = None
+        if flavor == "nequip" and int(polynomial_p) < 2:
+            raise ValueError(
+                f"NequIP polynomial_p must be >= 2, got {polynomial_p}"
+            )
+        self.polynomial_p = int(polynomial_p)
         super().__init__(
             num_rbf, cutoff_sr, cutoff_fn, apply_cutoff_fn=apply_cutoff_fn
         )
@@ -520,6 +537,19 @@ class BesselRBFLayer(BaseRBF):
             else:
                 self.register_buffer("bessel_weights", frequencies)
             self.register_buffer("prefactor", torch.tensor(1.0, dtype=dtype))
+        elif flavor == "nequip":
+            from ..cutoff import PolynomialEnvelope
+
+            self.envelope = PolynomialEnvelope(cutoff_sr, self.polynomial_p)
+            frequencies = torch.arange(1, num_rbf + 1, dtype=dtype)
+            if trainable:
+                self.bessel_weights = torch.nn.Parameter(frequencies)
+            else:
+                self.register_buffer("bessel_weights", frequencies)
+            self.register_buffer(
+                "prefactor",
+                torch.tensor(2.0 * math.pi / (cutoff_sr * cutoff_sr), dtype=dtype),
+            )
         else:
             self.envelope = None
             bessel_weights = (
@@ -547,6 +577,12 @@ class BesselRBFLayer(BaseRBF):
         if self.flavor == "dimenet":
             d_scaled = dist / self.cutoff_sr
             return self.envelope(d_scaled) * torch.sin(self.bessel_weights * d_scaled)
+        if self.flavor == "nequip":
+            # x = r/c, e_n = (2π/c²) * n * sinc(n x) * polynomial envelope.
+            scaled = dist / self.cutoff_sr
+            weights = self.bessel_weights.view(1, -1)
+            bessel = torch.sinc(scaled * weights) * weights
+            return self.prefactor * bessel * self.envelope(dist)
         if self.flavor == "painn":
             # SchNetPack BesselRBF: r = 0 contributes 0 (divide by 1).
             flat = dist.view(-1)
