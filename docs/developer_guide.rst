@@ -307,6 +307,7 @@ Tests live in :code:`test/`:
 - :code:`test_tace_cartesian_ops.py` — cartnn ICTD / harmonics / Cartesian contraction smoke
 - :code:`test_tace_parity_ops.py` — TACE spherical / Cartesian numerical parity vs vendored tace v0.1.0 fixtures
 - :code:`test_tece_core.py` — TECE registration / YAML smoke, feature shapes, build_model E/F, ECE/RRA flag sensitivity
+- :code:`test_equflash_core.py` — EquFlash irrep schedule, XPLOR / Bessel flavor, registration, SO(3) feature equivariance, build_model E/F and finite-difference forces
 - :code:`test_tece_ops.py` — WignerD / LayoutTransform / uvSO2Linear / SO2Gate / ComplexProductBasis / RRA path smoke
 - :code:`test_so3_wigner_backend.py` — shared e3nn/Jd Wigner-D backend (packed orthogonality, SO3_Rotation / fused / DPA4 quaternion adapters, high-l smoke)
 - :code:`test_so3_grid.py` — unified flat lat–long :code:`SO3Grid` / :code:`S2GridProjector` protocol (roundtrip, Lebedev duck-type, grid table)
@@ -518,6 +519,11 @@ PaiNN (:code:`painn`)
 ^^^^^^^^^^^^^^^^^^^^^
 
 Schütt, Unke, and Gastegger (ICML 2021, arXiv:2102.03150) live under :code:`enerzyme/models/painn/` (:code:`core.py`, :code:`interaction.py`), adapted from SchNetPack 2.0.4 (MIT). Register via :code:`get_ff_core("painn")`. Reuse :code:`BesselRBF(flavor="painn")`, :code:`cosine` cutoff values from :code:`RangeSeparation`, and :code:`RandomAtomEmbedding`. The Core emits :code:`atom_feature` and Cartesian :code:`atom_vector_feature` ``[N, 3, F]``. Scalar properties use :code:`SimpleReadout` (:code:`two_layer` + :code:`pyramidal: true` matches the SchNetPack two-layer width schedule; pass SiLU as ``swish`` with ``alpha=beta=1``, ``learnable: false``). Dipole and polarizability use :code:`EquivariantDipole` / :code:`EquivariantPolarizability`. The gated block itself is :code:`enerzyme.models.layers.gated_equivariant` so later Cartesian cores can share it. Distinct from external :code:`xpainn`. Examples: :code:`painn_layers_example.yaml`, :code:`painn_spectra_layers_example.yaml`. Tests: :code:`test/test_painn_*.py`. Enerzymette: :code:`architecture: painn` + resolved :code:`config.yaml`. The ASE calculator and :code:`enerzyme listen` copy :code:`polarizability` when the stack emits it.
+
+EquFlash (:code:`equflash`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+SamsungDS GGNN EquFlash lives under :code:`enerzyme/models/equflash/` (:code:`core.py`, :code:`interaction.py`, :code:`irreps.py`). Register via :code:`get_ff_core("equflash")`. The Core is the convolution stack only. Reuse :code:`RandomAtomEmbedding`, :code:`BesselRBF(flavor="equflash")` (``(2/c) sin(nπr/c)/r``, trainable frequencies by default), and :code:`RangeSeparation` with :code:`cutoff_fn: xplor` plus :code:`cuton`. :func:`equflash_irreps` builds the scalar → natural-parity → scalar schedule; :code:`irreps_manual` overrides it. Messages use :func:`tp_out_irreps_with_instructions` and an :code:`e3nn` gate. The Core emits :code:`atom_feature` and :code:`feature_irreps` for :code:`SimpleReadout`. :code:`conv_denominator` rescales the scatter (default 1; GGNN's OMat yaml uses the dataset neighbor count). Cuequivariance / FlashTP are not wired. Example: :code:`equflash_layers_example.yaml`. Tests: :code:`test/test_equflash_core.py`. Enerzymette: :code:`architecture: equflash` + resolved :code:`config.yaml`.
 
 So3krates (:code:`so3krates`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

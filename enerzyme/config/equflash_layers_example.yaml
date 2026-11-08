@@ -1,0 +1,56 @@
+# EquFlash (SamsungDS/GGNN, https://github.com/SamsungDS/GGNN).
+# Core: uvu Clebsch–Gordan convolution and equivariant gate only.
+# Species embedding, Bessel basis (flavor equflash), and the scalar energy
+# head stay outside the Core. The XPLOR window is applied to the radial basis.
+#
+# Published width is 256 channels, lmax 3, and 10 layers (this file).
+# The GGNN OMat config divides messages by a dataset neighbor count (~72.5).
+# conv_denominator here is 1. Set it to the mean number of neighbors when
+# matching a released training run.
+# Enerzymette: set architecture: equflash in the resolved config.yaml.
+# Cuequivariance / FlashTP kernels from GGNN are not required.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: equflash
+      active: true
+      build_params:
+        dim_embedding: 256
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: xplor
+        cuton: 5.5
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            trainable: true
+            apply_cutoff_fn: true
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            lmax: 3
+            num_layers: 10
+            parity: true
+            radial_hidden: [64, 64]
+            conv_denominator: 1.0
+            train_denominator: false
+            use_bias: false
+            normalize_sph: true
+            feed_forward: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

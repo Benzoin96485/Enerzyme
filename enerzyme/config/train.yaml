@@ -1049,6 +1049,59 @@ Modelhub:
             keep_feature: false
         - name: EnergyReduce
         - name: Force
+    FF16:
+      suffix:
+      # EquFlash (SamsungDS/GGNN). uvu tensor-product Core.
+      # Full notes: enerzyme/config/equflash_layers_example.yaml.
+      architecture: equflash
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 32
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: xplor
+        cuton: 5.5
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            trainable: true
+            apply_cutoff_fn: true
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            lmax: 2
+            num_layers: 2
+            parity: true
+            radial_hidden: [64, 64]
+            conv_denominator: 1.0
+            train_denominator: false
+            use_bias: false
+            feed_forward: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

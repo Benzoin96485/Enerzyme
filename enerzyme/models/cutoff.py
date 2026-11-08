@@ -94,6 +94,32 @@ def cosine_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     )
 
 
+def xplor_transition(x: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
+    """CHARMM / XPLOR switching function on absolute distance.
+
+    Returns 1 for ``r <= cuton``, 0 for ``r >= cutoff``, and the standard
+    cubic polynomial in ``r^2`` in between. ``cuton`` must be strictly smaller
+    than ``cutoff``. ``cuton=0`` is a valid full-range switch. This window is
+    not a linearly rescaled ``[0, 1]`` polynomial, so it does not use
+    :func:`scale`.
+    """
+    if cuton >= cutoff:
+        raise ValueError(f"xplor cuton ({cuton}) must be < cutoff ({cutoff})")
+    r_sq = x * x
+    r_on_sq = cuton * cuton
+    r_cut_sq = cutoff * cutoff
+    switched = (
+        (r_cut_sq - r_sq) ** 2
+        * (r_cut_sq + 2.0 * r_sq - 3.0 * r_on_sq)
+        / (r_cut_sq - r_on_sq) ** 3
+    )
+    return torch.where(
+        x <= cuton,
+        torch.ones_like(x),
+        torch.where(x >= cutoff, torch.zeros_like(x), switched),
+    )
+
+
 CUTOFF_REGISTER = {
     "polynomial": polynomial_transition,
     # SO3LR / So3krates-torch alias for the PhysNet polynomial envelope.
@@ -101,8 +127,9 @@ CUTOFF_REGISTER = {
     "bump": bump_transition,
     "smooth": smooth_transition,
     "cosine": cosine_transition,
+    "xplor": xplor_transition,
 }
-CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine"]
+CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine", "xplor"]
 
 
 class PolynomialEnvelope(torch.nn.Module):

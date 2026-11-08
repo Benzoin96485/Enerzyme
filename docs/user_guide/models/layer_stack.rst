@@ -17,7 +17,7 @@ From :code:`enerzyme/models/layers/`:
     from :code:`enerzyme.models.so3` for equivariant cores).
 
 **Radial basis**
-    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
+    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
 
 **Embeddings**
     :code:`RandomAtomEmbedding`, :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
@@ -184,6 +184,11 @@ PaiNN and Cartesian tensor heads
 --------------------------------
 
 With :code:`architecture: painn`, pre-core layers are :code:`BesselRBF` (``flavor: painn``, ``apply_cutoff_fn: false``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: cosine` supplies the filter window. The Core returns :code:`atom_feature` ``[N, F]`` and :code:`atom_vector_feature` ``[N, 3, F]``. Energy uses :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force`. Dipole and polarizability are post-core layers :code:`EquivariantDipole` and :code:`EquivariantPolarizability`; they read the same latents and :code:`Ra`. Charge-only dipoles remain :code:`SimpleReadout(Qa)` + :code:`AtomicCharge2Dipole`. Center coordinates in the dataset when the tensor reference frame should be the center of mass. Examples: :code:`enerzyme/config/painn_layers_example.yaml`, :code:`painn_spectra_layers_example.yaml`.
+
+EquFlash
+--------
+
+With :code:`architecture: equflash`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, ``(2/c) sin(nπr/c)/r``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: xplor` and :code:`cuton` supplies the radial window, which :code:`BesselRBF` multiplies in when ``apply_cutoff_fn: true``. The Core returns flat irreps :code:`atom_feature` and sets :code:`feature_irreps`. The default schedule ends on even scalars, so :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` is the energy stack. :code:`conv_denominator` on the Core rescales each aggregated message. Example: :code:`enerzyme/config/equflash_layers_example.yaml`.
 
 DimeNet and modular readouts
 ----------------------------

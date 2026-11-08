@@ -40,7 +40,8 @@ class BaseRBF(BaseFFLayer):
         if not self.apply_cutoff_fn:
             return rbf
         if cutoff_values_sr is None:
-            cutoff_values_sr = self.cutoff_fn(Dij_sr, cutoff=self.cutoff_sr)
+            cuton = getattr(self, "cuton", 0.0)
+            cutoff_values_sr = self.cutoff_fn(Dij_sr, self.cutoff_sr, cuton)
         return cutoff_values_sr.view(-1, 1) * rbf
 
     @abstractmethod
@@ -477,6 +478,12 @@ class BesselRBFLayer(BaseRBF):
     to false::
 
         e_n(r) = sin(n π r / c) / r
+
+    ``flavor="equflash"`` is the SevenNet / EquFlash basis. Frequencies are
+    trainable by default, and the radial window (XPLOR in the published
+    stack) multiplies the basis::
+
+        e_n(r) = (2/c) sin(n π r / c) / r
     """
 
     def __init__(
@@ -485,27 +492,29 @@ class BesselRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "polynomial",
         trainable: Optional[bool] = None,
-        flavor: Literal["default", "dimenet", "painn"] = "default",
+        flavor: Literal["default", "dimenet", "painn", "equflash"] = "default",
         envelope_exponent: int = 5,
         apply_cutoff_fn: Optional[bool] = None,
+        cuton: float = 0.0,
     ) -> None:
         self.flavor = flavor
-        if flavor not in ("default", "dimenet", "painn"):
+        if flavor not in ("default", "dimenet", "painn", "equflash"):
             raise ValueError(
                 "Unknown BesselRBF flavor "
-                f"{flavor!r}; expected 'default', 'dimenet', or 'painn'"
+                f"{flavor!r}; expected 'default', 'dimenet', 'painn', or 'equflash'"
             )
         if trainable is None:
-            trainable = flavor == "dimenet"
+            trainable = flavor in ("dimenet", "equflash")
         if apply_cutoff_fn is None:
             # DimeNet envelope and PaiNN filters own the radial window.
-            apply_cutoff_fn = flavor == "default"
+            apply_cutoff_fn = flavor in ("default", "equflash")
         if flavor == "dimenet":
             apply_cutoff_fn = False
             cutoff_fn = None
         super().__init__(
             num_rbf, cutoff_sr, cutoff_fn, apply_cutoff_fn=apply_cutoff_fn
         )
+        self.cuton = float(cuton)
         self.envelope_exponent = int(envelope_exponent)
         dtype = torch.get_default_dtype()
         if flavor == "dimenet":
@@ -536,7 +545,12 @@ class BesselRBFLayer(BaseRBF):
                 self.bessel_weights = torch.nn.Parameter(bessel_weights)
             else:
                 self.register_buffer("bessel_weights", bessel_weights)
-            prefactor = 1.0 if flavor == "painn" else np.sqrt(2.0 / cutoff_sr)
+            if flavor == "painn":
+                prefactor = 1.0
+            elif flavor == "equflash":
+                prefactor = 2.0 / cutoff_sr
+            else:
+                prefactor = np.sqrt(2.0 / cutoff_sr)
             self.register_buffer(
                 "prefactor",
                 torch.tensor(prefactor, dtype=dtype),
@@ -547,11 +561,18 @@ class BesselRBFLayer(BaseRBF):
         if self.flavor == "dimenet":
             d_scaled = dist / self.cutoff_sr
             return self.envelope(d_scaled) * torch.sin(self.bessel_weights * d_scaled)
-        if self.flavor == "painn":
+        if self.flavor in ("painn", "equflash"):
             # SchNetPack BesselRBF: r = 0 contributes 0 (divide by 1).
+            # EquFlash uses the same quotient times ``2/c``. At r = 0 the
+            # analytic limit is ``prefactor * nπ/c`` so a contact does not NaN.
             flat = dist.view(-1)
-            norm = torch.where(flat == 0, torch.ones_like(flat), flat).unsqueeze(-1)
-            return torch.sin(flat.unsqueeze(-1) * self.bessel_weights) / norm
+            safe = torch.where(flat == 0, torch.ones_like(flat), flat).unsqueeze(-1)
+            values = torch.sin(flat.unsqueeze(-1) * self.bessel_weights) / safe
+            if self.flavor == "equflash":
+                limit = self.prefactor * self.bessel_weights.view(1, -1)
+                values = self.prefactor * values
+                values = torch.where(flat.view(-1, 1) == 0, limit, values)
+            return values
         numerator = torch.sin(self.bessel_weights.view(1, -1) * dist)
         return self.prefactor * (numerator / dist)
 
