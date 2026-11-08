@@ -1,0 +1,72 @@
+# EquFlashV2 (Samsung Electronics, https://github.com/SamsungDS/GGNN).
+# The reference repository is CC BY-NC-SA 4.0. This stack is an Enerzyme
+# reimplementation: the Core is channelwise Clebsch-Gordan message passing
+# only. Bessel (flavor equflash, prefactor 2/c) and the XPLOR window
+# (cuton = cutoff_on) are pre-core layers. The energy head is the shared
+# SimpleReadout (two bias-free linears, hidden width F/2) plus AtomicAffine
+# with scale-then-shift. Forces are -dE/dR from the shared Force layer.
+#
+# Published OMat-style depth is much larger: 128 channels, lmax 4, 10 layers,
+# radial hidden [64, 64], denominator about 72.5, fixed per-element shifts.
+# conv_type full and efficient share the e3nn channelwise product.
+# Enerzymette: architecture: equflashv2 in the resolved config.yaml.
+# No cuequivariance / FlashTP dependency.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: equflashv2
+      active: true
+      build_params:
+        dim_embedding: 32
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 6.0
+        cuton: 5.5
+        cutoff_fn: xplor
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            trainable: false
+            apply_cutoff_fn: true
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 2
+            lmax: 2
+            is_parity: true
+            interaction_type: equflash
+            conv_type: full
+            sc_type: identity
+            nonlinear_type: bilinear_gate
+            nonlinear_scale: 1.0
+            after_nonlinear: linear
+            feedforward_type: feedforward
+            ff_nonlinear_type: bilinear_gate
+            radial_hidden: [32, 32]
+            denominator: 1.0
+            train_denominator: false
+            normalize_sph: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activate_hidden: false
+            use_bias: false
+            keep_feature: false
+        - name: AtomicAffine
+          params:
+            order: scale_then_shift
+            scales:
+              Ea:
+                values: 1.0
+                learnable: false
+            shifts:
+              Ea:
+                values: 0.0
+                learnable: true
+        - name: EnergyReduce
+        - name: Force

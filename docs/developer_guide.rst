@@ -212,6 +212,9 @@ the Core). Also :code:`So3krates` under :code:`enerzyme/models/so3krates/`
 or optional :code:`EquiformerV2FeedForwardReadout` / physics layers after the Core),
 :code:`EquiformerV3` under :code:`enerzyme/models/equiformer_v3/`
 (same latent contract; merged LN + SwiGLU-S² + envelope attention via extended :code:`so3/`),
+:code:`EquFlashV2` under :code:`enerzyme/models/equflash/`
+(scalar embedding + equflash Bessel / XPLOR outside the Core; channelwise CG
+message passing emits flat :code:`atom_feature`),
 :code:`Equiformer` (:code:`enerzyme/models/equiformer/`), and
 :code:`escn` (:code:`enerzyme/models/escn/`).
 
@@ -462,6 +465,22 @@ EquiformerV2 (:code:`equiformer_v2`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Liao et al. (ICLR 2024) lives under :code:`enerzyme/models/equiformer_v2/` and extends shared :code:`so3/` (rotate-inv rescale, component grids, :code:`SO3_LinearV2`). The Core emits the same :code:`atom_feature` / :code:`atom_sphere_feature` contract as eSCN; compose :code:`SimpleReadout` or :code:`EquiformerV2FeedForwardReadout` plus :code:`EnergyReduce` / :code:`Force` outside the Core. Offline parity vs vendored :code:`atomicarchitects/equiformer_v2` nets is in :code:`test/test_equiformer_v2_parity_*.py`. Enerzymette only needs :code:`architecture: equiformer_v2` plus a resolved :code:`config.yaml`.
+
+EquFlashV2 (:code:`equflashv2`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Samsung Electronics' EquFlashV2 lives under :code:`enerzyme/models/equflash/`
+(:code:`core.py`, :code:`interaction.py`, :code:`irreps.py`). Register via
+:code:`get_ff_core("equflashv2")` (alias :code:`equflash_v2`). The reference
+repository is CC BY-NC-SA 4.0 and uses cuequivariance; this stack is an e3nn
+reimplementation and does not load those checkpoints. Reuse
+:code:`BesselRBF(flavor="equflash")`, :code:`xplor` / :code:`cuton` on
+:code:`RangeSeparation`, :code:`EquivariantRMSNormSH` in :code:`e3nn_nn`,
+:code:`SimpleReadout` (``activate_hidden: false``, ``use_bias: false``), and
+:code:`AtomicAffine(order="scale_then_shift")`. The Core emits flat
+:code:`atom_feature`. Example: :code:`equflashv2_layers_example.yaml`. Tests:
+:code:`test/test_equflash_v2_core.py`. Enerzymette: :code:`architecture: equflashv2`
+plus a resolved :code:`config.yaml`.
 
 EquiformerV3 (:code:`equiformer_v3`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

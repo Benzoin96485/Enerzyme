@@ -1049,6 +1049,65 @@ Modelhub:
             keep_feature: false
         - name: EnergyReduce
         - name: Force
+    FF16:
+      suffix:
+      # EquFlashV2. See enerzyme/config/equflashv2_layers_example.yaml.
+      # Core is CG message passing; Bessel/XPLOR, readout, and forces are shared layers.
+      architecture: equflashv2
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 32
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 6.0
+        cuton: 5.5
+        cutoff_fn: xplor
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            trainable: false
+            apply_cutoff_fn: true
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 2
+            lmax: 2
+            interaction_type: equflash
+            nonlinear_type: bilinear_gate
+            radial_hidden: [32, 32]
+            denominator: 1.0
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activate_hidden: false
+            use_bias: false
+            keep_feature: false
+        - name: AtomicAffine
+          params:
+            order: scale_then_shift
+            scales:
+              Ea:
+                values: 1.0
+                learnable: false
+            shifts:
+              Ea:
+                values: 0.0
+                learnable: true
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

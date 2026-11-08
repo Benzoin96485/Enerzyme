@@ -53,9 +53,15 @@ class DistanceLayer(BaseFFLayer):
 
 
 class RangeSeparationLayer(BaseFFLayer):
-    def __init__(self, cutoff_sr, cutoff_fn: Optional[CUTOFF_KEY_TYPE]=None) -> None:
+    def __init__(
+        self,
+        cutoff_sr,
+        cutoff_fn: Optional[CUTOFF_KEY_TYPE] = None,
+        cuton: float = 0.0,
+    ) -> None:
         super().__init__()
         self.cutoff_sr = cutoff_sr
+        self.cuton = float(cuton)
         if cutoff_fn is not None:
             self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
         else:
@@ -71,7 +77,9 @@ class RangeSeparationLayer(BaseFFLayer):
             "idx_j_sr": idx_j_lr[cutmask],
         }
         if self.cutoff_fn is not None:
-            relevant_output["cutoff_values_sr"] = self.cutoff_fn(relevant_output["Dij_sr"], self.cutoff_sr)
+            relevant_output["cutoff_values_sr"] = self.cutoff_fn(
+                relevant_output["Dij_sr"], self.cutoff_sr, self.cuton
+            )
         if vij_lr is not None:
             relevant_output["vij_sr"] = vij_lr[cutmask]
         return relevant_output

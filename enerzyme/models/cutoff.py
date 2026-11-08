@@ -5,6 +5,8 @@ Transition functions (:func:`polynomial_transition`, :func:`bump_transition`,
 (:class:`PolynomialEnvelope`, :class:`DimeNetEnvelope`,
 :class:`C3CutoffEnvelope`) are the same family of smooth radial windows used
 inside equivariant message passing (EquiformerV3, DimeNet, DPA4).
+:func:`xplor_transition` is the CHARMM / HOOMD switch used by EquFlash
+(``cuton`` / ``cutoff_on``).
 """
 
 from __future__ import annotations
@@ -94,6 +96,26 @@ def cosine_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     )
 
 
+def xplor_transition(distance: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
+    """CHARMM / HOOMD XPLOR switch used by EquFlash.
+
+    The window is 1 for ``r <= cuton``, a smooth polynomial on
+    ``cuton < r < cutoff``, and 0 for ``r >= cutoff``. ``cuton`` is the
+    EquFlash config key ``cutoff_on``.
+    """
+    if not 0.0 <= float(cuton) < float(cutoff):
+        raise ValueError(f"cuton ({cuton}) must satisfy 0 <= cuton < cutoff ({cutoff})")
+    radius = distance
+    radius_sq = radius * radius
+    on_sq = float(cuton) ** 2
+    cut_sq = float(cutoff) ** 2
+    span = (cut_sq - on_sq) ** 3
+    window = (cut_sq - radius_sq) ** 2 * (cut_sq + 2.0 * radius_sq - 3.0 * on_sq) / span
+    ones = torch.ones_like(radius)
+    zeros = torch.zeros_like(radius)
+    return torch.where(radius <= cuton, ones, torch.where(radius < cutoff, window, zeros))
+
+
 CUTOFF_REGISTER = {
     "polynomial": polynomial_transition,
     # SO3LR / So3krates-torch alias for the PhysNet polynomial envelope.
@@ -101,8 +123,9 @@ CUTOFF_REGISTER = {
     "bump": bump_transition,
     "smooth": smooth_transition,
     "cosine": cosine_transition,
+    "xplor": xplor_transition,
 }
-CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine"]
+CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine", "xplor"]
 
 
 class PolynomialEnvelope(torch.nn.Module):

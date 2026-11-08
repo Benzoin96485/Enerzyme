@@ -18,6 +18,8 @@ class BaseRBF(BaseFFLayer):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = None,
         apply_cutoff_fn: bool = True,
+        *,
+        cuton: float = 0.0,
     ) -> None:
         input_fields = {"Dij_sr"}
         if apply_cutoff_fn:
@@ -25,6 +27,7 @@ class BaseRBF(BaseFFLayer):
         super().__init__(input_fields=input_fields, output_fields={"rbf"})
         self.num_rbf = num_rbf
         self.cutoff_sr = cutoff_sr
+        self.cuton = float(cuton)
         self.apply_cutoff_fn = apply_cutoff_fn
         if apply_cutoff_fn:
             if cutoff_fn is None:
@@ -40,7 +43,7 @@ class BaseRBF(BaseFFLayer):
         if not self.apply_cutoff_fn:
             return rbf
         if cutoff_values_sr is None:
-            cutoff_values_sr = self.cutoff_fn(Dij_sr, cutoff=self.cutoff_sr)
+            cutoff_values_sr = self.cutoff_fn(Dij_sr, self.cutoff_sr, self.cuton)
         return cutoff_values_sr.view(-1, 1) * rbf
 
     @abstractmethod
@@ -477,6 +480,12 @@ class BesselRBFLayer(BaseRBF):
     to false::
 
         e_n(r) = sin(n π r / c) / r
+
+    ``flavor="equflash"`` is the EquFlash / SevenNet spherical Bessel basis.
+    The XPLOR (or other) window is applied by ``apply_cutoff_fn``; pass
+    ``cuton`` when the fallback window is XPLOR::
+
+        e_n(r) = (2/c) sin(n π r / c) / r
     """
 
     def __init__(
@@ -485,26 +494,32 @@ class BesselRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "polynomial",
         trainable: Optional[bool] = None,
-        flavor: Literal["default", "dimenet", "painn"] = "default",
+        flavor: Literal["default", "dimenet", "painn", "equflash"] = "default",
         envelope_exponent: int = 5,
         apply_cutoff_fn: Optional[bool] = None,
+        cuton: float = 0.0,
     ) -> None:
         self.flavor = flavor
-        if flavor not in ("default", "dimenet", "painn"):
+        if flavor not in ("default", "dimenet", "painn", "equflash"):
             raise ValueError(
                 "Unknown BesselRBF flavor "
-                f"{flavor!r}; expected 'default', 'dimenet', or 'painn'"
+                f"{flavor!r}; expected 'default', 'dimenet', 'painn', or 'equflash'"
             )
         if trainable is None:
             trainable = flavor == "dimenet"
         if apply_cutoff_fn is None:
             # DimeNet envelope and PaiNN filters own the radial window.
-            apply_cutoff_fn = flavor == "default"
+            # EquFlash multiplies this basis by the XPLOR (or other) window.
+            apply_cutoff_fn = flavor in ("default", "equflash")
         if flavor == "dimenet":
             apply_cutoff_fn = False
             cutoff_fn = None
         super().__init__(
-            num_rbf, cutoff_sr, cutoff_fn, apply_cutoff_fn=apply_cutoff_fn
+            num_rbf,
+            cutoff_sr,
+            cutoff_fn,
+            apply_cutoff_fn=apply_cutoff_fn,
+            cuton=cuton,
         )
         self.envelope_exponent = int(envelope_exponent)
         dtype = torch.get_default_dtype()
@@ -536,7 +551,12 @@ class BesselRBFLayer(BaseRBF):
                 self.bessel_weights = torch.nn.Parameter(bessel_weights)
             else:
                 self.register_buffer("bessel_weights", bessel_weights)
-            prefactor = 1.0 if flavor == "painn" else np.sqrt(2.0 / cutoff_sr)
+            if flavor == "painn":
+                prefactor = 1.0
+            elif flavor == "equflash":
+                prefactor = 2.0 / cutoff_sr
+            else:
+                prefactor = np.sqrt(2.0 / cutoff_sr)
             self.register_buffer(
                 "prefactor",
                 torch.tensor(prefactor, dtype=dtype),
@@ -552,6 +572,12 @@ class BesselRBFLayer(BaseRBF):
             flat = dist.view(-1)
             norm = torch.where(flat == 0, torch.ones_like(flat), flat).unsqueeze(-1)
             return torch.sin(flat.unsqueeze(-1) * self.bessel_weights) / norm
+        if self.flavor == "equflash":
+            # (2/c) sin(n π r / c) / r, with the r → 0 limit n π (2/c²).
+            freq = self.bessel_weights.view(1, -1)
+            safe = dist.clamp_min(1e-12)
+            sinc = torch.where(dist > 0, torch.sin(freq * dist) / safe, freq)
+            return self.prefactor * sinc
         numerator = torch.sin(self.bessel_weights.view(1, -1) * dist)
         return self.prefactor * (numerator / dist)
 
