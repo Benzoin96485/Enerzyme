@@ -95,6 +95,8 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | MACE           | Equivariant accuracy                     | Higher compute cost       |
 +----------------+------------------------------------------+---------------------------+
+| GRACE          | Graph ACE foundation potentials          | Internal; presets 1L/2L   |
++----------------+------------------------------------------+---------------------------+
 | NequIP         | E(3) tensor-product potentials           | Built in                  |
 +----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |
