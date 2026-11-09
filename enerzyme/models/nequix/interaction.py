@@ -60,6 +60,20 @@ def _split_scalars(irreps: o3.Irreps, n_extra: int) -> Tuple[o3.Irreps, o3.Irrep
     return o3.Irreps(extra), o3.Irreps(gates)
 
 
+def _require_scalar_prefix(irreps: o3.Irreps) -> None:
+    """Gate channels are a suffix of the scalar prefix, then ``l > 0``."""
+    seen_nonscalar = False
+    for _, ir in irreps:
+        if ir.l == 0:
+            if seen_nonscalar:
+                raise ValueError(
+                    "Nequix gate scalars must form a prefix so the gate "
+                    f"channels are the trailing scalars. Got {irreps}"
+                )
+        else:
+            seen_nonscalar = True
+
+
 def _scalar_acts(irreps: o3.Irreps):
     acts = []
     for _, ir in irreps:
@@ -82,6 +96,7 @@ class NequixGate(nn.Module):
     def __init__(self, irreps_in) -> None:
         super().__init__()
         irreps_in = o3.Irreps(irreps_in)
+        _require_scalar_prefix(irreps_in)
         self.irreps_in = irreps_in
         scalars = _keep(irreps_in, ("0e", "0o"))
         vectors = _drop(irreps_in, ("0e", "0o"))
@@ -269,10 +284,20 @@ class NequixConvolution(nn.Module):
             [int(num_rbf), *hidden, self.tp.weight_numel],
             init_scale=float(mlp_init_scale),
         )
-        self.linear_1 = o3.Linear(self.irreps_in, self.irreps_in)
         self.pre_gate = pre_gate_irreps(requested)
-        self.linear_2 = o3.Linear(self.sort.irreps_sorted, self.pre_gate)
-        self.skip = o3.Linear(self.irreps_in, self.pre_gate)
+        # Keep duplicate path blocks unmerged. ``o3.Linear`` normalizes each
+        # block separately, so regrouping them (the torch port) is a different
+        # layer from the JAX / OpenEquivariance convolution that was trained.
+        self.linear_1 = o3.Linear(self.irreps_in, self.irreps_in, biases=False)
+        self.linear_2 = o3.Linear(
+            self.sort.irreps_sorted, self.pre_gate, biases=False
+        )
+        self.skip = o3.Linear(self.irreps_in, self.pre_gate, biases=False)
+        if self.linear_2.irreps_in != self.sort.irreps_sorted:
+            raise RuntimeError(
+                "linear_2 must read the sorted unmerged tensor-product blocks "
+                f"{self.sort.irreps_sorted}, got {self.linear_2.irreps_in}"
+            )
         self.layer_norm: Optional[RMSLayerNorm]
         if layer_norm:
             self.layer_norm = RMSLayerNorm(
@@ -283,6 +308,13 @@ class NequixConvolution(nn.Module):
         else:
             self.layer_norm = None
         self.gate = NequixGate(self.pre_gate)
+        n_data = requested.count("0e")
+        n_gates = requested.num_irreps - n_data
+        if self.gate.extra_dim != n_data or self.gate.gate_dim != n_gates:
+            raise RuntimeError(
+                f"gate slices are {self.gate.extra_dim} data + {self.gate.gate_dim} "
+                f"gates, expected {n_data} data scalars and {n_gates} gates"
+            )
         if self.gate.irreps_out != requested:
             raise RuntimeError(
                 f"gate produced {self.gate.irreps_out}, expected {requested}"

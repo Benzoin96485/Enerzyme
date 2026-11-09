@@ -11,12 +11,14 @@ Enerzyme reimplementation on e3nn. It does not depend on cuequivariance or
 FlashTP. Published OMat / OAM checkpoints are not loaded here.
 
 ``conv_type`` ``full`` and ``efficient`` share one channelwise ``uvu``
-convolution. The cuequivariance kernels differ in layout and fusion, not in
-the Enerzyme data flow.
+convolution. Selecting ``efficient`` warns, because this port has no fused
+kernel. The cuequivariance kernels differ in layout and fusion, not in the
+Enerzyme data flow.
 """
 
 from __future__ import annotations
 
+import warnings
 from typing import Dict, List, Optional, Sequence
 
 from e3nn import o3
@@ -161,6 +163,14 @@ class EquFlashV2Core(BaseFFCore):
         if conv_type not in ("full", "efficient"):
             raise ValueError(
                 f"Unknown conv_type {conv_type!r}; expected 'full' or 'efficient'"
+            )
+        if conv_type == "efficient":
+            warnings.warn(
+                "EquFlashV2 conv_type='efficient' runs the same e3nn "
+                "channelwise convolution as 'full'. This port has no separate "
+                "fused kernel.",
+                UserWarning,
+                stacklevel=2,
             )
         if feedforward_type not in ("feedforward", "identity"):
             raise ValueError(

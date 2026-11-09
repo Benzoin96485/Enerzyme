@@ -163,6 +163,9 @@ def test_nequix_registration_and_yaml_build():
     assert build_params["dim_embedding"] == 89
     assert layers[1]["params"]["flavor"] == "equflash"
     assert layers[2]["name"] == "OneHotAtomEmbedding"
+    assert layers[3]["params"]["avg_num_neighbors"] == pytest.approx(
+        57.413687022442645
+    )
     assert layers[4]["params"]["use_bias"] is False
 
     with EXAMPLE.open() as stream:
@@ -200,6 +203,50 @@ def _small_conv(**overrides):
     )
     params.update(overrides)
     return NequixConvolution(**params)
+
+
+def test_published_gate_keeps_data_scalars_then_gates():
+    from enerzyme.models.nequix import PUBLISHED_MP_CORE_PARAMS
+    from enerzyme.models.nequix.interaction import NequixGate, pre_gate_irreps
+
+    hidden = o3.Irreps(PUBLISHED_MP_CORE_PARAMS["hidden_irreps"])
+    pre = pre_gate_irreps(hidden)
+    n_data = hidden.count("0e")
+    n_gates = hidden.num_irreps - n_data
+    assert pre[0] == (n_data + n_gates, o3.Irrep("0e"))
+    assert all(ir.l > 0 for _, ir in list(pre)[1:])
+    gate = NequixGate("3x0e + 1x1o")
+    assert gate.extra_dim == 2 and gate.gate_dim == 1
+    base = torch.tensor([[1.0, 2.0, 0.0, 0.4, 0.0, 0.0]])
+    gated = base.clone()
+    gated[0, 2] = 1.5
+    base_out = gate(base)
+    gated_out = gate(gated)
+    assert torch.allclose(base_out[:, :2], gated_out[:, :2])
+    assert not torch.allclose(base_out[:, 2:], gated_out[:, 2:])
+    with pytest.raises(ValueError, match="odd scalar"):
+        pre_gate_irreps("1x0o + 1x1e")
+    with pytest.raises(ValueError, match="trailing scalars"):
+        NequixGate("1x1o + 2x0e")
+
+
+def test_linear2_keeps_sorted_unmerged_paths():
+    from enerzyme.models.nequix.interaction import NequixConvolution
+
+    conv = NequixConvolution(
+        "4x0e + 2x1o",
+        "4x0e",
+        o3.Irreps.spherical_harmonics(1),
+        num_rbf=4,
+        radial_mlp_size=8,
+        radial_mlp_layers=1,
+        mlp_init_scale=4.0,
+        avg_num_neighbors=1.0,
+        layer_norm=False,
+    )
+    assert conv.linear_2.irreps_in == conv.sort.irreps_sorted
+    assert conv.linear_2.irreps_in != conv.sort.irreps_sorted.regroup()
+    assert conv.linear_1.bias_numel == 0 and conv.skip.bias_numel == 0
 
 
 def test_convolution_hidden_features_rotate_with_edges():

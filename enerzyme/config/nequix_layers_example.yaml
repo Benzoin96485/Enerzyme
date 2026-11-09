@@ -52,7 +52,8 @@ Modelhub:
             radial_mlp_size: 16
             radial_mlp_layers: 2
             mlp_init_scale: 4.0
-            avg_num_neighbors: 1.0
+            # MPtrj mean degree. Widths above stay small; this scale matches the paper.
+            avg_num_neighbors: 57.413687022442645
             layer_norm: true
         - name: SimpleReadout
           params:

@@ -495,8 +495,9 @@ Koker and Smidt (arXiv:2508.16067) lives under :code:`enerzyme/models/nequix/`
 :code:`RMSLayerNorm` in :code:`e3nn_nn`, a bias-free :code:`SimpleReadout`,
 and :code:`AtomicAffine(order="scale_then_shift")`. The external
 :code:`nequip` wrapper is unchanged and is not this model. Published MPtrj
-hyperparameters are :code:`PUBLISHED_MP_CORE_PARAMS` (the default stack is
-smaller). Example: :code:`nequix_layers_example.yaml`. Tests:
+hyperparameters are :code:`PUBLISHED_MP_CORE_PARAMS`. The default stack keeps
+those widths small and uses the MPtrj neighbor normalization. Example:
+:code:`nequix_layers_example.yaml`. Tests:
 :code:`test/test_nequix_core.py`. Enerzymette: :code:`architecture: nequix`
 plus a resolved :code:`config.yaml`.
 

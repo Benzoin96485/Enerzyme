@@ -7,8 +7,10 @@ cutoff, per-element energy shifts, and forces stay outside this module.
 
 Reference code: https://github.com/atomicarchitects/nequix (MIT). The
 published ``nequix-mp-1`` widths live in :data:`PUBLISHED_MP_CORE_PARAMS`.
-The defaults below are a small stack with the same block, so importing the
-architecture does not compile the 700k-parameter tensor products.
+The default widths are a small stack, so importing the architecture does not
+compile the 700k-parameter tensor products. The neighbor normalization is the
+published MPtrj mean, because the default species list and cutoff are the
+MPtrj ones.
 """
 
 from __future__ import annotations
@@ -75,7 +77,7 @@ DEFAULT_LAYER_PARAMS = [
             "radial_mlp_size": 32,
             "radial_mlp_layers": 2,
             "mlp_init_scale": 4.0,
-            "avg_num_neighbors": 1.0,
+            "avg_num_neighbors": PUBLISHED_MP_CORE_PARAMS["avg_num_neighbors"],
             "layer_norm": True,
         },
     },
@@ -127,7 +129,7 @@ class NequixCore(BaseFFCore):
         radial_mlp_size: int = 32,
         radial_mlp_layers: int = 2,
         mlp_init_scale: float = 4.0,
-        avg_num_neighbors: float = 1.0,
+        avg_num_neighbors: float = PUBLISHED_MP_CORE_PARAMS["avg_num_neighbors"],
         layer_norm: bool = True,
     ) -> None:
         super().__init__(
