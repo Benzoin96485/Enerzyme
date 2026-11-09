@@ -1050,6 +1050,60 @@ Modelhub:
         - name: EnergyReduce
         - name: Force
     FF16:
+      architecture: facto
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: facto
+        Bohr_in_R: 0.5291772105638411
+        Hartree_in_E: 1.0
+      layers:
+        - name: RangeSeparation
+        - name: Core
+          params:
+            preset: S
+            r_short: 1.0
+        - name: FACTOEnergyReadout
+        - name: ZBLRepulsionEnergy
+        - name: EnergyReduce
+        - name: Force
+    FF17:
+      architecture: grace
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        max_Za: 94
+        dim_embedding: 128
+        cutoff_sr: 6.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            preset: 1L
+        - name: GRACEEnergyReadout
+        - name: EnergyReduce
+        - name: Force
+    FF18:
       suffix:
       # EquFlashV2. See enerzyme/config/equflashv2_layers_example.yaml.
       # Core is CG message passing; Bessel/XPLOR, readout, and forces are shared layers.

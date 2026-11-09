@@ -95,6 +95,14 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | MACE           | Equivariant accuracy                     | Higher compute cost       |
 +----------------+------------------------------------------+---------------------------+
+| GRACE          | Graph ACE foundation potentials          | Internal; presets 1L/2L   |
++----------------+------------------------------------------+---------------------------+
+| FACTO          | Atom-centered scalar and tensor state    | Internal; presets S-XL    |
++----------------+------------------------------------------+---------------------------+
+| EquFlashV2     | Channelwise Clebsch-Gordan messages      | Built in                  |
++----------------+------------------------------------------+---------------------------+
+| Nequix         | Separable E(3) convolution               | Built in                  |
++----------------+------------------------------------------+---------------------------+
 | NequIP         | External equivariant model               | Requires :code:`nequip`   |
 +----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |
