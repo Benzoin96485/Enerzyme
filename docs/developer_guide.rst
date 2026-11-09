@@ -317,6 +317,8 @@ Tests live in :code:`test/`:
 - :code:`test_dimenetpp_parity_ops.py` — numerical parity of ``DimeNetPPInteractionBlock`` vs PyG ``InteractionPPBlock`` (all-edge down-projection, then triplet gather), including an empty triplet list
 - :code:`test_facto_ops.py` — FACTO cutoff derivative, Gaussian window, descriptor table, and algebraic attention / feedback / injection / transport reductions
 - :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
+- :code:`test_grace_ops.py` — GRACE Chebyshev / spherical Bessel / cutoff, channel-aligned CG equivariance, Finnis–Sinclair powers, linear density head
+- :code:`test_grace_core.py` — GRACE registration / YAML smoke, preset table, batch isolation, 2L message ablation, rotation / inversion / translation, force finite-difference conservation, SimpleReadout contract
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
@@ -520,6 +522,11 @@ FACTO (:code:`facto`)
 ^^^^^^^^^^^^^^^^^^^^^
 
 Liu et al. (arXiv:2611.03276) live under :code:`enerzyme/models/facto/` (:code:`core.py`, :code:`geometry.py`, :code:`interaction.py`, :code:`readout.py`). There is no upstream repository. Register via :code:`get_ff_core("facto")`. The degree-9 window is :func:`enerzyme.models.cutoff.facto_polynomial_cutoff` (YAML :code:`cutoff_fn: facto`), distinct from :class:`~enerzyme.models.cutoff.C3CutoffEnvelope`. Real spherical harmonics reuse :func:`enerzyme.models.so3.spherical_harmonics.spherical_harmonics` with ``layout="e3nn"`` and integral normalization, which covers ``L=6``. The Core emits hierarchical scalars plus isolated-atom states; :code:`FACTOEnergyReadout` and :code:`ZBLRepulsionEnergy` stay outside it. The 31-d elemental table is an Enerzyme stand-in — the paper does not list the components — and stops at Z=94. CUDA neighbor kernels and BF16×3 emulation are intentionally not ported. Tests: :code:`test/test_facto_ops.py`, :code:`test/test_facto_core.py`. Enerzymette: :code:`architecture: facto` + resolved :code:`config.yaml`.
+
+GRACE (:code:`grace`)
+^^^^^^^^^^^^^^^^^^^^^
+
+Lysogorskiy, Bochkarev, and Drautz (arXiv:2508.17936; method in Phys. Rev. X 14, 021036) live under :code:`enerzyme/models/grace/` (:code:`core.py`, :code:`basis.py`, :code:`coupling.py`, :code:`radial.py`, :code:`readout.py`, :code:`presets.py`). Register via :code:`get_ff_core("grace")`. This is an original implementation of the published recursion. `grace-tensorpotential <https://github.com/ICAMS/grace-tensorpotential>`_ is Academic Software License and is not imported; do not vendor it, and do not expect its checkpoints to load. Reuse :code:`RandomAtomEmbedding`, :code:`RangeSeparation`, real spherical harmonics (:code:`layout="e3nn"`), :func:`enerzyme.models.cutoff.powered_cosine_window`, :func:`enerzyme.models.functional.reduce_edge`, and :code:`EnergyReduce` / :code:`Force`. The channel-aligned Clebsch–Gordan product stays in the package: it is the ACE recursion, and e3nn's generated tensor product is not used. The Core emits :code:`atom_feature` ``[N, n_densities]``. :code:`GRACEEnergyReadout` implements the foundation linear+MLP head and the Finnis–Sinclair powers; :code:`SimpleReadout` also fits. Presets follow Table S1 and the public preset defaults. Tests: :code:`test/test_grace_ops.py`, :code:`test/test_grace_core.py`. Enerzymette: :code:`architecture: grace` + resolved :code:`config.yaml`.
 
 PaiNN (:code:`painn`)
 ^^^^^^^^^^^^^^^^^^^^^

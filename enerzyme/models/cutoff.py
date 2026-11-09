@@ -6,6 +6,7 @@ Transition functions (:func:`polynomial_transition`, :func:`bump_transition`,
 :class:`C3CutoffEnvelope`) are the same family of smooth radial windows used
 inside equivariant message passing (EquiformerV3, DimeNet, DPA4).
 :func:`facto_polynomial_cutoff` is the separate degree-9 window from FACTO.
+:func:`powered_cosine_window` is the GRACE ``(r/rc)^p`` cosine window.
 """
 
 from __future__ import annotations
@@ -113,6 +114,22 @@ def facto_polynomial_cutoff(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     x3 = x2 * x_
     x6 = x3 * x3
     return 1.0 - 84.0 * x6 + 216.0 * x6 * x_ - 189.0 * x6 * x2 + 56.0 * x6 * x3
+
+
+def powered_cosine_window(distance: Tensor, cutoff: float, order: int) -> Tensor:
+    """``0.5 * (1 + cos(pi (r/rc)^p))`` on ``[0, rc)``, else 0.
+
+    GRACE uses ``p = 16`` for the foundation radial basis and ``p = 5`` for
+    the Finnis–Sinclair student. The derivative vanishes at ``r = rc`` because
+    ``sin(pi) = 0``, so a hard mask at the cutoff does not kink the force.
+    Distinct from :func:`cosine_transition`, which is linear in ``r/rc``.
+    """
+    if order < 1:
+        raise ValueError(f"cutoff order must be >= 1, got {order}")
+    ratio = (distance / cutoff).clamp(min=0)
+    powered = ratio if order == 1 else ratio.pow(int(order))
+    window = 0.5 * (1.0 + torch.cos(math.pi * powered))
+    return torch.where(distance < cutoff, window, torch.zeros_like(distance))
 
 
 def facto_pair_window(distance: Tensor, cutoff: float, r_short: float) -> Tensor:
