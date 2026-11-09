@@ -315,6 +315,8 @@ Tests live in :code:`test/`:
 - :code:`test_dimenet_parity_ops.py` — numerical parity vs PyG original DimeNet (not ++); energy uses PyG angles at atom ``i``; production Core uses paper angles at ``j``
 - :code:`test_dimenetpp_core.py` — DimeNet++ registration / YAML smoke, hierarchical features at ``out_emb_size``, SO(3) invariance, build_model E/F, pair graph with no triplets
 - :code:`test_dimenetpp_parity_ops.py` — numerical parity of ``DimeNetPPInteractionBlock`` vs PyG ``InteractionPPBlock`` (all-edge down-projection, then triplet gather), including an empty triplet list
+- :code:`test_facto_ops.py` — FACTO cutoff derivative, Gaussian window, descriptor table, and algebraic attention / feedback / injection / transport reductions
+- :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
@@ -513,6 +515,11 @@ TECE (:code:`tece`)
 ^^^^^^^^^^^^^^^^^^^
 
 Xu et al. (arXiv:2607.10664) lives under :code:`enerzyme/models/tece/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ v0.2.0 (MIT). Register via :code:`get_ff_core("tece")`. The Core seeds equivariant features from scalar embeddings, then stacks uvSO2 interactions with Edge Cluster Expansion (:code:`ComplexProductBasis`) and Radial Rotary Attention, plus node-side :code:`CgtpACE` reused from TACE. Shared SO(2) primitives (:code:`WignerD` recursive/direct, :code:`uvSO2Linear`, :code:`SO2Gate`, :code:`LayoutTransform`) live in :code:`enerzyme/models/so3/`. Requires :code:`Lmax == lmax`. Do not conflate RRA with EFA Euclidean RoPE. Emit :code:`atom_feature` for :code:`SimpleReadout`. Example: :code:`tece_layers_example.yaml`. Tests: :code:`test/test_tece_*.py`. Enerzymette: :code:`architecture: tece` + resolved :code:`config.yaml`.
+
+FACTO (:code:`facto`)
+^^^^^^^^^^^^^^^^^^^^^
+
+Liu et al. (arXiv:2611.03276) live under :code:`enerzyme/models/facto/` (:code:`core.py`, :code:`geometry.py`, :code:`interaction.py`, :code:`readout.py`). There is no upstream repository. Register via :code:`get_ff_core("facto")`. The degree-9 window is :func:`enerzyme.models.cutoff.facto_polynomial_cutoff` (YAML :code:`cutoff_fn: facto`), distinct from :class:`~enerzyme.models.cutoff.C3CutoffEnvelope`. Real spherical harmonics reuse :func:`enerzyme.models.so3.spherical_harmonics.spherical_harmonics` with ``layout="e3nn"`` and integral normalization, which covers ``L=6``. The Core emits hierarchical scalars plus isolated-atom states; :code:`FACTOEnergyReadout` and :code:`ZBLRepulsionEnergy` stay outside it. The 31-d elemental table is an Enerzyme stand-in — the paper does not list the components — and stops at Z=94. CUDA neighbor kernels and BF16×3 emulation are intentionally not ported. Tests: :code:`test/test_facto_ops.py`, :code:`test/test_facto_core.py`. Enerzymette: :code:`architecture: facto` + resolved :code:`config.yaml`.
 
 PaiNN (:code:`painn`)
 ^^^^^^^^^^^^^^^^^^^^^
