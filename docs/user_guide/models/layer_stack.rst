@@ -17,10 +17,10 @@ From :code:`enerzyme/models/layers/`:
     from :code:`enerzyme.models.so3` for equivariant cores).
 
 **Radial basis**
-    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
+    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`. Cutoff key :code:`nequip` is the NequIP / Nequix polynomial envelope (``p = 6``), distinct from PhysNet :code:`polynomial`.
 
 **Embeddings**
-    :code:`RandomAtomEmbedding`, :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
+    :code:`RandomAtomEmbedding`, :code:`OneHotAtomEmbedding` (Nequix species vocabulary), :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
 
 **Core**
     Architecture-specific message passing (:code:`Core` with :code:`architecture` in Modelhub)
@@ -184,6 +184,8 @@ EquFlashV2
 ----------
 
 With :code:`architecture: equflashv2`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, prefactor ``2/cutoff``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: xplor` and :code:`cuton` supplies the radial window (EquFlash ``cutoff_on``). The Core returns flat :code:`atom_feature`. Energy uses :code:`SimpleReadout` (two bias-free linears when ``activate_hidden: false`` and ``use_bias: false``) → :code:`AtomicAffine` (``order: scale_then_shift``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/equflashv2_layers_example.yaml`.
+
+With :code:`architecture: nequix`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``) and :code:`OneHotAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: nequip` multiplies the basis by the NequIP polynomial envelope (``p = 6``). The Core returns even-scalar :code:`atom_feature`. Energy uses :code:`SimpleReadout` (``head_type: dense``, ``use_bias: false``) → :code:`AtomicAffine` (``order: scale_then_shift``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/nequix_layers_example.yaml`. Published MPtrj widths are :code:`PUBLISHED_MP_CORE_PARAMS`.
 
 PaiNN and Cartesian tensor heads
 --------------------------------

@@ -109,6 +109,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .equflash.core import EquFlashV2Core as Core
         from .equflash.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "nequix":
+        from .nequix import NequixCore as Core
+        from .nequix import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "e2former":
         from .e2former.core import E2FormerCore as Core
         from .e2former.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

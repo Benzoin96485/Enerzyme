@@ -6,7 +6,8 @@ Transition functions (:func:`polynomial_transition`, :func:`bump_transition`,
 :class:`C3CutoffEnvelope`) are the same family of smooth radial windows used
 inside equivariant message passing (EquiformerV3, DimeNet, DPA4).
 :func:`xplor_transition` is the CHARMM / HOOMD switch used by EquFlash
-(``cuton`` / ``cutoff_on``).
+(``cuton`` / ``cutoff_on``). :func:`nequip_envelope` is the NequIP / Nequix
+polynomial cutoff (``p = 6``).
 """
 
 from __future__ import annotations
@@ -125,7 +126,9 @@ CUTOFF_REGISTER = {
     "cosine": cosine_transition,
     "xplor": xplor_transition,
 }
-CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine", "xplor"]
+CUTOFF_KEY_TYPE = Literal[
+    "polynomial", "phys", "bump", "smooth", "cosine", "xplor", "nequip"
+]
 
 
 class PolynomialEnvelope(torch.nn.Module):
@@ -163,6 +166,22 @@ class PolynomialEnvelope(torch.nn.Module):
 
     def extra_repr(self) -> str:
         return f"cutoff={self.cutoff}, exponent={self.exponent}"
+
+
+def nequip_envelope(distance: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
+    """NequIP / Nequix polynomial cutoff with exponent ``p = 6``.
+
+    On ``x = r / cutoff`` this is ``PolynomialEnvelope(..., exponent=6)``:
+    ``1 + a x^6 + b x^7 + c x^8`` for ``r < cutoff`` and 0 otherwise.
+    ``cuton`` is ignored. This is not the PhysNet ``polynomial`` transition.
+    """
+    del cuton
+    return PolynomialEnvelope(cutoff=float(cutoff), exponent=6)(distance).reshape(
+        distance.shape
+    )
+
+
+CUTOFF_REGISTER["nequip"] = nequip_envelope
 
 
 class DimeNetEnvelope(torch.nn.Module):
