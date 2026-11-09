@@ -6,6 +6,10 @@ Information A). The Finnis–Sinclair student uses a linear map on spherical
 Bessel functions, the same ``l = 0`` basis as :class:`~enerzyme.models.layers.rbf.BesselRBFLayer`
 with ``flavor="default"``. The cutoff is applied to the radial functions
 themselves so they vanish at ``cutoff`` independently of the MLP bias.
+The window is :func:`enerzyme.models.cutoff.powered_cosine_window`. Neighbor
+sums use :func:`enerzyme.models.functional.reduce_edge`. The spherical Bessel
+formula matches ``BesselRBF(flavor="default")`` and fills the ``r → 0`` limit,
+which that layer leaves as a division by ``r``.
 """
 
 from __future__ import annotations
@@ -17,19 +21,7 @@ import torch
 from torch import Tensor
 from torch.nn import Linear, Module, Sequential, SiLU, Tanh
 
-
-def powered_cosine_window(distance: Tensor, cutoff: float, order: int) -> Tensor:
-    """``0.5 * (1 + cos(pi (r/rc)^p))`` on ``[0, rc)``, else 0.
-
-    The derivative vanishes at ``r = rc`` because ``sin(pi) = 0``, so a hard
-    mask at the cutoff does not kink the force.
-    """
-    if order < 1:
-        raise ValueError(f"cutoff order must be >= 1, got {order}")
-    ratio = (distance / cutoff).clamp(min=0)
-    powered = ratio if order == 1 else ratio.pow(int(order))
-    window = 0.5 * (1.0 + torch.cos(math.pi * powered))
-    return torch.where(distance < cutoff, window, torch.zeros_like(distance))
+from ..cutoff import powered_cosine_window
 
 
 def chebyshev_basis(distance: Tensor, n_basis: int, cutoff: float) -> Tensor:

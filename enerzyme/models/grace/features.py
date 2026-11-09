@@ -15,6 +15,8 @@ from typing import List, Optional, Sequence
 import torch
 from torch import Tensor
 
+from ..functional import reduce_edge
+
 
 def rms_norm(features: Tensor, epsilon: float) -> Tensor:
     """Per-atom RMS over channels and ``m``. Zeros stay zero."""
@@ -43,13 +45,10 @@ def scatter_blocks(
     blocks: Sequence[Tensor], index: Tensor, n_atoms: int
 ) -> List[Tensor]:
     """Sum edge features onto receiver atoms. ``index`` has one entry per edge."""
-    scattered: List[Tensor] = []
-    for block in blocks:
-        acc = block.new_zeros((n_atoms, block.shape[1], block.shape[2]))
-        if block.shape[0] > 0:
-            acc = acc.index_add(0, index, block)
-        scattered.append(acc)
-    return scattered
+    return [
+        reduce_edge(block, index, (n_atoms, block.shape[1], block.shape[2]))
+        for block in blocks
+    ]
 
 
 def split_spherical_harmonics(harmonics: Tensor, lmax: int) -> List[Tensor]:

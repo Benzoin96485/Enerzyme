@@ -185,6 +185,11 @@ PaiNN and Cartesian tensor heads
 
 With :code:`architecture: painn`, pre-core layers are :code:`BesselRBF` (``flavor: painn``, ``apply_cutoff_fn: false``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: cosine` supplies the filter window. The Core returns :code:`atom_feature` ``[N, F]`` and :code:`atom_vector_feature` ``[N, 3, F]``. Energy uses :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force`. Dipole and polarizability are post-core layers :code:`EquivariantDipole` and :code:`EquivariantPolarizability`; they read the same latents and :code:`Ra`. Charge-only dipoles remain :code:`SimpleReadout(Qa)` + :code:`AtomicCharge2Dipole`. Center coordinates in the dataset when the tensor reference frame should be the center of mass. Examples: :code:`enerzyme/config/painn_layers_example.yaml`, :code:`painn_spectra_layers_example.yaml`.
 
+FACTO
+-----
+
+With :code:`architecture: facto`, the Core owns the elemental descriptor, the radial filters, and the interaction blocks. Pre-core :code:`RangeSeparation` should use :code:`cutoff_fn: facto` (6 Å in the paper) so the shared ZBL term sees the same smooth outer window. The Core returns :code:`atom_feature` ``(N, D, K)`` and :code:`isolated_atom_feature`. The paper energy head is :code:`FACTOEnergyReadout`; :code:`SimpleReadout` still works and reads the last block. :code:`ZBLRepulsionEnergy` is summed into :code:`Ea` by :code:`EnergyReduce` because its field name is :code:`E_zbl_a`. Set Core :code:`preset` to ``S``, ``M``, ``L``, or ``XL`` for the published widths. ``L`` and ``XL`` enable tensor transport. Example: :code:`enerzyme/config/facto_layers_example.yaml`.
+
 GRACE
 -----
 
