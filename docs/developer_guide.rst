@@ -34,7 +34,7 @@ Optional dependencies
 Not every contributor needs all optional stacks. Install only what your change touches:
 
 - **PhysNet parity tests** — TensorFlow 1.x compatibility mode and the reference PhysNet package
-- **NequIP / XPaiNN** — :code:`nequip`, :code:`XequiNet` and their transitive deps
+- **XPaiNN** — :code:`XequiNet` and its transitive deps
 - **PLUMED workflows** — :code:`py-plumed` and a PLUMED-enabled build
 - **QM annotation** — TeraChem executable/license, RDKit formal charges
 - **Bond assignment** — QuantumPDB-style PDB inputs and template SDFs
@@ -218,7 +218,7 @@ or optional :code:`EquiformerV2FeedForwardReadout` / physics layers after the Co
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-External models (NequIP, XPaiNN) live under :code:`enerzyme/models/nequip/` and :code:`enerzyme/models/xpainn/`. Requirements:
+External models (XPaiNN) live under :code:`enerzyme/models/xpainn/`. NequIP is internal (:code:`enerzyme/models/nequip/`). Requirements for a wrapper:
 
 - Lazy or guarded imports so core install still works
 - Add package names to :code:`autosummary_mock_imports` in :code:`docs/conf.py` if autodoc cannot import them on RTD
@@ -316,6 +316,10 @@ Tests live in :code:`test/`:
 - :code:`test_dimenet_parity_ops.py` — numerical parity vs PyG original DimeNet (not ++); energy uses PyG angles at atom ``i``; production Core uses paper angles at ``j``
 - :code:`test_dimenetpp_core.py` — DimeNet++ registration / YAML smoke, hierarchical features at ``out_emb_size``, SO(3) invariance, build_model E/F, pair graph with no triplets
 - :code:`test_dimenetpp_parity_ops.py` — numerical parity of ``DimeNetPPInteractionBlock`` vs PyG ``InteractionPPBlock`` (all-edge down-projection, then triplet gather), including an empty triplet list
+- :code:`test_facto_ops.py` — FACTO cutoff derivative, Gaussian window, descriptor table, and algebraic attention / feedback / injection / transport reductions
+- :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
+- :code:`test_grace_ops.py` — GRACE Chebyshev / spherical Bessel / cutoff, channel-aligned CG equivariance, Finnis–Sinclair powers, linear density head
+- :code:`test_grace_core.py` — GRACE registration / YAML smoke, preset table, batch isolation, 2L message ablation, rotation / inversion / translation, force finite-difference conservation, SimpleReadout contract
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
@@ -515,6 +519,21 @@ TECE (:code:`tece`)
 
 Xu et al. (arXiv:2607.10664) lives under :code:`enerzyme/models/tece/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ v0.2.0 (MIT). Register via :code:`get_ff_core("tece")`. The Core seeds equivariant features from scalar embeddings, then stacks uvSO2 interactions with Edge Cluster Expansion (:code:`ComplexProductBasis`) and Radial Rotary Attention, plus node-side :code:`CgtpACE` reused from TACE. Shared SO(2) primitives (:code:`WignerD` recursive/direct, :code:`uvSO2Linear`, :code:`SO2Gate`, :code:`LayoutTransform`) live in :code:`enerzyme/models/so3/`. Requires :code:`Lmax == lmax`. Do not conflate RRA with EFA Euclidean RoPE. Emit :code:`atom_feature` for :code:`SimpleReadout`. Example: :code:`tece_layers_example.yaml`. Tests: :code:`test/test_tece_*.py`. Enerzymette: :code:`architecture: tece` + resolved :code:`config.yaml`.
 
+NequIP (:code:`nequip`)
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Batzner et al. (Nat. Commun. 2022) live under :code:`enerzyme/models/nequip/` (:code:`core.py`, :code:`interaction.py`). Register via :code:`get_ff_core("nequip")`. The external ``nequip`` wrapper has been removed; do not import that package. Reuse :code:`BesselRBF(flavor="nequip")` (sinc basis × :code:`PolynomialEnvelope` × :math:`2\pi/r_{\max}^2`), :code:`RandomAtomEmbedding`, :code:`tp_out_irreps_with_instructions` / e3nn :code:`Gate`, :func:`enerzyme.models.activation.resolve_scalar_activation`, and :meth:`BaseFFCore.adopt_radius_stack`. The species embedding is the initial scalar state and the fixed node attribute for the self-connection. The first layer omits that connection unless :code:`sc_first` (isolated atoms stay at zero). The last convolution emits :math:`\ell=0` only, so :code:`atom_feature` is ``{F}x0e`` for :code:`SimpleReadout`. Per-element shift is :code:`AtomicAffine`, not a head inside the Core. Presets ``S``–``XL`` follow the current foundation widths; ``paper`` is the 2022 radial MLP. Example: :code:`nequip_layers_example.yaml`. Tests: :code:`test/test_nequip_core.py`. Enerzymette: :code:`architecture: nequip` + resolved :code:`config.yaml`. Checkpoints from mir-group/nequip are not weight-compatible.
+
+FACTO (:code:`facto`)
+^^^^^^^^^^^^^^^^^^^^^
+
+Liu et al. (arXiv:2611.03276) live under :code:`enerzyme/models/facto/` (:code:`core.py`, :code:`geometry.py`, :code:`interaction.py`, :code:`readout.py`). There is no upstream repository. Register via :code:`get_ff_core("facto")`. The degree-9 window is :func:`enerzyme.models.cutoff.facto_polynomial_cutoff` (YAML :code:`cutoff_fn: facto`), distinct from :class:`~enerzyme.models.cutoff.C3CutoffEnvelope`. Real spherical harmonics reuse :func:`enerzyme.models.so3.spherical_harmonics.spherical_harmonics` with ``layout="e3nn"`` and integral normalization, which covers ``L=6``. The Core emits hierarchical scalars plus isolated-atom states; :code:`FACTOEnergyReadout` and :code:`ZBLRepulsionEnergy` stay outside it. The 31-d elemental table is an Enerzyme stand-in — the paper does not list the components — and stops at Z=94. CUDA neighbor kernels and BF16×3 emulation are intentionally not ported. Tests: :code:`test/test_facto_ops.py`, :code:`test/test_facto_core.py`. Enerzymette: :code:`architecture: facto` + resolved :code:`config.yaml`.
+
+GRACE (:code:`grace`)
+^^^^^^^^^^^^^^^^^^^^^
+
+Lysogorskiy, Bochkarev, and Drautz (arXiv:2508.17936; method in Phys. Rev. X 14, 021036) live under :code:`enerzyme/models/grace/` (:code:`core.py`, :code:`basis.py`, :code:`coupling.py`, :code:`radial.py`, :code:`readout.py`, :code:`presets.py`). Register via :code:`get_ff_core("grace")`. This is an original implementation of the published recursion. `grace-tensorpotential <https://github.com/ICAMS/grace-tensorpotential>`_ is Academic Software License and is not imported; do not vendor it, and do not expect its checkpoints to load. Reuse :code:`RandomAtomEmbedding`, :code:`RangeSeparation`, real spherical harmonics (:code:`layout="e3nn"`), :func:`enerzyme.models.cutoff.powered_cosine_window`, :func:`enerzyme.models.functional.reduce_edge`, and :code:`EnergyReduce` / :code:`Force`. The channel-aligned Clebsch–Gordan product stays in the package: it is the ACE recursion, and e3nn's generated tensor product is not used. The Core emits :code:`atom_feature` ``[N, n_densities]``. :code:`GRACEEnergyReadout` implements the foundation linear+MLP head and the Finnis–Sinclair powers; :code:`SimpleReadout` also fits. Presets follow Table S1 and the public preset defaults. Tests: :code:`test/test_grace_ops.py`, :code:`test/test_grace_core.py`. Enerzymette: :code:`architecture: grace` + resolved :code:`config.yaml`.
+
 PaiNN (:code:`painn`)
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -523,7 +542,7 @@ Schütt, Unke, and Gastegger (ICML 2021, arXiv:2102.03150) live under :code:`ene
 EquFlash (:code:`equflash`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-SamsungDS GGNN EquFlash lives under :code:`enerzyme/models/equflash/` (:code:`core.py`, :code:`interaction.py`, :code:`irreps.py`). Register via :code:`get_ff_core("equflash")`. The Core is the convolution stack only. Reuse :code:`RandomAtomEmbedding`, :code:`BesselRBF(flavor="equflash")` (``(2/c) sin(nπr/c)/r``, trainable frequencies by default), and :code:`RangeSeparation` with :code:`cutoff_fn: xplor` plus :code:`cuton`. :func:`equflash_irreps` builds the scalar → natural-parity → scalar schedule; :code:`irreps_manual` overrides it. Messages use :func:`tp_out_irreps_with_instructions` and an :code:`e3nn` gate. The Core emits :code:`atom_feature` and :code:`feature_irreps` for :code:`SimpleReadout`. :code:`conv_denominator` rescales the scatter (default 1; GGNN's OMat yaml uses the dataset neighbor count). Cuequivariance / FlashTP are not wired. Example: :code:`equflash_layers_example.yaml`. Tests: :code:`test/test_equflash_core.py`. Enerzymette: :code:`architecture: equflash` + resolved :code:`config.yaml`.
+SamsungDS GGNN EquFlash lives under :code:`enerzyme/models/equflash/` (:code:`core.py`, :code:`interaction.py`, :code:`irreps.py`). Register via :code:`get_ff_core("equflash")`. The Core is the convolution stack only. Reuse :code:`RandomAtomEmbedding`, :code:`BesselRBF(flavor="equflash")` (``(2/c) sin(nπr/c)/r``, trainable frequencies by default), and :code:`RangeSeparation` with :code:`cutoff_fn: xplor` plus :code:`cuton`. :func:`equflash_irreps` builds the scalar → natural-parity → scalar schedule; :code:`irreps_manual` overrides it. Messages use :func:`tp_out_irreps_with_instructions` and an :code:`e3nn` gate. Scalar nonlinearities go through :func:`enerzyme.models.activation.resolve_scalar_activation`, shared with NequIP. :meth:`BaseFFCore.adopt_radius_stack` places the radius layers. The Core emits :code:`atom_feature` and :code:`feature_irreps` for :code:`SimpleReadout`. :code:`conv_denominator` rescales the scatter (default 1; GGNN's OMat yaml uses the dataset neighbor count). Cuequivariance / FlashTP are not wired. Example: :code:`equflash_layers_example.yaml`. Tests: :code:`test/test_equflash_core.py`. Enerzymette: :code:`architecture: equflash` + resolved :code:`config.yaml`.
 
 So3krates (:code:`so3krates`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -17,7 +17,7 @@ From :code:`enerzyme/models/layers/`:
     from :code:`enerzyme.models.so3` for equivariant cores).
 
 **Radial basis**
-    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
+    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash / nequip), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`
 
 **Embeddings**
     :code:`RandomAtomEmbedding`, :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
@@ -180,6 +180,11 @@ accept :code:`shallow_ensemble_size` on the last linear head; pair with
 :code:`e2former_lsr_layers_example.yaml`,
 :code:`equiformer_shallow_ensemble_example.yaml`.
 
+NequIP
+------
+
+With :code:`architecture: nequip`, pre-core layers are :code:`RangeSeparation`, :code:`BesselRBF` (``flavor: nequip``, polynomial order ``polynomial_p``, default 6), and :code:`RandomAtomEmbedding`. The Bessel layer already applies the polynomial envelope, so :code:`RangeSeparation` does not need a cutoff function. The Core returns scalar :code:`atom_feature`. Energy uses :code:`SimpleReadout` (bias-free linear matches the NequIP readout) → :code:`AtomicAffine` (per-element scale and shift) → :code:`EnergyReduce` → :code:`Force`. Set Core :code:`avg_num_neighbors` to the dataset mean. Optional Core :code:`preset` is ``S``, ``M``, ``L``, ``XL``, or ``paper``. Example: :code:`enerzyme/config/nequip_layers_example.yaml`.
+
 PaiNN and Cartesian tensor heads
 --------------------------------
 
@@ -189,6 +194,16 @@ EquFlash
 --------
 
 With :code:`architecture: equflash`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, ``(2/c) sin(nπr/c)/r``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: xplor` and :code:`cuton` supplies the radial window, which :code:`BesselRBF` multiplies in when ``apply_cutoff_fn: true``. The Core returns flat irreps :code:`atom_feature` and sets :code:`feature_irreps`. The default schedule ends on even scalars, so :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` is the energy stack. :code:`conv_denominator` on the Core rescales each aggregated message. Example: :code:`enerzyme/config/equflash_layers_example.yaml`.
+
+FACTO
+-----
+
+With :code:`architecture: facto`, the Core owns the elemental descriptor, the radial filters, and the interaction blocks. Pre-core :code:`RangeSeparation` should use :code:`cutoff_fn: facto` (6 Å in the paper) so the shared ZBL term sees the same smooth outer window. The Core returns :code:`atom_feature` ``(N, D, K)`` and :code:`isolated_atom_feature`. The paper energy head is :code:`FACTOEnergyReadout`; :code:`SimpleReadout` still works and reads the last block. :code:`ZBLRepulsionEnergy` is summed into :code:`Ea` by :code:`EnergyReduce` because its field name is :code:`E_zbl_a`. Set Core :code:`preset` to ``S``, ``M``, ``L``, or ``XL`` for the published widths. ``L`` and ``XL`` enable tensor transport. Example: :code:`enerzyme/config/facto_layers_example.yaml`.
+
+GRACE
+-----
+
+With :code:`architecture: grace`, pre-core layers are :code:`RangeSeparation` and :code:`RandomAtomEmbedding`. The Core does not own the embedding table. It returns invariant densities :code:`atom_feature` ``[N, n_densities]``. The foundation energy head is :code:`GRACEEnergyReadout` (linear density plus an MLP, then a per-element shift). :code:`SimpleReadout` reads the same vector. :code:`EnergyReduce` and :code:`Force` are unchanged, so forces stay :code:`Fa = -∇E`. Optional :code:`ZBLRepulsionEnergy` is added by name, as for other stacks. Set Core :code:`preset` to ``1L``, ``1L-M``, ``1L-L``, ``2L``, ``2L-M``, ``2L-L``, ``1L-latest``, ``2L-latest``, ``FS``, or ``custom``. ``FS`` is the Finnis–Sinclair readout; set :code:`dim_embedding: 64` and :code:`cutoff_sr: 7`. Example: :code:`enerzyme/config/grace_layers_example.yaml`.
 
 DimeNet and modular readouts
 ----------------------------

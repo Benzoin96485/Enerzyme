@@ -14,39 +14,21 @@ those dependencies.
 
 from __future__ import annotations
 
-import math
-from typing import Callable, Dict, List, Sequence
+from typing import List, Sequence
 
 import torch
-import torch.nn.functional as F
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
 from torch import Tensor, nn
 
+from ..activation import resolve_scalar_activation
 from ..e3nn_nn import tp_out_irreps_with_instructions
 from ..functional import segment_sum_coo
 
 
-def shifted_softplus(x: Tensor) -> Tensor:
-    return F.softplus(x) - math.log(2.0)
-
-
-_ACTIVATIONS: Dict[str, Callable[[Tensor], Tensor]] = {
-    "silu": F.silu,
-    "relu": F.relu,
-    "tanh": torch.tanh,
-    "sigmoid": torch.sigmoid,
-    "ssp": shifted_softplus,
-    "abs": torch.abs,
-}
-
-
-def resolve_activation(name: str) -> Callable[[Tensor], Tensor]:
-    key = name.lower()
-    if key not in _ACTIVATIONS:
-        known = ", ".join(sorted(_ACTIVATIONS))
-        raise ValueError(f"Unknown EquFlash activation {name!r}; expected one of {known}")
-    return _ACTIVATIONS[key]
+def resolve_activation(name: str):
+    """EquFlash name for :func:`enerzyme.models.activation.resolve_scalar_activation`."""
+    return resolve_scalar_activation(name)
 
 
 def build_equivariant_gate(

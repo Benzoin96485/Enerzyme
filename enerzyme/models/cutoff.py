@@ -5,6 +5,9 @@ Transition functions (:func:`polynomial_transition`, :func:`bump_transition`,
 (:class:`PolynomialEnvelope`, :class:`DimeNetEnvelope`,
 :class:`C3CutoffEnvelope`) are the same family of smooth radial windows used
 inside equivariant message passing (EquiformerV3, DimeNet, DPA4).
+:func:`facto_polynomial_cutoff` is the separate degree-9 window from FACTO.
+:func:`powered_cosine_window` is the GRACE ``(r/rc)^p`` cosine window.
+:func:`xplor_transition` is the CHARMM / XPLOR switch used by EquFlash.
 """
 
 from __future__ import annotations
@@ -120,6 +123,58 @@ def xplor_transition(x: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
     )
 
 
+@scale
+def facto_polynomial_cutoff(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
+    """C³ polynomial window used by FACTO (Liu et al., arXiv:2611.03276).
+
+    On the scaled coordinate ``x = r / R``::
+
+        f(x) = 1 - 84 x^6 + 216 x^7 - 189 x^8 + 56 x^9
+
+    ``f(0) = 1``, ``f(1) = 0``, and ``f', f'', f'''`` vanish at ``x = 1``.
+    The first five derivatives also vanish at ``x = 0``. On ``(0, 1)`` the
+    derivative is ``504 x^5 (x - 1)^3``, so ``f`` decreases from 1 to 0.
+    Distinct from :class:`C3CutoffEnvelope` (DeePMD / DPA4) and from
+    :class:`PolynomialEnvelope`.
+    """
+    x2 = x_ * x_
+    x3 = x2 * x_
+    x6 = x3 * x3
+    return 1.0 - 84.0 * x6 + 216.0 * x6 * x_ - 189.0 * x6 * x2 + 56.0 * x6 * x3
+
+
+def powered_cosine_window(distance: Tensor, cutoff: float, order: int) -> Tensor:
+    """``0.5 * (1 + cos(pi (r/rc)^p))`` on ``[0, rc)``, else 0.
+
+    GRACE uses ``p = 16`` for the foundation radial basis and ``p = 5`` for
+    the Finnis–Sinclair student. The derivative vanishes at ``r = rc`` because
+    ``sin(pi) = 0``, so a hard mask at the cutoff does not kink the force.
+    Distinct from :func:`cosine_transition`, which is linear in ``r/rc``.
+    """
+    if order < 1:
+        raise ValueError(f"cutoff order must be >= 1, got {order}")
+    ratio = (distance / cutoff).clamp(min=0)
+    powered = ratio if order == 1 else ratio.pow(int(order))
+    window = 0.5 * (1.0 + torch.cos(math.pi * powered))
+    return torch.where(distance < cutoff, window, torch.zeros_like(distance))
+
+
+def facto_pair_window(distance: Tensor, cutoff: float, r_short: float) -> Tensor:
+    """FACTO radial gate ``χ = f(r; Rc) * (1 - f(r; Rs))``.
+
+    ``f(·; Rc)`` is 1 at the origin and 0 at the interaction cutoff.
+    ``1 - f(·; Rs)`` suppresses learned pair terms inside the short-range
+    radius, where the ZBL repulsion carries the wall.
+    """
+    if r_short <= 0.0 or r_short >= cutoff:
+        raise ValueError(
+            f"short-range radius must lie in (0, cutoff), got Rs={r_short}, Rc={cutoff}"
+        )
+    outer = facto_polynomial_cutoff(distance, cutoff)
+    inner = facto_polynomial_cutoff(distance, r_short)
+    return outer * (1.0 - inner)
+
+
 CUTOFF_REGISTER = {
     "polynomial": polynomial_transition,
     # SO3LR / So3krates-torch alias for the PhysNet polynomial envelope.
@@ -128,8 +183,9 @@ CUTOFF_REGISTER = {
     "smooth": smooth_transition,
     "cosine": cosine_transition,
     "xplor": xplor_transition,
+    "facto": facto_polynomial_cutoff,
 }
-CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine", "xplor"]
+CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine", "xplor", "facto"]
 
 
 class PolynomialEnvelope(torch.nn.Module):

@@ -35,6 +35,14 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .equflash import EquFlashCore as Core
         from .equflash import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "facto":
+        from .facto import FACTOCore as Core
+        from .facto import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    elif architecture.lower() == "grace":
+        from .grace import GRACECore as Core
+        from .grace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "dimenet":
         from .dimenet import DimeNetCore as Core
         from .dimenet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
@@ -72,7 +80,7 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .allscaip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "nequip":
-        from .nequip import NequIPWrapper as Core
+        from .nequip import NequIPCore as Core
         from .nequip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "xpainn":

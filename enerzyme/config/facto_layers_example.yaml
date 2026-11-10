@@ -1,0 +1,43 @@
+# FACTO (Liu et al., arXiv:2611.03276). The Core is the interaction stack.
+# FACTOEnergyReadout is the paper energy head; ZBLRepulsionEnergy is the
+# short-range pair term. Both sit outside the Core.
+#
+# Paper backbones: set the Core preset to S, M, L, or XL (cutoff 6 Å,
+# short-range radius 1 Å, 5 blocks). S/M omit tensor transport; L/XL enable
+# it; XL uses angular order 6. This file is a small custom stack for smoke
+# tests. Enerzymette only needs architecture: facto in the resolved config.
+#
+# Fixed elemental DFT references belong in the datahub atomic-energy
+# transform (subtracted from the loss, restored on predict). The readout
+# reference buffer is the in-model e_ref and defaults to zero.
+# Train in eV by setting Hartree_in_E to 27.211386245988 so ZBL matches
+# the network targets. The default below is Hartree, matching other
+# Enerzyme stacks.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: facto
+      active: true
+      build_params:
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: facto
+        Bohr_in_R: 0.5291772105638411
+        Hartree_in_E: 1.0
+      layers:
+        - name: RangeSeparation
+        - name: Core
+          params:
+            preset: custom
+            scalar_dim: 16
+            num_groups: 4
+            tensor_channels: [8, 4]
+            num_radial: 8
+            num_blocks: 3
+            tensor_transport: true
+            r_short: 1.0
+        - name: FACTOEnergyReadout
+        - name: ZBLRepulsionEnergy
+        - name: EnergyReduce
+        - name: Force
