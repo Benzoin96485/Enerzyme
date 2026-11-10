@@ -48,7 +48,6 @@ Optional dependencies
 
 Some workflows need extra packages or external programs that are **not** installed by default:
 
-- **NequIP models** — :code:`nequip`
 - **XPaiNN models** — :code:`XequiNet`, SciPy, PySCF, pydantic
 - **PLUMED enhanced sampling** — :code:`py-plumed` and a PLUMED-enabled build
 - **QM annotation with TeraChem** — TeraChem (licensed)

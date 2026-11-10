@@ -75,7 +75,7 @@ Final Datahub Configuration
 Modelhub
 --------
 
-Models live under :code:`internal_FFs` (built into Enerzyme) or :code:`external_FFs` (NequIP, XPaiNN, etc.). Each model has a unique ID (e.g. :code:`FF01`).
+Models live under :code:`internal_FFs` (built into Enerzyme, including NequIP) or :code:`external_FFs` (XPaiNN and other wrappers). Each model has a unique ID (e.g. :code:`FF01`).
 
 Choosing an architecture
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -97,7 +97,7 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | GRACE          | Graph ACE foundation potentials          | Internal; presets 1L/2L   |
 +----------------+------------------------------------------+---------------------------+
-| NequIP         | External equivariant model               | Requires :code:`nequip`   |
+| NequIP         | E(3) tensor-product potentials           | Built in                  |
 +----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |
 +----------------+------------------------------------------+---------------------------+

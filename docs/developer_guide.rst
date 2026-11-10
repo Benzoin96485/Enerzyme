@@ -34,7 +34,7 @@ Optional dependencies
 Not every contributor needs all optional stacks. Install only what your change touches:
 
 - **PhysNet parity tests** — TensorFlow 1.x compatibility mode and the reference PhysNet package
-- **NequIP / XPaiNN** — :code:`nequip`, :code:`XequiNet` and their transitive deps
+- **XPaiNN** — :code:`XequiNet` and its transitive deps
 - **PLUMED workflows** — :code:`py-plumed` and a PLUMED-enabled build
 - **QM annotation** — TeraChem executable/license, RDKit formal charges
 - **Bond assignment** — QuantumPDB-style PDB inputs and template SDFs
@@ -218,7 +218,7 @@ or optional :code:`EquiformerV2FeedForwardReadout` / physics layers after the Co
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-External models (NequIP, XPaiNN) live under :code:`enerzyme/models/nequip/` and :code:`enerzyme/models/xpainn/`. Requirements:
+External models (XPaiNN) live under :code:`enerzyme/models/xpainn/`. NequIP is internal (:code:`enerzyme/models/nequip/`). Requirements for a wrapper:
 
 - Lazy or guarded imports so core install still works
 - Add package names to :code:`autosummary_mock_imports` in :code:`docs/conf.py` if autodoc cannot import them on RTD
@@ -517,6 +517,11 @@ TECE (:code:`tece`)
 ^^^^^^^^^^^^^^^^^^^
 
 Xu et al. (arXiv:2607.10664) lives under :code:`enerzyme/models/tece/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ v0.2.0 (MIT). Register via :code:`get_ff_core("tece")`. The Core seeds equivariant features from scalar embeddings, then stacks uvSO2 interactions with Edge Cluster Expansion (:code:`ComplexProductBasis`) and Radial Rotary Attention, plus node-side :code:`CgtpACE` reused from TACE. Shared SO(2) primitives (:code:`WignerD` recursive/direct, :code:`uvSO2Linear`, :code:`SO2Gate`, :code:`LayoutTransform`) live in :code:`enerzyme/models/so3/`. Requires :code:`Lmax == lmax`. Do not conflate RRA with EFA Euclidean RoPE. Emit :code:`atom_feature` for :code:`SimpleReadout`. Example: :code:`tece_layers_example.yaml`. Tests: :code:`test/test_tece_*.py`. Enerzymette: :code:`architecture: tece` + resolved :code:`config.yaml`.
+
+NequIP (:code:`nequip`)
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Batzner et al. (Nat. Commun. 2022) live under :code:`enerzyme/models/nequip/` (:code:`core.py`, :code:`interaction.py`). Register via :code:`get_ff_core("nequip")`. The external ``nequip`` wrapper has been removed; do not import that package. Reuse :code:`BesselRBF(flavor="nequip")` (sinc basis × :code:`PolynomialEnvelope` × :math:`2\pi/r_{\max}^2`), :code:`RandomAtomEmbedding`, and :code:`tp_out_irreps_with_instructions` / e3nn :code:`Gate`. The species embedding is the initial scalar state and the fixed node attribute for the self-connection. The first layer omits that connection unless :code:`sc_first` (isolated atoms stay at zero). The last convolution emits :math:`\ell=0` only, so :code:`atom_feature` is ``{F}x0e`` for :code:`SimpleReadout`. Per-element shift is :code:`AtomicAffine`, not a head inside the Core. Presets ``S``–``XL`` follow the current foundation widths; ``paper`` is the 2022 radial MLP. Example: :code:`nequip_layers_example.yaml`. Tests: :code:`test/test_nequip_core.py`. Enerzymette: :code:`architecture: nequip` + resolved :code:`config.yaml`. Checkpoints from mir-group/nequip are not weight-compatible.
 
 FACTO (:code:`facto`)
 ^^^^^^^^^^^^^^^^^^^^^
