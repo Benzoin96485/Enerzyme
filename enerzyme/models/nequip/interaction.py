@@ -14,25 +14,13 @@ import math
 from typing import Dict, List, Optional, Sequence
 
 import torch
-import torch.nn.functional as F
 from e3nn import o3
 from e3nn.nn import Gate, NormActivation
 from torch import Tensor, nn
 
+from ..activation import resolve_scalar_activation
 from ..e3nn_nn import tp_out_irreps_with_instructions
 from ..so3.radial import RadialMLP
-
-
-def _shifted_softplus(x: Tensor) -> Tensor:
-    return F.softplus(x) - math.log(2.0)
-
-
-_ACTS = {
-    "silu": F.silu,
-    "tanh": torch.tanh,
-    "abs": torch.abs,
-    "ssp": _shifted_softplus,
-}
 
 
 def _parity_key(parity: int) -> str:
@@ -50,10 +38,7 @@ def _resolve_acts(spec: Optional[Dict[str, str]]) -> Dict[str, str]:
         )
     resolved.update(spec)
     for name in resolved.values():
-        if name not in _ACTS:
-            raise ValueError(
-                f"unknown nonlinearity {name!r}; expected one of {sorted(_ACTS)}"
-            )
+        resolve_scalar_activation(name)
     return resolved
 
 
@@ -268,11 +253,13 @@ class NequIPConv(nn.Module):
             self.nonlin = Gate(
                 irreps_scalars=scalars,
                 act_scalars=[
-                    _ACTS[scalar_acts[_parity_key(ir.p)]] for _, ir in scalars
+                    resolve_scalar_activation(scalar_acts[_parity_key(ir.p)])
+                    for _, ir in scalars
                 ],
                 irreps_gates=irreps_gates,
                 act_gates=[
-                    _ACTS[gate_acts[_parity_key(ir.p)]] for _, ir in irreps_gates
+                    resolve_scalar_activation(gate_acts[_parity_key(ir.p)])
+                    for _, ir in irreps_gates
                 ],
                 irreps_gated=gated,
             )
@@ -281,7 +268,7 @@ class NequIPConv(nn.Module):
             conv_out = (scalars + gated).simplify()
             self.nonlin = NormActivation(
                 irreps_in=conv_out,
-                scalar_nonlinearity=_ACTS[scalar_acts["e"]],
+                scalar_nonlinearity=resolve_scalar_activation(scalar_acts["e"]),
                 normalize=True,
                 epsilon=1e-8,
                 bias=False,

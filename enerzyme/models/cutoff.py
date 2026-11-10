@@ -7,6 +7,7 @@ Transition functions (:func:`polynomial_transition`, :func:`bump_transition`,
 inside equivariant message passing (EquiformerV3, DimeNet, DPA4).
 :func:`facto_polynomial_cutoff` is the separate degree-9 window from FACTO.
 :func:`powered_cosine_window` is the GRACE ``(r/rc)^p`` cosine window.
+:func:`xplor_transition` is the CHARMM / XPLOR switch used by EquFlash.
 """
 
 from __future__ import annotations
@@ -96,6 +97,32 @@ def cosine_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     )
 
 
+def xplor_transition(x: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
+    """CHARMM / XPLOR switching function on absolute distance.
+
+    Returns 1 for ``r <= cuton``, 0 for ``r >= cutoff``, and the standard
+    cubic polynomial in ``r^2`` in between. ``cuton`` must be strictly smaller
+    than ``cutoff``. ``cuton=0`` is a valid full-range switch. This window is
+    not a linearly rescaled ``[0, 1]`` polynomial, so it does not use
+    :func:`scale`.
+    """
+    if cuton >= cutoff:
+        raise ValueError(f"xplor cuton ({cuton}) must be < cutoff ({cutoff})")
+    r_sq = x * x
+    r_on_sq = cuton * cuton
+    r_cut_sq = cutoff * cutoff
+    switched = (
+        (r_cut_sq - r_sq) ** 2
+        * (r_cut_sq + 2.0 * r_sq - 3.0 * r_on_sq)
+        / (r_cut_sq - r_on_sq) ** 3
+    )
+    return torch.where(
+        x <= cuton,
+        torch.ones_like(x),
+        torch.where(x >= cutoff, torch.zeros_like(x), switched),
+    )
+
+
 @scale
 def facto_polynomial_cutoff(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     """C³ polynomial window used by FACTO (Liu et al., arXiv:2611.03276).
@@ -155,9 +182,10 @@ CUTOFF_REGISTER = {
     "bump": bump_transition,
     "smooth": smooth_transition,
     "cosine": cosine_transition,
+    "xplor": xplor_transition,
     "facto": facto_polynomial_cutoff,
 }
-CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine", "facto"]
+CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine", "xplor", "facto"]
 
 
 class PolynomialEnvelope(torch.nn.Module):
