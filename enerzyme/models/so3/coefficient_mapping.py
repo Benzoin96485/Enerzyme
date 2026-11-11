@@ -143,3 +143,19 @@ class CoefficientMapping:
         rotate_inv_rescale = rotate_inv_rescale[:, :, mask_indices]
         self._rotate_inv_rescale_cache = rotate_inv_rescale
         return rotate_inv_rescale
+
+    def to(self, device: torch.device) -> "CoefficientMapping":
+        """Move index buffers in place. Callers share this object across layers."""
+        device = torch.device(device)
+        if self.device == device:
+            return self
+        self.device = device
+        self.l_harmonic = self.l_harmonic.to(device)
+        self.m_harmonic = self.m_harmonic.to(device)
+        self.m_complex = self.m_complex.to(device)
+        self.res_size = self.res_size.to(device)
+        self.to_m = self.to_m.to(device)
+        self.m_size = self.m_size.to(device)
+        self._mask_indices_cache = None
+        self._rotate_inv_rescale_cache = None
+        return self

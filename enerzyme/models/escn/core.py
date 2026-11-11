@@ -9,7 +9,7 @@ frames in ``so3.rotation``). Opt-in ``SphereSampleReadout`` consumes
 ``atom_sphere_feature`` for paper-style S² integration; optional
 ``vector_output_fields`` mirror the paper direct-force head.
 
-Distinct from ``enerzyme.models.esen`` (Meta UMA / eSCN-MD fairchem wrappers).
+Distinct from ``uma_qs`` and from native eSEN (``architecture: esen``).
 """
 
 from __future__ import annotations

@@ -1,0 +1,76 @@
+# eSEN (Fu et al., 2025, arXiv:2502.12147).
+# https://github.com/facebookresearch/fairchem tag fairchem_core-1.10.0 (MIT).
+# This stack is a native Core on shared SO(2) modules. It does not load UMA
+# checkpoints. architecture: uma_qs remains the fairchem UMA wrapper.
+#
+# The Core is the smooth message-passing stack only:
+#   GaussianRBF flavor esen = fairchem GaussianSmearing, width scalar 2
+#   polynomial envelope of order 5 on edge messages (inside the Core)
+#   two SO(2) convolutions with a SiLU gate, then a spectral (not grid) FFN
+# RangeSeparation keeps every neighbor inside the cutoff. Do not cap the
+# neighbor count: that discontinuity is what the paper's envelope avoids.
+# The energy MLP is SimpleReadout (two SiLU layers + bias), then
+# EnergyReduce and Force (Fa = -dE/dR). Element references belong in
+# AtomicAffine or the dataset, not in the Core.
+#
+# Published widths (sphere / hidden / edge channels 128, envelope on):
+#   MPTrj 3.2M: num_layers 2, lmax 2, mmax 2, 10 Gaussians, cutoff 6 Å
+#   SPICE 6.5M: num_layers 4, lmax 2, mmax 2, 10 Bessel, cutoff 5 Å
+#   30M:        num_layers 10, lmax 3, mmax 2, 64 Gaussians, cutoff 6 Å
+# See enerzyme.models.esen.native.PUBLISHED_*_CORE_PARAMS.
+# SPICE replaces GaussianRBF with BesselRBF flavor esen.
+# norm_type layer_norm is the Equiformer layer norm named in the paper text.
+# The released 30M config uses rms_norm_sh, which is the default here.
+#
+# Enerzymette: architecture: esen in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: esen
+      active: true
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 32
+        num_rbf: 10
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: null
+      layers:
+        - name: RangeSeparation
+        - name: GaussianRBF
+          params:
+            flavor: esen
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            sphere_channels: 32
+            hidden_channels: 32
+            edge_channels: 32
+            lmax: 2
+            mmax: 2
+            num_layers: 2
+            norm_type: rms_norm_sh
+            act_type: gate
+            mlp_type: spectral
+            use_envelope: true
+            rescale_factor: 5.0
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            num_hidden_layers: 2
+            use_bias_out: true
+            activation_fn: swish
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

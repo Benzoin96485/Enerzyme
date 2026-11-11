@@ -19,8 +19,9 @@ TECE (Xu et al., arXiv:2607.10664) adds recursive/direct :class:`WignerD`,
 :class:`uvSO2Linear`, :class:`SO2Gate`, :class:`ComplexProductBasis`, and
 :class:`LayoutTransform` for edge-frame ECE + Radial Rotary Attention.
 
-They are **not** used by the Meta UMA wrappers under ``enerzyme.models.esen``, which
-keep the fairchem ``eSCNMD*`` checkpoint path.
+Native eSEN (``architecture: esen``) uses these SO(2) convolutions, the SiLU
+gate, ``SO3Linear``, and the equivariant norms. The Meta UMA wrappers in the
+same ``esen`` package (``uma_qs``) do not: they keep the fairchem checkpoint path.
 """
 
 from .activation import GateActivation, S2Activation, SeparableS2Activation
