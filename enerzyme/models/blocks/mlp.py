@@ -1,3 +1,4 @@
+import math
 from typing import Optional, Union, Literal
 from numpy import ndarray
 from torch import Tensor
@@ -196,3 +197,94 @@ class ResidualMLP(NeuronLayer):
             return self.output(self.stack(x))
         else:
             return self.output(self.activation_fn(self.stack(x)))
+
+
+class _ShiftedSoftplus(Module):
+    """``softplus(x) - log(2)``, zero at the origin."""
+
+    def forward(self, x: Tensor) -> Tensor:
+        return F.softplus(x) - math.log(2.0)
+
+
+def _variance_nonlinearity(name: Optional[str]) -> Optional[type]:
+    if name is None:
+        return None
+    key = str(name).lower()
+    if key in {"none", "null"}:
+        return None
+    table = {
+        "silu": torch.nn.SiLU,
+        "mish": torch.nn.Mish,
+        "gelu": torch.nn.GELU,
+        "tanh": torch.nn.Tanh,
+        "ssp": _ShiftedSoftplus,
+    }
+    if key not in table:
+        known = ", ".join([*sorted(table), "none"])
+        raise ValueError(f"unknown nonlinearity {name!r}; expected one of {known}")
+    return table[key]
+
+
+class VariancePreservingMLP(Module):
+    """Bias-free MLP whose initial weights keep activation variance near one.
+
+    Matches ``nequip.nn.ScalarMLPFunction`` (uniform weights, ReLU gain on
+    every nonlinear layer except the variance-normalized end). ``nn.Linear``
+    stores ``(out, in)``; the scale is folded into the initial weight, so the
+    model class is the same as NequIP's ``(in, out)`` layout.
+    """
+
+    def __init__(
+        self,
+        input_dim: int,
+        output_dim: int,
+        hidden_layers_depth: int = 0,
+        hidden_layers_width: Optional[int] = None,
+        nonlinearity: Optional[str] = "silu",
+        bias: bool = False,
+        forward_weight_init: bool = True,
+    ) -> None:
+        super().__init__()
+        if int(input_dim) < 1 or int(output_dim) < 1:
+            raise ValueError(
+                f"MLP dims must be >= 1, got {input_dim} -> {output_dim}"
+            )
+        depth = int(hidden_layers_depth)
+        if depth < 0:
+            raise ValueError(f"hidden_layers_depth must be >= 0, got {depth}")
+        if depth == 0:
+            dims = [int(input_dim), int(output_dim)]
+        else:
+            if hidden_layers_width is None or int(hidden_layers_width) < 1:
+                raise ValueError(
+                    "hidden_layers_width must be >= 1 when "
+                    f"hidden_layers_depth={depth}"
+                )
+            width = int(hidden_layers_width)
+            dims = [int(input_dim), *([width] * depth), int(output_dim)]
+        act_cls = _variance_nonlinearity(nonlinearity)
+        self.dims = dims
+        self.is_nonlinear = act_cls is not None and len(dims) > 2
+        self.forward_weight_init = bool(forward_weight_init)
+        layers: list = []
+        n_linear = len(dims) - 1
+        for layer, (h_in, h_out) in enumerate(zip(dims, dims[1:])):
+            if self.forward_weight_init:
+                norm_dim = h_in
+                gain = 1.0 if act_cls is None or layer == 0 else math.sqrt(2.0)
+            else:
+                norm_dim = h_out
+                gain = 1.0 if act_cls is None or layer == n_linear - 1 else math.sqrt(2.0)
+            linear = torch.nn.Linear(h_in, h_out, bias=bias)
+            init.uniform_(linear.weight, -math.sqrt(3.0), math.sqrt(3.0))
+            with torch.no_grad():
+                linear.weight.mul_(gain / math.sqrt(float(norm_dim)))
+            if bias:
+                init.zeros_(linear.bias)
+            layers.append(linear)
+            if act_cls is not None and layer != n_linear - 1:
+                layers.append(act_cls())
+        self.net = Sequential(*layers)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.net(x)

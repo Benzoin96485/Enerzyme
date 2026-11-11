@@ -21,7 +21,7 @@ from .electrostatics import (
     VelocityConservationLayer,
 )
 from .gradient import ForceLayer, EnergyVarianceGradientLayer
-from .reduce import EnergyReduceLayer, ShallowEnsembleReduceLayer
+from .reduce import EnergyReduceLayer, EdgeEnergyReduceLayer, ShallowEnsembleReduceLayer
 from .denormalize import AtomicAffineLayer
 from .dispersion import GrimmeD3EnergyLayer, GrimmeD4EnergyLayer, TSQDODispersionEnergyLayer
 from .zbl import ZBLRepulsionEnergyLayer
@@ -31,12 +31,14 @@ from .spin import SpinConservationLayer
 from .nse import NeuralSpinChargeEquilibrationLayer
 from .readout import (
     SimpleReadout,
+    EdgeReadout,
     HierachicalReadout,
     NSEReadout,
     HierachicalNSEReadout,
     VelocityReadout,
     HirshfeldReadout,
 )
+from .pair_embedding import PairChemicalRadialLayer
 from .tensorial import EquivariantDipoleLayer, EquivariantPolarizabilityLayer
 # Architecture-specific readouts: defined next to interaction / so3 readout,
 # re-exported for layer-stack name discovery (``Layers.EquiformerGraphAttentionReadout``, …).

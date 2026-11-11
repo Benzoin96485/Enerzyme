@@ -1,0 +1,68 @@
+# Allegro (Musaelian et al., Nat. Commun. 2023, 14, 579).
+# Core: strictly local E(3)-equivariant tensor products on directed pairs.
+# num_layers raises body order (1 layer is three-body). The receptive field
+# stays inside cutoff_sr.
+# Pair species embedding, sinc-Bessel × polynomial basis, the pair-energy MLP,
+# the directed-edge sum, and the per-element shift stay outside the Core.
+#
+# Set avg_num_neighbors to the mean number of neighbors inside cutoff_sr.
+# EdgeEnergyReduce divides by sqrt(avg_num_neighbors) and, with pair_symmetry,
+# by sqrt(2), because the neighbor list stores both ij and ji.
+# Widths match mir-group/allegro configs/tutorial.yaml. Train near lr 1e-3.
+# Enerzymette: architecture: allegro in the resolved config.yaml.
+# This does not load checkpoints from mir-group/allegro.
+# Optional short-range repulsion: add ZBLRepulsionEnergy before EnergyReduce.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: allegro
+      active: true
+      build_params:
+        dim_edge: 64
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 5.0
+        avg_num_neighbors: 1.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: nequip
+            trainable: false
+            polynomial_p: 6
+        - name: PairChemicalRadial
+        - name: Core
+          params:
+            num_layers: 2
+            l_max: 1
+            parity: true
+            num_scalar_features: 64
+            num_tensor_features: 32
+            scalar_embed_mlp_depth: 1
+            latent_mlp_depth: 1
+            nonlinearity: silu
+            tp_path_channel_coupling: true
+            weight_individual_irreps: true
+        - name: EdgeReadout
+          params:
+            output_fields: [Eij]
+            head_type: variance_preserving
+            hidden_layers_depth: 1
+            nonlinearity: silu
+            use_bias: false
+        - name: EdgeEnergyReduce
+          params:
+            pair_symmetry: true
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+        - name: EnergyReduce
+        - name: Force

@@ -1,3 +1,4 @@
+import math
 from typing import Dict, List, Set
 import torch
 from torch import Tensor
@@ -26,6 +27,54 @@ class EnergyReduceLayer(BaseFFLayer):
         else:
             batch_seg = torch.zeros_like(relevant_input["Za"])
         return {"E": segment_sum_coo(Ea, batch_seg), "Ea": Ea}
+
+
+class EdgeEnergyReduceLayer(BaseFFLayer):
+    """Sum directed pair energies onto the center atom.
+
+    ``idx_i_sr`` is the center. The result is divided by
+    ``sqrt(avg_num_neighbors)``. ``pair_symmetry`` also divides by ``sqrt(2)``,
+    the Allegro normalization for a graph that stores both ``ij`` and ``ji``:
+    each endpoint contributes, and the factor keeps ``dE/dr`` from double-counting
+    that pair of directions. Isolated atoms stay at zero so their reference
+    energy can sit in ``AtomicAffine``.
+    """
+
+    def __init__(
+        self,
+        avg_num_neighbors: float = 1.0,
+        pair_symmetry: bool = True,
+    ) -> None:
+        super().__init__(
+            input_fields={"Eij", "idx_i_sr", "Za"},
+            output_fields={"Ea"},
+        )
+        if float(avg_num_neighbors) <= 0:
+            raise ValueError(
+                f"avg_num_neighbors must be positive, got {avg_num_neighbors}"
+            )
+        self.avg_num_neighbors = float(avg_num_neighbors)
+        self.pair_symmetry = bool(pair_symmetry)
+
+    def get_output(self, Eij: Tensor, idx_i_sr: Tensor, Za: Tensor) -> Dict[str, Tensor]:
+        n_atoms = Za.shape[0]
+        if Eij.shape[0] != idx_i_sr.shape[0]:
+            raise ValueError(
+                f"Eij has {Eij.shape[0]} edges but idx_i_sr has {idx_i_sr.shape[0]}"
+            )
+        out = Eij.new_zeros((n_atoms,) + tuple(Eij.shape[1:]))
+        if idx_i_sr.numel():
+            centers = idx_i_sr.long()
+            if int(centers.max()) >= n_atoms or int(centers.min()) < 0:
+                raise ValueError(
+                    f"idx_i_sr must lie in 0..{n_atoms - 1}, "
+                    f"got {int(centers.min())}..{int(centers.max())}"
+                )
+            out.index_add_(0, centers, Eij)
+        scale = 1.0 / math.sqrt(self.avg_num_neighbors)
+        if self.pair_symmetry:
+            scale /= math.sqrt(2.0)
+        return {"Ea": out * scale}
 
 
 class ShallowEnsembleReduceLayer(BaseFFLayer):

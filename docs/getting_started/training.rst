@@ -107,6 +107,8 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | NequIP         | E(3) tensor-product potentials           | Built in                  |
 +----------------+------------------------------------------+---------------------------+
+| Allegro        | Strictly local many-body pairs           | Built in; large systems   |
++----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |
 +----------------+------------------------------------------+---------------------------+
 | AllScAIP       | Research only (do not use as primary)   | Experimental 魔改 port;   |

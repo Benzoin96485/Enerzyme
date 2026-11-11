@@ -1,6 +1,6 @@
 from typing import Set, Literal, Dict, Optional, List, Callable
 from . import BaseFFLayer
-from ..blocks.mlp import DenseLayer, ResidualMLP, ResidualLayer
+from ..blocks.mlp import DenseLayer, ResidualMLP, ResidualLayer, VariancePreservingMLP
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, POSITIVE_ACTIVATION_KEY_TYPE, get_positive_activation_fn
 from ..e3nn_nn import extract_scalar_0e
 import math
@@ -16,6 +16,7 @@ HEAD_TYPE = Literal[
     "two_layer",
     "mlp",
     "equiformer_linear_rs",
+    "variance_preserving",
 ]
 
 
@@ -130,6 +131,12 @@ class BaseReadout(BaseFFLayer):
             self.dim_feature_in = dim_embedding
         else:
             raise ValueError("dim_embedding or dim_feature_out from the last layer must be provided")
+        self._hinted_hidden_width = None
+        for layer in reversed(built_layers):
+            hinted = getattr(layer, "readout_hidden_width", None)
+            if hinted is not None:
+                self._hinted_hidden_width = int(hinted)
+                break
         self.dim_feature_out = len(self.ordered_output_fields)
         self.activation_fn = activation_fn
         self.activation_params = activation_params
@@ -247,6 +254,37 @@ class BaseReadout(BaseFFLayer):
                 )
             )
             return Sequential(*layers)
+        elif self.head_type == "variance_preserving":
+            # Allegro / NequIP scalar MLP: SiLU hidden layers, bias-free by default,
+            # variance-preserving uniform init. Hidden width falls back to the
+            # Core's ``readout_hidden_width`` (Allegro scalar channels) and then
+            # to the latent width.
+            head_params = dict(self.head_params)
+            depth = int(head_params.pop("hidden_layers_depth", 1))
+            width = head_params.pop("hidden_layers_width", None)
+            nonlinearity = head_params.pop("nonlinearity", None)
+            use_bias = bool(head_params.pop("use_bias", False))
+            forward_init = bool(head_params.pop("forward_weight_init", True))
+            if head_params:
+                unknown = ", ".join(sorted(head_params))
+                raise ValueError(
+                    f"variance_preserving head received unknown params: {unknown}"
+                )
+            if nonlinearity is None:
+                nonlinearity = self.activation_fn if self.activation_fn is not None else "silu"
+            if width is None and self._hinted_hidden_width is not None:
+                width = self._hinted_hidden_width
+            if width is None:
+                width = self.dim_feature_in
+            return VariancePreservingMLP(
+                input_dim=self.dim_feature_in,
+                output_dim=self.dim_feature_out * self.shallow_ensemble_size,
+                hidden_layers_depth=depth,
+                hidden_layers_width=None if depth == 0 else int(width),
+                nonlinearity=None if depth == 0 else nonlinearity,
+                bias=use_bias,
+                forward_weight_init=forward_init,
+            )
         elif self.head_type == "equiformer_linear_rs":
             # Official Equiformer MD17 scalar energy MLP:
             # LinearRS → Activation(normalize2mom(SiLU)) → LinearRS.
@@ -305,6 +343,58 @@ class SimpleReadout(BaseReadout):
 
     def get_output(self, atom_feature: Tensor) -> Dict[str, Tensor]:
         return self._split_field_outputs(self.head(self._scalar_atom_feature(atom_feature)))
+
+
+class EdgeReadout(SimpleReadout):
+    """Property head on a per-edge latent.
+
+    Same heads as :class:`SimpleReadout`, reading ``edge_feature`` instead of
+    ``atom_feature``. Allegro writes ``Eij`` here; :class:`EdgeEnergyReduceLayer`
+    scatters that pair energy onto atoms. ``head_type: variance_preserving``
+    is the Allegro / NequIP scalar MLP.
+    """
+
+    def __init__(
+        self,
+        output_fields: Set[str],
+        built_layers: List[Module],
+        head_type: HEAD_TYPE = "variance_preserving",
+        dim_embedding: Optional[int] = None,
+        shallow_ensemble_size: int = 1,
+        keep_feature: bool = False,
+        activation_fn: Optional[ACTIVATION_KEY_TYPE] = None,
+        activation_params: ACTIVATION_PARAM_TYPE = dict(),
+        feature_irreps: Optional[str] = None,
+        **head_params,
+    ) -> None:
+        super().__init__(
+            output_fields=output_fields,
+            built_layers=built_layers,
+            head_type=head_type,
+            dim_embedding=dim_embedding,
+            shallow_ensemble_size=shallow_ensemble_size,
+            keep_feature=False,
+            activation_fn=activation_fn,
+            activation_params=activation_params,
+            feature_irreps=feature_irreps,
+            **head_params,
+        )
+        self._input_fields = {"edge_feature"}
+        fields = set(output_fields)
+        if keep_feature:
+            fields.add("edge_feature")
+        self._output_fields = fields
+        self._relevant_fields = self._input_fields | self._output_fields
+        self._name_mapping = {name: name for name in self._relevant_fields}
+        self.keep_edge_feature = bool(keep_feature)
+
+    def get_output(self, edge_feature: Tensor) -> Dict[str, Tensor]:
+        outputs = self._split_field_outputs(
+            self.head(self._scalar_atom_feature(edge_feature))
+        )
+        if self.keep_edge_feature:
+            outputs["edge_feature"] = edge_feature
+        return outputs
 
 
 class NSEReadout(BaseReadout):
