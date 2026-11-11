@@ -31,6 +31,18 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .painn import PaiNNCore as Core
         from .painn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "equflash":
+        from .equflash import EquFlashCore as Core
+        from .equflash import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    elif architecture.lower() == "facto":
+        from .facto import FACTOCore as Core
+        from .facto import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    elif architecture.lower() == "grace":
+        from .grace import GRACECore as Core
+        from .grace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "dimenet":
         from .dimenet import DimeNetCore as Core
         from .dimenet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
@@ -68,7 +80,7 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .allscaip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "nequip":
-        from .nequip import NequIPWrapper as Core
+        from .nequip import NequIPCore as Core
         from .nequip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "xpainn":
@@ -106,8 +118,8 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .equiformer_v3.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() in {"equflashv2", "equflash_v2"}:
-        from .equflash.core import EquFlashV2Core as Core
-        from .equflash.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        from .equflash.core_v2 import EquFlashV2Core as Core
+        from .equflash.core_v2 import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "e2former":
         from .e2former.core import E2FormerCore as Core

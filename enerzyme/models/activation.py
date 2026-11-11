@@ -210,3 +210,31 @@ def get_positive_activation_fn(
     key: POSITIVE_ACTIVATION_KEY_TYPE,
 ) -> Callable[[Tensor], Tensor]:
     return POSITIVE_ACTIVATION_REGISTER[key]
+
+
+def shifted_softplus(x: Tensor) -> Tensor:
+    """``softplus(x) - log(2)``. Zero at the origin, used by e3nn gates."""
+    return F.softplus(x) - math.log(2.0)
+
+
+SCALAR_ACTIVATION_REGISTER: Dict[str, Callable[[Tensor], Tensor]] = {
+    "silu": F.silu,
+    "relu": F.relu,
+    "tanh": torch.tanh,
+    "sigmoid": torch.sigmoid,
+    "ssp": shifted_softplus,
+    "abs": torch.abs,
+}
+
+
+def resolve_scalar_activation(name: str) -> Callable[[Tensor], Tensor]:
+    """Callable nonlinearity for an e3nn gate or radial MLP.
+
+    Distinct from :func:`get_activation_fn`, which returns a tempered module
+    (``swish`` / ``shifted_softplus`` with per-channel scale).
+    """
+    key = name.lower()
+    if key not in SCALAR_ACTIVATION_REGISTER:
+        known = ", ".join(sorted(SCALAR_ACTIVATION_REGISTER))
+        raise ValueError(f"Unknown scalar activation {name!r}; expected one of {known}")
+    return SCALAR_ACTIVATION_REGISTER[key]

@@ -38,7 +38,7 @@ Structure
                         rmse: 0.91656181
         external_FFs:
             FF06:
-                architecture: NequIP
+                architecture: XPaiNN
                 active: false
 
 Key fields

@@ -223,7 +223,7 @@ def test_equflash_isolated_atom_and_molecule_separation():
 def test_bilinear_gate_and_contraction_are_equivariant():
     from e3nn import o3
 
-    from enerzyme.models.equflash.interaction import BiLinearGate, SymmetricContraction
+    from enerzyme.models.equflash.interaction_v2 import BiLinearGate, SymmetricContraction
 
     torch.manual_seed(3)
     irreps = o3.Irreps("4x0e+4x1o")

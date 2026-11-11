@@ -18,8 +18,6 @@ class BaseRBF(BaseFFLayer):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = None,
         apply_cutoff_fn: bool = True,
-        *,
-        cuton: float = 0.0,
     ) -> None:
         input_fields = {"Dij_sr"}
         if apply_cutoff_fn:
@@ -27,7 +25,6 @@ class BaseRBF(BaseFFLayer):
         super().__init__(input_fields=input_fields, output_fields={"rbf"})
         self.num_rbf = num_rbf
         self.cutoff_sr = cutoff_sr
-        self.cuton = float(cuton)
         self.apply_cutoff_fn = apply_cutoff_fn
         if apply_cutoff_fn:
             if cutoff_fn is None:
@@ -43,7 +40,8 @@ class BaseRBF(BaseFFLayer):
         if not self.apply_cutoff_fn:
             return rbf
         if cutoff_values_sr is None:
-            cutoff_values_sr = self.cutoff_fn(Dij_sr, self.cutoff_sr, self.cuton)
+            cuton = getattr(self, "cuton", 0.0)
+            cutoff_values_sr = self.cutoff_fn(Dij_sr, self.cutoff_sr, cuton)
         return cutoff_values_sr.view(-1, 1) * rbf
 
     @abstractmethod
@@ -481,11 +479,22 @@ class BesselRBFLayer(BaseRBF):
 
         e_n(r) = sin(n π r / c) / r
 
-    ``flavor="equflash"`` is the EquFlash / SevenNet spherical Bessel basis.
-    The XPLOR (or other) window is applied by ``apply_cutoff_fn``; pass
-    ``cuton`` when the fallback window is XPLOR::
+    ``flavor="equflash"`` is the SevenNet / EquFlash basis. Frequencies are
+    trainable by default, and the radial window (XPLOR in the published
+    stack) multiplies the basis::
 
         e_n(r) = (2/c) sin(n π r / c) / r
+
+    ``flavor="nequip"`` is the maintained `mir-group/nequip` edge embedding:
+    normalized sinc Bessel functions, the DimeNet / NequIP polynomial envelope
+    of order ``polynomial_p`` (default 6), and the constant
+    :math:`2\\pi/c^2` applied in ``FullNequIPGNNModel``. Frequencies are the
+    integers :math:`n = 1\\ldots N` and are trainable when ``trainable`` is
+    true. The envelope is inside this layer, so ``apply_cutoff_fn`` is forced
+    off::
+
+        x = r / c
+        e_n(r) = (2π / c²) · n · sinc(n x) · u_p(x)
     """
 
     def __init__(
@@ -494,33 +503,36 @@ class BesselRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "polynomial",
         trainable: Optional[bool] = None,
-        flavor: Literal["default", "dimenet", "painn", "equflash"] = "default",
+        flavor: Literal["default", "dimenet", "painn", "equflash", "nequip"] = "default",
         envelope_exponent: int = 5,
         apply_cutoff_fn: Optional[bool] = None,
         cuton: float = 0.0,
+        polynomial_p: int = 6,
     ) -> None:
         self.flavor = flavor
-        if flavor not in ("default", "dimenet", "painn", "equflash"):
+        if flavor not in ("default", "dimenet", "painn", "equflash", "nequip"):
             raise ValueError(
                 "Unknown BesselRBF flavor "
-                f"{flavor!r}; expected 'default', 'dimenet', 'painn', or 'equflash'"
+                f"{flavor!r}; expected 'default', 'dimenet', 'painn', 'equflash', or 'nequip'"
             )
         if trainable is None:
-            trainable = flavor == "dimenet"
+            trainable = flavor in ("dimenet", "equflash")
         if apply_cutoff_fn is None:
-            # DimeNet envelope and PaiNN filters own the radial window.
-            # EquFlash multiplies this basis by the XPLOR (or other) window.
+            # DimeNet, PaiNN, and NequIP each own their radial window.
+            # EquFlash multiplies the XPLOR window onto this basis.
             apply_cutoff_fn = flavor in ("default", "equflash")
-        if flavor == "dimenet":
+        if flavor in ("dimenet", "nequip"):
             apply_cutoff_fn = False
             cutoff_fn = None
+        if flavor == "nequip" and int(polynomial_p) < 2:
+            raise ValueError(
+                f"NequIP polynomial_p must be >= 2, got {polynomial_p}"
+            )
+        self.polynomial_p = int(polynomial_p)
         super().__init__(
-            num_rbf,
-            cutoff_sr,
-            cutoff_fn,
-            apply_cutoff_fn=apply_cutoff_fn,
-            cuton=cuton,
+            num_rbf, cutoff_sr, cutoff_fn, apply_cutoff_fn=apply_cutoff_fn
         )
+        self.cuton = float(cuton)
         self.envelope_exponent = int(envelope_exponent)
         dtype = torch.get_default_dtype()
         if flavor == "dimenet":
@@ -535,6 +547,19 @@ class BesselRBFLayer(BaseRBF):
             else:
                 self.register_buffer("bessel_weights", frequencies)
             self.register_buffer("prefactor", torch.tensor(1.0, dtype=dtype))
+        elif flavor == "nequip":
+            from ..cutoff import PolynomialEnvelope
+
+            self.envelope = PolynomialEnvelope(cutoff_sr, self.polynomial_p)
+            frequencies = torch.arange(1, num_rbf + 1, dtype=dtype)
+            if trainable:
+                self.bessel_weights = torch.nn.Parameter(frequencies)
+            else:
+                self.register_buffer("bessel_weights", frequencies)
+            self.register_buffer(
+                "prefactor",
+                torch.tensor(2.0 * math.pi / (cutoff_sr * cutoff_sr), dtype=dtype),
+            )
         else:
             self.envelope = None
             bessel_weights = (
@@ -567,17 +592,24 @@ class BesselRBFLayer(BaseRBF):
         if self.flavor == "dimenet":
             d_scaled = dist / self.cutoff_sr
             return self.envelope(d_scaled) * torch.sin(self.bessel_weights * d_scaled)
-        if self.flavor == "painn":
+        if self.flavor == "nequip":
+            # x = r/c, e_n = (2π/c²) * n * sinc(n x) * polynomial envelope.
+            scaled = dist / self.cutoff_sr
+            weights = self.bessel_weights.view(1, -1)
+            bessel = torch.sinc(scaled * weights) * weights
+            return self.prefactor * bessel * self.envelope(dist)
+        if self.flavor in ("painn", "equflash"):
             # SchNetPack BesselRBF: r = 0 contributes 0 (divide by 1).
+            # EquFlash uses the same quotient times ``2/c``. At r = 0 the
+            # analytic limit is ``prefactor * nπ/c`` so a contact does not NaN.
             flat = dist.view(-1)
-            norm = torch.where(flat == 0, torch.ones_like(flat), flat).unsqueeze(-1)
-            return torch.sin(flat.unsqueeze(-1) * self.bessel_weights) / norm
-        if self.flavor == "equflash":
-            # (2/c) sin(n π r / c) / r, with the r → 0 limit n π (2/c²).
-            freq = self.bessel_weights.view(1, -1)
-            safe = dist.clamp_min(1e-12)
-            sinc = torch.where(dist > 0, torch.sin(freq * dist) / safe, freq)
-            return self.prefactor * sinc
+            safe = torch.where(flat == 0, torch.ones_like(flat), flat).unsqueeze(-1)
+            values = torch.sin(flat.unsqueeze(-1) * self.bessel_weights) / safe
+            if self.flavor == "equflash":
+                limit = self.prefactor * self.bessel_weights.view(1, -1)
+                values = self.prefactor * values
+                values = torch.where(flat.view(-1, 1) == 0, limit, values)
+            return values
         numerator = torch.sin(self.bessel_weights.view(1, -1) * dist)
         return self.prefactor * (numerator / dist)
 

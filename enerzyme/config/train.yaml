@@ -567,9 +567,10 @@ Modelhub:
         - name: AtomicCharge2Dipole
         - name: EnergyReduce
         - name: Force
-  external_FFs:
     FF05:
       suffix:
+      # Native NequIP. The nequip package is not required.
+      # Canonical stack: enerzyme/config/nequip_layers_example.yaml
       architecture: NequIP
       active: true
       loss:
@@ -581,40 +582,49 @@ Modelhub:
           rmse: 52.917721
         E:
           rmse: 1
-      build_params:                                      # TODO: explain parameters
-        r_max: 6.0
-        chemical_symbols: ["H", "C", "N", "O", "P", "S"]
-        default_dtype: float32
-        model_dtype: float32
+      build_params:
+        dim_embedding: 32
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 5.0
       layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: nequip
+            trainable: false
+            polynomial_p: 6
+        - name: RandomAtomEmbedding
         - name: Core
           params:
-            model_builders: 
-              - SimpleIrrepsConfig
-              - EnergyModel
-              - PerSpeciesRescale
-              - ForceOutput
-              - RescaleEnergyEtc
             num_layers: 4
             l_max: 1
             parity: true
             num_features: 32
-            nonlinearity_type: gate
-            activation: silu
-            resnet: false
-            nonlinearity_scalars:
-              e: silu
-              o: tanh
-            nonlinearity_gates:
-              e: silu
-              o: tanh
-            num_basis: 8
-            BesselBasis_trainable: true
-            PolynomialCutoff_p: 6
-            invariant_layers: 2
-            invariant_neurons: 64
-            avg_num_neighbors: 8
+            radial_mlp_depth: 1
+            radial_mlp_width: 128
             use_sc: true
+            sc_first: false
+            avg_num_neighbors: 8
+        - name: SimpleReadout
+          params:
+            output_fields:
+              - Ea
+            head_type: dense
+            use_bias: false
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+        - name: EnergyReduce
+        - name: Force
+  external_FFs:
     FF06:
       suffix:
       architecture: XPaiNN
@@ -1051,8 +1061,116 @@ Modelhub:
         - name: Force
     FF16:
       suffix:
+      # EquFlash (SamsungDS/GGNN). uvu tensor-product Core.
+      # Full notes: enerzyme/config/equflash_layers_example.yaml.
+      architecture: equflash
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 32
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: xplor
+        cuton: 5.5
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            trainable: true
+            apply_cutoff_fn: true
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            lmax: 2
+            num_layers: 2
+            parity: true
+            radial_hidden: [64, 64]
+            conv_denominator: 1.0
+            train_denominator: false
+            use_bias: false
+            feed_forward: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
+    FF17:
+      architecture: facto
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        max_Za: 94
+        cutoff_sr: 6.0
+        cutoff_fn: facto
+        Bohr_in_R: 0.5291772105638411
+        Hartree_in_E: 1.0
+      layers:
+        - name: RangeSeparation
+        - name: Core
+          params:
+            preset: S
+            r_short: 1.0
+        - name: FACTOEnergyReadout
+        - name: ZBLRepulsionEnergy
+        - name: EnergyReduce
+        - name: Force
+    FF18:
+      architecture: grace
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        max_Za: 94
+        dim_embedding: 128
+        cutoff_sr: 6.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            preset: 1L
+        - name: GRACEEnergyReadout
+        - name: EnergyReduce
+        - name: Force
+    FF19:
+      suffix:
       # EquFlashV2. See enerzyme/config/equflashv2_layers_example.yaml.
-      # Core is CG message passing; Bessel/XPLOR, readout, and forces are shared layers.
+      # Shares the equflash Bessel / XPLOR window with FF16. The Core is the
+      # channelwise stack; readout, species affine, and forces stay outside it.
       architecture: equflashv2
       active: false
       loss:
