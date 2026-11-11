@@ -62,6 +62,9 @@ class GaussianRBFLayer(BaseRBF):
     * ``PhysNet`` (default): ``coeff = -num_rbf / cutoff``
     * ``SchNet``: ``coeff = -0.5 / Δ²`` with ``Δ = cutoff / (num_rbf - 1)``
       (PyG Gaussian smearing convention)
+    * ``esen``: fairchem eSEN ``GaussianSmearing`` with ``basis_width_scalar=2``,
+      ``coeff = -0.5 / (2Δ)²``. The message envelope lives in the eSEN Core, so
+      the published stack sets ``apply_cutoff_fn: false``.
 
     Cutoff envelope application is controlled separately by ``apply_cutoff_fn``.
     """
@@ -72,7 +75,7 @@ class GaussianRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "bump",
         apply_cutoff_fn: bool = True,
-        flavor: Literal["PhysNet", "SchNet"] = "PhysNet",
+        flavor: Literal["PhysNet", "SchNet", "esen"] = "PhysNet",
     ) -> None:
         if apply_cutoff_fn and cutoff_fn is None:
             cutoff_fn = "bump"
@@ -96,9 +99,22 @@ class GaussianRBFLayer(BaseRBF):
             )
             self.register_buffer("coeff", coeff)
             self.register_buffer("width", -coeff)
+        elif flavor == "esen":
+            if num_rbf < 2:
+                raise ValueError(
+                    f"esen Gaussian flavor needs num_rbf >= 2, got {num_rbf}"
+                )
+            center = torch.linspace(0, cutoff_sr, num_rbf)
+            self.register_buffer("center", center)
+            delta = (center[1] - center[0]).item()
+            # fairchem GaussianSmearing(..., basis_width_scalar=2.0)
+            coeff = torch.tensor(-0.5 / (2.0 * delta) ** 2)
+            self.register_buffer("coeff", coeff)
+            self.register_buffer("width", -coeff)
         else:
             raise ValueError(
-                f"Unknown GaussianRBF flavor {flavor!r}; expected 'PhysNet' or 'SchNet'"
+                "Unknown GaussianRBF flavor "
+                f"{flavor!r}; expected 'PhysNet', 'SchNet', or 'esen'"
             )
 
     def _get_rbf(self, Dij: Tensor) -> Tensor:
@@ -495,6 +511,16 @@ class BesselRBFLayer(BaseRBF):
 
         x = r / c
         e_n(r) = (2π / c²) · n · sinc(n x) · u_p(x)
+
+    ``flavor="esen"`` is fairchem eSEN ``EnvelopedBesselBasis``: trainable
+    frequencies :math:`ω_n = nπ` on scaled distance, times the polynomial
+    envelope of order 5 and :math:`\\sqrt{2/c^3}`::
+
+        x = r / c
+        e_n(r) = u_5(x) · √(2/c³) · sin(ω_n x) / x
+
+    The envelope is inside this layer (``apply_cutoff_fn`` is forced off).
+    eSEN still multiplies a second envelope on the aggregated edge message.
     """
 
     def __init__(
@@ -503,25 +529,28 @@ class BesselRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "polynomial",
         trainable: Optional[bool] = None,
-        flavor: Literal["default", "dimenet", "painn", "equflash", "nequip"] = "default",
+        flavor: Literal[
+            "default", "dimenet", "painn", "equflash", "nequip", "esen"
+        ] = "default",
         envelope_exponent: int = 5,
         apply_cutoff_fn: Optional[bool] = None,
         cuton: float = 0.0,
         polynomial_p: int = 6,
     ) -> None:
         self.flavor = flavor
-        if flavor not in ("default", "dimenet", "painn", "equflash", "nequip"):
+        if flavor not in ("default", "dimenet", "painn", "equflash", "nequip", "esen"):
             raise ValueError(
                 "Unknown BesselRBF flavor "
-                f"{flavor!r}; expected 'default', 'dimenet', 'painn', 'equflash', or 'nequip'"
+                f"{flavor!r}; expected 'default', 'dimenet', 'painn', "
+                "'equflash', 'nequip', or 'esen'"
             )
         if trainable is None:
-            trainable = flavor in ("dimenet", "equflash")
+            trainable = flavor in ("dimenet", "equflash", "esen")
         if apply_cutoff_fn is None:
-            # DimeNet, PaiNN, and NequIP each own their radial window.
+            # DimeNet, PaiNN, NequIP, and eSEN each own their radial window.
             # EquFlash multiplies the XPLOR window onto this basis.
             apply_cutoff_fn = flavor in ("default", "equflash")
-        if flavor in ("dimenet", "nequip"):
+        if flavor in ("dimenet", "nequip", "esen"):
             apply_cutoff_fn = False
             cutoff_fn = None
         if flavor == "nequip" and int(polynomial_p) < 2:
@@ -560,6 +589,20 @@ class BesselRBFLayer(BaseRBF):
                 "prefactor",
                 torch.tensor(2.0 * math.pi / (cutoff_sr * cutoff_sr), dtype=dtype),
             )
+        elif flavor == "esen":
+            from ..cutoff import polynomial_envelope
+
+            self.envelope = None
+            frequencies = math.pi * torch.arange(1, num_rbf + 1, dtype=dtype)
+            if trainable:
+                self.bessel_weights = torch.nn.Parameter(frequencies)
+            else:
+                self.register_buffer("bessel_weights", frequencies)
+            self.register_buffer(
+                "prefactor",
+                torch.tensor(math.sqrt(2.0 / cutoff_sr**3), dtype=dtype),
+            )
+            self._esen_envelope = polynomial_envelope
         else:
             self.envelope = None
             bessel_weights = (
@@ -598,6 +641,16 @@ class BesselRBFLayer(BaseRBF):
             weights = self.bessel_weights.view(1, -1)
             bessel = torch.sinc(scaled * weights) * weights
             return self.prefactor * bessel * self.envelope(dist)
+        if self.flavor == "esen":
+            # x = r/c, e_n = u_5(x) * sqrt(2/c^3) * sin(n π x) / x
+            # Limit at x = 0 is u(0) * sqrt(2/c^3) * n π.
+            scaled = dist / self.cutoff_sr
+            env = self._esen_envelope(scaled, 1.0, self.envelope_exponent)
+            weights = self.bessel_weights.view(1, -1)
+            arg = scaled * weights
+            safe = scaled.clamp_min(1e-12)
+            quotient = torch.where(scaled == 0, weights, torch.sin(arg) / safe)
+            return env * self.prefactor * quotient
         if self.flavor in ("painn", "equflash"):
             # SchNetPack BesselRBF: r = 0 contributes 0 (divide by 1).
             # EquFlash uses the same quotient times ``2/c``. At r = 0 the

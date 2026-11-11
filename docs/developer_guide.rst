@@ -219,7 +219,10 @@ or optional :code:`EquiformerV2FeedForwardReadout` / physics layers after the Co
 (one-hot species + equflash Bessel / NequIP envelope outside the Core;
 separable convolution emits scalar :code:`atom_feature`),
 :code:`Equiformer` (:code:`enerzyme/models/equiformer/`), and
-:code:`escn` (:code:`enerzyme/models/escn/`).
+:code:`escn` (:code:`enerzyme/models/escn/`), and
+:code:`eSEN` under :code:`enerzyme/models/esen/native/`
+(UMA wrappers stay in the same package and still load fairchem only when
+:code:`uma_qs` / :code:`uma_flow_qs` is selected).
 
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -464,6 +467,23 @@ External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Register in :code:`get_ff_core` like other architectures. Keep fairchem imports inside :code:`enerzyme/models/esen/` so non-UMA installs do not import it until selected. Prefer shared :code:`layers/readout.py` and :code:`layers/spin.py` for Q/S heads. Package name :code:`esen/` is historical (UMA / eSCN-MD lineage); it is **not** the 2023 paper eSCN.
+
+Native eSEN (:code:`esen`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Fu et al. (2025, arXiv:2502.12147) lives under :code:`enerzyme/models/esen/native/`
+and is registered as :code:`architecture: esen`. The parent package
+:code:`enerzyme/models/esen/` still exports :code:`UMAWrapperQS` lazily, so
+importing the native Core does not import fairchem. The Core reuses shared
+:code:`SO2_Convolution`, :code:`GateActivation`, :code:`SO3Linear`,
+:code:`get_normalization_layer`, :code:`RadialFunction`, and
+:code:`polynomial_envelope`. Species and distance embeddings stay in
+:code:`RandomAtomEmbedding` and :code:`GaussianRBF(flavor="esen")` or
+:code:`BesselRBF(flavor="esen")`. Compose :code:`SimpleReadout` +
+:code:`EnergyReduce` + :code:`Force` outside the Core. Example:
+:code:`esen_layers_example.yaml`. Tests: :code:`test/test_esen_core.py`.
+Enerzymette only needs :code:`architecture: esen` plus a resolved
+:code:`config.yaml`.
 
 Native eSCN (:code:`escn`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^

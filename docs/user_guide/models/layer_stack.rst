@@ -141,7 +141,12 @@ direct force head). Opt-in :code:`SphereSampleReadout` integrates
 pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …); use
 :code:`vector_output_fields: [Fa]` (and omit :code:`Force`) for the paper-style
 direct vector path. See :code:`enerzyme/config/escn_sphere_readout_example.yaml`.
-Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`).
+Do not confuse with :code:`uma_qs` (Meta UMA under :code:`esen/`) or with :code:`esen` (native Fu et al. 2025).
+
+eSEN
+----
+
+With :code:`architecture: esen`, pre-core layers are :code:`RangeSeparation` (no neighbor cap), :code:`GaussianRBF` (``flavor: esen``, ``apply_cutoff_fn: false``) or :code:`BesselRBF` (``flavor: esen``), and :code:`RandomAtomEmbedding`. The Core returns :code:`atom_feature` (``l=0``) and :code:`atom_sphere_feature`. Energy uses :code:`SimpleReadout` (``head_type: mlp``, ``num_hidden_layers: 2``, ``use_bias_out: true``, SiLU / ``swish``) → :code:`EnergyReduce` → :code:`Force`. The message envelope and the SO(2) blocks stay inside the Core. Example: :code:`enerzyme/config/esen_layers_example.yaml`. :code:`uma_qs` is unchanged and still needs fairchem.
 
 EquiformerV2 / EquiformerV3 and modular readouts
 -----------------------------------------------
