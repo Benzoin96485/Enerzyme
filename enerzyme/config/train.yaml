@@ -1226,6 +1226,65 @@ Modelhub:
                 learnable: true
         - name: EnergyReduce
         - name: Force
+    FF20:
+      suffix:
+      # Nequix. See enerzyme/config/nequix_layers_example.yaml.
+      # Bessel flavor equflash, windowed by cutoff_fn nequip. The native
+      # architecture nequip is a different Core.
+      architecture: nequix
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 4
+        num_rbf: 8
+        max_Za: 8
+        cutoff_sr: 6.0
+        cutoff_fn: nequip
+        atomic_numbers: [1, 6, 7, 8]
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            trainable: false
+            apply_cutoff_fn: true
+        - name: OneHotAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 2
+            lmax: 1
+            hidden_irreps: "8x0e + 4x1o"
+            radial_mlp_size: 16
+            radial_mlp_layers: 2
+            mlp_init_scale: 4.0
+            avg_num_neighbors: 57.413687022442645
+            layer_norm: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            use_bias: false
+        - name: AtomicAffine
+          params:
+            order: scale_then_shift
+            scales:
+              Ea:
+                values: 1.0
+                learnable: false
+            shifts:
+              Ea:
+                values: 0.0
+                learnable: true
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

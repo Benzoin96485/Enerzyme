@@ -5,9 +5,12 @@ Transition functions (:func:`polynomial_transition`, :func:`bump_transition`,
 (:class:`PolynomialEnvelope`, :class:`DimeNetEnvelope`,
 :class:`C3CutoffEnvelope`) are the same family of smooth radial windows used
 inside equivariant message passing (EquiformerV3, DimeNet, DPA4).
-:func:`facto_polynomial_cutoff` is the separate degree-9 window from FACTO.
-:func:`powered_cosine_window` is the GRACE ``(r/rc)^p`` cosine window.
-:func:`xplor_transition` is the CHARMM / XPLOR switch used by EquFlash.
+:func:`xplor_transition` is the CHARMM / XPLOR switch used by EquFlash
+(``cuton`` / ``cutoff_on``). :func:`nequip_envelope` is the NequIP / Nequix
+polynomial cutoff (``p = 6``), the same polynomial as
+:class:`PolynomialEnvelope`. :func:`facto_polynomial_cutoff` is the separate
+degree-9 window from FACTO. :func:`powered_cosine_window` is the GRACE
+``(r/rc)^p`` cosine window.
 """
 
 from __future__ import annotations
@@ -97,29 +100,29 @@ def cosine_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     )
 
 
-def xplor_transition(x: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
+def xplor_transition(distance: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
     """CHARMM / XPLOR switching function on absolute distance.
 
     Returns 1 for ``r <= cuton``, 0 for ``r >= cutoff``, and the standard
-    cubic polynomial in ``r^2`` in between. ``cuton`` must be strictly smaller
-    than ``cutoff``. ``cuton=0`` is a valid full-range switch. This window is
-    not a linearly rescaled ``[0, 1]`` polynomial, so it does not use
-    :func:`scale`.
+    cubic polynomial in ``r^2`` in between. ``cuton`` must satisfy
+    ``0 <= cuton < cutoff``. ``cuton=0`` is a valid full-range switch. This
+    window is not a linearly rescaled ``[0, 1]`` polynomial, so it does not
+    use :func:`scale`.
     """
-    if cuton >= cutoff:
-        raise ValueError(f"xplor cuton ({cuton}) must be < cutoff ({cutoff})")
-    r_sq = x * x
-    r_on_sq = cuton * cuton
-    r_cut_sq = cutoff * cutoff
-    switched = (
-        (r_cut_sq - r_sq) ** 2
-        * (r_cut_sq + 2.0 * r_sq - 3.0 * r_on_sq)
-        / (r_cut_sq - r_on_sq) ** 3
+    if not 0.0 <= float(cuton) < float(cutoff):
+        raise ValueError(f"cuton ({cuton}) must satisfy 0 <= cuton < cutoff ({cutoff})")
+    radius_sq = distance * distance
+    on_sq = float(cuton) ** 2
+    cut_sq = float(cutoff) ** 2
+    window = (
+        (cut_sq - radius_sq) ** 2
+        * (cut_sq + 2.0 * radius_sq - 3.0 * on_sq)
+        / (cut_sq - on_sq) ** 3
     )
     return torch.where(
-        x <= cuton,
-        torch.ones_like(x),
-        torch.where(x >= cutoff, torch.zeros_like(x), switched),
+        distance <= cuton,
+        torch.ones_like(distance),
+        torch.where(distance >= cutoff, torch.zeros_like(distance), window),
     )
 
 
@@ -185,7 +188,27 @@ CUTOFF_REGISTER = {
     "xplor": xplor_transition,
     "facto": facto_polynomial_cutoff,
 }
-CUTOFF_KEY_TYPE = Literal["polynomial", "phys", "bump", "smooth", "cosine", "xplor", "facto"]
+CUTOFF_KEY_TYPE = Literal[
+    "polynomial", "phys", "bump", "smooth", "cosine", "xplor", "nequip", "facto"
+]
+
+
+def polynomial_envelope(distance: Tensor, cutoff: float, exponent: int) -> Tensor:
+    """``1 + a x^p + b x^{p+1} + c x^{p+2}`` on ``x = r / cutoff < 1``, else 0.
+
+    Shared by :class:`PolynomialEnvelope`, the NequIP Bessel flavor, and
+    :func:`nequip_envelope`. This is not the PhysNet
+    :func:`polynomial_transition` and not the FACTO degree-9 window.
+    """
+    if int(exponent) <= 0:
+        raise ValueError(f"exponent must be positive, got {exponent}")
+    p = float(exponent)
+    a = -(p + 1) * (p + 2) / 2
+    b = p * (p + 2)
+    c = -p * (p + 1) / 2
+    scaled = distance / float(cutoff)
+    env = 1 + a * scaled**p + b * scaled ** (p + 1) + c * scaled ** (p + 2)
+    return torch.where(scaled < 1, env, torch.zeros_like(scaled))
 
 
 class PolynomialEnvelope(torch.nn.Module):
@@ -202,27 +225,30 @@ class PolynomialEnvelope(torch.nn.Module):
 
     def __init__(self, cutoff: float = 6.0, exponent: int = 5) -> None:
         super().__init__()
-        assert exponent > 0
+        if int(exponent) <= 0:
+            raise ValueError(f"exponent must be positive, got {exponent}")
         self.cutoff = float(cutoff)
-        self.exponent = exponent
-        self.p: float = float(exponent)
-        self.a: float = -(self.p + 1) * (self.p + 2) / 2
-        self.b: float = self.p * (self.p + 2)
-        self.c: float = -self.p * (self.p + 1) / 2
+        self.exponent = int(exponent)
 
     def forward(self, distance: torch.Tensor) -> torch.Tensor:
-        d_scaled = distance / self.cutoff
-        env_val = (
-            1
-            + self.a * d_scaled**self.p
-            + self.b * d_scaled ** (self.p + 1)
-            + self.c * d_scaled ** (self.p + 2)
-        )
-        outputs = torch.where(d_scaled < 1, env_val, torch.zeros_like(d_scaled))
-        return outputs.view(-1, 1)
+        return polynomial_envelope(distance, self.cutoff, self.exponent).view(-1, 1)
 
     def extra_repr(self) -> str:
         return f"cutoff={self.cutoff}, exponent={self.exponent}"
+
+
+def nequip_envelope(distance: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
+    """NequIP / Nequix polynomial cutoff with exponent ``p = 6``.
+
+    On ``x = r / cutoff`` this is ``PolynomialEnvelope(..., exponent=6)``:
+    ``1 + a x^6 + b x^7 + c x^8`` for ``r < cutoff`` and 0 otherwise.
+    ``cuton`` is ignored. This is not the PhysNet ``polynomial`` transition.
+    """
+    del cuton
+    return polynomial_envelope(distance, float(cutoff), 6).reshape(distance.shape)
+
+
+CUTOFF_REGISTER["nequip"] = nequip_envelope
 
 
 class DimeNetEnvelope(torch.nn.Module):

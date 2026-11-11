@@ -215,6 +215,9 @@ or optional :code:`EquiformerV2FeedForwardReadout` / physics layers after the Co
 :code:`EquFlash` and :code:`EquFlashV2` under :code:`enerzyme/models/equflash/`
 (shared irreps, Bessel flavor, and XPLOR window; each Core emits flat
 :code:`atom_feature`),
+:code:`Nequix` under :code:`enerzyme/models/nequix/`
+(one-hot species + equflash Bessel / NequIP envelope outside the Core;
+separable convolution emits scalar :code:`atom_feature`),
 :code:`Equiformer` (:code:`enerzyme/models/equiformer/`), and
 :code:`escn` (:code:`enerzyme/models/escn/`).
 
@@ -491,6 +494,22 @@ path for EquFlash's following linear). Messages go through
 The Core emits flat :code:`atom_feature`. Example:
 :code:`equflashv2_layers_example.yaml`. Tests: :code:`test/test_equflash_v2_core.py`.
 Enerzymette: :code:`architecture: equflashv2` plus a resolved :code:`config.yaml`.
+
+Nequix (:code:`nequix`)
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Koker and Smidt (arXiv:2508.16067) lives under :code:`enerzyme/models/nequix/`
+(:code:`core.py`, :code:`interaction.py`). Register via
+:code:`get_ff_core("nequix")`. Reuse :code:`OneHotAtomEmbedding`,
+:code:`BesselRBF(flavor="equflash")`, :code:`cutoff_fn: nequip`,
+:code:`RMSLayerNorm` in :code:`e3nn_nn`, a bias-free :code:`SimpleReadout`,
+and :code:`AtomicAffine(order="scale_then_shift")`. The external
+:code:`nequip` wrapper is unchanged and is not this model. Published MPtrj
+hyperparameters are :code:`PUBLISHED_MP_CORE_PARAMS`. The default stack keeps
+those widths small and uses the MPtrj neighbor normalization. Example:
+:code:`nequix_layers_example.yaml`. Tests:
+:code:`test/test_nequix_core.py`. Enerzymette: :code:`architecture: nequix`
+plus a resolved :code:`config.yaml`.
 
 EquiformerV3 (:code:`equiformer_v3`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

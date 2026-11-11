@@ -97,6 +97,14 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | GRACE          | Graph ACE foundation potentials          | Internal; presets 1L/2L   |
 +----------------+------------------------------------------+---------------------------+
+| FACTO          | Atom-centered scalar and tensor state    | Internal; presets S-XL    |
++----------------+------------------------------------------+---------------------------+
+| EquFlash       | uvu tensor-product messages              | Built in                  |
++----------------+------------------------------------------+---------------------------+
+| EquFlashV2     | Channelwise Clebsch-Gordan messages      | Built in                  |
++----------------+------------------------------------------+---------------------------+
+| Nequix         | Separable E(3) convolution               | Built in                  |
++----------------+------------------------------------------+---------------------------+
 | NequIP         | E(3) tensor-product potentials           | Built in                  |
 +----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |

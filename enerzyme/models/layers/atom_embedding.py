@@ -1,6 +1,6 @@
 import math
 from abc import abstractmethod
-from typing import Dict
+from typing import Dict, Optional
 import numpy as np
 import torch
 from torch import Tensor
@@ -20,6 +20,64 @@ class BaseAtomEmbedding(BaseFFLayer):
 
     def get_atom_embedding(self, Za: Tensor) -> Tensor:
         return self.get_embedding(Za)
+
+
+class OneHotAtomEmbedding(BaseAtomEmbedding):
+    """One-hot species embedding.
+
+    Nequix feeds this directly into the first convolution (no learned species
+    matrix). ``atomic_numbers`` is the vocabulary in index order; width is
+    ``len(atomic_numbers)``. Without it, the vector is one-hot of ``Za`` on
+    ``0 .. max_Za`` and ``dim_embedding`` must be ``max_Za + 1``.
+    """
+
+    def __init__(
+        self,
+        max_Za: int,
+        dim_embedding: int,
+        atomic_numbers: Optional[list] = None,
+    ) -> None:
+        super().__init__(max_Za, dim_embedding)
+        if atomic_numbers is None:
+            if dim_embedding != max_Za + 1:
+                raise ValueError(
+                    "One-hot over 0..max_Za needs "
+                    f"dim_embedding={max_Za + 1}, got {dim_embedding}"
+                )
+            numbers = list(range(max_Za + 1))
+        else:
+            numbers = [int(z) for z in atomic_numbers]
+            if len(numbers) != dim_embedding:
+                raise ValueError(
+                    f"dim_embedding {dim_embedding} != vocabulary size {len(numbers)}"
+                )
+            if len(set(numbers)) != len(numbers):
+                raise ValueError("atomic_numbers contains duplicates")
+            if any(z < 0 or z > max_Za for z in numbers):
+                raise ValueError(
+                    f"atomic_numbers must lie in 0..max_Za ({max_Za})"
+                )
+        lookup = torch.full((max_Za + 1,), -1, dtype=torch.long)
+        for index, atomic_number in enumerate(numbers):
+            lookup[atomic_number] = index
+        self.register_buffer("atomic_numbers", torch.tensor(numbers, dtype=torch.long))
+        self.register_buffer("index_of_z", lookup)
+        self.register_buffer("_dtype_probe", torch.zeros(()))
+
+    def get_embedding(self, Za: Tensor) -> Tensor:
+        species = Za.long()
+        if species.numel() and int(species.max()) > self.max_Za:
+            raise ValueError(
+                f"atomic number {int(species.max())} exceeds max_Za {self.max_Za}"
+            )
+        index = self.index_of_z[species.clamp(min=0)]
+        if torch.any(index < 0):
+            missing = species[index < 0].unique().tolist()
+            raise ValueError(
+                f"atomic numbers {missing} are outside the one-hot vocabulary"
+            )
+        encoded = torch.nn.functional.one_hot(index, num_classes=self.dim_embedding)
+        return encoded.to(dtype=self._dtype_probe.dtype)
 
 
 class RandomAtomEmbedding(BaseAtomEmbedding):

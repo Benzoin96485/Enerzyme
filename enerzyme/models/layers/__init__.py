@@ -6,7 +6,12 @@ from .rbf import (
     GaussianRBFLayer, BernsteinRBFLayer, SincRBFLayer, BesselRBFLayer,
     ExpNormalSmearing,
 )
-from .atom_embedding import BaseAtomEmbedding, RandomAtomEmbedding, NuclearEmbedding
+from .atom_embedding import (
+    BaseAtomEmbedding,
+    NuclearEmbedding,
+    OneHotAtomEmbedding,
+    RandomAtomEmbedding,
+)
 from ..equiformer.embedding import EquiformerNodeEmbedding
 from .electron_embedding import BaseElectronEmbedding, ElectronicEmbedding
 from .electrostatics import (

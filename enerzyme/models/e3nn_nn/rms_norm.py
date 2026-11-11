@@ -1,9 +1,12 @@
 """Degree-balanced equivariant RMS normalization for flat e3nn features.
 
-One invariant scale is shared by every degree. Even scalars are centered
-together. Affine weights are per channel. This is the normalization used
-inside EquFlashV2 interaction and feed-forward blocks; other flat-Irreps
-cores can reuse it.
+:class:`EquivariantRMSNormSH` shares one scale across degrees and centers all
+even scalars together. EquFlashV2 uses it.
+
+:class:`RMSLayerNorm` is the eSEN / EquiformerV2 form used by Nequix: each
+irrep block is weighted by ``1 / (dim * n_blocks)``, the block norms are
+summed, and affine scales are per multiplicity. Centering, when enabled, is
+the mean over channels inside each scalar block.
 """
 
 from __future__ import annotations
@@ -101,3 +104,88 @@ class EquivariantRMSNormSH(nn.Module):
             biased[:, self.scalar_index] = out[:, self.scalar_index] + self.affine_bias
             out = biased
         return out
+
+
+class RMSLayerNorm(nn.Module):
+    """eSEN equivariant RMSNorm on a flat irreps tensor.
+
+    Matches the Nequix layer norm (centering off in the published model):
+    each ``(mul, ir)`` block contributes
+    ``mean_m(sum_u x^2) / (dim * n_blocks)``, those contributions are summed,
+    and the inverse square root scales every component. Affine weights have
+    one value per channel of each block. Scalar biases exist only when
+    ``centering`` is on.
+    """
+
+    def __init__(
+        self,
+        irreps,
+        eps: float = 1e-12,
+        affine: bool = True,
+        centering: bool = True,
+        std_balance_degrees: bool = True,
+    ) -> None:
+        super().__init__()
+        self.irreps = Irreps(irreps)
+        if len(self.irreps) == 0:
+            raise ValueError("RMSLayerNorm requires a non-empty irreps")
+        self.eps = float(eps)
+        self.affine = bool(affine)
+        self.centering = bool(centering)
+        self.std_balance_degrees = bool(std_balance_degrees)
+        if not self.std_balance_degrees:
+            raise NotImplementedError("RMSLayerNorm requires std_balance_degrees")
+
+        slices = list(self.irreps.slices())
+        self._slices = tuple((sl.start, sl.stop) for sl in slices)
+        if self.affine:
+            self.affine_weight = nn.ParameterList(
+                [nn.Parameter(torch.ones(mul)) for mul, _ in self.irreps]
+            )
+            if self.centering:
+                self.affine_bias = nn.ParameterList(
+                    [
+                        nn.Parameter(torch.zeros(mul)) if ir.l == 0 else None
+                        for mul, ir in self.irreps
+                    ]
+                )
+            else:
+                self.affine_bias = None
+        else:
+            self.affine_weight = None
+            self.affine_bias = None
+
+    def forward(self, node_input: Tensor) -> Tensor:
+        if node_input.shape[-1] != self.irreps.dim:
+            raise ValueError(
+                f"feature width {node_input.shape[-1]} != irreps.dim {self.irreps.dim}"
+            )
+        chunks = []
+        norms = []
+        n_blocks = len(self.irreps)
+        for (mul, ir), (start, stop) in zip(self.irreps, self._slices):
+            values = node_input.narrow(-1, start, stop - start).reshape(
+                *node_input.shape[:-1], mul, ir.dim
+            )
+            if self.centering and ir.l == 0:
+                values = values - values.mean(dim=-2, keepdim=True)
+            chunks.append(values)
+            weight = 1.0 / (ir.dim * n_blocks)
+            # Sum channels, then average components. The 1/n_blocks lets the
+            # later sum over blocks recover a uniform mixture.
+            block_norm = (values.square() * weight).sum(dim=-2, keepdim=True)
+            norms.append(block_norm.mean(dim=-1, keepdim=True))
+        norm = torch.cat(norms, dim=-1).sum(dim=-1, keepdim=True)
+        norm = torch.pow(norm + self.eps, -0.5)
+        outputs = []
+        for index, ((mul, ir), values) in enumerate(zip(self.irreps, chunks)):
+            if self.affine_weight is not None:
+                values = values * self.affine_weight[index].view(
+                    *([1] * (values.ndim - 2)), mul, 1
+                )
+            values = values * norm
+            if self.affine_bias is not None and ir.l == 0:
+                bias = self.affine_bias[index]
+                values = values + bias.view(*([1] * (values.ndim - 2)), mul, 1)
+            outputs.append(values.reshape(*node_input.shape[:-1], mul * ir.dim))
+        return torch.cat(outputs, dim=-1)

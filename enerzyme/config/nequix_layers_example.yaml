@@ -1,0 +1,75 @@
+# Nequix (Koker & Smidt, arXiv:2508.16067).
+# https://github.com/atomicarchitects/nequix (MIT). This stack is an Enerzyme
+# reimplementation on e3nn. The Core is the separable convolution only.
+#
+# One-hot species and the radial window are pre-core layers:
+#   BesselRBF flavor equflash  = (2/c) sin(n π r / c) / r
+#   cutoff_fn: nequip          = NequIP polynomial envelope, p = 6
+# The bias-free SimpleReadout is the reference o3.Linear on even scalars.
+# AtomicAffine scale-then-shift is the global scale plus isolated-atom shift.
+# Forces are -dE/dR from the shared Force layer.
+#
+# Published nequix-mp-1 (MPtrj) replaces the Core params with
+# enerzyme.models.nequix.PUBLISHED_MP_CORE_PARAMS:
+#   hidden_irreps: 128x0e + 64x1o + 32x2e + 32x3o
+#   lmax: 3, num_layers: 4, radial_mlp_size: 64, radial_mlp_layers: 2
+#   mlp_init_scale: 4, layer_norm: true
+#   avg_num_neighbors: 57.413687022442645
+# and AtomicAffine scale 0.8066479563713074 (fixed) with per-element shifts
+# equal to the dataset shift 0.16502578765761478 plus isolated-atom energies.
+# atomic_numbers below is a molecule subset. The MPtrj vocabulary is
+# MPTRJ_ATOMIC_NUMBERS (Z = 1..94 except 84..88), dim_embedding 89.
+#
+# Enerzymette: architecture: nequix in the resolved config.yaml.
+# No jax / openequivariance dependency. architecture: nequip is the separate
+# native NequIP Core and is not this stack.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: nequix
+      active: true
+      build_params:
+        dim_embedding: 4
+        num_rbf: 8
+        max_Za: 8
+        cutoff_sr: 6.0
+        cutoff_fn: nequip
+        atomic_numbers: [1, 6, 7, 8]
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            trainable: false
+            apply_cutoff_fn: true
+        - name: OneHotAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 2
+            lmax: 1
+            hidden_irreps: "8x0e + 4x1o"
+            radial_mlp_size: 16
+            radial_mlp_layers: 2
+            mlp_init_scale: 4.0
+            # MPtrj mean degree. Widths above stay small; this scale matches the paper.
+            avg_num_neighbors: 57.413687022442645
+            layer_norm: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            use_bias: false
+        - name: AtomicAffine
+          params:
+            order: scale_then_shift
+            scales:
+              Ea:
+                values: 1.0
+                learnable: false
+            shifts:
+              Ea:
+                values: 0.0
+                learnable: true
+        - name: EnergyReduce
+        - name: Force

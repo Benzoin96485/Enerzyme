@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import torch
 import yaml
 
@@ -324,3 +325,50 @@ def test_equflash_force_matches_energy_finite_difference():
             numerical[atom, coord] = -(e_plus - e_minus).detach() / (2 * step)
     assert torch.isfinite(analytical).all()
     assert torch.allclose(analytical, numerical, atol=1e-5, rtol=1e-4)
+
+
+def test_channelwise_conv_rejects_mismatched_multiplicity():
+    from enerzyme.models.equflash.interaction_v2 import ChannelwiseConv
+
+    with pytest.raises(ValueError, match="multiplicity"):
+        ChannelwiseConv(
+            "4x0e",
+            "1x0e + 1x1o",
+            "8x0e + 4x1o",
+            num_rbf=4,
+            radial_hidden=[4],
+        )
+
+
+def test_efficient_conv_type_warns_that_the_kernel_matches_full():
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        _core(conv_type="efficient", num_layers=1, radial_hidden=[4])
+    assert any("efficient" in str(item.message) for item in caught)
+
+
+def test_nequip_interaction_honors_after_nonlinear():
+    from torch import nn
+    from e3nn import o3
+
+    from enerzyme.models.equflash.interaction_v2 import NequIPInteractionBlock
+
+    common = dict(
+        irreps_x="4x0e",
+        irreps_filter="1x0e + 1x1o",
+        irreps_out="4x0e + 4x1o",
+        num_rbf=4,
+        radial_hidden=[4],
+        denominator=1.0,
+        train_denominator=False,
+        sc_type="linear",
+        nonlinear_type="gate",
+        nonlinear_scale=1.0,
+        nonlinear_kwargs=None,
+    )
+    linear = NequIPInteractionBlock(**common, after_nonlinear="linear")
+    identity = NequIPInteractionBlock(**common, after_nonlinear="identity")
+    assert isinstance(linear.project, o3.Linear)
+    assert isinstance(identity.project, nn.Identity)

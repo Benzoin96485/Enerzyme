@@ -72,26 +72,48 @@ def _skip(kind: str, irreps_in, irreps_out) -> nn.Module:
 
 
 def _uvu_instructions(irreps_x, irreps_filter, irreps_out):
-    """Channelwise paths that land on the requested output irreps.
+    """Channelwise paths whose multiplicity already matches the output.
 
     Distinct from :func:`enerzyme.models.e3nn_nn.tp_out_irreps_with_instructions`,
-    which emits one output slot per path for a following linear (EquFlash).
-    Here multiplicity must already match, and unused output irreps are dropped.
+    which emits one output slot per path for a following linear (EquFlash and
+    Nequix). Here an output irrep is kept only when its multiplicity equals
+    the input multiplicity. A mismatch or a missing path raises.
     """
     irreps_x = o3.Irreps(irreps_x)
     irreps_filter = o3.Irreps(irreps_filter)
     irreps_out = o3.Irreps(irreps_out)
     raw = []
+    covered = set()
     for i, (mul_x, ir_x) in enumerate(irreps_x):
         for j, (_, ir_f) in enumerate(irreps_filter):
             for produced in ir_x * ir_f:
                 for k, (mul_o, ir_o) in enumerate(irreps_out):
                     if ir_o == produced and mul_o == mul_x:
                         raw.append((i, j, k))
+                        covered.add(k)
                         break
-    if not raw:
+    missing = []
+    for k, (mul_o, ir_o) in enumerate(irreps_out):
+        if k in covered:
+            continue
+        producer_muls = sorted(
+            {
+                mul_x
+                for mul_x, ir_x in irreps_x
+                for _, ir_f in irreps_filter
+                if ir_o in ir_x * ir_f
+            }
+        )
+        if producer_muls:
+            missing.append(f"{mul_o}x{ir_o} (input multiplicities {producer_muls})")
+        else:
+            missing.append(f"{mul_o}x{ir_o} (no path through {irreps_filter})")
+    if missing or not raw:
+        detail = "; ".join(missing) if missing else "no Clebsch-Gordan paths"
         raise ValueError(
-            f"No channelwise paths {irreps_x} x {irreps_filter} -> {irreps_out}"
+            "Channelwise convolution keeps an output irrep only when its "
+            "multiplicity matches the input. "
+            f"{irreps_x} x {irreps_filter} -> {irreps_out}: {detail}"
         )
     used = sorted({k for _, _, k in raw})
     remap = {old: new for new, old in enumerate(used)}
@@ -443,7 +465,6 @@ class NequIPInteractionBlock(nn.Module):
         after_nonlinear: str = "linear",
     ) -> None:
         super().__init__()
-        del after_nonlinear
         self.linear_in = _linear(irreps_x, irreps_x)
         self.conv = ChannelwiseConv(
             irreps_x,
@@ -459,10 +480,9 @@ class NequIPInteractionBlock(nn.Module):
         )
         self.skip = _skip(sc_type, irreps_x, self.nonlinear.irreps_in)
         self.linear_mid = _linear(self.conv.irreps_out, self.nonlinear.irreps_in)
-        if self.nonlinear.irreps_out.simplify() == o3.Irreps(irreps_out).simplify():
-            self.align: nn.Module = nn.Identity()
-        else:
-            self.align = _linear(self.nonlinear.irreps_out, irreps_out)
+        self.project = _project(
+            after_nonlinear, self.nonlinear.irreps_out, irreps_out
+        )
 
     def forward(
         self,
@@ -476,7 +496,7 @@ class NequIPInteractionBlock(nn.Module):
         hidden = self.linear_in(features)
         hidden = self.conv(hidden, idx_i, idx_j, rbf, edge_sh)
         hidden = self.nonlinear(self.linear_mid(hidden) + residual)
-        return self.align(hidden)
+        return self.project(hidden)
 
 
 class FeedForwardBlock(nn.Module):
