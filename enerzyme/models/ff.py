@@ -117,6 +117,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .equiformer_v3.core import EquiformerV3Core as Core
         from .equiformer_v3.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {"equflashv2", "equflash_v2"}:
+        from .equflash.core_v2 import EquFlashV2Core as Core
+        from .equflash.core_v2 import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "e2former":
         from .e2former.core import E2FormerCore as Core
         from .e2former.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

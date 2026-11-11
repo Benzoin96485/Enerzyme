@@ -1,4 +1,4 @@
-from typing import Dict, Union, Literal, Optional
+from typing import Dict, Literal, Optional, Union
 import torch
 from torch import nn, Tensor
 from . import BaseFFLayer
@@ -15,6 +15,7 @@ class AtomicAffineLayer(BaseFFLayer):
         scales: Optional[
             Dict[str, Dict[Literal["values", "learnable"], Union[Dict[str, float], float, bool]]]
         ] = None,
+        order: Literal["shift_then_scale", "scale_then_shift"] = "shift_then_scale",
     ) -> None:
         if shifts is None:
             shifts = {
@@ -31,7 +32,13 @@ class AtomicAffineLayer(BaseFFLayer):
 
         atomic_properties = set(shifts.keys()) | set(scales.keys())
         super().__init__(input_fields={"Za"} | atomic_properties, output_fields=atomic_properties)
+        if order not in ("shift_then_scale", "scale_then_shift"):
+            raise ValueError(
+                "AtomicAffine order must be 'shift_then_scale' or 'scale_then_shift', "
+                f"got {order!r}"
+            )
         self.max_Za = max_Za
+        self.order = order
         self.shifts = self.build_affine(shifts, 0.0)
         self.scales = self.build_affine(scales, 1.0)
 
@@ -74,7 +81,11 @@ class AtomicAffineLayer(BaseFFLayer):
                 shift = shift.view(-1, 1)
                 scale = scale.view(-1, 1)
 
-            output[name] = (values + shift) * scale
+            if self.order == "scale_then_shift":
+                # EquFlash species calibration: E = scale * raw + shift.
+                output[name] = values * scale + shift
+            else:
+                output[name] = (values + shift) * scale
         return output
 
     def _load_from_state_dict(self, state_dict: Dict[str, Tensor], *args, **kwargs):

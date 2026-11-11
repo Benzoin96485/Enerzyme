@@ -185,6 +185,11 @@ NequIP
 
 With :code:`architecture: nequip`, pre-core layers are :code:`RangeSeparation`, :code:`BesselRBF` (``flavor: nequip``, polynomial order ``polynomial_p``, default 6), and :code:`RandomAtomEmbedding`. The Bessel layer already applies the polynomial envelope, so :code:`RangeSeparation` does not need a cutoff function. The Core returns scalar :code:`atom_feature`. Energy uses :code:`SimpleReadout` (bias-free linear matches the NequIP readout) → :code:`AtomicAffine` (per-element scale and shift) → :code:`EnergyReduce` → :code:`Force`. Set Core :code:`avg_num_neighbors` to the dataset mean. Optional Core :code:`preset` is ``S``, ``M``, ``L``, ``XL``, or ``paper``. Example: :code:`enerzyme/config/nequip_layers_example.yaml`.
 
+EquFlashV2
+----------
+
+With :code:`architecture: equflashv2`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, prefactor ``2/cutoff``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: xplor` and :code:`cuton` supplies the same radial window as EquFlash. The Core returns flat :code:`atom_feature`. Energy uses :code:`SimpleReadout` (two bias-free linears when ``activate_hidden: false`` and ``use_bias: false``) → :code:`AtomicAffine` (``order: scale_then_shift``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/equflashv2_layers_example.yaml`.
+
 PaiNN and Cartesian tensor heads
 --------------------------------
 

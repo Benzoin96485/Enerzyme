@@ -2,7 +2,8 @@
 
 Distinct from ``enerzyme.models.so3``, which owns SH-array / SPHC layouts.
 Both packages may use e3nn as a math library; this package's *API* is flat
-``Irreps`` tensors and e3nn tensor products.
+``Irreps`` tensors and e3nn tensor products. ``EquivariantRMSNormSH`` is the
+degree-balanced RMSNorm shared with EquFlashV2.
 """
 
 from .activation import Activation, Gate, get_gated_nonlinear
@@ -14,6 +15,7 @@ from .linear import (
     get_resnet_layer,
 )
 from .norm import EquivariantLayerNormV2
+from .rms_norm import EquivariantRMSNormSH
 from .tensor_product import (
     FullyConnectedTensorProductRescale,
     FullyConnectedTensorProductRescaleSwishGate,
@@ -41,6 +43,7 @@ __all__ = [
     "ElementIrrepsLinear",
     "EquivariantDropout",
     "EquivariantLayerNormV2",
+    "EquivariantRMSNormSH",
     "EquivariantScalarsDropout",
     "FullyConnectedTensorProductRescale",
     "FullyConnectedTensorProductRescaleSwishGate",

@@ -186,6 +186,10 @@ class BaseReadout(BaseFFLayer):
             head_params = dict(self.head_params)
             pyramidal = bool(head_params.pop("pyramidal", False))
             dim_hidden = head_params.pop("dim_hidden", None)
+            # EquFlash AtomicReduce is two bias-free linears. ``activate_hidden``
+            # false skips the hidden activation; ``use_bias`` applies to both layers.
+            activate_hidden = bool(head_params.pop("activate_hidden", True))
+            use_bias = bool(head_params.pop("use_bias", True))
             if pyramidal and dim_hidden is not None:
                 raise ValueError(
                     "SimpleReadout two_layer accepts pyramidal or dim_hidden, not both"
@@ -196,18 +200,23 @@ class BaseReadout(BaseFFLayer):
                 dim_hidden = self.dim_feature_in
             else:
                 dim_hidden = int(dim_hidden)
-            act = self.activation_fn if self.activation_fn is not None else "swish"
+            if activate_hidden:
+                act = self.activation_fn if self.activation_fn is not None else "swish"
+            else:
+                act = None
             return Sequential(
                 DenseLayer(
                     dim_feature_in=self.dim_feature_in,
                     dim_feature_out=dim_hidden,
                     activation_fn=act,
                     activation_params=self.activation_params,
+                    use_bias=use_bias,
                 ),
                 DenseLayer(
                     dim_feature_in=dim_hidden,
                     dim_feature_out=self.dim_feature_out,
                     shallow_ensemble_size=self.shallow_ensemble_size,
+                    use_bias=use_bias,
                     **head_params,
                 ),
             )
