@@ -582,6 +582,11 @@ TECE (:code:`tece`)
 
 Xu et al. (arXiv:2607.10664) lives under :code:`enerzyme/models/tece/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ v0.2.0 (MIT). Register via :code:`get_ff_core("tece")`. The Core seeds equivariant features from scalar embeddings, then stacks uvSO2 interactions with Edge Cluster Expansion (:code:`ComplexProductBasis`) and Radial Rotary Attention, plus node-side :code:`CgtpACE` reused from TACE. Shared SO(2) primitives (:code:`WignerD` recursive/direct, :code:`uvSO2Linear`, :code:`SO2Gate`, :code:`LayoutTransform`) live in :code:`enerzyme/models/so3/`. Requires :code:`Lmax == lmax`. Do not conflate RRA with EFA Euclidean RoPE. Emit :code:`atom_feature` for :code:`SimpleReadout`. Example: :code:`tece_layers_example.yaml`. Tests: :code:`test/test_tece_*.py`. Enerzymette: :code:`architecture: tece` + resolved :code:`config.yaml`.
 
+Allegro (:code:`allegro`)
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Musaelian et al. (Nat. Commun. 2023) live under :code:`enerzyme/models/allegro/` (:code:`core.py`, :code:`interaction.py`, :code:`irreps.py`). Register via :code:`get_ff_core("allegro")`. Reuse :code:`BesselRBF(flavor="nequip")`, :class:`~enerzyme.models.blocks.mlp.VariancePreservingMLP` (the NequIP scalar-MLP init, also the :code:`EdgeReadout` head), :func:`enerzyme.models.nequip.interaction.tp_path_exists`, and :meth:`BaseFFCore.adopt_radius_stack`. The species tables are :code:`PairChemicalRadial`, not inside the Core. The Core emits ``edge_feature``. :code:`EdgeReadout` and :code:`EdgeEnergyReduce` are shared layers so a later pair model can reuse the same head and the same directed sum. ``avg_num_neighbors`` is a build parameter read by both the environment sum and the energy sum. Example: :code:`allegro_layers_example.yaml`. Tests: :code:`test/test_allegro_core.py`. Enerzymette: :code:`architecture: allegro` + resolved :code:`config.yaml`. Checkpoints from mir-group/allegro are not weight-compatible.
+
 NequIP (:code:`nequip`)
 ^^^^^^^^^^^^^^^^^^^^^^^
 

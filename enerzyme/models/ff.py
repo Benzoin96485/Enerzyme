@@ -83,6 +83,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .nequip import NequIPCore as Core
         from .nequip import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "allegro":
+        from .allegro import AllegroCore as Core
+        from .allegro import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "xpainn":
         from .xpainn import XPaiNNWrapper as Core
         from .xpainn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

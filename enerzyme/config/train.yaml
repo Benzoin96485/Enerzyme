@@ -1335,6 +1335,62 @@ Modelhub:
             keep_feature: false
         - name: EnergyReduce
         - name: Force
+    FF22:
+      suffix:
+      # Allegro (Musaelian et al., Nat. Commun. 2023). Strictly local pairs.
+      # Canonical stack: enerzyme/config/allegro_layers_example.yaml
+      architecture: allegro
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_edge: 64
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 5.0
+        avg_num_neighbors: 1.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: nequip
+            trainable: false
+            polynomial_p: 6
+        - name: PairChemicalRadial
+        - name: Core
+          params:
+            num_layers: 2
+            l_max: 1
+            parity: true
+            num_scalar_features: 64
+            num_tensor_features: 32
+        - name: EdgeReadout
+          params:
+            output_fields: [Eij]
+            head_type: variance_preserving
+            hidden_layers_depth: 1
+            nonlinearity: silu
+            use_bias: false
+        - name: EdgeEnergyReduce
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

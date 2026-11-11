@@ -190,6 +190,11 @@ NequIP
 
 With :code:`architecture: nequip`, pre-core layers are :code:`RangeSeparation`, :code:`BesselRBF` (``flavor: nequip``, polynomial order ``polynomial_p``, default 6), and :code:`RandomAtomEmbedding`. The Bessel layer already applies the polynomial envelope, so :code:`RangeSeparation` does not need a cutoff function. The Core returns scalar :code:`atom_feature`. Energy uses :code:`SimpleReadout` (bias-free linear matches the NequIP readout) → :code:`AtomicAffine` (per-element scale and shift) → :code:`EnergyReduce` → :code:`Force`. Set Core :code:`avg_num_neighbors` to the dataset mean. Optional Core :code:`preset` is ``S``, ``M``, ``L``, ``XL``, or ``paper``. Example: :code:`enerzyme/config/nequip_layers_example.yaml`.
 
+Allegro
+-------
+
+With :code:`architecture: allegro`, pre-core layers are :code:`RangeSeparation`, :code:`BesselRBF` (``flavor: nequip``), and :code:`PairChemicalRadial`. The pair layer embeds the center species and the neighbor species separately and multiplies them by a linear map of the Bessel basis. The Core returns per-edge :code:`edge_feature`. Energy uses :code:`EdgeReadout` (``head_type: variance_preserving``, output ``Eij``) → :code:`EdgeEnergyReduce` (center-atom sum, ``sqrt(avg_num_neighbors)`` and optional ``sqrt(2)``) → :code:`AtomicAffine` → :code:`EnergyReduce` → :code:`Force`. Set :code:`avg_num_neighbors` on :code:`build_params` so the Core and the edge sum share it. Optional Core :code:`preset` is ``tutorial``. Example: :code:`enerzyme/config/allegro_layers_example.yaml`.
+
 EquFlashV2
 ----------
 
