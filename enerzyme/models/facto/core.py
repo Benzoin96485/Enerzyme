@@ -25,7 +25,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
-from ..layers import BaseFFCore, DistanceLayer, RangeSeparationLayer
+from ..layers import BaseFFCore
 from .descriptors import (
     DESCRIPTOR_DIM,
     elemental_descriptor_table,
@@ -255,23 +255,7 @@ class FACTOCore(BaseFFCore):
         )
 
     def build(self, built_layers: List[Module]) -> None:
-        self.calculate_distance = DistanceLayer()
-        self.calculate_distance.with_vector_on("vij_lr")
-        self.calculate_distance.reset_field_name(Dij="Dij_lr")
-        self.pre_sequence.append(self.calculate_distance)
-        pre_core = True
-        for layer in built_layers:
-            if layer is self:
-                pre_core = False
-                continue
-            if pre_core:
-                if isinstance(layer, DistanceLayer):
-                    continue
-                if isinstance(layer, RangeSeparationLayer):
-                    layer.reset_field_name(idx_i_lr="idx_i", idx_j_lr="idx_j")
-                self.pre_sequence.append(layer)
-            else:
-                self.post_sequence.append(layer)
+        self.adopt_radius_stack(built_layers)
 
     def initial_state(self, atomic_numbers: Tensor) -> Tuple[Tensor, List[Tensor]]:
         """SiLU embedding and a zero tensor state, one row per atom."""

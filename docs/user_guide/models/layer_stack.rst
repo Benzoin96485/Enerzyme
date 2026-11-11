@@ -17,7 +17,7 @@ From :code:`enerzyme/models/layers/`:
     from :code:`enerzyme.models.so3` for equivariant cores).
 
 **Radial basis**
-    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`. Cutoff key :code:`nequip` is the NequIP / Nequix polynomial envelope (``p = 6``), distinct from PhysNet :code:`polynomial`.
+    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash / nequip), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`. Cutoff key :code:`nequip` is the polynomial envelope (``p = 6``) that Nequix multiplies onto the equflash Bessel basis. Bessel flavor :code:`nequip` is the separate mir-group basis, with that envelope already inside the layer.
 
 **Embeddings**
     :code:`RandomAtomEmbedding`, :code:`OneHotAtomEmbedding` (Nequix species vocabulary), :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
@@ -180,10 +180,15 @@ accept :code:`shallow_ensemble_size` on the last linear head; pair with
 :code:`e2former_lsr_layers_example.yaml`,
 :code:`equiformer_shallow_ensemble_example.yaml`.
 
+NequIP
+------
+
+With :code:`architecture: nequip`, pre-core layers are :code:`RangeSeparation`, :code:`BesselRBF` (``flavor: nequip``, polynomial order ``polynomial_p``, default 6), and :code:`RandomAtomEmbedding`. The Bessel layer already applies the polynomial envelope, so :code:`RangeSeparation` does not need a cutoff function. The Core returns scalar :code:`atom_feature`. Energy uses :code:`SimpleReadout` (bias-free linear matches the NequIP readout) → :code:`AtomicAffine` (per-element scale and shift) → :code:`EnergyReduce` → :code:`Force`. Set Core :code:`avg_num_neighbors` to the dataset mean. Optional Core :code:`preset` is ``S``, ``M``, ``L``, ``XL``, or ``paper``. Example: :code:`enerzyme/config/nequip_layers_example.yaml`.
+
 EquFlashV2
 ----------
 
-With :code:`architecture: equflashv2`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, prefactor ``2/cutoff``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: xplor` and :code:`cuton` supplies the radial window (EquFlash ``cutoff_on``). The Core returns flat :code:`atom_feature`. Energy uses :code:`SimpleReadout` (two bias-free linears when ``activate_hidden: false`` and ``use_bias: false``) → :code:`AtomicAffine` (``order: scale_then_shift``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/equflashv2_layers_example.yaml`.
+With :code:`architecture: equflashv2`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, prefactor ``2/cutoff``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: xplor` and :code:`cuton` supplies the same radial window as EquFlash. The Core returns flat :code:`atom_feature`. Energy uses :code:`SimpleReadout` (two bias-free linears when ``activate_hidden: false`` and ``use_bias: false``) → :code:`AtomicAffine` (``order: scale_then_shift``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/equflashv2_layers_example.yaml`.
 
 Nequix
 ------
@@ -194,6 +199,11 @@ PaiNN and Cartesian tensor heads
 --------------------------------
 
 With :code:`architecture: painn`, pre-core layers are :code:`BesselRBF` (``flavor: painn``, ``apply_cutoff_fn: false``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: cosine` supplies the filter window. The Core returns :code:`atom_feature` ``[N, F]`` and :code:`atom_vector_feature` ``[N, 3, F]``. Energy uses :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force`. Dipole and polarizability are post-core layers :code:`EquivariantDipole` and :code:`EquivariantPolarizability`; they read the same latents and :code:`Ra`. Charge-only dipoles remain :code:`SimpleReadout(Qa)` + :code:`AtomicCharge2Dipole`. Center coordinates in the dataset when the tensor reference frame should be the center of mass. Examples: :code:`enerzyme/config/painn_layers_example.yaml`, :code:`painn_spectra_layers_example.yaml`.
+
+EquFlash
+--------
+
+With :code:`architecture: equflash`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, ``(2/c) sin(nπr/c)/r``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: xplor` and :code:`cuton` supplies the radial window, which :code:`BesselRBF` multiplies in when ``apply_cutoff_fn: true``. The Core returns flat irreps :code:`atom_feature` and sets :code:`feature_irreps`. The default schedule ends on even scalars, so :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` is the energy stack. :code:`conv_denominator` on the Core rescales each aggregated message. Example: :code:`enerzyme/config/equflash_layers_example.yaml`.
 
 FACTO
 -----

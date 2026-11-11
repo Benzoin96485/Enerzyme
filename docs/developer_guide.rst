@@ -34,7 +34,7 @@ Optional dependencies
 Not every contributor needs all optional stacks. Install only what your change touches:
 
 - **PhysNet parity tests** — TensorFlow 1.x compatibility mode and the reference PhysNet package
-- **NequIP / XPaiNN** — :code:`nequip`, :code:`XequiNet` and their transitive deps
+- **XPaiNN** — :code:`XequiNet` and its transitive deps
 - **PLUMED workflows** — :code:`py-plumed` and a PLUMED-enabled build
 - **QM annotation** — TeraChem executable/license, RDKit formal charges
 - **Bond assignment** — QuantumPDB-style PDB inputs and template SDFs
@@ -212,9 +212,9 @@ the Core). Also :code:`So3krates` under :code:`enerzyme/models/so3krates/`
 or optional :code:`EquiformerV2FeedForwardReadout` / physics layers after the Core),
 :code:`EquiformerV3` under :code:`enerzyme/models/equiformer_v3/`
 (same latent contract; merged LN + SwiGLU-S² + envelope attention via extended :code:`so3/`),
-:code:`EquFlashV2` under :code:`enerzyme/models/equflash/`
-(scalar embedding + equflash Bessel / XPLOR outside the Core; channelwise CG
-message passing emits flat :code:`atom_feature`),
+:code:`EquFlash` and :code:`EquFlashV2` under :code:`enerzyme/models/equflash/`
+(shared irreps, Bessel flavor, and XPLOR window; each Core emits flat
+:code:`atom_feature`),
 :code:`Nequix` under :code:`enerzyme/models/nequix/`
 (one-hot species + equflash Bessel / NequIP envelope outside the Core;
 separable convolution emits scalar :code:`atom_feature`),
@@ -224,7 +224,7 @@ separable convolution emits scalar :code:`atom_feature`),
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-External models (NequIP, XPaiNN) live under :code:`enerzyme/models/nequip/` and :code:`enerzyme/models/xpainn/`. Requirements:
+External models (XPaiNN) live under :code:`enerzyme/models/xpainn/`. NequIP is internal (:code:`enerzyme/models/nequip/`). Requirements for a wrapper:
 
 - Lazy or guarded imports so core install still works
 - Add package names to :code:`autosummary_mock_imports` in :code:`docs/conf.py` if autodoc cannot import them on RTD
@@ -313,6 +313,8 @@ Tests live in :code:`test/`:
 - :code:`test_tace_cartesian_ops.py` — cartnn ICTD / harmonics / Cartesian contraction smoke
 - :code:`test_tace_parity_ops.py` — TACE spherical / Cartesian numerical parity vs vendored tace v0.1.0 fixtures
 - :code:`test_tece_core.py` — TECE registration / YAML smoke, feature shapes, build_model E/F, ECE/RRA flag sensitivity
+- :code:`test_equflash_core.py` — EquFlash irrep schedule, XPLOR / Bessel flavor, registration, SO(3) feature equivariance, build_model E/F and finite-difference forces
+- :code:`test_equflash_v2_core.py` — EquFlashV2 registration, bilinear-gate equivariance, rotation, and energy/force finite difference
 - :code:`test_tece_ops.py` — WignerD / LayoutTransform / uvSO2Linear / SO2Gate / ComplexProductBasis / RRA path smoke
 - :code:`test_so3_wigner_backend.py` — shared e3nn/Jd Wigner-D backend (packed orthogonality, SO3_Rotation / fused / DPA4 quaternion adapters, high-l smoke)
 - :code:`test_so3_grid.py` — unified flat lat–long :code:`SO3Grid` / :code:`S2GridProjector` protocol (roundtrip, Lebedev duck-type, grid table)
@@ -476,18 +478,22 @@ Liao et al. (ICLR 2024) lives under :code:`enerzyme/models/equiformer_v2/` and e
 EquFlashV2 (:code:`equflashv2`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Samsung Electronics' EquFlashV2 lives under :code:`enerzyme/models/equflash/`
-(:code:`core.py`, :code:`interaction.py`, :code:`irreps.py`). Register via
-:code:`get_ff_core("equflashv2")` (alias :code:`equflash_v2`). The reference
-repository is CC BY-NC-SA 4.0 and uses cuequivariance; this stack is an e3nn
-reimplementation and does not load those checkpoints. Reuse
-:code:`BesselRBF(flavor="equflash")`, :code:`xplor` / :code:`cuton` on
-:code:`RangeSeparation`, :code:`EquivariantRMSNormSH` in :code:`e3nn_nn`,
+Samsung Electronics' EquFlashV2 lives next to EquFlash in
+:code:`enerzyme/models/equflash/` (:code:`core_v2.py`, :code:`interaction_v2.py`,
+shared :code:`irreps.py`). Register via :code:`get_ff_core("equflashv2")`
+(alias :code:`equflash_v2`). The reference repository is CC BY-NC-SA 4.0 and
+uses cuequivariance; this stack is an e3nn reimplementation and does not load
+those checkpoints. It reuses EquFlash's :code:`BesselRBF(flavor="equflash")`,
+:code:`xplor` / :code:`cuton`, and :meth:`BaseFFCore.adopt_radius_stack`.
+The channelwise convolution writes onto the requested irreps, so it does not
+use :func:`tp_out_irreps_with_instructions` (that helper keeps one slot per
+path for EquFlash's following linear). Messages go through
+:func:`segment_sum_coo`. :code:`EquivariantRMSNormSH`,
 :code:`SimpleReadout` (``activate_hidden: false``, ``use_bias: false``), and
-:code:`AtomicAffine(order="scale_then_shift")`. The Core emits flat
-:code:`atom_feature`. Example: :code:`equflashv2_layers_example.yaml`. Tests:
-:code:`test/test_equflash_v2_core.py`. Enerzymette: :code:`architecture: equflashv2`
-plus a resolved :code:`config.yaml`.
+:code:`AtomicAffine(order="scale_then_shift")` stay outside the convolution.
+The Core emits flat :code:`atom_feature`. Example:
+:code:`equflashv2_layers_example.yaml`. Tests: :code:`test/test_equflash_v2_core.py`.
+Enerzymette: :code:`architecture: equflashv2` plus a resolved :code:`config.yaml`.
 
 Nequix (:code:`nequix`)
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -556,6 +562,11 @@ TECE (:code:`tece`)
 
 Xu et al. (arXiv:2607.10664) lives under :code:`enerzyme/models/tece/` (:code:`core.py`, :code:`interaction.py`), adapted from `xvzemin/tace <https://github.com/xvzemin/tace>`_ v0.2.0 (MIT). Register via :code:`get_ff_core("tece")`. The Core seeds equivariant features from scalar embeddings, then stacks uvSO2 interactions with Edge Cluster Expansion (:code:`ComplexProductBasis`) and Radial Rotary Attention, plus node-side :code:`CgtpACE` reused from TACE. Shared SO(2) primitives (:code:`WignerD` recursive/direct, :code:`uvSO2Linear`, :code:`SO2Gate`, :code:`LayoutTransform`) live in :code:`enerzyme/models/so3/`. Requires :code:`Lmax == lmax`. Do not conflate RRA with EFA Euclidean RoPE. Emit :code:`atom_feature` for :code:`SimpleReadout`. Example: :code:`tece_layers_example.yaml`. Tests: :code:`test/test_tece_*.py`. Enerzymette: :code:`architecture: tece` + resolved :code:`config.yaml`.
 
+NequIP (:code:`nequip`)
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Batzner et al. (Nat. Commun. 2022) live under :code:`enerzyme/models/nequip/` (:code:`core.py`, :code:`interaction.py`). Register via :code:`get_ff_core("nequip")`. The external ``nequip`` wrapper has been removed; do not import that package. Reuse :code:`BesselRBF(flavor="nequip")` (sinc basis × :code:`PolynomialEnvelope` × :math:`2\pi/r_{\max}^2`), :code:`RandomAtomEmbedding`, :code:`tp_out_irreps_with_instructions` / e3nn :code:`Gate`, :func:`enerzyme.models.activation.resolve_scalar_activation`, and :meth:`BaseFFCore.adopt_radius_stack`. The species embedding is the initial scalar state and the fixed node attribute for the self-connection. The first layer omits that connection unless :code:`sc_first` (isolated atoms stay at zero). The last convolution emits :math:`\ell=0` only, so :code:`atom_feature` is ``{F}x0e`` for :code:`SimpleReadout`. Per-element shift is :code:`AtomicAffine`, not a head inside the Core. Presets ``S``–``XL`` follow the current foundation widths; ``paper`` is the 2022 radial MLP. Example: :code:`nequip_layers_example.yaml`. Tests: :code:`test/test_nequip_core.py`. Enerzymette: :code:`architecture: nequip` + resolved :code:`config.yaml`. Checkpoints from mir-group/nequip are not weight-compatible.
+
 FACTO (:code:`facto`)
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -570,6 +581,11 @@ PaiNN (:code:`painn`)
 ^^^^^^^^^^^^^^^^^^^^^
 
 Schütt, Unke, and Gastegger (ICML 2021, arXiv:2102.03150) live under :code:`enerzyme/models/painn/` (:code:`core.py`, :code:`interaction.py`), adapted from SchNetPack 2.0.4 (MIT). Register via :code:`get_ff_core("painn")`. Reuse :code:`BesselRBF(flavor="painn")`, :code:`cosine` cutoff values from :code:`RangeSeparation`, and :code:`RandomAtomEmbedding`. The Core emits :code:`atom_feature` and Cartesian :code:`atom_vector_feature` ``[N, 3, F]``. Scalar properties use :code:`SimpleReadout` (:code:`two_layer` + :code:`pyramidal: true` matches the SchNetPack two-layer width schedule; pass SiLU as ``swish`` with ``alpha=beta=1``, ``learnable: false``). Dipole and polarizability use :code:`EquivariantDipole` / :code:`EquivariantPolarizability`. The gated block itself is :code:`enerzyme.models.layers.gated_equivariant` so later Cartesian cores can share it. Distinct from external :code:`xpainn`. Examples: :code:`painn_layers_example.yaml`, :code:`painn_spectra_layers_example.yaml`. Tests: :code:`test/test_painn_*.py`. Enerzymette: :code:`architecture: painn` + resolved :code:`config.yaml`. The ASE calculator and :code:`enerzyme listen` copy :code:`polarizability` when the stack emits it.
+
+EquFlash (:code:`equflash`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+SamsungDS GGNN EquFlash lives under :code:`enerzyme/models/equflash/` (:code:`core.py`, :code:`interaction.py`, :code:`irreps.py`). Register via :code:`get_ff_core("equflash")`. The Core is the convolution stack only. Reuse :code:`RandomAtomEmbedding`, :code:`BesselRBF(flavor="equflash")` (``(2/c) sin(nπr/c)/r``, trainable frequencies by default), and :code:`RangeSeparation` with :code:`cutoff_fn: xplor` plus :code:`cuton`. :func:`equflash_irreps` builds the scalar → natural-parity → scalar schedule; :code:`irreps_manual` overrides it. Messages use :func:`tp_out_irreps_with_instructions` and an :code:`e3nn` gate. Scalar nonlinearities go through :func:`enerzyme.models.activation.resolve_scalar_activation`, shared with NequIP. :meth:`BaseFFCore.adopt_radius_stack` places the radius layers. The Core emits :code:`atom_feature` and :code:`feature_irreps` for :code:`SimpleReadout`. :code:`conv_denominator` rescales the scatter (default 1; GGNN's OMat yaml uses the dataset neighbor count). Cuequivariance / FlashTP are not wired. Example: :code:`equflash_layers_example.yaml`. Tests: :code:`test/test_equflash_core.py`. Enerzymette: :code:`architecture: equflash` + resolved :code:`config.yaml`.
 
 So3krates (:code:`so3krates`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

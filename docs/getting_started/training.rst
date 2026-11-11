@@ -75,7 +75,7 @@ Final Datahub Configuration
 Modelhub
 --------
 
-Models live under :code:`internal_FFs` (built into Enerzyme) or :code:`external_FFs` (NequIP, XPaiNN, etc.). Each model has a unique ID (e.g. :code:`FF01`).
+Models live under :code:`internal_FFs` (built into Enerzyme, including NequIP) or :code:`external_FFs` (XPaiNN and other wrappers). Each model has a unique ID (e.g. :code:`FF01`).
 
 Choosing an architecture
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -99,11 +99,13 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | FACTO          | Atom-centered scalar and tensor state    | Internal; presets S-XL    |
 +----------------+------------------------------------------+---------------------------+
+| EquFlash       | uvu tensor-product messages              | Built in                  |
++----------------+------------------------------------------+---------------------------+
 | EquFlashV2     | Channelwise Clebsch-Gordan messages      | Built in                  |
 +----------------+------------------------------------------+---------------------------+
 | Nequix         | Separable E(3) convolution               | Built in                  |
 +----------------+------------------------------------------+---------------------------+
-| NequIP         | External equivariant model               | Requires :code:`nequip`   |
+| NequIP         | E(3) tensor-product potentials           | Built in                  |
 +----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |
 +----------------+------------------------------------------+---------------------------+

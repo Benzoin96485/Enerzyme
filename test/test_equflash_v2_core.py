@@ -224,7 +224,7 @@ def test_equflash_isolated_atom_and_molecule_separation():
 def test_bilinear_gate_and_contraction_are_equivariant():
     from e3nn import o3
 
-    from enerzyme.models.equflash.interaction import BiLinearGate, SymmetricContraction
+    from enerzyme.models.equflash.interaction_v2 import BiLinearGate, SymmetricContraction
 
     torch.manual_seed(3)
     irreps = o3.Irreps("4x0e+4x1o")
@@ -328,7 +328,7 @@ def test_equflash_force_matches_energy_finite_difference():
 
 
 def test_channelwise_conv_rejects_mismatched_multiplicity():
-    from enerzyme.models.equflash.interaction import ChannelwiseConv
+    from enerzyme.models.equflash.interaction_v2 import ChannelwiseConv
 
     with pytest.raises(ValueError, match="multiplicity"):
         ChannelwiseConv(
@@ -353,7 +353,7 @@ def test_nequip_interaction_honors_after_nonlinear():
     from torch import nn
     from e3nn import o3
 
-    from enerzyme.models.equflash.interaction import NequIPInteractionBlock
+    from enerzyme.models.equflash.interaction_v2 import NequIPInteractionBlock
 
     common = dict(
         irreps_x="4x0e",

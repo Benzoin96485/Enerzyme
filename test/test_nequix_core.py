@@ -244,8 +244,8 @@ def test_linear2_keeps_sorted_unmerged_paths():
         avg_num_neighbors=1.0,
         layer_norm=False,
     )
-    assert conv.linear_2.irreps_in == conv.sort.irreps_sorted
-    assert conv.linear_2.irreps_in != conv.sort.irreps_sorted.regroup()
+    assert conv.linear_2.irreps_in == conv.tp.irreps_out
+    assert conv.linear_2.irreps_in != conv.tp.irreps_out.regroup()
     assert conv.linear_1.bias_numel == 0 and conv.skip.bias_numel == 0
 
 
@@ -400,7 +400,10 @@ def test_convolution_matches_nequix_torch_when_installed():
     def aggregated(conv, idx_i, idx_j):
         sent = conv.tp(conv.linear_1(features)[idx_j], edge_sh, conv.radial_mlp(radial))
         pooled = scatter_sum(sent, idx_i, dim=0, dim_size=features.shape[0])
-        return conv.sort(pooled) / math.sqrt(2.5)
+        sorter = getattr(conv, "sort", None)
+        if sorter is not None:
+            pooled = sorter(pooled)
+        return pooled / math.sqrt(2.5)
 
     assert torch.allclose(
         aggregated(ours, receivers, senders),

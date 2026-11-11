@@ -21,8 +21,8 @@
 # MPTRJ_ATOMIC_NUMBERS (Z = 1..94 except 84..88), dim_embedding 89.
 #
 # Enerzymette: architecture: nequix in the resolved config.yaml.
-# No nequip / jax / openequivariance dependency. The external `nequip`
-# wrapper is a different model and stays unused by this stack.
+# No jax / openequivariance dependency. architecture: nequip is the separate
+# native NequIP Core and is not this stack.
 
 Modelhub:
   internal_FFs:

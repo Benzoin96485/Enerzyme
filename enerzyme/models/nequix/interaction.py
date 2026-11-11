@@ -22,6 +22,7 @@ from e3nn import o3
 from torch import Tensor, nn
 from torch_scatter import scatter_sum
 
+from ..e3nn_nn import tp_out_irreps_with_instructions
 from ..e3nn_nn.activation import Activation
 from ..e3nn_nn.rms_norm import RMSLayerNorm
 
@@ -187,41 +188,6 @@ class NequixRadialMLP(nn.Module):
         return hidden
 
 
-class _SortIrreps(nn.Module):
-    """Reorder irrep blocks into ``Irreps.sort`` order without merging them."""
-
-    def __init__(self, irreps: o3.Irreps) -> None:
-        super().__init__()
-        irreps = o3.Irreps(irreps)
-        blocks = list(irreps.slices())
-        sorted_irreps, _, inverse = irreps.sort()
-        self.irreps_sorted = sorted_irreps
-        self._slices = tuple(blocks[index] for index in inverse)
-
-    def forward(self, features: Tensor) -> Tensor:
-        return torch.cat(
-            [features.narrow(-1, block.start, block.stop - block.start) for block in self._slices],
-            dim=-1,
-        )
-
-
-def _uvu_paths(irreps_in: o3.Irreps, irreps_sh: o3.Irreps, irreps_out: o3.Irreps):
-    """One output slot per path whose irrep appears in ``irreps_out``."""
-    paths = []
-    instructions = []
-    for i, (mul, ir_in) in enumerate(irreps_in):
-        for j, (_, ir_sh) in enumerate(irreps_sh):
-            for ir_out in ir_in * ir_sh:
-                if ir_out in irreps_out:
-                    instructions.append((i, j, len(paths), "uvu", True))
-                    paths.append((mul, ir_out))
-    if not paths:
-        raise ValueError(
-            f"no tensor-product paths {irreps_in} x {irreps_sh} -> {irreps_out}"
-        )
-    return o3.Irreps(paths), instructions
-
-
 def pre_gate_irreps(irreps_out: o3.Irreps) -> o3.Irreps:
     """Block output plus one even scalar gate per non-scalar channel."""
     irreps_out = o3.Irreps(irreps_out).simplify()
@@ -236,7 +202,12 @@ def pre_gate_irreps(irreps_out: o3.Irreps) -> o3.Irreps:
 
 
 class NequixConvolution(nn.Module):
-    """One Nequix interaction: conv, linear residual, RMSNorm, gate."""
+    """One Nequix interaction: conv, linear residual, RMSNorm, gate.
+
+    Path instructions come from ``tp_out_irreps_with_instructions``. That
+    helper sorts duplicate blocks without merging them, which is the layout
+    ``linear_2`` reads.
+    """
 
     def __init__(
         self,
@@ -258,13 +229,17 @@ class NequixConvolution(nn.Module):
             raise ValueError(f"radial_mlp_layers must be >= 0, got {radial_mlp_layers}")
         # Regroup so the gate layout (even scalars, then higher l) is the
         # tensor layout the next block reads. Duplicate tensor-product blocks
-        # stay unmerged until after the sort; linear_2 sees that sorted list.
+        # stay unmerged; linear_2 reads that sorted list.
         self.irreps_in = o3.Irreps(irreps_in).regroup()
         requested = o3.Irreps(irreps_out).regroup()
         irreps_sh = o3.Irreps(irreps_sh)
-        paths, instructions = _uvu_paths(self.irreps_in, irreps_sh, requested)
-        _, _, inverse = paths.sort()
-        instructions = [instructions[index] for index in inverse]
+        paths, instructions = tp_out_irreps_with_instructions(
+            self.irreps_in, irreps_sh, requested
+        )
+        if not instructions:
+            raise ValueError(
+                f"no tensor-product paths {self.irreps_in} x {irreps_sh} -> {requested}"
+            )
         self.tp = o3.TensorProduct(
             self.irreps_in,
             irreps_sh,
@@ -273,11 +248,10 @@ class NequixConvolution(nn.Module):
             shared_weights=False,
             internal_weights=False,
         )
-        self.sort = _SortIrreps(paths)
-        if self.tp.weight_numel != self.sort.irreps_sorted.num_irreps:
+        if self.tp.weight_numel != paths.num_irreps:
             raise RuntimeError(
                 "uvu weight count "
-                f"{self.tp.weight_numel} != path channels {self.sort.irreps_sorted.num_irreps}"
+                f"{self.tp.weight_numel} != path channels {paths.num_irreps}"
             )
         hidden = [int(radial_mlp_size)] * int(radial_mlp_layers)
         self.radial_mlp = NequixRadialMLP(
@@ -289,14 +263,12 @@ class NequixConvolution(nn.Module):
         # block separately, so regrouping them (the torch port) is a different
         # layer from the JAX / OpenEquivariance convolution that was trained.
         self.linear_1 = o3.Linear(self.irreps_in, self.irreps_in, biases=False)
-        self.linear_2 = o3.Linear(
-            self.sort.irreps_sorted, self.pre_gate, biases=False
-        )
+        self.linear_2 = o3.Linear(paths, self.pre_gate, biases=False)
         self.skip = o3.Linear(self.irreps_in, self.pre_gate, biases=False)
-        if self.linear_2.irreps_in != self.sort.irreps_sorted:
+        if self.linear_2.irreps_in != paths:
             raise RuntimeError(
                 "linear_2 must read the sorted unmerged tensor-product blocks "
-                f"{self.sort.irreps_sorted}, got {self.linear_2.irreps_in}"
+                f"{paths}, got {self.linear_2.irreps_in}"
             )
         self.layer_norm: Optional[RMSLayerNorm]
         if layer_norm:
@@ -333,13 +305,10 @@ class NequixConvolution(nn.Module):
         messages = self.linear_1(features)
         weights = self.radial_mlp(radial_basis)
         if idx_i.numel() == 0:
-            aggregated = features.new_zeros(
-                features.shape[0], self.sort.irreps_sorted.dim
-            )
+            aggregated = features.new_zeros(features.shape[0], self.tp.irreps_out.dim)
         else:
             sent = self.tp(messages[idx_j], edge_sh, weights)
             aggregated = scatter_sum(sent, idx_i, dim=0, dim_size=features.shape[0])
-            aggregated = self.sort(aggregated)
         aggregated = aggregated * self.inv_sqrt_neighbors
         hidden = self.linear_2(aggregated) + self.skip(features)
         if self.layer_norm is not None:

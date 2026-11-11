@@ -5,7 +5,7 @@ Transition functions (:func:`polynomial_transition`, :func:`bump_transition`,
 (:class:`PolynomialEnvelope`, :class:`DimeNetEnvelope`,
 :class:`C3CutoffEnvelope`) are the same family of smooth radial windows used
 inside equivariant message passing (EquiformerV3, DimeNet, DPA4).
-:func:`xplor_transition` is the CHARMM / HOOMD switch used by EquFlash
+:func:`xplor_transition` is the CHARMM / XPLOR switch used by EquFlash
 (``cuton`` / ``cutoff_on``). :func:`nequip_envelope` is the NequIP / Nequix
 polynomial cutoff (``p = 6``), the same polynomial as
 :class:`PolynomialEnvelope`. :func:`facto_polynomial_cutoff` is the separate
@@ -101,23 +101,29 @@ def cosine_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
 
 
 def xplor_transition(distance: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
-    """CHARMM / HOOMD XPLOR switch used by EquFlash.
+    """CHARMM / XPLOR switching function on absolute distance.
 
-    The window is 1 for ``r <= cuton``, a smooth polynomial on
-    ``cuton < r < cutoff``, and 0 for ``r >= cutoff``. ``cuton`` is the
-    EquFlash config key ``cutoff_on``.
+    Returns 1 for ``r <= cuton``, 0 for ``r >= cutoff``, and the standard
+    cubic polynomial in ``r^2`` in between. ``cuton`` must satisfy
+    ``0 <= cuton < cutoff``. ``cuton=0`` is a valid full-range switch. This
+    window is not a linearly rescaled ``[0, 1]`` polynomial, so it does not
+    use :func:`scale`.
     """
     if not 0.0 <= float(cuton) < float(cutoff):
         raise ValueError(f"cuton ({cuton}) must satisfy 0 <= cuton < cutoff ({cutoff})")
-    radius = distance
-    radius_sq = radius * radius
+    radius_sq = distance * distance
     on_sq = float(cuton) ** 2
     cut_sq = float(cutoff) ** 2
-    span = (cut_sq - on_sq) ** 3
-    window = (cut_sq - radius_sq) ** 2 * (cut_sq + 2.0 * radius_sq - 3.0 * on_sq) / span
-    ones = torch.ones_like(radius)
-    zeros = torch.zeros_like(radius)
-    return torch.where(radius <= cuton, ones, torch.where(radius < cutoff, window, zeros))
+    window = (
+        (cut_sq - radius_sq) ** 2
+        * (cut_sq + 2.0 * radius_sq - 3.0 * on_sq)
+        / (cut_sq - on_sq) ** 3
+    )
+    return torch.where(
+        distance <= cuton,
+        torch.ones_like(distance),
+        torch.where(distance >= cutoff, torch.zeros_like(distance), window),
+    )
 
 
 @scale
@@ -190,9 +196,9 @@ CUTOFF_KEY_TYPE = Literal[
 def polynomial_envelope(distance: Tensor, cutoff: float, exponent: int) -> Tensor:
     """``1 + a x^p + b x^{p+1} + c x^{p+2}`` on ``x = r / cutoff < 1``, else 0.
 
-    Shared by :class:`PolynomialEnvelope` and :func:`nequip_envelope`. This is
-    not the PhysNet :func:`polynomial_transition` and not the FACTO degree-9
-    window.
+    Shared by :class:`PolynomialEnvelope`, the NequIP Bessel flavor, and
+    :func:`nequip_envelope`. This is not the PhysNet
+    :func:`polynomial_transition` and not the FACTO degree-9 window.
     """
     if int(exponent) <= 0:
         raise ValueError(f"exponent must be positive, got {exponent}")
@@ -219,13 +225,10 @@ class PolynomialEnvelope(torch.nn.Module):
 
     def __init__(self, cutoff: float = 6.0, exponent: int = 5) -> None:
         super().__init__()
-        assert exponent > 0
+        if int(exponent) <= 0:
+            raise ValueError(f"exponent must be positive, got {exponent}")
         self.cutoff = float(cutoff)
-        self.exponent = exponent
-        self.p: float = float(exponent)
-        self.a: float = -(self.p + 1) * (self.p + 2) / 2
-        self.b: float = self.p * (self.p + 2)
-        self.c: float = -self.p * (self.p + 1) / 2
+        self.exponent = int(exponent)
 
     def forward(self, distance: torch.Tensor) -> torch.Tensor:
         return polynomial_envelope(distance, self.cutoff, self.exponent).view(-1, 1)

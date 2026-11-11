@@ -56,12 +56,14 @@ class RangeSeparationLayer(BaseFFLayer):
     def __init__(
         self,
         cutoff_sr,
-        cutoff_fn: Optional[CUTOFF_KEY_TYPE] = None,
-        cuton: float = 0.0,
+        cutoff_fn: Optional[CUTOFF_KEY_TYPE]=None,
+        cuton: float=0.0,
     ) -> None:
         super().__init__()
         self.cutoff_sr = cutoff_sr
         self.cuton = float(cuton)
+        if self.cuton < 0:
+            raise ValueError(f"cuton must be >= 0, got {self.cuton}")
         if cutoff_fn is not None:
             self.cutoff_fn = CUTOFF_REGISTER[cutoff_fn]
         else:
