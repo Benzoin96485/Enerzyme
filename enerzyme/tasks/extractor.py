@@ -277,13 +277,17 @@ class Extractor:
                 # Highest neighbourhood uncertainty first. Reversing the values
                 # before argsort mirrors the indices instead of ranking them.
                 sorted_atom_idx = np.argsort(local_uncertainty)[::-1]
-
-                coord = mol.GetConformer().GetPositions()
-                reference_mol.GetConformer().SetPositions(coord)
             elif self.extract_method == "random":
                 sorted_atom_idx = list(range(len(Ra)))
                 random.shuffle(sorted_atom_idx)
-            
+            else:
+                raise ValueError(f"Unknown extract_method: {self.extract_method}")
+
+            # Fragments are cut from reference_mol, so it must carry this
+            # frame's geometry for every extraction method.
+            coord = mol.GetConformer().GetPositions()
+            reference_mol.GetConformer().SetPositions(coord)
+
             submol_indices = []
             for i in range(0, len(sorted_atom_idx), self.n_centers):
                 submol, atom_map = extract_submol_with_center(reference_mol, sorted_atom_idx[i: i + self.n_centers], self.fragment_radius, dual_topology, self.must_include_indices)
