@@ -1,0 +1,59 @@
+# Geodite-MP (Reschützegger et al., J. Chem. Theory Comput. 2026,
+# doi:10.1021/acs.jctc.6c00712). The Core is the message-passing stack.
+# Bessel basis, polynomial envelope, covalent distance weight, isolated-atom
+# residual, per-layer readout, and screened ZBL stay outside it.
+#
+# Published Geodite-MP: dim_embedding 192, num_rbf 12, cutoff 6 Å, 4 layers,
+# lmax 2, 8 heads, dropout 0.2, edge update linw_mlpa_ln. Leave Core params
+# empty to get that model (see train.yaml FF23). This file is a small stack
+# for smoke tests.
+#
+# Energies are eV when Hartree_in_E is 27.211386245988 (ZBL prefactor
+# 14.3996 eV·Å). Set Hartree_in_E: 1.0 to train in Hartree.
+# PBE isolated-atom references belong in the dataset transform or in
+# AtomicAffine. The bias-free readout of (h - h_iso) is zero for an
+# isolated atom. Enerzymette only needs architecture: geodite.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: geodite
+      active: true
+      build_params:
+        dim_embedding: 16
+        num_rbf: 4
+        max_Za: 20
+        cutoff_sr: 6.0
+        Bohr_in_R: 0.5291772105638411
+        Hartree_in_E: 27.211386245988
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            trainable: false
+            apply_cutoff_fn: false
+        - name: RadialWindow
+          params:
+            envelope: polynomial
+            envelope_p: 6
+            attenuation: covalent
+            trainable_attenuation: true
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 2
+            lmax: 2
+            num_heads: 4
+            attn_dropout: 0.0
+        - name: IsolatedAtomResidual
+        - name: HierachicalReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            use_bias: false
+            initial_weight: xavier_uniform
+        - name: ScreenedZBLRepulsionEnergy
+          params:
+            envelope_p: 5
+        - name: EnergyReduce
+        - name: Force

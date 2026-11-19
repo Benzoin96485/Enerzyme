@@ -193,12 +193,14 @@ CUTOFF_KEY_TYPE = Literal[
 ]
 
 
-def polynomial_envelope(distance: Tensor, cutoff: float, exponent: int) -> Tensor:
+def polynomial_envelope(distance: Tensor, cutoff, exponent: int) -> Tensor:
     """``1 + a x^p + b x^{p+1} + c x^{p+2}`` on ``x = r / cutoff < 1``, else 0.
 
     Shared by :class:`PolynomialEnvelope`, the NequIP Bessel flavor, and
     :func:`nequip_envelope`. This is not the PhysNet
     :func:`polynomial_transition` and not the FACTO degree-9 window.
+    ``cutoff`` may be a scalar or a per-distance tensor (Geodite's ZBL
+    envelope uses the sum of covalent radii on each edge).
     """
     if int(exponent) <= 0:
         raise ValueError(f"exponent must be positive, got {exponent}")
@@ -206,7 +208,8 @@ def polynomial_envelope(distance: Tensor, cutoff: float, exponent: int) -> Tenso
     a = -(p + 1) * (p + 2) / 2
     b = p * (p + 2)
     c = -p * (p + 1) / 2
-    scaled = distance / float(cutoff)
+    cutoff_t = torch.as_tensor(cutoff, dtype=distance.dtype, device=distance.device)
+    scaled = distance / cutoff_t
     env = 1 + a * scaled**p + b * scaled ** (p + 1) + c * scaled ** (p + 2)
     return torch.where(scaled < 1, env, torch.zeros_like(scaled))
 

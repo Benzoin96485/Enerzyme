@@ -225,6 +225,11 @@ GRACE
 
 With :code:`architecture: grace`, pre-core layers are :code:`RangeSeparation` and :code:`RandomAtomEmbedding`. The Core does not own the embedding table. It returns invariant densities :code:`atom_feature` ``[N, n_densities]``. The foundation energy head is :code:`GRACEEnergyReadout` (linear density plus an MLP, then a per-element shift). :code:`SimpleReadout` reads the same vector. :code:`EnergyReduce` and :code:`Force` are unchanged, so forces stay :code:`Fa = -∇E`. Optional :code:`ZBLRepulsionEnergy` is added by name, as for other stacks. Set Core :code:`preset` to ``1L``, ``1L-M``, ``1L-L``, ``2L``, ``2L-M``, ``2L-L``, ``1L-latest``, ``2L-latest``, ``FS``, or ``custom``. ``FS`` is the Finnis–Sinclair readout; set :code:`dim_embedding: 64` and :code:`cutoff_sr: 7`. Example: :code:`enerzyme/config/grace_layers_example.yaml`.
 
+Geodite
+-------
+
+With :code:`architecture: geodite`, pre-core layers are :code:`RangeSeparation` (no ``cutoff_fn``), :code:`BesselRBF` (default flavor, ``apply_cutoff_fn: false``), :code:`RadialWindow` (polynomial envelope of order 6 and covalent attenuation), and :code:`RandomAtomEmbedding`. The Core returns hierarchical :code:`atom_feature` ``[N, C, K]``, :code:`isolated_atom_feature`, and :code:`atom_steerable_feature` in the Geodite polynomial basis. Energy uses :code:`IsolatedAtomResidual` → bias-free :code:`HierachicalReadout` → :code:`ScreenedZBLRepulsionEnergy` → :code:`EnergyReduce` → :code:`Force`. Place the residual immediately after the Core so the readout sees :code:`dim_feature_out` and :code:`num_output_blocks`. The neighbor list stores both directions. Default build parameters are Geodite-MP in eV (192 channels, 12 Bessel functions, 6 Å, ``Hartree_in_E: 27.211386245988``). An empty Core parameter block selects 4 layers, :code:`lmax` 2, 8 heads, dropout 0.2, and edge update ``linw_mlpa_ln``. Example: :code:`enerzyme/config/geodite_layers_example.yaml`. The published second-stage Huber loss is not implemented; use MAE and set the force weight to 1 or 5.
+
 DimeNet and modular readouts
 ----------------------------
 
