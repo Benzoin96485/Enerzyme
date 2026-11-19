@@ -1,6 +1,6 @@
 from typing import Set, Literal, Dict, Optional, List, Callable
 from . import BaseFFLayer
-from ..blocks.mlp import DenseLayer, ResidualMLP, ResidualLayer, VariancePreservingMLP
+from ..blocks.mlp import DenseLayer, GatedMLP, ResidualMLP, ResidualLayer, VariancePreservingMLP
 from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, POSITIVE_ACTIVATION_KEY_TYPE, get_positive_activation_fn
 from ..e3nn_nn import extract_scalar_0e
 import math
@@ -17,6 +17,7 @@ HEAD_TYPE = Literal[
     "mlp",
     "equiformer_linear_rs",
     "variance_preserving",
+    "gated",
 ]
 
 
@@ -284,6 +285,36 @@ class BaseReadout(BaseFFLayer):
                 nonlinearity=None if depth == 0 else nonlinearity,
                 bias=use_bias,
                 forward_weight_init=forward_init,
+            )
+        elif self.head_type == "gated":
+            # M3GNet atomic head: SiLU hidden gates, sigmoid on the last gate,
+            # and no activation on the last value. Hidden width follows ``units``,
+            # then the Core's ``readout_hidden_width``, then the latent width.
+            head_params = dict(self.head_params)
+            hidden_dims = head_params.pop("hidden_dims", None)
+            units = head_params.pop("units", None)
+            n_hidden = int(head_params.pop("num_hidden_layers", 2))
+            activate_last = bool(head_params.pop("activate_last", False))
+            use_bias = bool(head_params.pop("use_bias", True))
+            if head_params:
+                unknown = ", ".join(sorted(head_params))
+                raise ValueError(f"gated head received unknown params: {unknown}")
+            if hidden_dims is not None and units is not None:
+                raise ValueError("gated head accepts hidden_dims or units, not both")
+            if n_hidden < 0:
+                raise ValueError(f"num_hidden_layers must be >= 0, got {n_hidden}")
+            if hidden_dims is None:
+                if units is None and self._hinted_hidden_width is not None:
+                    units = self._hinted_hidden_width
+                if units is None:
+                    units = self.dim_feature_in
+                hidden_dims = [int(units)] * n_hidden
+            return GatedMLP(
+                in_features=self.dim_feature_in,
+                hidden_dims=[int(width) for width in hidden_dims],
+                out_features=self.dim_feature_out * self.shallow_ensemble_size,
+                activate_last=activate_last,
+                use_bias=use_bias,
             )
         elif self.head_type == "equiformer_linear_rs":
             # Official Equiformer MD17 scalar energy MLP:

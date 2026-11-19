@@ -89,6 +89,8 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | DimeNet++      | Faster directional messages              | Hadamard bottleneck       |
 +----------------+------------------------------------------+---------------------------+
+| M3GNet         | Three-body bonds + gated convolution     | Cutoffs 5 Å and 4 Å      |
++----------------+------------------------------------------+---------------------------+
 | PhysNet        | Production charge-aware PES              | Electrostatics, D3 layers |
 +----------------+------------------------------------------+---------------------------+
 | SpookyNet      | Large organic / mixed systems            | Similar feature set       |

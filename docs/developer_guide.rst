@@ -337,6 +337,8 @@ Tests live in :code:`test/`:
 - :code:`test_dimenetpp_parity_ops.py` — numerical parity of ``DimeNetPPInteractionBlock`` vs PyG ``InteractionPPBlock`` (all-edge down-projection, then triplet gather), including an empty triplet list
 - :code:`test_gemnet_ops.py` — GemNet Bessel flavor, reverse edges, receiver triplets, dihedral quadruplets, two-cutoff central bonds, real harmonics, bilinear aggregation
 - :code:`test_gemnet_core.py` — GemNet-T/Q registration, hierarchical features, rotation / inversion / translation, batch isolation, build_model energy and conservative forces, example YAML cutoffs
+- :code:`test_m3gnet_ops.py` — M3GNet spherical Bessel (``l = 0`` closed form, zero at the cutoff), ``r_ik`` joint basis, receiver triplets including periodic images, gated MLP
+- :code:`test_m3gnet_core.py` — M3GNet registration / YAML smoke, three-body cutoff, rotation / inversion / translation / edge order, batch isolation, build_model energy and conservative forces
 - :code:`test_facto_ops.py` — FACTO cutoff derivative, Gaussian window, descriptor table, and algebraic attention / feedback / injection / transport reductions
 - :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_grace_ops.py` — GRACE Chebyshev / spherical Bessel / cutoff, channel-aligned CG equivariance, Finnis–Sinclair powers, linear density head
@@ -501,6 +503,31 @@ stay at 1. Upstream checkpoints are not loaded: the harmonic channel order,
 the species-table initialization, and the fitted scales differ.
 Enerzymette only needs :code:`architecture: gemnet-t` or
 :code:`architecture: gemnet-q` plus a resolved :code:`config.yaml`.
+
+M3GNet (:code:`m3gnet`)
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Chen and Ong (Nat. Comput. Sci. 2022) live under :code:`enerzyme/models/m3gnet/`
+(:code:`core.py`, :code:`interaction.py`, :code:`basis.py`, :code:`geometry.py`).
+The update rules follow `materialyzeai/matgl <https://github.com/materialyzeai/matgl>`_
+(BSD). Do not import matgl, and do not load its checkpoints. Register
+:code:`m3gnet` in :code:`get_ff_core`. Reuse
+:func:`enerzyme.models.cutoff.polynomial_envelope` (order 3 on the three-body
+term), DimeNet spherical-Bessel zeros / :code:`spherical_jn` /
+:code:`real_sph_harm_l0`, :class:`~enerzyme.models.blocks.mlp.GatedMLP`,
+:code:`RandomAtomEmbedding`, :code:`segment_sum_coo`, and
+:meth:`BaseFFCore.adopt_radius_stack`. The bond expansion is the layer
+:code:`SphericalBesselRBF` (flavor ``m3gnet``), not a :code:`BesselRBF` flavor:
+its width is ``max_l * num_rbf`` and it carries no envelope.
+:code:`threebody_cutoff` must be at most :code:`cutoff_sr`. The Core emits
+flat :code:`atom_feature`. Compose :code:`SimpleReadout` (:code:`head_type: gated`)
++ :code:`EnergyReduce` / :code:`Force`. The gated head's hidden width follows
+Core :code:`readout_hidden_width` (``units``). An isolated atom is the species
+embedding, so the baseline is in that head rather than a zero descriptor.
+:code:`Force` returns zero when that energy does not depend on coordinates.
+Example: :code:`m3gnet_layers_example.yaml`. Tests: :code:`test/test_m3gnet_ops.py`,
+:code:`test/test_m3gnet_core.py`. Enerzymette only needs :code:`architecture: m3gnet`
+plus a resolved :code:`config.yaml`.
 
 External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -17,7 +17,7 @@ From :code:`enerzyme/models/layers/`:
     from :code:`enerzyme.models.so3` for equivariant cores).
 
 **Radial basis**
-    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash / nequip / esen / gemnet), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`. Cutoff key :code:`nequip` is the polynomial envelope (``p = 6``) that Nequix multiplies onto the equflash Bessel basis. Bessel flavor :code:`nequip` is the separate mir-group basis, with that envelope already inside the layer.
+    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash / nequip / esen / gemnet), :code:`SphericalBesselRBFLayer` (M3GNet ``j_l`` stack, width ``max_l * num_rbf``, no envelope), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`. Cutoff key :code:`nequip` is the polynomial envelope (``p = 6``) that Nequix multiplies onto the equflash Bessel basis. Bessel flavor :code:`nequip` is the separate mir-group basis, with that envelope already inside the layer.
 
 **Embeddings**
     :code:`RandomAtomEmbedding`, :code:`OneHotAtomEmbedding` (Nequix species vocabulary), :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
@@ -34,7 +34,8 @@ From :code:`enerzyme/models/layers/`:
 **Readouts**
     :code:`SimpleReadout` — per-atom MLP over scalar features. :code:`head_type: two_layer` accepts :code:`pyramidal: true` (hidden width ``max(n_out, F // 2)``) or :code:`dim_hidden`. With equivariant Cores
     that set :code:`feature_irreps`, it extracts even-scalar (:code:`0e`) channels first,
-    then applies :code:`dense` / :code:`residual_*` / :code:`two_layer` / :code:`mlp` heads.
+    then applies :code:`dense` / :code:`residual_*` / :code:`two_layer` / :code:`mlp` / :code:`gated` heads.
+    :code:`head_type: gated` is the M3GNet atomic head (parallel SiLU MLP times a sigmoid gate).
     :code:`head_type: mlp` is a stack of dense hidden layers plus a linear property
     head (DimeNet output blocks; :code:`num_hidden_layers`, optional :code:`use_bias_out: false`).
     Use :code:`head_type: equiformer_linear_rs` for the official Equiformer MD17 scalar
@@ -255,6 +256,8 @@ and a bias-free map to :code:`out_emb_size`, which becomes
 With :code:`architecture: gemnet` (aliases :code:`gemnet-t` and :code:`gemnett`), pre-core layers are :code:`RangeSeparation`, :code:`BesselRBF` (``flavor: gemnet``), and :code:`RandomAtomEmbedding`. The Core is GemNet-T. Leave ``basis_cutoff`` unset when ``cutoff_sr`` equals the embedding cutoff (default 5 Å). The envelope lives inside that Bessel flavor (order ``envelope_exponent``, default 5) and is not the DimeNet envelope. The Core emits hierarchical :code:`atom_feature` ``(N, F, num_blocks+1)``. Energy uses bias-free :code:`HierachicalReadout` (``head_type: dense``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/gemnet_layers_example.yaml`.
 
 With :code:`architecture: gemnet-q` (alias :code:`gemnetq`), the same stack uses two cutoffs. Set ``cutoff_sr`` and Core ``int_cutoff`` to 10 Å, and set both ``BesselRBF.basis_cutoff`` and Core ``emb_cutoff`` to 5 Å. ``triplets_only`` is false. Quadruplet central bonds use the longer neighbor list; messages stay on the embedding edges. Example: :code:`enerzyme/config/gemnetq_layers_example.yaml`.
+
+With :code:`architecture: m3gnet`, pre-core layers are :code:`RangeSeparation`, :code:`SphericalBesselRBF`, and :code:`RandomAtomEmbedding`. The Core owns the three-body update and the gated convolution. :code:`cutoff_sr` is the neighbor list (default 5 Å). :code:`threebody_cutoff` (default 4 Å) is the polynomial envelope inside the Core and cannot exceed :code:`cutoff_sr`. Energy uses :code:`SimpleReadout` (``head_type: gated``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/m3gnet_layers_example.yaml`.
 
 So3krates and modular readouts
 ------------------------------

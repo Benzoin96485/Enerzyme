@@ -1,0 +1,39 @@
+# M3GNet (Chen and Ong, Nat. Comput. Sci. 2022).
+# Spherical Bessel bond basis and species embedding stay outside the Core.
+# The Core is the three-body bond update and the gated graph convolution.
+# The potential head is SimpleReadout head_type gated, then EnergyReduce
+# and Force. Graph cutoff 5 Å, three-body cutoff 4 Å, max_n = max_l = 3.
+#
+# Enerzymette: set architecture: m3gnet in the resolved config.yaml.
+# An isolated atom keeps its species embedding, so the gated head is a
+# learned elemental baseline. AtomicAffine can add another reference.
+# matgl checkpoints do not load.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: m3gnet
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 3
+        max_l: 3
+        max_Za: 94
+        cutoff_sr: 5.0
+        threebody_cutoff: 4.0
+      layers:
+        - name: RangeSeparation
+        - name: SphericalBesselRBF
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_blocks: 3
+            envelope_exponent: 3
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: gated
+            num_hidden_layers: 2
+            activate_last: false
+        - name: EnergyReduce
+        - name: Force
