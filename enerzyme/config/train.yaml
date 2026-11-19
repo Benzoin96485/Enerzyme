@@ -1568,6 +1568,44 @@ Modelhub:
             initial_weight: orthogonal
         - name: EnergyReduce
         - name: Force
+    FF27:
+      suffix:
+      # M3GNet (Chen and Ong, Nat. Comput. Sci. 2022). Spherical Bessel basis
+      # and the gated atomic head stay outside the Core. Graph cutoff 5 Å,
+      # three-body cutoff 4 Å. matgl checkpoints do not load.
+      architecture: m3gnet
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 64
+        num_rbf: 3
+        max_l: 3
+        max_Za: 94
+        cutoff_sr: 5.0
+        threebody_cutoff: 4.0
+      layers:
+        - name: RangeSeparation
+        - name: SphericalBesselRBF
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_blocks: 3
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: gated
+            num_hidden_layers: 2
+            activate_last: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

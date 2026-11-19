@@ -1,5 +1,5 @@
 import math
-from typing import Optional, Union, Literal
+from typing import Optional, Sequence, Union, Literal
 from numpy import ndarray
 from torch import Tensor
 from torch.nn import Module, init, Sequential, Parameter, Dropout
@@ -223,6 +223,48 @@ def _variance_nonlinearity(name: Optional[str]) -> Optional[type]:
         known = ", ".join([*sorted(table), "none"])
         raise ValueError(f"unknown nonlinearity {name!r}; expected one of {known}")
     return table[key]
+
+
+class GatedMLP(Module):
+    """Two parallel MLPs whose outputs are multiplied.
+
+    The value branch and the gate branch both read the original input. Hidden
+    layers use SiLU on each branch. The last gate is a sigmoid. The last value
+    layer uses SiLU only when ``activate_last`` is true. This is the M3GNet /
+    MEGNet update (Chen and Ong, Nat. Comput. Sci. 2022), not a Cartesian
+    equivariant gate.
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        hidden_dims: Sequence[int],
+        out_features: int,
+        activate_last: bool = True,
+        use_bias: bool = True,
+    ) -> None:
+        super().__init__()
+        dims = [int(in_features), *[int(width) for width in hidden_dims], int(out_features)]
+        if any(width < 1 for width in dims):
+            raise ValueError(f"GatedMLP widths must be >= 1, got {dims}")
+        value: list = []
+        gate: list = []
+        last = len(dims) - 2
+        for index, (dim_in, dim_out) in enumerate(zip(dims, dims[1:])):
+            value.append(torch.nn.Linear(dim_in, dim_out, bias=use_bias))
+            gate.append(torch.nn.Linear(dim_in, dim_out, bias=use_bias))
+            if index < last:
+                value.append(torch.nn.SiLU())
+                gate.append(torch.nn.SiLU())
+            else:
+                if activate_last:
+                    value.append(torch.nn.SiLU())
+                gate.append(torch.nn.Sigmoid())
+        self.value_net = Sequential(*value)
+        self.gate_net = Sequential(*gate)
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        return self.value_net(inputs) * self.gate_net(inputs)
 
 
 class VariancePreservingMLP(Module):
