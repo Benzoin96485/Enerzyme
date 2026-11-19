@@ -202,7 +202,10 @@ Adding an internal architecture
 Recent internal example: :code:`DimeNet` under :code:`enerzyme/models/dimenet/`
 (Bessel RBF + atom embedding as pre-core layers; Core emits hierarchical
 :code:`atom_feature`; shared :code:`HierachicalReadout` / physics layers after
-the Core). Also :code:`So3krates` under :code:`enerzyme/models/so3krates/`
+the Core). Also :code:`GemNet` under :code:`enerzyme/models/gemnet/`
+(GemNet Bessel flavor and atom embedding outside the Core; directional
+triplets, and dihedral quadruplets for GemNet-Q, inside the Core; shared
+bias-free :code:`HierachicalReadout`). Also :code:`So3krates` under :code:`enerzyme/models/so3krates/`
 (scalar atom embedding + RBF as pre-core layers; Core emits invariant
 :code:`atom_feature` and SPHC :code:`atom_sphere_feature`; shared
 :code:`SimpleReadout` / physics layers after the Core). Also:
@@ -332,6 +335,8 @@ Tests live in :code:`test/`:
 - :code:`test_dimenet_parity_ops.py` — numerical parity vs PyG original DimeNet (not ++); energy uses PyG angles at atom ``i``; production Core uses paper angles at ``j``
 - :code:`test_dimenetpp_core.py` — DimeNet++ registration / YAML smoke, hierarchical features at ``out_emb_size``, SO(3) invariance, build_model E/F, pair graph with no triplets
 - :code:`test_dimenetpp_parity_ops.py` — numerical parity of ``DimeNetPPInteractionBlock`` vs PyG ``InteractionPPBlock`` (all-edge down-projection, then triplet gather), including an empty triplet list
+- :code:`test_gemnet_ops.py` — GemNet Bessel flavor, reverse edges, receiver triplets, dihedral quadruplets, two-cutoff central bonds, real harmonics, bilinear aggregation
+- :code:`test_gemnet_core.py` — GemNet-T/Q registration, hierarchical features, rotation / inversion / translation, batch isolation, build_model energy and conservative forces, example YAML cutoffs
 - :code:`test_facto_ops.py` — FACTO cutoff derivative, Gaussian window, descriptor table, and algebraic attention / feedback / injection / transport reductions
 - :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_grace_ops.py` — GRACE Chebyshev / spherical Bessel / cutoff, channel-aligned CG equivariance, Finnis–Sinclair powers, linear density head
@@ -472,6 +477,30 @@ The Core emits hierarchical :code:`atom_feature`; compose
 ``DimeNet.forward`` is not called — no torch-sparse / torch-cluster).
 Enerzymette only needs :code:`architecture: dimenet` plus a resolved
 :code:`config.yaml`.
+
+GemNet (:code:`gemnet`, :code:`gemnet-q`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Gasteiger, Becker, and Günnemann (NeurIPS 2021, arXiv:2106.08903) live under
+:code:`enerzyme/models/gemnet/` (:code:`core.py`, :code:`layers.py`,
+:code:`basis.py`, :code:`geometry.py`). This is an original implementation.
+`TUM-DAML/gemnet_pytorch <https://github.com/TUM-DAML/gemnet_pytorch>`_ is
+Hippocratic License 2.0; do not vendor it, and do not import it from tests.
+Register :code:`gemnet` / :code:`gemnet-t` / :code:`gemnett` and
+:code:`gemnet-q` / :code:`gemnetq` in :code:`get_ff_core`. Reuse
+:code:`BesselRBF(flavor="gemnet")`, :func:`enerzyme.models.cutoff.polynomial_envelope`,
+DimeNet spherical-Bessel zeros and :code:`real_sph_harm_l0`,
+:code:`RandomAtomEmbedding`, :code:`segment_sum_coo`, and
+:meth:`BaseFFCore.adopt_radius_stack`. The triplet index is local: two
+incoming edges share the receiver, which is not the DimeNet path triplet.
+The Core emits hierarchical :code:`atom_feature`. Compose bias-free
+:code:`HierachicalReadout` (:code:`head_type: dense`) + :code:`EnergyReduce` /
+:code:`Force`. ``basis_cutoff`` must equal ``emb_cutoff``. GemNet-Q sets
+``cutoff_sr`` and ``int_cutoff`` above that embedding cutoff. Variance scales
+stay at 1. Upstream checkpoints are not loaded: the harmonic channel order,
+the species-table initialization, and the fitted scales differ.
+Enerzymette only needs :code:`architecture: gemnet-t` or
+:code:`architecture: gemnet-q` plus a resolved :code:`config.yaml`.
 
 External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

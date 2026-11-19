@@ -1,0 +1,56 @@
+# GemNet-T (Gasteiger, Becker, Günnemann, NeurIPS 2021, arXiv:2106.08903).
+# Directional triplets at the receiver. BesselRBF flavor gemnet owns the
+# radial envelope (order 5). The Core emits hierarchical atom features.
+# HierachicalReadout is a bias-free linear map. An isolated atom has zero
+# network energy; elemental references belong in AtomicAffine.
+# Force is conservative (Fa = -∇E). Direct-force GemNet-dT is not implemented.
+#
+# TUM-DAML/gemnet_pytorch is Hippocratic License 2.0 and is not vendored.
+# Its checkpoints do not load.
+#
+# Enerzymette: set architecture: gemnet-t in the resolved config.yaml.
+# No Enerzymette code change is required.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: gemnet-t
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 6
+        max_Za: 94
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: gemnet
+            trainable: true
+            envelope_exponent: 5
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_blocks: 4
+            num_spherical: 7
+            emb_size_edge: 128
+            emb_size_trip: 64
+            emb_size_rbf: 16
+            emb_size_cbf: 16
+            emb_size_bil_trip: 64
+            num_before_skip: 1
+            num_after_skip: 1
+            num_concat: 1
+            num_atom: 2
+            triplets_only: true
+            envelope_exponent: 5
+            output_mode: feature
+        - name: HierachicalReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            use_bias: false
+            initial_weight: orthogonal
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
