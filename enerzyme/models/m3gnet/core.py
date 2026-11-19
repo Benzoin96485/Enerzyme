@@ -139,23 +139,36 @@ class M3GNetCore(BaseFFCore):
 #########################################################################
 """
 
+    def _allow_extra_radial(self) -> bool:
+        """Subclasses that add another basis (MatterSim's Gaussian) return True."""
+        return False
+
     def build(self, built_layers: List[Module]) -> None:
         self.adopt_radius_stack(built_layers)
         radial = [
             layer for layer in built_layers if isinstance(layer, BaseRBF)
         ]
-        if len(radial) != 1:
+        spherical = [
+            layer for layer in radial if getattr(layer, "flavor", None) == "m3gnet"
+        ]
+        extra = [layer for layer in radial if layer not in spherical]
+        if len(spherical) != 1:
+            if len(radial) == 1:
+                flavor = getattr(radial[0], "flavor", None)
+                raise ValueError(
+                    "M3GNetCore requires SphericalBesselRBF (flavor 'm3gnet'), "
+                    f"found {flavor!r}"
+                )
+            raise ValueError(
+                "M3GNetCore requires exactly one SphericalBesselRBF layer "
+                f"before the Core, found {len(spherical)}"
+            )
+        if extra and not self._allow_extra_radial():
             raise ValueError(
                 "M3GNetCore requires exactly one SphericalBesselRBF layer "
                 f"before the Core, found {len(radial)}"
             )
-        layer = radial[0]
-        flavor = getattr(layer, "flavor", None)
-        if flavor != "m3gnet":
-            raise ValueError(
-                "M3GNetCore requires SphericalBesselRBF (flavor 'm3gnet'), "
-                f"found {flavor!r}"
-            )
+        layer = spherical[0]
         if int(layer.max_l) != self.max_l or int(layer.num_rbf) != self.num_rbf:
             raise ValueError(
                 "SphericalBesselRBF "
@@ -173,7 +186,7 @@ class M3GNetCore(BaseFFCore):
             if isinstance(candidate, BaseAtomEmbedding):
                 self.atom_embedding = candidate
 
-    def get_output(
+    def _featurize(
         self,
         atom_embedding: Tensor,
         rbf: Tensor,
@@ -181,7 +194,8 @@ class M3GNetCore(BaseFFCore):
         vij_sr: Tensor,
         idx_i_sr: Tensor,
         idx_j_sr: Tensor,
-    ) -> dict[str, Tensor]:
+    ):
+        """Species state, initial bond state, and the three-body geometry."""
         if atom_embedding.ndim != 2:
             raise ValueError(
                 f"atom_embedding must be (N, F), got {tuple(atom_embedding.shape)}"
@@ -213,6 +227,9 @@ class M3GNetCore(BaseFFCore):
         )
         node = atom_embedding
         edge = self.edge_embed(rbf)
+        return node, edge, pairs, joint, envelope
+
+    def _run_blocks(self, node, edge, rbf, idx_i_sr, idx_j_sr, pairs, joint, envelope):
         for block in self.blocks:
             node, edge = block(
                 node,
@@ -225,4 +242,21 @@ class M3GNetCore(BaseFFCore):
                 joint,
                 envelope,
             )
+        return node, edge
+
+    def get_output(
+        self,
+        atom_embedding: Tensor,
+        rbf: Tensor,
+        Dij_sr: Tensor,
+        vij_sr: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+    ) -> dict[str, Tensor]:
+        node, edge, pairs, joint, envelope = self._featurize(
+            atom_embedding, rbf, Dij_sr, vij_sr, idx_i_sr, idx_j_sr
+        )
+        node, _edge = self._run_blocks(
+            node, edge, rbf, idx_i_sr, idx_j_sr, pairs, joint, envelope
+        )
         return {"atom_feature": node}

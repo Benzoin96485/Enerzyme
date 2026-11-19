@@ -1,0 +1,54 @@
+# MatterSim (Yang et al., arXiv:2405.04967).
+# The Core extends M3GNet with the materials Graphormer structural encoder:
+# centrality on the species embedding, then cutoff-masked attention whose
+# logits add a Gaussian distance bias. SphericalBesselRBF is the three-body
+# bond basis. GaussianRBF (SchNet width, no envelope) is the attention basis;
+# the Core renames it to graphormer_rbf.
+# The potential head is SimpleReadout head_type gated, then EnergyReduce
+# and Force. Graph cutoff 5 Å, three-body cutoff 4 Å, attention mask 5 Å.
+#
+# Enerzymette: set architecture: mattersim in the resolved config.yaml.
+# MatterSim-v1 M3GNet checkpoints do not load. The public repository does
+# not ship Graphormer weights. The paper's direct-force GeoMFormer decoder
+# and lattice stress head are not this stack; forces are Fa = -dE/dR.
+# Published Graphormer widths (24 layers, 32 heads, hidden 768, 128
+# Gaussians, 20 Å neighbor list, 5 Å mask) are a larger config of this Core.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: mattersim
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 3
+        max_l: 3
+        max_Za: 94
+        cutoff_sr: 5.0
+        threebody_cutoff: 4.0
+      layers:
+        - name: RangeSeparation
+        - name: SphericalBesselRBF
+        - name: GaussianRBF
+          params:
+            num_rbf: 16
+            flavor: SchNet
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_blocks: 3
+            num_attn_layers: 2
+            num_heads: 4
+            graphormer_num_basis: 16
+            attention_cutoff: 5.0
+            use_centrality: true
+            envelope_exponent: 3
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: gated
+            num_hidden_layers: 2
+            activate_last: false
+        - name: EnergyReduce
+        - name: Force

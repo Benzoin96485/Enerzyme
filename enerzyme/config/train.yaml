@@ -1606,6 +1606,54 @@ Modelhub:
             activate_last: false
         - name: EnergyReduce
         - name: Force
+    FF28:
+      suffix:
+      # MatterSim (Yang et al., arXiv:2405.04967). M3GNet three-body blocks
+      # plus Graphormer centrality and cutoff-masked attention. GaussianRBF
+      # is the attention basis. MatterSim-v1 checkpoints do not load.
+      architecture: mattersim
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 64
+        num_rbf: 3
+        max_l: 3
+        max_Za: 94
+        cutoff_sr: 5.0
+        threebody_cutoff: 4.0
+      layers:
+        - name: RangeSeparation
+        - name: SphericalBesselRBF
+        - name: GaussianRBF
+          params:
+            num_rbf: 16
+            flavor: SchNet
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_blocks: 3
+            num_attn_layers: 2
+            num_heads: 4
+            graphormer_num_basis: 16
+            attention_cutoff: 5.0
+            use_centrality: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: gated
+            num_hidden_layers: 2
+            activate_last: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

@@ -339,6 +339,8 @@ Tests live in :code:`test/`:
 - :code:`test_gemnet_core.py` — GemNet-T/Q registration, hierarchical features, rotation / inversion / translation, batch isolation, build_model energy and conservative forces, example YAML cutoffs
 - :code:`test_m3gnet_ops.py` — M3GNet spherical Bessel (``l = 0`` closed form, zero at the cutoff), ``r_ik`` joint basis, receiver triplets including periodic images, gated MLP
 - :code:`test_m3gnet_core.py` — M3GNet registration / YAML smoke, three-body cutoff, rotation / inversion / translation / edge order, batch isolation, build_model energy and conservative forces
+- :code:`test_mattersim_ops.py` — Graphormer segment softmax, centrality sum, post-softmax polynomial mask
+- :code:`test_mattersim_core.py` — MatterSim registration / aliases / YAML smoke, M3GNet reduction when attention and centrality are off, attention cutoff, rotation / inversion / translation / edge order, batch isolation, build_model energy and conservative forces
 - :code:`test_facto_ops.py` — FACTO cutoff derivative, Gaussian window, descriptor table, and algebraic attention / feedback / injection / transport reductions
 - :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_grace_ops.py` — GRACE Chebyshev / spherical Bessel / cutoff, channel-aligned CG equivariance, Finnis–Sinclair powers, linear density head
@@ -528,6 +530,30 @@ embedding, so the baseline is in that head rather than a zero descriptor.
 Example: :code:`m3gnet_layers_example.yaml`. Tests: :code:`test/test_m3gnet_ops.py`,
 :code:`test/test_m3gnet_core.py`. Enerzymette only needs :code:`architecture: m3gnet`
 plus a resolved :code:`config.yaml`.
+
+MatterSim (:code:`mattersim`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Yang et al. (arXiv:2405.04967) live under :code:`enerzyme/models/mattersim/`
+(:code:`core.py`, :code:`attention.py`). :class:`MatterSimCore` subclasses
+:class:`~enerzyme.models.m3gnet.core.M3GNetCore`. Register :code:`mattersim`,
+:code:`m3gnet-graphormer`, and :code:`m3gnet_graphormer`. The three-body
+convolution, spherical Bessel basis, gated MLP, triplet index, and polynomial
+envelope are the M3GNet ones. The added structural encoder is supplementary
+section S1.3: a centrality sum :code:`Linear(m_ij Φ_ij)` on the receiver, then
+multi-head attention whose logits add :code:`Linear(Φ_ij)` and whose weights
+are multiplied by the order-3 polynomial mask after the softmax. :code:`Φ` is
+:code:`GaussianRBF` with ``flavor: SchNet`` and ``apply_cutoff_fn: false``;
+the Core renames that output to ``graphormer_rbf``. Keys and values are read
+from ``idx_j``, which is the in-cell atom of a periodic image. ``num_attn_layers: 0``
+and ``use_centrality: false`` is M3GNet. The paper's GeoMFormer direct-force
+decoder and lattice stress head are not this potential. Forces stay on
+:code:`Force`. :code:`microsoft/mattersim` ships M3GNet checkpoints only and
+raises ``NotImplementedError`` for Graphormer; those checkpoints do not load.
+Example: :code:`mattersim_layers_example.yaml`. Tests:
+:code:`test/test_mattersim_ops.py`, :code:`test/test_mattersim_core.py`.
+Enerzymette only needs :code:`architecture: mattersim` plus a resolved
+:code:`config.yaml`.
 
 External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
