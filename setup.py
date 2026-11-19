@@ -14,6 +14,9 @@ setup(
         # Optional Q/S prior backends for Datahub transforms (runtime-checked in deps.py)
         "xtb": ["tblite>=0.5"],
         "pyscf_nao": ["pyscf"],
+        # Optional fast (C-optimized) backend for Datahub neighbor_list='cutoff';
+        # falls back to ase.neighborlist.primitive_neighbor_list when absent.
+        "pbc": ["matscipy"],
     },
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
     packages=find_packages(include=["enerzyme", "enerzyme.*"]),
