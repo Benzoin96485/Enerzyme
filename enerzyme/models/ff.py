@@ -59,6 +59,17 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .dimenet.core_pp import DimeNetPPCore as Core
         from .dimenet.core_pp import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {"gemnet", "gemnet-t", "gemnett"}:
+        from .gemnet import GemNetCore as Core
+        from .gemnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
+    elif architecture.lower() in {"gemnet-q", "gemnetq"}:
+        from .gemnet import GemNetCore as Core
+        from .gemnet import (
+            DEFAULT_BUILD_PARAMS_Q as DEFAULT_BUILD_PARAMS,
+            DEFAULT_LAYER_PARAMS_Q as DEFAULT_LAYER_PARAMS,
+        )
+        special_loss = {}
     elif architecture.lower() == "physnet":
         from .physnet import PhysNetCore as Core
         from .physnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

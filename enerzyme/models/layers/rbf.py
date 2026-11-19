@@ -521,6 +521,18 @@ class BesselRBFLayer(BaseRBF):
 
     The envelope is inside this layer (``apply_cutoff_fn`` is forced off).
     eSEN still multiplies a second envelope on the aggregated edge message.
+
+    ``flavor="gemnet"`` is the GemNet radial basis (Gasteiger et al., NeurIPS
+    2021). The envelope power is ``envelope_exponent`` itself (default 5),
+    not the DimeNet shift ``p = exponent + 1``. ``basis_cutoff`` is the
+    envelope cutoff and may be smaller than the neighbor-list ``cutoff_sr``
+    (GemNet-Q keeps interaction edges out to ``cutoff_sr`` while the
+    embedding basis dies at 5 Å)::
+
+        x = r / c
+        e_n(r) = u_p(x) · √(2/c) · sin(n π x) / r
+
+    The limit at ``r = 0`` is ``√(2/c) · nπ / c``.
     """
 
     def __init__(
@@ -530,27 +542,35 @@ class BesselRBFLayer(BaseRBF):
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "polynomial",
         trainable: Optional[bool] = None,
         flavor: Literal[
-            "default", "dimenet", "painn", "equflash", "nequip", "esen"
+            "default", "dimenet", "painn", "equflash", "nequip", "esen", "gemnet"
         ] = "default",
         envelope_exponent: int = 5,
         apply_cutoff_fn: Optional[bool] = None,
         cuton: float = 0.0,
         polynomial_p: int = 6,
+        basis_cutoff: Optional[float] = None,
     ) -> None:
         self.flavor = flavor
-        if flavor not in ("default", "dimenet", "painn", "equflash", "nequip", "esen"):
+        if flavor not in (
+            "default", "dimenet", "painn", "equflash", "nequip", "esen", "gemnet"
+        ):
             raise ValueError(
                 "Unknown BesselRBF flavor "
                 f"{flavor!r}; expected 'default', 'dimenet', 'painn', "
-                "'equflash', 'nequip', or 'esen'"
+                "'equflash', 'nequip', 'esen', or 'gemnet'"
+            )
+        if basis_cutoff is not None and flavor != "gemnet":
+            raise ValueError(
+                "basis_cutoff is only used by BesselRBF flavor 'gemnet' "
+                f"(got flavor {flavor!r})"
             )
         if trainable is None:
-            trainable = flavor in ("dimenet", "equflash", "esen")
+            trainable = flavor in ("dimenet", "equflash", "esen", "gemnet")
         if apply_cutoff_fn is None:
-            # DimeNet, PaiNN, NequIP, and eSEN each own their radial window.
+            # DimeNet, PaiNN, NequIP, eSEN, and GemNet each own their radial window.
             # EquFlash multiplies the XPLOR window onto this basis.
             apply_cutoff_fn = flavor in ("default", "equflash")
-        if flavor in ("dimenet", "nequip", "esen"):
+        if flavor in ("dimenet", "nequip", "esen", "gemnet"):
             apply_cutoff_fn = False
             cutoff_fn = None
         if flavor == "nequip" and int(polynomial_p) < 2:
@@ -603,6 +623,24 @@ class BesselRBFLayer(BaseRBF):
                 torch.tensor(math.sqrt(2.0 / cutoff_sr**3), dtype=dtype),
             )
             self._esen_envelope = polynomial_envelope
+        elif flavor == "gemnet":
+            from ..cutoff import polynomial_envelope
+
+            basis_c = float(cutoff_sr if basis_cutoff is None else basis_cutoff)
+            if basis_c <= 0:
+                raise ValueError(f"basis_cutoff must be positive, got {basis_c}")
+            self.basis_cutoff = basis_c
+            self.envelope = None
+            frequencies = math.pi * torch.arange(1, num_rbf + 1, dtype=dtype)
+            if trainable:
+                self.bessel_weights = torch.nn.Parameter(frequencies)
+            else:
+                self.register_buffer("bessel_weights", frequencies)
+            self.register_buffer(
+                "prefactor",
+                torch.tensor(math.sqrt(2.0 / basis_c), dtype=dtype),
+            )
+            self._gemnet_envelope = polynomial_envelope
         else:
             self.envelope = None
             bessel_weights = (
@@ -650,6 +688,19 @@ class BesselRBFLayer(BaseRBF):
             arg = scaled * weights
             safe = scaled.clamp_min(1e-12)
             quotient = torch.where(scaled == 0, weights, torch.sin(arg) / safe)
+            return env * self.prefactor * quotient
+        if self.flavor == "gemnet":
+            # x = r/c, e_n = u_p(x) * sqrt(2/c) * sin(n π x) / r
+            # Limit at r = 0 is sqrt(2/c) * n π / c.
+            cutoff = self.basis_cutoff
+            scaled = dist / cutoff
+            env = self._gemnet_envelope(dist, cutoff, self.envelope_exponent)
+            weights = self.bessel_weights.view(1, -1)
+            arg = scaled * weights
+            safe = dist.clamp_min(1e-12)
+            quotient = torch.where(
+                dist == 0, weights / cutoff, torch.sin(arg) / safe
+            )
             return env * self.prefactor * quotient
         if self.flavor in ("painn", "equflash"):
             # SchNetPack BesselRBF: r = 0 contributes 0 (divide by 1).
