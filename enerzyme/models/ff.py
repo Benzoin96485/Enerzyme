@@ -67,6 +67,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .m3gnet import M3GNetCore as Core
         from .m3gnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {"mattersim", "m3gnet-graphormer", "m3gnet_graphormer"}:
+        from .mattersim import MatterSimCore as Core
+        from .mattersim import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() in {"gemnet-q", "gemnetq"}:
         from .gemnet import GemNetCore as Core
         from .gemnet import (
