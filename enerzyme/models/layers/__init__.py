@@ -40,6 +40,7 @@ from .readout import (
     HierachicalNSEReadout,
     VelocityReadout,
     HirshfeldReadout,
+    AbsoluteLinearReadout,
 )
 from .pair_embedding import PairChemicalRadialLayer
 from .tensorial import EquivariantDipoleLayer, EquivariantPolarizabilityLayer

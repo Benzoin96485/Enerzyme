@@ -1654,6 +1654,62 @@ Modelhub:
             activate_last: false
         - name: EnergyReduce
         - name: Force
+    FF29:
+      suffix:
+      # CHGNet (Deng et al., Nat. Mach. Intell. 2023). Two gemnet Bessel
+      # bases (5 Å atom graph, 3 Å bond graph) and the species embedding
+      # stay outside the Core. Ma is the nonnegative magnetic-moment
+      # magnitude from the latent before the last atom convolution.
+      # Add Ma to the loss when those labels exist (paper weight 0.1).
+      # Energies are eV and distances are Å. Checkpoints do not load.
+      architecture: chgnet
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 64
+        num_rbf: 9
+        num_angular: 9
+        max_Za: 94
+        cutoff_sr: 5.0
+        bond_cutoff: 3.0
+        envelope_exponent: 5
+        Hartree_in_E: 27.211386245988
+        Bohr_in_R: 0.5291772105638411
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: gemnet
+            trainable: true
+        - name: BesselRBF
+          params:
+            flavor: gemnet
+            trainable: true
+            cutoff_sr: 3.0
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_blocks: 4
+        - name: AbsoluteLinearReadout
+          params:
+            output_fields: [Ma]
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            num_hidden_layers: 2
+            activation_fn: swish
+            use_bias_out: true
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

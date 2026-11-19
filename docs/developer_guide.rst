@@ -202,7 +202,10 @@ Adding an internal architecture
 Recent internal example: :code:`DimeNet` under :code:`enerzyme/models/dimenet/`
 (Bessel RBF + atom embedding as pre-core layers; Core emits hierarchical
 :code:`atom_feature`; shared :code:`HierachicalReadout` / physics layers after
-the Core). Also :code:`GemNet` under :code:`enerzyme/models/gemnet/`
+the Core). Also :code:`CHGNet` under :code:`enerzyme/models/chgnet/`
+(two GemNet Bessel bases and the species embedding outside the Core;
+undirected bonds and the angle line graph inside; :code:`Ma` from
+:code:`AbsoluteLinearReadout`). Also :code:`GemNet` under :code:`enerzyme/models/gemnet/`
 (GemNet Bessel flavor and atom embedding outside the Core; directional
 triplets, and dihedral quadruplets for GemNet-Q, inside the Core; shared
 bias-free :code:`HierachicalReadout`). Also :code:`So3krates` under :code:`enerzyme/models/so3krates/`
@@ -341,6 +344,8 @@ Tests live in :code:`test/`:
 - :code:`test_m3gnet_core.py` — M3GNet registration / YAML smoke, three-body cutoff, rotation / inversion / translation / edge order, batch isolation, build_model energy and conservative forces
 - :code:`test_mattersim_ops.py` — Graphormer segment softmax, centrality sum, post-softmax polynomial mask
 - :code:`test_mattersim_core.py` — MatterSim registration / aliases / YAML smoke, M3GNet reduction when attention and centrality are off, attention cutoff, rotation / inversion / translation / edge order, batch isolation, build_model energy and conservative forces
+- :code:`test_chgnet_ops.py` — CHGNet Fourier order, gemnet smooth Bessel, undirected bonds including periodic images, bond-graph cutoff, gated MLP layer norm
+- :code:`test_chgnet_core.py` — CHGNet registration / YAML smoke, bond cutoff, charge latent, rotation / inversion / translation / edge order, batch isolation, build_model energy, magmom, and conservative forces
 - :code:`test_facto_ops.py` — FACTO cutoff derivative, Gaussian window, descriptor table, and algebraic attention / feedback / injection / transport reductions
 - :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_grace_ops.py` — GRACE Chebyshev / spherical Bessel / cutoff, channel-aligned CG equivariance, Finnis–Sinclair powers, linear density head
@@ -554,6 +559,32 @@ Example: :code:`mattersim_layers_example.yaml`. Tests:
 :code:`test/test_mattersim_ops.py`, :code:`test/test_mattersim_core.py`.
 Enerzymette only needs :code:`architecture: mattersim` plus a resolved
 :code:`config.yaml`.
+
+CHGNet (:code:`chgnet`)
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Deng et al. (Nat. Mach. Intell. 2023) live under :code:`enerzyme/models/chgnet/`
+(:code:`core.py`, :code:`interaction.py`, :code:`basis.py`, :code:`geometry.py`).
+The update rules follow `CederGroupHub/chgnet <https://github.com/CederGroupHub/chgnet>`_.
+Do not import that package, and do not load its checkpoints. Register
+:code:`chgnet` in :code:`get_ff_core`. Reuse
+:code:`BesselRBF(flavor="gemnet")` for both smooth radial bases,
+:class:`~enerzyme.models.blocks.mlp.GatedMLP` (optional ``norm`` and
+``dropout``), :func:`~enerzyme.models.m3gnet.geometry.receiver_triplets`,
+:code:`RandomAtomEmbedding`, :code:`segment_sum_coo`, and
+:meth:`BaseFFCore.adopt_radius_stack`. The angle Fourier series stays in the
+Core because the bond graph is part of the interaction. The second Bessel
+layer's ``cutoff_sr`` is ``bond_cutoff``; the Core renames its output to
+``rbf_bg``. The neighbor list must be bidirectional. The Core emits
+``atom_feature`` and ``atom_feature_charge``. Compose
+:code:`AbsoluteLinearReadout` (field :code:`Ma`) and :code:`SimpleReadout`
+(``head_type: mlp``, two hidden layers, ``use_bias_out: true``) +
+:code:`EnergyReduce` / :code:`Force`. Energies are eV
+(``Hartree_in_E ≈ 27.211``) and distances are Å. The reference layer norms
+are ``gmlp_norm: layer`` and ``readout_norm: layer``. Example:
+:code:`chgnet_layers_example.yaml`. Tests: :code:`test/test_chgnet_ops.py`,
+:code:`test/test_chgnet_core.py`. Enerzymette only needs
+:code:`architecture: chgnet` plus a resolved :code:`config.yaml`.
 
 External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

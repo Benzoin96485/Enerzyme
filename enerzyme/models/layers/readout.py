@@ -727,3 +727,80 @@ class HirshfeldReadout(BaseFFLayer):
         k = self.transform(atom_feature)
         qk = (q * k * (1.0 / math.sqrt(k.shape[-1]))).sum(dim=-1)
         return torch.abs(v_shift + qk)
+
+
+class AbsoluteLinearReadout(BaseFFLayer):
+    """Linear map of a scalar latent, then an absolute value.
+
+    CHGNet reads the magnetic-moment magnitude from ``atom_feature_charge``,
+    the atom state before the last convolution. The absolute value matches
+    training on ``|m|``. The head is not part of the interaction.
+    """
+
+    def __init__(
+        self,
+        output_fields: Set[str],
+        built_layers: List[Module],
+        use_bias: bool = True,
+        shallow_ensemble_size: int = 1,
+    ) -> None:
+        if not isinstance(output_fields, set):
+            output_fields = set(output_fields)
+        if len(output_fields) < 1:
+            raise ValueError("AbsoluteLinearReadout needs at least one output field")
+        super().__init__(
+            input_fields={"atom_feature_charge"},
+            output_fields=set(output_fields),
+        )
+        self.ordered_output_fields = sorted(output_fields)
+        self.shallow_ensemble_size = int(shallow_ensemble_size)
+        if self.shallow_ensemble_size < 1:
+            raise ValueError(
+                f"shallow_ensemble_size must be >= 1, got {shallow_ensemble_size}"
+            )
+        dim_in = None
+        for layer in reversed(built_layers):
+            width = getattr(layer, "dim_feature_out", None)
+            if width is None:
+                continue
+            # A property head reports one channel per field. The latent width
+            # is the interaction output, which that head leaves unchanged.
+            fields = getattr(layer, "ordered_output_fields", None)
+            inner = getattr(layer, "dim_feature_in", None)
+            if (
+                fields is not None
+                and int(width) == len(fields)
+                and inner is not None
+                and int(inner) != int(width)
+            ):
+                continue
+            dim_in = int(width)
+            break
+        if dim_in is None:
+            raise ValueError(
+                "AbsoluteLinearReadout requires dim_feature_out on a previous layer"
+            )
+        self.dim_feature_in = dim_in
+        # The linear map has one channel per field. dim_feature_out stays at
+        # the latent width so a later energy head still reads atom_feature.
+        n_out = len(self.ordered_output_fields)
+        self.dim_feature_out = dim_in
+        self.head = DenseLayer(
+            dim_feature_in=self.dim_feature_in,
+            dim_feature_out=n_out,
+            use_bias=bool(use_bias),
+            shallow_ensemble_size=self.shallow_ensemble_size,
+        )
+
+    def get_output(self, atom_feature_charge: Tensor) -> Dict[str, Tensor]:
+        if atom_feature_charge.ndim != 2 or atom_feature_charge.shape[-1] != self.dim_feature_in:
+            raise ValueError(
+                "atom_feature_charge must be "
+                f"(N, {self.dim_feature_in}), got {tuple(atom_feature_charge.shape)}"
+            )
+        projected = self.head(atom_feature_charge).abs()
+        return split_readout_field_outputs(
+            projected,
+            self.ordered_output_fields,
+            self.shallow_ensemble_size,
+        )

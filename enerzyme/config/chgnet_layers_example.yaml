@@ -1,0 +1,65 @@
+# CHGNet (Deng et al., Nat. Mach. Intell. 2023).
+# Two smooth Bessel bases and the species embedding stay outside the Core.
+# The atom-graph basis uses cutoff_sr (5 Å). The bond-graph basis uses
+# bond_cutoff (3 Å). The Core pairs directed edges into undirected bonds,
+# then updates atoms, bonds, and angles. The last block updates atoms only.
+# AbsoluteLinearReadout reads atom_feature_charge (the state before that
+# last update) and emits the nonnegative magnetic-moment magnitude Ma.
+# Energy is SimpleReadout (two SiLU hidden layers, eq. 5) summed by
+# EnergyReduce. Forces are Fa = -dE/dR. The energy is extensive.
+#
+# gmlp_norm and readout_norm are the layer norms in the reference network.
+# Set both to null to drop them. CHGNet 0.3.0 uses a 6 Å atom graph, 31
+# radial functions, 31 angular functions, and envelope exponent 8. Those
+# widths are the same Core. Checkpoints from CederGroupHub/chgnet do not
+# load. The neighbor list must contain both directions of every bond.
+#
+# Enerzymette: set architecture: chgnet in the resolved config.yaml.
+# Train Ma with the absolute DFT moments when those labels exist.
+# Elemental energy references belong in the atomic-energy transform or
+# AtomicAffine, not in the Core.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: chgnet
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 9
+        num_angular: 9
+        max_Za: 94
+        cutoff_sr: 5.0
+        bond_cutoff: 3.0
+        envelope_exponent: 5
+        Hartree_in_E: 27.211386245988
+        Bohr_in_R: 0.5291772105638411
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: gemnet
+            trainable: true
+        - name: BesselRBF
+          params:
+            flavor: gemnet
+            trainable: true
+            cutoff_sr: 3.0
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_blocks: 4
+            gmlp_norm: layer
+            readout_norm: layer
+        - name: AbsoluteLinearReadout
+          params:
+            output_fields: [Ma]
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            num_hidden_layers: 2
+            activation_fn: swish
+            use_bias_out: true
+        - name: EnergyReduce
+        - name: Force
