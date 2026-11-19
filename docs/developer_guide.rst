@@ -222,7 +222,10 @@ separable convolution emits scalar :code:`atom_feature`),
 :code:`escn` (:code:`enerzyme/models/escn/`), and
 :code:`eSEN` under :code:`enerzyme/models/esen/native/`
 (UMA wrappers stay in the same package and still load fairchem only when
-:code:`uma_qs` / :code:`uma_flow_qs` is selected).
+:code:`uma_qs` / :code:`uma_flow_qs` is selected). Also :code:`Geodite`
+under :code:`enerzyme/models/geodite/` (Bessel basis, covalent window, and
+screened ZBL outside the Core; hierarchical scalars plus a polynomial
+steerable state; shared :code:`HierachicalReadout`).
 
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -330,6 +333,8 @@ Tests live in :code:`test/`:
 - :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_grace_ops.py` — GRACE Chebyshev / spherical Bessel / cutoff, channel-aligned CG equivariance, Finnis–Sinclair powers, linear density head
 - :code:`test_grace_core.py` — GRACE registration / YAML smoke, preset table, batch isolation, 2L message ablation, rotation / inversion / translation, force finite-difference conservation, SimpleReadout contract
+- :code:`test_geodite_ops.py` — polynomial envelope, covalent attenuation, radial window, screened ZBL pair formula, Geodite spherical harmonics, vector rejection, zero-basis isolated match
+- :code:`test_geodite_core.py` — Geodite registration / YAML smoke, published widths, batch isolation, isolated-atom energy, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
 - :code:`test_so3krates_parity_ops.py` — numerical parity vs vendored So3krates-torch (SH / L0 / FilterNet / attention / interaction)
 - :code:`test_so3lr.py` — SO3LR priors (ZBL / erf-Coulomb / TS–QDO), readouts, and :code:`architecture: so3lr` build_model smoke test
@@ -601,6 +606,11 @@ GRACE (:code:`grace`)
 ^^^^^^^^^^^^^^^^^^^^^
 
 Lysogorskiy, Bochkarev, and Drautz (arXiv:2508.17936; method in Phys. Rev. X 14, 021036) live under :code:`enerzyme/models/grace/` (:code:`core.py`, :code:`basis.py`, :code:`coupling.py`, :code:`radial.py`, :code:`readout.py`, :code:`presets.py`). Register via :code:`get_ff_core("grace")`. This is an original implementation of the published recursion. `grace-tensorpotential <https://github.com/ICAMS/grace-tensorpotential>`_ is Academic Software License and is not imported; do not vendor it, and do not expect its checkpoints to load. Reuse :code:`RandomAtomEmbedding`, :code:`RangeSeparation`, real spherical harmonics (:code:`layout="e3nn"`), :func:`enerzyme.models.cutoff.powered_cosine_window`, :func:`enerzyme.models.functional.reduce_edge`, and :code:`EnergyReduce` / :code:`Force`. The channel-aligned Clebsch–Gordan product stays in the package: it is the ACE recursion, and e3nn's generated tensor product is not used. The Core emits :code:`atom_feature` ``[N, n_densities]``. :code:`GRACEEnergyReadout` implements the foundation linear+MLP head and the Finnis–Sinclair powers; :code:`SimpleReadout` also fits. Presets follow Table S1 and the public preset defaults. Tests: :code:`test/test_grace_ops.py`, :code:`test/test_grace_core.py`. Enerzymette: :code:`architecture: grace` + resolved :code:`config.yaml`.
+
+Geodite (:code:`geodite`)
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Reschützegger et al. (J. Chem. Theory Comput. 2026, doi:10.1021/acs.jctc.6c00712) live under :code:`enerzyme/models/geodite/` (:code:`core.py`, :code:`geometry.py`, :code:`interaction.py`). Register via :code:`get_ff_core("geodite")`. Adapted from `IBM/materials <https://github.com/IBM/materials/tree/main/models/pos_egnn/mlip>`_ (Apache-2.0). IBM checkpoints do not load. Reuse :code:`BesselRBF` (default flavor, ``apply_cutoff_fn: false``), :code:`RandomAtomEmbedding`, :code:`HierachicalReadout` (bias-free dense heads), :code:`EnergyReduce` / :code:`Force`, and :func:`enerzyme.models.cutoff.polynomial_envelope` (scalar or per-edge cutoff). New shared layers are :code:`RadialWindow`, :code:`IsolatedAtomResidual`, and :code:`ScreenedZBLRepulsionEnergy`. The polynomial spherical harmonics through :code:`lmax` 4 stay in the package because the component order is the inner-product basis (``l = 1`` is ``(x, y, z)``). The Core emits :code:`atom_feature` ``[N, C, K]``, :code:`isolated_atom_feature`, and :code:`atom_steerable_feature`. Leave ``cutoff_fn`` unset so the envelope stays in :code:`RadialWindow`. The default stack is Geodite-MP in eV. Example: :code:`geodite_layers_example.yaml`. Tests: :code:`test/test_geodite_ops.py`, :code:`test/test_geodite_core.py`. Enerzymette: :code:`architecture: geodite` + resolved :code:`config.yaml`.
 
 PaiNN (:code:`painn`)
 ^^^^^^^^^^^^^^^^^^^^^

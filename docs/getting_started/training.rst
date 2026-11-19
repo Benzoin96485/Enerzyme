@@ -97,6 +97,8 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | GRACE          | Graph ACE foundation potentials          | Internal; presets 1L/2L   |
 +----------------+------------------------------------------+---------------------------+
+| Geodite        | Equivariant MP without tensor products   | Built in; lmax at most 4  |
++----------------+------------------------------------------+---------------------------+
 | FACTO          | Atom-centered scalar and tensor state    | Internal; presets S-XL    |
 +----------------+------------------------------------------+---------------------------+
 | EquFlash       | uvu tensor-product messages              | Built in                  |

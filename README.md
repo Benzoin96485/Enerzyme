@@ -32,6 +32,7 @@ Currently supported model architectures:
 | EquFlash | internal |             ✅             |         via readout         |       ✅       |   via readout   | SamsungDS GGNN EquFlash | [GGNN](https://github.com/SamsungDS/GGNN) |
 |  FACTO   | internal |             ✅             |         via readout         |       ✅       |   via readout   | [arXiv:2611.03276](https://arxiv.org/abs/2611.03276) | no public code; FP32 reference in this repo |
 |  GRACE   | internal |             ✅             |         via readout         |       ✅       |   via readout   | [arXiv:2508.17936](https://arxiv.org/abs/2508.17936) | reimplementation; TensorPotential is ASL and is not vendored |
+| Geodite | internal |             ✅             |         via readout         |       ✅       |   via readout   | [J. Chem. Theory Comput. 2026, doi:10.1021/acs.jctc.6c00712](https://doi.org/10.1021/acs.jctc.6c00712) | [IBM materials](https://github.com/IBM/materials/tree/main/models/pos_egnn/mlip) |
 | Equiformer | internal |             ✅             |              ✅              |       ✅       |   via readout   | [ICLR 2023, arXiv:2206.11990](https://arxiv.org/abs/2206.11990) | [Github](https://github.com/atomicarchitects/equiformer) |
 | EquiformerV2 | internal |             ✅             |         via readout         |       ✅       |   via readout   | [ICLR 2024, arXiv:2306.12059](https://arxiv.org/abs/2306.12059) | [Github](https://github.com/atomicarchitects/equiformer_v2) |
 | EquFlashV2 | internal |             ✅             |         via readout         |       ✅       |   via readout   | SamsungDS GGNN EquFlashV2 (e3nn reimplementation; reference code is CC BY-NC-SA) | [GGNN](https://github.com/SamsungDS/GGNN) |
@@ -50,6 +51,7 @@ Shared equivariant tooling (for developers):
 - `enerzyme.models.e3nn_nn` — flat e3nn Irreps helpers (Equiformer V1, MACE, TACE, TECE, NequIP): TP rescale, Gate/Activation, irreps Linear / ElementLinear, path generation, scatter TP, tools.
 - Representation-agnostic blocks: `activation.SmoothLeakyReLU`, `activation.ScaledSigmoid` / `ScaledSiLU`, `blocks.drop` (`GraphDropPath`), `blocks.radial_mlp`.
 - `enerzyme.models.layers.gated_equivariant` — Cartesian gated equivariant blocks for tensor heads. PaiNN stores vectors as `atom_vector_feature` with shape `[N, 3, F]`. `EquivariantDipole` and `EquivariantPolarizability` consume that pair.
+- `RadialWindow`, `IsolatedAtomResidual`, and `ScreenedZBLRepulsionEnergy` — cutoff envelope, covalent distance weight, isolated-atom residual, and learnable screened ZBL. Geodite uses them outside the Core; later stacks can reuse the same layers.
 
 Architecture packages keep `core.py` + `interaction.py` (plus embedding / input blocks as needed). Equiformer-specific readouts live in each package's `interaction.py` and are re-exported from `layers` for YAML layer-stack discovery.
 

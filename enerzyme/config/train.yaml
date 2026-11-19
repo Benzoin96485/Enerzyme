@@ -1391,6 +1391,59 @@ Modelhub:
                 learnable: true
         - name: EnergyReduce
         - name: Force
+    FF23:
+      suffix:
+      # Geodite-MP (Reschützegger et al., JCTC 2026). No Clebsch–Gordan products.
+      # Empty Core params select the published stack: 192 channels, 4 layers,
+      # lmax 2, 8 heads, dropout 0.2, edge update linw_mlpa_ln.
+      # Energies are eV. The neighbor list must store both directions.
+      # IBM checkpoints are not weight-compatible.
+      # Paper stage 1 uses force weight 1. Stage 2 uses force weight 5 and
+      # Huber δ=0.01, which is not a loss type in this package.
+      architecture: geodite
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 192
+        num_rbf: 12
+        max_Za: 100
+        cutoff_sr: 6.0
+        Bohr_in_R: 0.5291772105638411
+        Hartree_in_E: 27.211386245988
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            trainable: false
+            apply_cutoff_fn: false
+        - name: RadialWindow
+          params:
+            envelope: polynomial
+            envelope_p: 6
+            attenuation: covalent
+            trainable_attenuation: true
+        - name: RandomAtomEmbedding
+        - name: Core
+        - name: IsolatedAtomResidual
+        - name: HierachicalReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            use_bias: false
+            initial_weight: xavier_uniform
+        - name: ScreenedZBLRepulsionEnergy
+          params:
+            envelope_p: 5
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random
