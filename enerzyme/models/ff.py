@@ -43,6 +43,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .grace import GRACECore as Core
         from .grace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "cace":
+        from .cace import CACECore as Core
+        from .cace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "geodite":
         from .geodite import GeoditeCore as Core
         from .geodite import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

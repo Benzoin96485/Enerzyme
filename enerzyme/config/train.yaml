@@ -1444,6 +1444,45 @@ Modelhub:
             envelope_p: 5
         - name: EnergyReduce
         - name: Force
+    FF24:
+      suffix:
+      # CACE water fit (Cheng, npj Comput. Mater. 2024). Cartesian cluster
+      # invariants. The Core does not own the embedding or the Bessel basis.
+      # Leave cutoff_fn unset: the Core applies the degree-6 polynomial envelope.
+      # cacefit checkpoints are not weight-compatible (CC BY-NC reference).
+      # Elemental references belong in the datahub or AtomicAffine. An isolated
+      # atom has a zero descriptor. cacefit's first stage used MSE weights
+      # 0.1 (energy) and 1000 (force) on that dataset's energy scale.
+      architecture: cace
+      active: false
+      loss:
+        mae:
+          Fa: 52.917721
+          E: 1
+      Metric:
+        Fa:
+          mae: 52.917721
+        E:
+          mae: 1
+      build_params:
+        max_Za: 94
+        dim_embedding: 3
+        num_rbf: 6
+        cutoff_sr: 5.5
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: default
+            trainable: true
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            preset: water
+        - name: CACEEnergyReadout
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random
