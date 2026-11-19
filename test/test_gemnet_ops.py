@@ -87,6 +87,27 @@ def test_reverse_edge_matches_images_and_rejects_one_way_edges():
     else:
         raise AssertionError("one-way edges should fail")
 
+    # Same atoms, but the only return edge is a different image.
+    try:
+        reverse_edge_index(
+            torch.tensor([0, 1]),
+            torch.tensor([1, 0]),
+            torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+            num_nodes=2,
+        )
+    except ValueError as exc:
+        assert "opposite displacement" in str(exc)
+    else:
+        raise AssertionError("a non-opposite image should fail")
+
+    # The index is a neighbor-list identity: moving v continuously does not
+    # move the partner, and the partner stays out of the autograd graph.
+    moving = vij.clone().requires_grad_(True)
+    swap_moving = reverse_edge_index(idx_i, idx_j, moving, num_nodes=2)
+    assert swap_moving.tolist() == swap.tolist()
+    assert swap_moving.dtype == torch.long
+    assert not swap_moving.requires_grad
+
 
 def test_triplet_angle_is_at_the_receiver():
     pos = torch.tensor(

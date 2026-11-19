@@ -417,5 +417,64 @@ def test_gemnet_q_uses_the_longer_bond_and_matches_yaml():
         assert bessel["params"]["flavor"] == "gemnet"
         assert bessel["params"]["basis_cutoff"] == 5.0
         assert core["params"]["triplets_only"] is False
-        assert core["params"]["emb_cutoff"] == 5.0
-        assert core["params"]["int_cutoff"] == 10.0
+    assert core["params"]["emb_cutoff"] == 5.0
+    assert core["params"]["int_cutoff"] == 10.0
+
+
+def test_two_images_conserve_force_without_grad_through_the_partner():
+    """Two periodic images of one bond. The reverse partner is a fixed index."""
+    model = _stack("gemnet-t", True, 5.0)
+    pos = torch.tensor(
+        [[0.0, 0.0, 0.0], [1.2, 0.0, 0.0], [0.2, 1.0, 0.0]],
+        requires_grad=True,
+    )
+    idx_i = torch.tensor([0, 1, 0, 2, 1, 2, 0, 1])
+    idx_j = torch.tensor([1, 0, 2, 0, 2, 1, 1, 0])
+    offsets = torch.zeros(idx_i.shape[0], 3)
+    offsets[-2] = torch.tensor([0.0, 3.0, 0.0])
+    offsets[-1] = torch.tensor([0.0, -3.0, 0.0])
+    fields = {
+        "Za": torch.tensor([1, 6, 1]),
+        "batch_seg": torch.zeros(3, dtype=torch.long),
+        "idx_i": idx_i,
+        "idx_j": idx_j,
+        "offsets": offsets,
+    }
+    out = model({"Ra": pos, **fields})
+    assert torch.isfinite(out["E"]).all() and torch.isfinite(out["Fa"]).all()
+    grad = torch.autograd.grad(out["E"].sum(), pos)[0]
+    assert_allclose(out["Fa"].detach().numpy(), (-grad).detach().numpy(), atol=1e-5, rtol=1e-5)
+    step = 1e-4
+    plus = pos.detach().clone()
+    minus = pos.detach().clone()
+    plus[1, 0] = plus[1, 0] + step
+    minus[1, 0] = minus[1, 0] - step
+    plus.requires_grad_(True)
+    minus.requires_grad_(True)
+    finite = (model({"Ra": plus, **fields})["E"] - model({"Ra": minus, **fields})["E"]) / (2 * step)
+    assert_allclose(finite.detach().numpy(), grad[1, 0].detach().numpy(), atol=1e-4, rtol=1e-3)
+
+
+def test_last_mode_rejects_hierarchical_readout_and_mismatched_edges():
+    try:
+        _stack("gemnet-t", True, 5.0, output_mode="last")
+    except ValueError as exc:
+        assert "output_mode" in str(exc)
+    else:
+        raise AssertionError("last mode with HierachicalReadout should fail")
+
+    core = _tiny()
+    inp = _inputs()
+    try:
+        core.get_output(
+            atom_embedding=inp["atom_embedding"],
+            rbf=inp["rbf"][:-1],
+            Dij_sr=inp["Dij_sr"],
+            vij_sr=inp["vij_sr"],
+            idx_i_sr=inp["idx_i_sr"],
+            idx_j_sr=inp["idx_j_sr"],
+        )
+    except ValueError as exc:
+        assert "same edges" in str(exc)
+    else:
+        raise AssertionError("mismatched edge tensors should fail")

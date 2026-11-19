@@ -45,6 +45,8 @@ class GemNetCore(BaseFFCore):
 
     ``atom_feature`` is ``(N, emb_atom, num_blocks + 1)`` in
     ``output_mode="feature"`` and ``(N, emb_atom)`` in ``output_mode="last"``.
+    ``feature`` is the input of :class:`~enerzyme.models.layers.readout.HierachicalReadout`.
+    ``last`` is the input of :class:`~enerzyme.models.layers.readout.SimpleReadout`.
     ``emb_atom`` is ``dim_embedding``. GemNet-Q reads edges out to
     ``cutoff_sr`` and treats distances below ``emb_cutoff`` as the embedding
     graph. ``int_cutoff`` is the central-bond cutoff and is ignored for
@@ -201,6 +203,19 @@ class GemNetCore(BaseFFCore):
 
     def build(self, built_layers: List[Module]) -> None:
         self.adopt_radius_stack(built_layers)
+        if self.output_mode == "last":
+            from ..layers.readout import HierachicalNSEReadout, HierachicalReadout
+
+            hierarchical = any(
+                isinstance(layer, (HierachicalReadout, HierachicalNSEReadout))
+                for layer in built_layers
+            )
+            if hierarchical:
+                raise ValueError(
+                    "GemNet output_mode='last' returns atom_feature of shape (N, F) "
+                    "for SimpleReadout. HierachicalReadout reads "
+                    "(N, F, num_blocks+1). Use output_mode='feature'."
+                )
         for layer in built_layers:
             if isinstance(layer, BaseAtomEmbedding):
                 self.atom_embedding = layer
@@ -269,10 +284,7 @@ class GemNetCore(BaseFFCore):
         idx_i_sr: Tensor,
         idx_j_sr: Tensor,
     ) -> Dict[str, Tensor]:
-        if rbf.ndim != 2 or rbf.shape[-1] != self.num_rbf:
-            raise ValueError(
-                f"rbf must have shape (E, {self.num_rbf}), got {tuple(rbf.shape)}"
-            )
+        self._check_edge_tensors(rbf, Dij_sr, vij_sr, idx_i_sr, idx_j_sr)
         num_nodes = int(atom_embedding.shape[0])
         emb_index, int_index = split_cutoff_edges(
             Dij_sr,
@@ -326,3 +338,38 @@ class GemNetCore(BaseFFCore):
         if self.output_mode == "last":
             return {"atom_feature": atom_feature[:, :, -1]}
         return {"atom_feature": atom_feature}
+
+    def _check_edge_tensors(
+        self,
+        rbf: Tensor,
+        Dij_sr: Tensor,
+        vij_sr: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+    ) -> None:
+        shapes = {
+            "rbf": tuple(rbf.shape),
+            "Dij_sr": tuple(Dij_sr.shape),
+            "vij_sr": tuple(vij_sr.shape),
+            "idx_i_sr": tuple(idx_i_sr.shape),
+            "idx_j_sr": tuple(idx_j_sr.shape),
+        }
+        lengths = {name: shape[0] if shape else -1 for name, shape in shapes.items()}
+        aligned = (
+            rbf.ndim == 2
+            and rbf.shape[-1] == self.num_rbf
+            and Dij_sr.ndim == 1
+            and vij_sr.ndim == 2
+            and vij_sr.shape[-1] == 3
+            and idx_i_sr.ndim == 1
+            and idx_j_sr.ndim == 1
+            and len(set(lengths.values())) == 1
+        )
+        if aligned:
+            return
+        detail = ", ".join(f"{name} {shape}" for name, shape in shapes.items())
+        raise ValueError(
+            "rbf, Dij_sr, vij_sr, idx_i_sr, and idx_j_sr must describe the same "
+            f"edges (rbf width {self.num_rbf}, Dij_sr rank 1, vij_sr shape (E, 3)); "
+            f"got {detail}"
+        )

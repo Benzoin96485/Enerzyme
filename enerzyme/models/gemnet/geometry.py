@@ -19,6 +19,9 @@ from torch import Tensor
 
 
 _INV_SQRT_EPS = 1e-12
+# A true reverse edge has displacement -v, so the residual is identically zero.
+# Anything larger is a different periodic image and must not be paired.
+_OPPOSITE_TOL = 1e-4
 
 
 class TripletGraph(NamedTuple):
@@ -69,10 +72,16 @@ def reverse_edge_index(
     vij: Tensor,
     num_nodes: int,
 ) -> Tensor:
-    """Index of the opposite edge, matched by ``-vij`` when images repeat.
+    """Index of the edge whose displacement is ``-vij``.
 
-    GemNet adds each directed interaction onto both orientations. The neighbor
-    list has to contain both directions.
+    GemNet adds each directed interaction onto both orientations. For a
+    consistent neighbor list the partner of ``(receiver, sender, v)`` is
+    ``(sender, receiver, -v)``, including a distinct periodic image. That
+    residual is identically zero for every geometry, so the index does not
+    depend on a continuous relaxation of ``v``. Matching uses a detached copy
+    and then checks the residual, which keeps the permutation out of the
+    autograd graph and rejects a same-atom image that is not the opposite
+    displacement.
     """
     num_edges = int(idx_i.numel())
     if num_edges == 0:
@@ -83,7 +92,14 @@ def reverse_edge_index(
         raise ValueError("edge index is outside num_nodes")
     if int(idx_i.min()) < 0 or int(idx_j.min()) < 0:
         raise ValueError("edge index must be non-negative")
+    if vij.ndim != 2 or vij.shape[0] != num_edges or vij.shape[-1] != 3:
+        raise ValueError(
+            f"vij must have shape ({num_edges}, 3), got {tuple(vij.shape)}"
+        )
 
+    # The partner is a neighbor-list identity. Detach so a later change cannot
+    # put this discrete choice on the energy graph.
+    disp = vij.detach()
     key = idx_i * num_nodes + idx_j
     rev = idx_j * num_nodes + idx_i
     order = torch.argsort(key, stable=True)
@@ -96,21 +112,25 @@ def reverse_edge_index(
         )
     width = int((end - start).max().item())
     if width == 1:
-        return order[start]
-
-    device = idx_i.device
-    offsets = torch.arange(width, device=device)
-    pos = start[:, None] + offsets
-    valid = offsets[None, :] < (end - start)[:, None]
-    cand = order[pos.clamp(max=num_edges - 1)]
-    mismatch = (vij[cand] + vij[:, None, :]).square().sum(dim=-1)
-    mismatch = mismatch.masked_fill(~valid, float("inf"))
-    best = mismatch.argmin(dim=1)
-    if not torch.isfinite(mismatch[torch.arange(num_edges, device=device), best]).all():
+        chosen = order[start]
+    else:
+        device = idx_i.device
+        offsets = torch.arange(width, device=device)
+        pos = start[:, None] + offsets
+        valid = offsets[None, :] < (end - start)[:, None]
+        cand = order[pos.clamp(max=num_edges - 1)]
+        mismatch = (disp[cand] + disp[:, None, :]).square().sum(dim=-1)
+        mismatch = mismatch.masked_fill(~valid, float("inf"))
+        best = mismatch.argmin(dim=1)
+        chosen = cand[torch.arange(num_edges, device=device), best]
+    residual = (disp[chosen] + disp).square().sum(dim=-1).sqrt()
+    if not torch.isfinite(residual).all() or bool((residual > _OPPOSITE_TOL).any()):
         raise ValueError(
-            "GemNet could not match every edge to an opposite displacement"
+            "GemNet could not match every edge to the opposite displacement. "
+            "Each directed edge (receiver, sender, v) needs "
+            "(sender, receiver, -v) in the neighbor list."
         )
-    return cand[torch.arange(num_edges, device=device), best]
+    return chosen
 
 
 def angle_between(left: Tensor, right: Tensor) -> Tensor:

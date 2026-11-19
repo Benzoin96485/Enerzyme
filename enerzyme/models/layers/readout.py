@@ -488,6 +488,12 @@ class HierachicalReadout(BaseReadout):
         self.use_nhloss = use_nhloss
 
     def get_output(self, atom_feature: Tensor) -> Dict[str, Tensor]:
+        if atom_feature.ndim != 3 or atom_feature.shape[-1] != self.num_blocks:
+            raise ValueError(
+                "HierachicalReadout expects atom_feature of shape "
+                f"(N, F, {self.num_blocks}), got {tuple(atom_feature.shape)}. "
+                "A Core output_mode of 'last' is the input of SimpleReadout."
+            )
         raw_output = 0.
         if self.use_nhloss:
             nhloss = 0.
