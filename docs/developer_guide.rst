@@ -225,7 +225,10 @@ separable convolution emits scalar :code:`atom_feature`),
 :code:`uma_qs` / :code:`uma_flow_qs` is selected). Also :code:`Geodite`
 under :code:`enerzyme/models/geodite/` (Bessel basis, covalent window, and
 screened ZBL outside the Core; hierarchical scalars plus a polynomial
-steerable state; shared :code:`HierachicalReadout`).
+steerable state; shared :code:`HierachicalReadout`). Also :code:`CACE`
+under :code:`enerzyme/models/cace/` (default Bessel basis and chemical
+embedding outside the Core; Cartesian invariants inside; linear-plus-MLP
+readout outside).
 
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -333,6 +336,8 @@ Tests live in :code:`test/`:
 - :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_grace_ops.py` — GRACE Chebyshev / spherical Bessel / cutoff, channel-aligned CG equivariance, Finnis–Sinclair powers, linear density head
 - :code:`test_grace_core.py` — GRACE registration / YAML smoke, preset table, batch isolation, 2L message ablation, rotation / inversion / translation, force finite-difference conservation, SimpleReadout contract
+- :code:`test_cace_ops.py` — CACE monomials, invariant counts, two-body dot-product identity, rotation / inversion of the contraction, per-shell radial mix
+- :code:`test_cace_core.py` — CACE registration / YAML smoke, cacefit preset widths, batch isolation, scalar-message ablation, rotation / inversion / translation, force finite-difference conservation, SimpleReadout contract
 - :code:`test_geodite_ops.py` — polynomial envelope, covalent attenuation, radial window, screened ZBL pair formula, Geodite spherical harmonics, vector rejection, zero-basis isolated match
 - :code:`test_geodite_core.py` — Geodite registration / YAML smoke, published widths, batch isolation, isolated-atom energy, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
@@ -601,6 +606,11 @@ FACTO (:code:`facto`)
 ^^^^^^^^^^^^^^^^^^^^^
 
 Liu et al. (arXiv:2611.03276) live under :code:`enerzyme/models/facto/` (:code:`core.py`, :code:`geometry.py`, :code:`interaction.py`, :code:`readout.py`). There is no upstream repository. Register via :code:`get_ff_core("facto")`. The degree-9 window is :func:`enerzyme.models.cutoff.facto_polynomial_cutoff` (YAML :code:`cutoff_fn: facto`), distinct from :class:`~enerzyme.models.cutoff.C3CutoffEnvelope`. Real spherical harmonics reuse :func:`enerzyme.models.so3.spherical_harmonics.spherical_harmonics` with ``layout="e3nn"`` and integral normalization, which covers ``L=6``. The Core emits hierarchical scalars plus isolated-atom states; :code:`FACTOEnergyReadout` and :code:`ZBLRepulsionEnergy` stay outside it. The 31-d elemental table is an Enerzyme stand-in — the paper does not list the components — and stops at Z=94. CUDA neighbor kernels and BF16×3 emulation are intentionally not ported. Tests: :code:`test/test_facto_ops.py`, :code:`test/test_facto_core.py`. Enerzymette: :code:`architecture: facto` + resolved :code:`config.yaml`.
+
+CACE (:code:`cace`)
+^^^^^^^^^^^^^^^^^^^
+
+Cheng (npj Comput. Mater. 2024) lives under :code:`enerzyme/models/cace/` (:code:`core.py`, :code:`basis.py`, :code:`interaction.py`, :code:`readout.py`, :code:`presets.py`). Register via :code:`get_ff_core("cace")`. This is an original implementation of the published Cartesian contraction. `BingqingCheng/cace <https://github.com/BingqingCheng/cace>`_ is CC BY-NC 4.0 and is not imported; do not vendor it, and do not expect its checkpoints to load. Reuse :code:`BesselRBF` (default flavor, ``apply_cutoff_fn: false``), :code:`RandomAtomEmbedding`, :func:`enerzyme.models.cutoff.polynomial_envelope`, and :code:`EnergyReduce` / :code:`Force`. The monomial list and the body-order contraction stay in the package: they are the Cartesian cluster expansion, and a spherical-harmonic tensor product is not used. The Core emits :code:`atom_feature` ``[N, F]``. :code:`CACEEnergyReadout` is the linear map plus the SiLU MLP; :code:`SimpleReadout` also fits. Presets follow the cacefit training scripts (``water``, ``water-local``, ``ethanol``, ``bpa``, ``hea``). Leave ``cutoff_fn`` unset so the envelope order stays on the Core. Tests: :code:`test/test_cace_ops.py`, :code:`test/test_cace_core.py`. Enerzymette: :code:`architecture: cace` + resolved :code:`config.yaml`.
 
 GRACE (:code:`grace`)
 ^^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,39 @@
+# CACE (Cheng, npj Comput. Mater. 2024). The Core contracts a Cartesian
+# atomic density into invariant cluster features. RandomAtomEmbedding is the
+# chemical table. BesselRBF (default flavor, no envelope) is the raw radial
+# basis. The Core multiplies the degree-6 polynomial envelope, so
+# RangeSeparation only supplies the hard cutoff. CACEEnergyReadout is the
+# linear map plus the SiLU MLP. Enerzymette only needs architecture: cace.
+#
+# This file is a small stack for smoke tests. Paper widths are Core presets
+# water, water-local, ethanol, bpa, and hea. Reference checkpoints do not load.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: cace
+      active: true
+      build_params:
+        max_Za: 10
+        dim_embedding: 2
+        num_rbf: 3
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: default
+            trainable: true
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            preset: custom
+            lmax: 2
+            max_nu: 3
+            n_radial: 2
+            num_message_passing: 1
+            messages: b
+        - name: CACEEnergyReadout
+        - name: EnergyReduce
+        - name: Force
