@@ -1,0 +1,59 @@
+# NewtonNet (Haghighatlari et al., Digital Discovery 2022, arXiv:2108.02913).
+# Core: symmetric messages, latent force, and displacement. Embedding and the
+# energy head stay outside. BesselRBF flavor default is the paper basis
+# sqrt(2/c) sin(n π r / c) / r. The Core multiplies the polynomial envelope.
+# The default order is 9, matching both THGLab versions. The paper writes
+# order 7; set envelope_p: 7 for that polynomial.
+#
+# The energy head is the v1 network F -> 128 -> 64 -> 1. variant: repo is
+# InteractionNet on https://github.com/THGLab/NewtonNet main, whose head is
+# F -> F -> F -> 1 (omit hidden_dims and set num_hidden_layers: 2).
+# Checkpoints from that package do not load. layer_norm normalizes the
+# invariant features only.
+# Optional direction loss, installed while this architecture is loaded:
+#   loss:
+#     latent_force_cosine:
+#       weight: 1.0
+# Enerzymette: set architecture: newtonnet in the resolved config.yaml.
+# Cartesian dipoles: add EquivariantDipole / EquivariantPolarizability
+# after the Core. They read atom_feature and atom_vector_feature.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: newtonnet
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 20
+        max_Za: 94
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: default
+            trainable: false
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_interactions: 3
+            variant: paper
+            envelope_p: 9
+            layer_norm: false
+            shared_interactions: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            hidden_dims: [128, 64]
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

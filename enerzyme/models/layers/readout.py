@@ -230,24 +230,44 @@ class BaseReadout(BaseFFLayer):
             )
         elif self.head_type == "mlp":
             # DimeNet-style stacked dense hidden layers + linear property head.
+            # ``hidden_dims`` sets each hidden width (NewtonNet v1 is
+            # ``[128, 64]``). Omitting it keeps every hidden layer at the
+            # incoming feature width.
             head_params = dict(self.head_params)
-            num_hidden_layers = int(head_params.pop("num_hidden_layers", 3))
+            num_hidden_layers = head_params.pop("num_hidden_layers", None)
+            hidden_dims = head_params.pop("hidden_dims", None)
             use_bias_out = bool(head_params.pop("use_bias_out", False))
             act = self.activation_fn if self.activation_fn is not None else "swish"
+            if hidden_dims is None:
+                depth = 3 if num_hidden_layers is None else int(num_hidden_layers)
+                if depth < 0:
+                    raise ValueError(f"num_hidden_layers must be >= 0, got {depth}")
+                hidden_dims = [self.dim_feature_in] * depth
+            else:
+                hidden_dims = [int(width) for width in hidden_dims]
+                if num_hidden_layers is not None and int(num_hidden_layers) != len(hidden_dims):
+                    raise ValueError(
+                        "mlp hidden_dims length must equal num_hidden_layers, "
+                        f"got {hidden_dims} and num_hidden_layers={num_hidden_layers}"
+                    )
+            if any(width < 1 for width in hidden_dims):
+                raise ValueError(f"mlp hidden widths must be >= 1, got {hidden_dims}")
             layers = []
-            for _ in range(num_hidden_layers):
+            in_dim = self.dim_feature_in
+            for width in hidden_dims:
                 layers.append(
                     DenseLayer(
-                        dim_feature_in=self.dim_feature_in,
-                        dim_feature_out=self.dim_feature_in,
+                        dim_feature_in=in_dim,
+                        dim_feature_out=width,
                         activation_fn=act,
                         activation_params=self.activation_params,
                         **head_params,
                     )
                 )
+                in_dim = width
             layers.append(
                 DenseLayer(
-                    dim_feature_in=self.dim_feature_in,
+                    dim_feature_in=in_dim,
                     dim_feature_out=self.dim_feature_out,
                     use_bias=use_bias_out,
                     shallow_ensemble_size=self.shallow_ensemble_size,
