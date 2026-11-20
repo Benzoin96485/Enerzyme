@@ -91,6 +91,8 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | M3GNet         | Three-body bonds + gated convolution     | Cutoffs 5 Å and 4 Å      |
 +----------------+------------------------------------------+---------------------------+
+| CHGNet         | Atom, bond, and angle graphs + magmom    | Cutoffs 5 Å and 3 Å, eV   |
++----------------+------------------------------------------+---------------------------+
 | PhysNet        | Production charge-aware PES              | Electrostatics, D3 layers |
 +----------------+------------------------------------------+---------------------------+
 | SpookyNet      | Large organic / mixed systems            | Similar feature set       |

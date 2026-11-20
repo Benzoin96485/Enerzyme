@@ -263,6 +263,8 @@ With :code:`architecture: m3gnet`, pre-core layers are :code:`RangeSeparation`, 
 
 With :code:`architecture: mattersim` (aliases :code:`m3gnet-graphormer` and :code:`m3gnet_graphormer`), the same stack adds :code:`GaussianRBF` (``flavor: SchNet``, ``apply_cutoff_fn: false``, its own ``num_rbf``). The Core renames that field to ``graphormer_rbf`` and runs centrality plus cutoff-masked attention around the M3GNet blocks. ``attention_cutoff`` cannot exceed ``cutoff_sr``. The checked-in stack is small (2 attention layers, 4 heads, 16 Gaussians). The paper's 24-layer Graphormer is the same Core with those widths. Example: :code:`enerzyme/config/mattersim_layers_example.yaml`.
 
+With :code:`architecture: chgnet`, pre-core layers are :code:`RangeSeparation`, two :code:`BesselRBF` layers (``flavor: gemnet``), and :code:`RandomAtomEmbedding`. The first Bessel basis uses :code:`cutoff_sr` (default 5 Å). The second sets ``cutoff_sr`` to ``bond_cutoff`` (default 3 Å); the Core renames that field to ``rbf_bg``. The neighbor list must contain both directions of every bond. The Core owns the undirected bond index, the angle Fourier expansion, and the atom, bond, and angle updates. It emits ``atom_feature`` and ``atom_feature_charge``. :code:`AbsoluteLinearReadout` maps the charge latent to :code:`Ma`. Energy uses :code:`SimpleReadout` (``head_type: mlp``, two hidden SiLU layers, ``use_bias_out: true``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/chgnet_layers_example.yaml`.
+
 So3krates and modular readouts
 ------------------------------
 

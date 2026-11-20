@@ -233,6 +233,12 @@ class GatedMLP(Module):
     layer uses SiLU only when ``activate_last`` is true. This is the M3GNet /
     MEGNet update (Chen and Ong, Nat. Comput. Sci. 2022), not a Cartesian
     equivariant gate.
+
+    ``norm`` and ``dropout`` follow CHGNet (Deng et al., Nat. Mach. Intell.
+    2023). Normalization is applied to each branch after the last linear and
+    before the final SiLU or sigmoid. Dropout sits immediately before that
+    last linear. The default (``norm=None``, ``dropout=0``) keeps the M3GNet
+    module order.
     """
 
     def __init__(
@@ -242,29 +248,63 @@ class GatedMLP(Module):
         out_features: int,
         activate_last: bool = True,
         use_bias: bool = True,
+        norm: Optional[Literal["layer", "batch"]] = None,
+        dropout: float = 0.0,
     ) -> None:
         super().__init__()
         dims = [int(in_features), *[int(width) for width in hidden_dims], int(out_features)]
         if any(width < 1 for width in dims):
             raise ValueError(f"GatedMLP widths must be >= 1, got {dims}")
+        if norm not in (None, "layer", "batch"):
+            raise ValueError(f"GatedMLP norm must be 'layer', 'batch', or None, got {norm!r}")
+        if float(dropout) < 0 or float(dropout) >= 1:
+            raise ValueError(f"dropout must lie in [0, 1), got {dropout}")
+        self.activate_last = bool(activate_last)
+        self._external_activation = norm is not None or float(dropout) > 0
         value: list = []
         gate: list = []
         last = len(dims) - 2
+        drop = float(dropout)
         for index, (dim_in, dim_out) in enumerate(zip(dims, dims[1:])):
+            if self._external_activation and index == last and len(hidden_dims) == 0 and drop > 0:
+                value.append(Dropout(drop))
+                gate.append(Dropout(drop))
             value.append(torch.nn.Linear(dim_in, dim_out, bias=use_bias))
             gate.append(torch.nn.Linear(dim_in, dim_out, bias=use_bias))
             if index < last:
                 value.append(torch.nn.SiLU())
                 gate.append(torch.nn.SiLU())
-            else:
+                if self._external_activation and index == last - 1 and drop > 0:
+                    value.append(Dropout(drop))
+                    gate.append(Dropout(drop))
+            elif not self._external_activation:
                 if activate_last:
                     value.append(torch.nn.SiLU())
                 gate.append(torch.nn.Sigmoid())
         self.value_net = Sequential(*value)
         self.gate_net = Sequential(*gate)
+        if norm == "layer":
+            self.value_norm = torch.nn.LayerNorm(int(out_features))
+            self.gate_norm = torch.nn.LayerNorm(int(out_features))
+        elif norm == "batch":
+            self.value_norm = torch.nn.BatchNorm1d(int(out_features))
+            self.gate_norm = torch.nn.BatchNorm1d(int(out_features))
+        else:
+            self.value_norm = None
+            self.gate_norm = None
 
     def forward(self, inputs: Tensor) -> Tensor:
-        return self.value_net(inputs) * self.gate_net(inputs)
+        if not self._external_activation:
+            return self.value_net(inputs) * self.gate_net(inputs)
+        value = self.value_net(inputs)
+        gate = self.gate_net(inputs)
+        if self.value_norm is not None:
+            value = self.value_norm(value)
+            gate = self.gate_norm(gate)
+        if self.activate_last:
+            value = F.silu(value)
+        gate = torch.sigmoid(gate)
+        return value * gate
 
 
 class VariancePreservingMLP(Module):
