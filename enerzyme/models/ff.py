@@ -20,9 +20,22 @@ from . import layers as Layers
 
 SEP = "-"
 
+# Keys present before any architecture is loaded. ``get_ff_core`` may add a
+# loss that belongs to one architecture; the next architecture drops those
+# keys so they do not stay available for a different model.
+_BASE_LOSS_KEYS = frozenset(LOSS_REGISTER)
+_ARCH_LOSS_KEYS: set = set()
+
+
+def _install_architecture_losses(special_loss: Dict[str, Any]) -> None:
+    global _ARCH_LOSS_KEYS
+    for key in _ARCH_LOSS_KEYS:
+        LOSS_REGISTER.pop(key, None)
+    LOSS_REGISTER.update(special_loss)
+    _ARCH_LOSS_KEYS = {key for key in special_loss if key not in _BASE_LOSS_KEYS}
+
 
 def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], List[Dict[str, Any]]]:
-    global LOSS_REGISTER
     if architecture.lower() == "schnet":
         from .schnet import SchNetCore as Core
         from .schnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
@@ -218,7 +231,7 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         special_loss = {}
     else:
         raise NotImplementedError(f"Architecture {architecture} not implemented")
-    LOSS_REGISTER.update(special_loss)
+    _install_architecture_losses(special_loss)
     return Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
 

@@ -8,10 +8,14 @@ The Core consumes a scalar atom embedding and a radial basis and emits:
 
 Nuclear embedding, the Bessel expansion, the energy head, and ``Fa = -∇E``
 stay outside the Core. The polynomial envelope is applied inside each
-interaction, after that layer's radial linear map. ``variant="paper"`` is
-Eqs. 7–17. ``variant="repo"`` is ``InteractionNet`` in
-https://github.com/THGLab/NewtonNet (``main``). On that path
-``latent_force`` is the sum of ``atom_vector_feature`` over channels.
+interaction, after that layer's radial linear map. The default order is 9,
+matching both THGLab versions; ``envelope_p=7`` is the polynomial written in
+the paper. ``variant="paper"`` is Eqs. 7–17. ``variant="repo"`` is
+``InteractionNet`` in https://github.com/THGLab/NewtonNet (``main``). On
+that path ``latent_force`` is the sum of ``atom_vector_feature`` over
+channels. ``layer_norm`` normalizes the invariant features only, as both
+THGLab versions do. The default energy head is the v1 network
+``F → 128 → 64 → 1``. Current ``main`` uses ``F → F → F → 1``.
 
 Reference checkpoints do not load.
 """
@@ -54,7 +58,7 @@ DEFAULT_LAYER_PARAMS = [
         "params": {
             "num_interactions": 3,
             "variant": "paper",
-            "envelope_p": 7,
+            "envelope_p": 9,
             "layer_norm": False,
             "shared_interactions": False,
         },
@@ -64,7 +68,7 @@ DEFAULT_LAYER_PARAMS = [
         "params": {
             "output_fields": ["Ea"],
             "head_type": "mlp",
-            "num_hidden_layers": 2,
+            "hidden_dims": [128, 64],
             "activation_fn": "swish",
             "activation_params": dict(_SILU_READOUT),
             "keep_feature": False,
@@ -94,7 +98,7 @@ class NewtonNetCore(BaseFFCore):
         cutoff_sr: float = 5.0,
         num_interactions: int = 3,
         variant: str = "paper",
-        envelope_p: int = 7,
+        envelope_p: int = 9,
         layer_norm: bool = False,
         shared_interactions: bool = False,
         displacement_init_gain: float = 1e-3,

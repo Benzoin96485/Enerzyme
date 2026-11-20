@@ -89,7 +89,8 @@ def test_newtonnet_registration_and_yaml_build():
         assert build_params["cutoff_sr"] == 5.0
         assert layers[1]["params"]["flavor"] == "default"
         assert layers[3]["params"]["variant"] == "paper"
-        assert layers[3]["params"]["envelope_p"] == 7
+        assert layers[3]["params"]["envelope_p"] == 9
+        assert layers[4]["params"]["hidden_dims"] == [128, 64]
 
     assert "latent_force_cosine" in LOSS_REGISTER
 
@@ -108,7 +109,68 @@ def test_newtonnet_registration_and_yaml_build():
     assert model.vector_feature_layout == "cartesian_n3f"
     readout = next(layer for layer in model.post_sequence if isinstance(layer, SimpleReadout))
     assert readout.head_type == "mlp"
-    assert len(readout.head) == 3
+    assert [
+        (layer.dim_feature_in, layer.dim_feature_out) for layer in readout.head
+    ] == [(8, 128), (128, 64), (64, 1)]
+
+
+def test_newtonnet_loss_does_not_leak_across_architectures():
+    from enerzyme.models.ff import get_ff_core
+    from enerzyme.models.loss import LOSS_REGISTER
+
+    get_ff_core("newtonnet")
+    assert "latent_force_cosine" in LOSS_REGISTER
+    get_ff_core("physnet")
+    assert "nh_penalty" in LOSS_REGISTER
+    assert "latent_force_cosine" not in LOSS_REGISTER
+    get_ff_core("painn")
+    assert "latent_force_cosine" not in LOSS_REGISTER
+    assert "nh_penalty" not in LOSS_REGISTER
+    assert "mae" in LOSS_REGISTER
+    get_ff_core("newtonnet")
+    assert "latent_force_cosine" in LOSS_REGISTER
+    assert "nh_penalty" not in LOSS_REGISTER
+
+
+def test_layer_norm_scales_invariants_only():
+    """Both THGLab versions normalize the atomic features and leave the vectors."""
+    from enerzyme.models.newtonnet import NewtonNetCore
+
+    torch.manual_seed(3)
+    graph = _graph(4, 5, 3, seed=3)
+    for variant in ("paper", "repo"):
+        raw = NewtonNetCore(
+            dim_embedding=5,
+            num_rbf=3,
+            num_interactions=1,
+            cutoff_sr=5.0,
+            variant=variant,
+            layer_norm=False,
+        )
+        normed = NewtonNetCore(
+            dim_embedding=5,
+            num_rbf=3,
+            num_interactions=1,
+            cutoff_sr=5.0,
+            variant=variant,
+            layer_norm=True,
+        )
+        normed.load_state_dict(raw.state_dict(), strict=False)
+        raw.eval()
+        normed.eval()
+        kwargs = dict(
+            atom_embedding=graph["atom_embedding"],
+            rbf=graph["rbf"],
+            idx_i_sr=graph["idx_i_sr"],
+            idx_j_sr=graph["idx_j_sr"],
+            vij_sr=graph["vij_sr"],
+            Dij_sr=graph["Dij_sr"],
+        )
+        raw_out = raw.get_output(**kwargs)
+        normed_out = normed.get_output(**kwargs)
+        assert torch.allclose(raw_out["latent_force"], normed_out["latent_force"])
+        assert torch.allclose(raw_out["atom_vector_feature"], normed_out["atom_vector_feature"])
+        assert not torch.allclose(raw_out["atom_feature"], normed_out["atom_feature"], atol=1e-6)
 
 
 def test_newtonnet_rejects_a_second_cutoff_on_the_basis():

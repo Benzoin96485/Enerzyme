@@ -1827,10 +1827,14 @@ Modelhub:
       # NewtonNet (Haghighatlari et al., Digital Discovery 2022). Symmetric
       # messages, a latent force, and a displacement live in the Core.
       # BesselRBF (default flavor) and RandomAtomEmbedding stay outside.
-      # The Core multiplies the polynomial envelope (paper p = 7; reference
-      # code uses 9). variant: repo is InteractionNet on THGLab/NewtonNet main.
-      # Optional direction loss: latent_force_cosine weight λ_D, compared
-      # with Fa. Paper MD17 weights are λ_E = 1, λ_F = 50, λ_D = 1.
+      # The Core multiplies the polynomial envelope. Default order is 9
+      # (both THGLab versions); the paper writes 7. The energy head is the
+      # v1 network F -> 128 -> 64 -> 1. variant: repo is InteractionNet on
+      # THGLab/NewtonNet main and uses F -> F -> F -> 1. layer_norm
+      # normalizes invariant features only. Optional direction loss:
+      # latent_force_cosine weight λ_D, compared with Fa. It is removed
+      # when another architecture is loaded. Paper MD17 weights are
+      # λ_E = 1, λ_F = 50, λ_D = 1.
       # Checkpoints from THGLab/NewtonNet do not load.
       architecture: newtonnet
       active: false
@@ -1860,14 +1864,14 @@ Modelhub:
           params:
             num_interactions: 3
             variant: paper
-            envelope_p: 7
+            envelope_p: 9
             layer_norm: false
             shared_interactions: false
         - name: SimpleReadout
           params:
             output_fields: [Ea]
             head_type: mlp
-            num_hidden_layers: 2
+            hidden_dims: [128, 64]
             activation_fn: swish
             activation_params:
               dim_feature: 1
