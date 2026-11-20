@@ -224,7 +224,7 @@ class TensorNetCore(BaseFFCore):
             return idx_i, idx_j, vij, dist, rbf, window
         if not self._radial_holder:
             raise RuntimeError(
-                "TensorNet include_self needs the pre-core radial basis "
+                "include_self needs the pre-core radial basis "
                 "(a layer that writes rbf and implements get_rbf). "
                 "Call build(), or pass a self pair for every atom."
             )
@@ -244,6 +244,40 @@ class TensorNetCore(BaseFFCore):
             torch.cat((window, self_window)),
         )
 
+    def resolve_total_charge(
+        self,
+        n_atoms: int,
+        charge: Optional[Tensor],
+        batch_seg: Optional[Tensor],
+        like: Tensor,
+    ) -> Tensor:
+        """Molecular total charge written on every atom. Missing ``Q`` is 0."""
+        if n_atoms == 0:
+            return like.new_zeros(0)
+        if charge is None:
+            return like.new_zeros(n_atoms)
+        values = charge.to(device=like.device, dtype=like.dtype).reshape(-1)
+        if values.numel() == 1:
+            return values.expand(n_atoms)
+        if values.numel() == n_atoms:
+            return values
+        if batch_seg is None:
+            raise ValueError(
+                f"Q has {values.numel()} values for {n_atoms} atoms; pass batch_seg "
+                "when Q is the per-molecule total charge"
+            )
+        index = batch_seg.to(device=like.device).long()
+        if index.numel() != n_atoms:
+            raise ValueError(
+                f"batch_seg length {index.numel()} != number of atoms {n_atoms}"
+            )
+        if index.numel() and int(index.max()) >= values.numel():
+            raise ValueError(
+                f"Q has {values.numel()} molecule values but batch_seg "
+                f"indexes {int(index.max())}"
+            )
+        return values[index]
+
     def _charge_scale(
         self,
         n_atoms: int,
@@ -253,31 +287,11 @@ class TensorNetCore(BaseFFCore):
     ) -> Tensor:
         if charge is None or self.charge_scale == 0.0 or n_atoms == 0:
             return like.new_ones(n_atoms)
-        values = charge.to(device=like.device, dtype=like.dtype).reshape(-1)
-        if values.numel() == 1:
-            per_atom = values.expand(n_atoms)
-        elif values.numel() == n_atoms:
-            per_atom = values
-        elif batch_seg is None:
-            raise ValueError(
-                f"Q has {values.numel()} values for {n_atoms} atoms; pass batch_seg "
-                "when Q is the per-molecule total charge"
-            )
-        else:
-            index = batch_seg.to(device=like.device).long()
-            if index.numel() != n_atoms:
-                raise ValueError(
-                    f"batch_seg length {index.numel()} != number of atoms {n_atoms}"
-                )
-            if index.numel() and int(index.max()) >= values.numel():
-                raise ValueError(
-                    f"Q has {values.numel()} molecule values but batch_seg "
-                    f"indexes {int(index.max())}"
-                )
-            per_atom = values[index]
-        return 1.0 + self.charge_scale * per_atom
+        return 1.0 + self.charge_scale * self.resolve_total_charge(
+            n_atoms, charge, batch_seg, like
+        )
 
-    def get_output(
+    def _prepare_graph(
         self,
         atom_embedding: Tensor,
         rbf: Tensor,
@@ -285,17 +299,9 @@ class TensorNetCore(BaseFFCore):
         idx_j_sr: Tensor,
         vij_sr: Tensor,
         Dij_sr: Tensor,
-        cutoff_values_sr: Optional[Tensor] = None,
-        Q: Optional[Tensor] = None,
-        batch_seg: Optional[Tensor] = None,
-    ) -> Dict[str, Tensor]:
-        """Run the tensor embedding and ``num_interactions`` updates.
-
-        Receivers are ``idx_i_sr`` and senders are ``idx_j_sr``.
-        ``vij_sr = R_j - R_i``. ``Q`` is the molecular total charge. When it
-        is omitted, or ``charge_scale`` is 0, the charge factor is 1 and the
-        residual matches the paper's ``Y + Y²``.
-        """
+        cutoff_values_sr: Optional[Tensor],
+    ) -> tuple[int, Tensor, Tensor, Tensor, Tensor, Tensor]:
+        """Validate the short-range graph and insert missing self pairs."""
         n_atoms = int(atom_embedding.shape[0])
         if atom_embedding.ndim != 2 or atom_embedding.shape[-1] != self.dim_embedding:
             raise ValueError(
@@ -334,7 +340,36 @@ class TensorNetCore(BaseFFCore):
         idx_i, idx_j, vij, dist, basis, window = self._augment_self(
             n_atoms, idx_i_sr.long(), idx_j_sr.long(), vij, dist, basis, window
         )
-        hat = unit_vectors(vij, dist)
+        return n_atoms, idx_i, idx_j, unit_vectors(vij, dist), basis, window
+
+    def get_output(
+        self,
+        atom_embedding: Tensor,
+        rbf: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+        vij_sr: Tensor,
+        Dij_sr: Tensor,
+        cutoff_values_sr: Optional[Tensor] = None,
+        Q: Optional[Tensor] = None,
+        batch_seg: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        """Run the tensor embedding and ``num_interactions`` updates.
+
+        Receivers are ``idx_i_sr`` and senders are ``idx_j_sr``.
+        ``vij_sr = R_j - R_i``. ``Q`` is the molecular total charge. When it
+        is omitted, or ``charge_scale`` is 0, the charge factor is 1 and the
+        residual matches the paper's ``Y + Y²``.
+        """
+        n_atoms, idx_i, idx_j, hat, basis, window = self._prepare_graph(
+            atom_embedding,
+            rbf,
+            idx_i_sr,
+            idx_j_sr,
+            vij_sr,
+            Dij_sr,
+            cutoff_values_sr,
+        )
         features = self.embedding(
             atom_embedding, idx_i, idx_j, hat, basis, window
         )

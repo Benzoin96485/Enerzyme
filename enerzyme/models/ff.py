@@ -35,6 +35,13 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .tensornet import TensorNetCore as Core
         from .tensornet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {"tensornet2", "tensornet-2"}:
+        from .tensornet import TensorNet2Core as Core
+        from .tensornet import (
+            DEFAULT_BUILD_PARAMS_2 as DEFAULT_BUILD_PARAMS,
+            DEFAULT_LAYER_PARAMS_2 as DEFAULT_LAYER_PARAMS,
+        )
+        special_loss = {}
     elif architecture.lower() == "equflash":
         from .equflash import EquFlashCore as Core
         from .equflash import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
