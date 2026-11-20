@@ -118,8 +118,12 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .spookynet import SpookyNetCore as Core
         from .spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "leftnet":
+        from .leftnet import LEFTNetCore as Core
+        from .leftnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "alphanet":
-        from .alphanet import AlphaNet as Core
+        from .alphanet import AlphaNetCore as Core
         from .alphanet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
     elif architecture.lower() == "mace":

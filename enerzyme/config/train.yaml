@@ -272,19 +272,24 @@ Modelhub:
           Fa: 52.917721
           E: 1
           M2: 1.8897261
-      build_params:                         # TODO: explain parameters
+      build_params:
         max_Za: 94
         cutoff_sr: 5.0
+        cutoff_fn: cosine
+        dim_embedding: 128
+        num_rbf: 96
         Hartree_in_E: 1
         Bohr_in_R: 0.5291772108
       layers:
         - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
         - name: Core
           params:
             num_layers: 4
-            hidden_channels: 128
-            num_radial: 96
-            eps: 1e-10
             head: 16
             main_chi1: 24
             mp_chi1: 24
@@ -294,7 +299,6 @@ Modelhub:
             has_norm_before_flag: true
             has_norm_after_flag: false
             reduce_mode: sum
-            output_mode: feature
         - name: SimpleReadout
           params:
             output_fields:

@@ -1,1 +1,14 @@
-from .core import AlphaNet, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+"""AlphaNet: LEFTNet local frames, rotary phases, and a temporal state.
+
+Yin et al., npj Computational Materials 2025 (arXiv:2501.07155). The Core
+is the interaction stack. The species embedding, Bessel basis, energy head,
+and conservative forces stay in the shared layer stack.
+"""
+
+from .core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS, AlphaNetCore
+
+__all__ = [
+    "AlphaNetCore",
+    "DEFAULT_BUILD_PARAMS",
+    "DEFAULT_LAYER_PARAMS",
+]

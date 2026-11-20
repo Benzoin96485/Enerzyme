@@ -266,39 +266,25 @@ def test_spookynet_build_default_layers_forward_backward():
     out["E"].sum().backward()
 
 
-def test_alphanet_core_direct_default_is_feature_now():
-    """Constructor default is feature (NSE); explicit direct restores trained heads."""
-    from enerzyme.models.alphanet.core import AlphaNet
+def test_alphanet_core_emits_features_without_an_internal_head():
+    """Energy and charge heads live in the layer stack, not on the Core."""
+    from enerzyme.models.alphanet.core import AlphaNetCore
 
-    c_default = AlphaNet(
+    core = AlphaNetCore(
+        dim_embedding=8,
+        num_rbf=4,
         num_layers=1,
-        hidden_channels=16,
-        num_radial=8,
-        head=4,
-        main_chi1=4,
-        mp_chi1=4,
+        head=2,
+        main_chi1=2,
+        mp_chi1=2,
         chi2=2,
-        hidden_channels_chi=8,
+        hidden_channels_chi=4,
         has_dropout_flag=False,
     )
-    assert c_default.output_mode == "feature"
-    assert c_default._output_fields == {"atom_feature"}
-    assert not hasattr(c_default, "last_layer")
-
-    c_direct = AlphaNet(
-        num_layers=1,
-        hidden_channels=16,
-        num_radial=8,
-        head=4,
-        main_chi1=4,
-        mp_chi1=4,
-        chi2=2,
-        hidden_channels_chi=8,
-        has_dropout_flag=False,
-        output_mode="direct",
-    )
-    assert c_direct._output_fields == {"Ea", "Qa"}
-    assert hasattr(c_direct, "last_layer")
+    assert core._output_fields == {"atom_feature", "atom_vector_feature", "quantum_feature"}
+    assert core.dim_feature_out == 8
+    assert not hasattr(core, "output_mode")
+    assert not hasattr(core, "last_layer")
 
 
 def test_alphanet_build_default_layers_forward_backward():
@@ -335,7 +321,10 @@ def test_train_yaml_ff03_uses_feature_and_simple_readout():
     names = [layer["name"] for layer in ff03["layers"]]
     assert "SimpleReadout" in names
     core = next(layer for layer in ff03["layers"] if layer["name"] == "Core")
-    assert core["params"].get("output_mode") == "feature"
+    assert "output_mode" not in core.get("params", {})
+    assert "BesselRBF" in names
+    assert "RandomAtomEmbedding" in names
+    assert names.index("Core") < names.index("SimpleReadout")
 
 
 def test_train_yaml_ff08_allscaip_has_simple_readout():
