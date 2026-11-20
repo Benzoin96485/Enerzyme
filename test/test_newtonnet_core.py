@@ -111,6 +111,30 @@ def test_newtonnet_registration_and_yaml_build():
     assert len(readout.head) == 3
 
 
+def test_newtonnet_rejects_a_second_cutoff_on_the_basis():
+    from enerzyme.models.ff import build_model
+
+    layers = _tiny_layers()
+    layers[1]["params"]["apply_cutoff_fn"] = True
+    layers[1]["params"]["cutoff_fn"] = "polynomial"
+    try:
+        build_model(
+            "newtonnet",
+            layer_params=layers,
+            build_params={
+                "dim_embedding": 4,
+                "num_rbf": 3,
+                "max_Za": 10,
+                "cutoff_sr": 5.0,
+            },
+            verbose=0,
+        )
+    except ValueError as exc:
+        assert "apply_cutoff_fn" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
 def test_newtonnet_rejects_bad_settings():
     from enerzyme.models.newtonnet import NewtonNetCore
 

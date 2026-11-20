@@ -165,6 +165,14 @@ class NewtonNetCore(BaseFFCore):
         )
 
     def build(self, built_layers: List[nn.Module]) -> None:
+        from ..layers.rbf import BesselRBFLayer
+
+        for layer in built_layers:
+            if isinstance(layer, BesselRBFLayer) and layer.apply_cutoff_fn:
+                raise ValueError(
+                    "NewtonNetCore multiplies the polynomial envelope onto the "
+                    "radial basis. Set BesselRBF apply_cutoff_fn: false."
+                )
         self.adopt_radius_stack(built_layers)
 
     def _envelope(self, dist: Tensor) -> Tensor:
