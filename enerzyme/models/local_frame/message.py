@@ -203,7 +203,9 @@ class FrameTransition(nn.Module):
     stream). The node-frame projection in that file is computed and then
     discarded. ``frame`` is the paper update: scalarize on the node frame,
     map the three axes with a bias-free linear, then tensorize.
-    ``l1`` is the released AlphaNet reduction and does not use a node frame.
+    ``l1`` is the released AlphaNet reduction. It is the sum of absolute
+    Cartesian components, so it is not rotationally equivariant, and AlphaNet
+    does not use it unless asked. The AlphaNet default is ``l2``.
     """
 
     def __init__(self, hidden: int, scalarization: str) -> None:

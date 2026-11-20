@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import pytest
 import torch
 
 from enerzyme.models.layers.rbf import ExpNormalSmearing
@@ -11,6 +12,8 @@ from enerzyme.models.local_frame.encoding import LocalSubstructure
 from enerzyme.models.local_frame.geometry import (
     alphanet_edge_frame,
     leftnet_edge_frame,
+    leftnet_node_frame,
+    neighbor_mean,
     scalarize,
     subtract_graph_mean,
 )
@@ -117,3 +120,39 @@ def test_graphs_are_centered_separately():
     assert torch.allclose(centered[:2].mean(dim=0), torch.zeros(3, dtype=torch.float64))
     assert torch.allclose(centered[2:].mean(dim=0), torch.zeros(3, dtype=torch.float64))
     assert not torch.allclose(centered, pos - pos.mean(dim=0))
+
+
+def test_unconnected_atom_gets_the_identity_node_frame():
+    pos = torch.tensor(
+        [[4.0, -1.0, 0.3], [0.0, 0.0, 0.0], [1.2, 0.1, 0.0]],
+        dtype=torch.float64,
+    )
+    idx_i = torch.tensor([1, 2])
+    idx_j = torch.tensor([2, 1])
+    mean, count = neighbor_mean(pos, idx_i, idx_j)
+    assert count[0].item() == 0
+    assert count[1].item() == 1
+    assert torch.allclose(mean[1], pos[2])
+    frame = leftnet_node_frame(pos, idx_i, idx_j, 1e-10)
+    eye = torch.eye(3, dtype=torch.float64)
+    assert torch.allclose(frame[0], eye)
+    assert not torch.allclose(frame[1], eye)
+
+
+def test_centroid_on_the_atom_is_the_identity_frame():
+    pos = torch.tensor([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]], dtype=torch.float64)
+    frame = leftnet_node_frame(
+        pos, torch.tensor([0]), torch.tensor([1]), 1e-10
+    )
+    eye = torch.eye(3, dtype=torch.float64)
+    assert torch.allclose(frame[0], eye)
+    assert torch.allclose(frame[1], eye)
+
+
+def test_alphanet_bond_axis_uses_the_vector_length():
+    pos, idx_i, idx_j, vij, dij = _triangle()
+    _, unit = alphanet_edge_frame(pos, vij, dij, idx_i, idx_j, 1e-10)
+    length = torch.linalg.vector_norm(unit, dim=-1)
+    assert torch.allclose(length, torch.ones_like(length), atol=1e-8)
+    with pytest.raises(ValueError, match="Dij_sr"):
+        alphanet_edge_frame(pos, vij, dij * 2, idx_i, idx_j, 1e-10)

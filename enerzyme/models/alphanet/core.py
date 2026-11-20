@@ -22,10 +22,12 @@ that repository and then left out of the total energy; use
 Reference: https://github.com/zmyybc/AlphaNet (branch ``jax_and_zbl``,
 ``alphanet/models/alphanet.py``). Checkpoints from that repository do not
 load. The edge frame follows the released code (unnormalized centroid
-cross product), not the normalized frame written in the paper.
-``fte_scalarization='l1'`` is that release: the sum of absolute Cartesian
-components. It is not rotationally invariant. ``'l2'`` is the Euclidean
-norm used by the released LEFTNet transition and is rotationally invariant.
+cross product), not the normalized frame written in the paper. The bond
+axis is the unit ``vij``, and ``Dij_sr`` must be that length.
+The default ``fte_scalarization`` is ``l2``, the Euclidean norm, so the
+scalar state and the Cartesian vectors stay rotationally equivariant.
+``l1`` is the released sum of absolute Cartesian components. It is not
+equivariant and has to be requested explicitly.
 """
 
 from __future__ import annotations
@@ -38,7 +40,11 @@ from torch import Tensor, nn
 from ..cutoff import cosine_transition
 from ..layers import BaseFFCore
 from ..local_frame.encoding import LocalSubstructure, RadialFilter, aggregate_neighbors
-from ..local_frame.geometry import alphanet_edge_frame
+from ..local_frame.geometry import (
+    alphanet_edge_frame,
+    require_matching_distance,
+    require_same_graph,
+)
 from ..local_frame.message import (
     AlphaNetMessage,
     FrameTransition,
@@ -75,7 +81,7 @@ DEFAULT_LAYER_PARAMS = [
             "has_norm_before_flag": True,
             "has_norm_after_flag": False,
             "reduce_mode": "sum",
-            "fte_scalarization": "l1",
+            "fte_scalarization": "l2",
         },
     },
     {
@@ -121,7 +127,7 @@ class AlphaNetCore(BaseFFCore):
         has_norm_before_flag: bool = True,
         has_norm_after_flag: bool = False,
         reduce_mode: str = "sum",
-        fte_scalarization: str = "l1",
+        fte_scalarization: str = "l2",
         eps: float = 1e-10,
     ) -> None:
         hidden = int(dim_embedding)
@@ -161,8 +167,9 @@ class AlphaNetCore(BaseFFCore):
         if fte_scalarization not in {"l1", "l2"}:
             raise ValueError(
                 "fte_scalarization must be 'l1' or 'l2', got "
-                f"{fte_scalarization!r}. 'l1' matches the released AlphaNet "
-                "transition and is not rotationally invariant; 'l2' is."
+                f"{fte_scalarization!r}. The default 'l2' is rotationally "
+                "equivariant. 'l1' matches the released AlphaNet transition "
+                "and is not."
             )
         super().__init__(
             input_fields={
@@ -244,7 +251,6 @@ class AlphaNetCore(BaseFFCore):
         batch_seg: Optional[Tensor] = None,
         cutoff_values_sr: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
-        del batch_seg  # the centroid frame is translation invariant without a graph center
         if atom_embedding.shape[-1] != self.dim_embedding:
             raise ValueError(
                 f"atom_embedding width {atom_embedding.shape[-1]} != "
@@ -256,6 +262,8 @@ class AlphaNetCore(BaseFFCore):
             raise ValueError("idx_i_sr and idx_j_sr must be 1D and the same length")
         if Ra.shape[0] != atom_embedding.shape[0] or Ra.shape[-1] != 3:
             raise ValueError("Ra must have shape [N, 3] with the same N as atom_embedding")
+        require_same_graph(batch_seg, idx_i_sr, idx_j_sr)
+        require_matching_distance(vij_sr, Dij_sr)
 
         window = _window(Dij_sr, self.cutoff_sr, cutoff_values_sr, rbf.dtype)
         species = self.embed_norm(atom_embedding)

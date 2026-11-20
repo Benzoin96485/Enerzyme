@@ -191,6 +191,26 @@ def test_leftnet_isolated_atom_has_zero_vectors():
     out["atom_feature"].sum().backward()
 
 
+def test_leftnet_rejects_edges_that_cross_molecules():
+    core = _core(num_layers=1)
+    pos = torch.tensor(
+        [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [6.0, 0.0, 0.0], [7.0, 0.0, 0.0]],
+        dtype=torch.float64,
+    )
+    embedding = torch.randn(4, 8, dtype=torch.float64)
+    rbf = torch.randn(1, 4, dtype=torch.float64)
+    with pytest.raises(ValueError, match="molecule"):
+        _call(
+            core,
+            pos,
+            embedding,
+            rbf,
+            torch.tensor([0]),
+            torch.tensor([2]),
+            batch=torch.tensor([0, 0, 1, 1]),
+        )
+
+
 def test_leftnet_backward_reaches_positions():
     core = _core(num_layers=1)
     graph = _molecule(3, 8, 4, seed=4)

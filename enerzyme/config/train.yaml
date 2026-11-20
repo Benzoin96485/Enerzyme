@@ -299,6 +299,7 @@ Modelhub:
             has_norm_before_flag: true
             has_norm_after_flag: false
             reduce_mode: sum
+            fte_scalarization: l2
         - name: SimpleReadout
           params:
             output_fields:

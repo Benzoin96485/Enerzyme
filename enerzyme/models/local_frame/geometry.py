@@ -36,14 +36,51 @@ def reduce_nodes(src: Tensor, index: Tensor, dim_size: int, reduce: str = "sum")
 
 
 def neighbor_mean(pos: Tensor, idx_i: Tensor, idx_j: Tensor) -> tuple[Tensor, Tensor]:
-    """Mean sender position on each receiver, and the sender count."""
+    """Mean sender position on each receiver, and the sender count.
+
+    Atoms that never appear as a receiver keep a count of zero. Their mean
+    is left at zero and must not be used as a centroid: that value is not
+    the origin of the molecule.
+    """
     n_atoms = pos.shape[0]
+    mean = pos.new_zeros(n_atoms, 3)
+    count = pos.new_zeros(n_atoms)
     if idx_i.numel() == 0:
-        return pos.new_zeros(n_atoms, 3), pos.new_zeros(n_atoms)
+        return mean, count
     total = segment_sum_coo(pos[idx_j], idx_i, dim_size=n_atoms)
     count = segment_sum_coo(pos.new_ones(idx_i.shape[0]), idx_i, dim_size=n_atoms)
-    mean = total / count.clamp_min(1).unsqueeze(-1)
+    present = count > 0
+    filled = total / count.clamp_min(1).unsqueeze(-1)
+    mean = torch.where(present.unsqueeze(-1), filled, mean)
     return mean, count
+
+
+def require_same_graph(batch: Tensor | None, idx_i: Tensor, idx_j: Tensor) -> None:
+    """Reject an edge that joins atoms from two molecules."""
+    if batch is None or idx_i.numel() == 0:
+        return
+    if batch.ndim != 1:
+        raise ValueError("batch_seg must be a 1D graph id per atom")
+    highest = int(max(int(idx_i.max()), int(idx_j.max())))
+    if int(batch.shape[0]) <= highest:
+        raise ValueError(
+            "batch_seg must list one graph id per atom and cover every neighbor index"
+        )
+    if torch.any(batch[idx_i] != batch[idx_j]):
+        raise ValueError("neighbor edges must stay inside one molecule")
+
+
+def require_matching_distance(vij: Tensor, dij: Tensor, tol: float = 1e-4) -> None:
+    """``Dij`` is the Euclidean length of ``vij``, including a periodic image."""
+    if vij.numel() == 0:
+        return
+    actual = torch.linalg.vector_norm(vij, dim=-1)
+    given = dij.reshape(-1).to(dtype=actual.dtype)
+    if given.shape != actual.shape:
+        raise ValueError("Dij_sr and vij_sr must describe the same edges")
+    scale = actual.detach().clamp_min(1.0)
+    if torch.any((given - actual).abs() > tol * scale):
+        raise ValueError("Dij_sr must be the Euclidean norm of vij_sr")
 
 
 def subtract_graph_mean(pos: Tensor, batch: Tensor | None) -> Tensor:
@@ -116,16 +153,17 @@ def leftnet_node_frame(
     atoms (no neighbors, or a neighbor centroid on the atom) get the
     identity so the frame scalarization stays finite.
     """
-    mean, _ = neighbor_mean(pos, idx_i, idx_j)
-    diff = unit_vector(pos - mean, eps)
+    mean, count = neighbor_mean(pos, idx_i, idx_j)
+    displacement = pos - mean
+    diff = unit_vector(displacement, eps)
     cross = unit_vector(torch.cross(pos, mean, dim=-1), eps)
     vertical = torch.cross(diff, cross, dim=-1)
     frame = torch.stack((diff, cross, vertical), dim=-1)
-    degenerate = torch.linalg.vector_norm(diff, dim=-1) < 1e-6
-    if bool(degenerate.any()):
-        frame = frame.clone()
-        frame[degenerate] = torch.eye(3, device=pos.device, dtype=pos.dtype)
-    return frame
+    # A missing neighborhood used to look like a centroid at the origin.
+    # The identity does not depend on where that atom sits in the cell.
+    degenerate = (count == 0) | (torch.linalg.vector_norm(displacement, dim=-1) < 1e-6)
+    eye = torch.eye(3, device=pos.device, dtype=pos.dtype).expand(pos.shape[0], -1, -1)
+    return torch.where(degenerate.view(-1, 1, 1), eye, frame)
 
 
 def alphanet_edge_frame(
@@ -138,13 +176,17 @@ def alphanet_edge_frame(
 ) -> tuple[Tensor, Tensor]:
     """AlphaNet edge frame.
 
-    ``e1`` is ``vij / (r + eps)``. ``e2`` is the unnormalized cross product
+    ``e1`` is the unit ``vij``. ``Dij`` must be that length, so a stale
+    distance cannot tilt the axis. ``e2`` is the unnormalized cross product
     of the receiver and sender relative to the receiver's neighbor centroid.
     The released model does not normalize ``e2`` or ``e3``; the paper writes
     both as unit vectors. This follows the released model. ``pos`` is the
     in-cell coordinate, while ``vij`` may already include the periodic image.
+    Every receiver in ``idx_i`` has at least one neighbor, so the centroid
+    is the mean of those senders.
     """
-    edge_unit = vij / (dij.reshape(-1, 1) + eps)
+    require_matching_distance(vij, dij)
+    edge_unit = unit_vector(vij, eps)
     mean, _ = neighbor_mean(pos, idx_i, idx_j)
     center = mean[idx_i]
     cross = torch.cross(pos[idx_i] - center, pos[idx_j] - center, dim=-1)

@@ -42,9 +42,9 @@ Modelhub:
             has_norm_before_flag: true
             has_norm_after_flag: false
             reduce_mode: sum
-            # l1 is the released transition and is not rotationally invariant.
-            # l2 is the Euclidean norm.
-            fte_scalarization: l1
+            # l2 keeps the scalar state and the Cartesian vectors equivariant.
+            # l1 is the released sum of absolute Cartesian components.
+            fte_scalarization: l2
         - name: SimpleReadout
           params:
             output_fields: [Ea]

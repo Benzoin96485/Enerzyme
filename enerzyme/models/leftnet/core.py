@@ -33,6 +33,8 @@ from ..local_frame import (
     aggregate_neighbors,
     leftnet_edge_frame,
     leftnet_node_frame,
+    require_matching_distance,
+    require_same_graph,
     subtract_graph_mean,
 )
 
@@ -154,6 +156,8 @@ class LEFTNetCore(BaseFFCore):
         cutoff_values_sr: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
         self._check(atom_embedding, rbf, idx_i_sr, idx_j_sr, vij_sr, Dij_sr, Ra)
+        require_same_graph(batch_seg, idx_i_sr, idx_j_sr)
+        require_matching_distance(vij_sr, Dij_sr)
         window = _window(Dij_sr, self.cutoff_sr, cutoff_values_sr, rbf.dtype)
         radial_hidden = self.radial(rbf, window)
         scalar = aggregate_neighbors(atom_embedding, radial_hidden, idx_i_sr, idx_j_sr)

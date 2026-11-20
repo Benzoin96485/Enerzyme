@@ -51,7 +51,6 @@ def _core(**overrides):
         has_norm_before_flag=True,
         has_norm_after_flag=False,
         reduce_mode="sum",
-        fte_scalarization="l2",
     )
     params.update(overrides)
     return AlphaNetCore(**params).double()
@@ -91,7 +90,7 @@ def test_alphanet_registration_and_yaml_build():
         assert build_params["num_rbf"] == 96
         assert layers[1]["params"]["flavor"] == "equflash"
         assert layers[1]["params"]["apply_cutoff_fn"] is False
-        assert layers[3]["params"]["fte_scalarization"] == "l1"
+        assert layers[3]["params"]["fte_scalarization"] == "l2"
         assert layers[3]["params"]["head"] == 16
 
     with EXAMPLE.open() as stream:
@@ -107,7 +106,7 @@ def test_alphanet_registration_and_yaml_build():
     assert model.__class__.__name__ == "AlphaNetCore"
     assert model.dim_feature_out == 128
     assert model.vector_feature_layout == "cartesian_n3f"
-    assert model.fte_scalarization == "l1"
+    assert model.fte_scalarization == "l2"
     assert not hasattr(model, "output_mode")
 
 
@@ -168,7 +167,8 @@ def test_alphanet_dropout_is_inactive_in_eval():
 
 @pytest.mark.parametrize("improper", [False, True])
 def test_alphanet_l2_rotation_and_translation(improper):
-    core = _core(fte_scalarization="l2", has_dropout_flag=True).eval()
+    core = _core(has_dropout_flag=True).eval()
+    assert core.fte_scalarization == "l2"
     graph = _molecule(4, 8, 4, seed=4)
     idx_i, idx_j = graph["idx"]
     base = _call(core, graph["pos"], graph["embedding"], graph["rbf"], idx_i, idx_j)
@@ -206,6 +206,63 @@ def test_alphanet_molecules_do_not_mix():
     assert torch.allclose(both["atom_feature"][:3], single["atom_feature"], atol=1e-10)
     assert torch.allclose(both["atom_feature"][3:], single["atom_feature"], atol=1e-10)
     assert torch.allclose(both["quantum_feature"][:3], single["quantum_feature"], atol=1e-10)
+
+
+def test_alphanet_rejects_a_cross_molecule_edge_and_a_stale_distance():
+    core = _core(num_layers=1, has_dropout_flag=False).eval()
+    graph = _molecule(3, 8, 4, seed=8)
+    idx_i, idx_j = graph["idx"]
+    with pytest.raises(ValueError, match="molecule"):
+        _call(
+            core,
+            torch.cat((graph["pos"], graph["pos"] + 5), dim=0),
+            torch.cat((graph["embedding"], graph["embedding"]), dim=0),
+            graph["rbf"],
+            idx_i,
+            idx_j + 3,
+            batch=torch.tensor([0, 0, 0, 1, 1, 1]),
+        )
+    vij = graph["pos"][idx_j] - graph["pos"][idx_i]
+    with pytest.raises(ValueError, match="Dij_sr"):
+        core.get_output(
+            atom_embedding=graph["embedding"],
+            rbf=graph["rbf"],
+            idx_i_sr=idx_i,
+            idx_j_sr=idx_j,
+            vij_sr=vij,
+            Dij_sr=torch.linalg.vector_norm(vij, dim=-1) * 1.5,
+            Ra=graph["pos"],
+        )
+
+
+def test_alphanet_default_transition_is_equivariant():
+    from enerzyme.models.alphanet import AlphaNetCore
+
+    core = AlphaNetCore(
+        dim_embedding=8,
+        num_rbf=4,
+        num_layers=1,
+        head=2,
+        main_chi1=2,
+        mp_chi1=2,
+        chi2=2,
+        hidden_channels_chi=4,
+        has_dropout_flag=False,
+    )
+    assert core.fte_scalarization == "l2"
+    opted = AlphaNetCore(
+        dim_embedding=8,
+        num_rbf=4,
+        num_layers=1,
+        head=2,
+        main_chi1=2,
+        mp_chi1=2,
+        chi2=2,
+        hidden_channels_chi=4,
+        has_dropout_flag=False,
+        fte_scalarization="l1",
+    )
+    assert opted.fte_scalarization == "l1"
 
 
 def test_alphanet_isolated_atom():

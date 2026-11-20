@@ -5,6 +5,8 @@ from .geometry import (
     alphanet_edge_frame,
     leftnet_edge_frame,
     leftnet_node_frame,
+    require_matching_distance,
+    require_same_graph,
     scalarize,
     subtract_graph_mean,
 )
@@ -20,6 +22,8 @@ __all__ = [
     "alphanet_edge_frame",
     "leftnet_edge_frame",
     "leftnet_node_frame",
+    "require_matching_distance",
+    "require_same_graph",
     "scalarize",
     "subtract_graph_mean",
 ]
