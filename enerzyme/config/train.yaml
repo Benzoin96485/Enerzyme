@@ -1822,6 +1822,61 @@ Modelhub:
             pairs: all_to_all
         - name: EnergyReduce
         - name: Force
+    FF32:
+      suffix:
+      # NewtonNet (Haghighatlari et al., Digital Discovery 2022). Symmetric
+      # messages, a latent force, and a displacement live in the Core.
+      # BesselRBF (default flavor) and RandomAtomEmbedding stay outside.
+      # The Core multiplies the polynomial envelope (paper p = 7; reference
+      # code uses 9). variant: repo is InteractionNet on THGLab/NewtonNet main.
+      # Optional direction loss: latent_force_cosine weight λ_D, compared
+      # with Fa. Paper MD17 weights are λ_E = 1, λ_F = 50, λ_D = 1.
+      # Checkpoints from THGLab/NewtonNet do not load.
+      architecture: newtonnet
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 128
+        num_rbf: 20
+        max_Za: 94
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: default
+            trainable: false
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_interactions: 3
+            variant: paper
+            envelope_p: 7
+            layer_norm: false
+            shared_interactions: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            num_hidden_layers: 2
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

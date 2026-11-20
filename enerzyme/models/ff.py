@@ -31,6 +31,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .painn import PaiNNCore as Core
         from .painn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "newtonnet":
+        from .newtonnet import NewtonNetCore as Core
+        from .newtonnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        from .newtonnet import LOSS_REGISTER as special_loss
     elif architecture.lower() == "tensornet":
         from .tensornet import TensorNetCore as Core
         from .tensornet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

@@ -215,6 +215,11 @@ With :code:`architecture: tensornet2`, the pre-core layers are the same :code:`E
 
 With :code:`architecture: tensornet`, pre-core layers are :code:`ExpNormalSmearing` (``trainable: false``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: cosine` supplies the second window. The basis already contains a cosine window, so the Core's extra multiply matches TorchMD-Net. The Core inserts self pairs at ``r = 0``. It returns ``atom_feature`` ``[N, F]``, ``atom_vector_feature`` ``[N, 3, F]`` (the skew part), and ``atom_tensor_feature`` ``[N, 3, 3, F]``. Energy uses :code:`SimpleReadout` (``head_type: two_layer``, ``pyramidal: true``) → :code:`EnergyReduce` → :code:`Force`. ``Q`` is an optional molecular total charge; the default factor is ``1 + 0.1 Q``. The rMD17 widths are 2 interactions, 128 channels, 32 radial functions, and 4.5 Å. Example: :code:`enerzyme/config/tensornet_layers_example.yaml`.
 
+NewtonNet
+---------
+
+With :code:`architecture: newtonnet`, pre-core layers are :code:`BesselRBF` (default flavor, ``apply_cutoff_fn: false``) and :code:`RandomAtomEmbedding`. The Core multiplies the polynomial envelope, so :code:`RangeSeparation` only supplies the hard cutoff. It returns :code:`atom_feature` ``[N, F]``, :code:`atom_vector_feature` ``[N, 3, F]``, and :code:`latent_force` ``[N, 3]``. ``variant: paper`` keeps a separate displacement. ``variant: repo`` is the current THGLab interaction, and ``latent_force`` is then the channel sum of the force features. Energy uses :code:`SimpleReadout` (``head_type: mlp``, two hidden SiLU layers) → :code:`EnergyReduce` → :code:`Force`. Dipoles and polarizabilities reuse :code:`EquivariantDipole` and :code:`EquivariantPolarizability`. The optional loss ``latent_force_cosine`` compares ``latent_force`` with ``Fa``. Example: :code:`enerzyme/config/newtonnet_layers_example.yaml`.
+
 EquFlash
 --------
 
