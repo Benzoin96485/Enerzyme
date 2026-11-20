@@ -19,13 +19,14 @@ that term is not part of this Core.
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import ModuleList
+from torch.nn import Module, ModuleList
 
+from ..layers.electrostatics import WeightedCoulombEnergyLayer, expand_coulomb_weights
 from .charge import TensorChargeHead
 from .core import TensorNetCore
 from .interaction import TensorNet2Interaction
@@ -143,6 +144,27 @@ class TensorNet2Core(TensorNetCore):
         self._output_fields = set(self._output_fields) | {"charge_channels"}
         self._relevant_fields = self._input_fields | self._output_fields
         self._name_mapping["charge_channels"] = "charge_channels"
+
+    def build(self, built_layers: List[Module]) -> None:
+        super().build(built_layers)
+        after_core = False
+        for layer in built_layers:
+            if layer is self:
+                after_core = True
+                continue
+            if not after_core or not isinstance(layer, WeightedCoulombEnergyLayer):
+                continue
+            try:
+                expand_coulomb_weights(
+                    layer.layer_weights, self.charge_channels_dim, torch.zeros(1)
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    f"{exc} TensorNet2 emits {self.charge_channels_dim} charge "
+                    f"channels ({self.num_charge_blocks} blocks x q_dim {self.q_dim}). "
+                    "Set WeightedCoulombEnergy layer_weights to one weight per "
+                    "block, one weight per channel, or omit them."
+                ) from exc
 
     def get_output(
         self,

@@ -11,6 +11,9 @@
 # charge_channels has shape [N, (num_interactions + 1) * q_dim]. WeightedCoulombEnergy
 # damps 1/r with the AIMNet factor (0 at r = 0, about 1 beyond 4.6 Å) and averages
 # channels with layer_weights. [1, 2, 3] gives the last block half of that average.
+# The length must divide (num_interactions + 1) * q_dim; build() rejects a mismatch.
+# A length-N Q must repeat the same molecular total inside each molecule.
+# A charge channel whose weights are all zero is shifted uniformly.
 # AceFF says the last layer dominates and does not publish the numbers.
 # pairs: all_to_all is the vacuum path and ignores periodic images. For a periodic
 # box use pairs: directed, a cutoff, and reaction_field: true. Directed pairs must

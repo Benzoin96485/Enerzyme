@@ -266,6 +266,41 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         return segment_sum_coo(Eele, idx_i, dim_size=len(Qa))
 
 
+def require_uniform_molecular_charge(values: Tensor, batch_seg: Optional[Tensor]) -> None:
+    """Reject a per-atom total that is not constant inside one molecule.
+
+    ``values`` is one charge per atom. ``batch_seg is None`` means every atom
+    belongs to the same molecule.
+    """
+    flat = values.reshape(-1)
+    n_atoms = int(flat.numel())
+    if n_atoms <= 1:
+        return
+    if batch_seg is None:
+        index = torch.zeros(n_atoms, dtype=torch.long, device=flat.device)
+    else:
+        index = batch_seg.to(device=flat.device).long().reshape(-1)
+        if index.numel() != n_atoms:
+            raise ValueError(
+                f"batch_seg length {index.numel()} != number of charge values {n_atoms}"
+            )
+    if not torch.isfinite(flat).all():
+        raise ValueError("Q must be finite")
+    n_mol = int(index.max()) + 1
+    src = flat.detach().to(dtype=torch.float64)
+    lowest = torch.full((n_mol,), float("inf"), dtype=torch.float64, device=flat.device)
+    highest = torch.full((n_mol,), float("-inf"), dtype=torch.float64, device=flat.device)
+    lowest.scatter_reduce_(0, index, src, reduce="amin", include_self=True)
+    highest.scatter_reduce_(0, index, src, reduce="amax", include_self=True)
+    present = torch.zeros(n_mol, dtype=torch.bool, device=flat.device)
+    present.scatter_(0, index, torch.ones(n_atoms, dtype=torch.bool, device=flat.device))
+    if bool(((highest - lowest)[present] > 0).any()):
+        raise ValueError(
+            "Q must be one molecular total per molecule. A length-N Q has to "
+            "repeat that total on every atom of the molecule."
+        )
+
+
 def neutral_charge_equilibration(
     charges: Tensor,
     weights: Tensor,
@@ -279,7 +314,10 @@ def neutral_charge_equilibration(
     as one channel). ``weights`` are the non-negative redistribution weights;
     TensorNet2 passes the square of the network output. ``total_charge`` is
     the molecular total already written on every atom, shape ``[N]`` or
-    ``[N, 1]``. ``eps`` is added to the summed weights, matching TorchMD-Net.
+    ``[N, 1]``, and it must be the same value on every atom of a molecule.
+    ``eps`` is added to a positive weight sum, matching TorchMD-Net. A channel
+    whose weights sum to zero inside a molecule is shifted uniformly, because
+    the published ratio is otherwise undefined and the charges would not move.
     """
     if charges.shape != weights.shape:
         raise ValueError(
@@ -304,10 +342,24 @@ def neutral_charge_equilibration(
         raise ValueError(
             f"total_charge must have 1 or {n_atoms} values, got {target.numel()}"
         )
-    summed_weights = segment_sum_coo(weights, batch_seg) + float(eps)
+    require_uniform_molecular_charge(target, batch_seg)
+    counts = segment_sum_coo(
+        torch.ones(n_atoms, 1, dtype=charges.dtype, device=charges.device),
+        batch_seg,
+    )
+    raw_sum = segment_sum_coo(weights, batch_seg)
+    dead = raw_sum <= 0
+    uniform = torch.ones_like(weights) / counts[batch_seg].clamp_min(1)
+    effective = torch.where(dead[batch_seg], uniform, weights)
+    summed_weights = segment_sum_coo(effective, batch_seg)
+    summed_weights = summed_weights + torch.where(
+        dead,
+        torch.zeros_like(summed_weights),
+        summed_weights.new_full((), float(eps)),
+    )
     summed_charges = segment_sum_coo(charges, batch_seg)
     delta = target.unsqueeze(-1) - summed_charges[batch_seg]
-    updated = charges + weights / summed_weights[batch_seg] * delta
+    updated = charges + effective / summed_weights[batch_seg] * delta
     return updated.squeeze(-1) if squeezed else updated
 
 

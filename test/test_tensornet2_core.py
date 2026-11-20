@@ -128,6 +128,49 @@ def test_tensornet2_registration_and_yaml_build():
     else:
         raise AssertionError("expected q_dim 0 to fail")
 
+    try:
+        build_model(
+            "tensornet2",
+            build_params={
+                "dim_embedding": 4,
+                "num_rbf": 3,
+                "max_Za": 8,
+                "cutoff_sr": 4.5,
+                "q_dim": 2,
+            },
+            layer_params=[
+                {"name": "Core", "params": {"num_interactions": 1, "include_self": False}},
+                {
+                    "name": "WeightedCoulombEnergy",
+                    "params": {"layer_weights": [1.0, 2.0, 3.0]},
+                },
+            ],
+            verbose=0,
+        )
+    except ValueError as exc:
+        assert "layer_weights" in str(exc)
+        assert "4 charge channels" in str(exc)
+    else:
+        raise AssertionError("expected mismatched layer_weights to fail at build")
+
+
+def test_per_atom_charge_must_be_constant_in_a_molecule():
+    from enerzyme.models.tensornet import TensorNet2Core
+
+    core = TensorNet2Core(dim_embedding=4, num_rbf=2, q_dim=1, num_interactions=1)
+    like = torch.zeros(4)
+    batch = torch.tensor([0, 0, 1, 1])
+    same = core.resolve_total_charge(
+        4, torch.tensor([1.5, 1.5, -2.0, -2.0]), batch, like
+    )
+    assert torch.equal(same, torch.tensor([1.5, 1.5, -2.0, -2.0]))
+    try:
+        core.resolve_total_charge(4, torch.tensor([1.5, 0.5, -2.0, -2.0]), batch, like)
+    except ValueError as exc:
+        assert "molecular total" in str(exc)
+    else:
+        raise AssertionError("expected inconsistent per-atom Q to fail")
+
 
 def test_charge_conservation_equivariance_and_batch():
     from enerzyme.models.layers.rbf import ExpNormalSmearing

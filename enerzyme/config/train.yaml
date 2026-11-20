@@ -1766,9 +1766,11 @@ Modelhub:
       # TensorNet, with neutral charge equilibration inside each message.
       # ExpNormalSmearing, the species embedding, SimpleReadout, and
       # WeightedCoulombEnergy stay outside the Core. layer_weights 1, 2, 3
-      # give the last charge block the largest Coulomb share. AceFF does not
-      # publish those numbers. Q is the molecular total charge; omit it for
-      # a neutral molecule. AceFF-2-OMOL also adds StandardZBLRepulsionEnergy
+      # give the last charge block the largest Coulomb share. Their length must
+      # divide (num_interactions + 1) * q_dim; build() rejects a mismatch.
+      # AceFF does not publish those numbers. Q is the molecular total charge;
+      # omit it for a neutral molecule. A length-N Q must repeat that total
+      # inside each molecule. AceFF-2-OMOL also adds StandardZBLRepulsionEnergy
       # (fixed ZBL, not the learnable Geodite screen). Set Hartree_in_E to
       # 27.211386245988 on that layer and on WeightedCoulombEnergy when the
       # dataset energy is eV. Checkpoints from torchmd-net do not load.

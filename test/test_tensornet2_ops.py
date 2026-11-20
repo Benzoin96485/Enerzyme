@@ -27,6 +27,37 @@ def test_neutral_charge_equilibration_channels_and_batches():
     assert torch.allclose(updated[:3, 1], torch.tensor([2.0, 0.0, 1.0]))
 
 
+def test_zero_weights_shift_uniformly_and_inconsistent_charge_fails():
+    from enerzyme.models.layers.electrostatics import neutral_charge_equilibration
+
+    charges = torch.tensor([[0.0, 4.0], [0.0, -1.0]])
+    weights = torch.tensor([[0.0, 1.0], [0.0, 3.0]])
+    updated = neutral_charge_equilibration(charges, weights, torch.tensor(2.0), eps=0.0)
+    assert torch.allclose(updated[:, 0], torch.tensor([1.0, 1.0]))
+    assert torch.allclose(updated[:, 1], torch.tensor([3.75, -1.75]))
+
+    isolated = neutral_charge_equilibration(
+        torch.zeros(3, 1),
+        torch.tensor([[1.0], [1.0], [0.0]]),
+        torch.tensor([2.0, 2.0, 5.0]),
+        torch.tensor([0, 0, 1]),
+        eps=0.0,
+    )
+    assert torch.allclose(isolated.view(-1), torch.tensor([1.0, 1.0, 5.0]))
+
+    try:
+        neutral_charge_equilibration(
+            torch.zeros(2, 1),
+            torch.ones(2, 1),
+            torch.tensor([1.0, 2.0]),
+            torch.zeros(2, dtype=torch.long),
+        )
+    except ValueError as exc:
+        assert "molecular total" in str(exc)
+    else:
+        raise AssertionError("expected inconsistent per-atom Q to fail")
+
+
 def test_aimnet_damping_endpoints_and_coulomb_weights():
     from enerzyme.models.layers.electrostatics import (
         aimnet_charge_damping,

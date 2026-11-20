@@ -251,7 +251,12 @@ class TensorNetCore(BaseFFCore):
         batch_seg: Optional[Tensor],
         like: Tensor,
     ) -> Tensor:
-        """Molecular total charge written on every atom. Missing ``Q`` is 0."""
+        """Molecular total charge written on every atom. Missing ``Q`` is 0.
+
+        A length-``N`` ``Q`` is that total already copied onto each atom. Values
+        inside one molecule have to match; pass one value per molecule with
+        ``batch_seg`` when the molecules differ.
+        """
         if n_atoms == 0:
             return like.new_zeros(0)
         if charge is None:
@@ -260,6 +265,9 @@ class TensorNetCore(BaseFFCore):
         if values.numel() == 1:
             return values.expand(n_atoms)
         if values.numel() == n_atoms:
+            from ..layers.electrostatics import require_uniform_molecular_charge
+
+            require_uniform_molecular_charge(values, batch_seg)
             return values
         if batch_seg is None:
             raise ValueError(
