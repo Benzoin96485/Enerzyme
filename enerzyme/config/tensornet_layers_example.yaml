@@ -1,0 +1,51 @@
+# TensorNet (Simeon and De Fabritiis, NeurIPS 2023, arXiv:2306.06482).
+# Core: Cartesian 3x3 tensor embedding and interaction only.
+# ExpNormalSmearing, RandomAtomEmbedding, and the scalar energy head stay outside.
+#
+# TorchMD-Net's exponential-normal basis already includes a cosine window, and
+# the Core multiplies the RangeSeparation window again. cutoff_fn: cosine with
+# the same cutoff_sr reproduces that product. The neighbor list omits self
+# pairs; the Core inserts r = 0 through the same radial basis (loop=True).
+# Q, when present, is the molecular total charge (factor 1 + 0.1 Q).
+# Widths below are the rMD17 defaults (2 layers, 128 channels, 32 basis, 4.5 Å).
+# QM9 in the paper uses 3 layers, 256 channels, 64 basis functions, and 5 Å.
+# Checkpoints from torchmd/torchmd-net do not load.
+# Enerzymette: set architecture: tensornet in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: tensornet
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 4.5
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_interactions: 2
+            equivariance_group: O(3)
+            charge_scale: 0.1
+            include_self: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

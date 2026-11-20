@@ -231,7 +231,9 @@ screened ZBL outside the Core; hierarchical scalars plus a polynomial
 steerable state; shared :code:`HierachicalReadout`). Also :code:`CACE`
 under :code:`enerzyme/models/cace/` (default Bessel basis and chemical
 embedding outside the Core; Cartesian invariants inside; linear-plus-MLP
-readout outside).
+readout outside). Also :code:`TensorNet` under :code:`enerzyme/models/tensornet/`
+(exponential-normal basis and species embedding outside the Core; Cartesian
+3×3 messages inside; shared :code:`SimpleReadout` after the norm embedding).
 
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -341,6 +343,8 @@ Tests live in :code:`test/`:
 - :code:`test_m3gnet_core.py` — M3GNet registration / YAML smoke, three-body cutoff, rotation / inversion / translation / edge order, batch isolation, build_model energy and conservative forces
 - :code:`test_mattersim_ops.py` — Graphormer segment softmax, centrality sum, post-softmax polynomial mask
 - :code:`test_mattersim_core.py` — MatterSim registration / aliases / YAML smoke, M3GNet reduction when attention and centrality are off, attention cutoff, rotation / inversion / translation / edge order, batch isolation, build_model energy and conservative forces
+- :code:`test_tensornet_ops.py` — TensorNet decomposition, skew roundtrip, traceless outer product, O(3) product, TorchMD-Net pure-PyTorch op parity
+- :code:`test_tensornet_core.py` — TensorNet registration / YAML smoke, self pairs, charge scale, rotation / inversion / translation / edge order, batch isolation, periodic image, build_model energy, dipole head, and conservative forces
 - :code:`test_facto_ops.py` — FACTO cutoff derivative, Gaussian window, descriptor table, and algebraic attention / feedback / injection / transport reductions
 - :code:`test_facto_core.py` — FACTO registration / YAML smoke, isolated-atom head, batch isolation, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_grace_ops.py` — GRACE Chebyshev / spherical Bessel / cutoff, channel-aligned CG equivariance, Finnis–Sinclair powers, linear density head
@@ -708,6 +712,11 @@ PaiNN (:code:`painn`)
 ^^^^^^^^^^^^^^^^^^^^^
 
 Schütt, Unke, and Gastegger (ICML 2021, arXiv:2102.03150) live under :code:`enerzyme/models/painn/` (:code:`core.py`, :code:`interaction.py`), adapted from SchNetPack 2.0.4 (MIT). Register via :code:`get_ff_core("painn")`. Reuse :code:`BesselRBF(flavor="painn")`, :code:`cosine` cutoff values from :code:`RangeSeparation`, and :code:`RandomAtomEmbedding`. The Core emits :code:`atom_feature` and Cartesian :code:`atom_vector_feature` ``[N, 3, F]``. Scalar properties use :code:`SimpleReadout` (:code:`two_layer` + :code:`pyramidal: true` matches the SchNetPack two-layer width schedule; pass SiLU as ``swish`` with ``alpha=beta=1``, ``learnable: false``). Dipole and polarizability use :code:`EquivariantDipole` / :code:`EquivariantPolarizability`. The gated block itself is :code:`enerzyme.models.layers.gated_equivariant` so later Cartesian cores can share it. Distinct from external :code:`xpainn`. Examples: :code:`painn_layers_example.yaml`, :code:`painn_spectra_layers_example.yaml`. Tests: :code:`test/test_painn_*.py`. Enerzymette: :code:`architecture: painn` + resolved :code:`config.yaml`. The ASE calculator and :code:`enerzyme listen` copy :code:`polarizability` when the stack emits it.
+
+TensorNet (:code:`tensornet`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Simeon and De Fabritiis (NeurIPS 2023, arXiv:2306.06482) live under :code:`enerzyme/models/tensornet/` (:code:`core.py`, :code:`interaction.py`, :code:`ops.py`). Register via :code:`get_ff_core("tensornet")`. The pure PyTorch rules follow `torchmd/torchmd-net <https://github.com/torchmd/torchmd-net>`_ (MIT). Do not import that package, do not port the Warp kernels, and do not expect its checkpoints to load. Reuse :code:`ExpNormalSmearing`, :code:`cosine` windows from :code:`RangeSeparation`, :code:`RandomAtomEmbedding`, :func:`enerzyme.models.functional.reduce_edge`, and :code:`SimpleReadout` (``two_layer`` + ``pyramidal: true``, exact SiLU). The basis already contains a cosine window; the Core multiplies :code:`cutoff_values_sr` again, which is the repository product when both windows are the Behler cosine at the same cutoff. Self pairs are inserted inside the Core because the shared neighbor list omits them. The Core emits invariant :code:`atom_feature` ``[N, F]``, skew :code:`atom_vector_feature` ``[N, 3, F]``, and :code:`atom_tensor_feature` ``[N, 3, 3, F]``. ``Q`` is the optional molecular total charge. Example: :code:`tensornet_layers_example.yaml`. Tests: :code:`test/test_tensornet_ops.py`, :code:`test/test_tensornet_core.py`. Enerzymette: :code:`architecture: tensornet` + resolved :code:`config.yaml`.
 
 EquFlash (:code:`equflash`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

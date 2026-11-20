@@ -1,0 +1,197 @@
+"""TensorNet embedding and interaction (Simeon & De Fabritiis, NeurIPS 2023).
+
+The pure PyTorch update rules follow
+`torchmd/torchmd-net <https://github.com/torchmd/torchmd-net>`_ (MIT),
+``torchmdnet.models.tensornet``, without the optional Warp kernels.
+Species tables and the radial basis stay outside this module. Receivers are
+``idx_i`` and senders are ``idx_j``. ``hat`` is the unit vector
+``(R_j - R_i) / ||R_j - R_i||``.
+"""
+
+from __future__ import annotations
+
+import torch
+import torch.nn.functional as F
+from torch import Tensor
+from torch.nn import Linear, LayerNorm, Module, ModuleList
+
+from ..functional import reduce_edge
+from .ops import (
+    compose_tensor,
+    decompose_tensor,
+    frobenius_squared,
+    skew_tensor_to_vector,
+    symmetric_traceless,
+    tensor_anticommutator,
+    tensor_matmul,
+    vector_to_skew_tensor,
+)
+
+
+def aggregate_edge_tensors(
+    hat: Tensor,
+    processed: Tensor,
+    idx_i: Tensor,
+    n_atoms: int,
+) -> tuple[Tensor, Tensor, Tensor]:
+    """Sum edge channels ``(I, r_hat, r_hat r_hat^T)`` onto receivers.
+
+    ``processed`` has shape ``[E, 3, F]`` and already includes the cutoff and
+    the pair weight. The vector channel becomes a skew matrix. The outer
+    product is symmetrized and made traceless after the sum.
+    """
+    width = int(processed.shape[-1])
+    iso = reduce_edge(processed[:, 0, :], idx_i, (n_atoms, width))
+    vector = reduce_edge(
+        processed[:, 1, None, :] * hat.unsqueeze(-1),
+        idx_i,
+        (n_atoms, 3, width),
+    )
+    outer = hat.unsqueeze(-1) * hat.unsqueeze(-2)
+    symmetric = reduce_edge(
+        processed[:, 2, None, None, :] * outer.unsqueeze(-1),
+        idx_i,
+        (n_atoms, 3, 3, width),
+    )
+    return iso, vector_to_skew_tensor(vector), symmetric_traceless(symmetric)
+
+
+class TensorNetEmbedding(Module):
+    """Edge tensor features → gated atomic tensor (paper Eqs. 7–10)."""
+
+    def __init__(self, dim_embedding: int, num_rbf: int) -> None:
+        super().__init__()
+        self.dim_embedding = int(dim_embedding)
+        self.num_rbf = int(num_rbf)
+        self.distance_proj1 = Linear(self.num_rbf, self.dim_embedding)
+        self.distance_proj2 = Linear(self.num_rbf, self.dim_embedding)
+        self.distance_proj3 = Linear(self.num_rbf, self.dim_embedding)
+        # TorchMD-Net ``emb2``: one linear mix of the concatenated species pair.
+        self.pair_mix = Linear(2 * self.dim_embedding, self.dim_embedding)
+        self.linears_scalar = ModuleList(
+            [
+                Linear(self.dim_embedding, 2 * self.dim_embedding, bias=True),
+                Linear(2 * self.dim_embedding, 3 * self.dim_embedding, bias=True),
+            ]
+        )
+        self.linears_tensor = ModuleList(
+            [
+                Linear(self.dim_embedding, self.dim_embedding, bias=False)
+                for _ in range(3)
+            ]
+        )
+        self.init_norm = LayerNorm(self.dim_embedding)
+
+    def forward(
+        self,
+        atom_embedding: Tensor,
+        idx_i: Tensor,
+        idx_j: Tensor,
+        hat: Tensor,
+        rbf: Tensor,
+        window: Tensor,
+    ) -> Tensor:
+        n_atoms = atom_embedding.shape[0]
+        width = self.dim_embedding
+        if idx_i.numel() == 0:
+            pair_input = atom_embedding.new_zeros((0, 2 * width))
+        else:
+            pair_input = torch.cat(
+                (atom_embedding[idx_i], atom_embedding[idx_j]), dim=-1
+            )
+        pair = self.pair_mix(pair_input)
+        radial = torch.stack(
+            (
+                self.distance_proj1(rbf),
+                self.distance_proj2(rbf),
+                self.distance_proj3(rbf),
+            ),
+            dim=1,
+        )
+        processed = window.unsqueeze(-1).unsqueeze(-1) * pair.unsqueeze(1) * radial
+        iso, skew, traceless = aggregate_edge_tensors(
+            hat, processed, idx_i, n_atoms
+        )
+        features = compose_tensor(iso, skew, traceless)
+
+        gates = self.init_norm(frobenius_squared(features))
+        for linear in self.linears_scalar:
+            gates = F.silu(linear(gates))
+        gates = gates.reshape(n_atoms, 3, width)
+        iso = self.linears_tensor[0](iso) * gates[:, 0, :]
+        skew = self.linears_tensor[1](skew) * gates[:, 1, None, None, :]
+        traceless = self.linears_tensor[2](traceless) * gates[:, 2, None, None, :]
+        return compose_tensor(iso, skew, traceless)
+
+
+class TensorNetInteraction(Module):
+    """One normalized tensor update (paper Eqs. 11 and the residual polynomial)."""
+
+    def __init__(self, dim_embedding: int, num_rbf: int, equivariance_group: str) -> None:
+        super().__init__()
+        self.dim_embedding = int(dim_embedding)
+        self.num_rbf = int(num_rbf)
+        self.equivariance_group = equivariance_group
+        hidden = self.dim_embedding
+        self.linears_scalar = ModuleList(
+            [
+                Linear(self.num_rbf, hidden, bias=True),
+                Linear(hidden, 2 * hidden, bias=True),
+                Linear(2 * hidden, 3 * hidden, bias=True),
+            ]
+        )
+        self.linears_tensor = ModuleList(
+            [Linear(hidden, hidden, bias=False) for _ in range(6)]
+        )
+
+    def forward(
+        self,
+        features: Tensor,
+        idx_i: Tensor,
+        idx_j: Tensor,
+        rbf: Tensor,
+        window: Tensor,
+        charge_scale: Tensor,
+    ) -> Tensor:
+        n_atoms = features.shape[0]
+        width = self.dim_embedding
+        edge = rbf
+        for linear in self.linears_scalar:
+            edge = F.silu(linear(edge))
+        edge = (edge * window.unsqueeze(-1)).reshape(-1, 3, width)
+
+        normalized = features / (frobenius_squared(features) + 1.0)[:, None, None, :]
+        iso, skew, traceless = decompose_tensor(normalized)
+        iso = self.linears_tensor[0](iso)
+        skew = self.linears_tensor[1](skew)
+        traceless = self.linears_tensor[2](traceless)
+        node = compose_tensor(iso, skew, traceless)
+
+        vector = skew_tensor_to_vector(skew)
+        iso_m = reduce_edge(edge[:, 0, :] * iso[idx_j], idx_i, (n_atoms, width))
+        vector_m = reduce_edge(
+            edge[:, 1, None, :] * vector[idx_j], idx_i, (n_atoms, 3, width)
+        )
+        traceless_m = reduce_edge(
+            edge[:, 2, None, None, :] * traceless[idx_j],
+            idx_i,
+            (n_atoms, 3, 3, width),
+        )
+        message = compose_tensor(
+            iso_m, vector_to_skew_tensor(vector_m), traceless_m
+        )
+        scale = charge_scale[:, None, None, None]
+        if self.equivariance_group == "O(3)":
+            # Charge multiplies the anticommutator. The SO(3) product does not.
+            mixed = scale * tensor_anticommutator(node, message)
+        else:
+            mixed = 2.0 * tensor_matmul(node, message)
+
+        iso_c, skew_c, traceless_c = decompose_tensor(mixed)
+        norm = frobenius_squared(mixed) + 1.0
+        iso_c = self.linears_tensor[3](iso_c / norm)
+        skew_c = self.linears_tensor[4](skew_c / norm[:, None, None, :])
+        traceless_c = self.linears_tensor[5](traceless_c / norm[:, None, None, :])
+        delta = compose_tensor(iso_c, skew_c, traceless_c)
+        # Residual uses the normalized state. The square is charge-scaled for both groups.
+        return normalized + delta + scale * tensor_matmul(delta, delta)
