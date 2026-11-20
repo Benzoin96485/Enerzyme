@@ -378,3 +378,33 @@ def test_layer_stack_energy_forces_magmom_and_wrong_basis():
         assert "gemnet" in str(exc)
     else:
         raise AssertionError("a single radial basis must be rejected")
+
+    shared = dict(build)
+    shared["bond_cutoff"] = 5.0
+    equal = [
+        {"name": "RangeSeparation"},
+        {"name": "BesselRBF", "params": {"flavor": "gemnet", "trainable": False}},
+        {"name": "BesselRBF", "params": {"flavor": "gemnet", "trainable": False}},
+        {"name": "RandomAtomEmbedding"},
+        {"name": "Core", "params": {"num_blocks": 1, "num_angular": 5}},
+    ]
+    equal_model = build_model("chgnet", layer_params=equal, build_params=shared, verbose=0)
+    assert equal_model.atom_basis.basis_cutoff == 5.0
+    assert equal_model.bond_basis.basis_cutoff == 5.0
+    assert equal_model.bond_basis._name_mapping["rbf"] == "rbf_bg"
+    mismatched = [
+        {"name": "RangeSeparation"},
+        {"name": "BesselRBF", "params": {"flavor": "gemnet", "trainable": False}},
+        {
+            "name": "BesselRBF",
+            "params": {"flavor": "gemnet", "trainable": False, "basis_cutoff": 3.0},
+        },
+        {"name": "RandomAtomEmbedding"},
+        {"name": "Core", "params": {"num_blocks": 1, "num_angular": 5}},
+    ]
+    try:
+        build_model("chgnet", layer_params=mismatched, build_params=shared, verbose=0)
+    except ValueError as exc:
+        assert "basis_cutoff" in str(exc)
+    else:
+        raise AssertionError("a bond basis at the wrong cutoff must be rejected")

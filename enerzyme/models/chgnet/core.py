@@ -248,27 +248,35 @@ class CHGNetCore(BaseFFCore):
                 "CHGNetCore requires exactly two BesselRBF layers with flavor "
                 f"'gemnet' before the Core, found {found or 'none'}"
             )
+        def _at_cutoff(layer: BesselRBFLayer, cutoff: float) -> bool:
+            return (
+                abs(float(layer.basis_cutoff) - cutoff) <= 1e-4
+                and abs(float(layer.cutoff_sr) - cutoff) <= 1e-4
+            )
+
+        atom_layers = [layer for layer in gemnet if _at_cutoff(layer, self.cutoff_sr)]
+        bond_layers = [layer for layer in gemnet if _at_cutoff(layer, self.bond_cutoff)]
         same_cutoff = abs(self.bond_cutoff - self.cutoff_sr) <= 1e-4
         if same_cutoff:
-            atom_basis, bond_basis = gemnet[0], gemnet[1]
-        else:
-            atom_layers = [
-                layer
-                for layer in gemnet
-                if abs(float(layer.basis_cutoff) - self.cutoff_sr) <= 1e-4
-                and abs(float(layer.cutoff_sr) - self.cutoff_sr) <= 1e-4
-            ]
-            bond_layers = [
-                layer
-                for layer in gemnet
-                if abs(float(layer.basis_cutoff) - self.bond_cutoff) <= 1e-4
-            ]
-            if len(atom_layers) != 1 or len(bond_layers) != 1 or atom_layers[0] is bond_layers[0]:
+            if len(atom_layers) != 2:
                 raise ValueError(
-                    "CHGNetCore needs one gemnet Bessel basis at cutoff_sr "
-                    f"({self.cutoff_sr}) and one at bond_cutoff ({self.bond_cutoff}). "
-                    "Set the bond layer's cutoff_sr to bond_cutoff."
+                    "When bond_cutoff equals cutoff_sr "
+                    f"({self.cutoff_sr}), both gemnet Bessel bases must set "
+                    "cutoff_sr and basis_cutoff to that value. The first "
+                    "layer is the atom graph and the second is the bond graph."
                 )
+            atom_basis, bond_basis = atom_layers[0], atom_layers[1]
+        elif (
+            len(atom_layers) != 1
+            or len(bond_layers) != 1
+            or atom_layers[0] is bond_layers[0]
+        ):
+            raise ValueError(
+                "CHGNetCore needs one gemnet Bessel basis at cutoff_sr "
+                f"({self.cutoff_sr}) and one at bond_cutoff ({self.bond_cutoff}). "
+                "Set the bond layer's cutoff_sr and basis_cutoff to bond_cutoff."
+            )
+        else:
             atom_basis, bond_basis = atom_layers[0], bond_layers[0]
         for layer, expected in (
             (atom_basis, self.cutoff_sr),

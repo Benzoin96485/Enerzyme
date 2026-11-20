@@ -105,6 +105,27 @@ def test_bond_graph_on_a_right_angle():
     assert_allclose(theta.detach().numpy(), [math.pi / 2, math.pi / 2], atol=1e-5)
 
 
+def test_closest_reverse_wins_when_several_images_match():
+    from enerzyme.models.chgnet.geometry import undirected_bond_index
+
+    idx_i = torch.tensor([0, 1, 1, 0])
+    idx_j = torch.tensor([1, 0, 0, 1])
+    vij = torch.tensor(
+        [
+            [1.0, 0.0, 0.0],
+            [-1.0, 0.0, 5.0e-5],
+            [-1.0, 0.0, 0.0],
+            [1.0, 0.0, -5.0e-5],
+        ]
+    )
+    bonds = undirected_bond_index(idx_i, idx_j, vij)
+    assert bonds.directed_to_undirected[0] == bonds.directed_to_undirected[2]
+    assert bonds.directed_to_undirected[1] == bonds.directed_to_undirected[3]
+    assert bonds.directed_to_undirected[0] != bonds.directed_to_undirected[1]
+    assert int(bonds.representative[int(bonds.directed_to_undirected[0])]) == 0
+    assert int(bonds.representative[int(bonds.directed_to_undirected[1])]) == 1
+
+
 def test_missing_reverse_edge_is_rejected():
     from enerzyme.models.chgnet.geometry import undirected_bond_index
 

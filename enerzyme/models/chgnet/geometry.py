@@ -42,6 +42,8 @@ def undirected_bond_index(
 
     The neighbor list must contain both directions. A periodic image is a
     different bond from the in-cell pair when the displacements differ.
+    Several reverses can fall inside the tolerance; each edge is paired with
+    the unused reverse that makes ``vij + v_ji`` smallest.
     """
     n_edges = int(idx_i.shape[0])
     empty = idx_i.new_empty(0)
@@ -63,33 +65,33 @@ def undirected_bond_index(
     representative: list[int] = []
     used = [False] * n_edges
     tolerance = float(atol)
+    candidates: list[tuple[float, int, int]] = []
     for edge, (center, neighbor) in enumerate(zip(centers, neighbors)):
-        if used[edge]:
-            continue
-        match = None
         for reverse in grouped.get((neighbor, center), ()):
-            if used[reverse] or reverse == edge:
+            if reverse <= edge:
                 continue
             gap = vectors[edge] + vectors[reverse]
-            scale = vectors[edge].abs().max().clamp(min=1.0)
-            if float(gap.abs().max()) <= tolerance + 1e-5 * float(scale):
-                match = reverse
-                break
-        if match is None:
-            raise ValueError(
-                "CHGNet needs both directions of every bond, including the "
-                f"opposite periodic image. Edge {edge} ({center} -> {neighbor}) "
-                "has no reverse."
-            )
+            cost = float(gap.abs().max())
+            scale = torch.maximum(vectors[edge].abs(), vectors[reverse].abs()).max()
+            limit = tolerance + 1e-5 * float(scale.clamp(min=1.0))
+            if cost <= limit:
+                candidates.append((cost, edge, reverse))
+    for _cost, edge, reverse in sorted(candidates):
+        if used[edge] or used[reverse]:
+            continue
         bond = len(representative)
         directed[edge] = bond
-        directed[match] = bond
+        directed[reverse] = bond
         used[edge] = True
-        used[match] = True
+        used[reverse] = True
         representative.append(edge)
     if any(not flag for flag in used):
+        missing = next(edge for edge, flag in enumerate(used) if not flag)
+        center, neighbor = centers[missing], neighbors[missing]
         raise ValueError(
-            "CHGNet could not pair every directed edge with its reverse"
+            "CHGNet needs both directions of every bond, including the "
+            f"opposite periodic image. Edge {missing} ({center} -> {neighbor}) "
+            "has no reverse."
         )
     return UndirectedBonds(
         torch.tensor(directed, dtype=torch.long, device=idx_i.device),
