@@ -6,6 +6,10 @@ The pure PyTorch update rules follow
 Species tables and the radial basis stay outside this module. Receivers are
 ``idx_i`` and senders are ``idx_j``. ``hat`` is the unit vector
 ``(R_j - R_i) / ||R_j - R_i||``.
+
+:class:`TensorNet2Interaction` is the same tensor update. Its scalar MLP
+reads the radial basis concatenated with the receiver and sender charge
+channels, and the residual square is not multiplied by a total-charge factor.
 """
 
 from __future__ import annotations
@@ -124,6 +128,67 @@ class TensorNetEmbedding(Module):
         return compose_tensor(iso, skew, traceless)
 
 
+def scalar_edge_gates(edge_input: Tensor, linears_scalar: ModuleList, window: Tensor, width: int) -> Tensor:
+    """SiLU MLP, cutoff window, then ``[E, 3, F]`` gates."""
+    edge = edge_input
+    for linear in linears_scalar:
+        edge = F.silu(linear(edge))
+    return (edge * window.unsqueeze(-1)).reshape(-1, 3, width)
+
+
+def tensor_message_update(
+    features: Tensor,
+    edge: Tensor,
+    idx_i: Tensor,
+    idx_j: Tensor,
+    linears_tensor: ModuleList,
+    equivariance_group: str,
+    charge_scale: Tensor,
+) -> Tensor:
+    """Normalized tensor residual shared by TensorNet and TensorNet2.
+
+    ``edge`` is ``[E, 3, F]`` and already includes the cutoff window. ``O(3)``
+    uses the anticommutator ``Y M + M Y``. ``SO(3)`` uses ``2 Y M``. The
+    residual square is the ordinary matrix product. ``charge_scale`` multiplies
+    the O(3) product and the square; TensorNet2 passes ones.
+    """
+    n_atoms = features.shape[0]
+    width = int(features.shape[-1])
+    normalized = features / (frobenius_squared(features) + 1.0)[:, None, None, :]
+    iso, skew, traceless = decompose_tensor(normalized)
+    iso = linears_tensor[0](iso)
+    skew = linears_tensor[1](skew)
+    traceless = linears_tensor[2](traceless)
+    node = compose_tensor(iso, skew, traceless)
+
+    vector = skew_tensor_to_vector(skew)
+    iso_m = reduce_edge(edge[:, 0, :] * iso[idx_j], idx_i, (n_atoms, width))
+    vector_m = reduce_edge(
+        edge[:, 1, None, :] * vector[idx_j], idx_i, (n_atoms, 3, width)
+    )
+    traceless_m = reduce_edge(
+        edge[:, 2, None, None, :] * traceless[idx_j],
+        idx_i,
+        (n_atoms, 3, 3, width),
+    )
+    message = compose_tensor(iso_m, vector_to_skew_tensor(vector_m), traceless_m)
+    scale = charge_scale[:, None, None, None]
+    if equivariance_group == "O(3)":
+        # Charge multiplies the anticommutator. The SO(3) product does not.
+        mixed = scale * tensor_anticommutator(node, message)
+    else:
+        mixed = 2.0 * tensor_matmul(node, message)
+
+    iso_c, skew_c, traceless_c = decompose_tensor(mixed)
+    norm = frobenius_squared(mixed) + 1.0
+    iso_c = linears_tensor[3](iso_c / norm)
+    skew_c = linears_tensor[4](skew_c / norm[:, None, None, :])
+    traceless_c = linears_tensor[5](traceless_c / norm[:, None, None, :])
+    delta = compose_tensor(iso_c, skew_c, traceless_c)
+    # Residual uses the normalized state. The square is charge-scaled for both groups.
+    return normalized + delta + scale * tensor_matmul(delta, delta)
+
+
 class TensorNetInteraction(Module):
     """One normalized tensor update (paper Eqs. 11 and the residual polynomial)."""
 
@@ -153,45 +218,79 @@ class TensorNetInteraction(Module):
         window: Tensor,
         charge_scale: Tensor,
     ) -> Tensor:
-        n_atoms = features.shape[0]
-        width = self.dim_embedding
-        edge = rbf
-        for linear in self.linears_scalar:
-            edge = F.silu(linear(edge))
-        edge = (edge * window.unsqueeze(-1)).reshape(-1, 3, width)
-
-        normalized = features / (frobenius_squared(features) + 1.0)[:, None, None, :]
-        iso, skew, traceless = decompose_tensor(normalized)
-        iso = self.linears_tensor[0](iso)
-        skew = self.linears_tensor[1](skew)
-        traceless = self.linears_tensor[2](traceless)
-        node = compose_tensor(iso, skew, traceless)
-
-        vector = skew_tensor_to_vector(skew)
-        iso_m = reduce_edge(edge[:, 0, :] * iso[idx_j], idx_i, (n_atoms, width))
-        vector_m = reduce_edge(
-            edge[:, 1, None, :] * vector[idx_j], idx_i, (n_atoms, 3, width)
-        )
-        traceless_m = reduce_edge(
-            edge[:, 2, None, None, :] * traceless[idx_j],
+        edge = scalar_edge_gates(rbf, self.linears_scalar, window, self.dim_embedding)
+        return tensor_message_update(
+            features,
+            edge,
             idx_i,
-            (n_atoms, 3, 3, width),
+            idx_j,
+            self.linears_tensor,
+            self.equivariance_group,
+            charge_scale,
         )
-        message = compose_tensor(
-            iso_m, vector_to_skew_tensor(vector_m), traceless_m
-        )
-        scale = charge_scale[:, None, None, None]
-        if self.equivariance_group == "O(3)":
-            # Charge multiplies the anticommutator. The SO(3) product does not.
-            mixed = scale * tensor_anticommutator(node, message)
-        else:
-            mixed = 2.0 * tensor_matmul(node, message)
 
-        iso_c, skew_c, traceless_c = decompose_tensor(mixed)
-        norm = frobenius_squared(mixed) + 1.0
-        iso_c = self.linears_tensor[3](iso_c / norm)
-        skew_c = self.linears_tensor[4](skew_c / norm[:, None, None, :])
-        traceless_c = self.linears_tensor[5](traceless_c / norm[:, None, None, :])
-        delta = compose_tensor(iso_c, skew_c, traceless_c)
-        # Residual uses the normalized state. The square is charge-scaled for both groups.
-        return normalized + delta + scale * tensor_matmul(delta, delta)
+
+class TensorNet2Interaction(Module):
+    """TensorNet update whose radial MLP also reads ``q_i`` and ``q_j``.
+
+    Farr et al. (arXiv:2601.00581) Eq. 2. The total-charge scale used by
+    TensorNet is absent: both the O(3) product and the residual square use a
+    factor of one.
+    """
+
+    def __init__(
+        self,
+        dim_embedding: int,
+        num_rbf: int,
+        q_dim: int,
+        equivariance_group: str,
+    ) -> None:
+        super().__init__()
+        if int(q_dim) < 1:
+            raise ValueError(f"q_dim must be >= 1, got {q_dim}")
+        self.dim_embedding = int(dim_embedding)
+        self.num_rbf = int(num_rbf)
+        self.q_dim = int(q_dim)
+        self.equivariance_group = equivariance_group
+        hidden = self.dim_embedding
+        self.linears_scalar = ModuleList(
+            [
+                Linear(self.num_rbf + 2 * self.q_dim, hidden, bias=True),
+                Linear(hidden, 2 * hidden, bias=True),
+                Linear(2 * hidden, 3 * hidden, bias=True),
+            ]
+        )
+        self.linears_tensor = ModuleList(
+            [Linear(hidden, hidden, bias=False) for _ in range(6)]
+        )
+
+    def forward(
+        self,
+        features: Tensor,
+        charges: Tensor,
+        idx_i: Tensor,
+        idx_j: Tensor,
+        rbf: Tensor,
+        window: Tensor,
+    ) -> Tensor:
+        if charges.ndim != 2 or charges.shape[-1] != self.q_dim:
+            raise ValueError(
+                f"charges must have shape [N, {self.q_dim}], got {tuple(charges.shape)}"
+            )
+        if idx_i.numel() == 0:
+            edge_input = rbf.new_zeros((0, self.num_rbf + 2 * self.q_dim))
+        else:
+            edge_input = torch.cat((rbf, charges[idx_i], charges[idx_j]), dim=-1)
+        edge = scalar_edge_gates(
+            edge_input, self.linears_scalar, window, self.dim_embedding
+        )
+        ones = features.new_ones(features.shape[0])
+        return tensor_message_update(
+            features,
+            edge,
+            idx_i,
+            idx_j,
+            self.linears_tensor,
+            self.equivariance_group,
+            ones,
+        )

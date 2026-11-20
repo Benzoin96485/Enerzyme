@@ -1,0 +1,74 @@
+# TensorNet2 (Farr et al., arXiv:2601.00581).
+# Core: TensorNet embedding and interactions, plus neutral charge equilibration.
+# ExpNormalSmearing, RandomAtomEmbedding, SimpleReadout, and WeightedCoulombEnergy
+# stay outside the Core.
+#
+# Each charge channel is shifted so that it sums to the molecular total charge Q.
+# The next interaction concatenates q_i and q_j onto the radial basis. There is
+# no TensorNet charge_scale factor. The neighbor list omits self pairs; the Core
+# inserts r = 0 through the same radial basis.
+#
+# charge_channels has shape [N, (num_interactions + 1) * q_dim]. WeightedCoulombEnergy
+# damps 1/r with the AIMNet factor (0 at r = 0, about 1 beyond 4.6 Å) and averages
+# channels with layer_weights. [1, 2, 3] gives the last block half of that average.
+# The length must divide (num_interactions + 1) * q_dim; build() rejects a mismatch.
+# A length-N Q must repeat the same molecular total inside each molecule.
+# A charge channel whose weights are all zero is shifted uniformly.
+# AceFF says the last layer dominates and does not publish the numbers.
+# pairs: all_to_all is the vacuum path and ignores periodic images. For a periodic
+# box use pairs: directed, a cutoff, and reaction_field: true. Directed pairs must
+# list both directions, the same convention as ElectrostaticEnergy.
+#
+# Widths below are the AceFF-2 widths in TorchMD-Net (2 layers, 128 channels,
+# 32 basis functions, charge width 16, cutoff 4.5 Å). Energies stay in the dataset
+# unit. Hartree_in_E: 27.211386245988 on WeightedCoulombEnergy makes the Coulomb
+# prefactor 14.3996 eV·Å.
+#
+# AceFF-2-OMOL adds StandardZBLRepulsionEnergy after the Coulomb term. That layer
+# is the fixed ZBL wall (screening 0.4543 a0 / (Z^0.3 + Z^0.3), envelope order 6
+# at the covalent-radius sum). It is not ScreenedZBLRepulsionEnergy.
+# Checkpoints from torchmd/torchmd-net do not load.
+# Enerzymette: set architecture: tensornet2 in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: tensornet2
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 4.5
+        cutoff_fn: cosine
+        q_dim: 16
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_interactions: 2
+            equivariance_group: O(3)
+            include_self: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: WeightedCoulombEnergy
+          params:
+            layer_weights: [1.0, 2.0, 3.0]
+            damping_cutoff: 4.6
+            pairs: all_to_all
+        - name: EnergyReduce
+        - name: Force

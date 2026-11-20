@@ -1,4 +1,4 @@
-from typing import Dict, Literal, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Sequence, Tuple
 import math
 import torch
 from torch import Tensor
@@ -264,6 +264,290 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary).view(view_shape)
             Eele = torch.where(condition, Eele, zeros)
         return segment_sum_coo(Eele, idx_i, dim_size=len(Qa))
+
+
+def require_uniform_molecular_charge(values: Tensor, batch_seg: Optional[Tensor]) -> None:
+    """Reject a per-atom total that is not constant inside one molecule.
+
+    ``values`` is one charge per atom. ``batch_seg is None`` means every atom
+    belongs to the same molecule.
+    """
+    flat = values.reshape(-1)
+    n_atoms = int(flat.numel())
+    if n_atoms <= 1:
+        return
+    if batch_seg is None:
+        index = torch.zeros(n_atoms, dtype=torch.long, device=flat.device)
+    else:
+        index = batch_seg.to(device=flat.device).long().reshape(-1)
+        if index.numel() != n_atoms:
+            raise ValueError(
+                f"batch_seg length {index.numel()} != number of charge values {n_atoms}"
+            )
+    if not torch.isfinite(flat).all():
+        raise ValueError("Q must be finite")
+    n_mol = int(index.max()) + 1
+    src = flat.detach().to(dtype=torch.float64)
+    lowest = torch.full((n_mol,), float("inf"), dtype=torch.float64, device=flat.device)
+    highest = torch.full((n_mol,), float("-inf"), dtype=torch.float64, device=flat.device)
+    lowest.scatter_reduce_(0, index, src, reduce="amin", include_self=True)
+    highest.scatter_reduce_(0, index, src, reduce="amax", include_self=True)
+    present = torch.zeros(n_mol, dtype=torch.bool, device=flat.device)
+    present.scatter_(0, index, torch.ones(n_atoms, dtype=torch.bool, device=flat.device))
+    if bool(((highest - lowest)[present] > 0).any()):
+        raise ValueError(
+            "Q must be one molecular total per molecule. A length-N Q has to "
+            "repeat that total on every atom of the molecule."
+        )
+
+
+def neutral_charge_equilibration(
+    charges: Tensor,
+    weights: Tensor,
+    total_charge: Tensor,
+    batch_seg: Optional[Tensor] = None,
+    eps: float = 1e-6,
+) -> Tensor:
+    """Shift each channel so it sums to the molecular total charge.
+
+    ``charges`` and ``weights`` have shape ``[N, C]`` (a 1-D input is treated
+    as one channel). ``weights`` are the non-negative redistribution weights;
+    TensorNet2 passes the square of the network output. ``total_charge`` is
+    the molecular total already written on every atom, shape ``[N]`` or
+    ``[N, 1]``, and it must be the same value on every atom of a molecule.
+    ``eps`` is added to a positive weight sum, matching TorchMD-Net. A channel
+    whose weights sum to zero inside a molecule is shifted uniformly, because
+    the published ratio is otherwise undefined and the charges would not move.
+    """
+    if charges.shape != weights.shape:
+        raise ValueError(
+            f"charges and weights must share a shape, got {tuple(charges.shape)} "
+            f"and {tuple(weights.shape)}"
+        )
+    squeezed = charges.ndim == 1
+    if squeezed:
+        charges = charges.unsqueeze(-1)
+        weights = weights.unsqueeze(-1)
+    n_atoms = int(charges.shape[0])
+    if batch_seg is None:
+        batch_seg = torch.zeros(n_atoms, dtype=torch.long, device=charges.device)
+    elif batch_seg.shape[0] != n_atoms:
+        raise ValueError(
+            f"batch_seg length {batch_seg.shape[0]} != number of atoms {n_atoms}"
+        )
+    target = total_charge.to(device=charges.device, dtype=charges.dtype).reshape(-1)
+    if target.numel() == 1:
+        target = target.expand(n_atoms)
+    elif target.numel() != n_atoms:
+        raise ValueError(
+            f"total_charge must have 1 or {n_atoms} values, got {target.numel()}"
+        )
+    require_uniform_molecular_charge(target, batch_seg)
+    counts = segment_sum_coo(
+        torch.ones(n_atoms, 1, dtype=charges.dtype, device=charges.device),
+        batch_seg,
+    )
+    raw_sum = segment_sum_coo(weights, batch_seg)
+    dead = raw_sum <= 0
+    uniform = torch.ones_like(weights) / counts[batch_seg].clamp_min(1)
+    effective = torch.where(dead[batch_seg], uniform, weights)
+    summed_weights = segment_sum_coo(effective, batch_seg)
+    summed_weights = summed_weights + torch.where(
+        dead,
+        torch.zeros_like(summed_weights),
+        summed_weights.new_full((), float(eps)),
+    )
+    summed_charges = segment_sum_coo(charges, batch_seg)
+    delta = target.unsqueeze(-1) - summed_charges[batch_seg]
+    updated = charges + effective / summed_weights[batch_seg] * delta
+    return updated.squeeze(-1) if squeezed else updated
+
+
+def aimnet_charge_damping(distance: Tensor, damping_cutoff: float = 4.6) -> Tensor:
+    """AIMNet2 short-range factor: 0 at ``r = 0``, about 1 for ``r >= cutoff``.
+
+    This removes the Coulomb singularity. It is not the message-passing cutoff.
+    The constant ``exp(-1)`` is the AIMNet normalization.
+    """
+    if float(damping_cutoff) <= 0:
+        raise ValueError(f"damping_cutoff must be positive, got {damping_cutoff}")
+    reduced = (distance / float(damping_cutoff)).clamp(0, 1.0 - 1e-6)
+    screen = torch.exp(-1.0 / (1.0 - reduced.square())) / math.exp(-1.0)
+    return 1.0 - screen
+
+
+def coulomb_kernel(
+    distance: Tensor,
+    cutoff: Optional[float] = None,
+    epsilon_solvent: float = 78.3,
+    reaction_field: bool = False,
+) -> Tensor:
+    """``1/r``, or the OpenMM reaction-field kernel when ``reaction_field`` is set."""
+    inverse = 1.0 / distance.clamp_min(1e-12)
+    if not reaction_field:
+        return inverse
+    if cutoff is None or float(cutoff) <= 0:
+        raise ValueError("reaction_field requires a positive cutoff")
+    if float(epsilon_solvent) <= 0:
+        raise ValueError(f"epsilon_solvent must be positive, got {epsilon_solvent}")
+    cutoff_f = float(cutoff)
+    epsilon = float(epsilon_solvent)
+    k_rf = (1.0 / cutoff_f**3) * (epsilon - 1.0) / (2.0 * epsilon + 1.0)
+    c_rf = (1.0 / cutoff_f) * (3.0 * epsilon) / (2.0 * epsilon + 1.0)
+    return inverse + k_rf * distance.square() - c_rf
+
+
+def expand_coulomb_weights(
+    layer_weights: Optional[Sequence[float]],
+    n_channels: int,
+    like: Tensor,
+) -> Tensor:
+    """Broadcast per-stage weights across charge channels and normalize.
+
+    ``None`` gives every channel the same weight. A list whose length equals
+    the channel count is used as-is. A shorter list is repeated across
+    contiguous stages when it divides ``n_channels``. The result sums to 1.
+    """
+    if n_channels < 1:
+        raise ValueError(f"n_channels must be >= 1, got {n_channels}")
+    if layer_weights is None:
+        weights = like.new_ones(n_channels)
+    else:
+        values = [float(value) for value in layer_weights]
+        if len(values) < 1:
+            raise ValueError("layer_weights must contain at least one value")
+        if n_channels % len(values) != 0:
+            raise ValueError(
+                f"layer_weights has length {len(values)}, which does not divide "
+                f"{n_channels} charge channels. Pass one weight per stage or one "
+                "weight per channel."
+            )
+        stage = like.new_tensor(values)
+        weights = stage.repeat_interleave(n_channels // len(values))
+    total = weights.sum()
+    if total == 0:
+        raise ValueError("layer_weights must not sum to zero")
+    return weights / total
+
+
+def intramolecular_upper_pairs(
+    positions: Tensor,
+    batch_seg: Optional[Tensor] = None,
+) -> Tuple[Tensor, Tensor, Tensor]:
+    """Upper-triangle pairs that stay inside one molecule. No periodic images."""
+    n_atoms = int(positions.shape[0])
+    empty_index = torch.zeros(0, dtype=torch.long, device=positions.device)
+    empty_distance = positions.new_zeros(0)
+    if n_atoms <= 1:
+        return empty_index, empty_index, empty_distance
+    if batch_seg is None:
+        batch_seg = torch.zeros(n_atoms, dtype=torch.long, device=positions.device)
+    left, right = torch.triu_indices(n_atoms, n_atoms, offset=1, device=positions.device)
+    same_molecule = batch_seg[left] == batch_seg[right]
+    left = left[same_molecule]
+    right = right[same_molecule]
+    distance = torch.linalg.vector_norm(positions[left] - positions[right], dim=-1)
+    return left, right, distance
+
+
+class WeightedCoulombEnergyLayer(BaseFFLayer):
+    """Multi-channel Coulomb from AIMNet2 / TensorNet2.
+
+    ``charge_channels`` is ``[N, C]``. Each channel contributes ``q_i q_j``
+    times a damped kernel; those energies are then averaged with
+    ``layer_weights``. The prefactor is ``kehalf = 0.5 * Bohr_in_R *
+    Hartree_in_E``. ``pairs: all_to_all`` builds one undirected pair per
+    molecule from ``Ra`` and adds that energy to both atoms, which is the
+    vacuum AceFF path (no periodic images). ``pairs: directed`` reads
+    ``idx_i``, ``idx_j``, and ``Dij_lr`` and adds ``kehalf`` only onto
+    ``idx_i``, so a bidirectional neighbor list totals the full Coulomb.
+    A positive ``cutoff`` drops longer pairs. ``reaction_field`` replaces
+    ``1/r`` with the OpenMM reaction-field kernel and needs that cutoff.
+    ``EnergyReduce`` adds the atomic term because the field is ``E_coul_a``.
+    """
+
+    def __init__(
+        self,
+        layer_weights: Optional[List[float]] = None,
+        damping_cutoff: float = 4.6,
+        cutoff: Optional[float] = None,
+        reaction_field: bool = False,
+        epsilon_solvent: float = 78.3,
+        pairs: Literal["all_to_all", "directed"] = "all_to_all",
+        Bohr_in_R: float = 0.5291772105638411,
+        Hartree_in_E: float = 1.0,
+    ) -> None:
+        if pairs not in {"all_to_all", "directed"}:
+            raise ValueError("pairs must be 'all_to_all' or 'directed', got {0}".format(pairs))
+        if float(damping_cutoff) <= 0:
+            raise ValueError(f"damping_cutoff must be positive, got {damping_cutoff}")
+        if cutoff is not None and float(cutoff) <= 0:
+            raise ValueError(f"cutoff must be positive, got {cutoff}")
+        if reaction_field and cutoff is None:
+            raise ValueError("reaction_field requires cutoff")
+        if float(Bohr_in_R) <= 0 or float(Hartree_in_E) <= 0:
+            raise ValueError("Bohr_in_R and Hartree_in_E must be positive")
+        super().__init__(
+            input_fields={"Ra", "charge_channels", "batch_seg", "idx_i", "idx_j", "Dij_lr"},
+            output_fields={"E_coul_a"},
+        )
+        self.layer_weights = None if layer_weights is None else [float(value) for value in layer_weights]
+        self.damping_cutoff = float(damping_cutoff)
+        self.cutoff = None if cutoff is None else float(cutoff)
+        self.reaction_field = bool(reaction_field)
+        self.epsilon_solvent = float(epsilon_solvent)
+        self.pairs = pairs
+        self.kehalf = 0.5 * float(Bohr_in_R) * float(Hartree_in_E)
+
+    def get_E_coul_a(
+        self,
+        Ra: Tensor,
+        charge_channels: Tensor,
+        batch_seg: Optional[Tensor] = None,
+        idx_i: Optional[Tensor] = None,
+        idx_j: Optional[Tensor] = None,
+        Dij_lr: Optional[Tensor] = None,
+    ) -> Tensor:
+        if charge_channels.ndim == 1:
+            charge_channels = charge_channels.unsqueeze(-1)
+        if charge_channels.ndim != 2 or charge_channels.shape[0] != Ra.shape[0]:
+            raise ValueError(
+                "charge_channels must have shape [N, C] aligned with Ra, "
+                f"got {tuple(charge_channels.shape)} and {tuple(Ra.shape)}"
+            )
+        n_atoms = int(Ra.shape[0])
+        energy = Ra.new_zeros(n_atoms)
+        if n_atoms == 0:
+            return energy
+        weights = expand_coulomb_weights(
+            self.layer_weights, int(charge_channels.shape[-1]), Ra
+        )
+        if self.pairs == "all_to_all":
+            left, right, distance = intramolecular_upper_pairs(Ra, batch_seg)
+            add_both = True
+        else:
+            if idx_i is None or idx_j is None or Dij_lr is None:
+                raise ValueError("pairs: directed requires idx_i, idx_j, and Dij_lr")
+            left = idx_i.reshape(-1).long()
+            right = idx_j.reshape(-1).long()
+            distance = Dij_lr.reshape(-1).to(dtype=Ra.dtype)
+            add_both = False
+        if self.cutoff is not None and distance.numel():
+            keep = distance < self.cutoff
+            left, right, distance = left[keep], right[keep], distance[keep]
+        if distance.numel() == 0:
+            return energy
+        damping = aimnet_charge_damping(distance, self.damping_cutoff)
+        kernel = coulomb_kernel(
+            distance, self.cutoff, self.epsilon_solvent, self.reaction_field
+        )
+        pair = self.kehalf * damping * kernel
+        channel = pair.unsqueeze(-1) * charge_channels[left] * charge_channels[right]
+        edge = (channel * weights.unsqueeze(0)).sum(dim=-1)
+        energy = energy.index_add(0, left, edge)
+        if add_both:
+            energy = energy.index_add(0, right, edge)
+        return energy
 
 
 class AtomicCharge2DipoleLayer(BaseFFLayer):

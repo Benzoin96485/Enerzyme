@@ -1760,6 +1760,68 @@ Modelhub:
             use_bias_out: true
         - name: EnergyReduce
         - name: Force
+    FF31:
+      suffix:
+      # TensorNet2 (Farr et al., arXiv:2601.00581). Same Cartesian core as
+      # TensorNet, with neutral charge equilibration inside each message.
+      # ExpNormalSmearing, the species embedding, SimpleReadout, and
+      # WeightedCoulombEnergy stay outside the Core. layer_weights 1, 2, 3
+      # give the last charge block the largest Coulomb share. Their length must
+      # divide (num_interactions + 1) * q_dim; build() rejects a mismatch.
+      # AceFF does not publish those numbers. Q is the molecular total charge;
+      # omit it for a neutral molecule. A length-N Q must repeat that total
+      # inside each molecule. AceFF-2-OMOL also adds StandardZBLRepulsionEnergy
+      # (fixed ZBL, not the learnable Geodite screen). Set Hartree_in_E to
+      # 27.211386245988 on that layer and on WeightedCoulombEnergy when the
+      # dataset energy is eV. Checkpoints from torchmd-net do not load.
+      architecture: tensornet2
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 128
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 4.5
+        cutoff_fn: cosine
+        q_dim: 16
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_interactions: 2
+            equivariance_group: O(3)
+            include_self: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: WeightedCoulombEnergy
+          params:
+            layer_weights: [1, 2, 3]
+            damping_cutoff: 4.6
+            pairs: all_to_all
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

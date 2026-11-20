@@ -19,13 +19,14 @@ from .electrostatics import (
     ChargeConservationLayer,
     AtomicCharge2DipoleLayer,
     VelocityConservationLayer,
+    WeightedCoulombEnergyLayer,
 )
 from .gradient import ForceLayer, EnergyVarianceGradientLayer
 from .reduce import EnergyReduceLayer, EdgeEnergyReduceLayer, ShallowEnsembleReduceLayer
 from .denormalize import AtomicAffineLayer
 from .dispersion import GrimmeD3EnergyLayer, GrimmeD4EnergyLayer, TSQDODispersionEnergyLayer
 from .zbl import ZBLRepulsionEnergyLayer
-from .screened_zbl import ScreenedZBLRepulsionEnergyLayer
+from .screened_zbl import ScreenedZBLRepulsionEnergyLayer, StandardZBLRepulsionEnergyLayer
 from .radial_window import RadialWindowLayer
 from .isolated import IsolatedAtomResidualLayer
 from .gather_embedding import GatherAtomEmbedding
