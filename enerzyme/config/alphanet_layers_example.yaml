@@ -1,0 +1,63 @@
+# AlphaNet (Yin et al., npj Comput. Mater. 2025, arXiv:2501.07155).
+# Core: LEFTNet local frames, plus a rotary phase and a matrix-product state.
+# BesselRBF flavor equflash is (2/c) sin(n π r / c) / r. The cosine window
+# multiplies the radial filter inside the Core, not the basis.
+# The checked-in widths are the reference config (3 layers, 96 Bessel
+# functions, 16 heads, chi1 24). OC2M uses 4 layers and hidden 256;
+# MPTraj uses 6 layers, 24 heads, 256 Bessel functions, and a 6 Å cutoff.
+# Checkpoints from https://github.com/zmyybc/AlphaNet do not load.
+# The released ZBL term is not added to the energy there. Add
+# ZBLRepulsionEnergy or ScreenedZBLRepulsionEnergy after the readout to
+# include a wall. Charge and dipole heads are optional SimpleReadout /
+# EquivariantDipole layers; they are not part of this energy stack.
+# Enerzymette: set architecture: alphanet in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: alphanet
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 96
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 3
+            head: 16
+            main_chi1: 24
+            mp_chi1: 24
+            chi2: 6
+            hidden_channels_chi: 96
+            has_dropout_flag: true
+            has_norm_before_flag: true
+            has_norm_after_flag: false
+            reduce_mode: sum
+            # l2 keeps the scalar state and the Cartesian vectors equivariant.
+            # l1 is the released sum of absolute Cartesian components.
+            fte_scalarization: l2
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+        - name: AtomicAffine
+          params:
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+        - name: EnergyReduce
+        - name: Force

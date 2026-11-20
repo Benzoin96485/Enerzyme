@@ -200,73 +200,43 @@ def test_hierachical_nse_readout_positive_fa_3d_atom_feature():
     assert torch.all(out["fa_beta"] >= 0)
 
 
-def test_alphanet_output_mode_feature_atom_feature_shape():
-    from enerzyme.models.alphanet.core import AlphaNet
+def test_alphanet_feature_latent_shape():
+    from enerzyme.models.alphanet.core import AlphaNetCore
 
     torch.manual_seed(0)
-    N = 8
-    num_edges = 20
-    hidden_channels = 32
-    core = AlphaNet(
+    n_atoms = 5
+    hidden = 8
+    core = AlphaNetCore(
+        dim_embedding=hidden,
+        num_rbf=4,
         cutoff_sr=5.0,
-        num_layers=2,
-        hidden_channels=hidden_channels,
-        num_radial=16,
-        head=4,
-        main_chi1=8,
-        mp_chi1=8,
+        num_layers=1,
+        head=2,
+        main_chi1=2,
+        mp_chi1=2,
         chi2=2,
-        hidden_channels_chi=16,
+        hidden_channels_chi=4,
         has_dropout_flag=False,
-        output_mode="feature",
     ).double()
-    idx_i_sr, idx_j_sr = _rand_graph_indices(N, num_edges)
-    Ra = torch.randn(N, 3, dtype=torch.float64)
-    Za = torch.randint(1, 9, (N,), dtype=torch.long)
-    batch_seg = torch.zeros(N, dtype=torch.long)
-    Dij_sr = torch.rand(num_edges, dtype=torch.float64) + 0.5
-    vij_sr = torch.randn(num_edges, 3, dtype=torch.float64)
-    out = core.get_output(Ra, Za, batch_seg, idx_i_sr, idx_j_sr, Dij_sr, vij_sr)
-    assert set(out.keys()) == {"atom_feature"}
-    assert out["atom_feature"].shape == (N, hidden_channels)
-    assert core.dim_feature_out == hidden_channels
+    idx_i = torch.tensor([0, 1, 1, 2, 2, 3, 3, 4])
+    idx_j = torch.tensor([1, 0, 2, 1, 3, 2, 4, 3])
+    pos = torch.randn(n_atoms, 3, dtype=torch.float64)
+    vij = pos[idx_j] - pos[idx_i]
+    out = core.get_output(
+        atom_embedding=torch.randn(n_atoms, hidden, dtype=torch.float64),
+        rbf=torch.randn(idx_i.shape[0], 4, dtype=torch.float64),
+        idx_i_sr=idx_i,
+        idx_j_sr=idx_j,
+        vij_sr=vij,
+        Dij_sr=torch.linalg.vector_norm(vij, dim=-1),
+        Ra=pos,
+        batch_seg=torch.zeros(n_atoms, dtype=torch.long),
+    )
+    assert set(out) == {"atom_feature", "atom_vector_feature", "quantum_feature"}
+    assert out["atom_feature"].shape == (n_atoms, hidden)
+    assert out["atom_vector_feature"].shape == (n_atoms, 3, hidden)
+    assert out["quantum_feature"].shape == (n_atoms, 4)
+    assert core.dim_feature_out == hidden
     assert not hasattr(core, "last_layer")
-
-
-def test_alphanet_output_mode_direct_uses_trained_heads():
-    from enerzyme.models.alphanet.core import AlphaNet
-
-    torch.manual_seed(0)
-    N = 8
-    num_edges = 20
-    hidden_channels = 32
-    core = AlphaNet(
-        cutoff_sr=5.0,
-        num_layers=2,
-        hidden_channels=hidden_channels,
-        num_radial=16,
-        head=4,
-        main_chi1=8,
-        mp_chi1=8,
-        chi2=2,
-        hidden_channels_chi=16,
-        has_dropout_flag=False,
-        output_mode="direct",
-    ).double()
-    assert hasattr(core, "last_layer") and hasattr(core, "last_layer_quantum")
-    idx_i_sr, idx_j_sr = _rand_graph_indices(N, num_edges)
-    Ra = torch.randn(N, 3, dtype=torch.float64)
-    Za = torch.randint(1, 9, (N,), dtype=torch.long)
-    batch_seg = torch.zeros(N, dtype=torch.long)
-    Dij_sr = torch.rand(num_edges, dtype=torch.float64) + 0.5
-    vij_sr = torch.randn(num_edges, 3, dtype=torch.float64)
-    out = core.get_output(Ra, Za, batch_seg, idx_i_sr, idx_j_sr, Dij_sr, vij_sr)
-    assert set(out.keys()) == {"Ea", "Qa"}
-    assert out["Ea"].shape == (N,) and out["Qa"].shape == (N,)
-    # Heads are trainable Linear layers (not a raw embedding channel slice)
-    with torch.no_grad():
-        core.last_layer.bias.fill_(3.0)
-    out_shifted = core.get_output(Ra, Za, batch_seg, idx_i_sr, idx_j_sr, Dij_sr, vij_sr)
-    assert not torch.allclose(out["Ea"], out_shifted["Ea"])
-    (out_shifted["Ea"].sum() + out_shifted["Qa"].sum()).backward()
+    out["atom_feature"].sum().backward()
 

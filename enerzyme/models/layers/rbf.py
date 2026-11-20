@@ -722,6 +722,9 @@ class ExpNormalSmearing(BaseFFLayer):
     """Exponential normal radial basis (TorchMD-Net / Equiformer MD17).
 
     Includes an internal cosine cutoff; pass raw short-range distances ``Dij_sr``.
+    ``alpha`` scales the exponent ``exp(-alpha * r)``. The TorchMD-Net default is
+    ``5 / (cutoff - cuton)``. LEFTNet uses ``alpha=1`` (plain ``exp(-r)``). At a
+    5 Å cutoff and ``cuton=0`` the two choices coincide.
     """
 
     def __init__(
@@ -730,13 +733,19 @@ class ExpNormalSmearing(BaseFFLayer):
         cutoff_sr: float,
         cuton: float = 0.0,
         trainable: bool = False,
+        alpha: Optional[float] = None,
     ) -> None:
         super().__init__(input_fields={"Dij_sr"}, output_fields={"rbf"})
         self.num_rbf = num_rbf
         self.cutoff_sr = cutoff_sr
         self.cuton = cuton
         self.trainable = trainable
-        self.alpha = 5.0 / (cutoff_sr - cuton)
+        if alpha is None:
+            self.alpha = 5.0 / (cutoff_sr - cuton)
+        else:
+            if float(alpha) <= 0.0:
+                raise ValueError(f"alpha must be positive, got {alpha}")
+            self.alpha = float(alpha)
         means, betas = self._initial_params()
         if trainable:
             self.means = Parameter(means)

@@ -1,0 +1,40 @@
+# LEFTNet (Du et al., NeurIPS 2023, arXiv:2304.04757).
+# Core: local substructure encoding, Cartesian messages, frame transition.
+# The species embedding, exp(-r) radial basis, and energy head stay outside.
+# ExpNormalSmearing with alpha: 1 is the released basis. At 5 Å the TorchMD
+# default alpha = 5/cutoff equals 1, so the two bases match.
+# fte_scalarization: l2 is the released norm reduction. frame uses the node
+# frame from the paper (Eq. 10).
+# Checkpoints from https://github.com/yuanqidu/LeftNet do not load.
+# Enerzymette: set architecture: leftnet in the resolved config.yaml.
+# Cartesian dipoles: add EquivariantDipole / EquivariantPolarizability
+# after the Core. They read atom_feature and atom_vector_feature.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: leftnet
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            alpha: 1.0
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 4
+            fte_scalarization: l2
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+        - name: EnergyReduce
+        - name: Force
