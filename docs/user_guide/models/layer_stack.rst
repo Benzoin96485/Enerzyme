@@ -276,6 +276,8 @@ With :code:`architecture: dpa4c`, pre-core layers are :code:`RangeSeparation` (`
 
 With :code:`architecture: chgnet`, pre-core layers are :code:`RangeSeparation`, two :code:`BesselRBF` layers (``flavor: gemnet``), and :code:`RandomAtomEmbedding`. The first Bessel basis uses :code:`cutoff_sr` (default 5 Å). The second sets ``cutoff_sr`` to ``bond_cutoff`` (default 3 Å); the Core renames that field to ``rbf_bg``. The neighbor list must contain both directions of every bond. The Core owns the undirected bond index, the angle Fourier expansion, and the atom, bond, and angle updates. It emits ``atom_feature`` and ``atom_feature_charge``. :code:`AbsoluteLinearReadout` maps the charge latent to :code:`Ma`. Energy uses :code:`SimpleReadout` (``head_type: mlp``, two hidden SiLU layers, ``use_bias_out: true``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/chgnet_layers_example.yaml`.
 
+With :code:`architecture: alignn`, pre-core layers are :code:`RangeSeparation`, :code:`GaussianRBF` (``flavor: alignn``, ``apply_cutoff_fn: false``), and :code:`RandomAtomEmbedding`. ``cutoff_sr`` is both the neighbor list and the Gaussian support (default 8 Å). The Core owns the directed line graph, the cosine Gaussian on ``[-1, 1]``, and the edge-gated updates. ``update_order: code`` is the released layer order. Energy uses :code:`SimpleReadout` (``head_type: dense``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/alignn_layers_example.yaml`.
+
 So3krates and modular readouts
 ------------------------------
 

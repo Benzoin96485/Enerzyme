@@ -354,6 +354,8 @@ Tests live in :code:`test/`:
 - :code:`test_mattersim_core.py` — MatterSim registration / aliases / YAML smoke, M3GNet reduction when attention and centrality are off, attention cutoff, rotation / inversion / translation / edge order, batch isolation, build_model energy and conservative forces
 - :code:`test_chgnet_ops.py` — CHGNet Fourier order, gemnet smooth Bessel, undirected bonds including periodic images, bond-graph cutoff, gated MLP layer norm
 - :code:`test_chgnet_core.py` — CHGNet registration / YAML smoke, bond cutoff, charge latent, rotation / inversion / translation / edge order, batch isolation, build_model energy, magmom, and conservative forces
+- :code:`test_alignn_ops.py` — ALIGNN Gaussian width ``1/Δ``, directed line graph and cosines, periodic images, per-channel edge gate, code versus paper layer order
+- :code:`test_alignn_core.py` — ALIGNN registration / YAML smoke, when angles reach the atoms, rotation / inversion / translation / edge order, batch isolation, envelope, build_model energy and conservative forces including a finite difference
 - :code:`test_tensornet_ops.py` — TensorNet decomposition, skew roundtrip, traceless outer product, O(3) product, TorchMD-Net pure-PyTorch op parity
 - :code:`test_tensornet_core.py` — TensorNet registration / YAML smoke, self pairs, charge scale, rotation / inversion / translation / edge order, batch isolation, periodic image, build_model energy, dipole head, and conservative forces
 - :code:`test_tensornet2_ops.py` — neutral charge equilibration, AIMNet damping, weighted Coulomb, reaction field, charge-conditioned message, fixed ZBL pair
@@ -597,6 +599,37 @@ are ``gmlp_norm: layer`` and ``readout_norm: layer``. Example:
 :code:`chgnet_layers_example.yaml`. Tests: :code:`test/test_chgnet_ops.py`,
 :code:`test/test_chgnet_core.py`. Enerzymette only needs
 :code:`architecture: chgnet` plus a resolved :code:`config.yaml`.
+
+ALIGNN (:code:`alignn`)
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Choudhary and DeCost (npj Comput. Mater. 2021) live under
+:code:`enerzyme/models/alignn/` (:code:`core.py`, :code:`interaction.py`,
+:code:`geometry.py`). The update follows
+`usnistgov/alignn <https://github.com/usnistgov/alignn>`_, including
+``ALIGNNAtomWise``. Do not import that package, and do not load its
+checkpoints. Register :code:`alignn` in :code:`get_ff_core`. Reuse
+:func:`enerzyme.models.layers.rbf.alignn_gaussian_terms` through
+:code:`GaussianRBF(flavor="alignn")` for the bond expansion,
+:func:`enerzyme.models.cutoff.polynomial_envelope` only when
+``multiply_envelope`` is set,
+:code:`RandomAtomEmbedding`, :code:`segment_sum_coo`, and
+:meth:`BaseFFCore.adopt_radius_stack`. Do not reuse
+:func:`enerzyme.models.m3gnet.geometry.receiver_triplets` or the CHGNet bond
+graph: ALIGNN's line graph is the directed head-to-tail graph, and the
+message updates the outgoing bond. The cosine Gaussian on ``[-1, 1]`` stays
+in the Core. ``update_order`` is ``code`` or ``paper``; the gate stays the
+released per-channel sigmoid. One incoming edge cancels that gate, so the
+angle reaches an atom only after the updated bond competes with another
+incoming bond. The Core emits flat :code:`atom_feature`.
+Compose :code:`SimpleReadout` (:code:`head_type: dense`) +
+:code:`EnergyReduce` / :code:`Force`. The default widths are ALIGNN-FF.
+``PUBLISHED_PROPERTY_CORE_PARAMS`` is the 4 + 4, hidden-256, batch-norm
+property model. Batch norm needs more than one row; the force field uses
+layer norm. Example: :code:`alignn_layers_example.yaml`. Tests:
+:code:`test/test_alignn_ops.py`, :code:`test/test_alignn_core.py`.
+Enerzymette only needs :code:`architecture: alignn` plus a resolved
+:code:`config.yaml`.
 
 External UMA (:code:`uma_qs`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -103,6 +103,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .chgnet import CHGNetCore as Core
         from .chgnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "alignn":
+        from .alignn import ALIGNNCore as Core
+        from .alignn import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() in {"gemnet-q", "gemnetq"}:
         from .gemnet import GemNetCore as Core
         from .gemnet import (
