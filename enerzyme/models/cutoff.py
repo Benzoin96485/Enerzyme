@@ -10,7 +10,9 @@ inside equivariant message passing (EquiformerV3, DimeNet, DPA4).
 polynomial cutoff (``p = 6``), the same polynomial as
 :class:`PolynomialEnvelope`. :func:`facto_polynomial_cutoff` is the separate
 degree-9 window from FACTO. :func:`powered_cosine_window` is the GRACE
-``(r/rc)^p`` cosine window.
+``(r/rc)^p`` cosine window. :func:`exponential_switch` is the DPA3 neighbor
+gate (Zhang et al., arXiv:2506.01686, Eq. 12). The DeePMD polynomial gate on
+``[r_cs, r_c]`` is :func:`polynomial_transition` with ``cuton=r_cs``.
 """
 
 from __future__ import annotations
@@ -100,6 +102,32 @@ def cosine_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     )
 
 
+def exponential_switch(
+    distance: Tensor, cutoff: float, cuton: float = 0.0, decay: float = 20.0
+) -> Tensor:
+    """DPA3 exponential neighbor gate.
+
+    .. math::
+
+        s(r) = \\exp\\!\\big(-\\exp(C (r - r_{cs}) / r_{cs})\\big)
+        \\quad (r < r_c), \\qquad s(r) = 0 \\quad (r \\ge r_c).
+
+    ``cuton`` is the smoothing distance :math:`r_{cs}` and must lie in
+    ``(0, cutoff)``. ``decay`` is :math:`C` (20 in the paper and in
+    DeePMD-kit). At the origin the gate is just under 1. It is not the
+    polynomial :func:`polynomial_transition`.
+    """
+    if not 0.0 < float(cuton) < float(cutoff):
+        raise ValueError(
+            f"exponential switch needs 0 < cuton < cutoff, got cuton={cuton}, cutoff={cutoff}"
+        )
+    if float(decay) <= 0.0:
+        raise ValueError(f"exponential switch decay must be positive, got {decay}")
+    width = distance.new_tensor(float(cuton))
+    gate = torch.exp(-torch.exp(float(decay) * (distance - width) / width))
+    return torch.where(distance < float(cutoff), gate, torch.zeros_like(distance))
+
+
 def xplor_transition(distance: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
     """CHARMM / XPLOR switching function on absolute distance.
 
@@ -186,10 +214,12 @@ CUTOFF_REGISTER = {
     "smooth": smooth_transition,
     "cosine": cosine_transition,
     "xplor": xplor_transition,
+    "exponential": exponential_switch,
     "facto": facto_polynomial_cutoff,
 }
 CUTOFF_KEY_TYPE = Literal[
-    "polynomial", "phys", "bump", "smooth", "cosine", "xplor", "nequip", "facto"
+    "polynomial", "phys", "bump", "smooth", "cosine", "xplor", "exponential",
+    "nequip", "facto",
 ]
 
 
