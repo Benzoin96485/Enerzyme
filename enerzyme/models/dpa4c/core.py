@@ -29,6 +29,9 @@ from .readout import InvariantReadout
 ENVELOPE_EXPONENT = 5
 DISTANCE_EPS = 1.0e-7
 NORM_FLOOR = 0.25
+# A geometric column this small on the calibration set has no magnitude to
+# match to the embedding. Leave its scale at 1 instead of dividing by it.
+CALIBRATION_RMS_FLOOR = 1.0e-12
 
 # Grades in Li et al. and the DeePMD-kit descriptor docs. ``fitting_hidden``
 # is the width of the external residual MLP, three layers in the released nets.
@@ -164,6 +167,12 @@ class DPA4CCore(BaseFFCore):
                     f"DPA4C channels {self.channels}"
                 )
             if isinstance(layer, RangeSeparationLayer):
+                if layer.cutoff_fn is not None:
+                    raise ValueError(
+                        "DPA4C requires RangeSeparation without cutoff_fn. "
+                        "The neighbor list is a hard ball and the C³ envelope "
+                        "is the only smooth cutoff."
+                    )
                 if float(layer.cutoff_sr) + 1.0e-8 < self.cutoff_sr:
                     raise ValueError(
                         f"RangeSeparation cutoff_sr ({layer.cutoff_sr}) must be "
@@ -179,10 +188,13 @@ class DPA4CCore(BaseFFCore):
     def fit_output_calibration(self, raw: Tensor) -> None:
         """Fix the diagonal preconditioner from uncalibrated descriptor rows.
 
-        Geometric columns are scaled to the root-mean-square of the center
-        embedding and keep a zero stored mean. The two neighborhood masses are
-        standardized. The center embedding itself is left unchanged. Pass the
-        tensor returned by :meth:`raw_descriptor`.
+        Geometric columns with RMS above :data:`CALIBRATION_RMS_FLOOR` are
+        scaled to the root-mean-square of the center embedding and keep a zero
+        stored mean. A column at or below that floor stays at scale 1, so a
+        feature that is zero on this sample is neither rejected nor amplified.
+        The two neighborhood masses are standardized. The center embedding
+        itself is left unchanged. Pass the tensor returned by
+        :meth:`raw_descriptor`.
         """
         if raw.ndim != 2 or raw.shape[-1] != self.dim_feature_out:
             raise ValueError(
@@ -201,11 +213,12 @@ class DPA4CCore(BaseFFCore):
         if not torch.isfinite(target) or float(target) <= 0.0:
             raise ValueError(f"center embedding RMS is degenerate ({float(target)})")
         rms = torch.sqrt(torch.mean(geometry * geometry, dim=0))
-        if not torch.isfinite(rms).all() or bool((rms <= 0).any()):
-            raise ValueError("every geometric descriptor column needs a positive RMS")
+        if not torch.isfinite(rms).all():
+            raise ValueError("geometric descriptor columns must have a finite RMS")
         mean = torch.zeros(self.dim_feature_out, dtype=torch.float64)
         scale = torch.ones(self.dim_feature_out, dtype=torch.float64)
-        scale[:-channels] = rms / target
+        alive = rms > CALIBRATION_RMS_FLOOR
+        scale[:-channels] = torch.where(alive, rms / target, torch.ones_like(rms))
         mass = geometry[:, -2:]
         mass_mean = mass.mean(dim=0)
         mass_std = torch.sqrt(torch.mean((mass - mass_mean) ** 2, dim=0))
@@ -267,6 +280,11 @@ class DPA4CCore(BaseFFCore):
                 raise ValueError("edge indices must be non-negative")
             if int(center.max()) >= nodes or int(neighbor.max()) >= nodes:
                 raise ValueError("edge indices must address rows of atom_embedding")
+            if bool(torch.any(center == neighbor)):
+                raise ValueError(
+                    "DPA4C edges must not contain self-loops; a zero displacement "
+                    "has no direction for the Cartesian harmonics"
+                )
 
         moments, masses = self._moments(atom_embedding, center, neighbor, vij_sr, nodes)
         invariants = self.readout(moments)

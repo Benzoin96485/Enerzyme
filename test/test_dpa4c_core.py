@@ -212,6 +212,61 @@ def test_dpa4c_isolated_atom_and_cutoff_neighbor():
     torch.testing.assert_close(on_cutoff, alone, atol=1e-8, rtol=1e-8)
 
 
+def test_dpa4c_build_rejects_a_range_separation_cutoff():
+    from enerzyme.models.ff import build_model
+
+    layers = [
+        {"name": "RangeSeparation", "params": {"cutoff_fn": "polynomial"}},
+        {"name": "RandomAtomEmbedding"},
+        {"name": "Core", "params": {
+            "channels": 8, "lmax": 2, "radial_modes": 0, "n_radial": 4,
+        }},
+    ]
+    try:
+        build_model(
+            "dpa4c",
+            layer_params=layers,
+            build_params={"dim_embedding": 8, "max_Za": 20, "cutoff_sr": 6.0},
+            verbose=0,
+        )
+    except ValueError as error:
+        assert "cutoff_fn" in str(error)
+    else:
+        raise AssertionError("RangeSeparation cutoff_fn should be rejected")
+
+
+def test_dpa4c_rejects_self_loops():
+    core = _core().eval()
+    embedding = torch.randn(2, 8, dtype=torch.float64)
+    idx_i = torch.tensor([0, 1])
+    idx_j = torch.tensor([0, 1])
+    vij = torch.zeros(2, 3, dtype=torch.float64)
+    try:
+        core.get_output(embedding, idx_i, idx_j, vij)
+    except ValueError as error:
+        assert "self-loop" in str(error)
+    else:
+        raise AssertionError("self-loops should be rejected")
+
+
+def test_dpa4c_calibration_keeps_a_zero_column_at_unit_scale():
+    torch.manual_seed(3)
+    core = _core().eval()
+    positions = torch.tensor(
+        [[0.0, 0.0, 0.0], [1.0, 0.1, 0.0], [0.2, 1.4, 0.2], [3.5, 0.0, 0.2]],
+        dtype=torch.float64,
+    )
+    embedding = torch.randn(4, 8, dtype=torch.float64)
+    idx_i, idx_j = _edges(4)
+    vij = positions[idx_j] - positions[idx_i]
+    raw = core.raw_descriptor(embedding, idx_i, idx_j, vij).clone()
+    raw[:, 0] = 0
+    core.fit_output_calibration(raw)
+    torch.testing.assert_close(core.calib_scale[0], torch.ones((), dtype=core.calib_scale.dtype))
+    torch.testing.assert_close(core.calib_mean[0], torch.zeros((), dtype=core.calib_mean.dtype))
+    assert bool(torch.any(torch.abs(core.calib_scale[1:-10] - 1) > 1e-6))
+
+
 def test_dpa4c_calibration_standardizes_masses_and_keeps_the_embedding():
     torch.manual_seed(3)
     core = _core().eval()
