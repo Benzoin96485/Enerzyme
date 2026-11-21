@@ -1,0 +1,68 @@
+# SpinConv (Shuaibi et al., arXiv:2106.09575).
+# The Gaussian expansion stays outside the Core. flavor spinconv is
+# exp(-1/2 (r-μ)^2 / σ^2), σ = basis_width_scalar * Δ,
+# Δ = cutoff / (num_rbf - 1), with no envelope. basis_width_scalar 3
+# is the OC20 config and the paper's "three times the spacing".
+# The species table is RandomAtomEmbedding. Each block maps that vector
+# with its own source and target linears and a softmax mixture.
+#
+# Defaults match configs/s2ef/all/spinconv/spinconv_force.yml on
+# fairchem ocp2.0: width 32, three message updates, hidden width 256,
+# 512 Gaussians, a 16×12 grid, 40 neighbors, 6 Å. The energy-centric
+# paper grid is 12×8. The first update replaces the distance
+# initialization (residual_first: false). Equation (4) adds every
+# update; set residual_first: true for that residual.
+#
+# scale_distances learns a gain and offset for each species pair and
+# evaluates the same Gaussian on the scaled distance. The gain starts
+# at 1. Messages scattered onto the destination are divided by
+# max_num_neighbors / 2 + 1.
+#
+# SimpleReadout is the last linear of the energy mixture. Forces are
+# Fa = -dE/dR. The force-centric head (three axis-aligned spheres and
+# an average over random rotations) is not in this stack. Checkpoints
+# from fairchem do not load.
+#
+# Enerzymette: set architecture: spinconv in the resolved config.yaml.
+# Energies are eV and distances are Å.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: spinconv
+      active: true
+      build_params:
+        dim_embedding: 32
+        num_rbf: 512
+        hidden_channels: 32
+        mid_hidden_channels: 256
+        max_Za: 94
+        cutoff_sr: 6.0
+        basis_width_scalar: 3.0
+        Hartree_in_E: 27.211386245988
+        Bohr_in_R: 0.5291772105638411
+      layers:
+        - name: RangeSeparation
+        - name: GaussianRBF
+          params:
+            flavor: spinconv
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_interactions: 3
+            sphere_size_lat: 16
+            sphere_size_long: 12
+            max_num_neighbors: 40
+            num_embedding_basis: 8
+            group_channels: 8
+            scale_distances: true
+            distance_scale_max: 2.0
+            residual_first: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            use_bias: true
+        - name: EnergyReduce
+        - name: Force
