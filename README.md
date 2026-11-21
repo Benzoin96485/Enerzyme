@@ -53,6 +53,7 @@ Currently supported model architectures:
 | So3krates | internal |             ✅             |         via readout         |       ✅       |   via readout   | [NeurIPS 2022](https://proceedings.neurips.cc/paper_files/paper/2022/hash/bdcbe343e1768256db0c6480abd226bb-Abstract-Conference.html) | [So3krates-torch](https://github.com/TCPUniLU/So3krates-torch) |
 |   SO3LR   | internal |             ✅             |              ✅              |       ✅       |   via readout   | [JACS 2025](https://pubs.acs.org/doi/10.1021/jacs.4c17015) | [so3lr](https://github.com/general-molecular-simulation/so3lr) |
 | EFA / SO3LR+EFA | internal |             ✅             |     via readout / SO3LR     |       ✅       |   via readout   | [arXiv:2412.08541](https://arxiv.org/abs/2412.08541) | [euclidean_fast_attention](https://github.com/thorben-frank/euclidean_fast_attention) |
+|  DPA4C   | internal |             ✅             |         via readout         |       ✅       |   via readout   | [arXiv:2608.19041](https://arxiv.org/abs/2608.19041) | [deepmd-kit](https://github.com/deepmodeling/deepmd-kit) checkpoints do not load |
 
 Shared equivariant tooling (for developers):
 

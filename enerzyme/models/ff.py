@@ -225,6 +225,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .dpa4.core import DPA4Core as Core
         from .dpa4.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() == "dpa4c":
+        from .dpa4c.core import DPA4CCore as Core
+        from .dpa4c.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "so3krates":
         from .so3krates.core import So3kratesCore as Core
         from .so3krates.core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

@@ -96,7 +96,7 @@ Boundary with Enerzyme
 +------------------+------------------------+---------------------------+
 
 Architecture selection (e.g. :code:`Equiformer`, :code:`equiformer_v2`, :code:`equiformer_v3`,
-:code:`e2former`, :code:`e2former_v2`, :code:`e2former_lsr`, :code:`dpa3`, :code:`dpa4`, :code:`escn`,
+:code:`e2former`, :code:`e2former_v2`, :code:`e2former_lsr`, :code:`dpa3`, :code:`dpa4`, :code:`dpa4c`, :code:`escn`,
 :code:`dimenet`, :code:`dimenet++`, :code:`gemnet`, :code:`gemnet-t`, :code:`gemnet-q`, :code:`m3gnet`, :code:`mattersim`, :code:`chgnet`, :code:`painn`, :code:`tensornet`, :code:`tensornet2`, :code:`nequip`, :code:`nequix`, :code:`facto`, :code:`grace`, :code:`cace`, :code:`geodite`, :code:`equflash`, :code:`equflashv2`, :code:`esen`) is entirely in the Enerzyme training /
 model YAML (:code:`Modelhub.*.architecture`). Enerzymette only rewrites dataset paths,
 suffixes, and pretrain paths — no Enerzymette code changes are required when adding a
