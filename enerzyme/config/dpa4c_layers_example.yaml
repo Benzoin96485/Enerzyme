@@ -1,0 +1,42 @@
+# DPA4C-Nano (Li et al., arXiv:2608.19041).
+# The Core is the single aggregation and the polynomial invariants.
+# Leave cutoff_fn unset: the C³ envelope inside the Core is the smooth cutoff.
+# Published grades (channels, lmax, radial_modes, fitting width) are
+# DPA4CCore.PUBLISHED_GRADES. This file is Nano, fitting width 96.
+# Call core.fit_output_calibration(core.raw_descriptor(...)) once if you want
+# the paper's fixed diagonal preconditioner; the default calibration is identity.
+# DeePMD-kit checkpoints do not load. Duo blocks, native spin, charge
+# conditioning, and the compressed CUDA path are not in this stack.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: dpa4c
+      active: true
+      build_params:
+        dim_embedding: 8
+        max_Za: 94
+        cutoff_sr: 6.0
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            channels: 8
+            lmax: 2
+            radial_modes: 0
+            n_radial: 16
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            hidden_dims: [96, 96, 96]
+            identity_residual: true
+            use_bias_out: true
+            activation_fn: swish
+            activation_params:
+              initial_beta: 1.0
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

@@ -12,11 +12,13 @@ from ..cutoff import C3CutoffEnvelope
 
 
 class BesselC3RadialBasis(nn.Module):
-    """Bessel or Gaussian radial basis multiplied by a C³ cutoff envelope.
+    """Bessel or Gaussian radial basis, optionally multiplied by a C³ envelope.
 
     Distinct from YAML ``BesselRBFLayer`` (PhysNet-style ``sin(wr)/r`` ×
-    polynomial/bump cutoff). This module matches DPA4 EdgeCache radials
-    (``w * sinc(w r / π)`` × :class:`C3CutoffEnvelope`).
+    polynomial/bump cutoff). With ``apply_envelope=True`` this matches DPA4
+    EdgeCache radials (``w * sinc(w r / π)`` × :class:`C3CutoffEnvelope`).
+    DPA4C sets ``apply_envelope=False`` and multiplies one explicit envelope
+    onto the finished radial–chemical amplitude.
     """
 
     def __init__(
@@ -25,11 +27,13 @@ class BesselC3RadialBasis(nn.Module):
         n_radial: int = 16,
         basis_type: str = "bessel",
         exponent: int = 7,
+        apply_envelope: bool = True,
     ) -> None:
         super().__init__()
         self.rcut = float(rcut)
         self.n_radial = int(n_radial)
         self.basis_type = str(basis_type).lower()
+        self.apply_envelope = bool(apply_envelope)
         if self.basis_type not in ("bessel", "gaussian"):
             raise ValueError("`basis_type` must be 'bessel' or 'gaussian'")
         self.envelope = C3CutoffEnvelope(rcut=self.rcut, exponent=int(exponent))
@@ -59,6 +63,8 @@ class BesselC3RadialBasis(nn.Module):
         else:
             dr = r - freqs
             raw = torch.exp(dr * dr * self.gaussian_coeff)
+        if not self.apply_envelope:
+            return raw
         return raw * self.envelope(r)
 
 

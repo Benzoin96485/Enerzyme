@@ -21,6 +21,20 @@ HEAD_TYPE = Literal[
 ]
 
 
+class _IdentityResidual(Module):
+    """Add a dense map back to its input when the two shapes agree."""
+
+    def __init__(self, layer: Module) -> None:
+        super().__init__()
+        self.layer = layer
+
+    def forward(self, x: Tensor) -> Tensor:
+        y = self.layer(x)
+        if y.shape == x.shape:
+            return x + y
+        return y
+
+
 def _resolve_feature_irreps(built_layers: List[Module]) -> Optional[str]:
     """Find ``feature_irreps`` on the nearest prior Core (or any layer)."""
     for layer in reversed(built_layers):
@@ -252,18 +266,23 @@ class BaseReadout(BaseFFLayer):
                     )
             if any(width < 1 for width in hidden_dims):
                 raise ValueError(f"mlp hidden widths must be >= 1, got {hidden_dims}")
+            # DPA4C's fitting net adds the input of every hidden map whose
+            # width is unchanged. The scalar head stays a plain linear map.
+            identity_residual = bool(head_params.pop("identity_residual", False))
             layers = []
             in_dim = self.dim_feature_in
             for width in hidden_dims:
-                layers.append(
-                    DenseLayer(
-                        dim_feature_in=in_dim,
-                        dim_feature_out=width,
-                        activation_fn=act,
-                        activation_params=self.activation_params,
-                        **head_params,
-                    )
+                dense = DenseLayer(
+                    dim_feature_in=in_dim,
+                    dim_feature_out=width,
+                    activation_fn=act,
+                    activation_params=self.activation_params,
+                    **head_params,
                 )
+                if identity_residual and in_dim == width:
+                    layers.append(_IdentityResidual(dense))
+                else:
+                    layers.append(dense)
                 in_dim = width
             layers.append(
                 DenseLayer(
