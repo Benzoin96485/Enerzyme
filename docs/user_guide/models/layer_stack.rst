@@ -17,10 +17,10 @@ From :code:`enerzyme/models/layers/`:
     from :code:`enerzyme.models.so3` for equivariant cores).
 
 **Radial basis**
-    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash / nequip / esen / gemnet), :code:`SphericalBesselRBFLayer` (M3GNet ``j_l`` stack, width ``max_l * num_rbf``, no envelope), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`. Cutoff key :code:`nequip` is the polynomial envelope (``p = 6``) that Nequix multiplies onto the equflash Bessel basis. Bessel flavor :code:`nequip` is the separate mir-group basis, with that envelope already inside the layer.
+    :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet; optional ``apply_cutoff_fn``), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash / nequip / esen / gemnet), :code:`SphericalBesselRBFLayer` (M3GNet ``j_l`` stack, width ``max_l * num_rbf``, no envelope), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`. Cutoff key :code:`nequip` is the polynomial envelope (``p = 6``) that Nequix and EQNorm multiply onto the equflash Bessel basis. Bessel flavor :code:`nequip` is the separate mir-group basis, with that envelope already inside the layer.
 
 **Embeddings**
-    :code:`RandomAtomEmbedding`, :code:`OneHotAtomEmbedding` (Nequix species vocabulary), :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
+    :code:`RandomAtomEmbedding`, :code:`OneHotAtomEmbedding` (Nequix and EQNorm species vocabulary), :code:`NuclearEmbedding`, :code:`ElectronicEmbedding`, :code:`ChargeSpinEmbedding` (SO3LR-style), :code:`ScalarDenseEmbedding`, :code:`GatherAtomEmbedding` (optional :code:`scale_by_sqrt_count` for SO3LR)
 
 **Core**
     Architecture-specific message passing (:code:`Core` with :code:`architecture` in Modelhub)
@@ -205,6 +205,11 @@ Nequix
 ------
 
 With :code:`architecture: nequix`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``) and :code:`OneHotAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: nequip` multiplies the basis by the NequIP polynomial envelope (``p = 6``). The Core returns even-scalar :code:`atom_feature`. Energy uses :code:`SimpleReadout` (``head_type: dense``, ``use_bias: false``) → :code:`AtomicAffine` (``order: scale_then_shift``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/nequix_layers_example.yaml`. Published MPtrj widths are :code:`PUBLISHED_MP_CORE_PARAMS`.
+
+EQNorm
+------
+
+With :code:`architecture: eqnorm`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, trainable frequencies) and :code:`OneHotAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: nequip` multiplies the basis by the polynomial envelope. That cutoff key is fixed at ``p = 6``. The species linear stays in the Core and starts both branches. The Core returns the scalar accumulator as even-scalar :code:`atom_feature`. Energy uses :code:`SimpleReadout` (``head_type: variance_preserving``, hidden width ``F / 2``, bias-free SiLU) → :code:`AtomicAffine` (``order: scale_then_shift``) → :code:`EnergyReduce` → :code:`Force`. ``normalization: constant`` divides each message by ``sqrt(avg_num_neighbors)`` (MPtrj uses 61.84). ``normalization: degree`` divides the aggregated message by the square root of the receiver degree. ``message_envelope: true`` multiplies the polynomial window onto the tensor-product output a second time. Core ``polynomial_p`` is that second window and is read only in this mode, so keep it at 6 to match ``cutoff_fn: nequip``. The checked-in stack is small. Published widths are :code:`PUBLISHED_MPTRJ_CORE_PARAMS`, :code:`PUBLISHED_MAX_CORE_PARAMS` (the second envelope), and :code:`PUBLISHED_OMAT_CORE_PARAMS` (degree normalization). Example: :code:`enerzyme/config/eqnorm_layers_example.yaml`.
 
 PaiNN and Cartesian tensor heads
 --------------------------------

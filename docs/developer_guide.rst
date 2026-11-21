@@ -224,6 +224,9 @@ or optional :code:`EquiformerV2FeedForwardReadout` / physics layers after the Co
 :code:`Nequix` under :code:`enerzyme/models/nequix/`
 (one-hot species + equflash Bessel / NequIP envelope outside the Core;
 separable convolution emits scalar :code:`atom_feature`),
+:code:`EQNorm` under :code:`enerzyme/models/eqnorm/`
+(same one-hot and radial window; the Core's species linear starts a tensor
+branch and a scalar accumulator),
 :code:`Equiformer` (:code:`enerzyme/models/equiformer/`), and
 :code:`escn` (:code:`enerzyme/models/escn/`), and
 :code:`eSEN` under :code:`enerzyme/models/esen/native/`
@@ -769,6 +772,43 @@ NequIP (:code:`nequip`)
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 Batzner et al. (Nat. Commun. 2022) live under :code:`enerzyme/models/nequip/` (:code:`core.py`, :code:`interaction.py`). Register via :code:`get_ff_core("nequip")`. The external ``nequip`` wrapper has been removed; do not import that package. Reuse :code:`BesselRBF(flavor="nequip")` (sinc basis × :code:`PolynomialEnvelope` × :math:`2\pi/r_{\max}^2`), :code:`RandomAtomEmbedding`, :code:`tp_out_irreps_with_instructions` / e3nn :code:`Gate`, :func:`enerzyme.models.activation.resolve_scalar_activation`, and :meth:`BaseFFCore.adopt_radius_stack`. The species embedding is the initial scalar state and the fixed node attribute for the self-connection. The first layer omits that connection unless :code:`sc_first` (isolated atoms stay at zero). The last convolution emits :math:`\ell=0` only, so :code:`atom_feature` is ``{F}x0e`` for :code:`SimpleReadout`. Per-element shift is :code:`AtomicAffine`, not a head inside the Core. Presets ``S``–``XL`` follow the current foundation widths; ``paper`` is the 2022 radial MLP. Example: :code:`nequip_layers_example.yaml`. Tests: :code:`test/test_nequip_core.py`. Enerzymette: :code:`architecture: nequip` + resolved :code:`config.yaml`. Checkpoints from mir-group/nequip are not weight-compatible.
+
+EQNorm (:code:`eqnorm`)
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Chen, Fu, Yang, and Chen live under :code:`enerzyme/models/eqnorm/`
+(:code:`core.py`, :code:`interaction.py`, :code:`layernorm.py`). The update
+follows `yzchen08/eqnorm <https://github.com/yzchen08/eqnorm>`_ (MIT). Do not
+import that package, and do not load its checkpoints. Register :code:`eqnorm`
+in :code:`get_ff_core`. Reuse :code:`OneHotAtomEmbedding`,
+:code:`BesselRBF(flavor="equflash")` windowed by :code:`cutoff_fn: nequip`,
+:func:`enerzyme.models.nequip.interaction.tp_path_exists`, e3nn :code:`Gate`
+and :code:`FullyConnectedNet`, :func:`enerzyme.models.functional.reduce_edge`,
+:class:`~enerzyme.models.blocks.mlp.VariancePreservingMLP` (the scalar head),
+and :meth:`BaseFFCore.adopt_radius_stack`. The species linear stays in the
+Core: both the tensor state and the scalar accumulator start there.
+:func:`enerzyme.models.eqnorm.interaction.eqnorm_tp_paths` keeps the reference
+instruction order; :func:`tp_out_irreps_with_instructions` sorts that order
+for Nequix, so the two must not be swapped.
+:class:`~enerzyme.models.eqnorm.layernorm.EqnormRMSNorm` is the reference
+degree-balanced norm. eSEN :class:`~enerzyme.models.e3nn_nn.rms_norm.RMSLayerNorm`
+uses a different reduction and does not replace it. Each layer is a tensor
+convolution, a gate, and a scalar convolution. The scalar convolution does
+not write the tensor state. ``normalization`` is ``constant`` (MPtrj, and the
+max variant with ``message_envelope``) or ``degree`` (OMat).
+``polynomial_p`` is the second window and is read only when
+``message_envelope`` is true. :func:`enerzyme.models.cutoff.nequip_envelope`
+is fixed at exponent 6, so that Core value stays 6 and the two windows match.
+The Core emits
+flat :code:`atom_feature`. Compose :code:`SimpleReadout`
+(``head_type: variance_preserving``, hidden width ``num_features // 2``) +
+:code:`AtomicAffine` (``order: scale_then_shift``) + :code:`EnergyReduce` /
+:code:`Force`. Published widths are :code:`PUBLISHED_MPTRJ_CORE_PARAMS`,
+:code:`PUBLISHED_MAX_CORE_PARAMS`, and :code:`PUBLISHED_OMAT_CORE_PARAMS`.
+Example: :code:`eqnorm_layers_example.yaml`. Tests:
+:code:`test/test_eqnorm_ops.py`, :code:`test/test_eqnorm_core.py`.
+Enerzymette only needs :code:`architecture: eqnorm` plus a resolved
+:code:`config.yaml`.
 
 FACTO (:code:`facto`)
 ^^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,82 @@
+# EQNorm (Chen, Fu, Yang, Chen). https://github.com/yzchen08/eqnorm (MIT).
+# The Core is the dual branch only: a tensor convolution plus a gate, then a
+# scalar convolution whose SiLU output is added to a scalar accumulator.
+# That accumulator is atom_feature. The reference package is not imported.
+#
+# One-hot species and the radial window are pre-core layers:
+#   BesselRBF flavor equflash  = (2/c) sin(n π r / c) / r, trainable frequencies
+#   cutoff_fn: nequip          = polynomial envelope, p = 6 (fixed on this key)
+# message_envelope: true multiplies that same polynomial onto the
+# tensor-product output. Core polynomial_p is only that second window, so
+# it stays 6 (PUBLISHED_MAX_CORE_PARAMS).
+# The species linear inside the Core maps that one-hot onto num_features.
+# It initializes both branches. SimpleReadout head_type variance_preserving
+# is F -> F/2 -> 1, bias-free SiLU. The published head is e3nn
+# FullyConnectedNet with the same widths; checkpoints are not loaded.
+# AtomicAffine scale-then-shift is the reference per-atom scale and shift.
+# Forces are -dE/dR from the shared Force layer. Reference edge autograd
+# stress is not a separate layer.
+#
+# Published stacks replace the Core params:
+#   PUBLISHED_MPTRJ_CORE_PARAMS  constant / sqrt(61.84), no second envelope
+#   PUBLISHED_MAX_CORE_PARAMS    same, message_envelope: true
+#   PUBLISHED_OMAT_CORE_PARAMS   normalization: degree, avg_num_neighbors omitted
+# hidden_irreps: 128x0e+64x1o+32x2e+32x3o, lmax 3, 4 layers, 128 features,
+# invariant MLP 8 -> 64 -> 64 -> n_path, cutoff 6 Å, 8 Bessel functions.
+# MPtrj fixes a per-species shift and a global force_rms scale. OMat has
+# no scale. Those numbers belong in AtomicAffine, not in the Core.
+# atomic_numbers below is a molecule subset.
+#
+# Enerzymette: architecture: eqnorm in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: eqnorm
+      active: true
+      build_params:
+        dim_embedding: 4
+        num_rbf: 8
+        max_Za: 8
+        cutoff_sr: 6.0
+        cutoff_fn: nequip
+        atomic_numbers: [1, 6, 7, 8]
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            trainable: true
+            apply_cutoff_fn: true
+        - name: OneHotAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 2
+            lmax: 1
+            hidden_irreps: "8x0e+4x1o"
+            num_features: 8
+            invariant_layers: 2
+            invariant_neurons: 16
+            avg_num_neighbors: 61.84
+            normalization: constant
+            message_envelope: false
+            polynomial_p: 6
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: variance_preserving
+            use_bias: false
+            nonlinearity: silu
+        - name: AtomicAffine
+          params:
+            order: scale_then_shift
+            scales:
+              Ea:
+                values: 1.0
+                learnable: false
+            shifts:
+              Ea:
+                values: 0.0
+                learnable: true
+        - name: EnergyReduce
+        - name: Force
