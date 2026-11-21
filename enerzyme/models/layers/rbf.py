@@ -533,6 +533,13 @@ class BesselRBFLayer(BaseRBF):
         e_n(r) = u_p(x) · √(2/c) · sin(n π x) / r
 
     The limit at ``r = 0`` is ``√(2/c) · nπ / c``.
+
+    ``flavor="mace"`` is the MACE radial embedding (Batatia et al.): the
+    default spherical Bessel ``√(2/c) sin(nπr/c) / r`` times the polynomial
+    envelope of order ``polynomial_p``. The published MACE cutoff uses
+    ``polynomial_p: 5``. The envelope is inside this layer, so
+    ``apply_cutoff_fn`` is forced off. At ``r = 0`` the basis is
+    ``√(2/c) · nπ / c``.
     """
 
     def __init__(
@@ -542,7 +549,7 @@ class BesselRBFLayer(BaseRBF):
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "polynomial",
         trainable: Optional[bool] = None,
         flavor: Literal[
-            "default", "dimenet", "painn", "equflash", "nequip", "esen", "gemnet"
+            "default", "dimenet", "painn", "equflash", "nequip", "esen", "gemnet", "mace"
         ] = "default",
         envelope_exponent: int = 5,
         apply_cutoff_fn: Optional[bool] = None,
@@ -552,12 +559,12 @@ class BesselRBFLayer(BaseRBF):
     ) -> None:
         self.flavor = flavor
         if flavor not in (
-            "default", "dimenet", "painn", "equflash", "nequip", "esen", "gemnet"
+            "default", "dimenet", "painn", "equflash", "nequip", "esen", "gemnet", "mace"
         ):
             raise ValueError(
                 "Unknown BesselRBF flavor "
                 f"{flavor!r}; expected 'default', 'dimenet', 'painn', "
-                "'equflash', 'nequip', 'esen', or 'gemnet'"
+                "'equflash', 'nequip', 'esen', 'gemnet', or 'mace'"
             )
         if basis_cutoff is not None and flavor != "gemnet":
             raise ValueError(
@@ -570,7 +577,7 @@ class BesselRBFLayer(BaseRBF):
             # DimeNet, PaiNN, NequIP, eSEN, and GemNet each own their radial window.
             # EquFlash multiplies the XPLOR window onto this basis.
             apply_cutoff_fn = flavor in ("default", "equflash")
-        if flavor in ("dimenet", "nequip", "esen", "gemnet"):
+        if flavor in ("dimenet", "nequip", "esen", "gemnet", "mace"):
             apply_cutoff_fn = False
             cutoff_fn = None
         if flavor == "nequip" and int(polynomial_p) < 2:
@@ -689,6 +696,16 @@ class BesselRBFLayer(BaseRBF):
             safe = scaled.clamp_min(1e-12)
             quotient = torch.where(scaled == 0, weights, torch.sin(arg) / safe)
             return env * self.prefactor * quotient
+        if self.flavor == "mace":
+            # √(2/c) sin(nπr/c) / r × polynomial envelope. Limit nπ√(2/c) / c.
+            from ..cutoff import polynomial_envelope
+
+            env = polynomial_envelope(dist, self.cutoff_sr, self.polynomial_p)
+            weights = self.bessel_weights.view(1, -1)
+            arg = dist * weights
+            safe = dist.clamp_min(1e-12)
+            quotient = torch.where(dist == 0, weights, torch.sin(arg) / safe)
+            return self.prefactor * quotient * env
         if self.flavor == "gemnet":
             # x = r/c, e_n = u_p(x) * sqrt(2/c) * sin(n π x) / r
             # Limit at r = 0 is sqrt(2/c) * n π / c.

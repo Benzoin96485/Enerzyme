@@ -1,3 +1,16 @@
+"""MACE message-passing core.
+
+The Core maps a scalar species embedding and the short-range spherical-harmonic
+graph onto equivariant node features. The Bessel × polynomial basis, the
+per-layer energy head, and any long-range electrostatics stay outside.
+
+``output_mode="direct"`` keeps the historical in-core energy and charge head.
+``output_mode="feature"`` returns the last interaction. ``output_mode="layers"``
+returns every interaction as ``atom_feature`` of shape ``[N, irreps, T]``,
+which :class:`~enerzyme.models.mace.readout.MACEEnergyReadout` and
+:class:`~enerzyme.models.mace.polar.PolarFieldLayer` consume.
+"""
+
 from typing import Dict, List, Optional, Literal, Union
 import numpy as np
 import torch
@@ -6,29 +19,47 @@ import torch.nn.functional as F
 from e3nn.util.jit import compile_mode
 from e3nn.o3 import Irreps, SphericalHarmonics
 from .interaction import INTERACTION_CLASSES, EquivariantProductBasisBlock, LinearReadoutBlock, NonLinearReadoutBlock
-from ..layers import BaseFFCore, DistanceLayer, RangeSeparationLayer, BaseAtomEmbedding, BaseElectronEmbedding, BaseRBF, ChargeConservationLayer
+from ..e3nn_nn import scalar_0e_dim
+from ..layers import BaseFFCore
 
+# Small stack. MACE-MP / MACE-POLAR-1-L use 512 channels, correlation 3,
+# max_ell 3, and a 6 Å cutoff. Set avg_num_neighbors to the dataset mean.
 DEFAULT_BUILD_PARAMS = {
-    'r_max': 5.0,
-    'atomic_numbers': [1, 6, 7, 8, 15, 16],
+    "dim_embedding": 32,
+    "num_rbf": 8,
+    "max_Za": 94,
+    "cutoff_sr": 5.0,
+    "avg_num_neighbors": 8.0,
 }
-DEFAULT_LAYER_PARAMS = [{
-    'name': 'Core',
-    'params': {
-        'num_bessel': 8,
-        'num_polynomial_cutoff': 5,
-        'interaction_cls': "RealAgnosticResidualInteractionBlock",
-        'interaction_cls_first': "RealAgnosticResidualInteractionBlock",
-        'max_ell': 3,
-        'correlation': 3,
-        'num_interactions': 2,
-        'MLP_irreps': "16x0e",
-        'radial_MLP': [64, 64, 64],
-        'hidden_irreps': "128x0e + 128x1o",
-        'gate': "silu",
-        'avg_num_neighbors': 8.0,
-    }
-}]
+DEFAULT_LAYER_PARAMS = [
+    {"name": "RangeSeparation"},
+    {
+        "name": "BesselRBF",
+        "params": {"flavor": "mace", "trainable": False, "polynomial_p": 5},
+    },
+    {"name": "RandomAtomEmbedding"},
+    {
+        "name": "Core",
+        "params": {
+            "max_ell": 2,
+            "additional_hidden_irreps": "32x1o",
+            "correlation": 2,
+            "num_interactions": 2,
+            "output_mode": "layers",
+            "keep_last_layer_irreps": True,
+        },
+    },
+    {"name": "MACEEnergyReadout"},
+    {
+        "name": "AtomicAffine",
+        "params": {
+            "shifts": {"Ea": {"values": 0.0, "learnable": True}},
+            "scales": {"Ea": {"values": 1.0, "learnable": True}},
+        },
+    },
+    {"name": "EnergyReduce"},
+    {"name": "Force"},
+]
 GATE_FUNCTIONS = {
     "abs": torch.abs,
     "tanh": torch.tanh,
@@ -134,26 +165,57 @@ class MACECore(BaseFFCore):
     def __init__(self, 
         max_Za: int, max_ell: int, dim_embedding: int, num_rbf: int,
         additional_hidden_irreps: str,
-        interaction_cls_first: Literal["RealAgnosticResidualInteractionBlock"],
-        interaction_cls: Literal["RealAgnosticResidualInteractionBlock"],
-        correlation: Union[int, List[int]],
-        num_interactions: int, 
-        avg_num_neighbors: float,
-        MLP_irreps: str, 
-        radial_MLP: List[int], 
-        gate: str,
-        shallow_ensemble_size: int=1,
-        output_mode: Literal["direct", "feature"]="direct",
+        interaction_cls_first: str = "RealAgnosticResidualInteractionBlock",
+        interaction_cls: str = "RealAgnosticResidualInteractionBlock",
+        correlation: Union[int, List[int]] = 3,
+        num_interactions: int = 2, 
+        avg_num_neighbors: float = 1.0,
+        MLP_irreps: str = "16x0e", 
+        radial_MLP: Optional[List[int]] = None, 
+        gate: str = "silu",
+        shallow_ensemble_size: int = 1,
+        output_mode: Literal["direct", "feature", "layers"] = "direct",
+        keep_last_layer_irreps: bool = False,
     ):
-        self.output_mode: Literal["direct", "feature"] = output_mode
+        if output_mode not in ("direct", "feature", "layers"):
+            raise ValueError(
+                "output_mode must be 'direct', 'feature', or 'layers', "
+                f"got {output_mode!r}"
+            )
+        if output_mode == "layers":
+            keep_last_layer_irreps = True
+        self.output_mode: Literal["direct", "feature", "layers"] = output_mode
+        self.keep_last_layer_irreps = bool(keep_last_layer_irreps)
         output_fields = {"Ea", "Qa"} if output_mode == "direct" else {"atom_feature"}
         super().__init__(
             input_fields={"Za", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf", "atom_embedding", "charge_embedding", "spin_embedding"},
             output_fields=output_fields,
         )
         self.max_Za = max_Za
+        self.max_ell = int(max_ell)
+        self.dim_embedding = int(dim_embedding)
+        self.num_rbf = int(num_rbf)
+        self.num_interactions = int(num_interactions)
+        if self.num_interactions < 1:
+            raise ValueError(f"num_interactions must be >= 1, got {num_interactions}")
         if isinstance(correlation, int):
-            correlation = [correlation] * num_interactions
+            correlation = [correlation] * self.num_interactions
+        if len(correlation) != self.num_interactions:
+            raise ValueError(
+                f"correlation has length {len(correlation)}, expected {self.num_interactions}"
+            )
+        if radial_MLP is None:
+            radial_MLP = [64, 64, 64]
+        if interaction_cls_first not in INTERACTION_CLASSES:
+            raise KeyError(
+                f"Unknown interaction_cls_first {interaction_cls_first!r}. "
+                f"Choices: {sorted(INTERACTION_CLASSES)}"
+            )
+        if interaction_cls not in INTERACTION_CLASSES:
+            raise KeyError(
+                f"Unknown interaction_cls {interaction_cls!r}. "
+                f"Choices: {sorted(INTERACTION_CLASSES)}"
+            )
         sh_irreps = Irreps.spherical_harmonics(max_ell)
         self.spherical_harmonics = SphericalHarmonics(
             sh_irreps, normalize=True, normalization="component"
@@ -161,7 +223,11 @@ class MACECore(BaseFFCore):
         node_attrs_irreps = Irreps([(max_Za + 1, (0, 1))])
         node_feats_irreps = Irreps([(dim_embedding, (0, 1))])
         edge_feats_irreps = Irreps([(num_rbf, (0, 1))])
-        hidden_irreps = Irreps(f"{dim_embedding}x0e+" + additional_hidden_irreps)
+        hidden_body = f"{dim_embedding}x0e"
+        if additional_hidden_irreps:
+            hidden_body = hidden_body + "+" + additional_hidden_irreps
+        hidden_irreps = Irreps(hidden_body).simplify()
+        self.hidden_irreps = hidden_irreps
         interaction_irreps = (sh_irreps * dim_embedding).sort()[0].simplify()
         inter_first = INTERACTION_CLASSES[interaction_cls_first](
             node_attrs_irreps=node_attrs_irreps,
@@ -176,27 +242,25 @@ class MACECore(BaseFFCore):
         self.interactions = torch.nn.ModuleList([inter_first])
         self.shallow_ensemble_size = shallow_ensemble_size
 
-        use_sc_first = False
-        if "Residual" in interaction_cls_first:
-            use_sc_first = True
-
-        node_feats_irreps_out = inter_first.target_irreps
+        use_sc_first = "Residual" in interaction_cls_first
         prod = EquivariantProductBasisBlock(
-            node_feats_irreps=node_feats_irreps_out,
+            node_feats_irreps=inter_first.target_irreps,
             target_irreps=hidden_irreps,
             correlation=correlation[0],
             num_elements=max_Za + 1,
             use_sc=use_sc_first,
         )
         self.products = torch.nn.ModuleList([prod])
+        layer_out: List[Irreps] = [hidden_irreps]
         if self.output_mode == "direct":
-            self.readouts = torch.nn.ModuleList([LinearReadoutBlock(hidden_irreps, shallow_ensemble_size)])
+            self.readouts = torch.nn.ModuleList(
+                [LinearReadoutBlock(hidden_irreps, shallow_ensemble_size)]
+            )
 
-        for i in range(num_interactions - 1):
-            if i == num_interactions - 2:
-                hidden_irreps_out = str(
-                    hidden_irreps[0]
-                )  # Select only scalars for last layer
+        for i in range(self.num_interactions - 1):
+            last = i == self.num_interactions - 2
+            if last and not self.keep_last_layer_irreps:
+                hidden_irreps_out = Irreps(str(hidden_irreps[0]))
             else:
                 hidden_irreps_out = hidden_irreps
             inter = INTERACTION_CLASSES[interaction_cls](
@@ -218,55 +282,69 @@ class MACECore(BaseFFCore):
                 use_sc=True,
             )
             self.products.append(prod)
+            layer_out.append(Irreps(hidden_irreps_out).simplify())
             if self.output_mode == "direct":
-                if i == num_interactions - 2:
+                if last:
                     self.readouts.append(
-                        NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, GATE_FUNCTIONS[gate], shallow_ensemble_size)
+                        NonLinearReadoutBlock(
+                            hidden_irreps_out,
+                            MLP_irreps,
+                            GATE_FUNCTIONS[gate],
+                            shallow_ensemble_size,
+                        )
                     )
                 else:
-                    self.readouts.append(LinearReadoutBlock(hidden_irreps, shallow_ensemble_size))
-        
+                    self.readouts.append(
+                        LinearReadoutBlock(hidden_irreps, shallow_ensemble_size)
+                    )
+
+        if self.output_mode == "layers":
+            emitted = hidden_irreps
+            self.num_output_blocks = self.num_interactions
+        elif self.output_mode == "feature":
+            emitted = layer_out[-1]
+            self.num_output_blocks = 1
+        else:
+            emitted = layer_out[-1]
+            self.num_output_blocks = self.num_interactions
+        self.feature_irreps = str(emitted)
+        self.dim_feature_out = scalar_0e_dim(emitted)
 
     def __str__(self) -> str:
-        return """
-###################################################
-# Augmented MACE (NeurIPS 2022, arXiv:2206.07697) #
-###################################################
+        return f"""
+########################################################
+# MACE (NeurIPS 2022, arXiv:2206.07697)                #
+# output_mode={self.output_mode} features={self.feature_irreps}
+########################################################
 """
     
     def build(self, built_layers) -> None:
-        self.calculate_distance = DistanceLayer()
-        self.calculate_distance = DistanceLayer()
-        self.calculate_distance.with_vector_on("vij_lr")
-        self.calculate_distance.reset_field_name(Dij="Dij_lr")
-        self.pre_sequence.append(self.calculate_distance)
+        self.adopt_radius_stack(built_layers)
 
-        pre_core = True
-        for layer in built_layers:
-            if layer is self:
-                pre_core = False
-                continue
-            if pre_core:
-                # reset pre-core layers
-                if isinstance(layer, RangeSeparationLayer):
-                    self.range_separation = layer
-                    self.range_separation.reset_field_name(idx_i_lr="idx_i", idx_j_lr="idx_j")
-                elif isinstance(layer, BaseAtomEmbedding):
-                    self.atom_embedding = layer
-                elif isinstance(layer, BaseElectronEmbedding):
-                    if layer.attribute == "charge":
-                        self.charge_embedding = layer
-                    elif layer.attribute == "spin":
-                        self.spin_embedding = layer
-                elif isinstance(layer, BaseRBF):
-                    self.radial_basis_function = layer
-                # build pre-core sequence
-                self.pre_sequence.append(layer)
-            else: 
-                # build post-core sequence
-                if isinstance(layer, ChargeConservationLayer):
-                    self.charge_conservation = layer
-                self.post_sequence.append(layer)
+    def _messages(
+        self,
+        node_feats: Tensor,
+        node_attrs: Tensor,
+        edge_attrs: Tensor,
+        edge_feats: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+    ) -> List[Tensor]:
+        layers: List[Tensor] = []
+        for interaction, product in zip(self.interactions, self.products):
+            node_feats, sc = interaction(
+                node_attrs=node_attrs,
+                node_feats=node_feats,
+                edge_attrs=edge_attrs,
+                edge_feats=edge_feats,
+                idx_i_sr=idx_i_sr,
+                idx_j_sr=idx_j_sr,
+            )
+            node_feats = product(
+                node_feats=node_feats, sc=sc, node_attrs=node_attrs
+            )
+            layers.append(node_feats)
+        return layers
 
     def get_output(self, 
             Za: Tensor, vij_sr: Tensor,
@@ -282,20 +360,16 @@ class MACECore(BaseFFCore):
         node_attrs = F.one_hot(Za, num_classes=self.max_Za + 1).to(node_feats.dtype)
         edge_attrs = self.spherical_harmonics(vij_sr)
         edge_feats = rbf
+        if self.output_mode == "layers":
+            layers = self._messages(
+                node_feats, node_attrs, edge_attrs, edge_feats, idx_i_sr, idx_j_sr
+            )
+            return {"atom_feature": torch.stack(layers, dim=-1)}
         if self.output_mode == "feature":
-            for interaction, product in zip(self.interactions, self.products):
-                node_feats, sc = interaction(
-                    node_attrs=node_attrs,
-                    node_feats=node_feats,
-                    edge_attrs=edge_attrs,
-                    edge_feats=edge_feats,
-                    idx_i_sr=idx_i_sr,
-                    idx_j_sr=idx_j_sr,
-                )
-                node_feats = product(
-                    node_feats=node_feats, sc=sc, node_attrs=node_attrs
-                )
-            return {"atom_feature": node_feats}
+            layers = self._messages(
+                node_feats, node_attrs, edge_attrs, edge_feats, idx_i_sr, idx_j_sr
+            )
+            return {"atom_feature": layers[-1]}
 
         node_properties_list = []
         for interaction, product, readout in zip(

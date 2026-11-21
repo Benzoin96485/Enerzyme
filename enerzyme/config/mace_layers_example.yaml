@@ -1,0 +1,59 @@
+# MACE (Batatia et al., NeurIPS 2022, arXiv:2206.07697).
+# The Core is the interaction and the symmetric product. The Bessel basis,
+# the species embedding, and the per-layer energy head stay outside it.
+# output_mode: layers keeps the full irreps on every interaction, including
+# the last one, and stacks them as atom_feature [N, irreps, T].
+#
+# Checked-in widths are a small stack. MACE-MP / MACE-POLAR-1 use 512 channels,
+# correlation 3, max_ell 3, 8 Bessel functions, and a 6 Å cutoff. M has 2
+# interactions and L has 3. Set avg_num_neighbors to the dataset mean.
+# polynomial_p: 5 is the published MACE envelope. Leave cutoff_fn unset on
+# RangeSeparation: the envelope is inside BesselRBF flavor mace.
+# Enerzymette: architecture: mace in the resolved config.yaml.
+# Checkpoints from ACEsuit/mace do not load.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: mace
+      active: true
+      build_params:
+        dim_embedding: 32
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 5.0
+        avg_num_neighbors: 8.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: mace
+            trainable: false
+            polynomial_p: 5
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            max_ell: 2
+            additional_hidden_irreps: 32x1o
+            correlation: 2
+            num_interactions: 2
+            output_mode: layers
+            keep_last_layer_irreps: true
+            MLP_irreps: 16x0e
+            radial_MLP: [64, 64, 64]
+            gate: silu
+        - name: MACEEnergyReadout
+          params:
+            MLP_irreps: 16x0e
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+        - name: EnergyReduce
+        - name: Force
