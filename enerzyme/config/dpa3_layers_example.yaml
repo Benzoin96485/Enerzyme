@@ -1,0 +1,36 @@
+# DPA3 repflow stack (Zhang et al., arXiv:2506.01686).
+# The Core owns the radial gate and the node/edge/angle updates.
+# Leave cutoff_fn unset: RangeSeparation is a hard neighbor list at e_rcut.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: dpa3
+      active: true
+      build_params:
+        dim_embedding: 32
+        max_Za: 94
+        cutoff_sr: 6.0
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            e_dim: 16
+            a_dim: 16
+            nlayers: 2
+            e_rcut: 6.0
+            e_rcut_smth: 5.0
+            e_sel: 16
+            a_rcut: 4.0
+            a_rcut_smth: 3.5
+            a_sel: 8
+            axis_neuron: 4
+            smooth_edge_update: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

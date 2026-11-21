@@ -1,4 +1,5 @@
 from ._base_layer import BaseFFLayer, BaseFFCore
+from .symmetrize import dp_symmetrize
 from .geometry import DistanceLayer, RangeSeparationLayer
 from .rbf import (
     BaseRBF, 
