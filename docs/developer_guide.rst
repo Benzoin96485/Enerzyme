@@ -795,7 +795,11 @@ degree-balanced norm. eSEN :class:`~enerzyme.models.e3nn_nn.rms_norm.RMSLayerNor
 uses a different reduction and does not replace it. Each layer is a tensor
 convolution, a gate, and a scalar convolution. The scalar convolution does
 not write the tensor state. ``normalization`` is ``constant`` (MPtrj, and the
-max variant with ``message_envelope``) or ``degree`` (OMat). The Core emits
+max variant with ``message_envelope``) or ``degree`` (OMat).
+``polynomial_p`` is the second window and is read only when
+``message_envelope`` is true. :func:`enerzyme.models.cutoff.nequip_envelope`
+is fixed at exponent 6, so that Core value stays 6 and the two windows match.
+The Core emits
 flat :code:`atom_feature`. Compose :code:`SimpleReadout`
 (``head_type: variance_preserving``, hidden width ``num_features // 2``) +
 :code:`AtomicAffine` (``order: scale_then_shift``) + :code:`EnergyReduce` /

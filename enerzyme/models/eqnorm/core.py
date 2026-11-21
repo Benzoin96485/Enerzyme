@@ -122,7 +122,10 @@ class EqnormCore(BaseFFCore):
     and replaces the tensor state with the gated tensor convolution. The
     energy MLP reads the accumulator, so it stays in :class:`SimpleReadout`.
     ``readout_hidden_width`` is ``num_features // 2``, the published head's
-    hidden width.
+    hidden width. ``polynomial_p`` is the second envelope and is applied
+    only when ``message_envelope`` is true. The pre-core
+    ``cutoff_fn: nequip`` window is fixed at exponent 6, so the published
+    max stack keeps ``polynomial_p`` at 6.
     """
 
     def __str__(self) -> str:

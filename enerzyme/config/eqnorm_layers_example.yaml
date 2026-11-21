@@ -5,7 +5,10 @@
 #
 # One-hot species and the radial window are pre-core layers:
 #   BesselRBF flavor equflash  = (2/c) sin(n π r / c) / r, trainable frequencies
-#   cutoff_fn: nequip          = polynomial envelope, p = 6
+#   cutoff_fn: nequip          = polynomial envelope, p = 6 (fixed on this key)
+# message_envelope: true multiplies that same polynomial onto the
+# tensor-product output. Core polynomial_p is only that second window, so
+# it stays 6 (PUBLISHED_MAX_CORE_PARAMS).
 # The species linear inside the Core maps that one-hot onto num_features.
 # It initializes both branches. SimpleReadout head_type variance_preserving
 # is F -> F/2 -> 1, bias-free SiLU. The published head is e3nn
