@@ -1886,6 +1886,73 @@ Modelhub:
             keep_feature: false
         - name: EnergyReduce
         - name: Force
+    FF33:
+      suffix:
+      # EQNorm (Chen, Fu, Yang, Chen). Dual-branch tensor state and scalar
+      # accumulator. One-hot species and the equflash Bessel basis stay
+      # outside the Core. cutoff_fn nequip is the polynomial window, p = 6.
+      # See enerzyme/config/eqnorm_layers_example.yaml. Published widths are
+      # enerzyme.models.eqnorm.PUBLISHED_MPTRJ_CORE_PARAMS (constant norm),
+      # PUBLISHED_MAX_CORE_PARAMS (message_envelope), and
+      # PUBLISHED_OMAT_CORE_PARAMS (degree norm). Checkpoints from
+      # yzchen08/eqnorm do not load.
+      architecture: eqnorm
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 4
+        num_rbf: 8
+        max_Za: 8
+        cutoff_sr: 6.0
+        cutoff_fn: nequip
+        atomic_numbers: [1, 6, 7, 8]
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: equflash
+            trainable: true
+            apply_cutoff_fn: true
+        - name: OneHotAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 2
+            lmax: 1
+            hidden_irreps: "8x0e+4x1o"
+            num_features: 8
+            invariant_layers: 2
+            invariant_neurons: 16
+            avg_num_neighbors: 61.84
+            normalization: constant
+            message_envelope: false
+            polynomial_p: 6
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: variance_preserving
+            use_bias: false
+            nonlinearity: silu
+        - name: AtomicAffine
+          params:
+            order: scale_then_shift
+            scales:
+              Ea:
+                values: 1.0
+                learnable: false
+            shifts:
+              Ea:
+                values: 0.0
+                learnable: true
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random
