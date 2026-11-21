@@ -325,6 +325,8 @@ Tests live in :code:`test/`:
 - :code:`test_e2former_so2_tp.py` — EAAS / SO2 TP shapes, rotation equivariance, Triton PyTorch fallback
 - :code:`test_e2former_triton_parity.py` — QK index convention / CPU fallback guards; CUDA Triton vs PyTorch parity (skipped without GPU)
 - :code:`test_e2former_lsr_core.py` — E2Former-LSR shapes, kmeans/precomputed fragments, bipartite graph batch isolation, build_model E/F, SO(3) / translation, YAML smoke
+- :code:`test_dpa3_ops.py` — DPA3 polynomial / exponential gates, SiLUT join, symmetrizer, angle pairs, residual combiners
+- :code:`test_dpa3_core.py` — DPA3 registration / YAML smoke, rotation / inversion / translation / permutation, batch isolation, build_model E/F, force finite-difference conservation
 - :code:`test_dpa4_core.py` — DPA4 shapes, registration / YAML smoke, geometry autograd, SO(3) scalar invariance, build_model E/F, force finite-difference conservation
 - :code:`test_dpa4_parity_ops.py` — DPA4 indexing / C³ envelope / SO2Linear / envelope-gated softmax algebraic checks (no runtime deepmd dependency)
 - :code:`test_tace_core.py` — TACE registration / YAML smoke, spherical+Cartesian feature shapes, build_model E/F
@@ -697,6 +699,11 @@ the short-range E2Former package (:code:`cutoff_lr`, :code:`long_layers`, late f
 Fragmentation defaults to online k-means; :code:`fragment_mode: precomputed` uses Datahub
 :code:`cluster_ids`. Still emits :code:`atom_feature` / :code:`atom_sphere_feature`.
 Example: :code:`e2former_lsr_layers_example.yaml`. Tests: :code:`test/test_e2former_lsr_core.py`.
+
+DPA3 (:code:`dpa3`)
+^^^^^^^^^^^^^^^^^^^^^
+
+Zhang et al. (arXiv:2506.01686) live under :code:`enerzyme/models/dpa3/` (:code:`core.py`, :code:`interaction.py`, :code:`geometry.py`). Register via :code:`get_ff_core("dpa3")`. DeePMD-kit is not imported. The Core is the order-2 repflow update only. Reuse :func:`enerzyme.models.cutoff.polynomial_transition` (the DeePMD radial gate), :func:`enerzyme.models.cutoff.exponential_switch` (Eq. 12), :func:`enerzyme.models.layers.symmetrize.dp_symmetrize`, :func:`enerzyme.models.functional.reduce_edge`, :func:`enerzyme.models.activation.resolve_scalar_activation` (including :code:`silut`), and :meth:`BaseFFCore.adopt_radius_stack`. :code:`RandomAtomEmbedding` is the initial node state. :code:`SimpleReadout`, :code:`AtomicAffine`, :code:`EnergyReduce`, and :code:`Force` stay outside. ``e_sel`` / ``a_sel`` are :math:`N_m`, not a fixed neighbor cap. Published widths are :code:`PUBLISHED_CORE_PARAMS`. Example: :code:`dpa3_layers_example.yaml`. Tests: :code:`test/test_dpa3_ops.py`, :code:`test/test_dpa3_core.py`. Enerzymette: :code:`architecture: dpa3` plus a resolved :code:`config.yaml`.
 
 DPA4 (:code:`dpa4`)
 ^^^^^^^^^^^^^^^^^^^^^

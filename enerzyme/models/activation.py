@@ -1,5 +1,6 @@
 import math
 from abc import ABC, abstractmethod
+from functools import partial
 from typing import Literal, Dict, Union, Callable
 import torch
 import torch.nn.functional as F
@@ -217,12 +218,40 @@ def shifted_softplus(x: Tensor) -> Tensor:
     return F.softplus(x) - math.log(2.0)
 
 
+def silut_constants(threshold: float) -> tuple:
+    """Slope and offset that match SiLU's value and first derivative at ``threshold``.
+
+    The tail is ``tanh(a (x - t)) + b``. Its second derivative is 0 at the
+    join, while SiLU's is not, so the blend is C1. That is the DeePMD-kit
+    SiLUT (threshold 3). The DPA3 paper asks for C2; this one-parameter tanh
+    tail cannot supply it.
+    """
+    if float(threshold) <= 0.0:
+        raise ValueError(f"SiLUT threshold must be positive, got {threshold}")
+    sigmoid_t = 1.0 / (1.0 + math.exp(-float(threshold)))
+    slope = sigmoid_t + float(threshold) * sigmoid_t * (1.0 - sigmoid_t)
+    const = float(threshold) * sigmoid_t
+    return slope, const
+
+
+def silut(x: Tensor, threshold: float = 3.0) -> Tensor:
+    """SiLU for ``x < threshold``, C1 tanh tail above (DPA3 training activation)."""
+    slope, const = silut_constants(threshold)
+    tail = torch.tanh(slope * (x - float(threshold))) + const
+    return torch.where(x >= float(threshold), tail, F.silu(x))
+
+
+def _silut_default(x: Tensor) -> Tensor:
+    return silut(x, 3.0)
+
+
 SCALAR_ACTIVATION_REGISTER: Dict[str, Callable[[Tensor], Tensor]] = {
     "silu": F.silu,
     "relu": F.relu,
     "tanh": torch.tanh,
     "sigmoid": torch.sigmoid,
     "ssp": shifted_softplus,
+    "silut": _silut_default,
     "abs": torch.abs,
 }
 
@@ -231,9 +260,12 @@ def resolve_scalar_activation(name: str) -> Callable[[Tensor], Tensor]:
     """Callable nonlinearity for an e3nn gate or radial MLP.
 
     Distinct from :func:`get_activation_fn`, which returns a tempered module
-    (``swish`` / ``shifted_softplus`` with per-channel scale).
+    (``swish`` / ``shifted_softplus`` with per-channel scale). ``silut`` uses
+    threshold 3. ``silut:2.5`` selects another threshold.
     """
     key = name.lower()
+    if key.startswith("silut:"):
+        return partial(silut, threshold=float(key.split(":", 1)[1]))
     if key not in SCALAR_ACTIVATION_REGISTER:
         known = ", ".join(sorted(SCALAR_ACTIVATION_REGISTER))
         raise ValueError(f"Unknown scalar activation {name!r}; expected one of {known}")
