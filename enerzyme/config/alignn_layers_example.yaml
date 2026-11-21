@@ -1,0 +1,66 @@
+# ALIGNN (Choudhary and DeCost, npj Comput. Mater. 2021).
+# The distance Gaussian stays outside the Core. flavor alignn is
+# exp(-(r-μ)^2 / Δ), Δ = cutoff / (num_rbf - 1), with no envelope.
+# The species table is RandomAtomEmbedding. The Core applies the released
+# Linear-Norm-SiLU maps, then edge-gated convolution on the directed bond
+# graph and on its line graph (bond angles). update_order code is the
+# released module: the atom graph runs before the line graph inside each
+# ALIGNN layer. The paper's equations run the line graph first; set
+# update_order: paper for that order. The convolution itself is the
+# released one, with a per-channel gate.
+#
+# Defaults match ALIGNN-FF (alignn_atomwise): 2 ALIGNN layers, 2 gated
+# convolutions, width 64, 80 bond Gaussians, 40 angle Gaussians,
+# LayerNorm, 8 Å. The 2021 property model is the same Core with
+# alignn_layers 4, gcn_layers 4, hidden_features 256, and norm batch
+# (PUBLISHED_PROPERTY_CORE_PARAMS). Checkpoints from usnistgov/alignn
+# do not load. The neighbor list does not have to be a k-nearest graph;
+# every directed edge inside cutoff_sr is a bond.
+#
+# SimpleReadout is one linear map. Summing it over atoms is the released
+# average-pool times the atom count, including the bias. Forces are
+# Fa = -dE/dR. The reference short-bond hinge is not in this stack; add
+# ZBLRepulsionEnergy or ScreenedZBLRepulsionEnergy after the readout if
+# a pair wall is needed. multiply_envelope scales only the initial bond
+# embedding. It does not zero later messages at the cutoff.
+#
+# Enerzymette: set architecture: alignn in the resolved config.yaml.
+# Elemental energy references belong in the atomic-energy transform or
+# AtomicAffine, not in the Core. Energies are eV and distances are Å.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: alignn
+      active: true
+      build_params:
+        dim_embedding: 64
+        num_rbf: 80
+        num_angle_rbf: 40
+        embedding_features: 64
+        hidden_features: 64
+        max_Za: 94
+        cutoff_sr: 8.0
+        Hartree_in_E: 27.211386245988
+        Bohr_in_R: 0.5291772105638411
+      layers:
+        - name: RangeSeparation
+        - name: GaussianRBF
+          params:
+            flavor: alignn
+            apply_cutoff_fn: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            alignn_layers: 2
+            gcn_layers: 2
+            norm: layer
+            update_order: code
+            multiply_envelope: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            use_bias: true
+        - name: EnergyReduce
+        - name: Force

@@ -49,6 +49,31 @@ class BaseRBF(BaseFFLayer):
         ...
 
 
+def alignn_gaussian_terms(
+    vmin: float,
+    vmax: float,
+    bins: int,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> tuple[Tensor, Tensor]:
+    """Centers and coefficient of the ALIGNN Gaussian expansion.
+
+    The released ``RBFExpansion`` uses ``γ = 1/Δ`` with ``Δ`` the spacing of
+    ``linspace(vmin, vmax, bins)``, then ``exp(-γ (x-μ)²)``. Passing an
+    explicit length scale in that module switches to ``1/Δ²``; ALIGNN does
+    not. Both the bond expansion (``0`` to the cutoff) and the bond-angle
+    cosine expansion (``-1`` to ``1``) use this default.
+    """
+    if int(bins) < 2:
+        raise ValueError(f"ALIGNN Gaussian expansion needs at least 2 bins, got {bins}")
+    if float(vmax) <= float(vmin):
+        raise ValueError(f"vmax must exceed vmin, got vmin={vmin}, vmax={vmax}")
+    centers = torch.linspace(float(vmin), float(vmax), int(bins), dtype=dtype, device=device)
+    delta = (centers[1] - centers[0]).item()
+    coeff = torch.tensor(-1.0 / delta, dtype=centers.dtype, device=centers.device)
+    return centers, coeff
+
+
 class GaussianRBFLayer(BaseRBF):
     """
     Radial basis functions based on Gaussian functions:
@@ -65,6 +90,10 @@ class GaussianRBFLayer(BaseRBF):
     * ``esen``: fairchem eSEN ``GaussianSmearing`` with ``basis_width_scalar=2``,
       ``coeff = -0.5 / (2Δ)²``. The message envelope lives in the eSEN Core, so
       the published stack sets ``apply_cutoff_fn: false``.
+    * ``alignn``: Choudhary and DeCost, ``exp(-(r-μ)² / Δ)`` with
+      ``Δ = cutoff / (num_rbf - 1)`` and ``μ`` evenly spaced on ``[0, cutoff]``.
+      The published width is ``1/Δ``, not the SchNet ``1/(2Δ²)``. The published
+      expansion has no cutoff envelope (``apply_cutoff_fn: false``).
 
     Cutoff envelope application is controlled separately by ``apply_cutoff_fn``.
     """
@@ -75,7 +104,7 @@ class GaussianRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "bump",
         apply_cutoff_fn: bool = True,
-        flavor: Literal["PhysNet", "SchNet", "esen"] = "PhysNet",
+        flavor: Literal["PhysNet", "SchNet", "esen", "alignn"] = "PhysNet",
     ) -> None:
         if apply_cutoff_fn and cutoff_fn is None:
             cutoff_fn = "bump"
@@ -111,10 +140,15 @@ class GaussianRBFLayer(BaseRBF):
             coeff = torch.tensor(-0.5 / (2.0 * delta) ** 2)
             self.register_buffer("coeff", coeff)
             self.register_buffer("width", -coeff)
+        elif flavor == "alignn":
+            center, coeff = alignn_gaussian_terms(0.0, cutoff_sr, num_rbf)
+            self.register_buffer("center", center)
+            self.register_buffer("coeff", coeff)
+            self.register_buffer("width", -coeff)
         else:
             raise ValueError(
                 "Unknown GaussianRBF flavor "
-                f"{flavor!r}; expected 'PhysNet', 'SchNet', or 'esen'"
+                f"{flavor!r}; expected 'PhysNet', 'SchNet', 'esen', or 'alignn'"
             )
 
     def _get_rbf(self, Dij: Tensor) -> Tensor:
