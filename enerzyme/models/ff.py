@@ -130,6 +130,13 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .mace import MACECore as Core
         from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {"mace_polar", "mace-polar", "mace-polar-1"}:
+        from .mace import MACECore as Core
+        from .mace.polar import (
+            DEFAULT_BUILD_PARAMS_POLAR as DEFAULT_BUILD_PARAMS,
+            DEFAULT_LAYER_PARAMS_POLAR as DEFAULT_LAYER_PARAMS,
+        )
+        special_loss = {}
     elif architecture.lower() == "tace":
         from .tace import TACECore as Core
         from .tace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

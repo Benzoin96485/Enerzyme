@@ -1,0 +1,77 @@
+# MACE-POLAR-1 (Batatia et al., 2026).
+# Local MACE features are the same Core as architecture: mace. PolarField is
+# the spin-resolved Gaussian density, Fukui equilibration, and the real-space
+# Coulomb energy. Q is the molecular charge. S is the multiplicity minus one.
+# They are not embedded into the Core.
+#
+# Published M and L share max_ell 3, correlation 3, 128 edge channels,
+# 512 node channels, 8 radial functions, r_max 6 Å, σ_charge 1.5 Å, field
+# widths 1.5 and 2.0 Å, field lmax 1, and num_update 2. M has 2 local
+# interactions and L has 3. The loss in the paper is energy L1 (weight 1)
+# plus force L2 (weight 10), with no partial-charge loss.
+#
+# This file is a small stack. Coulomb energies are eV when Ra is in Å.
+# A Hartree dataset sets energy_scale: 0.036749322175655 (1/27.211386245988)
+# on PolarField. Set avg_num_neighbors to the dataset mean.
+# Open boundaries only. A batch with pbc raises NotImplementedError; periodic
+# k-space needs https://github.com/WillBaldwin0/graph_electrostatics and is
+# not part of this layer. No extra package is required for molecules.
+# An external applied field is not an input (v_app = 0).
+# Enerzymette: architecture: mace_polar in the resolved config.yaml.
+# Checkpoints from ACEsuit/mace do not load. Shallow ensembles stay at 1
+# because the Coulomb term is a single energy.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: mace_polar
+      active: true
+      build_params:
+        dim_embedding: 32
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 5.0
+        avg_num_neighbors: 8.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: mace
+            trainable: false
+            polynomial_p: 5
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            max_ell: 2
+            additional_hidden_irreps: 32x1o
+            correlation: 2
+            num_interactions: 2
+            output_mode: layers
+            keep_last_layer_irreps: true
+        - name: MACEEnergyReadout
+          params:
+            MLP_irreps: 16x0e
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+        - name: PolarField
+          params:
+            density_max_l: 1
+            density_smearing_width: 1.5
+            field_max_l: 1
+            field_smearing_widths: [1.5, 2.0]
+            num_update: 2
+            include_self_interaction: true
+            include_feature_self_interaction: false
+            add_nonlocal_energy: true
+            readout_irreps: 64x0e+32x1o
+            energy_scale: 1.0
+        - name: EnergyReduce
+        - name: Force
