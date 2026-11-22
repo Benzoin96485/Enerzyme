@@ -113,6 +113,55 @@ def gaussian_expansion(distance: Tensor, center: Tensor, coeff: Tensor) -> Tenso
     return torch.exp(coeff * (distance.reshape(-1, 1) - center) ** 2)
 
 
+def gemnet_oc_gaussian_terms(
+    num_rbf: int,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> tuple[Tensor, Tensor]:
+    """Centers and coefficient of the GemNet-OC Gaussian on a scaled distance.
+
+    Centers are ``linspace(0, 1, num_rbf)``. The width is the SchNet width on
+    that unit interval, ``coeff = -0.5 / Δ²`` with ``Δ = 1 / (num_rbf - 1)``.
+    The caller scales ``r / cutoff`` before the expansion and multiplies the
+    polynomial envelope. This is the radial basis in the OC20 GemNet-OC config.
+    """
+    if int(num_rbf) < 2:
+        raise ValueError(f"GemNet-OC Gaussian needs num_rbf >= 2, got {num_rbf}")
+    center = torch.linspace(0, 1, int(num_rbf), dtype=dtype, device=device)
+    delta = (center[1] - center[0]).item()
+    coeff = torch.tensor(-0.5 / delta**2, dtype=center.dtype, device=center.device)
+    return center, coeff
+
+
+def gemnet_oc_gaussian(
+    distance: Tensor,
+    cutoff: float,
+    center: Tensor,
+    coeff: Tensor,
+    exponent: int,
+) -> Tensor:
+    """``u_p(r/c) · exp(-½ ((r/c - μ) / Δ)²)`` with centers on ``[0, 1]``.
+
+    ``u_p`` is :func:`enerzyme.models.cutoff.polynomial_envelope`. Distances
+    at or beyond ``cutoff`` are zero. An empty distance returns ``(0, num_rbf)``.
+    """
+    from ..cutoff import polynomial_envelope
+
+    width = int(center.shape[0])
+    if distance.numel() == 0:
+        return distance.new_empty(0, width)
+    if float(cutoff) <= 0:
+        raise ValueError(f"cutoff must be positive, got {cutoff}")
+    scaled = distance / float(cutoff)
+    basis = gaussian_expansion(
+        scaled,
+        center.to(dtype=distance.dtype, device=distance.device),
+        coeff.to(dtype=distance.dtype, device=distance.device),
+    )
+    envelope = polynomial_envelope(distance, float(cutoff), int(exponent))
+    return envelope.unsqueeze(-1) * basis
+
+
 class GaussianRBFLayer(BaseRBF):
     """
     Radial basis functions based on Gaussian functions:
@@ -138,6 +187,12 @@ class GaussianRBFLayer(BaseRBF):
       The OC20 config uses ``basis_width_scalar: 3``. The scalar is ignored
       by the other flavors. The published expansion has no cutoff envelope
       (``apply_cutoff_fn: false``).
+    * ``gemnet-oc``: Gasteiger et al., TMLR 2022. Centers lie on the scaled
+      distance ``r / cutoff`` in ``[0, 1]``, with the SchNet width on that
+      interval. The polynomial envelope of order ``envelope_exponent``
+      (default 5) is inside the expansion, so ``apply_cutoff_fn`` is false.
+      :meth:`expansion` evaluates the same basis at another cutoff. GemNet-OC
+      uses that for the interaction hierarchy.
 
     Cutoff envelope application is controlled separately by ``apply_cutoff_fn``.
     """
@@ -148,8 +203,11 @@ class GaussianRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "bump",
         apply_cutoff_fn: bool = True,
-        flavor: Literal["PhysNet", "SchNet", "esen", "alignn", "spinconv"] = "PhysNet",
+        flavor: Literal[
+            "PhysNet", "SchNet", "esen", "alignn", "spinconv", "gemnet-oc"
+        ] = "PhysNet",
         basis_width_scalar: Optional[float] = None,
+        envelope_exponent: int = 5,
     ) -> None:
         if apply_cutoff_fn and cutoff_fn is None:
             cutoff_fn = "bump"
@@ -198,10 +256,31 @@ class GaussianRBFLayer(BaseRBF):
             self.register_buffer("center", center)
             self.register_buffer("coeff", coeff)
             self.register_buffer("width", -coeff)
+        elif flavor == "gemnet-oc":
+            if apply_cutoff_fn:
+                raise ValueError(
+                    "GaussianRBF flavor 'gemnet-oc' multiplies the polynomial "
+                    "envelope inside the expansion. Set apply_cutoff_fn: false."
+                )
+            if int(envelope_exponent) < 1:
+                raise ValueError(
+                    f"envelope_exponent must be >= 1, got {envelope_exponent}"
+                )
+            center, coeff = gemnet_oc_gaussian_terms(num_rbf)
+            self.envelope_exponent = int(envelope_exponent)
+            self.register_buffer("center", center)
+            self.register_buffer("coeff", coeff)
+            self.register_buffer("width", -coeff)
         else:
             raise ValueError(
                 "Unknown GaussianRBF flavor "
-                f"{flavor!r}; expected 'PhysNet', 'SchNet', 'esen', 'alignn', or 'spinconv'"
+                f"{flavor!r}; expected 'PhysNet', 'SchNet', 'esen', 'alignn', "
+                "'spinconv', or 'gemnet-oc'"
+            )
+        if flavor != "gemnet-oc" and int(envelope_exponent) != 5:
+            raise ValueError(
+                "envelope_exponent applies to GaussianRBF flavor 'gemnet-oc', "
+                f"got flavor {flavor!r}"
             )
         if flavor != "spinconv" and basis_width_scalar is not None:
             raise ValueError(
@@ -223,7 +302,27 @@ class GaussianRBFLayer(BaseRBF):
             rbf (FloatTensor [N, num_basis_functions]):
                 Values of the radial basis functions for the distances r.
         """
+        if self.flavor == "gemnet-oc":
+            return gemnet_oc_gaussian(
+                Dij, self.cutoff_sr, self.center, self.coeff, self.envelope_exponent
+            )
         return gaussian_expansion(Dij, self.center, self.coeff)
+
+    def expansion(self, distance: Tensor, cutoff: float) -> Tensor:
+        """GemNet-OC Gaussian at ``cutoff``, using this layer's centers.
+
+        The centers live on the scaled interval ``[0, 1]``. A shorter
+        interaction cutoff therefore uses the same coefficients and a
+        different envelope. Only flavor ``gemnet-oc`` implements this.
+        """
+        if self.flavor != "gemnet-oc":
+            raise ValueError(
+                "GaussianRBF.expansion is the GemNet-OC scaled Gaussian, "
+                f"got flavor {self.flavor!r}"
+            )
+        return gemnet_oc_gaussian(
+            distance, cutoff, self.center, self.coeff, self.envelope_exponent
+        )
 
 
 class BernsteinRBFLayer(BaseRBF):

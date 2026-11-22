@@ -208,7 +208,9 @@ undirected bonds and the angle line graph inside; :code:`Ma` from
 :code:`AbsoluteLinearReadout`). Also :code:`GemNet` under :code:`enerzyme/models/gemnet/`
 (GemNet Bessel flavor and atom embedding outside the Core; directional
 triplets, and dihedral quadruplets for GemNet-Q, inside the Core; shared
-bias-free :code:`HierachicalReadout`). Also :code:`So3krates` under :code:`enerzyme/models/so3krates/`
+bias-free :code:`HierachicalReadout`). GemNet-OC is the same package
+(:code:`core_oc.py`): a ``gemnet-oc`` Gaussian stays outside the Core, and
+the interaction hierarchy reuses the GemNet blocks. Also :code:`So3krates` under :code:`enerzyme/models/so3krates/`
 (scalar atom embedding + RBF as pre-core layers; Core emits invariant
 :code:`atom_feature` and SPHC :code:`atom_sphere_feature`; shared
 :code:`SimpleReadout` / physics layers after the Core). Also:
@@ -351,6 +353,8 @@ Tests live in :code:`test/`:
 - :code:`test_dimenetpp_parity_ops.py` — numerical parity of ``DimeNetPPInteractionBlock`` vs PyG ``InteractionPPBlock`` (all-edge down-projection, then triplet gather), including an empty triplet list
 - :code:`test_gemnet_ops.py` — GemNet Bessel flavor, reverse edges, receiver triplets, dihedral quadruplets, two-cutoff central bonds, real harmonics, bilinear aggregation
 - :code:`test_gemnet_core.py` — GemNet-T/Q registration, hierarchical features, rotation / inversion / translation, batch isolation, build_model energy and conservative forces, example YAML cutoffs
+- :code:`test_gemnet_oc_ops.py` — GemNet-OC scaled Gaussian, neighbor cap, canonical-half symmetrization, mixed-image triplets, legendre outer product, periodic quadruplet images
+- :code:`test_gemnet_oc_core.py` — GemNet-OC registration / YAML smoke, isolated atom, rotation / inversion / translation / edge order, batch isolation, neighbor cap, build_model energy and conservative forces
 - :code:`test_m3gnet_ops.py` — M3GNet spherical Bessel (``l = 0`` closed form, zero at the cutoff), ``r_ik`` joint basis, receiver triplets including periodic images, gated MLP
 - :code:`test_m3gnet_core.py` — M3GNet registration / YAML smoke, three-body cutoff, rotation / inversion / translation / edge order, batch isolation, build_model energy and conservative forces
 - :code:`test_mattersim_ops.py` — Graphormer segment softmax, centrality sum, post-softmax polynomial mask
@@ -529,6 +533,30 @@ stay at 1. Upstream checkpoints are not loaded: the harmonic channel order,
 the species-table initialization, and the fitted scales differ.
 Enerzymette only needs :code:`architecture: gemnet-t` or
 :code:`architecture: gemnet-q` plus a resolved :code:`config.yaml`.
+
+GemNet-OC (:code:`gemnet-oc`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Gasteiger et al. (TMLR 2022, arXiv:2204.02782) extend that package with
+:code:`core_oc.py` and :code:`oc.py`. The interaction block follows
+`facebookresearch/fairchem <https://github.com/facebookresearch/fairchem/tree/ocp2.0/ocpmodels/models>`_
+on branch ``ocp2.0`` (MIT). Do not vendor it, and do not import it from tests.
+Register :code:`gemnet-oc` / :code:`gemnetoc` / :code:`gemnet_oc`. Reuse
+:class:`~enerzyme.models.gemnet.layers.TripletInteraction`,
+:class:`~enerzyme.models.gemnet.layers.QuadrupletInteraction`,
+:class:`~enerzyme.models.gemnet.layers.BilinearAggregate`, and
+:func:`enerzyme.models.cutoff.polynomial_envelope`. The radial basis is
+:code:`GaussianRBF(flavor="gemnet-oc")` at ``cutoff_sr``; the Core evaluates
+it again at each interaction cutoff. Bind that layer with
+``object.__setattr__`` so it stays parented only by ``pre_sequence``.
+Quadruplet images use :func:`enerzyme.models.gemnet.geometry.quadruplet_graph`
+with ``images=True``. GemNet-Q keeps the default ``images=False``. The Core
+emits hierarchical :code:`atom_feature`. Compose the same bias-free
+:code:`HierachicalReadout` and conservative :code:`Force`. Direct forces and
+``qint_tags`` are not implemented. fairchem checkpoints do not load: the
+edge concatenation order, the missing tag filter, the unit variance scales,
+and the energy head all differ. Enerzymette only needs
+:code:`architecture: gemnet-oc` plus a resolved :code:`config.yaml`.
 
 M3GNet (:code:`m3gnet`)
 ^^^^^^^^^^^^^^^^^^^^^^^
