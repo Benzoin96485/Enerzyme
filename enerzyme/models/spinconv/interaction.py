@@ -107,6 +107,19 @@ class EmbeddingBlock(Module):
         return self.fc3(mixed)
 
 
+def _reject_atomic_numbers(za: Tensor, span: int) -> None:
+    """Require every atomic number to index the species-pair table."""
+    if za.numel() == 0:
+        return
+    low = int(za.min())
+    high = int(za.max())
+    if low < 0 or high >= span:
+        raise ValueError(
+            f"atomic numbers must lie in 0..max_Za ({span - 1}), "
+            f"got min {low} and max {high}"
+        )
+
+
 class PairDistanceScale(Module):
     """Per-species-pair gain and offset applied before the Gaussian expansion.
 
@@ -127,14 +140,8 @@ class PairDistanceScale(Module):
         torch.nn.init.uniform_(self.offset.weight, -1e-4, 1e-4)
 
     def forward(self, distance: Tensor, za_source: Tensor, za_target: Tensor) -> Tensor:
-        if int(za_source.numel()) and int(za_source.max()) >= self.span:
-            raise ValueError(
-                f"atomic number {int(za_source.max())} exceeds max_Za {self.span - 1}"
-            )
-        if int(za_target.numel()) and int(za_target.max()) >= self.span:
-            raise ValueError(
-                f"atomic number {int(za_target.max())} exceeds max_Za {self.span - 1}"
-            )
+        _reject_atomic_numbers(za_source, self.span)
+        _reject_atomic_numbers(za_target, self.span)
         index = za_source.long() * self.span + za_target.long()
         raw = 2.0 * torch.sigmoid(self.gain(index).view(-1)) - 1.0
         gain = torch.exp(self.log_scale * raw)

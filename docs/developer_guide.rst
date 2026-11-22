@@ -359,7 +359,7 @@ Tests live in :code:`test/`:
 - :code:`test_chgnet_core.py` — CHGNet registration / YAML smoke, bond cutoff, charge latent, rotation / inversion / translation / edge order, batch isolation, build_model energy, magmom, and conservative forces
 - :code:`test_alignn_ops.py` — ALIGNN Gaussian width ``1/Δ``, directed line graph and cosines, periodic images, per-channel edge gate, code versus paper layer order
 - :code:`test_alignn_core.py` — ALIGNN registration / YAML smoke, when angles reach the atoms, rotation / inversion / translation / edge order, batch isolation, envelope, build_model energy and conservative forces including a finite difference
-- :code:`test_spinconv_ops.py` — SpinConv Gaussian width ``σ = 3Δ``, symmetric neighbor cap, equivariant edge frame, latitude mass under a roll, longitude pool versus a reflection
+- :code:`test_spinconv_ops.py` — SpinConv Gaussian width ``σ = 3Δ``, symmetric neighbor cap, equivariant edge frame, leaf and cutoff frames, latitude mass under a roll, longitude pool versus a reflection
 - :code:`test_spinconv_core.py` — SpinConv registration / YAML smoke, angles at fixed bond lengths, rotation / translation / edge order, inversion sensitivity, batch isolation, pair-distance scale, build_model energy and autograd forces
 - :code:`test_tensornet_ops.py` — TensorNet decomposition, skew roundtrip, traceless outer product, O(3) product, TorchMD-Net pure-PyTorch op parity
 - :code:`test_tensornet_core.py` — TensorNet registration / YAML smoke, self pairs, charge scale, rotation / inversion / translation / edge order, batch isolation, periodic image, build_model energy, dipole head, and conservative forces
@@ -659,8 +659,10 @@ width ``mid_hidden_channels``. Compose :code:`SimpleReadout`
 (:code:`head_type: dense`) + :code:`EnergyReduce` / :code:`Force`. Detach
 the bilinear weights. That is the released ``force_estimator: grad`` path:
 the bond partner sits on the pole, and the latitude / longitude Jacobian is
-undefined there. The force-centric direct head is not a layer. Omit the
-released lab-frame ``1e-4`` on the second axis. Example: :code:`spinconv_layers_example.yaml`.
+undefined there. When the second axis is parallel to the bond or has
+zero weight, build the normal from a lab axis so the frame stays a
+rotation. Do not add the released lab-frame ``1e-4``. The force-centric
+direct head is not a layer. Example: :code:`spinconv_layers_example.yaml`.
 Tests: :code:`test/test_spinconv_ops.py`, :code:`test/test_spinconv_core.py`.
 Enerzymette only needs :code:`architecture: spinconv` plus a resolved
 :code:`config.yaml`.

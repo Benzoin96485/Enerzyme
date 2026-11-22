@@ -103,9 +103,31 @@ def source_neighbor_pairs(idx_i: Tensor, idx_j: Tensor, num_nodes: int) -> tuple
     return gathered[valid], query[valid]
 
 
+# Sine of the angle between the bond and the second axis. Below this the
+# cross product is numerical noise, and ``_unit`` would return a zero normal.
+_FRAME_SINE_FLOOR = 1e-5
+
+
 def _unit(vector: Tensor) -> Tensor:
     length = vector.norm(dim=-1, keepdim=True).clamp(min=1e-8)
     return vector / length
+
+
+def _fallback_normal(polar: Tensor) -> Tensor:
+    """A vector perpendicular to ``polar`` when the second axis is unusable.
+
+    Lab ``z`` is the reference. When ``polar`` itself lies along ``z``, lab
+    ``x`` is used. The longitude origin is then a lab convention. Average
+    pooling over longitude removes that origin from the edge message.
+    """
+    z_axis = polar.new_zeros(polar.shape)
+    z_axis[..., 2] = 1.0
+    crossed = torch.cross(polar, z_axis, dim=-1)
+    x_axis = polar.new_zeros(polar.shape)
+    x_axis[..., 0] = 1.0
+    crossed_x = torch.cross(polar, x_axis, dim=-1)
+    along_z = crossed.norm(dim=-1, keepdim=True) < _FRAME_SINE_FLOOR
+    return torch.where(along_z, crossed_x, crossed)
 
 
 def edge_spin_frames(
@@ -122,10 +144,12 @@ def edge_spin_frames(
     The sphere is centered on the source, so the direction from the source
     back to the destination has local ``x = -1``. Longitude is fixed by the
     cosine-weighted sum of ``vij`` at the destination
-    (:func:`enerzyme.models.cutoff.cosine_transition`). The released code
-    also adds ``1e-4`` in the lab frame; that nudge is omitted so a global
-    rotation leaves the local coordinates unchanged. Average pooling later
-    removes the longitude origin.
+    (:func:`enerzyme.models.cutoff.cosine_transition`). That sum is parallel
+    to the bond for a degree-1 destination, and it is zero when every edge
+    into the destination sits at the cutoff. The normal is then the cross
+    product of the bond with a lab axis, so the frame stays a rotation. The
+    released lab-frame ``1e-4`` nudge is not added: a non-degenerate second
+    axis still rotates with the molecule.
     """
     if vij.ndim != 2 or vij.shape[-1] != 3:
         raise ValueError(f"vij must have shape (E, 3), got {tuple(vij.shape)}")
@@ -139,7 +163,9 @@ def edge_spin_frames(
         averaged.index_add_(0, idx_i, vij * weight)
     polar = _unit(vij)
     second = _unit(averaged[idx_i])
-    normal = _unit(torch.cross(polar, second, dim=-1))
+    raw_normal = torch.cross(polar, second, dim=-1)
+    degenerate = raw_normal.norm(dim=-1, keepdim=True) < _FRAME_SINE_FLOOR
+    normal = _unit(torch.where(degenerate, _fallback_normal(polar), raw_normal))
     tangent = _unit(torch.cross(polar, normal, dim=-1))
     return torch.stack((polar, tangent, normal), dim=1)
 

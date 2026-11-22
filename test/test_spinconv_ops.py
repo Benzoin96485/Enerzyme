@@ -178,6 +178,79 @@ def test_frame_is_spin_stable_and_rotates_with_the_molecule():
     assert_allclose(grid.sum(-1).detach().numpy(), grid_s.sum(-1).detach().numpy(), atol=1e-5)
 
 
+def _assert_rotation(frames: torch.Tensor) -> None:
+    gram = frames @ frames.transpose(-1, -2)
+    eye = torch.eye(3).expand_as(gram)
+    assert_allclose(gram.detach().numpy(), eye.detach().numpy(), atol=1e-5)
+    # normal = polar × second and tangent = polar × normal, so det is -1.
+    det = torch.linalg.det(frames)
+    assert_allclose(det.detach().numpy(), -torch.ones_like(det).numpy(), atol=1e-5)
+
+
+def test_degenerate_second_axis_stays_a_rotation():
+    """A leaf and a cutoff edge have no usable second axis.
+
+    The destination of a leaf has one incoming bond, parallel to the polar
+    axis. An edge at the cutoff has cosine weight zero, so the average is
+    the zero vector. Both used to yield a zero normal. The off-axis neighbor
+    of the source must keep a transverse local coordinate.
+    """
+    from enerzyme.models.spinconv.geometry import (
+        edge_spin_frames,
+        project_neighbors,
+        source_neighbor_pairs,
+    )
+
+    def transverse(pos: torch.Tensor, pairs: list[tuple[int, int]], query: tuple[int, int], neighbor: tuple[int, int], cutoff: float) -> torch.Tensor:
+        idx_i = torch.tensor([dst for dst, _ in pairs])
+        idx_j = torch.tensor([src for _, src in pairs])
+        vij = pos[idx_j] - pos[idx_i]
+        distance = vij.norm(dim=-1)
+        frames = edge_spin_frames(vij, idx_i, distance, cutoff, pos.shape[0])
+        _assert_rotation(frames)
+        source_edge, query_edge = source_neighbor_pairs(idx_i, idx_j, pos.shape[0])
+        local = project_neighbors(vij, frames, source_edge, query_edge)
+        query_id = pairs.index(query)
+        neighbor_id = pairs.index(neighbor)
+        keep = (query_edge == query_id) & (source_edge == neighbor_id)
+        assert int(keep.sum()) == 1
+        return local[keep][0]
+
+    angle = 104.5 * math.pi / 180.0
+    water = torch.tensor(
+        [
+            [0.0, 0.0, 0.0],
+            [0.96, 0.0, 0.0],
+            [0.96 * math.cos(angle), 0.96 * math.sin(angle), 0.0],
+        ]
+    )
+    bonds = [(1, 0), (0, 1), (2, 0), (0, 2)]
+    # Edge into the leaf H, neighbor is the other H on the oxygen.
+    leaf = transverse(water, bonds, (1, 0), (0, 2), 5.0)
+    assert float(torch.hypot(leaf[1], leaf[2])) > 0.5
+
+    upright = torch.tensor(
+        [
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.96],
+            [0.96, 0.0, 0.0],
+        ]
+    )
+    along_z = transverse(upright, bonds, (1, 0), (0, 2), 5.0)
+    assert float(torch.hypot(along_z[1], along_z[2])) > 0.5
+
+    cutoff = 5.0
+    placed = torch.tensor(
+        [
+            [0.0, 0.0, 0.0],
+            [cutoff, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ]
+    )
+    at_cutoff = transverse(placed, bonds, (1, 0), (0, 2), cutoff)
+    assert float(torch.hypot(at_cutoff[1], at_cutoff[2])) > 0.5
+
+
 def test_spin_pool_is_invariant_to_a_longitude_roll():
     from enerzyme.models.spinconv.interaction import SpinConvolution
 
@@ -206,10 +279,22 @@ def test_pair_scale_starts_near_identity():
     with torch.no_grad():
         scale.gain.weight.fill_(4.0)
     stretched = scale(distance, source, target)
-    assert float((stretched - distance).abs().min()) > 0.1
+    assert float((stretched - distance).detach().abs().min()) > 0.1
     try:
         scale(distance, torch.tensor([9, 0, 0]), target)
     except ValueError as exc:
         assert "max_Za" in str(exc)
     else:
         raise AssertionError("an atomic number above max_Za must be rejected")
+    try:
+        scale(distance, torch.tensor([1, -1, 0]), target)
+    except ValueError as exc:
+        assert "max_Za" in str(exc)
+    else:
+        raise AssertionError("a negative atomic number must be rejected")
+    try:
+        scale(distance, source, torch.tensor([1, 6, -3]))
+    except ValueError as exc:
+        assert "max_Za" in str(exc)
+    else:
+        raise AssertionError("a negative target atomic number must be rejected")
