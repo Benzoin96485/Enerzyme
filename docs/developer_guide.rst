@@ -359,6 +359,8 @@ Tests live in :code:`test/`:
 - :code:`test_chgnet_core.py` — CHGNet registration / YAML smoke, bond cutoff, charge latent, rotation / inversion / translation / edge order, batch isolation, build_model energy, magmom, and conservative forces
 - :code:`test_alignn_ops.py` — ALIGNN Gaussian width ``1/Δ``, directed line graph and cosines, periodic images, per-channel edge gate, code versus paper layer order
 - :code:`test_alignn_core.py` — ALIGNN registration / YAML smoke, when angles reach the atoms, rotation / inversion / translation / edge order, batch isolation, envelope, build_model energy and conservative forces including a finite difference
+- :code:`test_spinconv_ops.py` — SpinConv Gaussian width ``σ = 3Δ``, symmetric neighbor cap, equivariant edge frame, leaf and cutoff frames, latitude mass under a roll, longitude pool versus a reflection
+- :code:`test_spinconv_core.py` — SpinConv registration / YAML smoke, angles at fixed bond lengths, rotation / translation / edge order, inversion sensitivity, batch isolation, pair-distance scale, build_model energy and autograd forces
 - :code:`test_tensornet_ops.py` — TensorNet decomposition, skew roundtrip, traceless outer product, O(3) product, TorchMD-Net pure-PyTorch op parity
 - :code:`test_tensornet_core.py` — TensorNet registration / YAML smoke, self pairs, charge scale, rotation / inversion / translation / edge order, batch isolation, periodic image, build_model energy, dipole head, and conservative forces
 - :code:`test_tensornet2_ops.py` — neutral charge equilibration, AIMNet damping, weighted Coulomb, reaction field, charge-conditioned message, fixed ZBL pair
@@ -632,6 +634,37 @@ property model. Batch norm needs more than one row; the force field uses
 layer norm. Example: :code:`alignn_layers_example.yaml`. Tests:
 :code:`test/test_alignn_ops.py`, :code:`test/test_alignn_core.py`.
 Enerzymette only needs :code:`architecture: alignn` plus a resolved
+:code:`config.yaml`.
+
+SpinConv (:code:`spinconv`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Shuaibi et al. (arXiv:2106.09575) live under :code:`enerzyme/models/spinconv/`
+(:code:`core.py`, :code:`interaction.py`, :code:`geometry.py`). The grid
+convolution follows
+`facebookresearch/fairchem <https://github.com/facebookresearch/fairchem/blob/ocp2.0/ocpmodels/models/spinconv.py>`_
+on branch ``ocp2.0``. Do not import that module, and do not load its
+checkpoints. Register :code:`spinconv` in :code:`get_ff_core`. Reuse
+:func:`enerzyme.models.layers.rbf.spinconv_gaussian_terms` through
+:code:`GaussianRBF(flavor="spinconv")`,
+:func:`enerzyme.models.layers.rbf.gaussian_expansion`,
+:func:`enerzyme.models.cutoff.cosine_transition` for the second-axis weight,
+:func:`enerzyme.models.activation.get_activation_fn` with fixed Swish
+(``beta = 1``), :code:`RandomAtomEmbedding`, :code:`segment_sum_coo`, and
+:meth:`BaseFFCore.adopt_radius_stack`. The latitude–longitude projection and
+the species mixture stay in the Core. One species table is shared; each
+block owns the maps of that vector. ``residual_first`` defaults to false,
+matching the released loop. The Core emits flat :code:`atom_feature` of
+width ``mid_hidden_channels``. Compose :code:`SimpleReadout`
+(:code:`head_type: dense`) + :code:`EnergyReduce` / :code:`Force`. Detach
+the bilinear weights. That is the released ``force_estimator: grad`` path:
+the bond partner sits on the pole, and the latitude / longitude Jacobian is
+undefined there. When the second axis is parallel to the bond or has
+zero weight, build the normal from a lab axis so the frame stays a
+rotation. Do not add the released lab-frame ``1e-4``. The force-centric
+direct head is not a layer. Example: :code:`spinconv_layers_example.yaml`.
+Tests: :code:`test/test_spinconv_ops.py`, :code:`test/test_spinconv_core.py`.
+Enerzymette only needs :code:`architecture: spinconv` plus a resolved
 :code:`config.yaml`.
 
 External UMA (:code:`uma_qs`)

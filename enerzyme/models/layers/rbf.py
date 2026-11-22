@@ -74,6 +74,45 @@ def alignn_gaussian_terms(
     return centers, coeff
 
 
+def spinconv_gaussian_terms(
+    cutoff: float,
+    bins: int,
+    basis_width_scalar: float = 3.0,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> tuple[Tensor, Tensor]:
+    """Centers and coefficient of the SpinConv Gaussian expansion.
+
+    Means are ``linspace(0, cutoff, bins)``. The released
+    ``GaussianSmearing`` uses ``σ = basis_width_scalar · Δ`` with
+    ``Δ = cutoff / (bins - 1)``, then ``exp(-½ (r-μ)² / σ²)``. The OC20
+    config sets ``basis_width_scalar`` to 3, which is the paper's
+    "three times the distance between Gaussian means". SchNet is the same
+    formula with the scalar equal to 1.
+    """
+    if int(bins) < 2:
+        raise ValueError(f"SpinConv Gaussian expansion needs at least 2 bins, got {bins}")
+    if float(cutoff) <= 0:
+        raise ValueError(f"cutoff must be positive, got {cutoff}")
+    if float(basis_width_scalar) <= 0:
+        raise ValueError(
+            f"basis_width_scalar must be positive, got {basis_width_scalar}"
+        )
+    centers = torch.linspace(0, float(cutoff), int(bins), dtype=dtype, device=device)
+    delta = (centers[1] - centers[0]).item()
+    coeff = torch.tensor(
+        -0.5 / (float(basis_width_scalar) * delta) ** 2,
+        dtype=centers.dtype,
+        device=centers.device,
+    )
+    return centers, coeff
+
+
+def gaussian_expansion(distance: Tensor, center: Tensor, coeff: Tensor) -> Tensor:
+    """``exp(coeff · (r - μ)²)`` for every center."""
+    return torch.exp(coeff * (distance.reshape(-1, 1) - center) ** 2)
+
+
 class GaussianRBFLayer(BaseRBF):
     """
     Radial basis functions based on Gaussian functions:
@@ -94,6 +133,11 @@ class GaussianRBFLayer(BaseRBF):
       ``Δ = cutoff / (num_rbf - 1)`` and ``μ`` evenly spaced on ``[0, cutoff]``.
       The published width is ``1/Δ``, not the SchNet ``1/(2Δ²)``. The published
       expansion has no cutoff envelope (``apply_cutoff_fn: false``).
+    * ``spinconv``: Shuaibi et al., ``exp(-½ (r-μ)² / σ²)`` with
+      ``σ = basis_width_scalar · Δ`` and ``Δ = cutoff / (num_rbf - 1)``.
+      The OC20 config uses ``basis_width_scalar: 3``. The scalar is ignored
+      by the other flavors. The published expansion has no cutoff envelope
+      (``apply_cutoff_fn: false``).
 
     Cutoff envelope application is controlled separately by ``apply_cutoff_fn``.
     """
@@ -104,12 +148,14 @@ class GaussianRBFLayer(BaseRBF):
         cutoff_sr: float,
         cutoff_fn: Optional[CUTOFF_KEY_TYPE] = "bump",
         apply_cutoff_fn: bool = True,
-        flavor: Literal["PhysNet", "SchNet", "esen", "alignn"] = "PhysNet",
+        flavor: Literal["PhysNet", "SchNet", "esen", "alignn", "spinconv"] = "PhysNet",
+        basis_width_scalar: Optional[float] = None,
     ) -> None:
         if apply_cutoff_fn and cutoff_fn is None:
             cutoff_fn = "bump"
         super().__init__(num_rbf, cutoff_sr, cutoff_fn, apply_cutoff_fn=apply_cutoff_fn)
         self.flavor = flavor
+        self.basis_width_scalar = None
         if flavor == "PhysNet":
             # float64 buffers match historical SpookyNet / PhysNet parity.
             self.register_buffer(
@@ -145,10 +191,22 @@ class GaussianRBFLayer(BaseRBF):
             self.register_buffer("center", center)
             self.register_buffer("coeff", coeff)
             self.register_buffer("width", -coeff)
+        elif flavor == "spinconv":
+            scalar = 3.0 if basis_width_scalar is None else float(basis_width_scalar)
+            center, coeff = spinconv_gaussian_terms(cutoff_sr, num_rbf, scalar)
+            self.basis_width_scalar = scalar
+            self.register_buffer("center", center)
+            self.register_buffer("coeff", coeff)
+            self.register_buffer("width", -coeff)
         else:
             raise ValueError(
                 "Unknown GaussianRBF flavor "
-                f"{flavor!r}; expected 'PhysNet', 'SchNet', 'esen', or 'alignn'"
+                f"{flavor!r}; expected 'PhysNet', 'SchNet', 'esen', 'alignn', or 'spinconv'"
+            )
+        if flavor != "spinconv" and basis_width_scalar is not None:
+            raise ValueError(
+                "basis_width_scalar is the SpinConv width σ / Δ and applies "
+                f"only to flavor 'spinconv', got flavor {flavor!r}"
             )
 
     def _get_rbf(self, Dij: Tensor) -> Tensor:
@@ -165,7 +223,7 @@ class GaussianRBFLayer(BaseRBF):
             rbf (FloatTensor [N, num_basis_functions]):
                 Values of the radial basis functions for the distances r.
         """
-        return torch.exp(self.coeff * (Dij.view(-1, 1) - self.center) ** 2)
+        return gaussian_expansion(Dij, self.center, self.coeff)
 
 
 class BernsteinRBFLayer(BaseRBF):
