@@ -34,6 +34,7 @@ from torch.nn import LayerNorm, Linear, Module, ModuleList
 
 from ..cutoff import cosine_transition
 from ..layers import BaseFFCore
+from ..layers.self_pairs import insert_missing_self_pairs
 from .interaction import TensorNetEmbedding, TensorNetInteraction
 from .ops import scalar_invariants, skew_tensor_to_vector, unit_vectors
 
@@ -212,36 +213,18 @@ class TensorNetCore(BaseFFCore):
         rbf: Tensor,
         window: Tensor,
     ) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
-        if not self.include_self or n_atoms == 0:
-            return idx_i, idx_j, vij, dist, rbf, window
-        present = torch.zeros(n_atoms, dtype=torch.bool, device=idx_i.device)
-        if idx_i.numel():
-            self_edge = idx_i == idx_j
-            if self_edge.any():
-                present[idx_i[self_edge]] = True
-        missing = (~present).nonzero(as_tuple=False).flatten()
-        if missing.numel() == 0:
-            return idx_i, idx_j, vij, dist, rbf, window
-        if not self._radial_holder:
-            raise RuntimeError(
-                "include_self needs the pre-core radial basis "
-                "(a layer that writes rbf and implements get_rbf). "
-                "Call build(), or pass a self pair for every atom."
-            )
-        zeros = dist.new_zeros(missing.numel())
-        self_rbf = self._radial_holder[0].get_rbf(zeros).to(dtype=rbf.dtype)
-        if self_rbf.shape[-1] != self.num_rbf:
-            raise ValueError(
-                f"self-pair rbf width {self_rbf.shape[-1]} != num_rbf {self.num_rbf}"
-            )
-        self_window = window.new_ones(missing.numel())
-        return (
-            torch.cat((idx_i, missing)),
-            torch.cat((idx_j, missing)),
-            torch.cat((vij, vij.new_zeros(missing.numel(), 3))),
-            torch.cat((dist, zeros)),
-            torch.cat((rbf, self_rbf), dim=0),
-            torch.cat((window, self_window)),
+        radial = self._radial_holder[0] if self._radial_holder else None
+        return insert_missing_self_pairs(
+            n_atoms,
+            idx_i,
+            idx_j,
+            vij,
+            dist,
+            rbf,
+            window,
+            enabled=self.include_self,
+            radial_basis=radial,
+            num_rbf=self.num_rbf,
         )
 
     def resolve_total_charge(

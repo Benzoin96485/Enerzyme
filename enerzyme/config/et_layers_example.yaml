@@ -1,0 +1,54 @@
+# Equivariant Transformer (Thölke and De Fabritiis, ICLR 2022, arXiv:2202.02541).
+# Core: neighbor embedding and equivariant multi-head attention.
+# ExpNormalSmearing, the first species table, and the scalar energy head stay outside.
+#
+# The exponential-normal basis already includes a cosine window. The Core
+# multiplies cutoff_values_sr again, on the attention values when
+# vector_cutoff is true (examples/ET-MD17.yaml and ET-QM9.yaml) and on the
+# attention score when it is false (the 2022 paper). cutoff_fn: cosine with
+# the same cutoff_sr is that second window. The neighbor list omits self
+# pairs; the Core inserts r = 0 (loop=True). There is no neighbor cap.
+# Widths below are the MD17 example (6 layers, 8 heads, 128 channels, 32
+# basis functions, 5 Å). QM9 uses 8 layers, 256 channels, and 64 basis
+# functions (PUBLISHED_QM9_CORE_PARAMS). Checkpoints from torchmd-net do not load.
+# Enerzymette: set architecture: et in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: et
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 6
+            num_heads: 8
+            distance_influence: both
+            neighbor_embedding: true
+            vector_cutoff: true
+            include_self: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

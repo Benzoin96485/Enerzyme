@@ -11,6 +11,8 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
+from ..layers.self_pairs import unit_direction
+
 
 def identity_tensor(iso: Tensor) -> Tensor:
     """Broadcast a per-channel scalar to ``iso * I_3`` with shape ``[N, 3, 3, F]``."""
@@ -98,6 +100,4 @@ def tensor_anticommutator(left: Tensor, right: Tensor) -> Tensor:
 
 def unit_vectors(vij: Tensor, dist: Tensor) -> Tensor:
     """``vij / ||vij||``, with the zero vector left at zero (self pairs)."""
-    positive = dist > 0
-    hat = vij / dist.clamp_min(1e-12).unsqueeze(-1)
-    return torch.where(positive.unsqueeze(-1), hat, torch.zeros_like(vij))
+    return unit_direction(vij, dist)

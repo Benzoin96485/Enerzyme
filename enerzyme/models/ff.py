@@ -59,6 +59,15 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
             DEFAULT_LAYER_PARAMS_2 as DEFAULT_LAYER_PARAMS,
         )
         special_loss = {}
+    elif architecture.lower() in {
+        "et",
+        "torchmd-et",
+        "torchmd_et",
+        "equivariant-transformer",
+    }:
+        from .et import ETCore as Core
+        from .et import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "equflash":
         from .equflash import EquFlashCore as Core
         from .equflash import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
