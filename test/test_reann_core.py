@@ -123,6 +123,22 @@ def test_registration_presets_and_example_yaml():
         assert "lmax" in str(exc)
     else:
         raise AssertionError("lmax above 6 must be rejected")
+    mismatched = [
+        {"name": "RangeSeparation", "params": {"cutoff_sr": 3.0}},
+        {"name": "RandomAtomEmbedding"},
+        {"name": "Core"},
+    ]
+    try:
+        build_model(
+            "reann",
+            layer_params=mismatched,
+            build_params={"dim_embedding": 4, "max_Za": 10, "cutoff_sr": 5.0},
+            verbose=0,
+        )
+    except ValueError as exc:
+        assert "cutoff_sr" in str(exc)
+    else:
+        raise AssertionError("a RangeSeparation cutoff that differs from the Core must be rejected")
     try:
         _tiny(elemental=True)
     except ValueError as exc:

@@ -207,6 +207,17 @@ class REANNCore(BaseFFCore):
         )
 
     def build(self, built_layers: List[nn.Module]) -> None:
+        from ..layers.geometry import RangeSeparationLayer
+
+        for candidate in built_layers:
+            if not isinstance(candidate, RangeSeparationLayer):
+                continue
+            if abs(float(candidate.cutoff_sr) - self.cutoff_sr) > 1e-4:
+                raise ValueError(
+                    "RangeSeparation cutoff_sr "
+                    f"({candidate.cutoff_sr}) must equal REANN cutoff_sr "
+                    f"({self.cutoff_sr})"
+                )
         self.adopt_radius_stack(built_layers)
 
     def _density(self, coeff: Tensor, species: Tensor, idx_i, idx_j, vij, distance) -> Tensor:
