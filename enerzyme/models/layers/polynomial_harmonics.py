@@ -4,9 +4,9 @@
 order. Higher degrees follow the e3nn component recursion used by IBM
 ``TensorInit`` and by ViSNet's ``Sphere``, without the constant ``l = 0``
 channel. Geodite-MP uses ``lmax = 2``. ViSNet's directional features use
-``lmax`` 1 or 2, which is the same prefix of this basis. Degrees above 4 are
-rejected: a mismatched basis would still be equivariant but would not be
-either architecture.
+``lmax`` 1 or 2, and QuinNet's ``Sphere(l=2)`` is that same 8-channel prefix.
+Degrees above 4 are rejected: a mismatched basis would still be equivariant
+but would not be any of these architectures.
 """
 
 from __future__ import annotations

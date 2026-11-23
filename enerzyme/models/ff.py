@@ -72,6 +72,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .visnet import ViSNetCore as Core
         from .visnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {"quinnet", "quin-net", "quin_net"}:
+        from .quinnet import QuinNetCore as Core
+        from .quinnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() in {
         "visnet_lsrm",
         "visnet-lsrm",

@@ -1,0 +1,55 @@
+# QuinNet (Wang et al., NeurIPS 2023).
+# Core: neighbor embedding, edge embedding, and the six-term quintuple block.
+# ExpNormalSmearing, the first species table, and the scalar energy head stay outside.
+#
+# The exponential-normal basis already includes a cosine window. The Core
+# multiplies cutoff_values_sr again, on the attention score. cutoff_fn: cosine
+# with the same cutoff_sr is that second window. The neighbor list omits self
+# pairs; the Core inserts r = 0 (loop=True). There is no neighbor cap. Both
+# directions of each pair are required: the three edge invariants scatter onto
+# the sender, which is the reverse of the attention receiver.
+# Widths below are example/hparams_aspirin.yaml (5 layers, 8 heads, 256
+# channels, 32 basis functions, 5 Å, trainable RBF off). The angular state is
+# Sphere(l=2), 8 channels. Checkpoints from Zun-Wang/QuinNet do not load.
+# Enerzymette: set architecture: quinnet in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: quinnet
+      active: true
+      build_params:
+        dim_embedding: 256
+        num_rbf: 32
+        max_Za: 100
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 5
+            num_heads: 8
+            distance_influence: both
+            neighbor_embedding: true
+            include_self: true
+            activation: silu
+            attn_activation: silu
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
