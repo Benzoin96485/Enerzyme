@@ -28,7 +28,8 @@ DATA_TYPES = {
     # ||M2|| from EquivariantDipole(predict_magnitude=true). Scalar, so metric
     # keys such as M2mag_mae split into one target name.
     "M2mag": IS_TARGET,
-    # Molecular polarizability [3, 3] from EquivariantPolarizability.
+    # Molecular polarizability [3, 3] from EquivariantPolarizability or
+    # DerivativePolarizability.
     "polarizability": TENSOR_RANK_BASE * 2 | IS_TARGET,
     "idx_i": IS_INT | IS_IDX,
     "idx_j": IS_INT | IS_IDX,

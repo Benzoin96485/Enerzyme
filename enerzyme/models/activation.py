@@ -138,6 +138,56 @@ class ShiftedSoftplus(BaseScaledTemperedActivation):
         )
 
 
+class ReluLike(BaseScaledTemperedActivation):
+    """REANN repository activation ``alpha * SiLU(beta * x)``.
+
+    Zhang, Xia, and Jiang write ``eta * x * sigmoid(beta * x)`` (J. Chem. Phys.
+    2022, Eq. 7). The released ``Relu_like`` module is ``alpha * SiLU(beta * x)``,
+    the same family with an extra factor of ``beta`` inside the scale. ``alpha``
+    and ``beta`` are learnable per channel. ``beta -> 0`` is a linear map and
+    ``beta -> inf`` approaches a scaled ReLU.
+    """
+
+    def __init__(
+        self,
+        dim_feature: int = 1,
+        initial_alpha: float = 1.0,
+        initial_beta: float = 1.0,
+        learnable: bool = True,
+    ) -> None:
+        super().__init__(dim_feature, initial_alpha, initial_beta, learnable)
+
+    def simple_activation_fn(self, x: Tensor) -> Tensor:
+        return F.silu(x)
+
+    def activation_fn(self, x: Tensor) -> Tensor:
+        return self.alpha * F.silu(self.beta * x)
+
+
+class TanhLike(BaseScaledTemperedActivation):
+    """REANN hyperbolic activation ``alpha * x / sqrt(1 + (beta * x)^2)``.
+
+    This is Eq. 7 of Zhang, Xia, and Jiang (J. Chem. Phys. 2022) and the
+    released ``Tanh_like`` module. ``beta -> 0`` recovers ``alpha * x``.
+    Large ``|x|`` saturates at ``alpha / |beta|``.
+    """
+
+    def __init__(
+        self,
+        dim_feature: int = 1,
+        initial_alpha: float = 1.0,
+        initial_beta: float = 1.0,
+        learnable: bool = True,
+    ) -> None:
+        super().__init__(dim_feature, initial_alpha, initial_beta, learnable)
+
+    def simple_activation_fn(self, x: Tensor) -> Tensor:
+        return x / torch.sqrt(1.0 + x.square())
+
+    def activation_fn(self, x: Tensor) -> Tensor:
+        return self.alpha * x / torch.sqrt(1.0 + (self.beta * x).square())
+
+
 class Swish(BaseScaledTemperedActivation):
     """
     Swish activation function with learnable feature-wise parameters:
@@ -187,8 +237,10 @@ class Swish(BaseScaledTemperedActivation):
 ACTIVATION_REGISTER = {
     "shifted_softplus": ShiftedSoftplus,
     "swish": Swish,
+    "relu_like": ReluLike,
+    "tanh_like": TanhLike,
 }
-ACTIVATION_KEY_TYPE = Literal["shifted_softplus", "swish"]
+ACTIVATION_KEY_TYPE = Literal["shifted_softplus", "swish", "relu_like", "tanh_like"]
 ACTIVATION_PARAM_TYPE = Dict[Literal["dim_feature", "initial_alpha", "initial_beta", "learnable"], Union[int, float, bool]]
 
 

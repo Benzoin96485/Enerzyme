@@ -44,6 +44,28 @@ def _resolve_feature_irreps(built_layers: List[Module]) -> Optional[str]:
     return None
 
 
+def _resolve_feature_width(built_layers: List[Module], dim_embedding: Optional[int]) -> int:
+    """Width of ``atom_feature`` for a property head.
+
+    A preceding readout stores the property count in ``dim_feature_out``.
+    Skip those heads and use the Core latent, so a second ``SimpleReadout``
+    still maps the same ``atom_feature``.
+    """
+    for layer in reversed(built_layers):
+        fields = getattr(layer, "_output_fields", None) or set()
+        width = getattr(layer, "dim_feature_out", None)
+        if "atom_feature" not in fields or not width:
+            continue
+        if "Ea" in fields or "Qa" in fields:
+            continue
+        return int(width)
+    if built_layers and hasattr(built_layers[-1], "dim_feature_out"):
+        return int(built_layers[-1].dim_feature_out)
+    if dim_embedding is not None:
+        return int(dim_embedding)
+    raise ValueError("dim_embedding or dim_feature_out from the last layer must be provided")
+
+
 def reshape_ensemble_head_output(
     head_output: Tensor,
     dim_feature_out: int,
@@ -140,12 +162,7 @@ class BaseReadout(BaseFFLayer):
             if feature_irreps is not None
             else _resolve_feature_irreps(built_layers)
         )
-        if len(built_layers) > 0 and hasattr(built_layers[-1], "dim_feature_out"):
-            self.dim_feature_in = built_layers[-1].dim_feature_out
-        elif dim_embedding is not None:
-            self.dim_feature_in = dim_embedding
-        else:
-            raise ValueError("dim_embedding or dim_feature_out from the last layer must be provided")
+        self.dim_feature_in = _resolve_feature_width(built_layers, dim_embedding)
         self._hinted_hidden_width = None
         for layer in reversed(built_layers):
             hinted = getattr(layer, "readout_hidden_width", None)

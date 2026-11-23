@@ -227,6 +227,11 @@ With :code:`architecture: tensornet2`, the pre-core layers are the same :code:`E
 
 With :code:`architecture: tensornet`, pre-core layers are :code:`ExpNormalSmearing` (``trainable: false``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: cosine` supplies the second window. The basis already contains a cosine window, so the Core's extra multiply matches TorchMD-Net. The Core inserts self pairs at ``r = 0``. It returns ``atom_feature`` ``[N, F]``, ``atom_vector_feature`` ``[N, 3, F]`` (the skew part), and ``atom_tensor_feature`` ``[N, 3, 3, F]``. Energy uses :code:`SimpleReadout` (``head_type: two_layer``, ``pyramidal: true``) → :code:`EnergyReduce` → :code:`Force`. ``Q`` is an optional molecular total charge; the default factor is ``1 + 0.1 Q``. The rMD17 widths are 2 interactions, 128 channels, 32 radial functions, and 4.5 Å. Example: :code:`enerzyme/config/tensornet_layers_example.yaml`.
 
+REANN
+-----
+
+With :code:`architecture: reann`, the only pre-core layers are :code:`RangeSeparation` and :code:`RandomAtomEmbedding`. The Core owns the Gaussian orbitals, the squared cosine window, and the coefficient iterations. It returns invariant :code:`atom_feature` ``[N, n_orbit]``. Energy uses :code:`SimpleReadout` (``head_type: mlp``, ``hidden_dims: [128, 128]``, ``relu_like``) → :code:`EnergyReduce` → :code:`Force`. ``num_iterations: 0`` drops the coefficient updates. ``elemental: true`` with ``atomic_numbers`` gives one update network per species. Dipoles are :code:`SimpleReadout(Qa)` and :code:`AtomicCharge2Dipole`. Polarizabilities are :code:`DerivativePolarizability`; ``variant: paper`` is Eqs. 9–11 and ``variant: repo`` is the released three-head product. ``Ra`` has to require grad. Examples: :code:`enerzyme/config/reann_layers_example.yaml`, :code:`reann_response_layers_example.yaml`.
+
 NewtonNet
 ---------
 

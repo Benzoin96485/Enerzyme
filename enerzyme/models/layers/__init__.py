@@ -46,6 +46,7 @@ from .readout import (
 )
 from .pair_embedding import PairChemicalRadialLayer
 from .tensorial import EquivariantDipoleLayer, EquivariantPolarizabilityLayer
+from .response import DerivativePolarizabilityLayer
 # Architecture-specific readouts: defined next to interaction / so3 readout,
 # re-exported for layer-stack name discovery (``Layers.EquiformerGraphAttentionReadout``, …).
 # Import SphereSampleReadout from the submodule (not ``so3`` package) to avoid a
