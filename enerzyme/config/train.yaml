@@ -2258,6 +2258,70 @@ Modelhub:
             keep_feature: false
         - name: EnergyReduce
         - name: Force
+    FF40:
+      suffix:
+      # ViSNet-LSRM (Li et al., ICLR 2024). The Core is ViSNet plus a serial
+      # atom–fragment long-range block. The latent is the concatenation, so
+      # SimpleReadout sees 2F channels. fragment_mode kmeans is the online
+      # fallback. MD22 used BRICS: fragment_mode precomputed and Datahub
+      # field cluster_ids. The paper loss weight is E: 1, Fa: 80. The
+      # released script also set dropout 0.1; this stack keeps dropout 0.
+      # liyy2/LSR-MP checkpoints do not load.
+      architecture: visnet_lsrm
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 128
+        num_rbf: 50
+        max_Za: 100
+        cutoff_sr: 4.0
+        cutoff_lr: 9.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            trainable: true
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 6
+            long_layers: 2
+            num_heads: 8
+            lmax: 1
+            vertex_type: none
+            vecnorm_type: max_min
+            trainable_vecnorm: false
+            neighbor_embedding: true
+            include_self: false
+            cutoff_lr: 9.0
+            fragment_mode: kmeans
+            center: atomic_number
+            min_nodes_per_group: 24
+            dropout: 0.0
+            trainable_rbf_lr: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

@@ -34,17 +34,19 @@ def resolve_cartesian_feature_dim(
     built_layers: Optional[List[Module]],
     dim_embedding: Optional[int],
 ) -> int:
-    """Width F of a preceding Cartesian scalar/vector Core, else ``dim_embedding``."""
+    """Width of the Cartesian scalar/vector pair a head should read.
+
+    A preceding layer that emits ``atom_vector_feature`` publishes that width
+    as ``dim_feature_out``. Late fusion can make it differ from
+    ``dim_embedding`` (ViSNet-LSRM concatenates to ``2 F``). The published
+    width is the one the head reads. ``dim_embedding`` is only the fallback
+    when no Cartesian layer is in the stack yet.
+    """
     for layer in reversed(list(built_layers or [])):
         fields = getattr(layer, "_output_fields", None) or set()
         width = getattr(layer, "dim_feature_out", None)
         if "atom_vector_feature" in fields and width:
-            width = int(width)
-            if dim_embedding is not None and int(dim_embedding) != width:
-                raise ValueError(
-                    f"dim_embedding ({dim_embedding}) != Cartesian feature width ({width})"
-                )
-            return width
+            return int(width)
     if dim_embedding is None:
         raise ValueError(
             "dim_embedding is required when no layer emits atom_vector_feature"

@@ -1,0 +1,77 @@
+# ViSNet-LSRM (Li et al., ICLR 2024).
+# Short-range stack is ViSNet. The long-range block is the released serial
+# fragment update (Visnorm_shared_LSRMNorm2_2branchSerial in liyy2/LSR-MP).
+# Checkpoints from that repository do not load.
+#
+# The Core emits atom_feature [N, 2F] and atom_vector_feature [N, 3, 2F].
+# SimpleReadout is the late fusion dense map on the concatenated invariant.
+# lmax 1 is the MD22 setting. lmax 2 still exposes atom_l2_feature from the
+# short-range stack only; the long-range block does not carry an l = 2 state.
+#
+# fragment_mode kmeans runs online and needs scikit-learn. The MD22/Chignolin
+# runs used BRICS: set fragment_mode: precomputed and store one cluster id
+# per atom in the Datahub field cluster_ids. Centers are recomputed from Ra.
+# center atomic_number is the released center_of_mass path (weights are
+# atomic numbers). geometric is the uniform mean. include_self false matches
+# the released script, which drops self pairs; true restores ViSNet's r = 0.
+#
+# Widths below are the MD22 script: 6 short layers, 2 long layers, 8 heads,
+# 128 channels, 50 basis functions, 4 Å / 9 Å. The training script used
+# dropout 0.1 on the fragment states; the default here is 0 so forces stay
+# deterministic. The paper's energy/force loss weight is 1/80.
+# Enerzymette: set architecture: visnet_lsrm in the resolved config.yaml.
+# No Enerzymette change is required. A future preprocessor can write
+# cluster_ids without a new Core argument.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: visnet_lsrm
+      active: true
+      build_params:
+        dim_embedding: 128
+        num_rbf: 50
+        max_Za: 100
+        cutoff_sr: 4.0
+        cutoff_lr: 9.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            trainable: true
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 6
+            long_layers: 2
+            num_heads: 8
+            lmax: 1
+            vertex_type: none
+            vecnorm_type: max_min
+            trainable_vecnorm: false
+            neighbor_embedding: true
+            include_self: false
+            activation: silu
+            attn_activation: silu
+            cutoff_lr: 9.0
+            fragment_mode: kmeans
+            center: atomic_number
+            min_nodes_per_group: 24
+            kmeans_random_state: 0
+            dropout: 0.0
+            trainable_rbf_lr: true
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

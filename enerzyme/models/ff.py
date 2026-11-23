@@ -72,6 +72,16 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .visnet import ViSNetCore as Core
         from .visnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {
+        "visnet_lsrm",
+        "visnet-lsrm",
+        "visnet_lsr",
+        "visnet-lsr",
+    }:
+        # ViSNet-LSRM: same short-range Core, serial fragment long-range branch.
+        from .visnet.lsr import ViSNetLSRMCore as Core
+        from .visnet.lsr import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "equflash":
         from .equflash import EquFlashCore as Core
         from .equflash import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
