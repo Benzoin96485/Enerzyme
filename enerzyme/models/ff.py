@@ -68,6 +68,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .et import ETCore as Core
         from .et import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {"visnet", "vis-net", "vis_net"}:
+        from .visnet import ViSNetCore as Core
+        from .visnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() == "equflash":
         from .equflash import EquFlashCore as Core
         from .equflash import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

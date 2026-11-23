@@ -20,6 +20,7 @@ from torch import Tensor
 from torch.nn import Identity, LayerNorm, Linear, Module, ModuleList, Parameter, Sequential
 
 from ..functional import reduce_edge
+from ..layers.rejection import vector_rejection
 from .geometry import degree_widths, split_degrees
 
 
@@ -179,17 +180,6 @@ class TensorLayerNorm(Module):
         gain = self.affine.index_select(0, self.degree_index).unsqueeze(0)
         normalized = packed * inverse_rms * gain
         return normalized[:, 0, :], normalized[:, 1:, :]
-
-
-def vector_rejection(features: Tensor, direction: Tensor) -> Tensor:
-    """Component of ``features`` orthogonal to ``direction``.
-
-    ``features`` is ``[E, M, C]`` and ``direction`` is ``[E, M]``. The
-    direction is not re-normalized. For ``l = 1`` it is already a unit vector.
-    """
-    direction = direction.unsqueeze(-1)
-    projected = (features * direction).sum(dim=1, keepdim=True)
-    return features - projected * direction
 
 
 class NodeInit(Module):
