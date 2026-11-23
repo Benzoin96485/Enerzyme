@@ -186,6 +186,11 @@ accept :code:`shallow_ensemble_size` on the last linear head; pair with
 :code:`e2former_lsr_layers_example.yaml`,
 :code:`equiformer_shallow_ensemble_example.yaml`.
 
+BOTNet
+------
+
+With :code:`architecture: botnet` (also :code:`body_ordered` and :code:`body-ordered`), pre-core layers are :code:`RangeSeparation`, :code:`BesselRBF` (``flavor: mace``, ``polynomial_p: 6``), and :code:`RandomAtomEmbedding`. The Bessel layer already applies the polynomial envelope, so :code:`RangeSeparation` does not need a cutoff function. The Core returns stacked equivariant :code:`atom_feature` ``[N, irreps, T]`` when ``output_mode`` is ``layers``. Energy uses :code:`BOTNetEnergyReadout` (linear on each layer, scalar MLP on the last when there are at least two interactions) → :code:`AtomicAffine` → :code:`EnergyReduce` → :code:`Force`. Set :code:`avg_num_neighbors` to the dataset mean. ``variant`` is ``agnostic``, ``element``, or ``residual_element``. Example: :code:`enerzyme/config/botnet_layers_example.yaml`. Published CLI widths are :code:`PUBLISHED_CORE_PARAMS`.
+
 NequIP
 ------
 
