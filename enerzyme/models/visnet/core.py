@@ -341,7 +341,7 @@ class ViSNetCore(BaseFFCore):
         ).to(dtype=dtype)
         return n_atoms, idx_i, idx_j, direction, basis, window
 
-    def get_output(
+    def encode_state(
         self,
         atom_embedding: Tensor,
         rbf: Tensor,
@@ -351,13 +351,13 @@ class ViSNetCore(BaseFFCore):
         Dij_sr: Tensor,
         cutoff_values_sr: Optional[Tensor] = None,
         Za: Optional[Tensor] = None,
-    ) -> Dict[str, Tensor]:
-        """Run the neighbor embedding and ``num_layers`` ViS-MP blocks.
+    ) -> tuple[Tensor, Tensor]:
+        """Neighbor embedding and ViS-MP stack, before the final norms.
 
-        Receivers are ``idx_i_sr`` and senders are ``idx_j_sr``.
-        ``vij_sr = R_j - R_i``. ``Za`` is required when ``neighbor_embedding``
-        is on. The radial basis is the windowed exponential-normal expansion;
-        ``cutoff_values_sr`` is the cosine window on the attention score.
+        Returns the scalar state ``[N, F]`` and the angular state
+        ``[N, (lmax+1)^2 - 1, F]``. :meth:`get_output` applies
+        ``out_norm`` and ``vec_out_norm``. ViSNet-LSRM reuses this state as
+        the short-range branch and only then normalizes.
         """
         if self.neighbor_embedding and Za is None:
             raise ValueError("neighbor_embedding requires atomic numbers Za")
@@ -385,6 +385,36 @@ class ViSNetCore(BaseFFCore):
             vector = vector + delta_vector
             if delta_edge is not None:
                 edge = edge + delta_edge
+        return scalar, vector
+
+    def get_output(
+        self,
+        atom_embedding: Tensor,
+        rbf: Tensor,
+        idx_i_sr: Tensor,
+        idx_j_sr: Tensor,
+        vij_sr: Tensor,
+        Dij_sr: Tensor,
+        cutoff_values_sr: Optional[Tensor] = None,
+        Za: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        """Run the neighbor embedding and ``num_layers`` ViS-MP blocks.
+
+        Receivers are ``idx_i_sr`` and senders are ``idx_j_sr``.
+        ``vij_sr = R_j - R_i``. ``Za`` is required when ``neighbor_embedding``
+        is on. The radial basis is the windowed exponential-normal expansion;
+        ``cutoff_values_sr`` is the cosine window on the attention score.
+        """
+        scalar, vector = self.encode_state(
+            atom_embedding,
+            rbf,
+            idx_i_sr,
+            idx_j_sr,
+            vij_sr,
+            Dij_sr,
+            cutoff_values_sr,
+            Za,
+        )
         scalar = self.out_norm(scalar)
         vector = self.vec_out_norm(vector)
         output = {

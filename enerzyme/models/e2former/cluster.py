@@ -1,6 +1,11 @@
 # Adapted from IQuestLab/UBio-MolFM tag E2Former-LSR (MIT)
 # https://github.com/IQuestLab/UBio-MolFM
-"""Fragment construction and atom–fragment bipartite neighborhoods for E2Former-LSR."""
+"""Fragment construction and atom–fragment bipartite neighborhoods for E2Former-LSR.
+
+Assignment and per-graph ids live in
+:mod:`enerzyme.models.layers.fragments` so ViSNet-LSRM can share them. This
+module keeps the padded atom–fragment neighborhood used by E2Former attention.
+"""
 
 from __future__ import annotations
 
@@ -10,143 +15,26 @@ import torch
 from torch import Tensor
 from torch_scatter import scatter_mean
 
+from ..layers.fragments import (
+    build_kmeans_fragments,
+    centers_from_ids,
+    flatten_cluster_ids,
+    num_clusters_for_graph,
+)
+
+# Historical private name. The count now lives in layers.fragments.
+_num_clusters_for_graph = num_clusters_for_graph
 from .graph import map_neighbor_list, pad_neighbor_list, select_closest_neighbors
 
-
-def _num_clusters_for_graph(num_atoms: int, min_nodes_per_group: int) -> int:
-    if num_atoms <= 0:
-        return 0
-    # Guard against misconfigured YAML (0 / negative) so denom never hits 0.
-    min_nodes = max(int(min_nodes_per_group), 1)
-    denom = min(min_nodes, max(num_atoms // 2, 1) + 1)
-    return int(num_atoms / denom) + 1
-
-
-def build_kmeans_fragments(
-    Ra: Tensor,
-    batch_seg: Tensor,
-    min_nodes_per_group: int = 24,
-    random_state: int = 0,
-) -> Tuple[Tensor, Tensor, Tensor]:
-    """Per-graph k-means fragments (upstream E2FormerCluster default).
-
-    Returns
-    -------
-    local_cluster_ids : LongTensor [N]
-        Cluster id within each graph (0 .. n_c-1).
-    cluster_pos : Tensor [U, 3]
-        Flattened cluster centers across the batch.
-    cluster_batch : LongTensor [U]
-        Graph id for each cluster.
-    """
-    try:
-        from sklearn.cluster import KMeans
-    except ImportError as exc:
-        raise ImportError(
-            "fragment_mode='kmeans' requires scikit-learn "
-            "(pip install scikit-learn). For offline BRICS labels use "
-            "fragment_mode='precomputed' with cluster_ids instead."
-        ) from exc
-
-    device = Ra.device
-    dtype = Ra.dtype
-    num_atoms = Ra.shape[0]
-    local_ids = torch.zeros(num_atoms, dtype=torch.long, device=device)
-    centers = []
-    cluster_batch = []
-
-    num_graphs = int(batch_seg.max().item()) + 1 if num_atoms else 0
-    for g in range(num_graphs):
-        mask = batch_seg == g
-        pos = Ra[mask]
-        n = int(pos.shape[0])
-        if n == 0:
-            continue
-        n_c = max(_num_clusters_for_graph(n, min_nodes_per_group), 1)
-        n_c = min(n_c, n)
-        if n_c == 1:
-            ids_np = torch.zeros(n, dtype=torch.long)
-            center = pos.mean(dim=0, keepdim=True)
-        else:
-            km = KMeans(n_clusters=n_c, random_state=random_state, n_init=10)
-            # sklearn / numpy path; detach so fragment assignment is not differentiated
-            ids_np = torch.as_tensor(
-                km.fit_predict(pos.detach().cpu().numpy()), dtype=torch.long
-            )
-            center = torch.as_tensor(km.cluster_centers_, dtype=dtype)
-        local_ids[mask] = ids_np.to(device=device)
-        centers.append(center.to(device=device, dtype=dtype))
-        cluster_batch.append(
-            torch.full((center.shape[0],), g, dtype=torch.long, device=device)
-        )
-
-    if centers:
-        cluster_pos = torch.cat(centers, dim=0)
-        cluster_batch_t = torch.cat(cluster_batch, dim=0)
-    else:
-        cluster_pos = Ra.new_zeros((0, 3))
-        cluster_batch_t = torch.zeros(0, dtype=torch.long, device=device)
-    return local_ids, cluster_pos, cluster_batch_t
-
-
-def centers_from_ids(
-    Ra: Tensor,
-    local_cluster_ids: Tensor,
-    batch_seg: Tensor,
-) -> Tuple[Tensor, Tensor, Tensor]:
-    """Mean fragment centers from precomputed per-graph cluster ids (BRICS path)."""
-    device = Ra.device
-    dtype = Ra.dtype
-    num_atoms = Ra.shape[0]
-    num_graphs = int(batch_seg.max().item()) + 1 if num_atoms else 0
-    centers = []
-    cluster_batch = []
-    # Remap local ids in case they are not dense 0..n_c-1 within a graph
-    remapped = local_cluster_ids.clone()
-    for g in range(num_graphs):
-        mask = batch_seg == g
-        ids = local_cluster_ids[mask]
-        if ids.numel() == 0:
-            continue
-        uniq = torch.unique(ids, sorted=True)
-        remap = torch.full(
-            (int(ids.max().item()) + 1,), -1, dtype=torch.long, device=device
-        )
-        remap[uniq] = torch.arange(uniq.numel(), device=device, dtype=torch.long)
-        remapped[mask] = remap[ids]
-        pos = Ra[mask]
-        n_c = int(uniq.numel())
-        flat = remapped[mask]
-        sum_pos = Ra.new_zeros((n_c, 3))
-        counts = Ra.new_zeros((n_c, 1))
-        sum_pos.index_add_(0, flat, pos)
-        counts.index_add_(
-            0, flat, torch.ones(pos.shape[0], 1, device=device, dtype=dtype)
-        )
-        centers.append(sum_pos / counts.clamp_min(1.0))
-        cluster_batch.append(
-            torch.full((n_c,), g, dtype=torch.long, device=device)
-        )
-    if centers:
-        return remapped, torch.cat(centers, dim=0), torch.cat(cluster_batch, dim=0)
-    return remapped, Ra.new_zeros((0, 3)), torch.zeros(0, dtype=torch.long, device=device)
-
-
-def flatten_cluster_ids(
-    local_cluster_ids: Tensor,
-    batch_seg: Tensor,
-    cluster_batch: Tensor,
-) -> Tensor:
-    """Map per-graph local cluster ids to global flat indices ``[0, U)``."""
-    if local_cluster_ids.numel() == 0:
-        return local_cluster_ids
-    device = local_cluster_ids.device
-    num_graphs = int(batch_seg.max().item()) + 1
-    counts = torch.bincount(cluster_batch, minlength=num_graphs)
-    offsets = torch.zeros(num_graphs, dtype=torch.long, device=device)
-    if num_graphs > 1:
-        offsets[1:] = torch.cumsum(counts, dim=0)[:-1]
-    return local_cluster_ids + offsets[batch_seg]
+__all__ = [
+    "build_atom_fragment_topk",
+    "build_kmeans_fragments",
+    "centers_from_ids",
+    "flatten_cluster_ids",
+    "num_clusters_for_graph",
+    "pool_fragment_irreps",
+    "resolve_fragments",
+]
 
 
 def pool_fragment_irreps(node_irreps: Tensor, flat_cluster_ids: Tensor) -> Tensor:
