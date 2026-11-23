@@ -99,6 +99,9 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | MACE           | Equivariant accuracy                     | Higher compute cost       |
 +----------------+------------------------------------------+---------------------------+
+| BOTNet         | Body-ordered E(3) message passing        | Two-body layers; MACE     |
+|                |                                          | adds the product          |
++----------------+------------------------------------------+---------------------------+
 | GRACE          | Graph ACE foundation potentials          | Internal; presets 1L/2L   |
 +----------------+------------------------------------------+---------------------------+
 | Geodite        | Equivariant MP without tensor products   | Built in; lmax at most 4  |

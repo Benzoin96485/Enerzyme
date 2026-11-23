@@ -1,0 +1,64 @@
+# BOTNet (Batatia et al., Nat. Mach. Intell., doi:10.1038/s42256-024-00956-x,
+# arXiv:2205.06643). The Core is the two-body equivariant convolution stack
+# from gncs/botnet. It reuses the MACE interaction blocks and does not apply
+# MACE's symmetric product. BesselRBF flavor mace with polynomial_p 6 is the
+# BOTNet radial basis (MACE publishes p = 5). The species embedding and the
+# per-layer energy head stay outside the Core.
+#
+# Messages follow ASE ij: idx_i is the sender, idx_j is the receiver, and
+# Y(vij) uses vij = R_j - R_i. The neighbor list has to contain both
+# directions. NequIP gathers idx_j onto idx_i; this stack does not.
+#
+# Checked-in widths are a small stack (2 interactions, 16 channels, l_max 2,
+# 8 Bessel functions, 4 Å). The gncs/botnet CLI default is
+# PUBLISHED_CORE_PARAMS (5 interactions, 32 channels, l_max 3). The 3BPA
+# hidden irreps are PUBLISHED_3BPA_HIDDEN_IRREPS; both parities make later
+# layers wider, and the stacked latent zero-fills channels a layer did not
+# produce. Set avg_num_neighbors to the dataset mean. Leave cutoff_fn unset:
+# the envelope is inside the Bessel layer. gncs/botnet checkpoints do not load.
+# Enerzymette: architecture: botnet (aliases body_ordered, body-ordered).
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: botnet
+      active: true
+      build_params:
+        dim_embedding: 16
+        num_rbf: 8
+        max_Za: 94
+        cutoff_sr: 4.0
+        avg_num_neighbors: 1.0
+      layers:
+        - name: RangeSeparation
+        - name: BesselRBF
+          params:
+            flavor: mace
+            trainable: false
+            polynomial_p: 6
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            max_ell: 2
+            num_interactions: 2
+            variant: agnostic
+            output_mode: layers
+            MLP_irreps: 16x0e
+            radial_MLP: [64, 64, 64]
+            gate: silu
+        - name: BOTNetEnergyReadout
+          params:
+            MLP_irreps: 16x0e
+            gate: silu
+        - name: AtomicAffine
+          params:
+            shifts:
+              Ea:
+                values: 0
+                learnable: true
+            scales:
+              Ea:
+                values: 1
+                learnable: true
+        - name: EnergyReduce
+        - name: Force

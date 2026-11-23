@@ -154,6 +154,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .mace import MACECore as Core
         from .mace import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {"botnet", "body_ordered", "body-ordered"}:
+        from .botnet import BOTNetCore as Core
+        from .botnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() in {"mace_polar", "mace-polar", "mace-polar-1"}:
         from .mace import MACECore as Core
         from .mace.polar import (

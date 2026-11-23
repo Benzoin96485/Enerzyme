@@ -59,4 +59,5 @@ from ..so3.sphere_sample_readout import SphereSampleReadout
 from .charge_spin_embedding import ChargeSpinEmbeddingLayer
 from ..m3gnet.basis import SphericalBesselRBFLayer
 from ..mace.readout import MACEEnergyReadout
+from ..botnet.readout import BOTNetEnergyReadout
 from ..mace.polar import PolarFieldLayer

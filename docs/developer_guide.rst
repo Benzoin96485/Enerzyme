@@ -943,6 +943,11 @@ Frank et al. (arXiv:2412.08541) — shared package :code:`enerzyme/models/efa/` 
 * Adding EFA to a **new** Core: (1) include :code:`Ra` and :code:`batch_seg` in Core :code:`input_fields`; (2) :code:`build_efa_blocks(...)` or construct :code:`EFABlock`; (3) after a local layer, :code:`x = x + apply_efa_if_configured(x, Ra, batch_seg, block)`. Keep EFA inside the Core, not as a post-core YAML physics layer.
 * Tests: :code:`test/test_efa.py`. Examples: :code:`efa_layers_example.yaml`, :code:`so3lr_efa_layers_example.yaml`.
 
+BOTNet (:code:`botnet`)
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Batatia et al. (Nat. Mach. Intell., doi:10.1038/s42256-024-00956-x, arXiv:2205.06643) live under :code:`enerzyme/models/botnet/` (:code:`core.py`, :code:`interaction.py`, :code:`readout.py`). Register via :code:`get_ff_core("botnet")`. Aliases are :code:`body_ordered` and :code:`body-ordered`. Do not import `gncs/botnet <https://github.com/gncs/botnet>`_; its checkpoints do not load. The interaction classes are the ones already in :mod:`enerzyme.models.mace.interaction` (``AgnosticNonlinearInteractionBlock``, ``AgnosticResidualNonlinearInteractionBlock``, ``ResidualElementDependentInteractionBlock``). MACE's ``RealAgnostic*`` blocks return a product-basis tensor and are rejected. Reuse :code:`BesselRBF(flavor="mace")` with ``polynomial_p: 6``, :code:`RandomAtomEmbedding`, :meth:`BaseFFCore.adopt_radius_stack`, and :class:`~enerzyme.models.mace.blocks.feature_spec`. The symmetric contraction stays in MACE. The Core emits :code:`atom_feature`. :code:`BOTNetEnergyReadout` is the linear-per-layer head with a scalar MLP on the last layer. :code:`AtomicAffine`, :code:`EnergyReduce`, and :code:`Force` stay outside. Published widths are :code:`PUBLISHED_CORE_PARAMS` and :code:`PUBLISHED_3BPA_HIDDEN_IRREPS`. Example: :code:`botnet_layers_example.yaml`. Tests: :code:`test/test_botnet_ops.py`, :code:`test/test_botnet_core.py`. Enerzymette: :code:`architecture: botnet` + resolved :code:`config.yaml`.
+
 AllScAIP (:code:`AllScAIP`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

@@ -19,7 +19,8 @@ MODEL_HEAD_NAMES = {
     "SpookyNetCore": {"output"},
     "AlphaNetCore": set(),
     "LEFTNetCore": set(),
-    "MACECore": {"readouts"}
+    "MACECore": {"readouts"},
+    "BOTNetCore": set(),
 }
 
 
