@@ -2153,6 +2153,54 @@ Modelhub:
               learnable: false
         - name: EnergyReduce
         - name: Force
+    FF38:
+      suffix:
+      # EquiREANN (Wu, Xia, Zhang, and Jiang, J. Phys. Chem. A 2024). The Core
+      # extends REANN with the equivariant orbital message. RandomAtomEmbedding
+      # is the initial orbital coefficient. num_iterations 0 is the embedded-atom
+      # density. Cumulene widths are PUBLISHED_CUMULENE_CORE_PARAMS.
+      # bjiangch/EquiREANN checkpoints do not load.
+      architecture: equireann
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 32
+        max_Za: 94
+        cutoff_sr: 6.0
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            lmax: 2
+            nwave: 20
+            num_iterations: 2
+            nblock: 1
+            hidden_dims: [32, 32]
+            activation: tanh_like
+            layer_norm: false
+            elemental: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            hidden_dims: [32, 32]
+            activation_fn: relu_like
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

@@ -232,6 +232,11 @@ REANN
 
 With :code:`architecture: reann`, the only pre-core layers are :code:`RangeSeparation` and :code:`RandomAtomEmbedding`. The Core owns the Gaussian orbitals, the squared cosine window, and the coefficient iterations. It returns invariant :code:`atom_feature` ``[N, n_orbit]``. Energy uses :code:`SimpleReadout` (``head_type: mlp``, ``hidden_dims: [128, 128]``, ``relu_like``) → :code:`EnergyReduce` → :code:`Force`. ``num_iterations: 0`` drops the coefficient updates. ``elemental: true`` with ``atomic_numbers`` gives one update network per species. Dipoles are :code:`SimpleReadout(Qa)` and :code:`AtomicCharge2Dipole`. Polarizabilities are :code:`DerivativePolarizability`; ``variant: paper`` is Eqs. 9–11 and ``variant: repo`` is the released three-head product. ``Ra`` has to require grad. Examples: :code:`enerzyme/config/reann_layers_example.yaml`, :code:`reann_response_layers_example.yaml`.
 
+EquiREANN
+---------
+
+With :code:`architecture: equireann`, the pre-core layers are the same :code:`RangeSeparation` and :code:`RandomAtomEmbedding`. The Core subclasses the REANN Core. It returns the same invariant :code:`atom_feature` ``[N, n_orbit]``. Each iteration updates the orbital coefficients and adds the neighbor's aggregated Cartesian orbital, scaled by the squared cosine window, before rebuilding the density. ``num_iterations: 0`` leaves that orbital unpassed. Energy uses :code:`SimpleReadout` (``head_type: mlp``, ``hidden_dims: [32, 32]``, ``relu_like``) → :code:`EnergyReduce` → :code:`Force`. The coefficient network in the checked-in stack is ``tanh_like`` without LayerNorm. Dipoles and polarizabilities reuse the REANN response layers. ``Ra`` has to require grad for the polarizability. Example: :code:`enerzyme/config/equireann_layers_example.yaml`.
+
 NewtonNet
 ---------
 
