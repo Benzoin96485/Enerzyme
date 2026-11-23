@@ -1,0 +1,54 @@
+# REANN charges, dipole, and polarizability.
+# Qa is a second readout of the same density. The dipole is sum_i q_i r_i
+# (J. Chem. Phys. 2022, Eq. 8). It shifts with the origin unless the charges
+# in each molecule sum to the total charge; add ChargeConservation in front
+# of AtomicCharge2Dipole when that frame matters.
+# DerivativePolarizability is Eq. 9–11 (variant: paper). variant: repo matches
+# Property_POL in zhangylch/REANN. Ra must require grad at inference.
+# EquivariantPolarizability is the other head and needs Cartesian vector features.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: reann
+      active: true
+      build_params:
+        dim_embedding: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            lmax: 2
+            nwave: 8
+            num_iterations: 1
+            nblock: 1
+            hidden_dims: [32, 32]
+            activation: relu_like
+            layer_norm: true
+            elemental: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            hidden_dims: [32]
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Qa]
+            head_type: dense
+        - name: AtomicCharge2Dipole
+        - name: DerivativePolarizability
+          params:
+            variant: paper
+            hidden_dims: [32]
+            activation_fn: swish
+        - name: EnergyReduce
+        - name: Force

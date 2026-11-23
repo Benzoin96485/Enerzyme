@@ -2106,6 +2106,53 @@ Modelhub:
                 learnable: true
         - name: EnergyReduce
         - name: Force
+    FF37:
+      suffix:
+      # REANN (Zhang, Xia, and Jiang, J. Chem. Phys. 2022). The Core is the
+      # recursive embedded-atom density. RandomAtomEmbedding is the initial
+      # orbital coefficient. num_iterations 0 is EANN. MD17 widths are
+      # PUBLISHED_MD17_CORE_PARAMS. zhangylch/REANN checkpoints do not load.
+      architecture: reann
+      active: false
+      loss:
+        mae:
+          Fa: 1
+          E: 1
+      Metric:
+        Fa:
+          mae: 1
+        E:
+          mae: 1
+      build_params:
+        dim_embedding: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            lmax: 2
+            nwave: 8
+            num_iterations: 1
+            nblock: 1
+            hidden_dims: [128, 128]
+            activation: relu_like
+            layer_norm: true
+            elemental: false
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            hidden_dims: [128, 128]
+            activation_fn: relu_like
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+        - name: EnergyReduce
+        - name: Force
 Trainer:
   Splitter:
     method: random                          # splitting method: random

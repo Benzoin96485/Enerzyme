@@ -6,7 +6,8 @@ Any Core that emits ``atom_feature`` ``[N, F]`` and ``atom_vector_feature``
 * :class:`EquivariantDipoleLayer` — Eq. 13, latent charges plus atomic dipoles.
   Charge-only dipoles stay on ``SimpleReadout(Qa)`` + ``AtomicCharge2Dipole``.
 * :class:`EquivariantPolarizabilityLayer` — Eq. 14, isotropic scalar plus
-  ``ν ⊗ r + r ⊗ ν``.
+  ``ν ⊗ r + r ⊗ ν``. Scalar latents without a Cartesian vector use
+  :class:`~enerzyme.models.layers.response.DerivativePolarizabilityLayer`.
 
 Both follow SchNetPack 2.0.4 ``DipoleMoment`` / ``Polarizability`` (MIT),
 including the gated MLP width schedule. Coordinates are used as stored.

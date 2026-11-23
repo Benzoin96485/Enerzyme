@@ -1,0 +1,54 @@
+# REANN (Zhang, Xia, and Jiang, J. Chem. Phys. 156, 114801, 2022).
+# The Core is the recursive embedded-atom density. RandomAtomEmbedding supplies
+# the initial orbital coefficients. SimpleReadout, EnergyReduce, and Force stay
+# outside. num_iterations: 0 is the embedded-atom network without message passing.
+#
+# Checked-in widths follow the repository defaults (nwave 8, lmax 2, one
+# coefficient update, hidden 128, cutoff 5 Å). MD17 in Table I is
+# PUBLISHED_MD17_CORE_PARAMS with cutoff 8 Å and nwave 20. Set elemental: true
+# and atomic_numbers to the species in the dataset for per-element coefficient
+# networks. Checkpoints from https://github.com/zhangylch/REANN do not load.
+#
+# Dipoles: SimpleReadout(Qa) then AtomicCharge2Dipole (paper Eq. 8).
+# Polarizabilities of this scalar latent: DerivativePolarizability.
+# See reann_response_layers_example.yaml. Enerzymette only needs
+# architecture: reann in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: reann
+      active: true
+      build_params:
+        dim_embedding: 32
+        max_Za: 94
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            lmax: 2
+            nwave: 8
+            num_iterations: 1
+            nblock: 1
+            hidden_dims: [128, 128]
+            activation: relu_like
+            layer_norm: true
+            dropout: 0.0
+            elemental: false
+            coeff_init: 0.1
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            hidden_dims: [128, 128]
+            activation_fn: relu_like
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
