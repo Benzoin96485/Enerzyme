@@ -53,8 +53,10 @@ class ETNeighborEmbedding(Module):
     TorchMD-Net assigns each element two vectors. :class:`RandomAtomEmbedding`
     owns the first. This block owns the neighborhood table (paper Eq. 3) and
     reuses the same embedding module, including its checkpoint resize. Self
-    pairs are dropped. On a bidirectional neighbor list the sum is the same
-    sum TorchMD-Net scatters onto ``edge_index[0]``.
+    pairs are dropped, and the sum is written onto ``idx_i`` (the receiver).
+    TorchMD-Net's neighbor embedding scatters onto ``edge_index[0]`` instead.
+    On a bidirectional list the two sums match. Attention still reads
+    ``edge_index[1]`` as the receiver.
     """
 
     def __init__(self, hidden_channels: int, num_rbf: int, max_Za: int) -> None:
