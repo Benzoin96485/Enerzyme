@@ -148,7 +148,7 @@ class EdgeEmbedding(Module):
     """``f_ij = (h_i + h_j) Linear(rbf)``, including self pairs.
 
     The radial basis already contains its cosine window. This block does not
-    multiply a second one. ``idx_i`` is the receiver.
+    multiply a second one. ``idx_i`` is the receiver. QuinNet uses the same map.
     """
 
     def __init__(self, num_rbf: int, hidden_channels: int) -> None:
