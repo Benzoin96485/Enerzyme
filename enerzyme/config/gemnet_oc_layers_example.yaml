@@ -1,0 +1,73 @@
+# GemNet-OC (Gasteiger et al., TMLR 2022, arXiv:2204.02782).
+# Interaction hierarchy on the GemNet stack. The embedding edges, quadruplet
+# central bonds, atom–edge edges, and atom–atom edges are separate capped
+# graphs. Widths and caps are the OC20 base config. The Gaussian basis
+# (flavor gemnet-oc) and the species embedding stay outside the Core.
+# HierachicalReadout is a bias-free linear map. Force is conservative
+# (Fa = -∇E). The published direct-force head and the OC20 quadruplet tag
+# filter are not in this stack. fairchem checkpoints do not load.
+#
+# Enerzymette: set architecture: gemnet-oc in the resolved config.yaml.
+# No Enerzymette code change is required.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: gemnet-oc
+      active: true
+      build_params:
+        dim_embedding: 256
+        num_rbf: 128
+        max_Za: 94
+        cutoff_sr: 12.0
+      layers:
+        - name: RangeSeparation
+        - name: GaussianRBF
+          params:
+            flavor: gemnet-oc
+            apply_cutoff_fn: false
+            envelope_exponent: 5
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_blocks: 4
+            num_spherical: 7
+            emb_size_edge: 512
+            emb_size_trip_in: 64
+            emb_size_trip_out: 64
+            emb_size_quad_in: 32
+            emb_size_quad_out: 32
+            emb_size_aint_in: 64
+            emb_size_aint_out: 64
+            emb_size_rbf: 16
+            emb_size_cbf: 16
+            emb_size_sbf: 32
+            num_before_skip: 2
+            num_after_skip: 2
+            num_concat: 1
+            num_atom: 3
+            num_atom_emb_layers: 2
+            num_output_afteratom: 3
+            cutoff: 12.0
+            cutoff_qint: 12.0
+            cutoff_aeaint: 12.0
+            cutoff_aint: 12.0
+            max_neighbors: 30
+            max_neighbors_qint: 8
+            max_neighbors_aeaint: 20
+            max_neighbors_aint: 1000
+            quad_interaction: true
+            atom_edge_interaction: true
+            edge_atom_interaction: true
+            atom_interaction: true
+            envelope_exponent: 5
+            output_mode: feature
+        - name: HierachicalReadout
+          params:
+            output_fields: [Ea]
+            head_type: dense
+            use_bias: false
+            initial_weight: orthogonal
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

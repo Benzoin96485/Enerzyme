@@ -118,6 +118,13 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
             DEFAULT_LAYER_PARAMS_Q as DEFAULT_LAYER_PARAMS,
         )
         special_loss = {}
+    elif architecture.lower() in {"gemnet-oc", "gemnetoc", "gemnet_oc"}:
+        from .gemnet import GemNetOCCore as Core
+        from .gemnet import (
+            DEFAULT_BUILD_PARAMS_OC as DEFAULT_BUILD_PARAMS,
+            DEFAULT_LAYER_PARAMS_OC as DEFAULT_LAYER_PARAMS,
+        )
+        special_loss = {}
     elif architecture.lower() == "physnet":
         from .physnet import PhysNetCore as Core
         from .physnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

@@ -25,6 +25,21 @@ from ..dimenet.basis import (
 )
 
 
+def legendre_outer(angle_cab: Tensor, dihedral: Tensor, num_spherical: int) -> Tensor:
+    """Outer product of two zonal harmonics, flattened to ``(Q, L²)``.
+
+    GemNet-OC's ``legendre_outer`` spherical basis. Channel
+    ``l_cab * L + l_dihedral`` stores ``Y_{l_cab}^0(angle_cab) Y_{l_dihedral}^0(φ)``.
+    Both angles are the unsigned angles in ``[0, π]`` already used by GemNet-Q.
+    This is not the real ``Y_l^m`` basis of GemNet-Q.
+    """
+    left = y_lm0(angle_cab, num_spherical)
+    right = y_lm0(dihedral, num_spherical)
+    if left.numel() == 0:
+        return left.new_empty(0, num_spherical * num_spherical)
+    return (left.unsqueeze(-1) * right.unsqueeze(-2)).reshape(left.shape[0], -1)
+
+
 def y_lm0(angle: Tensor, num_spherical: int) -> Tensor:
     """``Y_l^0(angle)`` for ``l = 0 … num_spherical-1``, shape ``(T, L)``."""
     if angle.numel() == 0:
