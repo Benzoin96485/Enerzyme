@@ -1,0 +1,56 @@
+# EquiREANN (Wu, Xia, Zhang, and Jiang, J. Phys. Chem. A 2024, 128, 11061).
+# The Core is the REANN density plus the equivariant orbital message.
+# RandomAtomEmbedding supplies the initial orbital coefficients.
+# SimpleReadout, EnergyReduce, and Force stay outside.
+# num_iterations: 0 is the embedded-atom density with no orbital message.
+#
+# Checked-in widths follow bjiangch/EquiREANN para/input_density and para/input_nn:
+# nwave 20, lmax 2 (nipsin 2 before the repository adds one), two coefficient
+# updates, hidden 32, tanh_like without LayerNorm, cutoff 6 Å.
+# The cumulene experiment is PUBLISHED_CUMULENE_CORE_PARAMS (Nφ 8, L 2, T 2,
+# 16×16, cutoff 6 Å). Checkpoints from https://github.com/bjiangch/EquiREANN
+# do not load. REANN checkpoints do not load either: this Core stores one
+# contraction per iteration.
+#
+# Dipoles and polarizabilities use the same shared heads as REANN.
+# See reann_response_layers_example.yaml. Enerzymette only needs
+# architecture: equireann in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: equireann
+      active: true
+      build_params:
+        dim_embedding: 32
+        max_Za: 94
+        cutoff_sr: 6.0
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            lmax: 2
+            nwave: 20
+            num_iterations: 2
+            nblock: 1
+            hidden_dims: [32, 32]
+            activation: tanh_like
+            layer_norm: false
+            dropout: 0.0
+            elemental: false
+            coeff_init: 0.1
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: mlp
+            hidden_dims: [32, 32]
+            activation_fn: relu_like
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

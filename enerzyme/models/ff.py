@@ -158,6 +158,10 @@ def get_ff_core(architecture: str) -> Tuple[Layers.BaseFFCore, Dict[str, Any], L
         from .reann import REANNCore as Core
         from .reann import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
         special_loss = {}
+    elif architecture.lower() in {"equireann", "equi-reann", "equi_reann"}:
+        from .equireann import EquiREANNCore as Core
+        from .equireann import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+        special_loss = {}
     elif architecture.lower() in {"botnet", "body_ordered", "body-ordered"}:
         from .botnet import BOTNetCore as Core
         from .botnet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
