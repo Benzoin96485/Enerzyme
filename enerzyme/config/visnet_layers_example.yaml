@@ -1,0 +1,61 @@
+# ViSNet (Wang et al., Nat. Commun. 2024, doi:10.1038/s41467-023-43720-2).
+# Core: neighbor embedding, edge state, and vector-scalar message passing.
+# ExpNormalSmearing, the first species table, and the scalar energy head stay outside.
+#
+# The exponential-normal basis already includes a cosine window. The Core
+# multiplies cutoff_values_sr onto the attention score, which is the second
+# window. cutoff_fn: cosine with the same cutoff_sr is that window. The
+# neighbor list omits self pairs; the Core inserts r = 0 (loop=True). The
+# reference max_num_neighbors cap of 32 is not applied.
+#
+# Widths below are examples/ViSNet-MD17.yml (9 layers, 8 heads, 256 channels,
+# 32 basis functions, 5 Å, lmax 2, vertex none, vecnorm none). QM9 uses 512
+# channels, 64 basis functions, and vecnorm max_min (PUBLISHED_QM9_CORE_PARAMS).
+# lmax 2 keeps a Cartesian l = 1 slice in atom_vector_feature, so
+# EquivariantDipole and EquivariantPolarizability apply. atom_l2_feature is
+# the five even-parity channels. Checkpoints from AI2BMD do not load.
+# Enerzymette: set architecture: visnet in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: visnet
+      active: true
+      build_params:
+        dim_embedding: 256
+        num_rbf: 32
+        max_Za: 100
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 9
+            num_heads: 8
+            lmax: 2
+            vertex_type: none
+            vecnorm_type: none
+            trainable_vecnorm: false
+            neighbor_embedding: true
+            include_self: true
+            activation: silu
+            attn_activation: silu
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force
