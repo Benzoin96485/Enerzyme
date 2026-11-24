@@ -417,5 +417,305 @@
    "error": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation."
   },
   "production_training": "The published FP32 accumulations remain in the compiled VJP. Native degree normalization matches all 60 parameter gradients, but the VJP loses all learned operators. The CPU code-generation controls retain learned contractions and reductions, with errors above the stated FP64 tolerances."
+ },
+ "opaque_operator_training_controls": {
+  "source": "9ee12e4",
+  "device": "CPU",
+  "torch": "2.13.0+cu126",
+  "minimum": {
+   "seed": 410,
+   "dtype": "float64 for coordinates and dense weights, float32 for normalization",
+   "shapes": {
+    "X": [
+     3,
+     7
+    ],
+    "W": [
+     7,
+     32
+    ],
+    "V": [
+     32,
+     1
+    ]
+   },
+   "energy": "h = (X @ W).float(); c = h - sum(h)/32; E = ((c * rsqrt(sum(c*c)/32 + 1e-4)).double() @ V).sum(). Each sum in the normalization reduces the last axis and keeps that axis.",
+   "derivatives": "energy, pullback = torch.func.vjp(E, X); F = -pullback(ones_like(energy))[0]. Differentiate energy**2 + sum(F**2) jointly with respect to W and V. Use fullgraph=True for both the FX and Inductor checks.",
+   "error_fields": [
+    "energy",
+    "force",
+    "weight_gradient_W",
+    "weight_gradient_V"
+   ],
+   "implementations": {
+    "regular": "Use ordinary Tensor.sum.",
+    "op": "torch.library.custom_op with a CPU sum, fake shape rule, registered autograd (backward expands the incoming gradient), setup_context, and registered vmap.",
+    "wrapped": "Call the opaque op on detached input from a new-style autograd.Function with setup_context, generate_vmap_rule and the same expand backward.",
+    "allow": "Wrap the call to that Function with torch.compiler.allow_in_graph.",
+    "detach_analytic": "Let r = x.sum(-1, keepdim=True); return opaque_sum(x.detach()) + (r-r.detach()). This finite-input diagnostic applies the native rounded value and uses the standard derivative of the linear sum."
+   },
+   "registered_op_smoke": {
+    "data_shape": [
+     6,
+     3,
+     32
+    ],
+    "native_forward_max_error": 0.0,
+    "native_backward_max_error": 0.0,
+    "vmap_forward_max_error": 0.0,
+    "vmap_backward_max_error": 0.0
+   },
+   "results": {
+    "regular": {
+     "eager": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [],
+      "learned_matrix_multiplications": 0,
+      "opaque_sum_nodes": 0
+     },
+     "fx": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [
+       27
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     },
+     "inductor": {
+      "maximum_absolute_errors": [
+       4.1062929057034125e-08,
+       8.797434114526936e-07,
+       7.455561739533323e-06,
+       5.972065579840091e-06
+      ],
+      "graph_sizes": [
+       27
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     }
+    },
+    "op": {
+     "eager": {
+      "error": "RuntimeError",
+      "cause": "GeneratedBackwardFor_dpa4_scratch_sum_last_default lacks a functorch-compatible setup_context method."
+     },
+     "fx": {
+      "error": "TorchRuntimeError",
+      "cause": "GeneratedBackwardFor_dpa4_scratch_sum_last_default lacks a functorch-compatible setup_context method."
+     },
+     "inductor": {
+      "error": "TorchRuntimeError",
+      "cause": "GeneratedBackwardFor_dpa4_scratch_sum_last_default lacks a functorch-compatible setup_context method."
+     }
+    },
+    "wrapped": {
+     "eager": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [],
+      "learned_matrix_multiplications": 0,
+      "opaque_sum_nodes": 0
+     },
+     "fx": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       1.9589476505072625,
+       5.448240637779236
+      ],
+      "graph_sizes": [
+       29
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     },
+     "inductor": {
+      "maximum_absolute_errors": [
+       0.0,
+       7.357734221891121e-08,
+       1.9589508152915691,
+       5.448240756988525
+      ],
+      "graph_sizes": [
+       29
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     }
+    },
+    "allow": {
+     "eager": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [],
+      "learned_matrix_multiplications": 0,
+      "opaque_sum_nodes": 0
+     },
+     "fx": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [
+       27
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     },
+     "inductor": {
+      "maximum_absolute_errors": [
+       0.0,
+       7.357734221891121e-08,
+       1.7755231027649643e-06,
+       5.960464477539062e-07
+      ],
+      "graph_sizes": [
+       27
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     }
+    },
+    "detach_analytic": {
+     "eager": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [],
+      "learned_matrix_multiplications": 0,
+      "opaque_sum_nodes": 0
+     },
+     "fx": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [
+       37
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 2
+     },
+     "inductor": {
+      "maximum_absolute_errors": [
+       0.0,
+       7.357734221891121e-08,
+       1.7755231027649643e-06,
+       5.960464477539062e-07
+      ],
+      "graph_sizes": [
+       37
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 2
+     }
+    }
+   }
+  },
+  "full_dpa4": {
+   "job": 6319030,
+   "variant": "Replace the scalar centering mean and both degree variance sums with opaque native reductions of detached inputs, with the ordinary differentiable reduction providing their linear derivatives. Keep the published FP32 casts, affine transform and VJP.",
+   "energy": {
+    "max_abs": 0.0,
+    "relative_l2": 0.0
+   },
+   "forces": {
+    "max_abs": 5.797906932336616e-09,
+    "relative_l2": 4.092140147775604e-08
+   },
+   "parameter_gradients_compared": 60,
+   "largest_gradient_error": {
+    "name": "blocks.0.module.post_so2_norm.bias",
+    "max_abs": 3.814697265625e-06,
+    "relative_l2": 2.413965382666459e-08
+   },
+   "graphs": 1,
+   "captured_operations": 1246,
+   "learned_operations": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ],
+   "outside_tolerance": [
+    "Fa",
+    "pre_sequence.2.embedding.weight",
+    "embed.radial_basis.freqs",
+    "embed.sphere_proj.weight",
+    "embed.sphere_proj.bias",
+    "embed.radial_feat_mlp.net.0.weight",
+    "embed.radial_feat_mlp.net.2.weight",
+    "embed.env_embed.output_proj.weight",
+    "blocks.0.module.post_so2_norm.bias",
+    "blocks.0.module.so2_conv.post_mix.weight",
+    "blocks.0.module.ffns.0.so3_linear_2.weight",
+    "blocks.1.module.post_so2_norm.bias",
+    "blocks.1.module.so2_conv.post_mix.weight",
+    "blocks.1.module.ffns.0.so3_linear_2.weight"
+   ],
+   "changed_gradient_participation": {},
+   "opaque_reduction_calls_per_generated_forward": 15,
+   "note": "The five degree RMS normalization sites each call the native centering mean and two native sums. All parameter gradients participate; force and thirteen weight gradients are outside tolerance."
+  },
+  "whole_norm_native_derivatives": {
+   "seed": 125,
+   "shapes": {
+    "X": [
+     4,
+     3
+    ],
+    "W": [
+     3,
+     32
+    ],
+    "V": [
+     32,
+     1
+    ]
+   },
+   "method": "Use one opaque op for the full single-input FP32-centered RMS norm, another for its torch.func.vjp, and a third for the VJP of the pullback. Wrap the ops in new-style autograd Functions. Allow the forward wrapper in the Dynamo graph. The test uses a 1e-5 variance floor and the same scalar energy + force-loss procedure.",
+   "isolated_ops": {
+    "first_vjp_maximum_absolute_error": 0.0,
+    "second_vjp_x_maximum_absolute_error": 0.0,
+    "second_vjp_cotangent_maximum_absolute_error": 0.0
+   },
+   "eager_and_fullgraph_fx": {
+    "energy_maximum_absolute_error": 0.0,
+    "force_maximum_absolute_error": 0.0,
+    "weight_W_maximum_absolute_error": 3.861223692780413e-06,
+    "weight_V_maximum_absolute_error": 0.0
+   },
+   "inductor": "The compiled call reaches the opaque native VJP, which fails inside torch.func.vjp with NotImplementedError: Cannot access storage of TensorWrapper.",
+   "ordinary_autograd_replay": "Calling torch.autograd.grad under torch.enable_grad() inside an opaque CPU kernel fails even in isolation: element 0 of tensors does not require grad and does not have a grad_fn."
+  }
  }
 }
