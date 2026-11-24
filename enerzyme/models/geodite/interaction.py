@@ -17,15 +17,16 @@ from typing import Callable, List, Optional, Sequence, Union
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Identity, LayerNorm, Linear, Module, ModuleList, Parameter, Sequential
+from torch.nn import Identity, LayerNorm, Linear, Module, ModuleList, Sequential
 
 from ..mp.block import Block, BlockState
 from ..mp.core import Embed
 from ..mp.head import Head
+from ..mp.nn.field_norm import TensorLayerNorm
 from ..mp.ops import scatter_sum
 from .geometry import angular_dim, geodite_spherical_harmonics
 from ..layers.rejection import vector_rejection
-from .geometry import degree_widths, split_degrees
+from .geometry import split_degrees
 
 
 _EDGE_PARTS = {
@@ -147,43 +148,6 @@ def _mlp(
         )
     layers.append(Dense(widths[-2], widths[-1], activation=last_activation))
     return Sequential(*layers)
-
-
-class TensorLayerNorm(Module):
-    """One RMS over every degree, with a per-degree affine gain.
-
-    The degree weight ``1 / (2l + 1)`` gives each ``l`` the same vote. The
-    statistic is then averaged over channels, so a symmetric geometry where
-    one degree is zero does not make its own norm singular.
-    """
-
-    def __init__(self, lmax: int, num_channels: int, eps: float = 1e-6) -> None:
-        super().__init__()
-        self.lmax = int(lmax)
-        self.eps = float(eps)
-        self.channels = int(num_channels)
-        self.split_sizes = [1, *degree_widths(self.lmax)]
-        degree_index: List[int] = []
-        balance: List[float] = []
-        for degree, size in enumerate(self.split_sizes):
-            degree_index.extend([degree] * size)
-            balance.extend([1.0 / size] * size)
-        self.register_buffer(
-            "degree_index", torch.tensor(degree_index, dtype=torch.long), persistent=False
-        )
-        self.register_buffer(
-            "balance", torch.tensor(balance).view(1, -1, 1), persistent=False
-        )
-        self.affine = Parameter(torch.ones(self.lmax + 1, self.channels))
-
-    def forward(self, scalars: Tensor, steerable: Tensor) -> tuple[Tensor, Tensor]:
-        packed = torch.cat([scalars.unsqueeze(1), steerable], dim=1)
-        # [N, 1, C] then a scalar per atom.
-        squared = (packed.square() * self.balance).sum(dim=1, keepdim=True)
-        inverse_rms = (squared.mean(dim=2, keepdim=True) + self.eps).pow(-0.5)
-        gain = self.affine.index_select(0, self.degree_index).unsqueeze(0)
-        normalized = packed * inverse_rms * gain
-        return normalized[:, 0, :], normalized[:, 1:, :]
 
 
 class NodeInit(Module):

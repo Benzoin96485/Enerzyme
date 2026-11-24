@@ -21,6 +21,45 @@ def rms_normalize(x: Tensor, dims, eps: float, eps_mode: str = "inside") -> Tens
     return x * inverse_rms(x.square().mean(dim=dims, keepdim=True), eps, eps_mode)
 
 
+def balanced_degree_moment(
+    values: Tensor, weights: Tensor, channels_first: bool
+) -> Tensor:
+    """Weighted sum of spherical component variances, averaged over channels."""
+    square = values.square()
+    if channels_first:
+        return torch.einsum(
+            "ai,nic->nac", weights.reshape(1, -1), square.mean(dim=2, keepdim=True)
+        )
+    moment = torch.einsum("nic,ia->nac", square, weights.reshape(-1, 1))
+    return moment.mean(dim=2, keepdim=True)
+
+
+def flat_rms_scale(
+    values: Tensor, weights: Tensor, eps: float, divisor: int = 1
+) -> Tensor:
+    """One RMS scale over flat components with representation-dependent weights."""
+    moment = (values.square() * weights).sum(dim=-1, keepdim=True)
+    return inverse_rms(moment / divisor if divisor != 1 else moment, eps)
+
+
+def degree_rms_scale(
+    values: Tensor,
+    component_dim: int,
+    channel_dim: int,
+    normalization: str,
+    eps: float,
+    eps_mode: str = "inside",
+) -> Tensor:
+    """Scale for one irrep block in either component-major or channel-major order."""
+    square = values.square()
+    moment = (
+        square.sum(dim=component_dim, keepdim=True)
+        if normalization == "norm"
+        else square.mean(dim=component_dim, keepdim=True)
+    )
+    return inverse_rms(moment.mean(dim=channel_dim, keepdim=True), eps, eps_mode)
+
+
 def feature_norm(name: str | None, width: int) -> nn.Module | None:
     if name in (None, "none", "null"):
         return None
@@ -141,20 +180,21 @@ class EquivariantNorm(nn.Module):
             self.balance_degree_weight = None
 
     def _shared_scale(self, x: Tensor) -> Tensor:
-        square = x.square()
-        if self.channels_first:
-            square = square.mean(dim=2, keepdim=True)
-        if self.normalization == "norm":
-            moment = square.sum(dim=1, keepdim=True)
-        elif self.std_balance_degrees:
-            if self.channels_first:
-                moment = torch.einsum("ai,nic->nac", self.balance_degree_weight, square)
-            else:
-                moment = torch.einsum("nic,ia->nac", square, self.balance_degree_weight)
+        if self.std_balance_degrees and self.normalization == "component":
+            moment = balanced_degree_moment(
+                x, self.balance_degree_weight, self.channels_first
+            )
         else:
-            moment = square.mean(dim=1, keepdim=True)
-        if not self.channels_first:
-            moment = moment.mean(dim=2, keepdim=True)
+            square = x.square()
+            if self.channels_first:
+                square = square.mean(dim=2, keepdim=True)
+            moment = (
+                square.sum(dim=1, keepdim=True)
+                if self.normalization == "norm"
+                else square.mean(dim=1, keepdim=True)
+            )
+            if not self.channels_first:
+                moment = moment.mean(dim=2, keepdim=True)
         scale = inverse_rms(moment, self.eps, self.eps_mode)
         if self.affine_weight is not None:
             scale = scale * self.affine_weight.index_select(
@@ -167,14 +207,8 @@ class EquivariantNorm(nn.Module):
         for degree, feature in enumerate(x.split(self.widths, dim=1)):
             if degree == 0 and self.centering:
                 feature = feature - feature.mean(dim=-1, keepdim=True)
-            square = feature.square()
-            moment = (
-                square.sum(dim=1, keepdim=True)
-                if self.normalization == "norm"
-                else square.mean(dim=1, keepdim=True)
-            )
-            scale = inverse_rms(
-                moment.mean(dim=-1, keepdim=True), self.eps, self.eps_mode
+            scale = degree_rms_scale(
+                feature, 1, -1, self.normalization, self.eps, self.eps_mode
             )
             if self.affine_weight is not None:
                 scale = scale * self.affine_weight[degree]

@@ -25,12 +25,12 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module
 
+from ..mp.nn.field_norm import VECNORM_TYPES, VecLayerNorm, normalize_vecnorm_type  # noqa: F401
 from ..mp.ops import scatter_sum
 from ..layers.rejection import vector_rejection
 
 
 VERTEX_TYPES = ("none", "edge", "node")
-VECNORM_TYPES = ("none", "rms", "max_min")
 
 
 def normalize_vertex_type(value: object) -> str:
@@ -51,15 +51,6 @@ def normalize_vertex_type(value: object) -> str:
     return key
 
 
-def normalize_vecnorm_type(value: object) -> str:
-    """Return ``none``, ``rms``, or ``max_min``."""
-    key = str(value).strip().lower().replace("-", "_")
-    if key not in VECNORM_TYPES:
-        choices = ", ".join(VECNORM_TYPES)
-        raise ValueError(f"vecnorm_type must be one of {choices}, got {value!r}")
-    return key
-
-
 def normalize_activation(value: object) -> str:
     """ViSNet's published runs use SiLU. ``swish`` here is that same map."""
     key = str(value).strip().lower()
@@ -74,74 +65,6 @@ def _xavier_linear(layer: Linear) -> None:
     torch.nn.init.xavier_uniform_(layer.weight)
     if layer.bias is not None:
         layer.bias.data.fill_(0)
-
-
-class VecLayerNorm(Module):
-    """Equivariant vector norm from ``visnet.models.utils.VecLayerNorm``.
-
-    ``vec`` is ``[N, 3, F]`` or ``[N, 8, F]``. ``l = 1`` and ``l = 2`` are
-    normalized separately. ``none`` leaves the direction unchanged and still
-    applies the per-channel weight. A non-trainable weight is a buffer of ones.
-    """
-
-    def __init__(self, hidden_channels: int, trainable: bool, norm_type: str) -> None:
-        super().__init__()
-        self.hidden_channels = int(hidden_channels)
-        self.norm_type = normalize_vecnorm_type(norm_type)
-        self.trainable = bool(trainable)
-        self.eps = 1e-12
-        weight = torch.ones(self.hidden_channels)
-        if self.trainable:
-            self.weight = torch.nn.Parameter(weight)
-        else:
-            self.register_buffer("weight", weight)
-        if self.norm_type == "rms":
-            self._norm = self.rms_norm
-        elif self.norm_type == "max_min":
-            self._norm = self.max_min_norm
-        else:
-            self._norm = self.none_norm
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        self.weight.data.copy_(torch.ones(self.hidden_channels))
-
-    def none_norm(self, vec: Tensor) -> Tensor:
-        return vec
-
-    def rms_norm(self, vec: Tensor) -> Tensor:
-        dist = torch.linalg.vector_norm(vec, dim=1)
-        if bool((dist == 0).all()):
-            return torch.zeros_like(vec)
-        dist = dist.clamp(min=self.eps)
-        dist = torch.sqrt(torch.mean(dist.square(), dim=-1))
-        return vec / F.relu(dist).unsqueeze(-1).unsqueeze(-1)
-
-    def max_min_norm(self, vec: Tensor) -> Tensor:
-        dist = torch.linalg.vector_norm(vec, dim=1, keepdim=True)
-        if bool((dist == 0).all()):
-            return torch.zeros_like(vec)
-        dist = dist.clamp(min=self.eps)
-        direct = vec / dist
-        max_val, _ = torch.max(dist, dim=-1)
-        min_val, _ = torch.min(dist, dim=-1)
-        delta = (max_val - min_val).reshape(-1)
-        delta = torch.where(delta == 0, torch.ones_like(delta), delta)
-        dist = (dist - min_val.reshape(-1, 1, 1)) / delta.reshape(-1, 1, 1)
-        return F.relu(dist) * direct
-
-    def forward(self, vec: Tensor) -> Tensor:
-        if vec.shape[1] == 3:
-            normalized = self._norm(vec)
-        elif vec.shape[1] == 8:
-            vec1, vec2 = torch.split(vec, [3, 5], dim=1)
-            normalized = torch.cat((self._norm(vec1), self._norm(vec2)), dim=1)
-        else:
-            raise ValueError(
-                "VecLayerNorm expects 3 or 8 angular channels, "
-                f"got {vec.shape[1]}"
-            )
-        return normalized * self.weight.view(1, 1, -1)
 
 
 class EdgeEmbedding(Module):
