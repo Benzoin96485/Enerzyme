@@ -10,6 +10,16 @@ an embedding, message-passing blocks, and a head. Architecture packages
 contain their default pipeline parameters and specialized operations.
 See :doc:`/developer_guide` for a complete preset construction example.
 
+For presets with e3nn layers, set :code:`e3nn_codegen: fx` in :code:`build_params`
+to keep generated tensor products and linear maps as FX graphs.
+This lets :code:`torch.compile(model)` trace their weight and coordinate
+derivatives when training on forces. The option applies to configured
+readouts as well as the Core. Both representations use the same checkpoint
+keys. The default uses each preset's usual code generator.
+EquFlashV2 and Nequix use native derivatives for CPU force training with Inductor. On
+PyTorch 2.13, the generated CPU backward can terminate the process in either
+floating-point precision.
+
 Internal architectures
 ----------------------
 

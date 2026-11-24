@@ -72,12 +72,14 @@ class OneHotAtomEmbedding(BaseAtomEmbedding):
 
     def get_embedding(self, Za: Tensor) -> Tensor:
         species = Za.long()
-        if species.numel() and int(species.max()) > self.max_Za:
+        if not torch.compiler.is_compiling() and species.numel() and int(species.max()) > self.max_Za:
             raise ValueError(
                 f"atomic number {int(species.max())} exceeds max_Za {self.max_Za}"
             )
         index = self.index_of_z[species.clamp(min=0)]
-        if torch.any(index < 0):
+        if torch.compiler.is_compiling():
+            torch._assert_async((index >= 0).all(), "atomic number is outside the one-hot vocabulary")
+        elif torch.any(index < 0):
             missing = species[index < 0].unique().tolist()
             raise ValueError(
                 f"atomic numbers {missing} are outside the one-hot vocabulary"

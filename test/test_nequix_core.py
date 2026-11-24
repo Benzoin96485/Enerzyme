@@ -151,6 +151,12 @@ def test_one_hot_vocabulary_and_unknown_species():
     with pytest.raises(ValueError, match="outside the one-hot"):
         layer.get_embedding(torch.tensor([7]))
 
+    encode = torch.compile(layer.get_embedding, backend="eager", fullgraph=True)
+    torch.testing.assert_close(encode(torch.tensor([8, 1, 6])), encoded)
+    assert encode(torch.empty(0, dtype=torch.long)).shape == (0, 3)
+    with pytest.raises(RuntimeError, match="outside the one-hot"):
+        encode(torch.tensor([7]))
+
 
 def test_nequix_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core

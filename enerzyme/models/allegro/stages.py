@@ -9,6 +9,8 @@ from ..mp.ops import scatter_sum
 
 
 class PairEmbed(Embed):
+    input_fields = ("Za",)
+
     def __init__(self, scalar_mlp, tensor_weight, pair_projection, weighter, sph,
                  dim_edge, scalar_width, avg_num_neighbors):
         super().__init__()
@@ -35,7 +37,12 @@ class PairEmbed(Embed):
         tensor = self.weighter(basis, self.tensor_weight(scalar))
         projected = self.pair_projection(scalar)
         ctx.cache["pair_basis"] = basis
-        ctx.cache["pair_centers"] = int(ctx.receiver.max()) + 1 if ctx.num_edges else 0
+        species = inputs.get("Za")
+        if torch.compiler.is_compiling() and species is not None:
+            # The fixed node axis keeps this allocation inside the coordinate VJP.
+            ctx.cache["pair_centers"] = species.shape[0]
+        else:
+            ctx.cache["pair_centers"] = int(ctx.receiver.max()) + 1 if ctx.num_edges else 0
         ctx.cache["neighbor_scale"] = self.neighbor_scale.to(dtype)
         return BlockState(equi=tensor, edge=(projected[:, :self.scalar_width],),
                           aux={"env_weight": projected[:, self.scalar_width:]})

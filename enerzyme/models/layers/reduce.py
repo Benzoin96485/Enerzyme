@@ -66,7 +66,9 @@ class EdgeEnergyReduceLayer(BaseFFLayer):
         out = Eij.new_zeros((n_atoms,) + tuple(Eij.shape[1:]))
         if idx_i_sr.numel():
             centers = idx_i_sr.long()
-            if int(centers.max()) >= n_atoms or int(centers.min()) < 0:
+            if torch.compiler.is_compiling():
+                torch._assert_async(((centers >= 0) & (centers < n_atoms)).all(), "idx_i_sr is outside the atom axis")
+            elif int(centers.max()) >= n_atoms or int(centers.min()) < 0:
                 raise ValueError(
                     f"idx_i_sr must lie in 0..{n_atoms - 1}, "
                     f"got {int(centers.min())}..{int(centers.max())}"
