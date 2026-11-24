@@ -22,48 +22,12 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
+from ..mp.nn.field_norm import CoupledRMSNorm
 from ..mp.ops import scatter_sum
 from .geometry import FACTOEdgeGeometry
 
 RESIDUAL_SCALE = 40.0 ** -0.5
 
-
-
-class CoupledRMSNorm(nn.Module):
-    """Per-channel RMS norm that keeps a finite tensor scale when ``T = 0``.
-
-    The scalar mean square ``ν`` is added to every tensor-channel denominator
-    (Eq. 4), so a symmetric environment with vanishing angular features still
-    has a normalization scale.
-    """
-
-    def __init__(
-        self,
-        scalar_dim: int,
-        channels: Sequence[int],
-        epsilon: float = 1e-6,
-    ) -> None:
-        super().__init__()
-        if epsilon <= 0.0:
-            raise ValueError(f"rms epsilon must be positive, got {epsilon}")
-        self.epsilon = float(epsilon)
-        self.scalar_gain = nn.Parameter(torch.ones(scalar_dim))
-        self.tensor_gain = nn.ParameterList(
-            [nn.Parameter(torch.ones(int(width))) for width in channels]
-        )
-
-    def forward(
-        self, scalars: Tensor, tensors: Sequence[Tensor]
-    ) -> Tuple[Tensor, List[Tensor]]:
-        variance = scalars.square().mean(dim=-1, keepdim=True)
-        scalar_out = self.scalar_gain * scalars / torch.sqrt(variance + self.epsilon)
-        tensor_out: List[Tensor] = []
-        for features, gain in zip(tensors, self.tensor_gain):
-            # features: [N, 2ℓ+1, C]; ω is the mean square over m.
-            angular = features.square().mean(dim=1)
-            denom = torch.sqrt(variance + angular + self.epsilon)
-            tensor_out.append(gain * features / denom.unsqueeze(1))
-        return scalar_out, tensor_out
 
 
 class FactorizedScalarAttention(nn.Module):

@@ -8,6 +8,9 @@ import torch.nn as nn
 from e3nn.o3 import Irreps
 
 
+from ...nn.norm import degree_rms_scale
+
+
 class EquivariantLayerNormV2(nn.Module):
     def __init__(self, irreps, eps=1e-5, affine=True, normalization="component"):
         super().__init__()
@@ -54,24 +57,14 @@ class EquivariantLayerNormV2(nn.Module):
                 field_mean = torch.mean(field, dim=1, keepdim=True)
                 field = field - field_mean
 
-            if self.normalization == "norm":
-                field_norm = field.pow(2).sum(-1)
-            elif self.normalization == "component":
-                field_norm = field.pow(2).mean(-1)
-            else:
-                raise ValueError(
-                    "Invalid normalization option {}".format(self.normalization)
-                )
-            field_norm = torch.mean(field_norm, dim=1, keepdim=True)
-
-            field_norm = (field_norm + self.eps).pow(-0.5)
+            field_norm = degree_rms_scale(field, -1, -2, self.normalization, self.eps).squeeze(-1)
 
             if self.affine:
                 weight = self.affine_weight[None, iw : iw + mul]
                 iw += mul
                 field_norm = field_norm * weight
 
-            field = field * field_norm.reshape(-1, mul, 1)
+            field = field * field_norm.unsqueeze(-1)
 
             if self.affine and d == 1 and ir.p == 1:
                 bias = self.affine_bias[ib : ib + mul]
