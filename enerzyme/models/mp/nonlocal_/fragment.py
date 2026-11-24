@@ -16,6 +16,7 @@ That map is not in the released class, so this block does not apply it.
 from __future__ import annotations
 
 import math
+import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Dropout, LayerNorm, Linear, Module, ModuleList, Sequential, SiLU
@@ -101,7 +102,7 @@ class FragmentLR(Module):
             group_vector = self.drop_vector(group_vector)
 
         n_edges = int(idx_atom.shape[0])
-        if n_edges == 0:
+        if not torch.compiler.is_compiling() and n_edges == 0:
             return node_scalar.new_zeros(n_atoms, self.hidden_channels), node_vector.new_zeros(
                 n_atoms, 3, self.hidden_channels
             )

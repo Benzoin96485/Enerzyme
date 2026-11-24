@@ -37,10 +37,11 @@ from ..mp.head import Head
 from .interaction import VecLayerNorm, _xavier_linear
 from .long_range import (
     FragmentBipartiteBlock,
-    bipartite_radius_edges,
+    bipartite_radius_edges as bipartite_radius_edges,
+    fragment_geometry,
     normalize_center,
     normalize_fragment_mode,
-    resolve_long_range_fragments,
+    resolve_long_range_fragments as resolve_long_range_fragments,
 )
 
 
@@ -149,7 +150,7 @@ class FragmentEdges(Block):
         batch_seg = ctx.batch
         cluster_ids = ctx.inputs.get("cluster_ids")
         batch = _batch_index(batch_seg, n_atoms, scalar.device)
-        flat_ids, centers, cluster_batch = resolve_long_range_fragments(
+        flat_ids, idx_atom, idx_fragment, distance, direction = fragment_geometry(
             Ra.to(dtype=scalar.dtype),
             batch,
             self.mode,
@@ -158,15 +159,9 @@ class FragmentEdges(Block):
             cluster_ids,
             self.min_nodes_per_group,
             self.kmeans_random_state,
-        )
-        idx_atom, idx_fragment, distance, direction = bipartite_radius_edges(
-            Ra.to(dtype=scalar.dtype),
-            centers,
-            batch,
-            cluster_batch,
             self.cutoff_lr,
         )
-        if idx_atom.numel() == 0:
+        if not torch.compiler.is_compiling() and idx_atom.numel() == 0:
             edge_attr = scalar.new_zeros(0, self.dim_embedding)
         else:
             edge_attr = self.long_rbf_proj(self.long_rbf.get_rbf(distance))
