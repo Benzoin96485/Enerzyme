@@ -16,12 +16,12 @@ This lets :code:`torch.compile(model)` trace their weight and coordinate
 derivatives when training on forces. The option applies to configured
 readouts as well as the Core. Both representations use the same checkpoint
 keys. The default uses each preset's usual code generator.
-CACE, CAMP, GRACE, EquiformerV3, and the FX configurations of EquFlashV2
-and Nequix use native derivatives for CPU force training with Inductor.
-PyTorch 2.13 can fail during differentiation or terminate the process
-when lowering these models' CPU force gradients. An explicit
-:code:`fullgraph=True` request reports this limitation. Energy inference
-and CUDA use their usual execution paths.
+CACE, CAMP, GRACE, EquiformerV3, and the FX configurations of Equiformer,
+EquFlashV2 and Nequix use native derivatives for CPU force training with
+Inductor. PyTorch 2.13 can return incorrect energies and forces for Equiformer.
+For the other affected presets, differentiation can raise an error or terminate
+the process. An explicit :code:`fullgraph=True` request reports this limitation.
+Energy inference and CUDA use their usual execution paths.
 
 Internal architectures
 ----------------------

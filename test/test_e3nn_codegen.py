@@ -44,18 +44,23 @@ def test_fx_codegen_preserves_checkpoint_derivatives_and_captures_contractions(a
         torch.compiler.reset()
 
 
-@pytest.mark.parametrize("architecture", ["equflash_v2", "nequix"])
-def test_fx_cpu_force_training_uses_native_derivatives(architecture):
+@pytest.mark.parametrize("architecture,dtype", [
+    ("equflash_v2", torch.float64),
+    ("equiformer", torch.float32),
+    ("equiformer", torch.float64),
+    ("nequix", torch.float64),
+])
+def test_fx_cpu_force_training_uses_native_derivatives(architecture, dtype):
     torch.compiler.reset()
     try:
         torch.manual_seed(142)
         _, params, _ = get_ff_core(architecture)
-        reference = build(architecture).double()
-        model = build(architecture, build_params={**params, "e3nn_codegen": "fx"}).double()
+        reference = build(architecture).to(dtype)
+        model = build(architecture, build_params={**params, "e3nn_codegen": "fx"}).to(dtype)
         model.load_state_dict(reference.state_dict(), strict=True)
-        batch = make_batch(random_molecules(107, [5, 4]), torch.float64)
-        expected = forward(reference, batch, torch.float64, train=True)
-        actual = forward(torch.compile(model), batch, torch.float64, train=True)
+        batch = make_batch(random_molecules(107, [5, 4]), dtype)
+        expected = forward(reference, batch, dtype, train=True)
+        actual = forward(torch.compile(model), batch, dtype, train=True)
         for output in (expected, actual):
             (output["E"].square().sum() + output["Fa"].square().sum()).backward()
         for key in ("E", "Fa"):
