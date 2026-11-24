@@ -1,0 +1,624 @@
+{
+  "baseline": "1aa0f8b",
+  "device": "Tesla V100-PCIE-32GB",
+  "torch": "2.13.0+cu126",
+  "modes": ["infer", "train"],
+  "measurements": ["median_ms", "peak_allocated_MiB", "new_Dynamo_graphs", "new_Dynamo_calls"],
+  "method": "Ordinary torch.compile, including any native partitions. Both sides run on the same allocated card. Error strings replace unavailable measurements. Null graph counters mean the driver did not record capture information.",
+  "expected_model_precision_pairs": 116,
+  "pairs": {
+    "schnet/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[13.518159976229072, 136.05224609375, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[9.701384929940104, 124.90673828125, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "schnet/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[15.490023884922266, 253.97900390625, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[11.684605851769447, 231.81494140625, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "physnet/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[19.022193970158696, 145.1181640625, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": [[148.7240178976208, 3314.3193359375, null, null], [281.9009879603982, 5494.80322265625, null, null]]
+      },
+      "new": {
+        "mol_batch_32x20": [[15.201129950582981, 145.26318359375, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": [[48.072508769109845, 3324.20263671875, null, null], [182.28479591198266, 5505.06396484375, null, null]]
+      }
+    },
+    "physnet/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[23.65638711489737, 273.92236328125, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": [[171.62501090206206, 6573.79296875, null, null], [375.278556952253, 10937.85888671875, null, null]]
+      },
+      "new": {
+        "mol_batch_32x20": [[17.46944198384881, 274.43994140625, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": [[74.36656416393816, 6594.77587890625, null, null], [277.5224579963833, 10957.7431640625, null, null]]
+      }
+    },
+    "spookynet/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": [[30.139531008899212, 74.40966796875, null, null], "err1"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[31.27885307185352, 131.6845703125, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "spookynet/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": [[30.569482129067183, 130.86474609375, null, null], "err1"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[34.70233199186623, 243.87939453125, null, null], "err1"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "mace/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "mace/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "leftnet/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[19.999622832983732, 1238.09033203125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[19.894148921594024, 1169.85693359375, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "leftnet/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[37.889437982812524, 2459.54296875, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[37.1004780754447, 2320.041015625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "alphanet/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[28.355648973956704, 1345.9697265625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[26.4849909581244, 1267.54736328125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "alphanet/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[43.687442084774375, 2672.45947265625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err5", "err5"]
+      },
+      "new": {
+        "mol_batch_32x20": [[45.34959001466632, 2590.00341796875, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err5", "err5"]
+      }
+    },
+    "reann/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[5.8669347781687975, 43.4560546875, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[5.1846569404006, 40.04248046875, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "reann/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[6.013991078361869, 70.0576171875, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[5.4360730573534966, 63.2666015625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "equireann/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[6.056151818484068, 147.59521484375, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[5.774461897090077, 147.5947265625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "equireann/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[7.16649810783565, 282.85986328125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[7.705746917054057, 282.85986328125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "nequip/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[29.42692907527089, 190.0244140625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "nequip/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[28.016288997605443, 355.7294921875, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "allegro/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err6", "err6"],
+        "bulk_256": ["err6", "err6"],
+        "large_2000": [[25.74537810869515, 712.859375, null, null], [73.9291210193187, 1176.63671875, null, null]]
+      },
+      "new": {
+        "mol_batch_32x20": [[9.912741836160421, 135.66015625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "allegro/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err6", "err6"],
+        "bulk_256": ["err6", "err6"],
+        "large_2000": [[34.07853189855814, 1402.41064453125, null, null], [105.68115999922156, 2329.55224609375, null, null]]
+      },
+      "new": {
+        "mol_batch_32x20": [[10.669867042452097, 247.39453125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "equflash/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err7", "err7"]
+      },
+      "new": {
+        "mol_batch_32x20": [[984.4785858877003, 14136.57470703125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err7", "err7"]
+      }
+    },
+    "equflash/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err7", "err7"],
+        "large_2000": ["err7", "err7"]
+      },
+      "new": {
+        "mol_batch_32x20": [[1916.4745029993355, 28199.4609375, null, null], "err4"],
+        "bulk_256": ["err7", "err7"],
+        "large_2000": ["err7", "err7"]
+      }
+    },
+    "equflashv2/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err6", "err6"],
+        "bulk_256": ["err6", "err6"],
+        "large_2000": ["err6", "err6"]
+      },
+      "new": {
+        "mol_batch_32x20": [[23.78909895196557, 110.103515625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "equflashv2/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err6", "err6"],
+        "bulk_256": ["err6", "err6"],
+        "large_2000": ["err6", "err6"]
+      },
+      "new": {
+        "mol_batch_32x20": [[23.250191006809473, 203.7216796875, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "tece/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err6", "err6"],
+        "bulk_256": ["err6", "err6"],
+        "large_2000": ["err6", "err6"]
+      },
+      "new": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "tece/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err6", "err6"],
+        "bulk_256": ["err6", "err6"],
+        "large_2000": ["err6", "err6"]
+      },
+      "new": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "e2former/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": ["err3", "err3"],
+        "large_2000": ["err3", "err3"]
+      },
+      "new": {
+        "mol_batch_32x20": [[55.91271608136594, 809.16455078125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "e2former/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": ["err3", "err3"],
+        "large_2000": ["err3", "err3"]
+      },
+      "new": {
+        "mol_batch_32x20": [[60.599069111049175, 1593.21337890625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "e2former_v2/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": ["err3", "err3"],
+        "large_2000": ["err3", "err3"]
+      },
+      "new": {
+        "mol_batch_32x20": ["err8", "err8"],
+        "bulk_256": ["err8", "err8"],
+        "large_2000": ["err8", "err8"]
+      }
+    },
+    "e2former_v2/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": ["err3", "err3"],
+        "large_2000": ["err3", "err3"]
+      },
+      "new": {
+        "mol_batch_32x20": ["err9", "err9"],
+        "bulk_256": ["err9", "err9"],
+        "large_2000": ["err9", "err9"]
+      }
+    },
+    "e2former_lsr/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": ["err3", "err3"],
+        "large_2000": ["err3", "err3"]
+      },
+      "new": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "e2former_lsr/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": ["err3", "err3"],
+        "large_2000": ["err3", "err3"]
+      },
+      "new": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "alignn/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[17.36230286769569, 781.4423828125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err7", "err7"]
+      },
+      "new": {
+        "mol_batch_32x20": [[17.077038995921612, 781.072265625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err7", "err7"]
+      }
+    },
+    "alignn/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err5", "err4"],
+        "bulk_256": ["err5", "err7"],
+        "large_2000": ["err7", "err7"]
+      },
+      "new": {
+        "mol_batch_32x20": ["err5", "err4"],
+        "bulk_256": ["err5", "err7"],
+        "large_2000": ["err7", "err7"]
+      }
+    },
+    "spinconv/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[506.4617139287293, 5390.58154296875, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "spinconv/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": ["err2", "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err7", "err7"]
+      },
+      "new": {
+        "mol_batch_32x20": [[1241.5713840164244, 9687.37744140625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err7", "err7"]
+      }
+    },
+    "tensornet/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[22.19046512618661, 311.17333984375, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[21.78581804037094, 307.02880859375, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "tensornet/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[34.932025941088796, 564.3349609375, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[32.98534406349063, 563.70703125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "tensornet2/float32": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[32.033164985477924, 288.1572265625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[31.84055699966848, 290.6142578125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "tensornet2/float64": {
+      "candidate_commit": "3b77a61",
+      "job": "6316979",
+      "base": {
+        "mol_batch_32x20": [[41.828355053439736, 553.12939453125, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[40.23447399958968, 553.447265625, null, null], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      }
+    },
+    "dpa4c/float64": {
+      "candidate_commit": "8eafafc",
+      "job": "6317560",
+      "base": {
+        "mol_batch_32x20": [[7.1924179792404175, 62.09375, 24, 264], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[5.655868910253048, 62.2099609375, 14, 518], [6.514929933473468, 87.55322265625, 1, 300]],
+        "bulk_256": [[4.7959270887076855, 69.48779296875, 1, 242], [6.16050511598587, 96.662109375, 1, 307]],
+        "large_2000": [[6.200782954692841, 349.60595703125, 1, 242], [10.45825402252376, 519.837890625, 1, 304]]
+      }
+    },
+    "tace/float32": {
+      "candidate_commit": "8eafafc",
+      "job": "6317560",
+      "base": {
+        "mol_batch_32x20": ["err6", "err6"],
+        "bulk_256": ["err6", "err6"],
+        "large_2000": ["err6", "err6"]
+      },
+      "new": {
+        "mol_batch_32x20": [[48.28918119892478, 1087.0185546875, 35, 194], [118.9626578707248, 1677.39794921875, 0, 0]],
+        "bulk_256": [[50.9069561958313, 1091.150390625, 17, 117], [123.30903089605272, 1578.71923828125, 0, 0]],
+        "large_2000": [[146.1812190245837, 6740.2431640625, 0, 0], [497.6448849774897, 9928.0302734375, 0, 0]]
+      }
+    },
+    "tace/float64": {
+      "candidate_commit": "8eafafc",
+      "job": "6317560",
+      "base": {
+        "mol_batch_32x20": ["err6", "err6"],
+        "bulk_256": ["err6", "err6"],
+        "large_2000": ["err6", "err6"]
+      },
+      "new": {
+        "mol_batch_32x20": [[66.12493493594229, 2161.1748046875, 35, 194], [175.3421570174396, 3334.78759765625, 0, 0]],
+        "bulk_256": [[65.54282386787236, 2164.916015625, 17, 117], [179.06623985618353, 3131.14453125, 0, 0]],
+        "large_2000": [[271.6689349617809, 13443.203125, 0, 0], [939.1626308206469, 19791.96044921875, 0, 0]]
+      }
+    }
+  },
+  "errors": {
+    "err1": "RuntimeError: torch.compile with aot_autograd does not currently support double backward",
+    "err2": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+    "err3": "TorchRuntimeError: RuntimeError when making fake tensor call",
+    "err4": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.",
+    "err5": "InductorError: SubprocException: An exception occurred in a subprocess:",
+    "err6": "InternalTorchDynamoError: NotImplementedError:",
+    "err7": "CUDA out of memory",
+    "err8": "self._call_impl(*args, **kwargs)",
+    "err9": "/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl"
+  }
+}
