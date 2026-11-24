@@ -42,6 +42,7 @@ from torch.nn import LayerNorm, Linear, Module, Parameter
 from ..et.interaction import normalize_distance_influence
 from ..mp.ops import scatter_sum
 from ..mp.ops.rejection import vector_rejection
+from ..mp.equivariant.body_order import angular_inner, angular_norm_squared, rejection_inner
 from ..visnet.interaction import normalize_activation
 
 
@@ -175,17 +176,13 @@ class QuinNetInteraction(Module):
         receiver = vector.index_select(0, idx_i)
         normal_sender = normal_i.index_select(0, idx_j)
         normal_receiver = normal_i.index_select(0, idx_i)
-        five_iii = F.silu(self.f_proj2(edge)) * (
-            self.dst_proj1(normal_sender) * self.src_proj1(normal_receiver)
-        ).sum(dim=1)
-        five_ii = F.silu(self.f_proj3(edge)) * self.src_proj2(
-            normal_receiver
-        ).square().sum(dim=1)
-        rejected_receiver = vector_rejection(self.trg_proj(receiver), direction)
-        rejected_sender = vector_rejection(self.src_proj(sender), -direction)
-        torsion = F.silu(self.f_proj1(edge)) * (
-            rejected_receiver * rejected_sender
-        ).sum(dim=1)
+        five_iii = F.silu(self.f_proj2(edge)) * angular_inner(
+            self.dst_proj1(normal_sender), self.src_proj1(normal_receiver)
+        )
+        five_ii = F.silu(self.f_proj3(edge)) * angular_norm_squared(self.src_proj2(normal_receiver))
+        torsion = F.silu(self.f_proj1(edge)) * rejection_inner(
+            self.trg_proj(receiver), self.src_proj(sender), direction
+        )
         return five_iii, five_ii, torsion
 
     def forward(
@@ -229,15 +226,15 @@ class QuinNetInteraction(Module):
         vec1, vec2, vec3 = torch.split(
             self.vec_proj(vector), self.hidden_channels, dim=-1
         )
-        three_body = (vec1 * vec2).sum(dim=1)
+        three_body = angular_inner(vec1, vec2)
         normal_i = vector_rejection(
             self.vec_proj_improper1(vector), self.vec_proj_improper2(vector)
         )
-        five_i = normal_i.square().sum(dim=1)
+        five_i = angular_norm_squared(normal_i)
         normal_improper = vector_rejection(
             self.vec_proj_improper3(vector), self.vec_proj_improper4(vector)
         )
-        improper = (normal_improper * self.vec_proj_improper5(vector)).sum(dim=1)
+        improper = angular_inner(normal_improper, self.vec_proj_improper5(vector))
         five_iii_edge, five_ii_edge, torsion_edge = self._edge_invariants(
             vector, normal_i, edge, idx_i, idx_j, direction
         )

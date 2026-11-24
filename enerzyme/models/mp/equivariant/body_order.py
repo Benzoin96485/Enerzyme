@@ -10,6 +10,8 @@ from torch import Tensor, nn
 
 from ..basis.cartesian import multi_indices
 from .product_ladder import ProductLadder
+from .cartesian import packed_l2_to_stf
+from ..ops.rejection import vector_rejection
 
 
 def contract_feature_dyad(
@@ -284,3 +286,60 @@ class InvariantSymmetrizer(nn.Module):
                 f"expected {self.n_invariants} invariants, got {invariants.shape[2]}"
             )
         return invariants
+
+
+def rejection_inner(
+    left: Tensor,
+    right: Tensor,
+    direction: Tensor,
+) -> Tensor:
+    """Inner product of the two rejections. Shape ``[E, C]``."""
+    rejected_left = vector_rejection(left, direction)
+    rejected_right = vector_rejection(right, -direction)
+    return angular_inner(rejected_left, rejected_right)
+
+
+def angular_inner(left: Tensor, right: Tensor) -> Tensor:
+    """Channelwise scalar product over the angular components (N, M, C)."""
+    return (left * right).sum(dim=1)
+
+
+def angular_norm_squared(value: Tensor) -> Tensor:
+    return value.square().sum(dim=1)
+
+
+def vector_tensor_invariants(vector: Tensor, packed: Tensor) -> Tuple[Tensor, Tensor]:
+    """Return vᵀQv and |Qv|² in the signed Cartesian Gaunt convention."""
+    nodes, _, rank_vector = vector.shape
+    rank_tensor = packed.shape[-1]
+    vectors = vector.transpose(1, 2)
+    matrices = packed_l2_to_stf(packed.transpose(1, 2))
+    contracted = torch.einsum("neij,nbi->nebj", matrices, vectors)
+    cubic = torch.einsum("nai,nebi->nabe", vectors, contracted)
+    cubic = cubic.reshape(nodes, rank_vector * rank_vector * rank_tensor)
+    cubic = cubic * (-1.0 / math.sqrt(5.0))
+    quartic = torch.sum(contracted * contracted, dim=-1).reshape(nodes, rank_tensor * rank_vector)
+    return cubic, quartic
+
+
+def bispectrum_contraction(
+    coupling: Tensor,
+    value_1: Tensor,
+    value_2: Tensor,
+    value_3: Tensor,
+) -> Tensor:
+    nodes = value_1.shape[0]
+    rank_1 = value_1.shape[-1]
+    rank_2 = value_2.shape[-1]
+    rank_3 = value_3.shape[-1]
+    full = torch.einsum("abc,naA,nbB,ncC->nABC", coupling, value_1, value_2, value_3)
+    return full.reshape(nodes, rank_1 * rank_2 * rank_3)
+
+
+def __getattr__(name):
+    if name == "SymmetricContraction":
+        # Only MACE needs the e3nn/FX contraction optimizer.
+        from .e3nn.symmetric_contraction import SymmetricContraction
+
+        return SymmetricContraction
+    raise AttributeError(name)
