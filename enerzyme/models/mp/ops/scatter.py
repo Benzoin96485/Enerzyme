@@ -4,7 +4,8 @@
 ``index_add_`` and ``torch_scatter.scatter_sum`` accumulate in the same order and
 agree bitwise, so the backend is picked per call for speed only: the
 ``torch_scatter`` kernel is faster for small reductions, ``index_add_`` for large
-ones, and ``index_add_`` is the only one ``torch.compile`` can trace.
+ones. CUDA uses a strided index view with native ``scatter_add_`` to avoid
+materializing expanded indices during force backpropagation.
 """
 
 from __future__ import annotations
@@ -40,13 +41,16 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
     size = _dim_size(index, dim_size)
     if index.dtype != torch.long:
         index = index.long()
-    if _use_torch_scatter(src) and index.numel():
+    if src.device.type != "cuda" and _use_torch_scatter(src) and index.numel():
         return _torch_scatter.scatter_sum(src, index, dim=dim, dim_size=size)
     shape = list(src.shape)
     shape[dim] = size
     out = src.new_zeros(shape)
     if index.numel():
-        out.index_add_(dim, index, src)
+        if src.device.type == "cuda":
+            out.scatter_add_(dim, _broadcast_index(index, src, dim), src)
+        else:
+            out.index_add_(dim, index, src)
     return out
 
 
