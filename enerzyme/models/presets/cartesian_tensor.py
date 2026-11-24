@@ -366,3 +366,127 @@ def facto(
         lmax=lmax, num_output_blocks=num_output_blocks, dim_feature_out=dim_feature_out,
         feature_irreps=feature_irreps,
     )
+
+
+def reann(
+    dim_embedding: int = 32,
+    max_Za: int = 94,
+    cutoff_sr: float = 5.0,
+    lmax: int = 2,
+    nwave: int = 8,
+    n_orbit: Optional[int] = None,
+    num_iterations: int = 1,
+    nblock: int = 1,
+    hidden_dims: Sequence[int] = (128, 128),
+    activation: str = "relu_like",
+    layer_norm: bool = True,
+    dropout: float = 0.0,
+    elemental: bool = False,
+    atomic_numbers: Optional[Sequence[int]] = None,
+    coeff_init: float = 0.1,
+) -> ComposableCore:
+    return _orbital_core(
+        dim_embedding, max_Za, cutoff_sr, lmax, nwave, n_orbit, num_iterations,
+        nblock, hidden_dims, activation, layer_norm, dropout, elemental, atomic_numbers, coeff_init,
+        pass_orbitals=False,
+    )
+
+
+def equireann(
+    dim_embedding: int = 32,
+    max_Za: int = 94,
+    cutoff_sr: float = 6.0,
+    lmax: int = 2,
+    nwave: int = 20,
+    n_orbit: Optional[int] = None,
+    num_iterations: int = 2,
+    nblock: int = 1,
+    hidden_dims: Sequence[int] = (32, 32),
+    activation: str = "tanh_like",
+    layer_norm: bool = False,
+    dropout: float = 0.0,
+    elemental: bool = False,
+    atomic_numbers: Optional[Sequence[int]] = None,
+    coeff_init: float = 0.1,
+) -> ComposableCore:
+    return _orbital_core(
+        dim_embedding, max_Za, cutoff_sr, lmax, nwave, n_orbit, num_iterations,
+        nblock, hidden_dims, activation, layer_norm, dropout, elemental, atomic_numbers, coeff_init,
+        pass_orbitals=True,
+    )
+
+
+def _orbital_core(
+    dim_embedding, max_Za, cutoff_sr, lmax, nwave, n_orbit, num_iterations, nblock, hidden_dims,
+    activation, layer_norm, dropout, elemental, atomic_numbers, coeff_init, *, pass_orbitals,
+):
+    from functools import partial
+    from ..reann.blocks import OrbitalEmbed, OrbitalUpdate, build_orbital_stack
+    from ..reann.density import default_n_orbit
+    from ..reann.network import REANNMLP, resolve_reann_activation
+
+    if int(dim_embedding) < 1:
+        raise ValueError(f"dim_embedding must be >= 1, got {dim_embedding}")
+    if int(max_Za) < 1:
+        raise ValueError(f"max_Za must be >= 1, got {max_Za}")
+    if float(cutoff_sr) <= 0.0:
+        raise ValueError(f"cutoff_sr must be positive, got {cutoff_sr}")
+    if int(lmax) < 0 or int(lmax) > 6:
+        raise ValueError(f"lmax must lie in 0..6, got {lmax}")
+    if int(nwave) < 1:
+        raise ValueError(f"nwave must be >= 1, got {nwave}")
+    if int(num_iterations) < 0:
+        raise ValueError(f"num_iterations must be >= 0, got {num_iterations}")
+    if int(nblock) < 0:
+        raise ValueError(f"nblock must be >= 0, got {nblock}")
+    orbit = default_n_orbit(int(nwave), int(lmax)) if n_orbit is None else int(n_orbit)
+    if orbit < 1:
+        raise ValueError(f"n_orbit must be >= 1, got {orbit}")
+    if elemental:
+        if not atomic_numbers:
+            raise ValueError(
+                "elemental=True requires atomic_numbers, the species that own a network"
+            )
+        numbers = [int(number) for number in atomic_numbers]
+        if any(number < 0 or number > int(max_Za) for number in numbers):
+            raise ValueError(
+                f"atomic_numbers must lie in 0..max_Za ({max_Za}), got {numbers}"
+            )
+    else:
+        numbers = None
+    dim_embedding = int(dim_embedding)
+    max_Za = int(max_Za)
+    cutoff_sr = float(cutoff_sr)
+    lmax = int(lmax)
+    nwave = int(nwave)
+    n_orbit = orbit
+    num_iterations = int(num_iterations)
+    nblock = int(nblock)
+    hidden_dims = tuple(int(width) for width in hidden_dims)
+    activation = resolve_reann_activation(activation)
+    layer_norm = bool(layer_norm)
+    dropout = float(dropout)
+    elemental = bool(elemental)
+    atomic_numbers = None if numbers is None else tuple(numbers)
+    coeff_init = float(coeff_init)
+    dim_feature_out = n_orbit
+    feature_irreps = f"{n_orbit}x0e"
+    embed = OrbitalEmbed(dim_embedding, max_Za, cutoff_sr, lmax, nwave, n_orbit, coeff_init)
+    network = partial(REANNMLP, n_in=n_orbit, n_out=nwave, hidden_dims=hidden_dims,
+                      nblock=nblock, activation=activation, layer_norm=layer_norm, dropout=dropout)
+    blocks = [
+        OrbitalUpdate(nwave, atomic_numbers, network, i + 1 if pass_orbitals else None)
+        for i in range(num_iterations)
+    ]
+    if pass_orbitals:
+        embed.enable_orbital_messages(num_iterations)
+    return ComposableCore(
+        embed, blocks, FeatureHead(), GraphRequires(rbf=False, optional_cutoff_values=False),
+        builder=build_orbital_stack,
+        dim_embedding=dim_embedding, max_Za=max_Za, cutoff_sr=cutoff_sr,
+        lmax=lmax, nwave=nwave, n_orbit=n_orbit,
+        num_iterations=num_iterations, nblock=nblock, hidden_dims=hidden_dims,
+        activation=activation, layer_norm=layer_norm, dropout=dropout,
+        elemental=elemental, atomic_numbers=atomic_numbers, coeff_init=coeff_init,
+        dim_feature_out=dim_feature_out, feature_irreps=feature_irreps,
+    )

@@ -5,16 +5,14 @@ REANN: the same embedded-atom density, plus the neighbor's Cartesian orbital
 passed at each coefficient update. Embedding and property heads stay outside.
 """
 
-from .core import (
+from .defaults import (
     DEFAULT_BUILD_PARAMS,
     DEFAULT_LAYER_PARAMS,
     PUBLISHED_CUMULENE_CORE_PARAMS,
     PUBLISHED_CUMULENE_CUTOFF,
-    EquiREANNCore,
 )
 
 __all__ = [
-    "EquiREANNCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "PUBLISHED_CUMULENE_CORE_PARAMS",

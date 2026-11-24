@@ -15,7 +15,14 @@ from typing import Dict, List, Tuple
 
 import torch
 
-KEY_MAPS: Dict[str, List[Tuple[str, str]]] = {}
+_ORBITAL_KEYS = [
+    (r"^(rs|inta|hyper|coeff)\b", r"embed.\1"),
+    (r"^updates\.", "blocks."),
+]
+KEY_MAPS: Dict[str, List[Tuple[str, str]]] = {
+    "reann": _ORBITAL_KEYS,
+    "equireann": _ORBITAL_KEYS,
+}
 
 
 def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:

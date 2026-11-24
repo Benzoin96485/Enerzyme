@@ -18,17 +18,21 @@ def cartesian_dyads(vectors: Tensor, max_rank: int, eps: float = 1e-12) -> Dict[
         raise ValueError(f"max_rank must be >= 0, got {max_rank}")
     norm = torch.linalg.vector_norm(vectors, dim=-1, keepdim=True)
     hat = torch.where(norm > eps, vectors / norm.clamp_min(eps), torch.zeros_like(vectors))
-    dyads = {0: vectors.new_ones(vectors.shape[0])}
-    if max_rank == 0:
-        return dyads
-    dyads[1] = hat
-    current = hat
+    return cartesian_powers(hat, max_rank)
+
+
+def cartesian_powers(vectors: Tensor, max_rank: int, weight: Tensor | None = None) -> Dict[int, Tensor]:
+    """Ordered tensor powers of each vector, with an optional weight shared by all degrees."""
+    count = vectors.shape[0]
+    powers = {0: vectors.new_ones(count) if weight is None else weight.reshape(count)}
+    if not max_rank:
+        return powers
+    current = vectors if weight is None else powers[0][:, None] * vectors
+    powers[1] = current
     for rank in range(2, max_rank + 1):
-        current = current.unsqueeze(-1) * hat.reshape(
-            *hat.shape[:-1], *([1] * (rank - 1)), 3
-        )
-        dyads[rank] = current
-    return dyads
+        current = current.unsqueeze(-1) * vectors.reshape(count, *([1] * (rank - 1)), 3)
+        powers[rank] = current
+    return powers
 
 
 Index = Tuple[int, int, int]
