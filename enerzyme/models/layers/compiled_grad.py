@@ -1,0 +1,70 @@
+"""Evaluate a force-field stack and its coordinate derivatives in one compiler graph."""
+
+from typing import Any, Dict
+
+import torch
+from torch import Tensor
+from torch_geometric.data import Data
+
+from .gradient import ForceLayer
+
+
+def forward_with_coordinate_gradients(core, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """Functional coordinate VJPs make force fitting a single compiled backward.
+
+    The prefix ending at each Force layer returns energy and tensor-valued
+    auxiliary outputs in one pass. This preserves random draws and lets losses
+    on forces and other heads differentiate the same weights.
+    """
+    def active(layer):
+        return not ((layer.test_only and not core.test_mode) or
+                    (layer.test_exclude and core.test_mode))
+
+    stages = [layer for layer in core.pre_sequence if active(layer)]
+    stages.append(core._forward)
+    stages.extend(layer for layer in core.post_sequence if active(layer))
+
+    def evaluate(net_input, stop):
+        # A later Force layer can differentiate quantities produced by an earlier
+        # one. Only the innermost prefix runs the actual message-passing stack.
+        start = 0
+        for i in reversed(range(stop)):
+            layer = stages[i]
+            if type(layer) is not ForceLayer:
+                continue
+            if (layer.train_only and not layer.training) or (layer.eval_only and layer.training):
+                continue
+            position_name, energy_name, force_name = (layer._name_mapping[k] for k in ("Ra", "E", "Fa"))
+            if position_name not in net_input:
+                continue
+
+            def energy(positions):
+                state = evaluate({**net_input, position_name: positions}, i)
+                # Non-tensor input metadata (e.g. a list of molecule sizes)
+                # passes through the layer stack and does not enter the VJP.
+                return state[energy_name], {key: value for key, value in state.items() if isinstance(value, Tensor)}
+
+            energies, pullback, tensor_fields = torch.func.vjp(energy, net_input[position_name], has_aux=True)
+            if energies.ndim > 1:
+                weights = torch.eye(energies.shape[-1], device=energies.device, dtype=energies.dtype)
+                forces = torch.stack([
+                    -pullback(row.expand_as(energies))[0] for row in weights
+                ], dim=-1)
+            else:
+                forces = -pullback(torch.ones_like(energies))[0]
+            net_input = {**net_input, **tensor_fields, force_name: forces if layer.training else forces.detach()}
+            start = i + 1
+            break
+        for i in range(start, stop):
+            net_input = stages[i](net_input)
+        return net_input
+
+    if isinstance(inputs, Data):
+        # PyG spells the membership vector "batch" and updates its Data in place.
+        fields = {name: value for name, value in inputs}
+        fields["batch_seg"] = fields.get("batch")
+        for name, value in evaluate(fields, len(stages)).items():
+            if name != "batch_seg":
+                inputs[name] = value
+        return inputs
+    return evaluate(inputs, len(stages))
