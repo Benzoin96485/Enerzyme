@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Dict, List, Literal, Optional, Sequence, Union
 
 from ..mp.core import ComposableCore, FeatureHead, FieldEmbed, ReadoutHead
-from ..mp.graph import GraphRequires
+from ..mp.graph import GraphRequires, HarmonicsRequest
 
 from ..equiformer.defaults import _AVG_DEGREE, _AVG_NUM_NODES
 from ..eqnorm.defaults import PUBLISHED_MPTRJ_CORE_PARAMS
@@ -132,7 +132,8 @@ def mace(
         emitted, num_output_blocks = layer_out[-1], num_interactions
         head = ReadoutHead(readouts=readouts, mode="per_block", source="equi", ensemble_size=shallow_ensemble_size)
 
-    requires = GraphRequires(distances=False, edge_convention="swap", fields=("Za",), optional_cutoff_values=False)
+    requires = GraphRequires(distances=False, edge_convention="swap", fields=("Za",), optional_cutoff_values=False,
+                             harmonics=(HarmonicsRequest(max_ell, edge_sign=-1.0),))
     return ComposableCore(
         FieldEmbed("atom_embedding", add_fields=("charge_embedding", "spin_embedding"), slot="equi"),
         blocks, head, requires,

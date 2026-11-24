@@ -16,7 +16,7 @@ from ..dimenet.interaction import (
 from ..dimenet.triplets import triplet_angles
 from ..mp.block import Block, BlockState
 from ..mp.core import ComposableCore, Embed
-from ..mp.graph import GraphRequires
+from ..mp.graph import GraphRequires, TripletRequest
 from ..mp.head import FeatureHead, Head
 from ..m3gnet.message import MaterialBlock, MaterialEmbed, build_material_stack
 from ..mattersim.attention import CentralityEncoding, GraphormerMessage
@@ -32,7 +32,7 @@ class DimeNetEmbed(Embed):
         self.embedding = embedding
 
     def forward(self, inputs, ctx):
-        incoming, outgoing = ctx.path_pairs(exclude_backtracking=True)
+        incoming, outgoing = ctx.triplets("path", exclude_backtracking=True)
         angles = triplet_angles(ctx.vec, incoming, outgoing)
         angular = self.basis(ctx.dist, angles, incoming)
         edge = self.embedding(inputs["atom_embedding"], ctx.rbf, ctx.receiver, ctx.sender)
@@ -81,7 +81,7 @@ def _dimenet(dim_embedding, num_rbf, cutoff_sr, num_blocks, num_spherical, num_b
     )) for _ in range(num_blocks)]
     head = DimeNetHead([readout() for _ in range(num_blocks + 1)], output_mode)
     return ComposableCore(
-        embed, blocks, head, GraphRequires(optional_cutoff_values=False, path_triplets=True),
+        embed, blocks, head, GraphRequires(optional_cutoff_values=False, topology=(TripletRequest("path", exclude_backtracking=True),)),
         positional_fields=("atom_embedding", "rbf", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         architecture=architecture, output_mode=output_mode, num_output_blocks=num_blocks + 1,
         dim_feature_out=width, feature_irreps=f"{width}x0e", dim_embedding=dim_embedding,
@@ -172,7 +172,8 @@ def m3gnet(
     blocks = [MaterialBlock(degree, dim_embedding, dim_edge, units, n_conv_hidden, dropout)
               for _ in range(num_blocks)]
     return ComposableCore(
-        embed, blocks, FeatureHead(), GraphRequires(optional_cutoff_values=False),
+        embed, blocks, FeatureHead(), GraphRequires(optional_cutoff_values=False,
+            topology=(TripletRequest("receiver", cutoff=threebody_cutoff),)),
         builder=build_material_stack, architecture="m3gnet",
         positional_fields=("atom_embedding", "rbf", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         dim_embedding=dim_embedding, dim_feature_out=dim_embedding, feature_irreps=f"{dim_embedding}x0e",

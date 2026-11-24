@@ -11,7 +11,7 @@ from ..esen.native.defaults import _RESCALE
 from ..equiformer_v2.defaults import _AVG_DEGREE
 from ..mp.block import FnBlock
 from ..mp.core import ComposableCore, FeatureHead
-from ..mp.graph import GraphRequires
+from ..mp.graph import GraphRequires, RotationRequest
 from ..mp.message.so2 import (
     ChannelBlock, ChannelEmbed, FusedChannelEmbed, SmoothChannelEmbed, SphereHead,
     channel_attention, fused_attention, smooth_convolution,
@@ -76,7 +76,8 @@ def escn(
     return ComposableCore(
         ChannelEmbed(sphere_proj, lmax, mmax),
         [ChannelBlock(block, residual=i > 0) for i, block in enumerate(layer_blocks)], SphereHead(wrapped=True),
-        GraphRequires(distances=False, optional_cutoff_values=False, fields=("Za",),
+        GraphRequires(rotations=(RotationRequest(lmax, "jd", edge_sign=-1, frame_field="edge_rot_mat"),),
+                      distances=False, optional_cutoff_values=False, fields=("Za",),
                       optional_fields=("edge_rot_mat",),
                       edge_convention="swap"),
         positional_fields=_CHANNEL_INPUTS, architecture="escn",
@@ -195,7 +196,8 @@ def esen(
     return ComposableCore(
         SmoothChannelEmbed(sphere_proj, source_embedding, target_embedding, edge_degree, lmax, mapping),
         [FnBlock(block, smooth_convolution) for block in blocks], SphereHead(norm),
-        GraphRequires(distances=False, optional_cutoff_values=False, fields=("Za",),
+        GraphRequires(rotations=(RotationRequest(lmax, "jd", frame_field="edge_rot_mat"),),
+                      distances=False, optional_cutoff_values=False, fields=("Za",),
                       optional_fields=("edge_rot_mat",),
                       edge_convention="receiver_i"),
         positional_fields=_CHANNEL_INPUTS, architecture="esen",
@@ -324,7 +326,8 @@ def equiformer_v2(
     return ComposableCore(
         ChannelEmbed(sphere_proj, lmax, mmax, edge_degree_embedding, mappingReduced),
         [FnBlock(block, channel_attention) for block in blocks], SphereHead(norm, wrapped=True),
-        GraphRequires(distances=False, optional_cutoff_values=False, fields=("Za",),
+        GraphRequires(rotations=(RotationRequest(lmax, "jd", edge_sign=-1, frame_field="edge_rot_mat"),),
+                      distances=False, optional_cutoff_values=False, fields=("Za",),
                       optional_fields=("edge_rot_mat", "batch_seg",),
                       edge_convention="swap"),
         positional_fields=_CHANNEL_INPUTS + ("batch_seg",), architecture="equiformer_v2",
@@ -466,7 +469,8 @@ def equiformer_v3(
     return ComposableCore(
         FusedChannelEmbed(sphere_proj, lmax, so3_rotation, edge_degree_embedding, envelope_func),
         [FnBlock(block, fused_attention) for block in blocks], SphereHead(norm),
-        GraphRequires(distances=False, optional_cutoff_values=False, fields=("Za",),
+        GraphRequires(rotations=(RotationRequest(lmax, so3_rotation, mmax, -1, "edge_rot_mat"),),
+                      distances=False, optional_cutoff_values=False, fields=("Za",),
                       optional_fields=("edge_rot_mat", "batch_seg", "edge_envelope_weight",),
                       edge_convention="swap"),
         positional_fields=_CHANNEL_INPUTS + ("batch_seg",), architecture="equiformer_v3",
@@ -770,7 +774,8 @@ def tece(
     return ComposableCore(
         ClusterEmbed(num_elements, node_proj, spherical_harmonics, wigner, edge_embedding_mod, tensor_seed),
         blocks, FeatureHead(source="equi"),
-        GraphRequires(distances=False, edge_convention="swap", fields=("Za",)),
+        GraphRequires(rotations=(RotationRequest(Lmax, wigner, mmax, -1),),
+                      distances=False, edge_convention="swap", fields=("Za",)),
         positional_fields=("Za", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf", "atom_embedding",
                            "charge_embedding", "spin_embedding", "cutoff_values_sr"), architecture="tece",
         dim_embedding=dim_embedding, num_rbf=num_rbf, num_layers=num_layers,

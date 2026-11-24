@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List, Literal, Optional, Sequence, Union
 
 from ..mp.core import ComposableCore
-from ..mp.graph import GraphRequires
+from ..mp.graph import GraphRequires, HarmonicsRequest
 from ..mp.head import FeatureHead
 
 
@@ -289,7 +289,7 @@ def grace(
     max_l = max(layer.lmax for layer in built)
     return ComposableCore(
         GRACEEmbed(dim_embedding, avg_n_neigh, max_l), built, GRACEDensityHead(density),
-        GraphRequires(rbf=False, optional_cutoff_values=False),
+        GraphRequires(rbf=False, optional_cutoff_values=False, harmonics=(HarmonicsRequest(max_l),)),
         is_grace_core=True, num_blocks=1,
         preset=preset, max_Za=max_Za, dim_embedding=dim_embedding,
         cutoff_sr=cutoff_sr, basis_type=basis_type, n_rad_base=n_rad_base,

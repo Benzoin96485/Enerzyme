@@ -37,7 +37,7 @@ def painn(
     updates = [PaiNNMixing(dim_embedding, epsilon, use_vector_scalar_product) for _ in range(n_blocks)]
     blocks = [PaiNNBlock(message, update) for message, update in zip(messages, updates)]
     return ComposableCore(
-        embed, blocks, FeatureHead(equi_field="atom_vector_feature"), GraphRequires(),
+        embed, blocks, FeatureHead(equi_field="atom_vector_feature"), GraphRequires(unit=True),
         schedule=[0] * num_interactions if shared_interactions else None,
         positional_fields=_VECTOR_INPUTS + ("cutoff_values_sr",), architecture="painn", num_interactions=num_interactions, shared_filters=shared_filters,
         shared_interactions=shared_interactions, **vector_metadata(dim_embedding),
@@ -90,7 +90,7 @@ def newtonnet(
                     for index in (interaction, n_blocks + step)]
     return ComposableCore(
         NewtonEmbed(dim_embedding, num_rbf, cutoff_sr, envelope_p, variant_key), blocks,
-        NewtonHead(variant_key), GraphRequires(optional_cutoff_values=False), schedule=schedule,
+        NewtonHead(variant_key), GraphRequires(optional_cutoff_values=False, unit=True), schedule=schedule,
         positional_fields=_VECTOR_INPUTS, builder=build_newtonnet, architecture="newtonnet", variant=variant_key,
         num_interactions=num_interactions, **vector_metadata(dim_embedding),
     )

@@ -18,9 +18,8 @@ from ..mp.block import BlockState
 from ..mp.core import Embed
 from ..mp.message.triplet_graph import check_gemnet_edges
 
-from typing import List, Tuple
+from typing import List
 
-import torch
 from torch import Tensor
 from torch.nn import Module
 
@@ -28,10 +27,9 @@ from ..layers import BaseAtomEmbedding
 from ..layers.geometry import RangeSeparationLayer
 from ..layers.rbf import GaussianRBFLayer
 from .basis import legendre_outer, y_lm0
+from ..mp.graph import GraphContext
 from .geometry import (
-    cap_incoming_mask,
-    mixed_triplets,
-    quadruplet_graph,
+    mixed_graph_triplets,
     symmetrize_edges,
 )
 from .layers import BasisDownProjection
@@ -130,67 +128,21 @@ class GemNetOCEmbed(Embed):
         projected = self._down(layer, self._basis(distance, cutoff))
         return (projected * y_lm0(angle, self.num_spherical).unsqueeze(1)).sum(dim=-1)
 
-    def _select(
-        self,
-        idx_i: Tensor,
-        idx_j: Tensor,
-        dist: Tensor,
-        vij: Tensor,
-        num_nodes: int,
-        cutoff: float,
-        max_neighbors: int,
-    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-        mask = cap_incoming_mask(idx_i, dist, num_nodes, max_neighbors, cutoff)
-        return idx_i[mask], idx_j[mask], dist[mask], vij[mask]
-
-    def _quadruplet_basis(
-        self,
-        main_i: Tensor,
-        main_j: Tensor,
-        main_d: Tensor,
-        main_v: Tensor,
-        rbf_main: Tensor,
-        q_i: Tensor,
-        q_j: Tensor,
-        q_d: Tensor,
-        q_v: Tensor,
-        num_nodes: int,
-    ) -> dict:
+    def _quadruplet_basis(self, main, interaction, rbf_main) -> dict:
         assert self.mlp_rbf_qint is not None
         assert self.mlp_cbf_qint is not None
         assert self.mlp_sbf_qint is not None
-        n_main = int(main_i.shape[0])
         n_sph = self.num_spherical * self.num_spherical
         radial_w4 = self._down(self.mlp_sbf_qint, rbf_main)
         rbf_q = self.mlp_rbf_qint(rbf_main)
-        empty_e = main_i.new_empty(0)
-        if n_main == 0 or q_i.numel() == 0:
-            return {
-                "rbf_q": rbf_q,
-                "cbf_q": rbf_main.new_zeros(0, self.emb_size_cbf),
-                "radial_w4": radial_w4,
-                "angular4": rbf_main.new_zeros(0, n_sph),
-                "edge_db": empty_e,
-                "edge_ca": empty_e,
-            }
-        offset = n_main
-        quads = quadruplet_graph(
-            torch.cat([main_i, q_i]),
-            torch.cat([main_j, q_j]),
-            torch.cat([main_d, q_d]),
-            torch.cat([main_v, q_v]),
-            torch.arange(n_main, device=main_i.device),
-            torch.arange(offset, offset + int(q_i.shape[0]), device=main_i.device),
-            num_nodes,
-            images=True,
-        )
+        quads = main.quadruplets(interaction, images=True)
         if quads.edge_ca.numel() == 0:
             cbf_q = rbf_main.new_zeros(0, self.emb_size_cbf)
             angular4 = rbf_main.new_zeros(0, n_sph)
         else:
             cbf_q = self._circular(
                 self.mlp_cbf_qint,
-                q_d[quads.int_local],
+                interaction.dist[quads.int_local],
                 quads.angle_abd,
                 self.cutoff_qint,
             )
@@ -220,51 +172,21 @@ class GemNetOCEmbed(Embed):
         ):
             raise ValueError("edge index is outside atom_embedding")
 
-        main_i, main_j, main_d, main_v = self._select(
-            ctx.receiver,
-            ctx.sender,
-            ctx.dist,
-            ctx.vec,
-            num_nodes,
-            self.cutoff,
-            self.max_neighbors,
-        )
-        main_i, main_j, main_d, main_v, swap = symmetrize_edges(main_i, main_j, main_d, main_v)
-        use_ae = self.atom_edge_interaction or self.edge_atom_interaction
-        if use_ae:
-            ae_i, ae_j, ae_d, ae_v = self._select(
-                ctx.receiver,
-                ctx.sender,
-                ctx.dist,
-                ctx.vec,
-                num_nodes,
-                self.cutoff_aeaint,
-                self.max_neighbors_aeaint,
-            )
-        else:
-            ae_i = ae_j = ctx.receiver.new_empty(0)
-            ae_d = ctx.dist.new_empty(0)
-            ae_v = ctx.vec.new_empty(0, 3)
+        capped = ctx.closest(self.cutoff, self.max_neighbors)
+        main_i, main_j, main_d, main_v, swap = symmetrize_edges(
+            capped.receiver, capped.sender, capped.dist, capped.vec)
+        main = GraphContext(main_i, main_j, num_nodes, vec=main_v, dist=main_d)
+        if self.atom_edge_interaction or self.edge_atom_interaction:
+            ae = ctx.closest(self.cutoff_aeaint, self.max_neighbors_aeaint)
         if self.atom_interaction:
-            a2a_i, a2a_j, a2a_d, _a2a_v = self._select(
-                ctx.receiver,
-                ctx.sender,
-                ctx.dist,
-                ctx.vec,
-                num_nodes,
-                self.cutoff_aint,
-                self.max_neighbors_aint,
-            )
-        else:
-            a2a_i = a2a_j = ctx.receiver.new_empty(0)
-            a2a_d = ctx.dist.new_empty(0)
+            a2a = ctx.closest(self.cutoff_aint, self.max_neighbors_aint)
 
         rbf_main = self._basis(main_d, self.cutoff)
         rbf_e2e = self.mlp_rbf_tint(rbf_main)
         rbf_h = self.mlp_rbf_h(rbf_main)
         rbf_out = self.mlp_rbf_out(rbf_main)
         radial_w3 = self._down(self.mlp_cbf_tint, rbf_main)
-        trips = mixed_triplets(main_i, main_j, main_v, main_i, main_j, main_v, num_nodes)
+        trips = mixed_graph_triplets(main, main)
         angular3 = y_lm0(trips.angle, self.num_spherical)
 
         quad_kwargs: dict = {}
@@ -272,57 +194,38 @@ class GemNetOCEmbed(Embed):
             assert self.mlp_rbf_qint is not None
             assert self.mlp_cbf_qint is not None
             assert self.mlp_sbf_qint is not None
-            q_i, q_j, q_d, q_v = self._select(
-                ctx.receiver,
-                ctx.sender,
-                ctx.dist,
-                ctx.vec,
-                num_nodes,
-                self.cutoff_qint,
-                self.max_neighbors_qint,
-            )
-            quad_kwargs = self._quadruplet_basis(
-                main_i,
-                main_j,
-                main_d,
-                main_v,
-                rbf_main,
-                q_i,
-                q_j,
-                q_d,
-                q_v,
-                num_nodes,
-            )
+            interaction = ctx.closest(self.cutoff_qint, self.max_neighbors_qint)
+            quad_kwargs = self._quadruplet_basis(main, interaction, rbf_main)
         ae_kwargs: dict = {}
         if self.atom_edge_interaction:
             assert self.mlp_rbf_aeint is not None and self.mlp_cbf_aeint is not None
-            a2e = mixed_triplets(main_i, main_j, main_v, ae_i, ae_j, ae_v, num_nodes)
+            a2e = mixed_graph_triplets(main, ae)
             ae_kwargs.update(
-                rbf_a2e=self.mlp_rbf_aeint(self._basis(ae_d, self.cutoff_aeaint)),
+                rbf_a2e=self.mlp_rbf_aeint(self._basis(ae.dist, self.cutoff_aeaint)),
                 radial_a2e=self._down(self.mlp_cbf_aeint, rbf_main),
                 angular_a2e=y_lm0(a2e.angle, self.num_spherical),
-                a2e_sender=ae_j,
+                a2e_sender=ae.sender,
                 a2e_other=a2e.idx_other,
                 a2e_edge=a2e.idx_edge,
             )
         if self.edge_atom_interaction:
             assert self.mlp_rbf_eaint is not None and self.mlp_cbf_eaint is not None
-            e2a = mixed_triplets(ae_i, ae_j, ae_v, main_i, main_j, main_v, num_nodes)
-            raw_ae = self._basis(ae_d, self.cutoff_aeaint)
+            e2a = mixed_graph_triplets(ae, main)
+            raw_ae = self._basis(ae.dist, self.cutoff_aeaint)
             ae_kwargs.update(
                 rbf_e2a=self.mlp_rbf_eaint(rbf_main),
                 radial_e2a=self._down(self.mlp_cbf_eaint, raw_ae),
                 angular_e2a=y_lm0(e2a.angle, self.num_spherical),
                 e2a_other=e2a.idx_other,
                 e2a_edge=e2a.idx_edge,
-                e2a_receiver=ae_i,
+                e2a_receiver=ae.receiver,
             )
         if self.atom_interaction:
             assert self.mlp_rbf_aint is not None
             ae_kwargs.update(
-                rbf_a2a=self.mlp_rbf_aint(self._basis(a2a_d, self.cutoff_aint)),
-                a2a_i=a2a_i,
-                a2a_j=a2a_j,
+                rbf_a2a=self.mlp_rbf_aint(self._basis(a2a.dist, self.cutoff_aint)),
+                a2a_i=a2a.receiver,
+                a2a_j=a2a.sender,
             )
 
         h = inputs["atom_embedding"]

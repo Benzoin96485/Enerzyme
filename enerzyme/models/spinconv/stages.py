@@ -118,14 +118,13 @@ class SpinConvEmbed(Embed):
         distance = ctx.dist
         vij = ctx.vec
         basis = ctx.rbf
+        edges = ctx
         if idx_i.numel():
             keep = symmetric_neighbor_mask(idx_i, idx_j, distance, num_nodes, self.max_num_neighbors)
             if not bool(keep.all()):
-                idx_i = idx_i[keep]
-                idx_j = idx_j[keep]
-                distance = distance[keep]
-                vij = vij[keep]
-                basis = basis[keep]
+                edges = ctx.subset(keep)
+                idx_i, idx_j = edges.receiver, edges.sender
+                distance, vij, basis = edges.dist, edges.vec, edges.rbf
 
         if self.pair_scale is not None:
             scaled = self.pair_scale(distance, inputs["Za"][idx_j], inputs["Za"][idx_i])
@@ -134,7 +133,8 @@ class SpinConvEmbed(Embed):
         hidden = self.act(self.init_fc2(self.act(self.init_fc1(distance_embed))))
         messages = self.init_mix(hidden, inputs["atom_embedding"], idx_j, idx_i)
         projection = sphere_projection(
-            vij, idx_i, idx_j, distance, self.cutoff, num_nodes, self.n_lat, self.n_long
+            vij, idx_i, idx_j, distance, self.cutoff, num_nodes, self.n_lat, self.n_long,
+            pairs=edges.triplets("path"),
         )
         ctx.cache["spin_graph"] = (
             distance_embed,
