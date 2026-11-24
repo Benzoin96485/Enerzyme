@@ -14,7 +14,7 @@ import torch
 from torch import Tensor
 from torch.nn import functional as F
 
-from .scatter import scatter_reduce, scatter_sum
+from .scatter import _broadcast_index, scatter_reduce, scatter_sum
 
 
 def segment_softmax(
@@ -28,6 +28,8 @@ def segment_softmax(
     exp_rescale: Optional[Tensor] = None,
     dropout: Optional[torch.nn.Module] = None,
     floor: Optional[float] = None,
+    envelope: Optional[Tensor] = None,
+    null_logit: Optional[Tensor] = None,
 ) -> Tensor:
     """Softmax of ``logits`` along ``dim`` within segments given by ``index``.
 
@@ -36,21 +38,53 @@ def segment_softmax(
     (EquiformerV3 envelope); ``dropout`` is applied to the exponentials.
     ``floor`` initialises the running maximum (``None`` means empty segments
     produce zero maxima, matching PyG ``scatter(..., reduce="max")``).
+    ``envelope`` is a nonnegative weight per edge or per logit. Zero weights
+    exclude edges. ``null_logit`` adds a competing logit per segment, broadcast
+    over the non-edge dimensions. The output contains only the edge weights.
     """
-    if logits.numel() == 0:
+    if logits.numel() == 0 and null_logit is None and envelope is None:
         return logits
     dim = dim + logits.dim() if dim < 0 else dim
+    if envelope is not None:
+        if envelope.ndim == 1:
+            edge_shape = [1] * logits.ndim
+            edge_shape[dim] = -1
+            envelope = envelope.reshape(edge_shape)
+        active = envelope > 0
+        log_weight = torch.where(active, envelope, 1.0).log()
+        logits = (logits + log_weight).masked_fill(~active, -torch.inf)
     source = logits.detach() if detach_max else logits
-    if floor is None:
+    if null_logit is not None:
+        # Include the null alternative in the maximum even for empty segments.
+        shape = list(logits.shape)
+        shape[dim] = num_segments
+        if null_logit.ndim == logits.ndim:
+            null = null_logit.expand(shape)
+        else:
+            channels = list(logits.shape)
+            del channels[dim]
+            null = null_logit.expand(channels).unsqueeze(dim).expand(shape)
+        initial = null.detach() if detach_max else null
+        if floor is not None:
+            initial = initial.clamp_min(floor)
+        maxima = initial.scatter_reduce(dim, _broadcast_index(index, logits, dim),
+                                        source, reduce="amax", include_self=True)
+    elif floor is None:
         maxima = scatter_reduce(source, index, num_segments, dim, reduce="amax")
     else:
         maxima = scatter_reduce(source, index, num_segments, dim, reduce="amax", fill=floor, include_self=True)
+    if envelope is not None and null_logit is None:
+        maxima = maxima.masked_fill(maxima == -torch.inf, 0.0)
     out = (logits - maxima.index_select(dim, index)).exp()
     if exp_rescale is not None:
         out = out * exp_rescale
     if dropout is not None:
         out = dropout(out)
     denominator = scatter_sum(out, index, num_segments, dim)
+    if null_logit is not None:
+        denominator = denominator + (null - maxima).exp()
+    elif envelope is not None:
+        denominator = denominator.masked_fill(denominator == 0, 1.0)
     if clamp_min is not None:
         denominator = denominator.clamp_min(clamp_min)
     if eps:
@@ -135,15 +169,8 @@ def segment_envelope_gated_softmax(
     null_mass = F.softplus(z_bias_raw.to(dtype=compute_dtype)) + float(eps)
     null_logit = torch.log(null_mass).reshape(1, n_channel)
 
-    group_max = null_logit.expand(n_nodes, n_channel).clone()
-    group_max = group_max.scatter_reduce(
-        0, dst[:, None].expand(-1, n_channel), effective_logits, reduce="amax", include_self=True
+    alpha = segment_softmax(
+        effective_logits, dst, n_nodes, null_logit=null_logit,
+        exp_rescale=source_ratio[:, None] if source_ratio is not None else None,
     )
-    edge_exp = torch.exp(effective_logits - group_max.index_select(0, dst))
-    if source_ratio is not None:
-        edge_exp = edge_exp * source_ratio[:, None]
-    denom_sum = torch.zeros(n_nodes, n_channel, dtype=compute_dtype, device=logits.device)
-    denom_sum.index_add_(0, dst, edge_exp)
-    denominator = denom_sum + torch.exp(null_logit - group_max)
-    alpha = edge_exp / denominator.index_select(0, dst)
     return alpha.reshape(n_edge, n_focus, n_head).to(dtype=logits.dtype)

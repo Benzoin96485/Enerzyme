@@ -26,6 +26,28 @@ def _edges(n_nodes=7, n_edges=40, width=5, dtype=torch.float64, seed=0):
     return src, index
 
 
+@pytest.mark.parametrize("with_null", [False, True])
+def test_segment_softmax_with_envelope_matches_dense_values_and_gradients(with_null):
+    logits = torch.tensor([[5., -2., 1., 3.], [-4., 2., 1., 1.]], dtype=torch.float64, requires_grad=True)
+    envelope = torch.tensor([0.25, 0., 0.75, 0.], dtype=logits.dtype, requires_grad=True)
+    index = torch.tensor([1, 0, 1, 2])
+    null = torch.tensor([0.3, -0.4], dtype=logits.dtype, requires_grad=True) if with_null else None
+    weights = segment_softmax(logits, index, 4, dim=1, envelope=envelope, null_logit=null)
+    active = envelope > 0
+    numer = logits.exp() * torch.where(active, envelope, 0.)
+    denom = torch.stack([numer[:, index == group].sum(1) for group in range(4)], dim=1)
+    if null is not None:
+        denom = denom + null.exp().unsqueeze(1)
+    expected = numer / denom.masked_fill(denom == 0, 1.)[:, index]
+    torch.testing.assert_close(weights, expected)
+    direction = torch.arange(weights.numel(), dtype=weights.dtype).reshape_as(weights)
+    inputs = (logits, envelope, null) if with_null else (logits, envelope)
+    actual_grad = torch.autograd.grad(weights, inputs, direction)
+    expected_grad = torch.autograd.grad(expected, inputs, direction)
+    for actual, reference in zip(actual_grad, expected_grad):
+        torch.testing.assert_close(actual, reference)
+
+
 def test_scatter_sum_backends_bitwise(dtype, monkeypatch):
     torch_scatter = pytest.importorskip("torch_scatter")
     src, index = _edges(dtype=dtype)
