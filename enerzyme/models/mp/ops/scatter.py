@@ -77,7 +77,11 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
     shape[dim] = size
     out = src.new_zeros(shape)
     if torch.compiler.is_compiling() or index.numel():
-        if src.device.type == "cuda":
+        # CPU Inductor can miscompile index_add_ across a nonleading axis in
+        # channel-first messages. The expanded index keeps the destination
+        # of each vector lane explicit without allocating a full index tensor.
+        compiled_nonleading = dim != 0 and src.device.type == "cpu" and torch.compiler.is_compiling()
+        if src.device.type == "cuda" or compiled_nonleading:
             out.scatter_add_(dim, _broadcast_index(index, src, dim), src)
         else:
             out.index_add_(dim, index, src)
