@@ -176,7 +176,9 @@ def cace(
     width = (num_message_passing + 1) * n_radial * n_invariants * n_channels
     return ComposableCore(
         embed, blocks, FeatureHead("concat", include_embedding=True), GraphRequires(),
-        is_cace_core=True, _native_cpu_inductor_forces=True, dim_feature_out=width, feature_irreps=f"{width}x0e",
+        # Vectorized CPU kernels can corrupt memory in the density derivatives.
+        is_cace_core=True, _cpu_force_training_option="cpp.simdlen", _cpu_force_inference_option="cpp.simdlen",
+        dim_feature_out=width, feature_irreps=f"{width}x0e",
         preset=preset, dim_embedding=dim_embedding, cutoff_sr=cutoff_sr,
         num_rbf=num_rbf, lmax=lmax, max_nu=max_nu,
         n_radial=n_radial, num_message_passing=num_message_passing, messages=messages,

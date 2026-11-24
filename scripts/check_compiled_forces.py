@@ -28,7 +28,7 @@ class PreparedEnergyForces(torch.nn.Module):
 
         if getattr(model, "_scripted_force_kernels", False) or (device.type == "cpu" and (
             getattr(model, "_native_cpu_inductor_forces", False)
-            or getattr(model, "_separate_cpu_force_reductions", False)
+            or getattr(model, "_cpu_force_training_option", None)
         )):
             raise ValueError("This preset requires its specialized force-training entry point")
         self.model = model
