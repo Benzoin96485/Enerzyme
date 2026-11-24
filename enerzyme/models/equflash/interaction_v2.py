@@ -53,11 +53,13 @@ class IrrepsEmbed(nn.Module):
             _, src = choices.pop(match)
             pairs.append((src.start, src.stop, sl.start, sl.stop))
         self._pairs = tuple(pairs)
+        self.output_width = self.irreps_out.dim
+        self.is_identity = not self._pairs and self.irreps_in == self.irreps_out
 
     def forward(self, features: Tensor) -> Tensor:
-        if not self._pairs and self.irreps_in == self.irreps_out:
+        if self.is_identity:
             return features
-        out = features.new_zeros(features.shape[0], self.irreps_out.dim)
+        out = features.new_zeros(features.shape[0], self.output_width)
         for src_start, src_stop, dst_start, dst_stop in self._pairs:
             out[:, dst_start:dst_stop] = features[:, src_start:src_stop]
         return out

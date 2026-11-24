@@ -17,7 +17,7 @@ def weighted_messages(tp, features, sender, edge_sh, weights):
 def irreps_convolution(tp, radial, features, sender, receiver, edge_sh, rbf):
     """Sum radial-weighted tensor-product messages onto receiver atoms."""
     if sender.numel() == 0:
-        return features.new_zeros(features.shape[0], tp.irreps_out.dim)
+        return features.new_zeros(features.shape[0], tp.output_mask.numel())
     messages = weighted_messages(tp, features, sender, edge_sh, radial(rbf))
     return scatter_sum(messages, receiver, features.shape[0])
 
