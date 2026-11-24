@@ -242,6 +242,9 @@ def compiled_coordinate_vjp(core, inputs):
     edges, topology = _prepare_radius_graph(core, inputs)
     post_pairs = _post_pair_indices(core, inputs)
     with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+        if core.training and getattr(core, "architecture", None) == "chgnet":
+            from ..chgnet.stages import train_with_magnetic_readout
+            return train_with_magnetic_readout(core, inputs, edges, topology, post_pairs)
         return forward_with_coordinate_gradients(core, inputs, edges, topology, post_pairs)
 
 
