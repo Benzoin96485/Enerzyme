@@ -7,10 +7,12 @@ import numpy as np
 from numpy.testing import assert_allclose
 from numpy.random import get_state, set_state
 import torch
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
 sys.path.extend(["..", "."])
 from enerzyme.models.ff import build_model
+import pytest
+
+tf = pytest.importorskip("tensorflow.compat.v1", reason="PhysNet upstream parity requires TensorFlow")
+tf.disable_v2_behavior()
 from physnet.NeuralNetwork import NeuralNetwork
 from physnet.grimme_d3.grimme_d3 import d3_autoang, d3_autoev
 from enerzyme.models.physnet import DEFAULT_LAYER_PARAMS, DEFAULT_BUILD_PARAMS
@@ -63,7 +65,16 @@ elif dtype == "float32":
     W_init = W_init.type(dtype_torch)
     b_init = b_init.astype(np.float32)
 
-# set_dtype("float64")
+@pytest.fixture(scope="module", autouse=True)
+def initialize_parameters_at_reference_precision():
+    # The two implementations draw the same NumPy weights. Constructing them
+    # in fp32 before a cast would compare rounded weights to the fp64 originals.
+    previous = torch.get_default_dtype()
+    torch.set_default_dtype(dtype_torch)
+    try:
+        yield
+    finally:
+        torch.set_default_dtype(previous)
 
 def initialize(build_params=DEFAULT_BUILD_PARAMS, layer_params=DEFAULT_LAYER_PARAMS):
     state = get_state()
