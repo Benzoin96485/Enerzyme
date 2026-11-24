@@ -269,7 +269,7 @@ def retained_inference(core, inputs, *, joint=False):
 
 
 def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, topology=None,
-                                      post_pairs=None) -> Dict[str, Any]:
+                                      post_pairs=None, *, core_stage=None, skip_post=()) -> Dict[str, Any]:
     """Functional coordinate VJPs make force fitting a single compiled backward.
 
     The prefix ending at each Force layer returns energy and tensor-valued
@@ -297,10 +297,13 @@ def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, 
             return {**state, **{ranges._name_mapping[k]: v for k, v in selected.items()}}
 
         stages[1] = select_neighbors
-    stages.append(core._forward if topology is None else
-                  partial(core._forward, extra_inputs={"_prepared_topology": topology}))
+    if core_stage is None:
+        core_stage = core._forward if topology is None else partial(
+            core._forward, extra_inputs={"_prepared_topology": topology}
+        )
+    stages.append(core_stage)
     for i, layer in enumerate(core.post_sequence):
-        if active(layer):
+        if i not in skip_post and active(layer):
             if post_pairs and i in post_pairs:
                 stages.append(partial(layer._forward, extra_inputs={"_pair_indices": post_pairs[i]}))
             else:
@@ -341,12 +344,22 @@ def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, 
             net_input = stages[i](net_input)
         return net_input
 
+    return _restore_input_type(inputs, evaluate(_input_fields(inputs), len(stages)))
+
+
+def _input_fields(inputs):
     if isinstance(inputs, Data):
-        # PyG spells the membership vector "batch" and updates its Data in place.
         fields = {name: value for name, value in inputs}
         fields["batch_seg"] = fields.get("batch")
-        for name, value in evaluate(fields, len(stages)).items():
+        return fields
+    return inputs
+
+
+def _restore_input_type(inputs, fields):
+    if isinstance(inputs, Data):
+        # PyG spells the membership vector "batch" and updates its Data in place.
+        for name, value in fields.items():
             if name != "batch_seg":
                 inputs[name] = value
         return inputs
-    return evaluate(inputs, len(stages))
+    return fields
