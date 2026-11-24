@@ -1,10 +1,10 @@
 {
   "cpu": {
-    "revision": "2fa0e3d",
-    "job": "6318263",
+    "revision": "2859597",
+    "job": "6318601",
     "test_files_and_shards": 170,
     "results": {
-      "passed": 1573,
+      "passed": 1584,
       "skipped": 61,
       "errors": 0,
       "failures": 0
@@ -49,5 +49,18 @@
       "test.test_e2former_triton_parity::test_want_triton_cpu_fallback_matches_pytorch_sparse_ops": "CUDA Triton available; CPU fallback path not exercised here"
     }
   },
-  "notes": "The two runs use different recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run."
+  "notes": "The runs use the recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run.",
+  "wheel": {
+    "revision": "2859597",
+    "job": "6318612",
+    "filename": "enerzyme-0.6.0-py3-none-any.whl",
+    "sha256": "40cf920cff144607b881f3e9463a143009acd11b231e329c383798dcba7bbe8b",
+    "results": {
+      "passed": 58,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0
+    },
+    "method": "Build from git archive with no index, install into a fresh target directory, load the registry and bundled Jd, CG and Lebedev data, and run the 58 frozen-weight checks outside the source checkout. The isolated test directory contains only the test harness and the frozen-weight symlink."
+  }
 }
