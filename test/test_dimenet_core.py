@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+import pytest
 import torch
 import yaml
 from numpy.testing import assert_allclose
@@ -148,9 +150,12 @@ def test_dimenet_rotation_invariance():
     assert torch.allclose(f0, f1, atol=1e-5, rtol=1e-5)
 
 
-def test_dimenet_layer_stack_energy_and_force():
+@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
+def test_dimenet_layer_stack_energy_and_force(dtype):
     from enerzyme.models.ff import build_model
 
+    torch.manual_seed(42)
+    np.random.seed(42)  # The semi-orthogonal initializer uses NumPy.
     layers = [
         {"name": "RangeSeparation"},
         {
@@ -200,10 +205,11 @@ def test_dimenet_layer_stack_energy_and_force():
             "cutoff_fn": "polynomial",
         },
         verbose=0,
-    )
+    ).to(dtype)
     n = 4
     idx_i, idx_j = _complete_graph_edges(n)
-    positions = torch.randn(n, 3, requires_grad=True)
+    positions = torch.tensor([[0.0, 0.0, 0.0], [1.1, -0.2, 0.1],
+                              [-0.3, 1.3, 0.2], [0.1, -0.4, 1.5]], dtype=dtype, requires_grad=True)
     out = model(
         {
             "Ra": positions,

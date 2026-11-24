@@ -67,7 +67,13 @@ def _assert_close(out, ref, dtype, label):
     for key, expected in ref.items():
         got = out[key].detach().to(torch.float64)
         expected = expected.to(torch.float64)
-        scale = max(1.0, float(expected.abs().max())) if expected.numel() else 1.0
+        magnitude = float(expected.abs().max()) if expected.numel() else 0.0
+        if key in ("E", "Fa", "Qa"):
+            # The main compatibility contract uses absolute error in fp64 and
+            # normwise relative error in fp32, including small charged outputs.
+            scale = 1.0 if dtype == torch.float64 or magnitude == 0 else magnitude
+        else:
+            scale = max(1.0, magnitude)
         diff = float((got - expected).abs().max()) if expected.numel() else 0.0
         assert diff <= TOL[dtype] * scale, f"{label} {key}: max |diff| {diff:.3e} (scale {scale:.3e})"
 

@@ -7,15 +7,14 @@ Each revised measurement uses the paired run for that case, with its own candida
 | Reference | Within +3% | Above +3% | Unavailable | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Phase 0 defaults | 1180 | 0 | 212 | 1392 |
-| Main checkpoints | 96 | 0 | 0 | 96 |
+| Main checkpoints | 95 | 1 | 0 | 96 |
 
-Of the 48 directly comparable main-checkpoint timings, 43 were as fast or faster. The following medians were slower.
+Of the 48 directly comparable main-checkpoint timings, 44 were as fast or faster. The following medians were slower.
 
-- physnet_ff01 float32, bulk_256, infer_ms +2.80% (run 6317461)
-- physnet_ff01 float32, bulk_256, train_ms +0.26% (run 6317461)
-- physnet_ff01 float32, mol_batch_32x20, train_ms +1.00% (run 6317461)
-- physnet_ff01 float64, bulk_256, infer_ms +0.41% (run 6317461)
-- spookynet_ff02 float64, bulk_256, infer_ms +2.18% (run 6317461)
+- spookynet_ff02 float64, bulk_256, infer_ms +1.08% (run 6317925)
+- spookynet_ff02 float64, bulk_256, train_ms +5.14% (run 6317925)
+- spookynet_ff02 float64, large_2000, train_ms +1.59% (run 6317925)
+- spookynet_ff02 float64, mol_batch_32x20, train_ms +1.50% (run 6317925)
 
 ## Missing paired measurements
 
