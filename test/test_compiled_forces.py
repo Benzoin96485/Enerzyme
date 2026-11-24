@@ -18,8 +18,8 @@ def isolate_compiler_cache():
     torch.compiler.reset()
 
 
-@pytest.mark.parametrize("architecture", ["equiformer_v3", "camp"])
-def test_cpu_compiled_force_training_uses_native_gradients(monkeypatch, architecture):
+@pytest.mark.parametrize("architecture", ["cace", "grace", "equiformer_v3"])
+def test_conflicting_cpu_kernel_option_uses_native_gradients(monkeypatch, architecture):
     from torch._dynamo.exc import TorchRuntimeError
 
     # Fail before compiler code generation if the unsafe coordinate VJP is traced.
@@ -42,7 +42,13 @@ def test_cpu_compiled_force_training_uses_native_gradients(monkeypatch, architec
         return out["E"].detach(), out["Fa"].detach(), gradients
 
     expected_e, expected_f, expected_g = step(model)
-    actual_e, actual_f, actual_g = step(torch.compile(model))
+    options = {"cpp.simdlen": 256}
+
+    def delegate(graph, inputs, **kwargs):
+        return torch._inductor.compile(graph, inputs, **kwargs)
+
+    backend = delegate if architecture == "grace" else "inductor"
+    actual_e, actual_f, actual_g = step(torch.compile(model, backend=backend, options=options))
     torch.testing.assert_close(actual_e, expected_e, atol=0, rtol=0)
     torch.testing.assert_close(actual_f, expected_f, atol=0, rtol=0)
     assert actual_g.keys() == expected_g.keys() and len(actual_g) > 1
@@ -51,8 +57,8 @@ def test_cpu_compiled_force_training_uses_native_gradients(monkeypatch, architec
     # PyTorch's code cache can reuse a previous non-strict trace of the same
     # method when only fullgraph changes. Exercise an independent strict trace.
     torch.compiler.reset()
-    with pytest.raises((AssertionError, TorchRuntimeError), match="Fullgraph CPU force training"):
-        torch.compile(model, fullgraph=True)(dict(batch))
+    with pytest.raises((AssertionError, TorchRuntimeError), match=r"Fullgraph CPU forces.*cpp\.simdlen"):
+        torch.compile(model, backend=backend, fullgraph=True, options=options)(dict(batch))
 
 
 def test_batched_charge_dipole_and_energy_keep_empty_structures_in_fullgraph():
@@ -225,7 +231,7 @@ def test_compiled_topology_preserves_force_and_parameter_gradients(architecture)
     assert "linear" in operators
 
 
-@pytest.mark.parametrize("architecture", ["so3krates", "mattersim", "dpa3", "facto", "cace", "grace"])
+@pytest.mark.parametrize("architecture", ["so3krates", "mattersim", "dpa3", "facto", "cace", "grace", "equiformer_v3"])
 def test_cpu_compiler_keeps_force_gradients(architecture):
     from scripts.core_harness import build, forward, make_batch, random_molecules
 

@@ -73,7 +73,11 @@ def cpu_inductor_option(option):
     except AttributeError:
         return None
     backend = getattr(wrapper, "_torchdynamo_orig_backend", wrapper)
-    return getattr(backend, "config", {}).get(option)
+    overrides = getattr(backend, "config", None)
+    if overrides is None:
+        # torch.compile forwards options to custom backends as keyword arguments.
+        overrides = getattr(backend, "kwargs", {}).get("options", {})
+    return overrides.get(option) if isinstance(overrides, dict) else None
 
 
 @torch.compiler.disable(recursive=False)
