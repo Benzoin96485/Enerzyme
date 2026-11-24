@@ -46,13 +46,13 @@ class PaiNNInteraction(Module):
         idx_j: Tensor,
         n_atoms: int,
     ) -> tuple[Tensor, Tensor]:
-        x = self.interatomic_context_net(q).index_select(0, idx_j)
+        x = self.interatomic_context_net(q)[idx_j]
         x = wij * x
         dq, dmu_r, dmu_mu = torch.split(x, self.n_atom_basis, dim=-1)
         dq = scatter_sum(dq, idx_i, n_atoms)
         dmu = dmu_r.unsqueeze(-2) * dir_ij.unsqueeze(-1)
         if self.propagate_vectors:
-            dmu = dmu + dmu_mu.unsqueeze(-2) * mu.index_select(0, idx_j)
+            dmu = dmu + dmu_mu.unsqueeze(-2) * mu[idx_j]
         dmu = scatter_sum(dmu, idx_i, n_atoms)
         return q + dq, mu + dmu
 
