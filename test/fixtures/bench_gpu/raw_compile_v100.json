@@ -567,6 +567,48 @@
         "large_2000": ["err2", "err2"]
       }
     },
+    "facto/float32": {
+      "candidate_commit": "8eafafc",
+      "job": "6317560",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[15.754053834825754, 273.2197265625, 15, 2340], [25.028115836903453, 847.40576171875, 1, 1248]],
+        "bulk_256": [[15.258234925568104, 210.904296875, 1, 1108], [24.653006810694933, 829.40576171875, 1, 1253]],
+        "large_2000": [[34.68963992781937, 1144.61083984375, 1, 1108], [101.45520605146885, 5019.05078125, 1, 1250]]
+      }
+    },
+    "facto/float64": {
+      "candidate_commit": "8eafafc",
+      "job": "6317560",
+      "base": {
+        "mol_batch_32x20": ["err3", "err3"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[27.151989983394742, 537.8349609375, 15, 2340], [46.57636885531247, 1685.2763671875, 1, 1248]],
+        "bulk_256": [[24.77669483050704, 405.755859375, 1, 1108], [42.064371053129435, 1625.77197265625, 1, 1253]],
+        "large_2000": [[98.11910009011626, 2266.8349609375, 1, 1108], [191.5353371296078, 9915.73388671875, 1, 1250]]
+      }
+    },
+    "dpa4c/float32": {
+      "candidate_commit": "8eafafc",
+      "job": "6317560",
+      "base": {
+        "mol_batch_32x20": [[6.463123951107264, 38.8232421875, 24, 264], "err4"],
+        "bulk_256": ["err2", "err2"],
+        "large_2000": ["err2", "err2"]
+      },
+      "new": {
+        "mol_batch_32x20": [[5.125779891386628, 38.876953125, 14, 518], [5.9102370869368315, 52.62646484375, 1, 300]],
+        "bulk_256": [[4.658593097701669, 43.64013671875, 1, 242], [6.104515865445137, 57.14306640625, 1, 307]],
+        "large_2000": [[5.090390797704458, 183.18798828125, 1, 242], [6.869188044220209, 269.19873046875, 1, 304]]
+      }
+    },
     "dpa4c/float64": {
       "candidate_commit": "8eafafc",
       "job": "6317560",
@@ -610,6 +652,8 @@
       }
     }
   },
+  "frozen_method": "Rechecks load the pre-refactor state dict strictly and use the same deterministic inputs on each checkout. Each timed step includes energy and force inference. Training differentiates squared energies and forces through the weights. Numerical fields compare the first compiled result with that checkout\u2019s eager result, including every training gradient and its presence. cross_eager compares original and candidate eager E and Fa. fp64 tolerances are atol 1e-8, rtol 1e-7. fp32 tolerances are 3e-4 for both, and atol 7e-4, rtol 1e-3 for parameter derivatives. Each leg uses a fresh process, two warmups, then the median of its repetitions. ABBA compares medians of the two per-side medians. A cell with passing numerical evidence and no baseline timing is additional candidate capability. It contributes no speed or memory comparison. A zero graph delta may indicate reuse of prior graphs or execution in eager mode.",
+  "frozen_rechecks": {},
   "errors": {
     "err1": "RuntimeError: torch.compile with aot_autograd does not currently support double backward",
     "err2": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
@@ -620,5 +664,18 @@
     "err7": "CUDA out of memory",
     "err8": "self._call_impl(*args, **kwargs)",
     "err9": "/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl"
+  },
+  "assessment": {
+    "attempted_architecture_precision_pairs": 46,
+    "expected_architecture_precision_pairs": 116,
+    "historical_architecture_precision_pairs": 46,
+    "completed_frozen_attempts": 0,
+    "comparable_mode_system_cells": 23,
+    "comparable_metrics": 46,
+    "above_3_percent": 2,
+    "frozen_mode_system_cells": 0,
+    "frozen_candidate_only_cells": 0,
+    "frozen_numerical_or_reference_failures": 0,
+    "excesses": [{"model_precision": "alphanet/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "median_ms", "candidate": "3b77a61", "relative_percent": 3.805}, {"model_precision": "equireann/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "median_ms", "candidate": "3b77a61", "relative_percent": 7.525}]
   }
 }
