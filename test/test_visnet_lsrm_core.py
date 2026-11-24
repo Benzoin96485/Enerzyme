@@ -125,7 +125,7 @@ def test_registration_and_yaml_build():
 
     for name in ("visnet_lsrm", "visnet-lsrm", "visnet_lsr", "ViSNet-LSR"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "ViSNetLSRMCore"
+        assert core_cls.__name__ == "visnet_lsrm"
         assert build_params["dim_embedding"] == 128
         assert build_params["num_rbf"] == 50
         assert build_params["cutoff_sr"] == 4.0
@@ -145,7 +145,7 @@ def test_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "ViSNetLSRMCore"
+    assert model.architecture == "visnet_lsrm"
     assert model.dim_feature_out == 16
     assert model.feature_irreps == "16x0e"
     assert model.vector_feature_layout == "cartesian_n3f"
@@ -155,11 +155,11 @@ def test_registration_and_yaml_build():
 
 
 def test_precomputed_shapes_and_lmax2():
-    from enerzyme.models.visnet.lsr import ViSNetLSRMCore
+    from enerzyme.models.presets.cartesian_vector import visnet_lsrm
 
     torch.manual_seed(0)
     n = 4
-    core = ViSNetLSRMCore(
+    core = visnet_lsrm(
         dim_embedding=8,
         num_rbf=4,
         num_layers=2,
@@ -194,10 +194,10 @@ def test_precomputed_shapes_and_lmax2():
 
 
 def test_long_layers_zero_still_concatenates():
-    from enerzyme.models.visnet.lsr import ViSNetLSRMCore
+    from enerzyme.models.presets.cartesian_vector import visnet_lsrm
 
     torch.manual_seed(1)
-    core = ViSNetLSRMCore(
+    core = visnet_lsrm(
         dim_embedding=4,
         num_rbf=2,
         num_layers=1,

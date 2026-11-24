@@ -27,6 +27,46 @@ KEY_MAPS["newtonnet"] = [
     (r"^blocks\.(\d+)\.", r"blocks.\1.module."),
 ]
 
+KEY_MAPS["et"] = [
+    (r"^neighborhood\.", r"embed.neighborhood."),
+    (r"^edge_embedding\.", r"embed.edge_embedding."),
+    (r"^attention_layers\.(\d+)\.", r"blocks.\1.module."),
+    (r"^(vec_out_norm|out_norm)\.", r"head.\1."),
+]
+
+KEY_MAPS["visnet"] = [
+    (r"^neighborhood\.", r"embed.neighborhood."),
+    (r"^edge_embedding\.", r"embed.edge_embedding."),
+    (r"^vis_layers\.(\d+)\.", r"blocks.\1.module."),
+    (r"^(vec_out_norm|out_norm)\.", r"head.\1."),
+]
+
+KEY_MAPS["quinnet"] = [
+    (r"^neighborhood\.", r"embed.neighborhood."),
+    (r"^edge_embedding\.", r"embed.edge_embedding."),
+    (r"^quin_layers\.(\d+)\.", r"blocks.\1.module."),
+    (r"^(vec_out_norm|out_norm)\.", r"head.\1."),
+]
+
+KEY_MAPS["freecg"] = [
+    (r"^neighborhood\.", r"embed.neighborhood."),
+    (r"^edge_embedding\.", r"embed.edge_embedding."),
+    (r"^vis_layers\.(\d+)\.", r"blocks.\1.module."),
+    (r"^(vec_out_norm|out_norm)\.", r"head.\1."),
+]
+
+# The frozen LSRM fixture has six short-range interactions followed by two fragment layers.
+KEY_MAPS["visnet_lsrm"] = [
+    (r"^(long_rbf(?:_proj)?)\.", r"blocks.6.\1."),
+    (r"^long_blocks\.0\.", r"blocks.7.module."),
+    (r"^long_blocks\.1\.", r"blocks.8.module."),
+    (r"^neighborhood\.", r"embed.neighborhood."),
+    (r"^edge_embedding\.", r"embed.edge_embedding."),
+    (r"^vis_layers\.(\d+)\.", r"blocks.\1.module."),
+    (r"^(vec_out_norm|out_norm)\.", r"head.short.\1."),
+    (r"^(out_norm_long|vec_out_norm_long)\.", r"head.\1."),
+]
+
 
 def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:
     out = {}
