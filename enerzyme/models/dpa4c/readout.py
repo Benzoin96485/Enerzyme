@@ -13,8 +13,8 @@ from typing import List, Sequence, Tuple
 import torch
 from torch import Tensor, nn
 
+from ..mp.equivariant.cg import gaunt
 from .geometry import (
-    cached_couplings,
     degree_offsets,
     derive_bispectrum_ranks,
     derive_degree_channels,
@@ -81,10 +81,10 @@ class InvariantReadout(nn.Module):
         probe_offsets = [0]
         coupling_parts = []
         coupling_offsets = [0]
-        couplings = cached_couplings(lmax)
-        for degrees, coupling in zip(self.triples, couplings):
-            coupling_parts.append(torch.as_tensor(coupling.reshape(-1), dtype=torch.float64))
-            coupling_offsets.append(coupling_offsets[-1] + int(coupling.size))
+        for degrees in self.triples:
+            coupling = gaunt(*degrees, dtype=torch.float64, convention="dpa4c")
+            coupling_parts.append(coupling.flatten())
+            coupling_offsets.append(coupling_offsets[-1] + coupling.numel())
             index, scale = probe_entries(degrees, self.ranks)
             probe_index_parts.append(torch.as_tensor(index, dtype=torch.long))
             probe_scale_parts.append(torch.as_tensor(scale, dtype=torch.float64))

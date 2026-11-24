@@ -32,6 +32,7 @@ from torch import Tensor
 from torch.nn import Module, Parameter, init
 
 from ..layers.polynomial_harmonics import angular_dim
+from ..mp.equivariant.cg import coupling_paths
 
 
 ANGULAR_DIM = angular_dim(2)
@@ -107,11 +108,14 @@ class GroupSparseCG(Module):
         self.shuffle_scale = float(shuffle_scale)
         self.offset = shuffle_offset(channels, num_groups, self.shuffle_scale)
         self.width = channels // num_groups
-        irreps = f"{self.width}x1o + {self.width}x2e"
-        self.tp = o3.FullyConnectedTensorProduct(
+        irreps = o3.Irreps(f"{self.width}x1o + {self.width}x2e")
+        degrees = tuple(ir for _, ir in irreps)
+        paths = coupling_paths(degrees, degrees, degrees)
+        self.tp = o3.TensorProduct(
             irreps,
             irreps,
             irreps,
+            [(i, j, k, "uvw", True, 1.0) for i, j, k in paths],
             shared_weights=False,
             internal_weights=False,
         )

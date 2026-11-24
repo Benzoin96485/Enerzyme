@@ -17,8 +17,9 @@ import e3nn
 import numpy as np
 import torch
 from e3nn import o3
-from e3nn.o3._wigner import _su2_clebsch_gordan, change_basis_real_to_complex
 from torch import nn
+
+from ..mp.equivariant.cg import wigner_3j
 
 
 def drop_duplicates_random(arr, key):
@@ -35,17 +36,7 @@ def drop_duplicates_random(arr, key):
 
 
 def wigner_3j_wonorm(l1: int, l2: int, l3: int, norm: bool = False) -> torch.Tensor:
-    assert abs(l2 - l3) <= l1 <= l2 + l3
-    Q1 = change_basis_real_to_complex(l1, dtype=torch.float64)
-    Q2 = change_basis_real_to_complex(l2, dtype=torch.float64)
-    Q3 = change_basis_real_to_complex(l3, dtype=torch.float64)
-    C = _su2_clebsch_gordan(l1, l2, l3).to(dtype=torch.complex128)
-    C = torch.einsum("ij,kl,mn,ikn->jlm", Q1, Q2, torch.conj(Q3.T), C)
-    assert torch.all(torch.abs(torch.imag(C)) < 1e-5)
-    C = torch.real(C)
-    if norm:
-        C = C / torch.norm(C)
-    return C
+    return wigner_3j(l1, l2, l3, dtype=torch.float64, device="cpu", normalized=norm)
 
 
 @dataclass

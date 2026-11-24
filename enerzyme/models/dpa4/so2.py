@@ -26,6 +26,7 @@ from ..mp.equivariant.indexing import (
 )
 from ..mp.equivariant.so2.focus import FocusSO2Linear
 from ..mp.ops import segment_envelope_gated_softmax
+from ..mp.equivariant.rotation import edge_rotation
 from ..mp.equivariant.rotation.wigner_quaternion import (
     WignerDCalculator,
     build_edge_quaternion,
@@ -77,7 +78,8 @@ def build_edge_cache(
     if random_gamma and wigner_calc.training:
         gamma = torch.rand(src.shape[0], device=device, dtype=dtype) * (2 * math.pi)
         edge_quat = quaternion_multiply(quaternion_z_rotation(gamma), edge_quat)
-    D_full, Dt_full = wigner_calc(edge_quat)
+    frame = wigner_calc.cartesian_frame(edge_quat)
+    D_full, Dt_full = edge_rotation(vij, wigner_calc.lmax, wigner_calc, frame=frame)
 
     deg = torch.zeros(n_nodes, device=device, dtype=dtype)
     deg.scatter_add_(0, dst, (edge_env.squeeze(-1) ** 2))

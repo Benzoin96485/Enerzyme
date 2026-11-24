@@ -149,14 +149,13 @@ class EdgeRotation(NamedTuple):
         return torch.bmm(self.wigner_inv, inputs)
 
 
-class SO3RotationFused(torch.nn.Module):
-    """EquiformerV3 SO(3) rotation with fused m-primary permute."""
+class OrderProjection(torch.nn.Module):
+    """Fold the m-primary permutation and inverse truncation scale into a rotation."""
 
-    def __init__(self, lmax, mmax, use_rotation_mask=False):
+    def __init__(self, lmax, mmax):
         super().__init__()
         self.lmax = lmax
         self.mmax = mmax
-        self.use_rotation_mask = use_rotation_mask
 
         mapping = CoefficientMappingModule(
             lmax=self.lmax, mmax=self.lmax, use_rotate_inv_rescale=True
@@ -175,20 +174,31 @@ class SO3RotationFused(torch.nn.Module):
         self.register_buffer("wigner_index_to_m_array", wigner_index_to_m_array)
         self.register_buffer("wigner_inv_rescale", wigner_inv_rescale)
 
-    def for_edges(self, rot_mat3x3):
-        wigner = self._rotation_to_wigner_matrix(rot_mat3x3, 0, self.lmax)
+    def project(self, wigner, *, autocast_half=False):
         index = self.wigner_index_to_m_array.to(
             device=wigner.device, dtype=wigner.dtype
         )
         wigner = torch.einsum("mi, nij -> nmj", index, wigner)
-        if torch.is_autocast_enabled():
+        if autocast_half and torch.is_autocast_enabled():
             wigner = wigner.to(torch.float16)
         wigner_inv = torch.transpose(wigner, 1, 2).contiguous()
-        rescale = self.wigner_inv_rescale.to(device=wigner.device, dtype=wigner.dtype)
+        rescale = self.wigner_inv_rescale.to(wigner) if autocast_half else self.wigner_inv_rescale
         wigner_inv = wigner_inv * rescale
-        if torch.is_autocast_enabled():
+        if autocast_half and torch.is_autocast_enabled():
             wigner_inv = wigner_inv.to(torch.float16)
         return EdgeRotation(wigner, wigner_inv)
+
+
+class SO3RotationFused(OrderProjection):
+    """EquiformerV3 rotation with fused m-primary permutation."""
+
+    def __init__(self, lmax, mmax, use_rotation_mask=False):
+        super().__init__(lmax, mmax)
+        self.use_rotation_mask = use_rotation_mask
+
+    def for_edges(self, rot_mat3x3):
+        wigner = self._rotation_to_wigner_matrix(rot_mat3x3, 0, self.lmax)
+        return self.project(wigner, autocast_half=True)
 
     def set_wigner(self, rot_mat3x3):
         self.wigner, self.wigner_inv = self.for_edges(rot_mat3x3)

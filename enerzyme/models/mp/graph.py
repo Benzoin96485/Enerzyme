@@ -365,6 +365,16 @@ class GraphContext:
             self.vec, list(range(int(lmax) + 1)), layout=layout, normalization=normalization,
             normalize_input=normalize, edge_sign=edge_sign))
 
+    def edge_rotation(self, lmax, backend="cg", *, mmax=None, edge_sign=1, frame=None):
+        """Cache the rotation of this graph's edges, including any supplied frame."""
+        from .equivariant.rotation import edge_rotation
+
+        if edge_sign not in (1, -1):
+            raise ValueError("edge_sign must be 1 or -1")
+        key = ("edge_rotation", lmax, backend, mmax, edge_sign, frame)
+        return self.cached(key, lambda: edge_rotation(
+            self.vec if edge_sign == 1 else -self.vec, lmax, backend, frame=frame, mmax=mmax))
+
     def csr(self) -> ReceiverCSR:
         return self.cached("csr", lambda: receiver_csr(self.receiver, self.num_nodes))
 

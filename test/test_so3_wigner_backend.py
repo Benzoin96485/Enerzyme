@@ -107,3 +107,43 @@ def test_dpa4_lmax3_forward_and_geometry_grad():
     assert torch.isfinite(out["atom_feature"]).all()
     grad = torch.autograd.grad(out["atom_feature"].square().sum(), positions)[0]
     assert torch.isfinite(grad).all()
+
+
+@pytest.mark.parametrize("backend", ["jd", "cg", "quaternion", "fused"])
+@pytest.mark.parametrize("mmax", [None, 1])
+def test_edge_rotation_common_frame_values_and_gradients(backend, mmax):
+    from enerzyme.models.mp.equivariant.rotation import edge_rotation
+    from enerzyme.models.mp.equivariant.rotation.so3_rotation import init_edge_rot_mat
+
+    rng = torch.Generator().manual_seed(1951)
+    edge = torch.randn(5, 3, dtype=torch.float64, generator=rng, requires_grad=True)
+    frame = init_edge_rot_mat(edge)
+    reference = edge_rotation(edge, 3, "jd", frame=frame, mmax=mmax)
+    result = edge_rotation(edge, 3, backend, frame=frame, mmax=mmax)
+    for actual, expected in zip(result, reference):
+        torch.testing.assert_close(actual, expected, rtol=1e-7, atol=1e-7)
+        weights = torch.randn(expected.shape, dtype=edge.dtype, generator=rng)
+        grad, = torch.autograd.grad((weights * actual).sum(), edge, retain_graph=True)
+        ref_grad, = torch.autograd.grad((weights * expected).sum(), edge, retain_graph=True)
+        torch.testing.assert_close(grad, ref_grad, rtol=1e-7, atol=1e-7)
+
+
+@pytest.mark.parametrize("backend", ["jd", "cg", "quaternion", "fused"])
+def test_empty_scalar_edge_rotation(backend):
+    from enerzyme.models.mp.equivariant.rotation import edge_rotation
+
+    pair = edge_rotation(torch.empty(0, 3, dtype=torch.float64), 0, backend)
+    assert pair.wigner.shape == pair.wigner_inv.shape == (0, 1, 1)
+
+
+def test_graph_frame_cache_distinguishes_signs_and_explicit_frames():
+    from enerzyme.models.mp.graph import GraphContext
+    from enerzyme.models.mp.equivariant.rotation.so3_rotation import init_edge_rot_mat
+
+    vec = torch.tensor([[1.0, 2.0, -3.0]])
+    graph = GraphContext(torch.tensor([0]), torch.tensor([1]), 2, vec=vec)
+    cached = graph.edge_rotation(1, "jd")
+    assert graph.edge_rotation(1, "jd") is cached
+    with_frame = graph.edge_rotation(1, "jd", frame=init_edge_rot_mat(vec))
+    torch.testing.assert_close(with_frame.wigner, cached.wigner)
+    assert not torch.allclose(graph.edge_rotation(1, "jd", edge_sign=-1).wigner, cached.wigner)

@@ -127,6 +127,14 @@ class WignerDCalculator(nn.Module):
         self.dim_full = (lmax + 1) ** 2
         self.register_buffer("_basis_A", _DPA4_CARTESIAN_BASIS.clone(), persistent=False)
 
+    def cartesian_frame(self, edge_quaternion: Tensor) -> Tensor:
+        """Express the quaternion rotation in DPA4's signed Cartesian basis."""
+        q = quaternion_normalize(edge_quaternion, self.eps)
+        rot = quaternion_to_rotation_matrix(q)
+        A = self._basis_A.to(device=rot.device, dtype=rot.dtype)
+        # Conjugate into DPA4's Cartesian basis before the shared Jd backend.
+        return A @ rot @ A.transpose(-2, -1)
+
     def forward(self, edge_quaternion: Tensor) -> tuple[Tensor, Tensor]:
         """Build block-diagonal Wigner-D from quaternions.
 
@@ -136,11 +144,7 @@ class WignerDCalculator(nn.Module):
         Returns:
             (D_full, Dt_full) each with shape (E, D, D) where D=(lmax+1)^2.
         """
-        q = quaternion_normalize(edge_quaternion, self.eps)
-        rot = quaternion_to_rotation_matrix(q)
-        A = self._basis_A.to(device=rot.device, dtype=rot.dtype)
-        # Conjugate into DPA4's Cartesian basis before the shared Jd backend.
-        rot = A @ rot @ A.transpose(-2, -1)
+        rot = self.cartesian_frame(edge_quaternion)
         D_full = wigner_from_rotation_matrix(rot, end_lmax=self.lmax, start_lmax=0)
         Dt_full = D_full.transpose(-2, -1)
         return D_full, Dt_full

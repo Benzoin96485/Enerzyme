@@ -22,6 +22,7 @@ import torch
 from torch import Tensor
 from torch.nn import Linear, Module, ModuleList, Parameter
 
+from .cg import coupling_paths, wigner_3j
 from .degree_blocks import (
     cg_scale,
     clip_lmax,
@@ -107,23 +108,15 @@ class SparseCGProduct(Module):
         self, channels: int, lmax_left: int, lmax_right: int, Lmax: int
     ) -> None:
         super().__init__()
-        from e3nn.o3 import wigner_3j
-
         self.channels = int(channels)
         self.lmax_left = int(lmax_left)
         self.lmax_right = int(lmax_right)
         self.Lmax = int(Lmax)
-        paths: List[tuple] = []
-        counts = [0 for _ in range(self.Lmax + 1)]
-        for l1 in range(self.lmax_left + 1):
-            for l2 in range(self.lmax_right + 1):
-                low = abs(l1 - l2)
-                high = min(l1 + l2, self.Lmax)
-                for out in range(low, high + 1):
-                    if natural_parity(l1) * natural_parity(l2) != natural_parity(out):
-                        continue
-                    paths.append((l1, l2, out))
-                    counts[out] += 1
+        degrees = tuple((l, natural_parity(l)) for l in range(max(lmax_left, lmax_right, Lmax) + 1))
+        paths = list(coupling_paths(degrees[: lmax_left + 1], degrees[: lmax_right + 1], degrees[: Lmax + 1]))
+        counts = [0] * (self.Lmax + 1)
+        for _, _, out in paths:
+            counts[out] += 1
         if not paths:
             raise ValueError(
                 f"no coupling paths for lmax=({lmax_left}, {lmax_right}) -> {Lmax}"

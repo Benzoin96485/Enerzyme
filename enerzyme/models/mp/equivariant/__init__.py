@@ -116,6 +116,7 @@ _EXPORTS = {
     "S2GridProjector": ".s2.projector",
     "L0Contraction": ".sph.l0_contraction",
     "load_cgmatrix": ".sph.l0_contraction",
+    "edge_rotation": ".rotation",
     "SO3_Rotation": ".rotation.so3_rotation",
     "init_edge_rot_mat": ".rotation.so3_rotation",
     "SO2Block": ".so2.conv",

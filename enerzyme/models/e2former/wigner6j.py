@@ -21,9 +21,9 @@ from e3nn.util import prod
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
 from opt_einsum_fx import optimize_einsums_full
-from sympy.physics.wigner import wigner_6j
 from torch import fx
 
+from ..mp.equivariant.cg import wigner_3j, wigner_6j
 from ..mp.equivariant.sph.linear import SO3Linear as SO3_Linear_e2former
 from .tensor_product import Simple_TensorProduct_oTchannel, _sum_tensors, slices_basis
 
@@ -375,7 +375,7 @@ def CODEGEN_MAIN_LEFT_RIGHT(
             graph.erase_node(w3j.node)
         else:
             if w3j_name not in constants:
-                constants[w3j_name] = o3.wigner_3j(
+                constants[w3j_name] = wigner_3j(
                     mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l
                 )
 
@@ -601,7 +601,7 @@ class FullyConnectedTensorProductWigner6j(Simple_TensorProduct_oTchannel):
             x2 = x2_list[ins.i_in2]
 
             # 获取 Wigner 3j 符号
-            w3j = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l).to(
+            w3j = wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l).to(
                 x1s.device
             )
 
