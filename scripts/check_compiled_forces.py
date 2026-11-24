@@ -26,8 +26,11 @@ class PreparedEnergyForces(torch.nn.Module):
         super().__init__()
         from enerzyme.models.layers.compiled_grad import forward_with_coordinate_gradients
 
+        native = getattr(model, "_native_cpu_inductor_forces", False)
+        if isinstance(native, torch.dtype):
+            native = native == next(model.parameters()).dtype
         if getattr(model, "_scripted_force_kernels", False) or (device.type == "cpu" and (
-            getattr(model, "_native_cpu_inductor_forces", False)
+            native
             or getattr(model, "_cpu_force_training_option", None)
         )):
             raise ValueError("This preset requires its specialized force-training entry point")

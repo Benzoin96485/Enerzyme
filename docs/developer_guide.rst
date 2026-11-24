@@ -263,6 +263,15 @@ training graphs use the same setting. The model restores the compiler settings
 before returning. An explicit conflicting backend override uses native
 derivatives for that call.
 
+DPA4 uses native derivatives for CPU float64 force training under ordinary
+Inductor. Its published degree normalization accumulates in float32. Compiling
+the full coordinate derivative changes rounding enough to alter forces and
+force-loss parameter gradients. CPU float64 force inference uses native
+normalization within otherwise compiled layers. For both modes, use
+:code:`torch.compile(model)` on Inductor. The CPU float64 force path reports
+the restriction when :code:`fullgraph=True`. The checks and measured errors
+are in :code:`test/fixtures/validation/dpa4_degree_norm_inference.json`.
+
 .. code-block:: shell
 
    PYTHONPATH=. python scripts/check_compiled_forces.py mattersim --dtype float64
