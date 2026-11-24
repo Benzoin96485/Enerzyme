@@ -653,7 +653,44 @@
     }
   },
   "frozen_method": "Rechecks load the pre-refactor state dict strictly and use the same deterministic inputs on each checkout. Each timed step includes energy and force inference. Training differentiates squared energies and forces through the weights. Numerical fields compare the first compiled result with that checkout\u2019s eager result, including every training gradient and its presence. cross_eager compares original and candidate eager E and Fa. fp64 tolerances are atol 1e-10, rtol 1e-8. fp32 tolerances are 3e-4 for both, and atol 7e-4, rtol 1e-3 for parameter derivatives. Each leg uses a fresh process, two warmups, then the median of its repetitions. ABBA compares medians of the two per-side medians. A cell with passing numerical evidence and no baseline timing is additional candidate capability. It contributes no speed or memory comparison. A zero graph delta may indicate reuse of prior graphs or execution in eager mode.",
-  "frozen_rechecks": {},
+  "frozen_rechecks": {
+    "alphanet/float64/c32ede3/abba": {
+      "job": "6317929",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "0",
+      "systems": ["mol_batch_32x20"],
+      "modes": ["infer"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 7.105427357601002e-15,
+          "Fa_max_abs": 3.079758670310184e-13
+        }
+      },
+      "legs": [{"side": "new", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[40.31125106848776, 3258.11669921875, 12, 1067]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 8.881784197001252e-15, "force_max_abs": 1.63069557856943e-12, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[43.98474982008338, 2673.1318359375, 20, 530]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 8.881784197001252e-15, "force_max_abs": 1.0982326159592048e-12, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[43.23311196640134, 2673.1318359375, 20, 530]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.0658141036401503e-14, "force_max_abs": 7.491784970170556e-13, "gradient_max_abs": 0.0}}}}, {"side": "new", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[39.98595220036805, 3260.923828125, 12, 1067]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.2434497875801753e-14, "force_max_abs": 1.0444978215673473e-12, "gradient_max_abs": 0.0}}}}]
+    },
+    "equireann/float64/c32ede3/abba": {
+      "job": "6317929",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "0",
+      "systems": ["mol_batch_32x20"],
+      "modes": ["infer"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 1.3877787807814457e-16,
+          "Fa_max_abs": 5.551115123125783e-17
+        }
+      },
+      "legs": [{"side": "new", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[6.487814011052251, 333.59814453125, 12, 510]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.6653345369377348e-16, "force_max_abs": 8.326672684688674e-17, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[7.293660892173648, 280.85986328125, 19, 200]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.220446049250313e-16, "force_max_abs": 8.326672684688674e-17, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[7.2896459605544806, 280.85986328125, 19, 200]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.6653345369377348e-16, "force_max_abs": 1.1102230246251565e-16, "gradient_max_abs": 0.0}}}}, {"side": "new", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[6.309004034847021, 333.59814453125, 12, 510]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.440892098500626e-16, "force_max_abs": 1.1102230246251565e-16, "gradient_max_abs": 0.0}}}}]
+    }
+  },
   "errors": {
     "err1": "RuntimeError: torch.compile with aot_autograd does not currently support double backward",
     "err2": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
@@ -669,13 +706,16 @@
     "attempted_architecture_precision_pairs": 46,
     "expected_architecture_precision_pairs": 116,
     "historical_architecture_precision_pairs": 46,
-    "completed_frozen_attempts": 0,
+    "completed_frozen_attempts": 2,
     "comparable_mode_system_cells": 23,
     "comparable_metrics": 46,
     "above_3_percent": 2,
-    "frozen_mode_system_cells": 0,
+    "frozen_mode_system_cells": 2,
     "frozen_candidate_only_cells": 0,
+    "frozen_candidate_timing_incomplete_baseline_cells": 0,
+    "frozen_baseline_only_cells": 0,
+    "frozen_both_unavailable_cells": 0,
     "frozen_numerical_or_reference_failures": 0,
-    "excesses": [{"model_precision": "alphanet/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "median_ms", "candidate": "3b77a61", "relative_percent": 3.805}, {"model_precision": "equireann/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "median_ms", "candidate": "3b77a61", "relative_percent": 7.525}]
+    "excesses": [{"model_precision": "alphanet/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.936}, {"model_precision": "equireann/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 18.777}]
   }
 }
