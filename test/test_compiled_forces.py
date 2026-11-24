@@ -225,11 +225,12 @@ def test_compiled_topology_preserves_force_and_parameter_gradients(architecture)
     assert "linear" in operators
 
 
-def test_so3krates_cpu_compiler_keeps_degree_gradients():
+@pytest.mark.parametrize("architecture", ["so3krates", "mattersim"])
+def test_cpu_compiler_keeps_attention_force_gradients(architecture):
     from scripts.core_harness import build, forward, make_batch, random_molecules
 
     torch.manual_seed(142)
-    model = build("so3krates").double()
+    model = build(architecture).double()
     batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float64)
     reference = forward(model, batch, torch.float64, train=True)
     actual = forward(torch.compile(model), batch, torch.float64, train=True)

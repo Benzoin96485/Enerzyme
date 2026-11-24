@@ -48,6 +48,13 @@ class CentralityEncoding(Module):
         mask = polynomial_envelope(dist, cutoff, 3)
         if idx_i.numel() == 0:
             return basis.new_zeros(n_atoms, self.linear.out_features)
+        if torch.compiler.is_compiling() and basis.device.type == "cpu":
+            # Pool the masked basis and its neighbor count together. Each edge
+            # contributes the linear bias once, including periodic images.
+            features = torch.cat((basis * mask.unsqueeze(-1), torch.ones_like(mask[:, None])), dim=-1)
+            pooled = scatter_sum(features, idx_i, n_atoms)
+            weight = torch.cat((self.linear.weight, self.linear.bias[:, None]), dim=-1)
+            return torch.nn.functional.linear(pooled, weight)
         mapped = self.linear(basis * mask.unsqueeze(-1))
         return scatter_sum(mapped, idx_i, n_atoms)
 
