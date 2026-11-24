@@ -225,6 +225,8 @@ operations, numerical errors, and changes between an absent and a zero gradient.
 The command exits with a nonzero status on a mismatch. For dropout comparisons,
 add :code:`--match-rng` to use matching random draws. For presets using the
 optional e3nn FX kernels, pass :code:`--e3nn-codegen fx`.
+Use :code:`--mode inference` to compare the reported energy and forces and
+differentiate the returned energy twice with respect to the coordinates.
 
 .. code-block:: shell
 

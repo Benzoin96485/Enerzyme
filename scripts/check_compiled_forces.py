@@ -19,20 +19,25 @@ import torch
 from core_harness import build, forward, make_batch, random_molecules
 
 
-def step(model, runner, batch, dtype):
+def step(model, runner, batch, dtype, mode="training"):
     torch.manual_seed(22)
     np.random.seed(22)
     random.seed(22)
     model.zero_grad(set_to_none=True)
-    out = forward(runner, batch, dtype, train=True)
-    (out["E"].square().sum() + out["Fa"].square().sum()).backward()
+    out = forward(runner, batch, dtype, train=mode == "training")
     values = {key: out[key].detach().clone() for key in ("E", "Fa")}
+    if mode == "inference":
+        for key in ("energy_coordinate_gradient", "repeated_energy_coordinate_gradient"):
+            gradient = torch.autograd.grad(out["E"].sum(), out["Ra"], retain_graph=True, allow_unused=True)[0]
+            values[key] = gradient.detach().clone() if gradient is not None else None
+        return values
+    (out["E"].square().sum() + out["Fa"].square().sum()).backward()
     values.update({name: p.grad.detach().clone() if p.grad is not None else None
                    for name, p in model.named_parameters()})
     return values
 
 
-def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", match_rng=False):
+def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", match_rng=False, mode="training"):
     from torch._dynamo.backends.registry import lookup_backend
     from enerzyme.models.ff import get_ff_core
 
@@ -45,7 +50,7 @@ def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", ma
     batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
     batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
     weights = copy.deepcopy(model.state_dict())
-    expected = step(model, model, batch, dtype)
+    expected = step(model, model, batch, dtype, mode)
     model.load_state_dict(weights, strict=True)
 
     graphs = []
@@ -59,7 +64,7 @@ def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", ma
 
     from torch._inductor import config
     with config.patch(fallback_random=True) if match_rng else nullcontext():
-        actual = step(model, torch.compile(model, backend=lower), batch, dtype)
+        actual = step(model, torch.compile(model, backend=lower), batch, dtype, mode)
     errors, changed_participation, failed = {}, {}, []
     for name, reference in expected.items():
         value = actual[name]
@@ -83,7 +88,8 @@ def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", ma
     return {"architecture": architecture, "torch": str(torch.__version__), "device": str(device),
             "dtype": str(dtype), "atol": atol, "rtol": rtol, "graphs": graphs,
             "e3nn_codegen": e3nn_codegen, "matched_rng": match_rng,
-            "parameter_gradients_compared": len(errors) - 2, "changed_gradient_participation": changed_participation,
+            "mode": mode, "parameter_gradients_compared": len(errors) - 2 if mode == "training" else 0,
+            "changed_gradient_participation": changed_participation,
             "outside_tolerance": failed, "errors": errors}
 
 
@@ -92,6 +98,8 @@ def main():
     parser.add_argument("architecture")
     parser.add_argument("--dtype", choices=("float32", "float64"), default="float32")
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    parser.add_argument("--mode", choices=("training", "inference"), default="training",
+                        help="Check force-loss weight gradients or repeated derivatives of the inference energy.")
     parser.add_argument("--atol", type=float)
     parser.add_argument("--rtol", type=float)
     parser.add_argument("--e3nn-codegen", choices=("default", "fx"), default="default",
@@ -103,7 +111,7 @@ def main():
     atol = args.atol if args.atol is not None else (1e-10 if double else 7e-4)
     rtol = args.rtol if args.rtol is not None else (1e-8 if double else 1e-3)
     report = check(args.architecture, getattr(torch, args.dtype), atol, rtol, torch.device(args.device),
-                   e3nn_codegen=args.e3nn_codegen, match_rng=args.match_rng)
+                   e3nn_codegen=args.e3nn_codegen, match_rng=args.match_rng, mode=args.mode)
     print(json.dumps(report, indent=2, allow_nan=False))
     return int(bool(report["outside_tolerance"] or report["changed_gradient_participation"]))
 
