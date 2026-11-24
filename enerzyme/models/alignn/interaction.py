@@ -18,20 +18,10 @@ from typing import Optional
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import BatchNorm1d, LayerNorm, Linear, Module, Sequential
+from torch.nn import Linear, Module, Sequential
 
+from ..mp.nn.norm import feature_norm as normalization
 from ..mp.ops import scatter_sum
-
-
-def normalization(name: Optional[str], features: int) -> Optional[Module]:
-    """``layer`` and ``batch`` match the force field and the property model."""
-    if name in (None, "none", "null"):
-        return None
-    if name == "layer":
-        return LayerNorm(int(features))
-    if name == "batch":
-        return BatchNorm1d(int(features))
-    raise ValueError(f"norm must be 'layer', 'batch', or null, got {name!r}")
 
 
 def _apply_norm(norm: Optional[Module], features: Tensor) -> Tensor:
