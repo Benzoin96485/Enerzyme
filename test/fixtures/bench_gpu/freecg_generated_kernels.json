@@ -1,0 +1,548 @@
+{
+ "_meta": {
+  "job": "6317603",
+  "baseline_revision": "1aa0f8b",
+  "candidate_revision": "c91c153bedb184e7b377ef472e0543f0b9270351",
+  "gpu": "Tesla V100-PCIE-32GB",
+  "gpu_uuid": "590cd023-ff31-c1a2-8267-e0afba042725",
+  "torch": "2.13.0+cu126",
+  "python": "3.13.5",
+  "initial_reps": 5,
+  "confirm_reps": 11,
+  "threads": 2,
+  "coordinate_seed": 11,
+  "system_set": "acceptance"
+ },
+ "method": "Eager inference, force training and peak allocated memory under scripts/bench_cores.py acceptance with the published default 256-channel, eight-group FreeCG. Each first pass was a median of five. ABBA combines two medians of eleven per tree on one V100. The original memory ceiling applies to both trees.",
+ "cpu_group_tensor_product": {
+  "description": "Forward and backward of GroupSparseCG, 256 channels, eight groups, 16 and 64 atoms. Script and FX kernels loaded identical state and compared the whole output, both inputs' gradients and the weight gradient. Each time is a median of five milliseconds in an ABBA run on 2 CPU threads.",
+  "samples_ms": {
+   "float32/16": {
+    "script": [
+     224.02620897628367,
+     227.33827214688063
+    ],
+    "fx": [
+     190.97033003345132,
+     199.7068179771304
+    ]
+   },
+   "float32/64": {
+    "script": [
+     940.680522006005,
+     954.8073678743094
+    ],
+    "fx": [
+     865.4319299384952,
+     818.1113358587027
+    ]
+   },
+   "float64/16": {
+    "script": [
+     474.4379629846662,
+     490.8011360093951
+    ],
+    "fx": [
+     420.8356151357293,
+     419.9198179412633
+    ]
+   },
+   "float64/64": {
+    "script": [
+     1932.1496470365673,
+     1970.0097569730133
+    ],
+    "fx": [
+     1639.5323949400336,
+     1663.7515691109002
+    ]
+   }
+  }
+ },
+ "cpu_recording_backend_training": {
+  "description": "Default model on two molecules of 5 and 4 atoms. Compared E/F and every model parameter gradient against eager after energy.square().sum() + force.square().sum(). Counts use a recording backend and actual backward.",
+  "0613402": {
+   "calls": 2,
+   "graphs": 2,
+   "learned": [],
+   "compared_parameter_gradients": 223
+  },
+  "c91c153": {
+   "calls": 1774,
+   "graphs": 1,
+   "learned": [
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear"
+   ],
+   "compared_parameter_gradients": 223
+  }
+ },
+ "gpu_eager": {
+  "float32": {
+   "mol_batch_32x20/infer_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "RuntimeError: The following operation failed in the TorchScript interpreter.",
+       "RuntimeError: The following operation failed in the TorchScript interpreter."
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 2.50 GiB. GPU 0 has a total capacity of 31.73 GiB of which 2.24 GiB is free. Including non-PyTorch memory, this process has ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 2.50 GiB. GPU 0 has a total capacity of 31.73 GiB of which 2.24 GiB is free. Including non-PyTorch memory, this process has "
+      ]
+     ]
+    }
+   },
+   "mol_batch_32x20/train_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "RuntimeError: The following operation failed in the TorchScript interpreter.",
+       "RuntimeError: The following operation failed in the TorchScript interpreter."
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 2.50 GiB. GPU 0 has a total capacity of 31.73 GiB of which 2.24 GiB is free. Including non-PyTorch memory, this process has ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 2.50 GiB. GPU 0 has a total capacity of 31.73 GiB of which 2.24 GiB is free. Including non-PyTorch memory, this process has "
+      ]
+     ]
+    }
+   },
+   "mol_batch_32x20/infer_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "RuntimeError: The following operation failed in the TorchScript interpreter.",
+       "RuntimeError: The following operation failed in the TorchScript interpreter."
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 2.50 GiB. GPU 0 has a total capacity of 31.73 GiB of which 2.24 GiB is free. Including non-PyTorch memory, this process has ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 2.50 GiB. GPU 0 has a total capacity of 31.73 GiB of which 2.24 GiB is free. Including non-PyTorch memory, this process has "
+      ]
+     ]
+    }
+   },
+   "mol_batch_32x20/train_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "RuntimeError: The following operation failed in the TorchScript interpreter.",
+       "RuntimeError: The following operation failed in the TorchScript interpreter."
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 2.50 GiB. GPU 0 has a total capacity of 31.73 GiB of which 2.24 GiB is free. Including non-PyTorch memory, this process has ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 2.50 GiB. GPU 0 has a total capacity of 31.73 GiB of which 2.24 GiB is free. Including non-PyTorch memory, this process has "
+      ]
+     ]
+    }
+   },
+   "bulk_256/infer_ms": {
+    "initial": {
+     "baseline": 201.1924060061574,
+     "candidate": 183.56837006285787,
+     "percent": -8.759791829697662,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 201.9847434712574,
+     "candidate": 184.25407796166837,
+     "percent": -8.778220178848361,
+     "status": "pass",
+     "baseline_samples": [
+      203.25260004028678,
+      200.716886902228
+     ],
+     "candidate_samples": [
+      184.7197760362178,
+      183.78837988711894
+     ]
+    }
+   },
+   "bulk_256/train_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 256.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 126.25 MiB is free. Including non-PyTorch memory, this process ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 256.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 126.25 MiB is free. Including non-PyTorch memory, this process "
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 850.25 MiB is free. Including non-PyTorch memory, this process",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 850.25 MiB is free. Including non-PyTorch memory, this process"
+      ]
+     ]
+    }
+   },
+   "bulk_256/infer_peak_mb": {
+    "initial": {
+     "baseline": 18689.4248046875,
+     "candidate": 17295.0830078125,
+     "percent": -7.4605923480603025,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 18689.4248046875,
+     "candidate": 17295.0830078125,
+     "percent": -7.4605923480603025,
+     "status": "pass",
+     "baseline_samples": [
+      18689.4248046875,
+      18689.4248046875
+     ],
+     "candidate_samples": [
+      17295.0830078125,
+      17295.0830078125
+     ]
+    }
+   },
+   "bulk_256/train_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 256.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 126.25 MiB is free. Including non-PyTorch memory, this process ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 256.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 126.25 MiB is free. Including non-PyTorch memory, this process "
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 850.25 MiB is free. Including non-PyTorch memory, this process",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 850.25 MiB is free. Including non-PyTorch memory, this process"
+      ]
+     ]
+    }
+   },
+   "large_2000/infer_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 234.25 MiB is free. Including non-PyTorch memory, this process ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 234.25 MiB is free. Including non-PyTorch memory, this process "
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 7.81 GiB. GPU 0 has a total capacity of 31.73 GiB of which 958.25 MiB is free. Including non-PyTorch memory, this process ha",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 7.81 GiB. GPU 0 has a total capacity of 31.73 GiB of which 958.25 MiB is free. Including non-PyTorch memory, this process ha"
+      ]
+     ]
+    }
+   },
+   "large_2000/train_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 234.25 MiB is free. Including non-PyTorch memory, this process ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 234.25 MiB is free. Including non-PyTorch memory, this process "
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 7.81 GiB. GPU 0 has a total capacity of 31.73 GiB of which 958.25 MiB is free. Including non-PyTorch memory, this process ha",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 7.81 GiB. GPU 0 has a total capacity of 31.73 GiB of which 958.25 MiB is free. Including non-PyTorch memory, this process ha"
+      ]
+     ]
+    }
+   },
+   "large_2000/infer_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 234.25 MiB is free. Including non-PyTorch memory, this process ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 234.25 MiB is free. Including non-PyTorch memory, this process "
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 7.81 GiB. GPU 0 has a total capacity of 31.73 GiB of which 958.25 MiB is free. Including non-PyTorch memory, this process ha",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 7.81 GiB. GPU 0 has a total capacity of 31.73 GiB of which 958.25 MiB is free. Including non-PyTorch memory, this process ha"
+      ]
+     ]
+    }
+   },
+   "large_2000/train_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    },
+    "abba": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom",
+     "baseline_samples": [
+      null,
+      null
+     ],
+     "candidate_samples": [
+      null,
+      null
+     ],
+     "errors": [
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 234.25 MiB is free. Including non-PyTorch memory, this process ",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 234.25 MiB is free. Including non-PyTorch memory, this process "
+      ],
+      [
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 7.81 GiB. GPU 0 has a total capacity of 31.73 GiB of which 958.25 MiB is free. Including non-PyTorch memory, this process ha",
+       "OutOfMemoryError: CUDA out of memory. Tried to allocate 7.81 GiB. GPU 0 has a total capacity of 31.73 GiB of which 958.25 MiB is free. Including non-PyTorch memory, this process ha"
+      ]
+     ]
+    }
+   }
+  },
+  "float64": {
+   "mol_batch_32x20/infer_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "mol_batch_32x20/train_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "mol_batch_32x20/infer_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "mol_batch_32x20/train_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "bulk_256/infer_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "bulk_256/train_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "bulk_256/infer_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "bulk_256/train_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "large_2000/infer_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "large_2000/train_ms": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "large_2000/infer_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   },
+   "large_2000/train_peak_mb": {
+    "initial": {
+     "baseline": null,
+     "candidate": null,
+     "percent": null,
+     "status": "both_oom"
+    }
+   }
+  }
+ }
+}
