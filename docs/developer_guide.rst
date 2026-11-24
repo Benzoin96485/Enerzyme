@@ -301,10 +301,12 @@ gradient can receive an optimizer update even when the corresponding eager
 gradient is absent. The inference results in
 :code:`test/fixtures/validation/compiled_inference_cpu.json` include the energy,
 forces, both coordinate derivatives, and the revision used for each check.
-In each file, the run at :code:`5a994c4` covers all 58 default presets in
-both precisions. All 116 inference cases passed. In the matching training
-run, 77 cases passed with learned operators captured, 24 matched through
-native gradients, and 15 had a numerical or gradient-participation mismatch.
+The complete CPU runs at :code:`5a994c4` and :code:`66c842a` cover all 58
+default presets in both precisions. All 116 inference cases passed in both
+runs. The latter also checked tensor shapes, dtypes and finiteness throughout.
+In its training sweep, 77 cases passed with learned operators captured, 25
+matched through native gradients, and 14 had a numerical or gradient-participation
+mismatch. The earlier training sweep recorded 77, 24 and 15 respectively.
 Later model-specific checks identify their own code revision.
 
 The second command prepares the batch's discrete neighbors before compiling
