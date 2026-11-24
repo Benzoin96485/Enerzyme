@@ -151,25 +151,31 @@ def test_inductor_cpu_single_destination_scalar_sum():
 
 @pytest.mark.parametrize("dim", [0, 1])
 def test_inductor_cpu_vector_sum_into_single_or_multiple_structures(dim):
-    values = torch.linspace(-1., 1., 256 * 3, dtype=torch.float64).reshape(256, 3).movedim(0, dim)
-    values.requires_grad_(True)
-    edges = values.movedim(dim, 0)
+    # Atom-contiguous storage and enough rows to vectorize reproduce the
+    # singleton failure in the fused charge-times-position scatter.
+    n_atoms = 16384
+    coords = torch.linspace(-1., 1., 3 * n_atoms, dtype=torch.float64).reshape(3, n_atoms).movedim(1, dim)
+    coords.requires_grad_(True)
+    charges = torch.linspace(-1., 1., n_atoms, dtype=coords.dtype, requires_grad=True)
 
-    def reduce(x, index, count):
-        return scatter_sum(x, index, count, dim)
+    def reduce(x, q, index, count):
+        dipoles = (q[:, None] * x.movedim(dim, 0)).movedim(0, dim)
+        return scatter_sum(dipoles, index, count, dim)
 
     compiled = torch.compile(reduce, fullgraph=True)
     for size in (1, 3):
-        index = torch.arange(256) % size
-        expected = torch.stack([edges[index == i].sum(0) for i in range(size)], dim=dim)
-        actual = compiled(values, index, size)
+        index = torch.arange(n_atoms) % size
+        dipoles = charges[:, None] * coords.movedim(dim, 0)
+        expected = torch.stack([dipoles[index == i].sum(0) for i in range(size)], dim=dim)
+        actual = compiled(coords, charges, index, size)
         torch.testing.assert_close(actual, expected)
         assert actual.is_contiguous()
-        gradient = torch.autograd.grad(actual.square().sum(), values)[0]
-        reference = torch.autograd.grad(expected.square().sum(), values)[0]
-        torch.testing.assert_close(gradient, reference)
-    empty = compiled(values.narrow(dim, 0, 0), torch.empty(0, dtype=torch.long), 1)
-    torch.testing.assert_close(empty, torch.zeros_like(values.narrow(dim, 0, 1)))
+        gradients = torch.autograd.grad(actual.square().sum(), (coords, charges))
+        reference = torch.autograd.grad(expected.square().sum(), (coords, charges))
+        for gradient, target in zip(gradients, reference):
+            torch.testing.assert_close(gradient, target)
+    empty = compiled(coords.narrow(dim, 0, 0), charges[:0], torch.empty(0, dtype=torch.long), 1)
+    torch.testing.assert_close(empty, torch.zeros_like(coords.narrow(dim, 0, 1)))
     assert not empty.requires_grad
 
 
