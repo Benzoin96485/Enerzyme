@@ -53,6 +53,18 @@ class FACTOBlock(FACTOInteraction):
         empty_dots = isolated.new_zeros(1, self.feedback.mix.in_features)
         delta = self.feedback.mix(empty_dots) * self.feedback.to_gate(intermediate)
         delta = delta + self.feedback.to_residual(intermediate)
+        if torch.is_grad_enabled():
+            # A zero neighbor sum and zero tensor channels still connect these
+            # weights in the full empty-graph calculation. Preserve their zero
+            # gradients (and optimizer weight decay) without evaluating the maps.
+            zero_gradient_weights = (
+                self.norm.scalar_gain, *self.norm.tensor_gain,
+                self.attention.query.weight, self.attention.query.bias,
+                *(layer.weight for layer in self.feedback.left),
+                *(layer.weight for layer in self.feedback.right),
+            )
+            empty = torch.cat([weight.flatten()[:0] for weight in zero_gradient_weights])
+            delta = delta + empty.sum().to(delta.dtype)
         isolated = isolated + self.residual_scale * delta
         return BlockState(scalar=scalars, equi=tensors, edge=state.edge, aux={"isolated": isolated})
 
