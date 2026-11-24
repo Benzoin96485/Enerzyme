@@ -66,7 +66,7 @@ def _batch(name, sizes, dtype, cutoff):
 
 
 def _fixture_configuration(path):
-    """Read the architecture and exact construction settings from a main-branch fixture."""
+    """Read the construction settings and the trained parameters from one main fixture."""
     import torch
     from torch.torch_version import TorchVersion
 
@@ -75,7 +75,7 @@ def _fixture_configuration(path):
     config = {key: payload[key] for key in ("architecture", "layers", "build_params")}
     config["architecture"] = config["architecture"].lower()
     encoded = json.dumps(config, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    return config, hashlib.sha256(encoded).hexdigest()
+    return config, hashlib.sha256(encoded).hexdigest(), payload["checkpoint"]["model_state_dict"]
 
 
 def _load_reference_module(name, path):
@@ -138,12 +138,18 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
         model = build(arch)
         _, build_params, _ = get_ff_core(arch)
     else:
-        config, digest = _fixture_configuration(fixture)
+        config, digest, state = _fixture_configuration(fixture)
         if config["architecture"] != arch.lower():
             raise ValueError(f"Fixture builds {config['architecture']!r}, worker requested {arch!r}")
         build_params = config["build_params"]
         model = build(arch, layer_params=config["layers"], build_params=build_params)
-        metadata = {"fixture": Path(fixture).name, "config_sha256": digest}
+        model = model.to(dtype=dtype)
+        if model.state_dict().keys() != state.keys():
+            from enerzyme.models.compat.main_branch import convert_state_dict
+            state, _ = convert_state_dict(arch, state)
+        model.load_state_dict(state, strict=True)
+        metadata = {"fixture": Path(fixture).name, "config_sha256": digest,
+                    "fixture_sha256": hashlib.sha256(Path(fixture).read_bytes()).hexdigest()}
     model = model.to(device=device, dtype=dtype)
     cutoff = max(float(build_params.get("cutoff_sr") or 0), float(build_params.get("cutoff_lr") or 0), 6.0)
     # AllScAIP builds its own neighbors. Its native option selects periodic images.
@@ -300,7 +306,7 @@ def compare(base_path, new_path, threshold):
         current = new.get(arch, {})
         if "error" in old or "error" in current:
             raise ValueError(f"{arch}: incomplete benchmark: {old.get('error') or current.get('error')}")
-        for field, default in (("params", None), ("config_sha256", None), ("device", None),
+        for field, default in (("params", None), ("config_sha256", None), ("fixture_sha256", None), ("device", None),
                                ("device_name", None), ("precision", "float32"), ("compile", False),
                                ("compile_reference", False)):
             if old.get(field, default) != current.get(field, default):
@@ -349,7 +355,7 @@ def main():
                        help="use the same full-graph force derivative and tensor table gather for both checkouts")
     parser.add_argument("--dtype", choices=("float32", "float64"), default="float32")
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
-    parser.add_argument("--fixture", help="use the exact layer and build settings from a main_legacy .pt.gz fixture")
+    parser.add_argument("--fixture", help="load the settings and trained weights from a main_legacy .pt.gz fixture")
     parser.add_argument("--model-tree", help="load Enerzyme from this checkout using the same benchmark driver")
     parser.add_argument("--systems", choices=sorted(SYSTEM_SETS), default="default")
     parser.add_argument("--worker", default=None)
@@ -369,7 +375,7 @@ def main():
     from core_harness import ARCHITECTURES
 
     if args.fixture:
-        config, _ = _fixture_configuration(args.fixture)
+        config, _, _ = _fixture_configuration(args.fixture)
         archs = [config["architecture"]]
         if args.only and args.only.lower().split(",") != archs:
             parser.error(f"--fixture builds {archs[0]!r}, incompatible with --only {args.only!r}")
