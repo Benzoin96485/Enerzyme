@@ -50,7 +50,7 @@ def make_batch(mols, dtype=torch.float64) -> Dict:
     from enerzyme.tasks.batch import _decorate_batch_input
 
     batch = [(dict(m), None) for m in mols]
-    features, _ = _decorate_batch_input(batch, dtype=dtype, device=torch.device("cpu"), otf_graph=True)
+    features, _ = _decorate_batch_input(batch, dtype=dtype, device=torch.device("cpu"))
     return features
 
 

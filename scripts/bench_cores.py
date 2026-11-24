@@ -47,10 +47,11 @@ def _batch(name, sizes, dtype, cutoff):
     receiver, sender, shifts = primitive_neighbor_list("ijS", [periodic] * 3, cell, positions, cutoff)
     n = len(positions)
     sample = dict(Ra=positions, Za=rng.choice([1, 6, 7, 8], n), N=n, Q=0.0, S=0.0,
-                  idx_i=receiver, idx_j=sender)
+                  idx_i=receiver, idx_j=sender, N_pair=len(receiver))
     batch = make_batch([sample], dtype=dtype)
     if periodic:
         batch["offsets"] = torch.as_tensor(shifts @ cell, dtype=dtype)
+        batch["cell"] = torch.as_tensor(cell, dtype=dtype).unsqueeze(0)
     return batch
 
 
@@ -75,6 +76,10 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
     model = build(arch).to(device=device, dtype=dtype)
     _, defaults, _ = get_ff_core(arch)
     cutoff = max(float(defaults.get("cutoff_sr") or 0), float(defaults.get("cutoff_lr") or 0), 6.0)
+    # AllScAIP builds its own neighbors. Its native option selects periodic images.
+    graph_options = None
+    if arch == "allscaip":
+        graph_options = getattr(getattr(model, "embed", None), "graph_params", model)
     if use_compile:
         model = torch.compile(model)
     result = {"params": sum(p.numel() for p in model.parameters()), "device": device.type,
@@ -86,34 +91,48 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
         if device.type == "cuda":
             torch.cuda.synchronize()
 
+    def measure(batch, mode):
+        times = []
+        peaks = []
+        for step in range(reps + 2):
+            sync()
+            if device.type == "cuda":
+                torch.cuda.reset_peak_memory_stats()
+            t = time.perf_counter()
+            out = forward(model, batch, dtype, train=(mode == "train"))
+            if mode == "train":
+                loss = out["E"].pow(2).sum() + out["Fa"].pow(2).sum()
+                loss.backward()
+                model.zero_grad(set_to_none=True)
+                del loss
+            sync()
+            if step >= 2:
+                times.append((time.perf_counter() - t) * 1e3)
+                if device.type == "cuda":
+                    peaks.append(torch.cuda.max_memory_allocated() / 2**20)
+            del out
+        metrics = {f"{mode}_ms": statistics.median(times)}
+        if peaks:
+            metrics[f"{mode}_peak_mb"] = statistics.median(peaks)
+        return metrics
+
     for name, sizes in SYSTEM_SETS[systems].items():
+        if graph_options is not None:
+            graph_options.pbc = name == "bulk_256"
         batch = _batch(name, sizes, dtype, cutoff)
         batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
         entry = {}
         for mode in ("infer", "train"):
-            times = []
-            peaks = []
-            for step in range(reps + 2):
-                sync()
+            try:
+                entry.update(measure(batch, mode))
+            except (RuntimeError, NotImplementedError) as exc:
+                entry[f"{mode}_error"] = f"{type(exc).__name__}: {exc}"[:2500]
+            if f"{mode}_error" in entry:
+                model.zero_grad(set_to_none=True)
                 if device.type == "cuda":
-                    torch.cuda.reset_peak_memory_stats()
-                t = time.perf_counter()
-                out = forward(model, batch, dtype, train=(mode == "train"))
-                if mode == "train":
-                    loss = out["E"].pow(2).sum() + out["Fa"].pow(2).sum()
-                    loss.backward()
-                    model.zero_grad(set_to_none=True)
-                    del loss
-                sync()
-                if step >= 2:
-                    times.append((time.perf_counter() - t) * 1e3)
-                    if device.type == "cuda":
-                        peaks.append(torch.cuda.max_memory_allocated() / 2**20)
-                del out
-            entry[f"{mode}_ms"] = statistics.median(times)
-            if device.type == "cuda":
-                entry[f"{mode}_peak_mb"] = statistics.median(peaks)
+                    torch.cuda.empty_cache()
         result[name] = entry
+        print("BENCH_PROGRESS " + json.dumps(result), flush=True)
     result["rss_mb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
     return result
 
@@ -135,8 +154,13 @@ def run_all(archs, out_path, reps, threads, use_compile, timeout, systems="defau
             cmd += ["--model-tree", model_tree]
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
-        except subprocess.TimeoutExpired:
-            results[arch] = {"error": "timeout"}
+        except subprocess.TimeoutExpired as exc:
+            stdout = exc.stdout or ""
+            if isinstance(stdout, bytes):
+                stdout = stdout.decode(errors="replace")
+            progress = [line for line in stdout.splitlines() if line.startswith("BENCH_PROGRESS ")]
+            results[arch] = json.loads(progress[-1].split(" ", 1)[1]) if progress else {}
+            results[arch]["error"] = "timeout"
         else:
             line = [l for l in proc.stdout.splitlines() if l.startswith("BENCH ")]
             start = proc.stderr.rfind("Traceback")
@@ -151,7 +175,9 @@ def run_all(archs, out_path, reps, threads, use_compile, timeout, systems="defau
                                          delete=False) as f:
             json.dump(results, f, indent=1, sort_keys=True)
         os.replace(f.name, out_path)
-    return all("error" not in results[arch] for arch in archs)
+    return all("error" not in results[arch] and all(
+        not any(k.endswith("_error") for k in results[arch].get(system, {}))
+        for system in SYSTEM_SETS[systems]) for arch in archs)
 
 
 def compare(base_path, new_path, threshold):
@@ -177,6 +203,10 @@ def compare(base_path, new_path, threshold):
             raise ValueError(f"{arch}: missing or mismatched benchmark systems")
         for system in sorted(measured):
             b, n = old[system], current[system]
+            for side, record in (("baseline", b), ("candidate", n)):
+                for key in ("infer_error", "train_error"):
+                    if key in record:
+                        raise ValueError(f"{arch}/{system}/{side}/{key}: {record[key]}")
             required = {"infer_ms", "train_ms"}
             if old.get("device") == "cuda":
                 required.update(("infer_peak_mb", "train_peak_mb"))
