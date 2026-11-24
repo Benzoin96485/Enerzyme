@@ -155,6 +155,7 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
     elif use_compile:
         model = torch.compile(model)
     result = {"params": sum(p.numel() for p in model.parameters()), "device": device.type,
+              "system_set": systems, "threads": threads, "reps": reps,
               "precision": precision, "compile": use_compile or compile_reference,
               "compile_reference": compile_reference, **metadata}
     if device.type == "cuda":
@@ -194,18 +195,17 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
             graph_options.pbc = name == "bulk_256"
         batch = _batch(name, sizes, dtype, cutoff)
         batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
-        entry = {}
+        entry = result[name] = {}
         for mode in ("infer", "train"):
             try:
                 entry.update(measure(batch, mode))
-            except (RuntimeError, ValueError, NotImplementedError) as exc:
+            except (RuntimeError, ValueError, TypeError) as exc:
                 entry[f"{mode}_error"] = f"{type(exc).__name__}: {exc}"[:2500]
             if f"{mode}_error" in entry:
                 model.zero_grad(set_to_none=True)
                 if device.type == "cuda":
                     torch.cuda.empty_cache()
-        result[name] = entry
-        print("BENCH_PROGRESS " + json.dumps(result), flush=True)
+            print("BENCH_PROGRESS " + json.dumps(result), flush=True)
     result["rss_mb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
     return result
 
@@ -231,24 +231,35 @@ def run_all(archs, out_path, reps, threads, use_compile, timeout, systems="defau
             cmd += ["--fixture", fixture]
         if model_tree:
             cmd += ["--model-tree", model_tree]
+        error = None
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         except subprocess.TimeoutExpired as exc:
             stdout = exc.stdout or ""
             if isinstance(stdout, bytes):
                 stdout = stdout.decode(errors="replace")
-            progress = [line for line in stdout.splitlines() if line.startswith("BENCH_PROGRESS ")]
-            results[arch] = json.loads(progress[-1].split(" ", 1)[1]) if progress else {}
-            results[arch]["error"] = "timeout"
+            error = "timeout"
         else:
-            line = [l for l in proc.stdout.splitlines() if l.startswith("BENCH ")]
-            start = proc.stderr.rfind("Traceback")
-            if line:
-                results[arch] = json.loads(line[-1][6:])
-            elif proc.returncode < 0:
-                results[arch] = {"error": f"killed by signal {-proc.returncode} (out of memory?)"}
-            else:
-                results[arch] = {"error": proc.stderr[start:][-1500:] if start >= 0 else proc.stderr[-800:]}
+            stdout = proc.stdout
+            if proc.returncode < 0:
+                error = f"killed by signal {-proc.returncode}"
+            elif proc.returncode:
+                error = proc.stderr.strip()[-1500:] or f"worker exited with code {proc.returncode}"
+        results[arch] = {}
+        completed = False
+        for line in stdout.splitlines():
+            label, _, payload = line.partition(" ")
+            if label in ("BENCH_PROGRESS", "BENCH"):
+                try:
+                    record = json.loads(payload)
+                except json.JSONDecodeError:
+                    if error:  # A killed worker can leave its final line truncated.
+                        continue
+                    raise
+                results[arch] = record
+                completed = label == "BENCH"
+        if error or not completed:
+            results[arch]["error"] = error or "worker ended without a final result"
         print(arch, results[arch], flush=True)
         with tempfile.NamedTemporaryFile("w", dir=os.path.dirname(os.path.abspath(out_path)),
                                          delete=False) as f:
@@ -274,13 +285,20 @@ def compare(base_path, new_path, threshold):
         current = new.get(arch, {})
         if "error" in old or "error" in current:
             raise ValueError(f"{arch}: incomplete benchmark: {old.get('error') or current.get('error')}")
-        for field, default in (("params", None), ("config_sha256", None), ("device", None), ("device_name", None), ("precision", "float32"),
-                               ("compile", False), ("compile_reference", False)):
+        for field, default in (("params", None), ("config_sha256", None), ("device", None),
+                               ("device_name", None), ("precision", "float32"), ("compile", False),
+                               ("compile_reference", False)):
             if old.get(field, default) != current.get(field, default):
+                raise ValueError(f"{arch}: different {field} in the two runs")
+        for field in ("system_set", "threads", "reps"):
+            if field in old and field in current and old[field] != current[field]:
                 raise ValueError(f"{arch}: different {field} in the two runs")
         measured = systems.intersection(old)
         if not measured or measured != systems.intersection(current):
             raise ValueError(f"{arch}: missing or mismatched benchmark systems")
+        system_set = old.get("system_set", current.get("system_set"))
+        if system_set is not None and measured != set(SYSTEM_SETS[system_set]):
+            raise ValueError(f"{arch}: incomplete {system_set} benchmark")
         for system in sorted(measured):
             b, n = old[system], current[system]
             for side, record in (("baseline", b), ("candidate", n)):

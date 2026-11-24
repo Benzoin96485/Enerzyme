@@ -1,13 +1,14 @@
 """The performance gate requires complete measurements for matching workloads."""
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from bench_cores import _fixture_configuration, compare
+from bench_cores import _fixture_configuration, compare, run_all
 
 
 def _timings():
@@ -85,3 +86,25 @@ def test_compare_rejects_different_fixture_configs_at_same_parameter_count(tmp_p
         paths.append(path)
     with pytest.raises(ValueError, match="config_sha256"):
         compare(*paths, 0.03)
+
+
+def test_worker_failure_preserves_completed_measurements(tmp_path, monkeypatch):
+    output = 'BENCH_PROGRESS {"bulk_256":{"infer_ms":1.2}}\nBENCH_PROGRESS {"bulk_'
+
+    def run(*args, **kwargs):
+        return subprocess.CompletedProcess([], -9, stdout=output, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    path = tmp_path / "partial.json"
+    assert not run_all(["schnet"], path, 5, 2, False, timeout=60, systems="acceptance")
+    result = json.loads(path.read_text())["schnet"]
+    assert result["bulk_256"] == {"infer_ms": 1.2}
+    assert result["error"] == "killed by signal 9"
+
+
+def test_compare_checks_declared_workload_against_historical_measurements(tmp_path):
+    old, new = tmp_path / "old.json", tmp_path / "new.json"
+    old.write_text(json.dumps({"schnet": _timings()}))
+    new.write_text(json.dumps({"schnet": dict(_timings(), system_set="default")}))
+    with pytest.raises(ValueError, match="incomplete default"):
+        compare(old, new, 0.03)
