@@ -16,6 +16,12 @@ The original xPaiNN wrapper omitted periodic image offsets. The periodic timing 
 
 ## Missing paired measurements
 
+The Phase 0 model ran out of memory on the 32 GB V100 for 164 missing timing or memory comparisons.
+
+A separate frozen-weight AllScAIP run (6317546) recorded the exception for each system. On the molecular batch and the 2,000-atom cluster, the old model modified a tensor that its force calculation needed. On the periodic system its graph builder received an empty cell argument. Both attention backends reproduced these failures.
+
+The old E2Former-V2 raised a module-call error in FP32 and rejected the FP64 dtype. Neither old run returned timing or memory measurements.
+
 Each model and precision has 12 possible comparisons. Individual exceptions are preserved in the baseline and candidate archives.
 
 | Preset | float32 | float64 |
