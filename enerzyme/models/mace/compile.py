@@ -15,6 +15,7 @@ def prepare_edge_tensor_products(core) -> None:
     for equality to one. Append two zero feature/weight rows and remove their
     outputs so Dynamo can prove the internal layout without inspecting positions.
     """
+    core._native_empty_short_range_forces = True
     for block in core.blocks:
         kernel = block.interaction.conv_tp._compiled_main_left_right
         graph = kernel.graph

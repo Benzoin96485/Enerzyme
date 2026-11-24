@@ -7,22 +7,27 @@ import torch
 from enerzyme.models.ff import build_model, get_ff_core
 
 
+def _mace_models():
+    _, defaults, layer_params = get_ff_core("mace")
+    params = {**defaults, "dim_embedding": 4, "num_rbf": 3, "max_Za": 8, "cutoff_sr": 2.0}
+    layers = copy.deepcopy(layer_params)
+    core = next(layer["params"] for layer in layers if layer["name"] == "Core")
+    core.update(additional_hidden_irreps="4x1o", radial_MLP=[8], MLP_irreps="4x0e")
+    torch.manual_seed(61)
+    reference = build_model("mace", layers, params, verbose=0)
+    model = build_model("mace", layers, {**params, "e3nn_codegen": "fx"}, verbose=0)
+    assert set(model.state_dict()) == set(reference.state_dict())
+    model.load_state_dict(reference.state_dict(), strict=True)
+    model = copy.deepcopy(model)
+    return reference, model, params
+
+
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
 def test_mace_fx_checkpoint_sparse_edges_and_derivatives(dtype):
     old_dtype = torch.get_default_dtype()
     torch.set_default_dtype(dtype)
     try:
-        _, defaults, layer_params = get_ff_core("mace")
-        params = {**defaults, "dim_embedding": 4, "num_rbf": 3, "max_Za": 8, "cutoff_sr": 2.0}
-        layers = copy.deepcopy(layer_params)
-        core = next(layer["params"] for layer in layers if layer["name"] == "Core")
-        core.update(additional_hidden_irreps="4x1o", radial_MLP=[8], MLP_irreps="4x0e")
-        torch.manual_seed(61)
-        reference = build_model("mace", layers, params, verbose=0)
-        model = build_model("mace", layers, {**params, "e3nn_codegen": "fx"}, verbose=0)
-        assert set(model.state_dict()) == set(reference.state_dict())
-        model.load_state_dict(reference.state_dict(), strict=True)
-        model = copy.deepcopy(model)
+        reference, model, params = _mace_models()
         compiled = torch.compile(model, fullgraph=True, backend="eager")
         features = dict(
             Za=torch.tensor([1, 8]), batch_seg=torch.zeros(2, dtype=torch.long),
@@ -59,3 +64,26 @@ def test_mace_fx_checkpoint_sparse_edges_and_derivatives(dtype):
             torch.testing.assert_close(force_jacobian(compiled), force_jacobian(reference))
     finally:
         torch.set_default_dtype(old_dtype)
+
+
+def test_ordinary_mace_fx_leaves_isolated_coordinates_unused():
+    reference, model, _ = _mace_models()
+    compiled = torch.compile(model, backend="aot_eager")
+    for pairs, distance in [(1, 1.1), (1, 3.0), (0, 1.1), (1, 1.1)]:
+        features = {
+            "Za": torch.tensor([1, 8]), "batch_seg": torch.zeros(2, dtype=torch.long), "N": [2],
+            "idx_i": torch.tensor([0])[:pairs], "idx_j": torch.tensor([1])[:pairs],
+        }
+
+        def coordinate_gradient(runner):
+            positions = torch.tensor([[0.1, -0.2, 0.2], [distance, 0.1, -0.3]], requires_grad=True)
+            outputs = runner({**features, "Ra": positions})
+            loss = outputs["E"].square().sum() + outputs["Fa"].square().sum()
+            return torch.autograd.grad(loss, positions, allow_unused=True)[0]
+
+        expected = coordinate_gradient(reference)
+        actual = coordinate_gradient(compiled)
+        if pairs == 0 or distance > 2:
+            assert expected is None and actual is None
+        else:
+            torch.testing.assert_close(actual, expected)

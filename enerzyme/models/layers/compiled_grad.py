@@ -240,6 +240,10 @@ def compiled_coordinate_vjp(core, inputs):
         # either the inputs or outputs of the coordinate differentiation.
         return native_forces(core, inputs)
     edges, topology = _prepare_radius_graph(core, inputs)
+    if getattr(core, "_native_empty_short_range_forces", False) and edges is not None and edges.numel() == 0:
+        # With no MACE messages, an energy/force loss can be independent of
+        # the coordinates. Its joint VJP would materialize a zero derivative.
+        return native_forces(core, inputs)
     post_pairs = _post_pair_indices(core, inputs)
     with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
         if core.training and getattr(core, "architecture", None) == "chgnet":
