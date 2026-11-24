@@ -264,6 +264,8 @@ class PolarFieldLayer(BaseFFLayer):
             raise ValueError(f"num_update must be >= 0, got {num_update}")
         self.add_nonlocal_energy = bool(add_nonlocal_energy)
         self.spin_irreps = _spin_irreps(self.density_max_l)
+        self.spin_width = self.spin_irreps.dim
+        self.node_width = self.node_irreps.dim
         self.nlm = (self.density_max_l + 1) ** 2
         self.field_irreps = _field_irreps(self.field_max_l, len(field_smearing_widths))
         self.potential_irreps = self.field_irreps + self.field_irreps
@@ -427,10 +429,10 @@ class PolarFieldLayer(BaseFFLayer):
         charge = self._graph_total(Q, batch_seg, n_graphs, Ra.dtype)
         spin = self._graph_total(S, batch_seg, n_graphs, Ra.dtype)
         layers = stack_node_features(atom_feature, self.num_output_blocks)
-        if layers.shape[1] != self.node_irreps.dim:
+        if layers.shape[1] != self.node_width:
             raise ValueError(
                 f"atom_feature width {layers.shape[1]} does not match {self.node_irreps} "
-                f"(dim {self.node_irreps.dim})."
+                f"(dim {self.node_width})."
             )
         mixed = self.mixer(layers)
         raw = self.sources(layers).view(n_atoms, 2, self.nlm)
@@ -444,16 +446,16 @@ class PolarFieldLayer(BaseFFLayer):
                 mixed,
                 one_hot,
                 potential,
-                density.reshape(n_atoms, self.spin_irreps.dim),
+                density.reshape(n_atoms, self.spin_width),
             )
-            delta = correction[:, : self.spin_irreps.dim].view(n_atoms, 2, self.nlm)
-            next_fukui = correction[:, self.spin_irreps.dim :]
+            delta = correction[:, : self.spin_width].view(n_atoms, 2, self.nlm)
+            next_fukui = correction[:, self.spin_width :]
             density = self._equilibrate(density + delta, next_fukui, charge, spin, batch_seg)
         final_potential = self._spin_potential(density, Ra, batch_seg)
         if self.add_nonlocal_energy:
             nonlocal_energy = self.nonlocal_head(
                 layers[:, :, -1],
-                density.reshape(n_atoms, self.spin_irreps.dim),
+                density.reshape(n_atoms, self.spin_width),
                 final_potential,
             )
         else:

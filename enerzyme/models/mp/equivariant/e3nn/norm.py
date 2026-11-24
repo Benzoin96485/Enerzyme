@@ -16,6 +16,7 @@ class EquivariantLayerNormV2(nn.Module):
         super().__init__()
 
         self.irreps = Irreps(irreps)
+        self.blocks = tuple((mul, ir.dim, ir.l == 0 and ir.p == 1) for mul, ir in self.irreps)
         self.eps = eps
         self.affine = affine
 
@@ -46,14 +47,13 @@ class EquivariantLayerNormV2(nn.Module):
         iw = 0
         ib = 0
 
-        for mul, ir in self.irreps:
-            d = ir.dim
+        for mul, d, even_scalar in self.blocks:
             field = node_input.narrow(1, ix, mul * d)
             ix += mul * d
 
             field = field.reshape(-1, mul, d)
 
-            if ir.l == 0 and ir.p == 1:
+            if even_scalar:
                 field_mean = torch.mean(field, dim=1, keepdim=True)
                 field = field - field_mean
 
@@ -66,7 +66,7 @@ class EquivariantLayerNormV2(nn.Module):
 
             field = field * field_norm.unsqueeze(-1)
 
-            if self.affine and d == 1 and ir.p == 1:
+            if self.affine and even_scalar:
                 bias = self.affine_bias[ib : ib + mul]
                 ib += mul
                 field += bias.reshape(mul, 1)

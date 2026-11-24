@@ -13,6 +13,7 @@ class LayoutTransform(torch.nn.Module):
     def __init__(self, irreps: o3.Irreps) -> None:
         super().__init__()
         self.irreps = o3.Irreps(irreps)
+        self.flat_width = self.irreps.dim
         multiplicities = {mul for mul, _ in self.irreps}
         if len(multiplicities) != 1 or 0 in multiplicities:
             raise ValueError("a spherical array requires equal positive multiplicities")
@@ -22,15 +23,15 @@ class LayoutTransform(torch.nn.Module):
         self.same_order = self.channels == 1 or all(ir.dim == 1 for _, ir in self.irreps)
         # Each individual block is a transpose view. Joining several transposed
         # blocks with different degree widths requires a permutation of storage.
-        perm = torch.arange(self.irreps.dim)
+        perm = torch.arange(self.flat_width)
         perm = torch.cat([perm[sl].reshape(mul, ir.dim).T.reshape(-1)
                           for (mul, ir), sl in zip(self.irreps, self.irreps.slices())])
         self.register_buffer("to_sphere", perm, persistent=False)
         self.register_buffer("to_flat", perm.argsort(), persistent=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if x.ndim != 2 or x.size(1) != self.irreps.dim:
-            raise ValueError(f"expected flat features [N, {self.irreps.dim}]")
+        if x.ndim != 2 or x.size(1) != self.flat_width:
+            raise ValueError(f"expected flat features [N, {self.flat_width}]")
         if self.single_block:
             return x.reshape(x.size(0), self.channels, self.components).transpose(1, 2)
         if not self.same_order:
@@ -41,8 +42,8 @@ class LayoutTransform(torch.nn.Module):
         if x.ndim != 3 or x.size(1) != self.components or x.size(2) != self.channels:
             raise ValueError(f"expected spherical features [N, {self.components}, {self.channels}]")
         if self.single_block:
-            return x.transpose(1, 2).reshape(x.size(0), self.irreps.dim)
-        flat = x.reshape(x.size(0), self.irreps.dim)
+            return x.transpose(1, 2).reshape(x.size(0), self.flat_width)
+        flat = x.reshape(x.size(0), self.flat_width)
         return flat if self.same_order else flat.index_select(1, self.to_flat)
 
     def __repr__(self) -> str:

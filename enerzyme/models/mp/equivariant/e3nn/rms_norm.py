@@ -43,6 +43,7 @@ class EquivariantRMSNormSH(nn.Module):
     ) -> None:
         super().__init__()
         self.irreps = Irreps(irreps).simplify()
+        self.feature_width = self.irreps.dim
         if len(self.irreps) == 0:
             raise ValueError("EquivariantRMSNormSH requires a non-empty irreps")
         self.eps = float(eps)
@@ -87,9 +88,9 @@ class EquivariantRMSNormSH(nn.Module):
             self.register_parameter("affine_bias", None)
 
     def forward(self, features: Tensor) -> Tensor:
-        if features.shape[-1] != self.irreps.dim:
+        if features.shape[-1] != self.feature_width:
             raise ValueError(
-                f"feature width {features.shape[-1]} != irreps.dim {self.irreps.dim}"
+                f"feature width {features.shape[-1]} != irreps.dim {self.feature_width}"
             )
         values = features
         if self.centering and self.scalar_index.numel():
@@ -132,6 +133,7 @@ class RMSLayerNorm(nn.Module):
     ) -> None:
         super().__init__()
         self.irreps = Irreps(irreps)
+        self.feature_width = self.irreps.dim
         if len(self.irreps) == 0:
             raise ValueError("RMSLayerNorm requires a non-empty irreps")
         self.eps = float(eps)
@@ -175,9 +177,9 @@ class RMSLayerNorm(nn.Module):
             self.affine_bias = None
 
     def forward(self, node_input: Tensor) -> Tensor:
-        if node_input.shape[-1] != self.irreps.dim:
+        if node_input.shape[-1] != self.feature_width:
             raise ValueError(
-                f"feature width {node_input.shape[-1]} != irreps.dim {self.irreps.dim}"
+                f"feature width {node_input.shape[-1]} != irreps.dim {self.feature_width}"
             )
         values = node_input
         if self.centering and self.scalar_slices:
@@ -240,6 +242,7 @@ class EqnormRMSNorm(nn.Module):
     ) -> None:
         super().__init__()
         self.irreps = one_irrep_per_degree(irreps)
+        self.feature_width = self.irreps.dim
         self.lmax = int(self.irreps.lmax)
         self.eps = float(eps)
         self.affine = bool(affine)
@@ -286,9 +289,9 @@ class EqnormRMSNorm(nn.Module):
         )
 
     def forward(self, node_input: Tensor) -> Tensor:
-        if node_input.ndim != 2 or node_input.shape[-1] != self.irreps.dim:
+        if node_input.ndim != 2 or node_input.shape[-1] != self.feature_width:
             raise ValueError(
-                f"EQNorm RMSNorm expects [N, {self.irreps.dim}], "
+                f"EQNorm RMSNorm expects [N, {self.feature_width}], "
                 f"got {tuple(node_input.shape)}"
             )
         if self.centering:

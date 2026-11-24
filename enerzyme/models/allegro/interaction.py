@@ -51,10 +51,14 @@ class WeightedSphericalChannels(nn.Module):
         )
         self.irreps_out = o3.Irreps([(self.mul, ir) for _, ir in self.irreps_in])
 
+        self.basis_width = self.irreps_in.dim
+        self.output_width = self.irreps_out.dim
+        self.component_slices = tuple(self.irreps_in.slices())
+
     def forward(self, basis: Tensor, weights: Tensor) -> Tensor:
-        if basis.ndim != 2 or basis.shape[-1] != self.irreps_in.dim:
+        if basis.ndim != 2 or basis.shape[-1] != self.basis_width:
             raise ValueError(
-                f"basis must be [edges, {self.irreps_in.dim}], got {tuple(basis.shape)}"
+                f"basis must be [edges, {self.basis_width}], got {tuple(basis.shape)}"
             )
         if weights.shape[-1] != self.weight_numel or weights.shape[0] != basis.shape[0]:
             raise ValueError(
@@ -62,11 +66,11 @@ class WeightedSphericalChannels(nn.Module):
                 f"got {tuple(weights.shape)}"
             )
         if basis.shape[0] == 0:
-            return basis.new_zeros((0, self.irreps_out.dim))
+            return basis.new_zeros((0, self.output_width))
         pieces = []
         if self.weight_individual_irreps:
             scale = weights.reshape(basis.shape[0], self.mul, self.num_irreps)
-            for irrep_i, slc in enumerate(self.irreps_in.slices()):
+            for irrep_i, slc in enumerate(self.component_slices):
                 component = basis[:, slc].unsqueeze(1)
                 pieces.append(
                     (scale[:, :, irrep_i].unsqueeze(-1) * component).reshape(
@@ -75,7 +79,7 @@ class WeightedSphericalChannels(nn.Module):
                 )
         else:
             scale = weights.reshape(basis.shape[0], self.mul, 1)
-            for slc in self.irreps_in.slices():
+            for slc in self.component_slices:
                 component = basis[:, slc].unsqueeze(1)
                 pieces.append((scale * component).reshape(basis.shape[0], -1))
         return torch.cat(pieces, dim=-1)
@@ -110,6 +114,9 @@ class ChannelTensorProduct(nn.Module):
         self.irreps_in1 = o3.Irreps([(self.mul, ir) for _, ir in self.base_in1])
         self.irreps_in2 = o3.Irreps([(self.mul, ir) for _, ir in self.base_in2])
         self.irreps_out = o3.Irreps([(self.mul, ir) for _, ir in self.base_out])
+        self.pair_width = self.irreps_in1.dim
+        self.environment_width = self.irreps_in2.dim
+        self.output_width = self.irreps_out.dim
         instructions = []
         for i_out, (_, ir_out) in enumerate(self.base_out):
             for i_1, (_, ir_1) in enumerate(self.base_in1):
@@ -147,18 +154,18 @@ class ChannelTensorProduct(nn.Module):
         return torch.cat(chunks, dim=0)
 
     def forward(self, pair: Tensor, environment: Tensor) -> Tensor:
-        if pair.shape[-1] != self.irreps_in1.dim or environment.shape[-1] != self.irreps_in2.dim:
+        if pair.shape[-1] != self.pair_width or environment.shape[-1] != self.environment_width:
             raise ValueError(
                 "tensor-product inputs have widths "
                 f"{pair.shape[-1]} and {environment.shape[-1]}, expected "
-                f"{self.irreps_in1.dim} and {self.irreps_in2.dim}"
+                f"{self.pair_width} and {self.environment_width}"
             )
         if pair.shape[0] != environment.shape[0]:
             raise ValueError(
                 f"pair and environment batches differ: {pair.shape[0]} vs {environment.shape[0]}"
             )
         if pair.shape[0] == 0:
-            return pair.new_zeros((0, self.irreps_out.dim))
+            return pair.new_zeros((0, self.output_width))
         if self.path_channel_coupling:
             return self.tp(pair, environment)
         weight = self._shared_channel_weight(pair.dtype, pair.device)

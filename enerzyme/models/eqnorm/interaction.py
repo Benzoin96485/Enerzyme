@@ -137,6 +137,7 @@ class EqnormConv(nn.Module):
             internal_weights=False,
         )
         hidden = [int(invariant_neurons)] * int(invariant_layers)
+        self.tp_width = self.tp.irreps_out.dim
         self.fc = e3nn_radial_mlp(
             [int(num_rbf), *hidden, self.tp.weight_numel],
             F.silu,
@@ -169,7 +170,7 @@ class EqnormConv(nn.Module):
         mixed = self.linear_1(features)
         n_atoms = features.shape[0]
         if idx_i.numel() == 0:
-            aggregated = features.new_zeros(n_atoms, self.tp.irreps_out.dim)
+            aggregated = features.new_zeros(n_atoms, self.tp_width)
         else:
             messages = weighted_messages(self.tp, mixed, idx_j, edge_sh, self.fc(radial_basis))
             if self.normalization == "constant":

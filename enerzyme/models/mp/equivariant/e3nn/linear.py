@@ -129,6 +129,7 @@ class SkipIdentity(nn.Module):
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps(irreps_out)
+        self.output_width = self.irreps_out.dim
         if self.irreps_in == self.irreps_out:
             self._mode = "id"
             return
@@ -150,7 +151,7 @@ class SkipIdentity(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         if self._mode == "id":
             return x
-        out = x.new_zeros(x.shape[0], self.irreps_out.dim)
+        out = x.new_zeros(x.shape[0], self.output_width)
         for isl, osl in self._pairs:
             out[:, osl] = x[:, isl]
         return out
