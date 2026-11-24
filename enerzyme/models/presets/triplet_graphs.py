@@ -498,8 +498,9 @@ def chgnet(
         embed,
         blocks,
         head,
-        GraphRequires(optional_cutoff_values=False, fields=("rbf_bg",),
-                      topology=(TripletRequest("receiver", cutoff=bond_cutoff),)),
+        GraphRequires(optional_cutoff_values=False, fields=("rbf_bg",), topology=(
+            ReverseEdgeRequest(rtol=1e-5, metric="max", distinct=True),
+            TripletRequest("receiver", cutoff=bond_cutoff))),
         builder=build_stack,
         positional_fields=("atom_embedding", "rbf", "rbf_bg", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         architecture="chgnet",

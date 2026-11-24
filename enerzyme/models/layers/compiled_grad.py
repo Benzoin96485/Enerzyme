@@ -45,18 +45,18 @@ def _prepare_radius_graph(core, inputs):
         fields = {k: inputs.get(distance._name_mapping[k]) for k in distance._input_fields}
         geometry = distance.get_output(**fields)
         edges = torch.where(geometry["Dij"] < ranges.cutoff_sr)[0]
-        return edges, _triplet_indices(core, ranges, fields, geometry, edges)
+        return edges, _topology_indices(core, ranges, fields, geometry, edges)
 
 
-def _triplet_indices(core, ranges, fields, geometry, edges):
-    """Build the declared integer triplets for an unmodified short-range graph."""
-    from ..mp.graph import GraphContext, TripletRequest
+def _topology_indices(core, ranges, fields, geometry, edges):
+    """Build the declared integer topology for an unmodified short-range graph."""
+    from ..mp.graph import GraphContext, PreparedTopology, QuadrupletRequest, ReverseEdgeRequest, TripletRequest
 
     requires = getattr(core, "requires", None)
-    if requires is None or requires.edge_set != "sr":
+    if requires is None or requires.edge_set != "sr" or not requires.topology:
         return None
-    requests = [r for r in requires.topology if type(r) is TripletRequest and r.edge_cutoff is None]
-    if not requests:
+    if any(type(r) not in (TripletRequest, QuadrupletRequest, ReverseEdgeRequest)
+           and not isinstance(getattr(r, "force_cache_key", None), str) for r in requires.topology):
         return None
     # A user-defined preprocessing layer can replace the original geometry.
     # Only reuse indices when the Core consumes these exact distance-layer edges.
@@ -81,12 +81,7 @@ def _triplet_indices(core, ranges, fields, geometry, edges):
         receiver, sender = sender, receiver
         vec = -vec if vec is not None else None
     ctx = GraphContext(receiver, sender, fields["Ra"].shape[0], dist=dist, vec=vec)
-    for req in requests:
-        req.prepare(ctx)
-    # Only primitive keys are needed to look up the final indexing tensors.
-    # Intermediate CSR entries keyed by a particular tensor belong to this pass.
-    return {k: v for k, v in ctx.cache.items()
-            if isinstance(k, str) or all(not isinstance(x, Tensor) for x in k)}
+    return PreparedTopology.build(ctx, requires.topology)
 
 
 @torch.compiler.disable(recursive=False)

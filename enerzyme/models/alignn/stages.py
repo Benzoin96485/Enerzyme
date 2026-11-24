@@ -104,7 +104,10 @@ class ALIGNNEmbed(Embed):
         if ctx.rbf.ndim != 2 or ctx.rbf.shape[0] != n_edges or ctx.rbf.shape[-1] != self.num_rbf:
             raise ValueError(f"rbf must be ({n_edges}, {self.num_rbf}), got {tuple(ctx.rbf.shape)}")
         n_atoms = int(inputs["atom_embedding"].shape[0])
-        if n_edges and (
+        if torch.compiler.is_compiling():
+            valid = (ctx.receiver >= 0) & (ctx.receiver < n_atoms) & (ctx.sender >= 0) & (ctx.sender < n_atoms)
+            torch._assert_async(valid.all(), "edge indices are outside the atom range")
+        elif n_edges and (
             int(ctx.receiver.max()) >= n_atoms
             or int(ctx.sender.max()) >= n_atoms
             or int(ctx.receiver.min()) < 0

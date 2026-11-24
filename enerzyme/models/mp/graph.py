@@ -56,9 +56,14 @@ class QuadrupletRequest:
 @dataclass(frozen=True)
 class ReverseEdgeRequest:
     edge_cutoff: Optional[float] = None
+    atol: float = _OPPOSITE_TOL
+    rtol: float = 0.0
+    metric: str = "l2"
+    distinct: bool = False
 
     def prepare(self, ctx):
-        return ctx.within(self.edge_cutoff).reverse_edge()
+        return ctx.within(self.edge_cutoff).reverse_edge(
+            atol=self.atol, rtol=self.rtol, metric=self.metric, distinct=self.distinct)
 
 
 @dataclass(frozen=True)
@@ -184,6 +189,56 @@ class EdgePairs(NamedTuple):
 
     first: Tensor
     second: Tensor
+
+
+@dataclass
+class PreparedTopology:
+    """Discrete tables shared with a new, differentiable view of the same geometry."""
+
+    root: dict
+    subgraphs: dict
+    quadruplets: list
+
+    @classmethod
+    def build(cls, graph, requests):
+        from .quadruplets import quadruplet_indices
+
+        quadruplets = []
+        fixed = {}
+        for request in requests:
+            if isinstance(request, QuadrupletRequest):
+                embedding = graph.within(request.edge_cutoff)
+                interaction = graph.within(request.interaction_cutoff)
+                quadruplets.append((request, quadruplet_indices(embedding, interaction, request.images)))
+            else:
+                result = request.prepare(graph)
+                if getattr(request, "force_cache_key", None) is not None:
+                    fixed[request.force_cache_key] = result
+
+        def indices(view):
+            # Subgraphs carry differentiable distances and directions. Keep
+            # only discrete tables addressed by stable keys in this view.
+            return {k: v for k, v in view.cache.items() if k == "csr" or (
+                isinstance(k, tuple) and k[0] in ("edge_indices", "receiver_pairs", "path_pairs", "reverse_edge")
+            )}
+
+        subgraphs = {k[1]: indices(v) for k, v in graph.cache.items()
+                     if isinstance(k, tuple) and k[0] == "within"}
+        return cls({**indices(graph), **fixed}, subgraphs, quadruplets)
+
+    def apply(self, graph):
+        from .quadruplets import dihedral_geometry
+
+        graph.cache.update(self.root)
+        for cutoff, indices in self.subgraphs.items():
+            view = graph.within(cutoff)
+            view.cache.update(indices)
+            view.cache["_prepared_cutoff"] = cutoff
+        for request, indices in self.quadruplets:
+            embedding = graph.within(request.edge_cutoff)
+            interaction = graph.within(request.interaction_cutoff)
+            key = ("_prepared_quads", request.interaction_cutoff, request.images)
+            embedding.cache[key] = dihedral_geometry(embedding, interaction, indices)
 
 
 def receiver_csr(receiver: Tensor, num_nodes: int) -> ReceiverCSR:
@@ -432,7 +487,7 @@ class GraphContext:
             cutoff_values=cutoff_values, batch=inputs.get("batch_seg"), inputs=inputs,
         )
         if "_prepared_topology" in inputs:
-            ctx.cache.update(inputs["_prepared_topology"])
+            inputs["_prepared_topology"].apply(ctx)
 
         if requires.csr:
             ctx.csr()
@@ -554,6 +609,10 @@ class GraphContext:
 
         if interaction is None:
             interaction = self
+        if "_prepared_cutoff" in interaction.cache:
+            key = ("_prepared_quads", interaction.cache["_prepared_cutoff"], images)
+            if key in self.cache:
+                return self.cache[key]
         return self.cached(("quadruplets", interaction, images),
                            lambda: dihedral_quadruplets(self, interaction, images))
 

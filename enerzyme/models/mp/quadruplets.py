@@ -4,6 +4,7 @@ from typing import NamedTuple
 
 import torch
 from torch import Tensor
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 
 from .graph import _OPPOSITE_TOL
 
@@ -25,9 +26,19 @@ class QuadrupletGraph(NamedTuple):
     atom_d: Tensor
 
 
+class QuadrupletIndices(NamedTuple):
+    edge_ca: Tensor
+    edge_db: Tensor
+    int_local: Tensor
+    atom_c: Tensor
+    atom_a: Tensor
+    atom_b: Tensor
+    atom_d: Tensor
+
+
 def angle_between(left: Tensor, right: Tensor) -> Tensor:
     """Unsigned angle in ``[0, π]`` between row vectors."""
-    if left.numel() == 0:
+    if statically_known_true(left.numel() == 0):
         return left.new_zeros(0)
     sine = torch.linalg.cross(left, right, dim=-1).norm(dim=-1)
     sine = torch.maximum(sine, sine.new_tensor(1e-9))
@@ -54,14 +65,15 @@ def dihedral_quadruplets(embedding, interaction, images=False):
     `interaction`. With `images`, distinct periodic images of the same atom
     may participate. Filtering topology never detaches the output angles.
     """
+    return dihedral_geometry(embedding, interaction, quadruplet_indices(embedding, interaction, images))
+
+
+def quadruplet_indices(embedding, interaction, images=False):
+    """Enumerate the discrete edge and atom indices at each central bond."""
     idx_i_emb, idx_j_emb = embedding.receiver, embedding.sender
     a_node, b_node = interaction.receiver, interaction.sender
     empty_l = idx_i_emb.new_empty(0)
-    empty_f = embedding.vec.new_zeros(0)
-    blank = QuadrupletGraph(
-        empty_l, empty_l, empty_l, empty_f, empty_f, empty_f,
-        empty_l, empty_l, empty_l, empty_l,
-    )
+    blank = QuadrupletIndices(*(empty_l,) * 7)
     if embedding.num_edges == 0 or interaction.num_edges == 0:
         return blank
 
@@ -98,16 +110,16 @@ def dihedral_quadruplets(embedding, interaction, images=False):
         )
     else:
         keep = (atom_c != b_rep) & (a_rep != atom_d) & (atom_c != atom_d)
-    edge_ca = edge_ca[keep]
-    edge_db = edge_db[keep]
-    int_local = int_local[keep]
-    atom_c = atom_c[keep]
-    atom_a = a_rep[keep]
-    atom_b = b_rep[keep]
-    atom_d = atom_d[keep]
-    if edge_ca.numel() == 0:
-        return blank
+    return QuadrupletIndices(edge_ca[keep], edge_db[keep], int_local[keep],
+                             atom_c[keep], a_rep[keep], b_rep[keep], atom_d[keep])
 
+
+def dihedral_geometry(embedding, interaction, indices):
+    """Differentiate the signed projections at the current edge vectors."""
+    edge_ca, edge_db, int_local, atom_c, atom_a, atom_b, atom_d = indices
+    if statically_known_true(edge_ca.numel() == 0):
+        empty = embedding.vec.new_zeros(0)
+        return QuadrupletGraph(edge_ca, edge_db, int_local, empty, empty, empty, atom_c, atom_a, atom_b, atom_d)
     vij_emb = embedding.vec
     vij_ab = interaction.vec[int_local]
     vij_ca = vij_emb[edge_ca]
