@@ -1285,5 +1285,60 @@
    "self": {"energy_forces": [5, 3], "combined_vector": [3, 3], "vector_only": [9, 9]}
   },
   "scope": "CPU Inductor and AOT. Fullgraph retains the original joint path. Vector-only and dipole-only unused scalar-head gradient differences are recorded in the original column. GPU observations belong to the V100 validation archive."
+ },
+ "quinnet_freecg_independent_vector_training": {
+  "comparison": "3d94237 joint force graph versus 2cf94b0 (QuinNet) and d6f6731 (FreeCG), using the shared terminal-vector code from 1d9d6e1. Each model is compared to its own eager forward on the same weights and inputs. PyTorch 2.13.0+cu126 on xeon-p8 CPU.",
+  "jobs": {
+   "quinnet_full_inductor": 6319820,
+   "quinnet_small_inductor": 6319822,
+   "freecg_full_inductor": 6319858,
+   "freecg_small_inductor": 6319860,
+   "joint_and_isolated_aot_eager": 6319879
+  },
+  "full_method": "scripts/check_compiled_forces.py with default model hyperparameters and --dtype float32/float64. The model returns the full mapping and the training loss is sum(E^2)+sum(Fa^2). All parameter gradient values and their presence are compared to eager.",
+  "small_method": "Two-layer FP64 model with width 8, two heads, 4 radial functions and two FreeCG groups. Model seed 42, coordinate seed 107, 3+2 atoms. Joint uses AOT eager and candidate uses CPU Inductor. The isolated one-atom controls use AOT eager for both. Every returned tensor, coordinate derivative and active weight derivative was checked at atol=1e-10, rtol=1e-8.",
+  "layouts": {
+   "default": "Standard scalar energy and force readouts.",
+   "before": "One-layer equivariant dipole immediately after the core.",
+   "after": "Same dipole after Force.",
+   "energy": "Custom pre-force layer adds squared Cartesian features to Ea. The vector branch is part of the energy and the normal joint graph is retained.",
+   "isolated": "One atom with self edges disabled.",
+   "isolated_self": "One atom with self edges enabled."
+  },
+  "loss_order": ["energy_forces", "combined_vector", "vector_only", "combined_dipole", "dipole_only"],
+  "loss_definitions": "Energy and force use sum of squares. Vector supervision sums sin(v)+v^2 for Cartesian features and squares for degree-two features. Dipole supervision sums cos(M2). Combined losses include energy and force. Layouts without a dipole report the first three entries.",
+  "miscount": "Each count is the number of eager-absent gradients that AOT returned as explicit all-zero tensors. Counts include the input coordinates when disconnected. Every candidate mismatch is already present in the joint control. The tensor-value checks cover every jointly active gradient separately.",
+  "quinnet": {
+   "full_preset": {
+    "float32": {"atol": 0.0007, "rtol": 0.001, "active_weight_gradients": 182, "E_max_abs": 2.980232238769531e-07, "Fa_max_abs": 2.980232238769531e-07, "graphs": [{"operations": 911, "learned_operators": ["embedding", "index_add_", "linear"]}, {"operations": 25, "learned_operators": ["index_add_", "linear"]}], "participation_or_value_failures": 0},
+    "float64": {"atol": 1e-10, "rtol": 1e-08, "active_weight_gradients": 182, "E_max_abs": 7.771561172376096e-16, "Fa_max_abs": 8.881784197001252e-16, "graphs": [{"operations": 911, "learned_operators": ["embedding", "index_add_", "linear"]}, {"operations": 25, "learned_operators": ["index_add_", "linear"]}], "participation_or_value_failures": 0}
+   },
+   "small_controls": {
+    "default": {"joint_zero_for_unused": [2, 0, 23], "split_zero_for_unused": [0, 0, 23], "split_coordinate_max_abs": [1.9539925233402755e-14, 1.2434497875801753e-14, 2.220446049250313e-16]},
+    "before": {"joint_zero_for_unused": [7, 5, 28, 0, 4], "split_zero_for_unused": [0, 0, 23, 0, 4], "split_coordinate_max_abs": [2.220446049250313e-15, 2.6645352591003757e-15, 2.220446049250313e-16, 2.6645352591003757e-15, 1.1657341758564144e-15]},
+    "after": {"joint_zero_for_unused": [7, 5, 28, 0, 4], "split_zero_for_unused": [0, 0, 23, 0, 4], "split_coordinate_max_abs": [1.9539925233402755e-14, 1.2434497875801753e-14, 2.220446049250313e-16, 1.1546319456101628e-14, 7.993605777301127e-15]},
+    "energy": {"joint_zero_for_unused": [0, 0, 23], "split_zero_for_unused": [0, 0, 23], "split_coordinate_max_abs": [1.7763568394002505e-14, 2.042810365310288e-14, 2.220446049250313e-16]},
+    "isolated": {"joint_zero_for_unused": [1, 1, 22], "split_zero_for_unused": [1, 1, 22], "split_coordinate_max_abs": [null, null, null]},
+    "isolated_self": {"joint_zero_for_unused": [5, 3, 26], "split_zero_for_unused": [3, 3, 26], "split_coordinate_max_abs": [0.0, 0.0, 0.0]}
+   },
+   "pure_vector_remaining_unused_weights": ["post_sequence.0.head.0.weight", "post_sequence.0.head.0.bias", "post_sequence.0.head.1.weight", "post_sequence.0.head.1.bias", "blocks.1.module.ratio", "blocks.1.module.f_proj1.weight", "blocks.1.module.f_proj1.bias", "blocks.1.module.f_proj2.weight", "blocks.1.module.f_proj2.bias", "blocks.1.module.f_proj3.weight", "blocks.1.module.f_proj3.bias", "blocks.1.module.vec_proj_improper1.weight", "blocks.1.module.vec_proj_improper2.weight", "blocks.1.module.vec_proj_improper3.weight", "blocks.1.module.vec_proj_improper4.weight", "blocks.1.module.vec_proj_improper5.weight", "blocks.1.module.dst_proj1.weight", "blocks.1.module.src_proj1.weight", "blocks.1.module.src_proj2.weight", "blocks.1.module.trg_proj.weight", "blocks.1.module.src_proj.weight", "head.out_norm.weight", "head.out_norm.bias"],
+   "last_vector_only_parameters": ["blocks[-1].module.s_proj.weight", "blocks[-1].module.s_proj.bias"]
+  },
+  "freecg": {
+   "full_preset": {
+    "float32": {"atol": 0.0007, "rtol": 0.001, "active_weight_gradients": 223, "E_max_abs": 2.384185791015625e-07, "Fa_max_abs": 1.7881393432617188e-07, "graphs": [{"operations": 1684, "learned_operators": ["einsum", "embedding", "index_add_", "linear"]}, {"operations": 100, "learned_operators": ["einsum", "index_add_", "linear"]}], "participation_or_value_failures": 0},
+    "float64": {"atol": 1e-10, "rtol": 1e-08, "active_weight_gradients": 223, "E_max_abs": 6.661338147750939e-16, "Fa_max_abs": 3.608224830031759e-16, "graphs": [{"operations": 1684, "learned_operators": ["einsum", "embedding", "index_add_", "linear"]}, {"operations": 100, "learned_operators": ["einsum", "index_add_", "linear"]}], "participation_or_value_failures": 0}
+   },
+   "small_controls": {
+    "default": {"joint_zero_for_unused": [3, 0, 6], "split_zero_for_unused": [0, 0, 6], "split_coordinate_max_abs": [7.438494264988549e-15, 8.215650382226158e-15, 1.1102230246251565e-16]},
+    "before": {"joint_zero_for_unused": [8, 5, 11, 0, 4], "split_zero_for_unused": [0, 0, 6, 0, 4], "split_coordinate_max_abs": [2.6645352591003757e-15, 3.552713678800501e-15, 1.1102230246251565e-16, 1.0658141036401503e-14, 6.661338147750939e-16]},
+    "after": {"joint_zero_for_unused": [8, 5, 11, 0, 4], "split_zero_for_unused": [0, 0, 6, 0, 4], "split_coordinate_max_abs": [7.438494264988549e-15, 8.215650382226158e-15, 1.1102230246251565e-16, 5.773159728050814e-15, 2.220446049250313e-15]},
+    "energy": {"joint_zero_for_unused": [0, 0, 6], "split_zero_for_unused": [0, 0, 6], "split_coordinate_max_abs": [5.995204332975845e-15, 6.661338147750939e-15, 1.1102230246251565e-16]},
+    "isolated": {"joint_zero_for_unused": [2, 1, 10], "split_zero_for_unused": [2, 1, 10], "split_coordinate_max_abs": [null, null, null]},
+    "isolated_self": {"joint_zero_for_unused": [6, 3, 9], "split_zero_for_unused": [3, 3, 9], "split_coordinate_max_abs": [0.0, 0.0, 0.0]}
+   },
+   "pure_vector_remaining_unused_weights": ["post_sequence.0.head.0.weight", "post_sequence.0.head.0.bias", "post_sequence.0.head.1.weight", "post_sequence.0.head.1.bias", "head.out_norm.weight", "head.out_norm.bias"],
+   "last_vector_only_parameters": ["blocks[-1].module.s_proj.weight", "blocks[-1].module.s_proj.bias", "blocks[-1].module.group_cg.tp_weight"]
+  }
  }
 }
