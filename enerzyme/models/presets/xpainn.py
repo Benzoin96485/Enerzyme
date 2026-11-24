@@ -100,6 +100,11 @@ def xpainn(
     )
     with traceable_e3nn_kernels():
         external = XPaiNN(config)
+    # e3nn's FX tensor products contain unused outer products, which its
+    # scripted executor prunes automatically. Prune them for eager FX as well.
+    for kernel in external.modules():
+        if isinstance(kernel, torch.fx.GraphModule) and kernel.graph.eliminate_dead_code():
+            kernel.recompile()
     return XPaiNNCore(
         XPaiNNEmbed(external.embed),
         [XPaiNNBlock(message, update) for message, update in zip(external.message, external.update)],
