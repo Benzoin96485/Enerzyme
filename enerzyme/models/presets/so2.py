@@ -474,7 +474,7 @@ def equiformer_v3(
                       optional_fields=("edge_rot_mat", "batch_seg", "edge_envelope_weight",),
                       edge_convention="swap"),
         positional_fields=_CHANNEL_INPUTS + ("batch_seg",), architecture="equiformer_v3",
-        _native_cpu_inductor_forces=True,
+        _cpu_force_training_option="cpp.simdlen",
         dim_feature_out=dim_feature_out, feature_irreps=feature_irreps, lmax=lmax,
         mmax=mmax, sphere_channels=sphere_channels, ffn_hidden_channels=ffn_hidden_channels,
         dim_embedding=dim_embedding, num_rbf=num_rbf, num_layers=num_layers,
