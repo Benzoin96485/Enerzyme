@@ -84,7 +84,14 @@ class EdgeEmbedding(Module):
         rbf: Tensor,
         scalar: Tensor,
     ) -> Tensor:
-        mixed = scalar.index_select(0, idx_i) + scalar.index_select(0, idx_j)
+        receiver = scalar.index_select(0, idx_i)
+        if torch.compiler.is_compiling() and scalar.device.type == "cpu":
+            # Different accumulation layouts keep CPU Inductor from fusing the
+            # endpoint gradients into a buffer it reads before its indexed writes.
+            sender = scalar.T.contiguous().index_select(1, idx_j).T
+        else:
+            sender = scalar.index_select(0, idx_j)
+        mixed = receiver + sender
         return mixed * self.edge_proj(rbf)
 
 

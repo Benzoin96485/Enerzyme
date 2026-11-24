@@ -252,3 +252,34 @@ def test_block_matches_the_reference_for_each_vertex():
         assert "divisible" in str(exc)
     else:
         raise AssertionError("expected a bad head count to fail")
+
+
+def test_compiled_edge_embedding_preserves_node_and_endpoint_derivatives():
+    from enerzyme.models.visnet.interaction import EdgeEmbedding
+
+    torch.manual_seed(31)
+    embedding = EdgeEmbedding(3, 5).double()
+    scalar = torch.randn(4, 5, dtype=torch.float64, requires_grad=True)
+    rbf = torch.randn(6, 3, dtype=torch.float64, requires_grad=True)
+    receiver = torch.tensor([1, 1, 1, 0, 2, 0])
+    sender = torch.tensor([0, 2, 1, 1, 0, 1])
+    parameters = (scalar, rbf, embedding.edge_proj.weight, embedding.edge_proj.bias)
+    direction = torch.randn_like(scalar)
+
+    def derivatives(nodes, edges):
+        loss = nodes.square().sum() + edges.sin().sum()
+        first = torch.autograd.grad(loss, parameters, create_graph=True)
+        second = torch.autograd.grad((first[0] * direction).sum(), parameters)
+        return (*first, *second)
+
+    compiled = torch.compile(embedding, backend="eager", fullgraph=True)
+    for count in (6, 0):
+        i, j, basis = receiver[:count], sender[:count], rbf[:count]
+        edges = compiled(i, j, basis, scalar)
+        original = embedding(i, j, basis, scalar)
+        torch.testing.assert_close(edges, original)
+        if count:
+            actual = derivatives(scalar, edges)
+            expected = derivatives(scalar, original)
+            for result, reference in zip(actual, expected):
+                torch.testing.assert_close(result, reference, atol=1e-13, rtol=1e-13)
