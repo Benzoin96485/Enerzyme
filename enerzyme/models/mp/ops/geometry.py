@@ -15,12 +15,17 @@ import torch
 from torch import Tensor
 
 
+def smooth_norm(x: Tensor, eps: float = 1e-7, *, dim: int = -1, keepdim: bool = True) -> Tensor:
+    """Euclidean norm with the squared guard used by quaternion edge frames."""
+    return torch.sqrt((x * x).sum(dim=dim, keepdim=keepdim) + eps * eps)
+
+
 def safe_norm(x: Tensor, dim: int = -1, keepdim: bool = False, eps: float = 1e-12, mode: str = "clamp_zero") -> Tensor:
     if mode == "norm_clamp":
         return torch.linalg.vector_norm(x, dim=dim, keepdim=keepdim).clamp_min(eps)
-    sq = x.square().sum(dim=dim, keepdim=keepdim)
     if mode == "sqrt_eps2":
-        return torch.sqrt(sq + eps * eps)
+        return smooth_norm(x, eps, dim=dim, keepdim=keepdim)
+    sq = x.square().sum(dim=dim, keepdim=keepdim)
     norm = sq.clamp_min(eps).sqrt()
     if mode == "clamp":
         return norm

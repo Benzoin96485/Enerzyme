@@ -213,3 +213,22 @@ def test_safe_norm_modes(mode):
     assert torch.allclose(unit[1:].norm(dim=-1), torch.ones(9, dtype=torch.float64), atol=1e-6)
     if mode == "clamp_zero":
         assert norm[0] == 0 and not unit[0].any()
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_quaternion_norm_matches_values_and_coordinate_derivatives(dtype):
+    from enerzyme.models.mp.equivariant.rotation.wigner_quaternion import safe_norm as quaternion_norm
+
+    x = torch.tensor([[0.0, 0.0, 0.0], [2e-8, -1e-7, 0.0], [-1.0, 2.0, 3.0]],
+                     dtype=dtype, requires_grad=True)
+    eps = 1e-7
+
+    def derivatives(value):
+        grad, = torch.autograd.grad(value.sum(), x, create_graph=True)
+        second, = torch.autograd.grad(grad.sum(), x)
+        return value, grad, second
+
+    reference = derivatives(torch.sqrt((x * x).sum(dim=-1, keepdim=True) + eps * eps))
+    for value in (quaternion_norm(x, eps), safe_norm(x, keepdim=True, eps=eps, mode="sqrt_eps2")):
+        for actual, expected in zip(derivatives(value), reference):
+            torch.testing.assert_close(actual, expected, rtol=0, atol=0)

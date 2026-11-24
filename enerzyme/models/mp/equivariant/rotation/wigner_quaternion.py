@@ -18,6 +18,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
+from ...ops.geometry import smooth_norm as safe_norm
 from .wigner_jd import max_wigner_lmax, wigner_from_rotation_matrix
 
 # Signed permutation: rows are -e_y, -e_z, +e_x (historical DPA4 l=1 basis).
@@ -28,10 +29,6 @@ _DPA4_CARTESIAN_BASIS = torch.tensor(
         [1.0, 0.0, 0.0],
     ]
 )
-
-
-def safe_norm(x: Tensor, eps: float = 1e-7) -> Tensor:
-    return torch.sqrt((x * x).sum(dim=-1, keepdim=True) + eps * eps)
 
 
 def quaternion_normalize(q: Tensor, eps: float = 1e-7) -> Tensor:
