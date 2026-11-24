@@ -1,0 +1,36 @@
+# CAMP (Wen et al., npj Comput. Mater. 2025). The Core builds Cartesian
+# atomic moments and hyper moments. RandomAtomEmbedding is the chemical
+# table. Each CAMP layer owns its species-pair Chebyshev basis, so there is
+# no separate radial layer. CAMPEnergyReadout is a linear map on every layer
+# but the last, and a SiLU MLP on the last layer. Enerzymette only needs
+# architecture: camp.
+#
+# This file is a small stack for smoke tests. Table S5 widths are Core
+# presets such as water, lips-1000, aspirin, and graphene. dim_embedding is
+# max_u + 1. Set atomic_numbers to the elements in the dataset so the pair
+# table stays n_species x n_species. Set avg_num_neighbors to the training-set
+# mean inside the cutoff. Reference checkpoints do not load.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: camp
+      active: true
+      build_params:
+        max_Za: 8
+        dim_embedding: 4
+        cutoff_sr: 5.0
+      layers:
+        - name: RangeSeparation
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            preset: custom
+            max_v: 2
+            num_layers: 2
+            max_chebyshev_degree: 3
+            avg_num_neighbors: 1.0
+            atomic_numbers: [1, 6, 8]
+        - name: CAMPEnergyReadout
+        - name: EnergyReduce
+        - name: Force

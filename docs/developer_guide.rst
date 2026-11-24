@@ -239,7 +239,9 @@ screened ZBL outside the Core; hierarchical scalars plus a polynomial
 steerable state; shared :code:`HierachicalReadout`). Also :code:`CACE`
 under :code:`enerzyme/models/cace/` (default Bessel basis and chemical
 embedding outside the Core; Cartesian invariants inside; linear-plus-MLP
-readout outside). Also :code:`TensorNet` and :code:`TensorNet2` under :code:`enerzyme/models/tensornet/`
+readout outside). Also :code:`CAMP` under :code:`enerzyme/models/camp/`
+(chemical embedding outside the Core; a species-pair Chebyshev basis inside
+each moment layer; per-layer linear / final MLP readout outside). Also :code:`TensorNet` and :code:`TensorNet2` under :code:`enerzyme/models/tensornet/`
 (exponential-normal basis and species embedding outside the Core; Cartesian
 3×3 messages inside; TensorNet2 equilibrates charge channels inside the
 messages; shared :code:`SimpleReadout` and :code:`WeightedCoulombEnergy`
@@ -383,6 +385,8 @@ Tests live in :code:`test/`:
 - :code:`test_grace_core.py` — GRACE registration / YAML smoke, preset table, batch isolation, 2L message ablation, rotation / inversion / translation, force finite-difference conservation, SimpleReadout contract
 - :code:`test_cace_ops.py` — CACE monomials, invariant counts, two-body dot-product identity, rotation / inversion of the contraction, per-shell radial mix
 - :code:`test_cace_core.py` — CACE registration / YAML smoke, cacefit preset widths, batch isolation, scalar-message ablation, rotation / inversion / translation, force finite-difference conservation, SimpleReadout contract
+- :code:`test_camp_ops.py` — CAMP Chebyshev on ``r/rc``, species-pair envelope, supplement moment rules, dyad contraction, one-neighbor atomic moment
+- :code:`test_camp_core.py` — CAMP registration / YAML smoke, Table S5 widths, batch isolation, edge order, rotation / inversion / translation, force finite-difference conservation, SimpleReadout on the last layer
 - :code:`test_geodite_ops.py` — polynomial envelope, covalent attenuation, radial window, screened ZBL pair formula, Geodite spherical harmonics, vector rejection, zero-basis isolated match
 - :code:`test_geodite_core.py` — Geodite registration / YAML smoke, published widths, batch isolation, isolated-atom energy, rotation / inversion / translation, force finite-difference conservation
 - :code:`test_so3krates_core.py` — So3krates shapes, SimpleReadout contract, build_model E/F, SO(3) energy/force checks
@@ -888,6 +892,11 @@ CACE (:code:`cace`)
 ^^^^^^^^^^^^^^^^^^^
 
 Cheng (npj Comput. Mater. 2024) lives under :code:`enerzyme/models/cace/` (:code:`core.py`, :code:`basis.py`, :code:`interaction.py`, :code:`readout.py`, :code:`presets.py`). Register via :code:`get_ff_core("cace")`. This is an original implementation of the published Cartesian contraction. `BingqingCheng/cace <https://github.com/BingqingCheng/cace>`_ is CC BY-NC 4.0 and is not imported; do not vendor it, and do not expect its checkpoints to load. Reuse :code:`BesselRBF` (default flavor, ``apply_cutoff_fn: false``), :code:`RandomAtomEmbedding`, :func:`enerzyme.models.cutoff.polynomial_envelope`, and :code:`EnergyReduce` / :code:`Force`. The monomial list and the body-order contraction stay in the package: they are the Cartesian cluster expansion, and a spherical-harmonic tensor product is not used. The Core emits :code:`atom_feature` ``[N, F]``. :code:`CACEEnergyReadout` is the linear map plus the SiLU MLP; :code:`SimpleReadout` also fits. Presets follow the cacefit training scripts (``water``, ``water-local``, ``ethanol``, ``bpa``, ``hea``). Leave ``cutoff_fn`` unset so the envelope order stays on the Core. Tests: :code:`test/test_cace_ops.py`, :code:`test/test_cace_core.py`. Enerzymette: :code:`architecture: cace` + resolved :code:`config.yaml`.
+
+CAMP (:code:`camp`)
+^^^^^^^^^^^^^^^^^^^
+
+Wen, Huang, Dai, and Adhikari (npj Comput. Mater. 2025) live under :code:`enerzyme/models/camp/` (:code:`core.py`, :code:`moment.py`, :code:`radial.py`, :code:`rules.py`, :code:`readout.py`, :code:`presets.py`). Register via :code:`get_ff_core("camp")`. This is an original implementation of the published Cartesian moments. `wengroup/camp <https://github.com/wengroup/camp>`_ is not imported; do not vendor it, and do not expect its checkpoints to load. Reuse :code:`RandomAtomEmbedding`, :code:`RangeSeparation`, :func:`enerzyme.models.cutoff.polynomial_envelope`, and :code:`EnergyReduce` / :code:`Force`. The species-pair Chebyshev basis stays inside each moment layer because the reference constructs a new radial map per layer. It is not the GRACE Chebyshev argument. The moment rules are the supplement's full contraction onto the highest rank, not a spherical Clebsch–Gordan product. The Core emits :code:`atom_feature` ``[N, C, T]``. :code:`CAMPEnergyReadout` is the per-layer head; :code:`SimpleReadout` reads the last layer. Presets follow Table S5. ``dim_embedding`` is ``max_u + 1``. Leave ``cutoff_fn`` unset. Tests: :code:`test/test_camp_ops.py`, :code:`test/test_camp_core.py`. Enerzymette: :code:`architecture: camp` + resolved :code:`config.yaml`. Set ``atomic_numbers`` and ``avg_num_neighbors`` in that YAML.
 
 GRACE (:code:`grace`)
 ^^^^^^^^^^^^^^^^^^^^^
