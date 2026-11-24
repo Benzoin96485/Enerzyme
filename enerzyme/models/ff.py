@@ -92,7 +92,10 @@ def build_model(
         elif hasattr(Layers, layer_name):
             Layer = getattr(Layers, layer_name)
         else:
-            raise NotImplementedError(f"Layer {layer_name} not implemented")
+            from .compat.layers import LEGACY_LAYERS
+            if layer_name not in LEGACY_LAYERS:
+                raise NotImplementedError(f"Layer {layer_name} not implemented")
+            Layer = LEGACY_LAYERS[layer_name]
         
         layer = build_layer(Layer, params, build_params, built_layers)
         if layer_name == "Core":

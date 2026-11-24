@@ -107,6 +107,8 @@ def _load_state_dict(model: Module, device: Optional[torch.device]=None, pretrai
     loaded_info = torch.load(pretrain_path, map_location=device, weights_only=False)
     if 'pytorch-lightning_version' in loaded_info:
         loaded_info = _convert_lightning_state_dict(loaded_info)
+    from ..models.compat import upgrade_checkpoint
+    loaded_info = upgrade_checkpoint(model, loaded_info, optimizer)
     if ema is not None and "ema_state_dict" in loaded_info:
         model.load_state_dict(loaded_info["model_state_dict"])
         ema.load_state_dict(loaded_info["ema_state_dict"])
@@ -313,7 +315,8 @@ class Trainer:
         if model_rank is None:
             model_rank = ''
         os.makedirs(dump_dir, exist_ok=True)
-        info = {"model_state_dict": model.state_dict()}
+        from ..models.compat import CHECKPOINT_FORMAT, FORMAT_KEY
+        info = {"model_state_dict": model.state_dict(), FORMAT_KEY: CHECKPOINT_FORMAT}
         if ema is not None:
             info["ema_state_dict"] = ema.state_dict()
         info["optimizer_state_dict"] = optimizer.state_dict()
