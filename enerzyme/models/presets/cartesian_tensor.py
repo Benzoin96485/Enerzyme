@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import List, Literal, Optional, Sequence, Union
 
 from ..mp.core import ComposableCore
 from ..mp.graph import GraphRequires
@@ -592,3 +592,108 @@ def tensornet2(dim_embedding: int = 128, num_rbf: int = 32, cutoff_sr: float = 4
     """Charge-conditioned tensor interactions with equilibrated per-layer charge taps."""
     return _tensornet(dim_embedding, num_rbf, cutoff_sr, num_interactions, equivariance_group,
                       include_self, 0.0, q_dim)
+
+
+def tace(
+    max_Za: int,
+    dim_embedding: int,
+    num_rbf: int,
+    num_channel: int = 48,
+    num_layers: int = 2,
+    Lmax: int = 2,
+    lmax: int = 3,
+    correlation: Union[int, List[int]] = 2,
+    avg_num_neighbors: float = 8.0,
+    tensor_basis: Literal["spherical", "cartesian"] = "spherical",
+    parity: bool = False,
+    edge_embedding: str = "nonlinear",
+    edge_update: str = "element2",
+    scatter_norm: str = "avg_num_neighbors",
+    resnet_type: str = "BB",
+    resnet_linear_type: str = "aware",
+    use_first_resnet: bool = False,
+    nonlinear: str = "sigmoid_gate",
+    radial_mlp: Optional[List[int]] = None,
+    radial_bias: bool = False,
+    l1l2: Optional[str] = None,
+    agnostic_product: bool = False,
+    bias: bool = True,
+) -> ComposableCore:
+    """Spherical CG tensor products or irreducible Cartesian tensor contractions."""
+    from e3nn.o3 import Irreps
+    from ..mp.equivariant.e3nn import scalar_0e_dim
+    from ..tace.blocks import TACEEmbed, SphericalTACEBlock
+    from ..tace.interaction import EDGE_UPDATE, CgtpACE, CgtpInteraction
+
+    if radial_mlp is None:
+        radial_mlp = [64, 64, 64]
+    if isinstance(correlation, int):
+        correlation = [correlation] * num_layers
+    else:
+        correlation = list(correlation)
+        if len(correlation) != num_layers:
+            raise ValueError(
+                f"correlation list length ({len(correlation)}) must equal "
+                f"num_layers ({num_layers}); got {correlation!r}"
+            )
+
+
+    num_elements = max_Za + 1
+    common = dict(num_elements=num_elements, num_layers=num_layers, num_channel=num_channel, Lmax=Lmax, lmax=lmax)
+    if tensor_basis == "cartesian":
+        from ..tace.cartesian.core_blocks import CartesianTACEBlock, CartesianTACEHead, CartesianTACEHarmonics
+
+        harmonics = CartesianTACEHarmonics(lmax)
+    elif tensor_basis == "spherical":
+        harmonics = None
+    else:
+        raise ValueError(f"Unknown tensor_basis={tensor_basis}")
+    embed = TACEEmbed(num_elements, dim_embedding, num_channel, num_rbf, edge_embedding, lmax, harmonics)
+    blocks = []
+    if tensor_basis == "spherical":
+        target = (Irreps.spherical_harmonics(Lmax) if parity
+                  else Irreps([(1, (degree, (-1) ** degree)) for degree in range(Lmax + 1)]))
+        irreps_in = Irreps([(num_channel, (0, 1))])
+        for layer, order in enumerate(correlation):
+            update = EDGE_UPDATE[edge_update](
+                num_elements=num_elements, num_channel=num_channel, edge_embedding_channel=embed.edge_embedding.out_dim,
+                bias=False,
+            )
+            interaction = CgtpInteraction(
+                **common, layer=layer, irreps_in=irreps_in, edge_feats_channel=update.out_dim,
+                avg_num_neighbors=avg_num_neighbors, radial_mlp=radial_mlp, radial_bias=radial_bias,
+                scatter_norm=scatter_norm, nonlinear=nonlinear, l1l2=l1l2, resnet_type=resnet_type,
+                resnet_linear_type=resnet_linear_type, use_first_resnet=use_first_resnet,
+                parity=parity, bias=bias, target_irreps=target, correlation=order,
+            )
+            product = CgtpACE(
+                **common, layer=layer, irreps_in=interaction.irreps_out, correlation=order,
+                target_irreps=target, l1l2=l1l2, parity=parity, bias=bias, agnostic=agnostic_product,
+            )
+            if hasattr(interaction, "resnetBB") and interaction.irreps_sc != product.irreps_out:
+                raise ValueError(
+                    f"TACE BB residual irreps mismatch at layer {layer}: "
+                    f"skip={interaction.irreps_sc} product={product.irreps_out}"
+                )
+            blocks.append(SphericalTACEBlock(update, interaction, product))
+            irreps_in = product.irreps_out
+        feature_irreps = str(irreps_in)
+        head = FeatureHead(source="equi")
+    else:
+        for layer, order in enumerate(correlation):
+            blocks.append(CartesianTACEBlock(
+                **common, layer=layer, correlation=order, avg_num_neighbors=avg_num_neighbors,
+                edge_embedding_channel=embed.edge_embedding.out_dim, edge_update=edge_update,
+                scatter_norm=scatter_norm, radial_mlp=radial_mlp, radial_bias=radial_bias,
+                use_first_resnet=use_first_resnet, resnet_type=resnet_type,
+                resnet_linear_type=resnet_linear_type, l1l2=l1l2, bias=bias,
+            ))
+        feature_irreps = f"{num_channel}x0e"
+        head = CartesianTACEHead()
+    return ComposableCore(
+        embed, blocks, head, GraphRequires(distances=False), tensor_basis=tensor_basis, max_Za=max_Za,
+        **common, parity=parity, num_rbf=num_rbf, dim_embedding=dim_embedding,
+        feature_irreps=feature_irreps, dim_feature_out=scalar_0e_dim(feature_irreps),
+        positional_fields=("Za", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf", "atom_embedding",
+                           "charge_embedding", "spin_embedding", "cutoff_values_sr"),
+    )

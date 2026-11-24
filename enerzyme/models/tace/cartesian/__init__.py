@@ -1,5 +1,5 @@
 """Cartesian TACE blocks."""
 
-from .core_blocks import CartesianLayerStack
+from .core_blocks import CartesianTACEBlock
 
-__all__ = ["CartesianLayerStack"]
+__all__ = ["CartesianTACEBlock"]
