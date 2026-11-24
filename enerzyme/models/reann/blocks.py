@@ -91,9 +91,13 @@ class OrbitalEmbed(Embed):
         if ctx.receiver.numel() == 0:
             return BlockState(scalar=atom_embedding.new_zeros(ctx.num_nodes, self.n_orbit), equi=(coeff, species, None))
         pass_orbitals = self.hyper.ndim == 4
-        # CPU Inductor gives incorrect coordinate derivatives for the packed
-        # contraction. Compiled traces retain the tested ordered-shell formulation.
-        packed = pass_orbitals and not torch.compiler.is_compiling()
+        # CPU Inductor needs the ordered shells for correct coordinate
+        # derivatives. CUDA force inference can share permutation-equivalent
+        # channels without saving the repeated edge orbitals for backward.
+        packed = pass_orbitals and (
+            not torch.compiler.is_compiling()
+            or (ctx.vec.is_cuda and not self.training and not torch._C._are_functorch_transforms_active())
+        )
         pair, window = pair_gaussian_orbitals(
             ctx.receiver, ctx.sender, ctx.vec, ctx.dist, species, self.rs, self.inta, self.lmax, self.cutoff_sr,
             species_checked=True,
