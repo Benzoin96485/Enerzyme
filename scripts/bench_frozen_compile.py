@@ -18,6 +18,7 @@ import json
 import math
 import random
 import statistics
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -92,7 +93,7 @@ def compare_main_runs(paths, reference_paths):
         raise ValueError("expected both files to contain the same single architecture")
     arch = next(iter(raw[0]))
     base, candidate = (result[arch] for result in raw)
-    fields = ("fixture_kind", "snapshot", "snapshot_sha256", "config_sha256", "checkpoint_state",
+    fields = ("fixture_kind", "snapshot", "snapshot_sha256", "config_sha256", "checkpoint_state", "torch",
               "tiled_atom_features", "compile", "device", "device_name", "precision", "params",
               "reps", "threads", "requested_systems", "modes")
     if base.get("fixture_kind") != "main_trained" or not base.get("config_sha256") or not base.get("snapshot_sha256"):
@@ -103,13 +104,19 @@ def compare_main_runs(paths, reference_paths):
             continue
         if base.get(field) != candidate.get(field):
             raise ValueError(f"cannot compare different {field}")
-    if not base.get("compile"):
-        raise ValueError("expected ordinary compiled measurements")
+    if not base.get("compile") or not base.get("torch"):
+        raise ValueError("expected ordinary compiled measurements with a PyTorch version")
 
     refs = [torch.load(path, map_location="cpu", weights_only=True) if path.is_file() else {}
             for path in reference_paths]
     result = {key: value for key, value in base.items() if key in fields}
     result.update(architecture=arch, comparisons={}, counts={})
+    result["source"] = {
+        name: {key: row.get(key) for key in ("model_revision", "driver_revision", "driver_sha256", "torch")}
+        for name, row in (("baseline", base), ("candidate", candidate))
+    }
+    if base.get("driver_sha256") != candidate.get("driver_sha256"):
+        raise ValueError("cannot compare different benchmark drivers")
     dtype = getattr(torch, base["precision"])
     for system in base["requested_systems"]:
         result["comparisons"][system] = modes = {}
@@ -163,8 +170,20 @@ def run(args):
     if main_fixture:
         config, digest, weights, atom_features = _fixture_configuration(source)
         arch, params = config["architecture"], config["build_params"]
+        driver_path = Path(__file__).resolve()
+
+        def revision(directory):
+            try:
+                git = subprocess.run(["git", "-C", str(directory), "rev-parse", "HEAD"],
+                                     capture_output=True, text=True)
+            except FileNotFoundError:
+                return None
+            return git.stdout.strip() if git.returncode == 0 else None
+
         provenance = {"fixture_kind": "main_trained", "config_sha256": digest,
-                      "checkpoint_state": "model_state_dict", "tiled_atom_features": sorted(atom_features)}
+                      "checkpoint_state": "model_state_dict", "tiled_atom_features": sorted(atom_features),
+                      "model_revision": revision(args.model_tree), "driver_revision": revision(driver_path.parent),
+                      "driver_sha256": hashlib.sha256(driver_path.read_bytes()).hexdigest()}
     else:
         payload = torch.load(source, map_location="cpu", weights_only=False)
         arch = payload["architecture"]
