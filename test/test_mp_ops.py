@@ -104,6 +104,18 @@ def test_scatter_sum_compiles():
     assert torch.allclose(compiled(src), fn(src))
 
 
+def test_inductor_cpu_single_destination_scalar_sum():
+    compiled = torch.compile(scatter_sum, backend="inductor")
+    values = torch.tensor([1., -2., 0.5, 3., 4.], dtype=torch.float64, requires_grad=True)
+    for index in (torch.zeros(5, dtype=torch.long), torch.tensor([1, 0, 0, 1, 0])):
+        expected = torch.stack([values[index == i].sum() for i in range(index.max().item() + 1)])
+        for size in (None, len(expected)):
+            result = compiled(values, index, dim_size=size)
+            torch.testing.assert_close(result, expected)
+            probe = torch.arange(1, len(result) + 1, dtype=values.dtype)
+            torch.testing.assert_close(torch.autograd.grad(result, values, probe)[0], probe[index])
+
+
 def test_segment_softmax_normalises_and_matches_pyg_style():
     logits = torch.randn(30, 4, dtype=torch.float64)
     index = torch.randint(0, 6, (30,))

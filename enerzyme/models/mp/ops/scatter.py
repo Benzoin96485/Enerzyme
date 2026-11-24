@@ -46,6 +46,15 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
         index = index.long()
     if src.device.type != "cuda" and _use_torch_scatter(src) and index.numel():
         return _torch_scatter.scatter_sum(src, index, dim=dim, dim_size=size)
+    # With a single output scalar the CPU Inductor vectorizer collapses an
+    # atomic-add destination to a constant index. Retain a spare slot until
+    # after reduction so the generated kernel keeps its indexed writes.
+    if torch.compiler.is_compiling() and src.device.type == "cpu" and src.ndim == 1:
+        if dim_size is not None:
+            # A supplied out-of-bounds index must not fall in the spare slot.
+            index = index + (index == size)
+        padded = src.new_zeros(size + 1)
+        return padded.index_add_(dim, index, src).narrow(dim, 0, size)
     shape = list(src.shape)
     shape[dim] = size
     out = src.new_zeros(shape)
