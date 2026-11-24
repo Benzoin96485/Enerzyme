@@ -16,6 +16,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from ..mp.basis.angular import spherical_harmonics
 from ..mp.equivariant.s2.lebedev import load_lebedev_rule
 
 
@@ -118,72 +119,8 @@ def invariant_width(channels: int, lmax: int) -> int:
 
 
 def cartesian_harmonics(direction: Tensor, lmax: int) -> Tensor:
-    """Real solid harmonics through degree ``lmax``, shape ``(E, (lmax+1)^2)``.
-
-    Degree blocks obey the addition theorem with Legendre polynomials. Degree
-    one is Cartesian ``(x, y, z)`` and degree two is increasing-``m`` order.
-    """
-    if lmax < 0 or lmax > MAX_ANGULAR_DEGREE:
-        raise ValueError(f"lmax must be in [0, {MAX_ANGULAR_DEGREE}], got {lmax}")
-    x, y, z = direction.unbind(dim=-1)
-    squared = x * x + y * y + z * z
-    blocks = [torch.ones_like(x).unsqueeze(-1)]
-    if lmax >= 1:
-        blocks.append(torch.stack((x, y, z), dim=-1))
-    if lmax >= 2:
-        sqrt_three = math.sqrt(3.0)
-        blocks.append(
-            torch.stack(
-                (
-                    sqrt_three * x * y,
-                    sqrt_three * y * z,
-                    0.5 * (3.0 * z * z - squared),
-                    sqrt_three * x * z,
-                    0.5 * sqrt_three * (x * x - y * y),
-                ),
-                dim=-1,
-            )
-        )
-    if lmax >= 3:
-        blocks.append(
-            torch.stack(
-                (
-                    math.sqrt(5.0 / 8.0) * y * (3.0 * x * x - y * y),
-                    math.sqrt(15.0) * x * y * z,
-                    math.sqrt(3.0 / 8.0) * y * (5.0 * z * z - squared),
-                    0.5 * z * (5.0 * z * z - 3.0 * squared),
-                    math.sqrt(3.0 / 8.0) * x * (5.0 * z * z - squared),
-                    0.5 * math.sqrt(15.0) * z * (x * x - y * y),
-                    math.sqrt(5.0 / 8.0) * x * (x * x - 3.0 * y * y),
-                ),
-                dim=-1,
-            )
-        )
-    if lmax >= 4:
-        z_squared = z * z
-        x2_minus_y2 = x * x - y * y
-        blocks.append(
-            torch.stack(
-                (
-                    0.5 * math.sqrt(35.0) * x * y * x2_minus_y2,
-                    0.25 * math.sqrt(70.0) * y * z * (3.0 * x * x - y * y),
-                    0.5 * math.sqrt(5.0) * x * y * (7.0 * z_squared - squared),
-                    0.25 * math.sqrt(10.0) * y * z * (7.0 * z_squared - 3.0 * squared),
-                    0.125
-                    * (
-                        35.0 * z_squared * z_squared
-                        - 30.0 * z_squared * squared
-                        + 3.0 * squared * squared
-                    ),
-                    0.25 * math.sqrt(10.0) * x * z * (7.0 * z_squared - 3.0 * squared),
-                    0.25 * math.sqrt(5.0) * x2_minus_y2 * (7.0 * z_squared - squared),
-                    0.25 * math.sqrt(70.0) * x * z * (x * x - 3.0 * y * y),
-                    0.125 * math.sqrt(35.0) * (x**4 - 6.0 * x * x * y * y + y**4),
-                ),
-                dim=-1,
-            )
-        )
-    return torch.cat(blocks, dim=-1)
+    """DPA4C solid harmonics with Cartesian degree one and increasing m above it."""
+    return spherical_harmonics(direction, lmax=lmax, layout="dpa4c", normalize_input=False)
 
 
 def packed_l2_to_stf(packed: Tensor) -> Tensor:
