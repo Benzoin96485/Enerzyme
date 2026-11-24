@@ -95,7 +95,8 @@ class OrbitalEmbed(Embed):
         # derivatives. CUDA force inference can share permutation-equivalent
         # channels without saving the repeated edge orbitals for backward.
         packed = pass_orbitals and (
-            not torch.compiler.is_compiling() or (ctx.vec.is_cuda and not self.training)
+            not torch.compiler.is_compiling()
+            or (ctx.vec.is_cuda and not self.training and not torch._C._are_functorch_transforms_active())
         )
         pair, window = pair_gaussian_orbitals(
             ctx.receiver, ctx.sender, ctx.vec, ctx.dist, species, self.rs, self.inta, self.lmax, self.cutoff_sr,

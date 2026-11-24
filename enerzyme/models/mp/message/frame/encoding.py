@@ -107,9 +107,11 @@ class LocalSubstructure(nn.Module):
     def _endpoint(self, environment: Tensor, frame: Tensor, nodes: Tensor) -> Tensor:
         projected = scalarize(environment[nodes], frame)
         local_axes = projected.transpose(1, 2)
-        if torch.compiler.is_compiling() and local_axes.is_cuda and not self.training:
+        if (torch.compiler.is_compiling() and local_axes.is_cuda and not self.training
+                and not torch._C._are_functorch_transforms_active()):
             # Force evaluation retains the energy graph. Keep the three input
             # coordinates and recompute the much wider hidden activations.
+            # torch.func VJPs cannot install the checkpoint saved-tensor hooks.
             mixed = checkpoint(self.lin, local_axes, use_reentrant=False)
         else:
             mixed = self.lin(local_axes)
