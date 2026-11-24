@@ -75,7 +75,8 @@ def camp(
     return ComposableCore(
         CAMPEmbed(width, lookup, rank), blocks, FeatureHead("layers"),
         GraphRequires(rbf=False, optional_cutoff_values=False),
-        preset=preset, is_camp_core=True, _native_cpu_inductor_forces=True, dim_embedding=width, max_Za=max_Za,
+        preset=preset, is_camp_core=True, _cpu_force_training_option="cpp.simdlen",
+        dim_embedding=width, max_Za=max_Za,
         n_species=n_species, cutoff_sr=cutoff_sr, max_v=rank, num_layers=depth,
         max_chebyshev_degree=degree, envelope_p=spec["envelope_p"], avg_num_neighbors=spec["avg_num_neighbors"],
         output_mlp_hidden_layers=spec["output_mlp_hidden_layers"],

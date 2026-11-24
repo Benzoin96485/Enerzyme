@@ -231,7 +231,7 @@ def test_compiled_topology_preserves_force_and_parameter_gradients(architecture)
     assert "linear" in operators
 
 
-@pytest.mark.parametrize("architecture", ["so3krates", "mattersim", "dpa3", "facto", "cace", "grace", "equiformer_v3"])
+@pytest.mark.parametrize("architecture", ["so3krates", "mattersim", "dpa3", "facto", "cace", "grace", "equiformer_v3", "camp"])
 def test_cpu_compiler_keeps_force_gradients(architecture):
     from scripts.core_harness import build, forward, make_batch, random_molecules
 
