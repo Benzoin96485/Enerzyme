@@ -58,9 +58,28 @@ def uses_cpu_inductor_forces(core, inputs, *, include_eval=False):
 
 
 @torch.compiler.disable
-def native_cpu_forces(core, inputs):
-    # Differentiating the affected CPU kernels can abort the process.
+def native_forces(core, inputs):
+    """Run the original force layers with native coordinate and weight derivatives."""
     return core._run_layers(inputs)
+
+
+def has_force_hooks(core):
+    """The joint VJP replaces ForceLayer.forward, including its hook boundary."""
+    from torch.nn.modules import module
+
+    global_hooks = (module._global_forward_hooks or module._global_forward_pre_hooks
+                    or module._global_backward_hooks or module._global_backward_pre_hooks)
+    for stages in (core.pre_sequence, core.post_sequence):
+        for layer in stages:
+            if (type(layer) is not ForceLayer or (layer.train_only and not layer.training)
+                    or (layer.eval_only and layer.training)):
+                continue
+            if (layer.test_only and not core.test_mode) or (layer.test_exclude and core.test_mode):
+                continue
+            if (global_hooks or layer._forward_hooks or layer._forward_pre_hooks
+                    or layer._backward_hooks or layer._backward_pre_hooks):
+                return True
+    return False
 
 
 @torch.compiler.assume_constant_result
@@ -90,7 +109,7 @@ def compiled_cpu_forces_with_options(core, inputs, options):
 
     if not (all(hasattr(config.cpp, key.removeprefix("cpp.")) for key in options)
             and hasattr(autograd_config, "force_non_lazy_backward_lowering")):
-        return native_cpu_forces(core, inputs)
+        return native_forces(core, inputs)
     # Training's weight backward happens after this scope. During inference
     # the Force layer runs its retained backward here. Let AOT lower that
     # backward on its first use so it records that the caller can reuse it.
@@ -207,18 +226,14 @@ def compiled_coordinate_vjp(core, inputs):
     """Keep differentiable distances inside the VJP and discrete sizes outside it."""
     from torch._dynamo import config
 
-    if getattr(core, "_scripted_force_kernels", False):
-        return _scripted_force_training(core, inputs)
+    if getattr(core, "_scripted_force_kernels", False) or has_force_hooks(core):
+        # Scripted kernels close over weights, and force hooks can replace
+        # either the inputs or outputs of the coordinate differentiation.
+        return native_forces(core, inputs)
     edges, topology = _prepare_radius_graph(core, inputs)
     post_pairs = _post_pair_indices(core, inputs)
     with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
         return forward_with_coordinate_gradients(core, inputs, edges, topology, post_pairs)
-
-
-@torch.compiler.disable
-def _scripted_force_training(core, inputs):
-    """Use native higher derivatives for scripted kernels with closed-over weights."""
-    return core._run_layers(inputs)
 
 
 @torch.compiler.disable(recursive=False)
@@ -259,6 +274,13 @@ def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, 
     auxiliary outputs in one pass. This preserves random draws and lets losses
     on forces and other heads differentiate the same weights.
     """
+    if torch.compiler.is_compiling():
+        if compiling_fullgraph():
+            torch._assert(not has_force_hooks(core),
+                          "ForceLayer hooks require ordinary torch.compile with graph breaks")
+    elif has_force_hooks(core):
+        return core._run_layers(inputs)
+
     def active(layer):
         return not ((layer.test_only and not core.test_mode) or
                     (layer.test_exclude and core.test_mode))
