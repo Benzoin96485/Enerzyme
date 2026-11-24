@@ -28,9 +28,11 @@ def init_edge_rot_euler_angles(
     deterministic inference.
     """
     edge_vec_0 = edge_distance_vec
-    edge_vec_0_distance = torch.norm(edge_vec_0, dim=1)
-    mask = edge_vec_0_distance < ts
-    edge_vec_0_distance = torch.where(mask, 1.0, edge_vec_0_distance)
+    squared_distance = edge_vec_0.square().sum(dim=1)
+    mask = squared_distance < ts * ts
+    # Mask before the square root so even the second derivative at a
+    # zero-length vector avoids dividing by its norm.
+    edge_vec_0_distance = squared_distance.masked_fill(mask, 1.0).sqrt()
     xyz = edge_vec_0 / edge_vec_0_distance.unsqueeze(-1)
     mask = mask | xyz[:, 1].abs().isclose(xyz.new_ones(1))
 
