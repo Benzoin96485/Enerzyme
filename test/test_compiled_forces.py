@@ -104,8 +104,11 @@ def test_inference_partitions_preserve_energy_gradients():
     target = copy.deepcopy(eager)
     compiled = torch.compile(target, backend="inductor", dynamic=True)
     previous = getattr(config, "donated_buffer", None)
+    compiler_config = getattr(torch.compiler, "config", None)
+    tag = getattr(compiler_config, "cache_key_tag", None)
     expected, result = eager(_batch(1.1)), compiled(_batch(1.1))
     assert getattr(config, "donated_buffer", None) == previous
+    assert getattr(compiler_config, "cache_key_tag", None) == tag
     torch.testing.assert_close(result["E"], expected["E"])
     torch.testing.assert_close(result["Fa"], expected["Fa"])
     assert not result["Fa"].requires_grad
@@ -123,3 +126,27 @@ def test_inference_partitions_preserve_energy_gradients():
         assert (p.grad is None) == (q.grad is None), name
         if p.grad is not None:
             torch.testing.assert_close(p.grad, q.grad, msg=name)
+
+
+def test_reusable_inference_uses_a_distinct_compiler_cache_tag():
+    from torch._functorch import config
+
+    compiler_config = getattr(torch.compiler, "config", None)
+    if not (hasattr(config, "donated_buffer") and hasattr(compiler_config, "cache_key_tag")):
+        pytest.skip("This PyTorch version does not expose reusable-buffer cache configuration")
+
+    tags = set()
+
+    def capture(graph, _inputs):
+        if any(getattr(node.target, "__name__", "") == "linear" for node in graph.graph.nodes):
+            tags.add(compiler_config.cache_key_tag)
+        return graph.forward
+
+    torch.compiler.reset()
+    try:
+        with compiler_config.patch(cache_key_tag="project-A"):
+            torch.compile(_schnet(1).eval(), backend=capture)(_batch(1.1))
+            assert compiler_config.cache_key_tag == "project-A"
+        assert tags == {"project-A:enerzyme-retained-backward"}
+    finally:
+        torch.compiler.reset()

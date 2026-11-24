@@ -34,12 +34,24 @@ def retained_inference(core, inputs):
     backward can otherwise overwrite its saved tensors on the first use.
     Only this configuration frame is skipped, so the layers still compile.
     """
+    from contextlib import nullcontext
     from torch._functorch import config
 
-    if hasattr(config, "donated_buffer"):
-        with config.patch(donated_buffer=False):
-            return core._run_layers(inputs)
-    return core._run_layers(inputs)
+    if not hasattr(config, "donated_buffer"):
+        return core._run_layers(inputs)
+
+    # The Inductor FX cache key on PyTorch 2.13 omits AOTAutograd's donated
+    # input indices. A cached single-use backward can overwrite buffers even
+    # when this invocation requested reusable ones. Keep the caller's tag.
+    compiler_config = getattr(torch.compiler, "config", None)
+    if hasattr(compiler_config, "cache_key_tag"):
+        cache_scope = compiler_config.patch(
+            cache_key_tag=compiler_config.cache_key_tag + ":enerzyme-retained-backward"
+        )
+    else:
+        cache_scope = nullcontext()
+    with config.patch(donated_buffer=False), cache_scope:
+        return core._run_layers(inputs)
 
 
 def forward_with_coordinate_gradients(core, inputs: Dict[str, Any]) -> Dict[str, Any]:
