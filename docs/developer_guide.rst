@@ -236,6 +236,20 @@ forces and active weight gradients, then records the median time and peak
 allocation after warmup. A model can reuse a graph captured for a previous
 system. The per-system graph counters report only newly captured operations.
 
+To measure a trained main-branch model, use :code:`--main-fixture` with one
+of the :code:`test/fixtures/main_legacy/*.pt.gz` files and pass the same
+fixture to both runs. Save an :code:`--eager-grad-out` file for each checkout.
+Compare the two reports from the same GPU with the following command.
+
+.. code-block:: shell
+
+   python scripts/bench_frozen_compile.py --compare-main baseline.json candidate.json --reference-grads baseline.pt candidate.pt --out comparison.json
+
+The comparison checks gradients using the original parameter names and
+reports a timing ratio when both runs have valid numerical results. The
+reports also record the checkpoint hash, source revisions, PyTorch version,
+physical GPU and measurement intervals.
+
 To check force training with the installed Inductor backend, run the following
 from the checkout. The report compares the energy, forces, and every parameter
 gradient for identical initial weights and coordinates. It records captured

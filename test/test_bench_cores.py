@@ -8,11 +8,24 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from bench_cores import _fixture_configuration, compare, run_all
+from bench_cores import _add_fixture_features, _build_fixture_model, _fixture_configuration, compare, run_all
 
 
 def _timings():
     return {"device": "cpu", "mol_batch": {"infer_ms": 10.0, "train_ms": 20.0}}
+
+
+def test_force_check_requires_matching_tensor_shapes_dtypes_and_finite_values():
+    import torch
+    from check_compiled_forces import compare_fields
+
+    expected = {"E": torch.ones(2), "Fa": torch.ones(2, 3), "weight": torch.tensor(float("inf"))}
+    actual = {"E": torch.ones(2, 1), "Fa": torch.ones(2, 3, dtype=torch.float64), "weight": expected["weight"]}
+    errors, changed, failed = compare_fields(expected, actual, atol=1e-5, rtol=1e-5)
+    assert failed == ["E", "Fa", "weight"] and not changed
+    assert errors["E"]["actual_shape"] == [2, 1] and errors["E"]["reference_shape"] == [2]
+    assert errors["Fa"]["actual_dtype"] == "torch.float64" and errors["Fa"]["reference_dtype"] == "torch.float32"
+    assert errors["weight"]["max_abs"] is None
 
 
 @pytest.mark.parametrize("entry", [
@@ -79,10 +92,31 @@ def test_fixture_retains_shared_architecture_configuration():
 
 
 def test_fixture_includes_external_atomic_embeddings():
+    import torch
+
     fixture = Path(__file__).parent / "fixtures" / "main_legacy" / "physnet_ff01.pt.gz"
     _, _, _, features = _fixture_configuration(fixture)
     assert set(features) == {"Qa_xTB"}
     assert features["Qa_xTB"].shape == (21,)
+    batch = _add_fixture_features({"Za": torch.ones(44)}, features, torch.float64)
+    torch.testing.assert_close(batch["Qa_xTB"], features["Qa_xTB"].repeat(3)[:44].double())
+    explicit = torch.zeros(44)
+    batch["Qa_xTB"] = explicit
+    assert _add_fixture_features(batch, features, torch.float32)["Qa_xTB"] is explicit
+
+
+@pytest.mark.parametrize("name", ["schnet_default", "physnet_ff01", "spookynet_ff02", "mace_ff04"])
+def test_trained_benchmark_keeps_original_parameter_names_and_weights(name):
+    import torch
+
+    fixture = Path(__file__).parent / "fixtures" / "main_legacy" / f"{name}.pt.gz"
+    config, _, state, _ = _fixture_configuration(fixture)
+    model, loaded_state, names = _build_fixture_model(config, state, torch.float64)
+    assert names.keys() == dict(model.named_parameters()).keys()
+    assert len(set(names.values())) == len(names)
+    assert loaded_state.keys() == model.state_dict().keys()
+    for key, parameter in model.named_parameters():
+        torch.testing.assert_close(parameter, state[names[key]].double(), rtol=0, atol=0)
 
 
 def test_compare_rejects_different_fixture_configs_at_same_parameter_count(tmp_path):
@@ -94,6 +128,53 @@ def test_compare_rejects_different_fixture_configs_at_same_parameter_count(tmp_p
         paths.append(path)
     with pytest.raises(ValueError, match="config_sha256"):
         compare(*paths, 0.03)
+
+
+def test_compiled_checkpoint_comparison_requires_cross_branch_weight_gradients(tmp_path):
+    import torch
+    from bench_frozen_compile import compare_main_runs
+
+    measurement = {
+        "fixture_kind": "main_trained", "snapshot": "fixture.pt.gz", "snapshot_sha256": "fixture",
+        "config_sha256": "config", "compile": True, "torch": "2.13", "precision": "float32",
+        "device": "cuda", "device_uuid": "test-card", "params": 1,
+        "requested_systems": ["large_2000"], "modes": ["train"], "reps": 5,
+        "large_2000": {"train_ms": 10.0, "train_peak_mb": 64.0},
+        "numerical": {"large_2000": {"train": {"passed": True}}},
+    }
+    paths = [tmp_path / (side + ".json") for side in ("base", "new")]
+    refs = [tmp_path / (side + ".pt") for side in ("base", "new")]
+    values = {"E": torch.tensor([1.0]), "Fa": torch.zeros(1, 3)}
+    for path, ref in zip(paths, refs):
+        path.write_text(json.dumps({"schnet": measurement}))
+        torch.save({("large_2000", "train"): (values, {"w": torch.ones(1)})}, ref)
+
+    def cell():
+        return compare_main_runs(paths, refs)["comparisons"]["large_2000"]["train"]
+
+    assert cell()["delta_percent"] == {"ms": 0.0, "peak_MiB": 0.0}
+    paths[0].write_text(json.dumps({"schnet": dict(measurement, large_2000={"train_error": "compiler error"})}))
+    assert cell()["status"] == "candidate_only_validated"
+    assert "delta_percent" not in cell()
+    torch.save({("large_2000", "train"): (values, {"other": torch.ones(1)})}, refs[1])
+    mismatch = cell()
+    assert mismatch["status"] == "cross_native_mismatch"
+    assert mismatch["cross_native"]["different_gradient_names"] == ["other", "w"]
+    # Equal values must not pass through allclose's broadcasting or dtype conversions.
+    torch.save({("large_2000", "train"): (dict(values, E=torch.ones(1, 1)), {"w": torch.ones(1).double()})}, refs[1])
+    incompatible = cell()["cross_native"]
+    assert not incompatible["passed"]
+    assert set(incompatible["incompatible_tensors"]) == {"E", "w"}
+    torch.save({("large_2000", "train"): "missing external field"}, refs[1])
+    missing = cell()
+    assert missing["status"] == "cross_native_unavailable"
+    assert missing["native_reference_errors"]["candidate"] == "missing external field"
+    paths[1].write_text(json.dumps({"schnet": dict(measurement, torch="other")}))
+    with pytest.raises(ValueError, match="different torch"):
+        cell()
+    paths[1].write_text(json.dumps({"schnet": dict(measurement, device_uuid="second-card")}))
+    with pytest.raises(ValueError, match="different device_uuid"):
+        cell()
 
 
 def test_worker_failure_preserves_completed_measurements(tmp_path, monkeypatch):

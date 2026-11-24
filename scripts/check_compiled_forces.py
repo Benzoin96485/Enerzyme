@@ -75,6 +75,38 @@ def step(model, runner, batch, dtype, mode="training"):
     return values
 
 
+def compare_fields(expected, actual, atol, rtol):
+    errors, changed_participation, failed = {}, {}, []
+    for name, reference in expected.items():
+        value = actual[name]
+        if (reference is None) != (value is None):
+            available = reference if value is None else value
+            changed_participation[name] = {
+                "absent_in": "compiled" if value is None else "eager",
+                "other_is_zero": bool(torch.count_nonzero(available) == 0),
+            }
+            continue
+        if reference is None:
+            continue
+        if value.shape != reference.shape or value.dtype != reference.dtype:
+            errors[name] = {
+                "max_abs": None, "relative_l2": None,
+                "actual_shape": list(value.shape), "reference_shape": list(reference.shape),
+                "actual_dtype": str(value.dtype), "reference_dtype": str(reference.dtype),
+            }
+            failed.append(name)
+            continue
+        delta = value.double() - reference.double()
+        norm = reference.double().norm()
+        max_abs = float(delta.abs().max()) if delta.numel() else 0.0
+        rel_l2 = float(delta.norm() / norm) if norm > 0 else None
+        errors[name] = {"max_abs": max_abs if math.isfinite(max_abs) else None,
+                        "relative_l2": rel_l2 if rel_l2 is not None and math.isfinite(rel_l2) else None}
+        if not math.isfinite(max_abs) or not torch.allclose(value, reference, rtol=rtol, atol=atol):
+            failed.append(name)
+    return errors, changed_participation, failed
+
+
 def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", match_rng=False,
           mode="training", prepared_energy_forces=False):
     from torch._dynamo.backends.registry import lookup_backend
@@ -106,26 +138,7 @@ def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", ma
         runner = (PreparedEnergyForces(model, lower, device) if prepared_energy_forces
                   else torch.compile(model, backend=lower))
         actual = step(model, runner, batch, dtype, mode)
-    errors, changed_participation, failed = {}, {}, []
-    for name, reference in expected.items():
-        value = actual[name]
-        if (reference is None) != (value is None):
-            available = reference if value is None else value
-            changed_participation[name] = {
-                "absent_in": "compiled" if value is None else "eager",
-                "other_is_zero": bool(torch.count_nonzero(available) == 0),
-            }
-            continue
-        if reference is None:
-            continue
-        delta = value.double() - reference.double()
-        norm = reference.double().norm()
-        max_abs = float(delta.abs().max()) if delta.numel() else 0.0
-        rel_l2 = float(delta.norm() / norm) if norm > 0 else None
-        errors[name] = {"max_abs": max_abs if math.isfinite(max_abs) else None,
-                        "relative_l2": rel_l2 if rel_l2 is not None and math.isfinite(rel_l2) else None}
-        if not torch.allclose(value, reference, rtol=rtol, atol=atol):
-            failed.append(name)
+    errors, changed_participation, failed = compare_fields(expected, actual, atol, rtol)
     return {"architecture": architecture, "torch": str(torch.__version__), "device": str(device),
             "dtype": str(dtype), "atol": atol, "rtol": rtol, "graphs": graphs,
             "e3nn_codegen": e3nn_codegen, "matched_rng": match_rng,
