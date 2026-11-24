@@ -42,10 +42,7 @@ def random_molecules(seed: int, sizes: Iterable[int], elements=(1, 6, 7, 8), min
             p = rng.random(3) * box
             if all(np.linalg.norm(p - q) >= min_dist for q in pos):
                 pos.append(p)
-        mols.append(dict(
-            Ra=np.asarray(pos), Za=rng.choice(elements, size=n), N=n,
-            Q=0.0, S=0.0, Qa_xTB=rng.normal(scale=0.3, size=n),
-        ))
+        mols.append(dict(Ra=np.asarray(pos), Za=rng.choice(elements, size=n), N=n, Q=0.0, S=0.0))
     return mols
 
 
