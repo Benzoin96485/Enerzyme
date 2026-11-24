@@ -16,17 +16,8 @@ from torch import Tensor
 from torch.nn import Linear, Module
 
 from ..mp.nn.mlp import GatedMLP
+from ..mp.nn.norm import feature_norm as _feature_norm
 from ..mp.ops import scatter_sum
-
-
-def _feature_norm(name: Optional[str], dim: int) -> Optional[Module]:
-    if name is None:
-        return None
-    if name == "layer":
-        return torch.nn.LayerNorm(int(dim))
-    if name == "batch":
-        return torch.nn.BatchNorm1d(int(dim))
-    raise ValueError(f"normalization must be 'layer', 'batch', or None, got {name!r}")
 
 
 def _gated(

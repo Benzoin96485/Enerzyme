@@ -15,13 +15,13 @@ from typing import List, Optional, Sequence
 import torch
 from torch import Tensor
 
+from ..mp.nn.norm import rms_normalize
 from ..mp.ops import scatter_sum
 
 
 def rms_norm(features: Tensor, epsilon: float) -> Tensor:
     """Per-atom RMS over channels and ``m``. Zeros stay zero."""
-    moment = features.square().mean(dim=(1, 2), keepdim=True)
-    return features * torch.rsqrt(moment + epsilon)
+    return rms_normalize(features, (1, 2), epsilon)
 
 
 def scale_features(blocks: Sequence[Tensor], factor: Tensor) -> List[Tensor]:
