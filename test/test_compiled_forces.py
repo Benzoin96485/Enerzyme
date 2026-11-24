@@ -18,6 +18,41 @@ def isolate_compiler_cache():
     torch.compiler.reset()
 
 
+def test_compiled_force_layer_keeps_hooks_added_after_first_call():
+    from torch._dynamo.exc import TorchRuntimeError
+    from enerzyme.models.layers.gradient import ForceLayer
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(93)
+    model = build("schnet").double()
+    batch = make_batch(random_molecules(107, [5, 4]), torch.float64)
+    layer, = (stage for stage in model.post_sequence if type(stage) is ForceLayer)
+
+    def values(runner):
+        out = forward(runner, batch, torch.float64, train=True)
+        grads = torch.autograd.grad(out["Fa"].square().sum(), tuple(model.parameters()), allow_unused=True)
+        return out["E"], out["Fa"], grads
+
+    runner = torch.compile(model, backend="eager")
+    original = values(runner)
+
+    def scale_energy(module, args):
+        return ({**args[0], "E": 2 * args[0]["E"]},)
+
+    def scale_forces(module, args, result):
+        return {**result, "Fa": 3 * result["Fa"]}
+
+    with layer.register_forward_pre_hook(scale_energy), layer.register_forward_hook(scale_forces):
+        expected = values(model)
+        torch.testing.assert_close(expected[1], 6 * original[1])
+        torch.testing.assert_close(values(runner), expected)
+        torch.compiler.reset()
+        with pytest.raises((AssertionError, TorchRuntimeError), match="ForceLayer hooks require ordinary"):
+            values(torch.compile(model, backend="eager", fullgraph=True))
+
+    torch.testing.assert_close(values(runner), original)
+
+
 @pytest.mark.parametrize("architecture", ["cace", "grace", "equiformer_v3"])
 def test_conflicting_cpu_kernel_option_uses_native_gradients(monkeypatch, architecture):
     from torch._dynamo.exc import TorchRuntimeError

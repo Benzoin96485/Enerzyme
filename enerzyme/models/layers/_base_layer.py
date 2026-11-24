@@ -141,7 +141,7 @@ class BaseFFCore(BaseFFModule):
         if torch.compiler.is_compiling():
             from .compiled_grad import (
                 compiled_coordinate_vjp, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
-                uses_cpu_inductor_forces, native_cpu_forces,
+                uses_cpu_inductor_forces, native_forces,
                 compiled_cpu_forces_with_options, cpu_inductor_options,
             )
 
@@ -155,7 +155,7 @@ class BaseFFCore(BaseFFModule):
                               "Fullgraph CPU force training requires an eager backend for this model"
                               if self.training else "Fullgraph CPU force inference requires an eager backend "
                               "for reusable energy derivatives in this model")
-                return native_cpu_forces(self, net_input)
+                return native_forces(self, net_input)
             option = getattr(self, "_cpu_force_training_option" if self.training
                              else "_cpu_force_inference_option", None)
             if option and uses_cpu_inductor_forces(self, net_input, include_eval=not self.training):
@@ -167,7 +167,7 @@ class BaseFFCore(BaseFFModule):
                 elif all(value is None or value == 1 for value in overrides):
                     return compiled_cpu_forces_with_options(self, net_input, required)
                 else:
-                    return native_cpu_forces(self, net_input)
+                    return native_forces(self, net_input)
             if compiling_fullgraph():
                 return forward_with_coordinate_gradients(self, net_input)
             if self.training:
