@@ -20,15 +20,22 @@ from core_harness import ARCHITECTURES, build, forward, make_batch, random_molec
 
 
 def snapshot(arch: str, out_dir: str, seed: int = 7) -> str:
+    """Float64 outputs, or float32 when the Core cannot run in float64."""
     torch.manual_seed(seed)
     model = build(arch).float()
     state = {k: v.detach().clone() for k, v in model.state_dict().items()}
     batch = make_batch(random_molecules(seed, [9, 6, 11]), dtype=torch.float64)
-    model = model.double()
-    out = targets(forward(model, batch, torch.float64))
+    try:
+        dtype = torch.float64
+        out = targets(forward(model.double(), batch, dtype))
+    except RuntimeError as err:
+        print(f"{arch}: float64 failed ({err}); snapshotting float32", flush=True)
+        dtype = torch.float32
+        model.load_state_dict(state)
+        out = targets(forward(model.float(), batch, dtype))
     commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     payload = dict(
-        architecture=arch, state_dict=state, batch=batch, outputs=out,
+        architecture=arch, state_dict=state, batch=batch, outputs=out, dtype=dtype,
         param_names=[k for k, _ in model.named_parameters()], commit=commit,
     )
     path = os.path.join(out_dir, f"{arch.replace('+', 'p')}.pt")

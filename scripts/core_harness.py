@@ -80,7 +80,12 @@ def forward(model, batch: Dict, dtype: torch.dtype, train: bool = False) -> Dict
     model.train(train)
     inp = clone_batch(batch, dtype)
     inp["Ra"].requires_grad_(True)
-    return model(inp)
+    previous = torch.get_default_dtype()
+    torch.set_default_dtype(dtype)
+    try:
+        return model(inp)
+    finally:
+        torch.set_default_dtype(previous)
 
 
 def targets(out: Dict) -> Dict[str, torch.Tensor]:
