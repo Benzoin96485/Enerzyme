@@ -28,6 +28,7 @@ from ..mp.equivariant.so2.focus import FocusSO2Linear
 from ..mp.aggregate import EnvelopeGated
 from ..mp.ops import scatter_sum
 from ..mp.equivariant.rotation import edge_rotation
+from ..mp.equivariant.rotation.wigner_cg import wigner_from_cg
 from ..mp.equivariant.rotation.wigner_quaternion import (
     WignerDCalculator,
     build_edge_quaternion,
@@ -80,7 +81,16 @@ def build_edge_cache(
         gamma = torch.rand(src.shape[0], device=device, dtype=dtype) * (2 * math.pi)
         edge_quat = quaternion_multiply(quaternion_z_rotation(gamma), edge_quat)
     frame = wigner_calc.cartesian_frame(edge_quat)
-    D_full, Dt_full = edge_rotation(vij, wigner_calc.lmax, wigner_calc, frame=frame)
+    if (torch.compiler.is_compiling() and wigner_calc.training and vij.is_cuda
+            and dtype == torch.float32 and wigner_calc.lmax == 2 and not torch.is_autocast_enabled()):
+        # Rounding near an Euler pole can make acos singular in force training.
+        # Couple two copies of the same Cartesian l=1 rotation for the l=2 block.
+        quadrupole = getattr(wigner_calc, "_quadrupole_cg", None)
+        coefficients = (lambda _: quadrupole.to(frame)) if quadrupole is not None else None
+        D_full = wigner_from_cg(frame, 2, coefficients=coefficients)
+        Dt_full = D_full.transpose(-1, -2)
+    else:
+        D_full, Dt_full = edge_rotation(vij, wigner_calc.lmax, wigner_calc, frame=frame)
 
     deg = torch.zeros(n_nodes, device=device, dtype=dtype)
     deg.scatter_add_(0, dst, (edge_env.squeeze(-1) ** 2))

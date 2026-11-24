@@ -19,6 +19,7 @@ import torch.nn as nn
 from torch import Tensor
 
 from ...ops.geometry import smooth_norm as safe_norm
+from ..cg import wigner_3j
 from .wigner_jd import max_wigner_lmax, wigner_from_rotation_matrix
 
 # Signed permutation: rows are -e_y, -e_z, +e_x (historical DPA4 l=1 basis).
@@ -123,6 +124,8 @@ class WignerDCalculator(nn.Module):
         self.eps = eps
         self.dim_full = (lmax + 1) ** 2
         self.register_buffer("_basis_A", _DPA4_CARTESIAN_BASIS.clone(), persistent=False)
+        if lmax == 2:
+            self.register_buffer("_quadrupole_cg", wigner_3j(1, 1, 2, dtype=torch.float64), persistent=False)
 
     def cartesian_frame(self, edge_quaternion: Tensor) -> Tensor:
         """Express the quaternion rotation in DPA4's signed Cartesian basis."""

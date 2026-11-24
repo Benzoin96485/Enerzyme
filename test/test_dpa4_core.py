@@ -274,3 +274,39 @@ def test_native_force_routing_uses_the_active_layers_mapped_coordinate_dtype_and
     assert not uses_native(coordinates["cpu"][torch.float64])
     core.post_sequence = torch.nn.Sequential()
     assert not uses_native(coordinates["cpu"][torch.float64])
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="compiled single-precision CUDA training")
+def test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles():
+    from enerzyme.models.dpa4.so2 import build_edge_cache
+    from enerzyme.models.mp.equivariant.rotation.wigner_cg import wigner_from_cg
+    from enerzyme.models.mp.equivariant.rotation.wigner_quaternion import WignerDCalculator, build_edge_quaternion, safe_norm
+
+    vectors = torch.tensor([[0., 0., 1.], [0., 0., -1.], [1e-5, 0., 1.], [0.1, 0.3, -0.8]], device="cuda")
+    indices = torch.arange(len(vectors), device="cuda")
+    calculator = WignerDCalculator(2).float().cuda()
+    identity = torch.nn.Identity()
+
+    def compiled_frame(v):
+        return build_edge_cache(idx_i=indices, idx_j=indices, vij=v, n_nodes=len(v),
+                                radial_basis=identity, envelope=identity, wigner_calc=calculator).D_full
+
+    reference = WignerDCalculator(2).double().cuda()
+
+    def reference_frame(v):
+        q = build_edge_quaternion(v, safe_norm(v))
+        return wigner_from_cg(reference.cartesian_frame(q), 2)
+
+    def derivatives(frame, v):
+        v = v.detach().requires_grad_()
+        matrix = frame(v)
+        weights = torch.linspace(-1, 1, matrix.numel(), device=v.device, dtype=v.dtype).reshape_as(matrix)
+        gradient, = torch.autograd.grad((matrix * weights).sum(), v, create_graph=True)
+        tangent = torch.linspace(0.2, 1, v.numel(), device=v.device, dtype=v.dtype).reshape_as(v)
+        hessian, = torch.autograd.grad((gradient * tangent).sum(), v)
+        return matrix, gradient, hessian
+
+    expected = derivatives(reference_frame, vectors.double())
+    actual = derivatives(torch.compile(compiled_frame, backend="eager", fullgraph=True), vectors)
+    for a, b in zip(actual, expected):
+        torch.testing.assert_close(a.double(), b, atol=3e-5, rtol=3e-5)
