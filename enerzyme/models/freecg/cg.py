@@ -86,6 +86,18 @@ def _unpack_groups(packed: Tensor, num_groups: int, width: int) -> Tensor:
     return angular.permute(0, 3, 1, 2).reshape(n_atoms, ANGULAR_DIM, num_groups * width)
 
 
+class _GroupedTensorProduct(o3.TensorProduct):
+    """Apply one weight vector per channel group to every atom in that group."""
+
+    def forward(self, left: Tensor, right: Tensor, group_weights: Tensor) -> Tensor:
+        # The e3nn kernel shares weights across its atom dimension. Batching
+        # over groups keeps the trainable weights at [groups, path weights].
+        def one_group(left, right, weights):
+            return o3.TensorProduct.forward(self, left, right, weights)
+
+        return torch.vmap(one_group, in_dims=(1, 1, 0), out_dims=1)(left, right, group_weights)
+
+
 class GroupSparseCG(Module):
     """One grouped sparse tensor product, then the abstract-edge roll.
 
@@ -113,12 +125,12 @@ class GroupSparseCG(Module):
         degrees = tuple(ir for _, ir in irreps)
         paths = coupling_paths(degrees, degrees, degrees)
         with traceable_e3nn_kernels():
-            self.tp = o3.TensorProduct(
+            self.tp = _GroupedTensorProduct(
                 irreps,
                 irreps,
                 irreps,
                 [(i, j, k, "uvw", True, 1.0) for i, j, k in paths],
-                shared_weights=False,
+                shared_weights=True,
                 internal_weights=False,
             )
         self.n_paths = len(self.tp.instructions)

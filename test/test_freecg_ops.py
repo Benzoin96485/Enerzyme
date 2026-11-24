@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+
 import e3nn
 import torch
 from e3nn.o3 import Irrep
@@ -195,3 +197,66 @@ def test_group_product_compiles_with_weight_gradients_and_restores_defaults():
 
     compiled = torch.compile(block, backend="eager", fullgraph=True)
     torch.testing.assert_close(evaluate(compiled), evaluate(block))
+
+
+def test_group_weights_are_shared_across_atoms_with_mixed_second_derivatives():
+    torch.manual_seed(29)
+    block = GroupSparseCG(channels=8, num_groups=2, shuffle_scale=0).double()
+    grouped = block.tp
+    paths = [(p.i_in1, p.i_in2, p.i_out, p.connection_mode, p.has_weight, 1.0)
+             for p in grouped.instructions]
+    original = e3nn.o3.TensorProduct(
+        grouped.irreps_in1, grouped.irreps_in2, grouped.irreps_out, paths,
+        internal_weights=False, shared_weights=False,
+    ).double()
+    original.load_state_dict(grouped.state_dict(), strict=True)
+
+    atoms = 11
+    operands = [torch.randn(atoms, block.num_groups, grouped.irreps_in1.dim,
+                            dtype=torch.double, requires_grad=True) for _ in range(2)]
+    operands.append(block.tp_weight)
+    probe = torch.randn_like(operands[0])
+    directions = [torch.randn_like(value) for value in operands]
+
+    def evaluate(product):
+        mixed = product(*operands)
+        gradients = torch.autograd.grad((mixed * probe).sum(), operands, create_graph=True)
+        directional = sum((grad * direction).sum() for grad, direction in zip(gradients, directions))
+        hessian = torch.autograd.grad(directional, operands)
+        return mixed, gradients, hessian
+
+    expected = evaluate(original)
+    saved_sizes = []
+
+    def save(tensor):
+        saved_sizes.append(tensor.untyped_storage().nbytes())
+        return tensor
+
+    with torch.autograd.graph.saved_tensors_hooks(save, lambda tensor: tensor):
+        actual = evaluate(grouped)
+    torch.testing.assert_close(actual, expected, atol=1e-10, rtol=1e-8)
+    per_atom_weights_bytes = atoms * block.tp_weight.numel() * block.tp_weight.element_size()
+    assert max(saved_sizes) < per_atom_weights_bytes
+
+
+def test_group_tensor_product_loads_existing_modules_and_keeps_hook_inputs():
+    grouped = GroupSparseCG(channels=8, num_groups=2)
+    shared = grouped.tp
+    paths = [(p.i_in1, p.i_in2, p.i_out, p.connection_mode, p.has_weight, 1.0)
+             for p in shared.instructions]
+    legacy = e3nn.o3.TensorProduct(
+        shared.irreps_in1, shared.irreps_in2, shared.irreps_out, paths,
+        internal_weights=False, shared_weights=False,
+    )
+    legacy.load_state_dict(shared.state_dict(), strict=True)
+    inputs = [torch.randn(7, 8, 8) for _ in range(2)]
+    for product in (shared, legacy):
+        grouped.tp = product
+        stream = io.BytesIO()
+        torch.save(grouped, stream)
+        stream.seek(0)
+        restored = torch.load(stream, weights_only=False)
+        seen = []
+        restored.tp.register_forward_hook(lambda module, args, output: seen.append(tuple(x.shape for x in args)))
+        torch.testing.assert_close(restored(*inputs), grouped(*inputs))
+        assert seen == [((7, 2, 32), (7, 2, 32), (2, shared.weight_numel))]
