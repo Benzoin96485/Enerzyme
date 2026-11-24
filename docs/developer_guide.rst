@@ -230,6 +230,14 @@ optional e3nn FX kernels, pass :code:`--e3nn-codegen fx`.
 
    PYTHONPATH=. python scripts/check_compiled_forces.py mattersim --dtype float64
 
+The per-preset CPU results are in
+:code:`test/fixtures/validation/compiled_forces_cpu.json`. Each entry identifies
+the revision, either directly or through its enclosing run. A numerical match
+without a captured learned operator is recorded as native differentiation.
+The report keeps the original sweep and subsequent checks with corrected
+models or matched dropout masks. An auxiliary weight with an explicit zero
+gradient can receive an optimizer update even when the corresponding eager
+gradient is absent.
 
 :code:`GraphContext` caches geometry for the duration of one forward pass.
 Each block returns a :code:`BlockState` carrying node, edge or auxiliary
