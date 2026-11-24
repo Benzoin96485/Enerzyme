@@ -10,7 +10,9 @@ Every variant writes ``<name>.pt`` holding the trainer-format checkpoint
 (``model_state_dict``, ``ema_state_dict``, ``optimizer_state_dict``), the
 YAML-level config, the exact batched inputs, and reference outputs for the raw
 and EMA weights in float64 and float32, plus the parameters after one more
-optimizer step on a fixed loss.
+optimizer step on a fixed loss. Variants marked ``muon`` also hold a
+``muon_checkpoint`` trained with ``main``'s two-group Muon optimizer and the
+parameters after one more Muon step.
 """
 import argparse
 import copy
@@ -74,6 +76,7 @@ def variants():
             {"name": "Core", "params": {"num_interactions": 2, "hidden_channels": 16,
                                         "activation_fn": "shifted_softplus", "activation_params": SSP}},
         ] + _tail("PhysNet"),
+        muon=True,
     )
     v["schnet_default"] = dict(
         architecture="SchNet",
@@ -129,6 +132,7 @@ def variants():
             {"name": "EnergyReduce"},
             {"name": "Force"},
         ],
+        muon=True,
     )
     v["spookynet_ff02"] = dict(
         architecture="SpookyNet",
@@ -168,8 +172,10 @@ def variants():
             {"name": "Core", "params": dict(SPOOKY_CORE)},
         ] + _tail("SpookyNet"),
         with_charge_spin=True,
+        muon=True,
     )
     v["spookynet_noirreps"] = copy.deepcopy(v["spookynet_mtase"])
+    v["spookynet_noirreps"].pop("muon")
     v["spookynet_noirreps"]["layers"][5]["params"]["use_irreps"] = False
     v["spookynet_noirreps"]["build_params"].pop("activation_params")
 
@@ -214,6 +220,7 @@ def variants():
         architecture="MACE", build_params=dict(mace_build),
         layers=copy.deepcopy(mace_pre) + [{"name": "Core", "params": c1_core}] + copy.deepcopy(mace_tail),
         with_charge_spin=True,
+        muon=True,
     )
     return v
 
@@ -326,18 +333,46 @@ def generate(name, cfg, out_dir, seed):
     fresh = build(cfg).float()
     fresh.load_state_dict(ckpt["model_state_dict"])
     tmp = ExponentialMovingAverage(fresh.parameters(), decay=1, use_num_updates=True)
-    tmp.load_state_dict(ckpt["ema_state_dict"])
+    tmp.load_state_dict(copy.deepcopy(ckpt["ema_state_dict"]))
     tmp.copy_to(fresh.parameters())
     ref["ema_fp64"] = detach(run(fresh, test_batch, torch.float64))
 
     fresh = build(cfg).float()
     fresh.load_state_dict(ckpt["model_state_dict"])
     opt = torch.optim.Adam(fresh.parameters(), lr=1e-3, eps=1e-6, amsgrad=True)
-    opt.load_state_dict(ckpt["optimizer_state_dict"])
+    # load_state_dict keeps state tensors that already match the parameters'
+    # dtype and device, so the step below would advance the saved state too.
+    opt.load_state_dict(copy.deepcopy(ckpt["optimizer_state_dict"]))
     opt.zero_grad()
     loss_fn(run(fresh, train_batch, torch.float32, train=True)).backward()
     opt.step()
     ref["after_step_params"] = {k: v.detach().clone() for k, v in fresh.named_parameters()}
+
+    muon_ckpt = None
+    if cfg.get("muon"):
+        from enerzyme.tasks.optimizer import get_optimizer
+        torch.manual_seed(seed + 1)
+        muon_model = build(cfg).float()
+        muon = get_optimizer("Muon", muon_model, {})
+        for _ in range(3):
+            muon.zero_grad()
+            loss_fn(run(muon_model, train_batch, torch.float32, train=True)).backward()
+            muon.step()
+        muon_ckpt = {
+            "model_state_dict": {k: v.detach().clone() for k, v in muon_model.state_dict().items()},
+            "optimizer_state_dict": copy.deepcopy(muon.state_dict()),
+            "epoch": 3,
+        }
+        name_of = {id(p): k for k, p in muon_model.named_parameters()}
+        muon_param_names = [[name_of[id(p)] for p in group["params"]] for group in muon.param_groups]
+        fresh = build(cfg).float()
+        fresh.load_state_dict(muon_ckpt["model_state_dict"])
+        opt = get_optimizer("Muon", fresh, {})
+        opt.load_state_dict(copy.deepcopy(muon_ckpt["optimizer_state_dict"]))
+        opt.zero_grad()
+        loss_fn(run(fresh, train_batch, torch.float32, train=True)).backward()
+        opt.step()
+        ref["muon_after_step_params"] = {k: v.detach().clone() for k, v in fresh.named_parameters()}
 
     payload = {
         "name": name,
@@ -351,6 +386,9 @@ def generate(name, cfg, out_dir, seed):
         "reference": ref,
         "torch_version": torch.__version__,
     }
+    if muon_ckpt is not None:
+        payload["muon_checkpoint"] = muon_ckpt
+        payload["muon_param_names"] = muon_param_names
     os.makedirs(out_dir, exist_ok=True)
     buffer = io.BytesIO()
     torch.save(payload, buffer)
