@@ -26,6 +26,9 @@ TORCH_SCATTER_MAX_NUMEL = 4 * 2**20
 def _dim_size(index: Tensor, dim_size: Optional[int]) -> int:
     if dim_size is not None:
         return int(dim_size)
+    if torch.compiler.is_compiling():
+        # AOTAutograd saves the output size itself for the compiled backward.
+        return int((index.max().long() + 1).item()) if index.numel() else 0
     return int(index.max().item()) + 1 if index.numel() else 0
 
 
@@ -46,7 +49,7 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
     shape = list(src.shape)
     shape[dim] = size
     out = src.new_zeros(shape)
-    if index.numel():
+    if torch.compiler.is_compiling() or index.numel():
         if src.device.type == "cuda":
             out.scatter_add_(dim, _broadcast_index(index, src, dim), src)
         else:

@@ -1,6 +1,7 @@
 from typing import Dict, Set, List, Optional, Union
 from inspect import signature
 from abc import ABC, abstractmethod
+import torch
 from torch import Tensor
 from torch.nn import Module, Sequential
 from torch_geometric.data import Data
@@ -135,6 +136,10 @@ class BaseFFCore(BaseFFModule):
         self.test_mode = False
 
     def forward(self, net_input):
+        if torch.compiler.is_compiling():
+            from .compiled_grad import forward_with_coordinate_gradients
+
+            return forward_with_coordinate_gradients(self, net_input)
         for layer in self.pre_sequence:
             if layer.test_only and not self.test_mode:
                 continue
