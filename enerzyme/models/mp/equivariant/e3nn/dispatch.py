@@ -1,10 +1,9 @@
 """Use e3nn's scripted kernel eagerly and trace the same generated FX operations."""
-import pickle
-
 import torch
 from e3nn import o3
 from e3nn.o3._spherical_harmonics import _spherical_harmonics
 from e3nn.util import jit
+from e3nn.util.codegen import CodeGenMixin
 
 _SCRIPTED_SH = torch.jit.script(_spherical_harmonics)
 
@@ -65,14 +64,14 @@ class _GeneratedKernel(torch.nn.Module):
         graph = state.pop("_fx")
         state.pop("_script")
         state.pop("_script_forward")
-        # Let torch.load(map_location=...) remap the registered buffers.
-        # Store just the generated code and the shape/type of its attributes.
-        shapes = {name: buf.to("meta") for name, buf in self._buffers.items()}
-        state["_generated_code"] = pickle.dumps(torch.fx.GraphModule(shapes, graph.graph))
+        # FX's reducer stores generated code rather than the live graph. The
+        # enclosing serializer shares its buffer storage and honors map_location.
+        state["_generated_code"] = graph.__reduce__()
         return state
 
     def __setstate__(self, state):
-        graph = pickle.loads(state.pop("_generated_code"))
+        rebuild, arguments = state.pop("_generated_code")
+        graph = rebuild(*arguments)
         super().__setstate__(state)
         graph._buffers = self._buffers
         graph._non_persistent_buffers_set = self._non_persistent_buffers_set
@@ -94,7 +93,9 @@ def install_generated_kernels(model):
     scripted = False
     for owner in list(model.modules()):
         names = getattr(owner, "__codegen__", ())
-        if names:
+        if names and not isinstance(owner, CodeGenMixin):
+            scripted |= any(isinstance(getattr(owner, name), torch.jit.ScriptModule) for name in names)
+        elif names:
             managed_by_e3nn = []
             for name in names:
                 graph = getattr(owner, name)

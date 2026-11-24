@@ -184,6 +184,7 @@ def test_generated_tensor_product_keeps_one_set_of_movable_constants():
         assert getattr(kernel._script, name).data_ptr() == getattr(kernel._fx, name).data_ptr() == buffer.data_ptr()
     stream = io.BytesIO()
     torch.save(product, stream)
+    assert kernel._fx.graph.owning_module is kernel._fx
     stream.seek(0)
     meta = torch.load(stream, map_location="meta", weights_only=False)
     assert all(buffer.device.type == "meta" for buffer in meta.buffers())
