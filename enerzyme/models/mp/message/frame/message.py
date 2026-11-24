@@ -152,7 +152,14 @@ class AlphaNetMessage(nn.Module):
         kernel = kernel.unsqueeze(0).expand(query.shape[0], -1, -1, -1)
         conv = torch.einsum("ijl,ijlk->ik", torch.cat((ones, query), dim=1), kernel)
         diag_gate = self.activation(self.diagonal(gated))
-        raw = diag_gate.unsqueeze(-1) * self.diachi1.view(1, 1, -1)
+        if (torch.compiler.is_compiling() and diag_gate.is_cuda
+                and diag_gate.dtype == self.diachi1.dtype == torch.float64):
+            # The two derivatives of this outer product reduce over opposite
+            # axes. Keep them as matrix products so Inductor retains float64
+            # accumulators for both gradients on large graphs.
+            raw = diag_gate.unsqueeze(-1) @ self.diachi1.view(1, -1)
+        else:
+            raw = diag_gate.unsqueeze(-1) * self.diachi1.view(1, 1, -1)
         raw = raw + torch.ones(
             raw.shape[0],
             self.chi2,
