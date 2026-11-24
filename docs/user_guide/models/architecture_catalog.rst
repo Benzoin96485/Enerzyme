@@ -18,12 +18,13 @@ readouts as well as the Core. Both representations use the same checkpoint
 keys. NequIP and Allegro use their original scripted tensor operations in
 eager execution and expose those same operations to :code:`torch.compile`
 under their default settings. Other presets keep their usual code generator.
-CACE, CAMP, GRACE, EquiformerV3, and the FX configurations of Equiformer,
-EquFlashV2 and Nequix use native derivatives for CPU force training with
-Inductor. PyTorch 2.13 can return incorrect energies and forces for Equiformer.
-For the other affected presets, differentiation can raise an error or terminate
-the process. An explicit :code:`fullgraph=True` request reports this limitation.
-Energy inference and CUDA use their usual execution paths.
+
+On PyTorch 2.13, ordinary CPU Inductor uses scalar C++ kernels for force
+training with CACE, CAMP, GRACE, EquiformerV3, and the EquFlashV2 and Nequix
+FX configurations. The setting applies to each model call. Equiformer with
+FX kernels and DPA4 in float64 use native derivatives for CPU force training
+to preserve their energies, forces and weight gradients. Details and
+per-preset validation results are in the :doc:`/developer_guide`.
 
 Internal architectures
 ----------------------
@@ -273,9 +274,11 @@ For MACE energy and force training with :code:`torch.compile(model, fullgraph=Tr
 set :code:`e3nn_codegen: fx` in :code:`build_params`. This selects e3nn's FX
 tensor products and linears throughout the model, including its energy readout.
 The generated kernels use the same checkpoint keys and accept the same weights
-as the standard MACE pipeline. If the cutoff removes every candidate edge in a
-batch, compiled backward gives zero gradients for message weights that eager
-backward leaves unused. Optimizers with weight decay can update these weights.
+as the standard MACE pipeline. With a full graph, a cutoff that removes every
+candidate edge can yield zero gradients for unused message weights. Optimizers
+with weight decay can then update those weights. Ordinary compilation runs the
+native force calculation for an empty short-range graph, preserving unused
+weight and coordinate gradients.
 
 **MACE-POLAR-1** (:code:`architecture: mace_polar`, also :code:`mace-polar` and :code:`mace-polar-1`) adds the polarizable electrostatics of Batatia et al. (2026) on that same Core. :code:`PolarField` is architecture-independent: any Core that emits the same stacked irreps can feed it. Spin-resolved Gaussian multipoles are linear maps of the layer features. Fukui weights from the last layer equilibrate only the monopoles to ``(Q ± S) / 2``. ``Q`` is the molecular charge and ``S`` is the multiplicity minus one. Two updates then project the Coulomb potential of each spin density onto atom-centered Gaussians and add an equivariant correction. The Coulomb energy and the nonlocal MLP both use the final density. The pair kernel is ``K q_i q_j erf(r / (2σ)) / r`` with ``K ≈ 14.3996`` eV·Å, including the on-site self energy. Feature self-interaction is off. There is no external-field input. Real space supports :math:`\ell \le 1` and open boundaries. The dipole stencil is the reference laboratory-frame finite difference (0.02 Å on the energy, 0.1 Å on the potential) and is equivariant as those offsets go to zero. Monopole electrostatics depend only on distance. A ``pbc`` tensor with any true entry raises ``NotImplementedError``; periodic k-space needs `graph_electrostatics <https://github.com/WillBaldwin0/graph_electrostatics>`_ and is not implemented. Molecules do not need that package. A Hartree dataset sets ``energy_scale: 1/27.211386245988`` on :code:`PolarField`. The checked-in stack is the small MACE stack plus ``σ = 1.5`` Å, field widths 1.5 and 2.0 Å, and ``num_update: 2``. Published M uses 2 local interactions and L uses 3, both at 512 channels. Shallow ensembles stay at 1. Example: :code:`enerzyme/config/mace_polar_layers_example.yaml`. Tests: :code:`test/test_gto_electrostatics.py`, :code:`test/test_mace_polar.py`. Enerzymette only needs :code:`architecture: mace_polar` in the resolved :code:`config.yaml`.
 
@@ -330,8 +333,9 @@ The default compiler otherwise drops part of the derivative. Normal
 :code:`torch.compile(model)` applies the setting for this call. Explicit
 full-graph CPU Inductor training requires the compiler option
 :code:`{"cpp.max_horizontal_fusion_size": 1}`.
-CPU Inductor force inference uses native derivatives because the generated
-backward can terminate the process when the energy is differentiated again.
+For CPU force inference, the ordinary call also sets :code:`cpp.simdlen` to
+1. With both settings, the compiled model returns forces and supports further
+coordinate derivatives of the energy.
 
 **DPA4** (:code:`architecture: dpa4`) implements the EMFA SO(2) descriptor of Li et al. (2026, arXiv:2606.02419) under :code:`enerzyme/models/dpa4/` (:code:`interaction.py`, :code:`so2.py`). Shared SO(3) helpers (C³ envelope, Apache e3x Lebedev tables / :code:`S2LebedevProjector`, packed indexing, :code:`FocusSO2Linear`, focus gated activation, degree RMSNorm, Bessel×C³ RBF, quaternion edge frames + shared e3nn/:code:`Jd` Wigner-D via :code:`A R Aᵀ` into DPA4's Cartesian basis; flat :code:`SO3Grid` / Lebedev behind :code:`S2GridProjector`) live in :code:`enerzyme/models/mp/equivariant/`. The Core owns the radial cache, geometric/environment seed, m-truncated interactions, and Lebedev-grid equivariant FFN. It emits :code:`atom_feature` / :code:`atom_sphere_feature`, so the standard :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force` stack applies. Example: :code:`enerzyme/config/dpa4_layers_example.yaml`. Tests: :code:`test/test_dpa4_core.py`, :code:`test/test_dpa4_parity_ops.py`. Enerzymette only needs :code:`architecture: dpa4` plus a resolved :code:`config.yaml`.
 
@@ -359,6 +363,11 @@ Examples: :code:`enerzyme/config/efa_layers_example.yaml`, :code:`so3lr_efa_laye
 
    **AllScAIP** (:code:`architecture: AllScAIP`) in Enerzyme is an **experimental, heavily adapted (魔改)** port of fairchem-style attention IP, not a drop-in of the upstream model.
    It is **not recommended as a primary production architecture** yet. Prefer PhysNet, SpookyNet, MACE, or UMA for real campaigns; keep AllScAIP for research / ablation only (:code:`train.yaml` FF08 stays :code:`active: false` by default). The Core emits :code:`atom_feature` only — always attach :code:`SimpleReadout` (or NSE heads) before energy/charge physics layers.
+
+For AllScAIP training that requires rotational invariance of the energy, set
+:code:`equivariant_mode: true` on the Core. This selects the equivariant
+input block and disables the direction-dependent attention mask. The default
+input block has a different parameter layout.
 
 Selection guidelines
 --------------------
