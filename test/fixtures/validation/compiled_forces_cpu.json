@@ -3093,6 +3093,27 @@
         "109-float64-default": {"energy": {"max_abs": 1.7763568394002505e-15, "relative_l2": 8.986049181710271e-16}, "forces": {"max_abs": 3.552713678800501e-15, "relative_l2": 1.349478009048448e-15}, "gradients_compared": 147, "changed_gradient_participation": {}, "largest_parameter_relative_l2": [3.0070365801142474e-15, "blocks.1.interaction.dense_rbf1.weight"], "status": "pass", "weight_tensors_outside_tolerance": 0, "outputs_outside_tolerance": [], "captured_operations": 628},
         "109-float64-scalar": {"energy": {"max_abs": 2.6645352591003757e-15, "relative_l2": 1.2875867142127275e-15}, "forces": {"max_abs": 4.440892098500626e-15, "relative_l2": 1.4017339405071854e-15}, "gradients_compared": 147, "changed_gradient_participation": {}, "largest_parameter_relative_l2": [3.1185619561980706e-15, "blocks.1.interaction.dense_rbf1.weight"], "status": "pass", "weight_tensors_outside_tolerance": 0, "outputs_outside_tolerance": [], "captured_operations": 628}
       }
+    },
+    "dimenet_rotation_precision": {
+      "jobs": ["6319215", "6319217"],
+      "method": "Compare scalar features under rotations of a complete five-atom graph. NumPy seeds 0 through 99 initialize the two-block core. Every candidate/baseline pair uses the same torch seed 1 for coordinates and random rotation. qr32 computes QR and rotates in FP32; qr64_input32 applies the FP64 orthogonal matrix before casting the coordinates to FP32; axis32 uses an exact signed coordinate permutation; qr64 evaluates the FP64 model. Tolerances are atol=rtol=1e-5 for FP32 and 1e-10 for FP64. The second check loads precisely the weights and inputs from the seed-14 candidate into the pre-refactor core.",
+      "independent_seeds": {
+        "1aa0f8b": {"qr32": {"outside_tolerance_seeds": [], "largest_absolute_error": 6.866455078125e-05}, "qr64_input32": {"outside_tolerance_seeds": [63], "largest_absolute_error": 3.814697265625e-05}, "axis32": {"outside_tolerance_seeds": [], "largest_absolute_error": 7.62939453125e-06}, "qr64": {"outside_tolerance_seeds": [], "largest_absolute_error": 9.947598300641403e-14}},
+        "9aab3db": {"qr32": {"outside_tolerance_seeds": [14], "largest_absolute_error": 5.340576171875e-05}, "qr64_input32": {"outside_tolerance_seeds": [], "largest_absolute_error": 3.0517578125e-05}, "axis32": {"outside_tolerance_seeds": [], "largest_absolute_error": 9.5367431640625e-06}, "qr64": {"outside_tolerance_seeds": [], "largest_absolute_error": 1.0658141036401503e-13}}
+      },
+      "same_weights_and_coordinates": {
+        "base": {"difference": 3.814697265625e-06, "outside_tolerance": 0},
+        "qr32": {"difference": 5.0067901611328125e-06, "outside_tolerance": 0},
+        "qr64_input32": {"difference": 2.86102294921875e-06, "outside_tolerance": 0},
+        "base64": {"difference": 1.0658141036401503e-14, "outside_tolerance": 0},
+        "qr64": {"difference": 1.0658141036401503e-14, "outside_tolerance": 0},
+        "base_qr32": {"rotation_difference": 1.811981201171875e-05, "outside_tolerance": 0},
+        "base_qr64_input32": {"rotation_difference": 9.5367431640625e-06, "outside_tolerance": 0},
+        "base_qr64": {"rotation_difference": 3.197442310920451e-14, "outside_tolerance": 0},
+        "new_qr32": {"rotation_difference": 1.7642974853515625e-05, "outside_tolerance": 1},
+        "new_qr64_input32": {"rotation_difference": 7.62939453125e-06, "outside_tolerance": 0},
+        "new_qr64": {"rotation_difference": 3.197442310920451e-14, "outside_tolerance": 0}
+      }
     }
   }
 }

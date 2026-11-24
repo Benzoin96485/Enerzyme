@@ -249,6 +249,12 @@ On PyTorch versions with :code:`donated_buffer`, the two additional gradient
 calls request reusable saved tensors with
 :code:`torch._functorch.config.patch(donated_buffer=False)`.
 
+If a forward hook rescales a force or replaces its input energy, its changes
+also affect the force-loss gradients. Ordinary compiled training invokes the
+original :code:`ForceLayer` whenever that layer has hooks. Use ordinary
+:code:`torch.compile(model)` when installing such hooks, including hooks added
+after the first call.
+
 On CPU, ordinary Inductor compiles the CACE and GRACE force calculations with
 scalar C++ kernels. This preserves their coordinate and parameter derivatives
 on PyTorch 2.13, where the vectorized kernels can terminate the process. The
