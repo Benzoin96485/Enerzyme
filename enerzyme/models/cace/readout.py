@@ -68,4 +68,4 @@ def _find_cace_core(built_layers: List[nn.Module]) -> nn.Module:
     for layer in reversed(built_layers):
         if getattr(layer, "is_cace_core", False):
             return layer
-    raise TypeError("CACEEnergyReadout must follow a CACECore in the layer list")
+    raise TypeError("CACEEnergyReadout must follow the CACE preset in the layer list")

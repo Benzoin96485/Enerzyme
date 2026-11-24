@@ -82,3 +82,104 @@ def camp(
         atomic_numbers=None if atomic_numbers is None else list(atomic_numbers),
         dim_feature_out=width, num_output_blocks=depth, feature_irreps=f"{width}x0e",
     )
+
+
+def cace(
+    dim_embedding: int = 3,
+    cutoff_sr: float = 5.5,
+    num_rbf: int = 6,
+    preset: Optional[str] = "water",
+    lmax: Optional[int] = None,
+    max_nu: Optional[int] = None,
+    n_radial: Optional[int] = None,
+    num_message_passing: Optional[int] = None,
+    messages: Optional[str] = None,
+    envelope_p: Optional[int] = None,
+    avg_num_neighbors: Optional[float] = None,
+    readout_hidden: Optional[tuple] = None,
+    shared_channels: Optional[bool] = None,
+    shared_l: Optional[bool] = None,
+    separate_receiver: Optional[bool] = None,
+    bchi_layers: Optional[int] = None,
+) -> ComposableCore:
+    """Cartesian densities, shared invariant contraction and concatenated scalars."""
+    from ..cace.blocks import CACEEmbed, CACEBlock
+    from ..cace.interaction import parse_messages
+    from ..cace.presets import resolve_cace_preset
+
+    spec = resolve_cace_preset(
+        preset,
+        lmax=lmax,
+        max_nu=max_nu,
+        n_radial=n_radial,
+        num_message_passing=num_message_passing,
+        messages=messages,
+        envelope_p=envelope_p,
+        avg_num_neighbors=avg_num_neighbors,
+        readout_hidden=readout_hidden,
+        shared_channels=shared_channels,
+        shared_l=shared_l,
+        separate_receiver=separate_receiver,
+        bchi_layers=bchi_layers,
+    )
+    if int(dim_embedding) < 1:
+        raise ValueError(f"dim_embedding must be >= 1, got {dim_embedding}")
+    if float(cutoff_sr) <= 0:
+        raise ValueError(f"cutoff_sr must be positive, got {cutoff_sr}")
+    if int(num_rbf) < 1:
+        raise ValueError(f"num_rbf must be >= 1, got {num_rbf}")
+    if int(spec["lmax"]) < 0:
+        raise ValueError(f"lmax must be >= 0, got {spec['lmax']}")
+    if int(spec["n_radial"]) < 1:
+        raise ValueError(f"n_radial must be >= 1, got {spec['n_radial']}")
+    if int(spec["num_message_passing"]) < 0:
+        raise ValueError(
+            f"num_message_passing must be >= 0, got {spec['num_message_passing']}"
+        )
+    if float(spec["avg_num_neighbors"]) <= 0:
+        raise ValueError(
+            f"avg_num_neighbors must be positive, got {spec['avg_num_neighbors']}"
+        )
+    if int(spec["envelope_p"]) < 1:
+        raise ValueError(f"envelope_p must be >= 1, got {spec['envelope_p']}")
+    preset = None if preset is None else str(preset)
+    dim_embedding = int(dim_embedding)
+    cutoff_sr = float(cutoff_sr)
+    num_rbf = int(num_rbf)
+    lmax = int(spec["lmax"])
+    max_nu = int(spec["max_nu"])
+    n_radial = int(spec["n_radial"])
+    num_message_passing = int(spec["num_message_passing"])
+    messages = parse_messages(spec["messages"])
+    envelope_p = int(spec["envelope_p"])
+    avg_num_neighbors = float(spec["avg_num_neighbors"])
+    readout_hidden = tuple(spec["readout_hidden"])
+    shared_channels = bool(spec["shared_channels"])
+    shared_l = bool(spec["shared_l"])
+    separate_receiver = bool(spec["separate_receiver"])
+    bchi_layers = int(spec["bchi_layers"])
+    n_channels = dim_embedding * dim_embedding
+    norm = avg_num_neighbors ** -0.5
+
+    embed = CACEEmbed(dim_embedding, cutoff_sr, num_rbf, lmax, max_nu, n_radial, envelope_p, separate_receiver)
+    n_invariants = embed.n_invariants
+    blocks = [
+        CACEBlock(
+            messages, n_raw=num_rbf, n_radial=n_radial, n_angular=embed.n_angular, n_channels=n_channels,
+            n_invariants=n_invariants, lmax=lmax, shells=embed.angular.shells, l_index=embed.angular.l_index,
+            cutoff=cutoff_sr, norm=norm, shared_channels=shared_channels, shared_l=shared_l, bchi_layers=bchi_layers,
+            mix=embed.mix, symmetrizer=embed.symmetrizer,
+        )
+        for _ in range(num_message_passing)
+    ]
+    width = (num_message_passing + 1) * n_radial * n_invariants * n_channels
+    return ComposableCore(
+        embed, blocks, FeatureHead("concat", include_embedding=True), GraphRequires(),
+        is_cace_core=True, dim_feature_out=width, feature_irreps=f"{width}x0e",
+        preset=preset, dim_embedding=dim_embedding, cutoff_sr=cutoff_sr,
+        num_rbf=num_rbf, lmax=lmax, max_nu=max_nu,
+        n_radial=n_radial, num_message_passing=num_message_passing, messages=messages,
+        envelope_p=envelope_p, avg_num_neighbors=avg_num_neighbors, readout_hidden=readout_hidden,
+        shared_channels=shared_channels, shared_l=shared_l, separate_receiver=separate_receiver,
+        bchi_layers=bchi_layers, n_channels=n_channels, n_invariants=n_invariants,
+    )
