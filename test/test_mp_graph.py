@@ -151,6 +151,30 @@ def test_declared_topology_prepares_once_and_reuses_receiver_csr(monkeypatch):
     assert torch.isfinite(grad).all() and grad.abs().sum() > 0
 
 
+def test_prepared_quadruplets_recompute_angles_and_their_derivatives():
+    from enerzyme.models.mp.graph import PreparedTopology, QuadrupletRequest
+
+    receiver, sender, vec, dist, n = _graph(n_nodes=4, cutoff=10)
+    req = GraphRequires(rbf=False, topology=(QuadrupletRequest(10., 10.),))
+    original = GraphContext(receiver, sender, n, vec=vec, dist=dist)
+    with torch.no_grad():
+        topology = PreparedTopology.build(original, req.topology)
+    vectors = (vec * vec.new_tensor([1.2, 0.8, 0.9])).requires_grad_()
+    fields = dict(idx_i_sr=receiver, idx_j_sr=sender, vij_sr=vectors, Dij_sr=vectors.norm(dim=-1))
+
+    def evaluate(inputs):
+        view = GraphContext.from_inputs(inputs, req, n).within(10.)
+        angles = view.quadruplets(view).dihedral
+        grad, = torch.autograd.grad(angles.square().sum(), vectors, create_graph=True)
+        hessian, = torch.autograd.grad(grad.square().sum(), vectors)
+        return angles, grad, hessian
+
+    reference = evaluate(fields)
+    actual = evaluate({**fields, "_prepared_topology": topology})
+    for before, after in zip(reference, actual):
+        torch.testing.assert_close(after, before)
+
+
 def test_periodic_line_graph_backtracking_and_duplicate_reverse_edges():
     r = torch.tensor([0, 1, 0, 1])
     s = torch.tensor([1, 0, 1, 0])
