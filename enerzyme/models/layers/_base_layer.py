@@ -137,9 +137,13 @@ class BaseFFCore(BaseFFModule):
 
     def forward(self, net_input):
         if torch.compiler.is_compiling():
-            from .compiled_grad import forward_with_coordinate_gradients
+            from .compiled_grad import compiling_fullgraph, forward_with_coordinate_gradients
 
-            return forward_with_coordinate_gradients(self, net_input)
+            # A graph break inside a VJP discards the whole energy trace. In
+            # normal inference the ordinary stack can compile on both sides
+            # of a break and autograd can differentiate the compiled pieces.
+            if self.training or compiling_fullgraph():
+                return forward_with_coordinate_gradients(self, net_input)
         for layer in self.pre_sequence:
             if layer.test_only and not self.test_mode:
                 continue
