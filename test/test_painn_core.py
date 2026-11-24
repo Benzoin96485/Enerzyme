@@ -42,7 +42,7 @@ def test_painn_registration_and_yaml_build():
 
     for name in ("painn", "PaiNN"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "PaiNNCore"
+        assert core_cls.__name__ == "painn"
         assert build_params["num_rbf"] == 20
         assert build_params["cutoff_fn"] == "cosine"
         assert layers[1]["params"]["flavor"] == "painn"
@@ -55,7 +55,7 @@ def test_painn_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "PaiNNCore"
+    assert model.architecture == "painn"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.vector_feature_layout == "cartesian_n3f"
@@ -132,11 +132,11 @@ def test_bessel_painn_matches_sine_over_r():
 
 
 def test_painn_feature_shapes_rotation_and_isolated_atom():
-    from enerzyme.models.painn import PaiNNCore
+    from enerzyme.models.presets.cartesian_vector import painn
 
     torch.manual_seed(0)
     n, f, n_rbf = 5, 8, 4
-    core = PaiNNCore(dim_embedding=f, num_rbf=n_rbf, num_interactions=3, cutoff_sr=5.0)
+    core = painn(dim_embedding=f, num_rbf=n_rbf, num_interactions=3, cutoff_sr=5.0)
     core.eval()
     idx_i, idx_j = _edges(n)
     pos = torch.randn(n, 3)
@@ -176,9 +176,9 @@ def test_painn_feature_shapes_rotation_and_isolated_atom():
 
     # Same weights, vector-propagation ablation changes the representation.
     torch.manual_seed(2)
-    full = PaiNNCore(dim_embedding=f, num_rbf=n_rbf, num_interactions=2)
+    full = painn(dim_embedding=f, num_rbf=n_rbf, num_interactions=2)
     torch.manual_seed(2)
-    ablated = PaiNNCore(
+    ablated = painn(
         dim_embedding=f, num_rbf=n_rbf, num_interactions=2, propagate_vectors=False
     )
     kwargs = dict(
@@ -196,7 +196,7 @@ def test_painn_feature_shapes_rotation_and_isolated_atom():
         rtol=1e-5,
     )
 
-    isolated = PaiNNCore(dim_embedding=f, num_rbf=n_rbf, num_interactions=2)
+    isolated = painn(dim_embedding=f, num_rbf=n_rbf, num_interactions=2)
     alone = isolated.get_output(
         atom_embedding=torch.randn(1, f),
         rbf=torch.zeros(0, n_rbf),
@@ -211,11 +211,11 @@ def test_painn_feature_shapes_rotation_and_isolated_atom():
 
 
 def test_painn_messages_do_not_cross_molecules():
-    from enerzyme.models.painn import PaiNNCore
+    from enerzyme.models.presets.cartesian_vector import painn
 
     torch.manual_seed(3)
     f, n_rbf = 6, 3
-    core = PaiNNCore(dim_embedding=f, num_rbf=n_rbf, num_interactions=2)
+    core = painn(dim_embedding=f, num_rbf=n_rbf, num_interactions=2)
     core.eval()
 
     def _pack(n):
@@ -436,10 +436,10 @@ def test_rank2_metric_flattens_polarizability():
 
 
 def test_shared_filters_and_interactions_reuse_one_block():
-    from enerzyme.models.painn.core import PaiNNCore
+    from enerzyme.models.presets.cartesian_vector import painn
 
     torch.manual_seed(4)
-    core = PaiNNCore(
+    core = painn(
         dim_embedding=4,
         num_rbf=3,
         num_interactions=3,
@@ -447,9 +447,9 @@ def test_shared_filters_and_interactions_reuse_one_block():
         shared_filters=True,
         shared_interactions=True,
     )
-    assert len(core.interactions) == 1
-    assert len(core.mixings) == 1
-    assert core.filter_net.dim_feature_out == 12
+    assert len(core.blocks) == 1
+    assert core.schedule == [0, 0, 0]
+    assert core.embed.filter_net.dim_feature_out == 12
     n = 4
     idx_i, idx_j = _edges(n)
     pos = torch.randn(n, 3)

@@ -17,6 +17,16 @@ import torch
 
 KEY_MAPS: Dict[str, List[Tuple[str, str]]] = {}
 
+KEY_MAPS["painn"] = [
+    (r"^filter_net\.", r"embed.filter_net."),
+    (r"^interactions\.(\d+)\.", r"blocks.\1.message."),
+    (r"^mixings\.(\d+)\.", r"blocks.\1.update."),
+]
+
+KEY_MAPS["newtonnet"] = [
+    (r"^blocks\.(\d+)\.", r"blocks.\1.module."),
+]
+
 
 def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:
     out = {}

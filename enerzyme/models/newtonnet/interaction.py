@@ -25,6 +25,10 @@ from __future__ import annotations
 import torch
 from torch import Tensor, nn
 
+from ..mp.basis.envelope import polynomial_envelope
+from ..mp.block import BlockState
+from ..mp.core import FieldEmbed
+from ..mp.head import Head
 from ..mp.ops import scatter_sum
 
 
@@ -157,3 +161,65 @@ class NewtonNetRepoInteraction(nn.Module):
         force = force + scatter_sum(directional + transported, idx_i, n_atoms)
         atom = atom + torch.sum(force * self.equiv_update(force), dim=1)
         return atom, force
+
+
+def build_newtonnet(core, built_layers):
+    from ..layers.rbf import BesselRBFLayer
+
+    for layer in built_layers:
+        if isinstance(layer, BesselRBFLayer) and layer.apply_cutoff_fn:
+            raise ValueError(
+                "NewtonNet multiplies the polynomial envelope onto the "
+                "radial basis. Set BesselRBF apply_cutoff_fn: false."
+            )
+    core.adopt_radius_stack(built_layers)
+
+
+class NewtonEmbed(FieldEmbed):
+    def __init__(self, width, num_rbf, cutoff, order, variant):
+        super().__init__(width=width, vector_channels=width)
+        self.num_rbf = num_rbf
+        self.cutoff = cutoff
+        self.order = order
+        self.variant = variant
+
+    def forward(self, inputs, ctx):
+        state = super().forward(inputs, ctx)
+        if ctx.rbf.ndim != 2 or ctx.rbf.shape[-1] != self.num_rbf:
+            raise ValueError(f"rbf must have shape [E, {self.num_rbf}], got {tuple(ctx.rbf.shape)}")
+        if ctx.sender.shape[0] != ctx.num_edges or ctx.dist.shape[0] != ctx.num_edges:
+            raise ValueError("edge indices and distances must cover the same edges")
+        if ctx.vec.shape != (ctx.num_edges, 3):
+            raise ValueError(f"vij_sr must have shape [E, 3], got {tuple(ctx.vec.shape)}")
+        window = polynomial_envelope(ctx.dist.reshape(-1), self.cutoff, self.order).reshape(-1, 1)
+        if self.variant == "repo":
+            return BlockState(state.scalar, state.equi, window)
+        displacement = state.equi.new_zeros(state.equi.shape)
+        latent = state.scalar.new_zeros(ctx.num_nodes, 3)
+        return BlockState(state.scalar, state.equi, window, {"displacement": displacement, "latent": latent})
+
+
+def newton_paper_step(message, state, ctx):
+    atom, force, displacement, latent = message(
+        state.scalar, state.equi, state.aux["displacement"], state.aux["latent"],
+        ctx.rbf, state.edge, ctx.unit(), ctx.receiver, ctx.sender, ctx.num_nodes,
+    )
+    return BlockState(atom, force, state.edge, {"displacement": displacement, "latent": latent})
+
+
+def newton_repo_step(message, state, ctx):
+    atom, force = message(state.scalar, state.equi, ctx.rbf, state.edge, ctx.unit(),
+                          ctx.receiver, ctx.sender, ctx.num_nodes)
+    return BlockState(atom, force, state.edge)
+
+
+class NewtonHead(Head):
+    output_fields = ("atom_feature", "atom_vector_feature", "latent_force")
+
+    def __init__(self, variant):
+        super().__init__()
+        self.variant = variant
+
+    def forward(self, state, ctx, taps, inputs):
+        latent = state.aux["latent"] if self.variant == "paper" else state.equi.sum(dim=-1)
+        return {"atom_feature": state.scalar, "atom_vector_feature": state.equi, "latent_force": latent}

@@ -13,8 +13,8 @@ def _add(name, core, build, layers, aliases=(), losses=None, family=""):
 
 
 _add('schnet', '.presets.scalar:schnet', '.schnet:DEFAULT_BUILD_PARAMS', '.schnet:DEFAULT_LAYER_PARAMS', family='scalar')
-_add('painn', '.painn:PaiNNCore', '.painn:DEFAULT_BUILD_PARAMS', '.painn:DEFAULT_LAYER_PARAMS', family='vector')
-_add('newtonnet', '.newtonnet:NewtonNetCore', '.newtonnet:DEFAULT_BUILD_PARAMS', '.newtonnet:DEFAULT_LAYER_PARAMS', losses='.newtonnet:LOSS_REGISTER', family='vector')
+_add('painn', '.presets.cartesian_vector:painn', '.painn:DEFAULT_BUILD_PARAMS', '.painn:DEFAULT_LAYER_PARAMS', family='vector')
+_add('newtonnet', '.presets.cartesian_vector:newtonnet', '.newtonnet:DEFAULT_BUILD_PARAMS', '.newtonnet:DEFAULT_LAYER_PARAMS', losses='.newtonnet:LOSS_REGISTER', family='vector')
 _add('tensornet', '.tensornet:TensorNetCore', '.tensornet:DEFAULT_BUILD_PARAMS', '.tensornet:DEFAULT_LAYER_PARAMS', family='carttensor')
 _add('tensornet2', '.tensornet:TensorNet2Core', '.tensornet:DEFAULT_BUILD_PARAMS_2', '.tensornet:DEFAULT_LAYER_PARAMS_2', aliases=('tensornet-2',), family='carttensor')
 _add('et', '.et:ETCore', '.et:DEFAULT_BUILD_PARAMS', '.et:DEFAULT_LAYER_PARAMS', aliases=('torchmd-et', 'torchmd_et', 'equivariant-transformer'), family='vector')

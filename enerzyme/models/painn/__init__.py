@@ -5,10 +5,9 @@ message-passing stack only. Tensor heads live in
 :mod:`enerzyme.models.layers.tensorial`.
 """
 
-from .core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS, PaiNNCore
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
 __all__ = [
-    "PaiNNCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
 ]
