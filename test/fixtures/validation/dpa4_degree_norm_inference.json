@@ -1093,5 +1093,181 @@
    "passed": 22,
    "scope": "DPA4 core, normalization, frozen snapshots and shared ForceLayer hook regression."
   }
+ },
+ "energy_only_training_controls": {
+  "source": "61a9976",
+  "original_revision": "11e93d4",
+  "method": "Remove the ForceLayer from the same published model and fit only sum(E**2). Compare energy and all 60 weight gradients with the uncompiled model. All controls keep the original parameters, including the two zero-initialized SO2 output matrices, and the published FP32 norm.",
+  "production": "The CPU float64 force dispatch only applies if the corresponding ForceLayer is active. Energy-only training keeps its preexisting compiled path.",
+  "cases": {
+   "existing_energy_only_training": {
+    "job": 6319196,
+    "task": 0,
+    "method": "Original full compiled energy graph.",
+    "energy_max_abs": 8.92751508274614e-08,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.0.module.post_so2_norm.bias",
+     "max_abs": 7.62939453125e-06
+    },
+    "failed_fields": {
+     "E": 8.92751508274614e-08,
+     "pre_sequence.2.embedding.weight": 1.2860058760111315e-06,
+     "post_sequence.0.head.weight": 6.909750837280626e-06,
+     "post_sequence.0.head.bias": 1.6027523059847226e-06,
+     "embed.radial_basis.freqs": 1.433658597393972e-08,
+     "embed.sphere_proj.weight": 6.987114034018305e-06,
+     "embed.sphere_proj.bias": 6.67572021484375e-06,
+     "embed.radial_feat_mlp.net.0.weight": 1.1197807514573554e-08,
+     "embed.radial_feat_mlp.net.2.weight": 1.7022071946426465e-08,
+     "embed.env_embed.output_proj.weight": 1.5439382064497131e-09,
+     "blocks.0.module.post_so2_norm.bias": 7.62939453125e-06,
+     "blocks.0.module.so2_conv.post_mix.weight": 1.9186966682127604e-06,
+     "blocks.0.module.ffns.0.so3_linear_2.weight": 1.236947761995566e-07,
+     "blocks.1.module.post_so2_norm.bias": 7.62939453125e-06,
+     "blocks.1.module.so2_conv.post_mix.weight": 3.4612073633866203e-06,
+     "blocks.1.module.ffns.0.so3_linear_2.weight": 1.138694530888884e-07,
+     "head.norm.scale": 1.9073486328125e-06,
+     "head.norm.bias": 9.5367431640625e-07
+    },
+    "changed_gradient_participation": [],
+    "graphs": 1,
+    "captured_operations": 1140,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_normalization": {
+    "job": 6319196,
+    "task": 1,
+    "method": "Move only the published degree normalization into native CPU execution.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.1.module.so2_conv.post_mix.weight",
+     "max_abs": 9.690878499668543e-07
+    },
+    "failed_fields": {
+     "blocks.0.module.so2_conv.post_mix.weight": 9.398247513559e-08,
+     "blocks.1.module.so2_conv.post_mix.weight": 9.690878499668543e-07
+    },
+    "changed_gradient_participation": [],
+    "graphs": 10,
+    "captured_operations": 745,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_norm_and_output_linears": {
+    "job": 6319210,
+    "task": 0,
+    "method": "Also run the two SO2 post_mix output linear layers natively.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.1.module.so2_conv.post_mix.weight",
+     "max_abs": 9.690878499668543e-07
+    },
+    "failed_fields": {
+     "blocks.0.module.so2_conv.post_mix.weight": 9.398247513559e-08,
+     "blocks.1.module.so2_conv.post_mix.weight": 9.690878499668543e-07
+    },
+    "changed_gradient_participation": [],
+    "graphs": 12,
+    "captured_operations": 744,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_norm_and_convolutions": {
+    "job": 6319210,
+    "task": 1,
+    "method": "Run both complete SO2Convolution modules natively in addition to the degree normalizations.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.0.module.so2_conv.post_mix.weight",
+     "max_abs": 8.526512829121202e-14
+    },
+    "failed_fields": {},
+    "changed_gradient_participation": [],
+    "graphs": 11,
+    "captured_operations": 541,
+    "learned_operations": [
+     "bmm",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_norm_with_scalar_codegen": {
+    "job": 6319210,
+    "task": 2,
+    "method": "Use native degree norms and cpp.simdlen=1 for the remaining compiled model.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.0.module.so2_conv.post_mix.weight",
+     "max_abs": 7.194245199571014e-14
+    },
+    "failed_fields": {},
+    "changed_gradient_participation": [],
+    "graphs": 10,
+    "captured_operations": 745,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_norm_and_output_linears_with_scalar_codegen": {
+    "job": 6319210,
+    "task": 3,
+    "method": "Use native degree norms and output linear layers, and cpp.simdlen=1 for the remaining compiled model.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.0.module.so2_conv.post_mix.weight",
+     "max_abs": 7.194245199571014e-14
+    },
+    "failed_fields": {},
+    "changed_gradient_participation": [],
+    "graphs": 12,
+    "captured_operations": 744,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   }
+  }
  }
 }
