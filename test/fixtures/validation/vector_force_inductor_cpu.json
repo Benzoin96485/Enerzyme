@@ -905,5 +905,242 @@
    "blocks.4.module.s_proj.bias",
    "blocks.4.module.s_proj.weight"
   ]
+ },
+ "fullgraph_training_outputs": {
+  "torch": "2.13.0+cu126",
+  "device": "cpu",
+  "precision": "float32",
+  "compile": {
+   "backend": "inductor",
+   "fullgraph": true,
+   "capture_dynamic_output_shape_ops": true,
+   "capture_scalar_outputs": true
+  },
+  "method": "Use the same inputs and loss as above. Compile a wrapper returning only E and Fa (output) or the squared loss inside the compiled function, with E and Fa detached for diagnostics (loss). Compare the .grad presence of every named parameter after loss.backward(). Empty presence dictionaries mean both executions skip the same parameters. The four LSRM biases retain the previously documented FP32 rounding differences.",
+  "models": {
+   "visnet": {
+    "revision": "e956f75",
+    "job": 6318272,
+    "runs": {
+     "output": {
+      "shared_parameters": 197,
+      "compiled_only": {},
+      "eager_only": {},
+      "outputs_max_abs": {
+       "E": 4.76837158203125e-07,
+       "Fa": 4.76837158203125e-07
+      },
+      "numerical_failures": {}
+     },
+     "loss": {
+      "shared_parameters": 197,
+      "compiled_only": {},
+      "eager_only": {},
+      "outputs_max_abs": {
+       "E": 2.384185791015625e-07,
+       "Fa": 7.152557373046875e-07
+      },
+      "numerical_failures": {}
+     }
+    }
+   },
+   "freecg": {
+    "revision": "e956f75",
+    "job": 6318272,
+    "runs": {
+     "output": {
+      "shared_parameters": 223,
+      "compiled_only": {},
+      "eager_only": {},
+      "outputs_max_abs": {
+       "E": 1.1920928955078125e-07,
+       "Fa": 1.4901161193847656e-07
+      },
+      "numerical_failures": {}
+     },
+     "loss": {
+      "shared_parameters": 223,
+      "compiled_only": {},
+      "eager_only": {},
+      "outputs_max_abs": {
+       "E": 1.1920928955078125e-07,
+       "Fa": 1.564621925354004e-07
+      },
+      "numerical_failures": {}
+     }
+    }
+   },
+   "quinnet": {
+    "revision": "2fa0e3d",
+    "job": 6318320,
+    "runs": {
+     "output": {
+      "failure": "Inductor BMM input layout lowering could not determine if the dynamically selected edge dimension has extent one.",
+      "operation": "QuinNetInteraction._edge_invariants, self.src_proj(sender)",
+      "expression": "Eq(Max(1, u0 + u2), 1)"
+     },
+     "loss": {
+      "failure": "Inductor BMM input layout lowering could not determine if the dynamically selected edge dimension has extent one.",
+      "operation": "QuinNetInteraction._edge_invariants, self.src_proj(sender)",
+      "expression": "Eq(Max(1, u0 + u2), 1)"
+     }
+    },
+    "projection_update": {
+     "revision": "b6796ea",
+     "measured_source": "2fa0e3d with the angular projection change from 48b9e13 (integrated as b6796ea).",
+     "jobs": [
+      6318337,
+      6318436
+     ],
+     "float64_tolerance": {
+      "atol": 1e-10,
+      "rtol": 1e-08
+     },
+     "ordinary": {
+      "float32": {
+       "compared_parameter_tensors": 184,
+       "outputs_max_abs": {
+        "E": 2.980232238769531e-07,
+        "Fa": 3.5762786865234375e-07
+       },
+       "max_relative_l2": 3.3744307673506464e-06,
+       "elementwise_failures": {},
+       "strict_float64_failures": {},
+       "gradients_only_in_eager": [],
+       "gradients_only_in_compiled": [
+        "blocks.4.module.s_proj.bias",
+        "blocks.4.module.s_proj.weight"
+       ]
+      },
+      "float64": {
+       "compared_parameter_tensors": 184,
+       "outputs_max_abs": {
+        "E": 3.3306690738754696e-16,
+        "Fa": 6.661338147750939e-16
+       },
+       "max_relative_l2": 5.0860389404852925e-15,
+       "elementwise_failures": {},
+       "strict_float64_failures": {},
+       "gradients_only_in_eager": [],
+       "gradients_only_in_compiled": [
+        "blocks.4.module.s_proj.bias",
+        "blocks.4.module.s_proj.weight"
+       ]
+      }
+     },
+     "fullgraph": {
+      "float32": {
+       "output": {
+        "shared_parameters": 182,
+        "numerical_failures": {},
+        "outputs_max_abs": {
+         "E": 2.980232238769531e-07,
+         "Fa": 2.384185791015625e-07
+        },
+        "compiled_only": {},
+        "eager_only": {}
+       },
+       "loss": {
+        "shared_parameters": 182,
+        "numerical_failures": {},
+        "outputs_max_abs": {
+         "E": 2.980232238769531e-07,
+         "Fa": 3.5762786865234375e-07
+        },
+        "compiled_only": {},
+        "eager_only": {}
+       }
+      },
+      "float64": {
+       "output": {
+        "shared_parameters": 182,
+        "numerical_failures": {},
+        "outputs_max_abs": {
+         "E": 5.551115123125783e-16,
+         "Fa": 6.661338147750939e-16
+        },
+        "compiled_only": {},
+        "eager_only": {}
+       },
+       "loss": {
+        "shared_parameters": 182,
+        "numerical_failures": {},
+        "outputs_max_abs": {
+         "E": 6.661338147750939e-16,
+         "Fa": 3.3306690738754696e-16
+        },
+        "compiled_only": {},
+        "eager_only": {}
+       }
+      }
+     }
+    }
+   },
+   "chgnet": {
+    "revision": "2fa0e3d",
+    "job": 6318320,
+    "runs": {
+     "output": {
+      "failure": "Dynamo could not determine if the dynamically selected edge list is empty while constructing reverse-edge indices.",
+      "operation": "GraphContext.reverse_edge / reverse_edge_index",
+      "expression": "Eq(u0, 0)"
+     },
+     "loss": {
+      "failure": "Dynamo could not determine if the dynamically selected edge list is empty while constructing reverse-edge indices.",
+      "operation": "GraphContext.reverse_edge / reverse_edge_index",
+      "expression": "Eq(u0, 0)"
+     }
+    }
+   },
+   "visnet_lsrm": {
+    "revision": "2fa0e3d",
+    "job": 6318320,
+    "runs": {
+     "output": {
+      "shared_parameters": 182,
+      "compiled_only": {},
+      "eager_only": {},
+      "outputs_max_abs": {
+       "E": 1.7881393432617188e-07,
+       "Fa": 1.4603137969970703e-06
+      },
+      "numerical_failures": {
+       "blocks.0.module.s_proj.bias": 0.0703125,
+       "blocks.1.module.s_proj.bias": 0.06982421875,
+       "blocks.1.module.o_proj.bias": 0.028076171875,
+       "blocks.2.module.s_proj.bias": 0.0693359375
+      }
+     },
+     "loss": {
+      "shared_parameters": 182,
+      "compiled_only": {},
+      "eager_only": {},
+      "outputs_max_abs": {
+       "E": 1.7881393432617188e-07,
+       "Fa": 1.4603137969970703e-06
+      },
+      "numerical_failures": {
+       "blocks.1.module.s_proj.bias": 0.06982421875,
+       "blocks.0.module.s_proj.bias": 0.0703125,
+       "blocks.2.module.s_proj.bias": 0.0693359375,
+       "blocks.1.module.o_proj.bias": 0.028076171875
+      }
+     }
+    },
+    "float64_output": {
+     "job": 6318457,
+     "atol": 1e-10,
+     "rtol": 1e-08,
+     "shared_parameters": 182,
+     "numerical_failures": {},
+     "outputs_max_abs": {
+      "E": 2.220446049250313e-16,
+      "Fa": 2.0539125955565396e-15
+     },
+     "compiled_only": {},
+     "eager_only": {}
+    }
+   }
+  }
  }
 }

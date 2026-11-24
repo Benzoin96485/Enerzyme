@@ -315,6 +315,72 @@ each moment layer; per-layer linear / final MLP readout outside). Also :code:`Te
 messages; shared :code:`SimpleReadout` and :code:`WeightedCoulombEnergy`
 after the norm embedding).
 
+Compiled energy and force losses
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When fitting only energy and forces, the compiled function can select those
+two outputs from the usual model dictionary. This lets AOTAutograd see which
+auxiliary parameters contribute to the loss. AdamW skips a parameter whose
+gradient is :code:`None` and applies weight decay to a parameter with an
+explicit zero gradient.
+
+The following CPU example uses the same model, weights, two structures and
+squared loss as the recorded checks. Run it from the repository checkout.
+Keep the dynamic-shape and scalar capture settings active when executing the
+compiled function. The coordinate tensor must require gradients.
+
+.. code-block:: python
+
+    import torch
+    from scripts.core_harness import build, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    model = build("visnet").float().train()
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
+    batch["Ra"].requires_grad_(True)
+    capture = dict(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True)
+
+    def energy_forces(inputs):
+        outputs = model(inputs)
+        return outputs["E"], outputs["Fa"]
+
+    with torch._dynamo.config.patch(**capture):
+        predict = torch.compile(energy_forces, fullgraph=True)
+        energy, forces = predict(batch)
+        (energy.square().sum() + forces.square().sum()).backward()
+
+To include the loss inside the graph, compile the following function instead.
+A supervised fit can pass its energy and force targets as additional inputs.
+
+.. code-block:: python
+
+    def force_loss(inputs):
+        energy, forces = energy_forces(inputs)
+        return energy.square().sum() + forces.square().sum()
+
+    model.zero_grad(set_to_none=True)
+    with torch._dynamo.config.patch(**capture):
+        torch.compile(force_loss, fullgraph=True)(batch).backward()
+
+On CPU with PyTorch 2.13.0, both wrappers preserved all 197 participating
+ViSNet parameter gradients and all 223 FreeCG gradients. The unused final-layer
+parameters retained :code:`grad is None` (two for ViSNet, three for FreeCG).
+For the energy/force wrapper, maximum force errors against eager FP32 were
+:code:`4.77e-7` and :code:`1.49e-7`, respectively. Both wrappers also preserved
+ViSNet-LSRM's 182 participating gradients and ten absent gradients. Four LSRM
+bias tensors had individual FP32 elements outside the recorded tolerance.
+The LSRM energy/force wrapper passed all 182 gradients in FP64 with
+:code:`atol=1e-10` and :code:`rtol=1e-8`. Its maximum force error was
+:code:`2.06e-15`.
+
+QuinNet preserves all 182 participating gradients and both absent gradients
+with either wrapper in both precisions at revision :code:`b6796ea`.
+The maximum FP64 energy and force errors were each below :code:`7e-16`.
+The ordinary fullgraph call on CHGNet at revision :code:`2fa0e3d` stops when
+constructing reverse edges from a data-dependent edge count. Per-model
+results, tolerances and the independent FP64 controls are recorded in
+:code:`test/fixtures/validation/vector_force_inductor_cpu.json`.
+
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 

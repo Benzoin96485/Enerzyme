@@ -453,3 +453,36 @@ def test_stack_energy_force_dipole_and_image():
         edges=(torch.zeros(0, dtype=torch.long), torch.zeros(0, dtype=torch.long)),
     )
     assert torch.allclose(alone["Fa"], torch.zeros_like(alone["Fa"]), atol=1e-8)
+
+
+def test_fullgraph_energy_force_loss_keeps_unused_vector_weights_out_of_adamw():
+    from torch._dynamo import config
+    from enerzyme.models.ff import build_model
+
+    torch.manual_seed(53)
+    layers = _tiny_layers()
+    layers[3]["params"].update(vertex_type="none", vecnorm_type="none")
+    model = build_model(
+        "visnet", layer_params=layers,
+        build_params={"dim_embedding": 8, "num_rbf": 6, "cutoff_sr": 3.0, "max_Za": 8},
+        verbose=0,
+    ).train()
+    receiver, sender = _edges(3)
+    batch = dict(Ra=torch.tensor([[0., 0., 0.], [1.2, 0., 0.], [0., 0.9, 0.]], requires_grad=True),
+                 Za=torch.tensor([1, 6, 8]), N=[3], batch_seg=torch.zeros(3, dtype=torch.long),
+                 idx_i=receiver, idx_j=sender)
+    weights = model.blocks[-1].module.s_proj.weight
+    before = weights.detach().clone()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.01, weight_decay=0.1)
+
+    def energy_forces(inputs):
+        out = model(inputs)
+        return out["E"], out["Fa"]
+
+    with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+        energy, forces = torch.compile(energy_forces, fullgraph=True, backend="aot_eager")(batch)
+        (energy.square().sum() + forces.square().sum()).backward()
+    assert model.blocks[0].module.s_proj.weight.grad is not None
+    assert weights.grad is None
+    optimizer.step()
+    torch.testing.assert_close(weights, before, atol=0, rtol=0)
