@@ -15,6 +15,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from ..mp.basis.envelope import cosine_transition
+from ..mp.graph import receiver_csr, receiver_rank
 
 
 def symmetric_neighbor_mask(
@@ -43,16 +44,11 @@ def symmetric_neighbor_mask(
         )
     if idx_i.numel() == 0 or int(num_nodes) == 0:
         return torch.ones(idx_i.shape[0], dtype=torch.bool, device=idx_i.device)
-    counts = torch.zeros(int(num_nodes), dtype=torch.long, device=idx_i.device)
-    counts.scatter_add_(0, idx_i, torch.ones_like(idx_i))
+    counts = torch.bincount(idx_i, minlength=int(num_nodes))
     if int(counts.max().item()) <= int(max_neighbors):
         return torch.ones(idx_i.shape[0], dtype=torch.bool, device=idx_i.device)
 
-    by_distance = torch.argsort(distance, stable=True)
-    order = by_distance[torch.argsort(idx_i[by_distance], stable=True)]
-    start = torch.cumsum(counts, 0) - counts
-    local = torch.arange(idx_i.numel(), device=idx_i.device) - start[idx_i[order]]
-    selected = order[local < int(max_neighbors)]
+    selected = receiver_rank(idx_i, distance, int(num_nodes)) < int(max_neighbors)
 
     lo = torch.minimum(idx_i, idx_j).to(torch.long)
     hi = torch.maximum(idx_i, idx_j).to(torch.long)
@@ -75,12 +71,9 @@ def incoming_edge_table(idx_i: Tensor, num_nodes: int) -> Tensor:
         return idx_i.new_zeros((0, 0))
     if idx_i.numel() == 0:
         return idx_i.new_full((int(num_nodes), 0), -1)
-    counts = torch.zeros(int(num_nodes), dtype=torch.long, device=idx_i.device)
-    counts.scatter_add_(0, idx_i, torch.ones_like(idx_i))
+    counts, offsets, order = receiver_csr(idx_i, int(num_nodes))
     max_degree = int(counts.max().item())
-    order = torch.argsort(idx_i, stable=True)
-    start = torch.cumsum(counts, 0) - counts
-    local = torch.arange(idx_i.numel(), device=idx_i.device) - start[idx_i[order]]
+    local = torch.arange(idx_i.numel(), device=idx_i.device) - offsets[idx_i[order]]
     table = idx_i.new_full((int(num_nodes) * max_degree,), -1)
     table[idx_i[order] * max_degree + local] = order
     return table.view(int(num_nodes), max_degree)
@@ -144,7 +137,7 @@ def edge_spin_frames(
     The sphere is centered on the source, so the direction from the source
     back to the destination has local ``x = -1``. Longitude is fixed by the
     cosine-weighted sum of ``vij`` at the destination
-    (:func:`enerzyme.models.cutoff.cosine_transition`). That sum is parallel
+    (:func:`enerzyme.models.mp.basis.envelope.cosine_transition`). That sum is parallel
     to the bond for a degree-1 destination, and it is zero when every edge
     into the destination sits at the cutoff. The normal is then the cross
     product of the bond with a lab axis, so the frame stays a rotation. The

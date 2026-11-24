@@ -17,6 +17,14 @@ from typing import NamedTuple, Tuple
 import torch
 from torch import Tensor
 
+from ..mp.graph import (  # noqa: F401
+    cross_receiver_pairs,
+    receiver_csr,
+    receiver_pairs,
+    receiver_rank,
+    reverse_edge_index,
+)
+
 
 _INV_SQRT_EPS = 1e-12
 # A true reverse edge has displacement -v, so the residual is identically zero.
@@ -66,73 +74,6 @@ def split_cutoff_edges(
     return emb, inter
 
 
-def reverse_edge_index(
-    idx_i: Tensor,
-    idx_j: Tensor,
-    vij: Tensor,
-    num_nodes: int,
-) -> Tensor:
-    """Index of the edge whose displacement is ``-vij``.
-
-    GemNet adds each directed interaction onto both orientations. For a
-    consistent neighbor list the partner of ``(receiver, sender, v)`` is
-    ``(sender, receiver, -v)``, including a distinct periodic image. That
-    residual is identically zero for every geometry, so the index does not
-    depend on a continuous relaxation of ``v``. Matching uses a detached copy
-    and then checks the residual, which keeps the permutation out of the
-    autograd graph and rejects a same-atom image that is not the opposite
-    displacement.
-    """
-    num_edges = int(idx_i.numel())
-    if num_edges == 0:
-        return idx_i.new_empty(0)
-    if num_nodes < 1:
-        raise ValueError("num_nodes must be positive when the graph has edges")
-    if int(idx_i.max()) >= num_nodes or int(idx_j.max()) >= num_nodes:
-        raise ValueError("edge index is outside num_nodes")
-    if int(idx_i.min()) < 0 or int(idx_j.min()) < 0:
-        raise ValueError("edge index must be non-negative")
-    if vij.ndim != 2 or vij.shape[0] != num_edges or vij.shape[-1] != 3:
-        raise ValueError(
-            f"vij must have shape ({num_edges}, 3), got {tuple(vij.shape)}"
-        )
-
-    # The partner is a neighbor-list identity. Detach so a later change cannot
-    # put this discrete choice on the energy graph.
-    disp = vij.detach()
-    key = idx_i * num_nodes + idx_j
-    rev = idx_j * num_nodes + idx_i
-    order = torch.argsort(key, stable=True)
-    sorted_key = key[order]
-    start = torch.searchsorted(sorted_key, rev, right=False)
-    end = torch.searchsorted(sorted_key, rev, right=True)
-    if torch.any(end == start):
-        raise ValueError(
-            "GemNet requires both directions of every edge in the neighbor list"
-        )
-    width = int((end - start).max().item())
-    if width == 1:
-        chosen = order[start]
-    else:
-        device = idx_i.device
-        offsets = torch.arange(width, device=device)
-        pos = start[:, None] + offsets
-        valid = offsets[None, :] < (end - start)[:, None]
-        cand = order[pos.clamp(max=num_edges - 1)]
-        mismatch = (disp[cand] + disp[:, None, :]).square().sum(dim=-1)
-        mismatch = mismatch.masked_fill(~valid, float("inf"))
-        best = mismatch.argmin(dim=1)
-        chosen = cand[torch.arange(num_edges, device=device), best]
-    residual = (disp[chosen] + disp).square().sum(dim=-1).sqrt()
-    if not torch.isfinite(residual).all() or bool((residual > _OPPOSITE_TOL).any()):
-        raise ValueError(
-            "GemNet could not match every edge to the opposite displacement. "
-            "Each directed edge (receiver, sender, v) needs "
-            "(sender, receiver, -v) in the neighbor list."
-        )
-    return chosen
-
-
 def angle_between(left: Tensor, right: Tensor) -> Tensor:
     """Unsigned angle in ``[0, π]`` between row vectors."""
     if left.numel() == 0:
@@ -147,15 +88,6 @@ def _reject(vec: Tensor, normal: Tensor) -> Tensor:
     denom = (normal * normal).sum(dim=-1, keepdim=True).clamp(min=_INV_SQRT_EPS)
     coef = (vec * normal).sum(dim=-1, keepdim=True) / denom
     return vec - coef * normal
-
-
-def _incoming_csr(receivers: Tensor, num_nodes: int) -> Tuple[Tensor, Tensor, Tensor]:
-    counts = torch.bincount(receivers, minlength=num_nodes)
-    offsets = torch.empty(num_nodes + 1, dtype=torch.long, device=receivers.device)
-    offsets[0] = 0
-    offsets[1:] = torch.cumsum(counts, dim=0)
-    perm = torch.argsort(receivers, stable=True)
-    return counts, offsets, perm
 
 
 def triplet_graph(
@@ -175,21 +107,8 @@ def triplet_graph(
     if num_edges == 0:
         return TripletGraph(empty, empty, vij.new_zeros(0))
 
-    counts, offsets, perm = _incoming_csr(idx_i, num_nodes)
-    local = torch.empty(num_edges, dtype=torch.long, device=idx_i.device)
-    local[perm] = torch.arange(num_edges, device=idx_i.device) - offsets[idx_i[perm]]
-    n_other = counts[idx_i] - 1
-    total = int(n_other.sum().item())
-    if total == 0:
-        return TripletGraph(empty, empty, vij.new_zeros(0))
-
-    idx_edge = torch.repeat_interleave(torch.arange(num_edges, device=idx_i.device), n_other)
-    prefix = torch.cumsum(n_other, dim=0) - n_other
-    slot = torch.arange(total, device=idx_i.device) - torch.repeat_interleave(prefix, n_other)
-    self_local = local[idx_edge]
-    other_local = slot + (slot >= self_local).to(slot.dtype)
-    starts = offsets[idx_i[idx_edge]]
-    idx_other = perm[starts + other_local]
+    pairs = receiver_pairs(idx_i, num_nodes)
+    idx_edge, idx_other = pairs.first, pairs.second
     keep = idx_j[idx_other] != idx_j[idx_edge]
     idx_edge = idx_edge[keep]
     idx_other = idx_other[keep]
@@ -231,7 +150,7 @@ def quadruplet_graph(
 
     idx_i_emb = idx_i[emb_index]
     idx_j_emb = idx_j[emb_index]
-    counts, offsets, perm = _incoming_csr(idx_i_emb, num_nodes)
+    counts, offsets, perm = receiver_csr(idx_i_emb, num_nodes)
     a_node = idx_i[int_index]
     b_node = idx_j[int_index]
     n_a = counts[a_node]
@@ -331,16 +250,10 @@ def cap_incoming_mask(
     if int(local_i.min()) < 0 or int(local_i.max()) >= int(num_nodes):
         raise ValueError("receiver index is outside num_nodes")
     local_d = distance[within]
-    counts = torch.zeros(int(num_nodes), dtype=torch.long, device=idx_i.device)
-    counts.scatter_add_(0, local_i, torch.ones_like(local_i))
+    counts = torch.bincount(local_i, minlength=int(num_nodes))
     if int(counts.max().item()) <= int(max_neighbors):
         return within
-    by_distance = torch.argsort(local_d, stable=True)
-    order = by_distance[torch.argsort(local_i[by_distance], stable=True)]
-    start = torch.cumsum(counts, 0) - counts
-    local_rank = torch.arange(local_i.numel(), device=idx_i.device) - start[local_i[order]]
-    chosen = torch.zeros(local_i.shape[0], dtype=torch.bool, device=idx_i.device)
-    chosen[order[local_rank < int(max_neighbors)]] = True
+    chosen = receiver_rank(local_i, local_d, int(num_nodes)) < int(max_neighbors)
     mask = torch.zeros(idx_i.shape[0], dtype=torch.bool, device=idx_i.device)
     mask[torch.where(within)[0][chosen]] = True
     return mask
@@ -425,16 +338,9 @@ def mixed_triplets(
     blank = MixedTriplets(empty, empty, out_v.new_zeros(0))
     if out_i.numel() == 0 or in_i.numel() == 0 or int(num_nodes) == 0:
         return blank
-    counts, offsets, perm = _incoming_csr(in_i, num_nodes)
-    n_in = counts[out_i]
-    total = int(n_in.sum().item())
-    if total == 0:
+    idx_edge, idx_other = cross_receiver_pairs(out_i, in_i, num_nodes)
+    if idx_edge.numel() == 0:
         return blank
-    device = out_i.device
-    idx_edge = torch.repeat_interleave(torch.arange(out_i.numel(), device=device), n_in)
-    prefix = torch.cumsum(n_in, dim=0) - n_in
-    slot = torch.arange(total, device=device) - torch.repeat_interleave(prefix, n_in)
-    idx_other = perm[offsets[out_i[idx_edge]] + slot]
     same = in_j[idx_other] == out_j[idx_edge]
     if bool(same.any()):
         residual = (in_v[idx_other] - out_v[idx_edge]).detach().square().sum(dim=-1).sqrt()
