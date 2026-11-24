@@ -25,28 +25,28 @@ def _random_so3(dtype=torch.float64):
 
 
 def _core(**kwargs):
-    from enerzyme.models.dpa4 import DPA4Core
+    from enerzyme.models.presets.so2 import dpa4
 
     params = dict(
         dim_embedding=8, channels=8, lmax=2, mmax=1, n_blocks=1,
         mixing_layers=1, n_radial=8, ffn_neurons=16,
     )
     params.update(kwargs)
-    return DPA4Core(**params)
+    return dpa4(**params)
 
 
 def test_dpa4_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, _, _ = get_ff_core("DPA4")
-    assert core_cls.__name__ == "DPA4Core"
+    assert core_cls.__name__ == "dpa4"
     with EXAMPLE.open() as stream:
         ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
     model = build_model(
         ff["architecture"], layer_params=ff["layers"],
         build_params=ff["build_params"], verbose=0,
     )
-    assert model.__class__.__name__ == "DPA4Core"
+    assert model.__class__.__name__ == "ComposableCore"
 
 
 def test_dpa4_shapes_and_geometry_autograd():

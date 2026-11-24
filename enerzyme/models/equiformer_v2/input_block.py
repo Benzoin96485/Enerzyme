@@ -79,9 +79,11 @@ class EdgeDegreeEmbedding(torch.nn.Module):
         self,
         atomic_numbers,
         edge_distance,
-        edge_index
+        edge_index,
+        rotation=None,
     ):    
         
+        rotation = self.SO3_rotation if rotation is None else rotation
         if self.use_atom_edge_embedding:
             source_element = atomic_numbers[edge_index[0]]  # Source atom atomic number
             target_element = atomic_numbers[edge_index[1]]  # Target atom atomic number
@@ -114,7 +116,7 @@ class EdgeDegreeEmbedding(torch.nn.Module):
         x_edge_embedding._l_primary(self.mappingReduced)
 
         # Rotate back the irreps
-        x_edge_embedding._rotate_inv(self.SO3_rotation, self.mappingReduced)
+        x_edge_embedding._rotate_inv(rotation, self.mappingReduced)
 
         # Compute the sum of the incoming neighboring messages for each target node
         x_edge_embedding._reduce_edge(edge_index[1], atomic_numbers.shape[0])

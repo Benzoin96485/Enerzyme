@@ -27,7 +27,7 @@ def _random_so3(dtype=torch.float64):
 
 
 def _tiny_core(**overrides):
-    from enerzyme.models.esen.native import eSENCore
+    from enerzyme.models.presets.so2 import esen
 
     params = dict(
         dim_embedding=8,
@@ -42,7 +42,7 @@ def _tiny_core(**overrides):
         cutoff_sr=6.0,
     )
     params.update(overrides)
-    return eSENCore(**params)
+    return esen(**params)
 
 
 def _pair_inputs(core, vij, rbf_scale=1.0):
@@ -247,14 +247,14 @@ def test_native_esen_does_not_import_fairchem_source():
             assert "fairchem" not in stripped
     init = (root / "__init__.py").read_text()
     assert "UMAWrapperQS" in init
-    assert "eSENCore" in init
+    assert "esen" in init
 
 
 def test_get_ff_core_registers_esen_and_keeps_uma():
     from enerzyme.models.ff import get_ff_core
 
     core, _, layers = get_ff_core("esen")
-    assert core.__name__ == "eSENCore"
+    assert core.__name__ == "esen"
     assert any(layer["name"] == "Force" for layer in layers)
     from enerzyme.models.presets import get_architecture
 

@@ -78,8 +78,10 @@ class EdgeDegreeEmbedding(torch.nn.Module):
         atomic_numbers,
         edge_distance,
         edge_index,
-        edge_envelope_weight=None
+        edge_envelope_weight=None,
+        rotation=None,
     ):
+        rotation = self.so3_rotation if rotation is None else rotation
         if self.use_atom_edge_embedding:
             source_element = atomic_numbers[edge_index[0]]  # Source atom atomic number
             target_element = atomic_numbers[edge_index[1]]  # Target atom atomic number
@@ -96,12 +98,12 @@ class EdgeDegreeEmbedding(torch.nn.Module):
 
         x_edge_m0 = x_edge_m0.view(x_edge_m0.shape[0], (self.lmax + 1), self.num_channels)
         x_edge = torch.bmm(
-            self.so3_rotation.wigner_inv.narrow(2, 0, (self.lmax + 1)), 
+            rotation.wigner_inv.narrow(2, 0, (self.lmax + 1)),
             x_edge_m0
         )   # (num_edges, (self.lmax + 1) ** 2, self.num_channels)
         #x_edge = torch.einsum(
         #    'bij, bjc -> bic', 
-        #    self.so3_rotation.wigner_inv.narrow(2, 0, (self.lmax + 1)),
+        #    rotation.wigner_inv.narrow(2, 0, (self.lmax + 1)),
         #    x_edge_m0
         #)   # (num_edges, (self.lmax + 1) ** 2, self.num_channels)
 

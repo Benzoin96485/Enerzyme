@@ -5,6 +5,6 @@ adapted from https://github.com/xvzemin/tace (MIT). Reuses TACE edge embed /
 ``CgtpACE`` and shared ``enerzyme.models.mp.equivariant`` SO(2) primitives.
 """
 
-from .core import TECECore, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
-__all__ = ["TECECore", "DEFAULT_BUILD_PARAMS", "DEFAULT_LAYER_PARAMS"]
+__all__ = ["DEFAULT_BUILD_PARAMS", "DEFAULT_LAYER_PARAMS"]

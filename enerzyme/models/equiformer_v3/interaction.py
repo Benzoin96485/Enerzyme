@@ -249,8 +249,10 @@ class EquivariantGraphAttention(torch.nn.Module):
         target_atomic_numbers,
         edge_distance,
         edge_index,
-        edge_envelope_weight=None
+        edge_envelope_weight=None,
+        rotation=None,
     ):
+        rotation = self.so3_rotation if rotation is None else rotation
         num_nodes = x.shape[0]
 
         # Compute edge scalar features (invariant to rotations)
@@ -276,9 +278,9 @@ class EquivariantGraphAttention(torch.nn.Module):
             x_message = torch.cat((x_source, x_target), dim=2)
             if self.use_rad_l_parametrization:
                 x_message = x_message * x_edge_weight
-                x_message = self.so3_rotation.rotate(x_message)
+                x_message = rotation.rotate(x_message)
             else:
-                x_message = self.so3_rotation.rotate(x_message)
+                x_message = rotation.rotate(x_message)
                 x_message = x_message * x_edge_weight
         elif self.use_add_merge:
             # Add
@@ -287,7 +289,7 @@ class EquivariantGraphAttention(torch.nn.Module):
             x_source = x_source * x_edge_weight_source
             x_target = x_target * x_edge_weight_target
             x_message = x_source + x_target
-            x_message = self.so3_rotation.rotate(x_message)
+            x_message = rotation.rotate(x_message)
         
         x_message, x_m0_extra = self.so2_linear_1(x_message)
 
@@ -330,7 +332,7 @@ class EquivariantGraphAttention(torch.nn.Module):
         x_message = attn
 
         # Rotate back the irreps
-        x_message = self.so3_rotation.rotate_inv(x_message)
+        x_message = rotation.rotate_inv(x_message)
         
         # Compute the sum of the incoming neighboring messages for each target node
         x_message = scatter_sum(x_message, edge_index[1], num_nodes)
@@ -711,7 +713,8 @@ class TransBlockV3(torch.nn.Module):
         edge_distance,
         edge_index,
         edge_envelope_weight=None,  # for smooth cutoff
-        batch=None                  # for GraphDropPath
+        batch=None,                 # for GraphDropPath
+        rotation=None,
     ):
         outputs = x
         x_res = x
@@ -723,7 +726,7 @@ class TransBlockV3(torch.nn.Module):
             target_atomic_numbers,
             edge_distance,
             edge_index,
-            edge_envelope_weight
+            edge_envelope_weight, rotation=rotation
         )
 
         if self.drop_path is not None:
