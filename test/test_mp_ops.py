@@ -77,6 +77,39 @@ def test_scatter_sum_empty_and_inferred_size():
     assert scatter_sum(src, index).shape[0] == int(index.max()) + 1
 
 
+@pytest.mark.parametrize("width", [None, 3])
+@pytest.mark.parametrize("size", [None, 4])
+def test_compiled_static_empty_scatter_is_an_independent_zero(width, size):
+    values = torch.empty((0,) if width is None else (0, width), requires_grad=True)
+    index = torch.empty(0, dtype=torch.long)
+    compiled = torch.compile(scatter_sum, backend="eager", fullgraph=True)
+    expected = scatter_sum(values, index, size)
+    actual = compiled(values, index, size)
+    torch.testing.assert_close(actual, expected)
+    assert not actual.requires_grad and actual.grad_fn is None
+
+
+@pytest.mark.parametrize("size", [None, 4])
+def test_compiled_scatter_with_masked_edges_tracks_values_and_gradients(size):
+    values = torch.tensor([1., -2., 3., 4.], requires_grad=True)
+    index = torch.tensor([1, 3, 1, 2])
+    def reduce(mask):
+        return scatter_sum(values[mask], index[mask], size)
+
+    with torch._dynamo.config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+        compiled = torch.compile(reduce, backend="eager", fullgraph=True)
+        for selected in ([True, False, True, False], [False, True, False, True], [False] * 4):
+            mask = torch.tensor(selected)
+            actual = compiled(mask)
+            expected = reduce(mask)
+            torch.testing.assert_close(actual, expected)
+            if any(selected):
+                torch.testing.assert_close(
+                    torch.autograd.grad(actual.square().sum(), values)[0],
+                    torch.autograd.grad(expected.square().sum(), values)[0],
+                )
+
+
 def test_scatter_mean_max():
     torch_scatter = pytest.importorskip("torch_scatter")
     src, index = _edges()

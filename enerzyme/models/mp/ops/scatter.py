@@ -14,6 +14,7 @@ from typing import Optional
 
 import torch
 from torch import Tensor
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 
 try:
     import torch_scatter as _torch_scatter
@@ -36,7 +37,13 @@ def _dim_size(index: Tensor, dim_size: Optional[int]) -> int:
         return int(dim_size)
     if torch.compiler.is_compiling():
         # AOTAutograd saves the output size itself for the compiled backward.
-        return int((index.max().long() + 1).item()) if index.numel() else 0
+        if statically_known_true(index.numel() == 0):
+            return 0
+        if not statically_known_true(index.numel() > 0):
+            # A mask can select any number of entries, including none.
+            index = index.long()
+            index = torch.cat((index.reshape(-1), index.new_full((1,), -1)))
+        return int((index.max().long() + 1).item())
     return int(index.max().item()) + 1 if index.numel() else 0
 
 
@@ -50,6 +57,11 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
     """Sum slices of ``src`` along ``dim`` into ``dim_size`` rows given by 1-D ``index``."""
     dim = dim + src.dim() if dim < 0 else dim
     size = _dim_size(index, dim_size)
+    shape = list(src.shape)
+    shape[dim] = size
+    if torch.compiler.is_compiling() and statically_known_true(index.numel() == 0):
+        # Match eager's independent zero: an unused parameter must keep grad=None.
+        return src.new_zeros(shape)
     if index.dtype != torch.long:
         index = index.long()
     if src.device.type != "cuda" and _use_torch_scatter(src) and index.numel():
@@ -63,8 +75,6 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
             index = index + (index == size)
         padded = src.new_zeros(size + 1)
         return padded.index_add_(dim, index, src).narrow(dim, 0, size)
-    shape = list(src.shape)
-    shape[dim] = size
     out = src.new_zeros(shape)
     if torch.compiler.is_compiling() or index.numel():
         if src.device.type == "cuda":
