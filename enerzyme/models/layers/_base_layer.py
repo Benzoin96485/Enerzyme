@@ -141,11 +141,17 @@ class BaseFFCore(BaseFFModule):
         if torch.compiler.is_compiling():
             from .compiled_grad import (
                 compiled_training, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
+                needs_native_cpu_force_training, native_cpu_force_training,
             )
 
             # A graph break inside a VJP discards the whole energy trace. In
             # normal inference the ordinary stack can compile on both sides
             # of a break and autograd can differentiate the compiled pieces.
+            if (self.training and getattr(self, "_native_cpu_inductor_forces", False)
+                    and needs_native_cpu_force_training(self, net_input)):
+                torch._assert(not compiling_fullgraph(),
+                              "Fullgraph CPU force training requires an eager backend for this model")
+                return native_cpu_force_training(self, net_input)
             if compiling_fullgraph():
                 return forward_with_coordinate_gradients(self, net_input)
             if self.training:

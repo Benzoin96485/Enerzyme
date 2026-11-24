@@ -27,6 +27,39 @@ def compiling_fullgraph() -> bool:
         return True
 
 
+@torch.compiler.assume_constant_result
+def _cpu_backend_may_use_inductor() -> bool:
+    """Custom backends may delegate to Inductor. Eager backends do no kernel lowering."""
+    from torch._dynamo.symbolic_convert import InstructionTranslator
+
+    try:
+        wrapper = InstructionTranslator.current_tx().output.compiler_fn
+    except AttributeError:
+        return True
+    backend = getattr(wrapper, "_torchdynamo_orig_backend", wrapper)
+    name = getattr(backend, "compiler_name", getattr(backend, "__name__", None))
+    return name not in ("eager", "aot_eager")
+
+
+def needs_native_cpu_force_training(core, inputs):
+    for stages in (core.pre_sequence, core.post_sequence):
+        for layer in stages:
+            if type(layer) is not ForceLayer or not layer.training or layer.eval_only:
+                continue
+            if (layer.test_only and not core.test_mode) or (layer.test_exclude and core.test_mode):
+                continue
+            coordinates = inputs.get(layer._name_mapping["Ra"])
+            if coordinates is not None and coordinates.device.type == "cpu":
+                return _cpu_backend_may_use_inductor()
+    return False
+
+
+@torch.compiler.disable
+def native_cpu_force_training(core, inputs):
+    # Force-loss double backward in the affected CPU kernels can abort the process.
+    return core._run_layers(inputs)
+
+
 @torch.compiler.disable
 def _prepare_radius_graph(core, inputs):
     """Choose discrete neighbors once, before tracing the differentiable geometry."""

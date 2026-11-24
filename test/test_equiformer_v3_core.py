@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import torch
+import pytest
 import yaml
 from numpy.testing import assert_allclose
 
@@ -149,6 +150,43 @@ def test_equiformer_v3_build_model_energy_force_finite():
     assert out["Fa"].shape == (N, 3)
     assert torch.isfinite(out["E"]).all()
     assert torch.isfinite(out["Fa"]).all()
+
+
+def test_cpu_compiled_force_training_uses_native_gradients(monkeypatch):
+    from enerzyme.models.ff import build_model
+    from torch._dynamo.exc import TorchRuntimeError
+
+    # Fail before compiler code generation if the unsafe coordinate VJP is traced.
+    def unexpected_lowering(*args, **kwargs):
+        raise AssertionError("CPU Inductor received an EquiformerV3 force-training graph")
+
+    monkeypatch.setattr(torch._inductor, "compile", unexpected_lowering)
+    torch.manual_seed(31)
+    model = build_model("equiformer_v3", verbose=0).train()
+    receivers, senders = _complete_graph_edges(4)
+    batch = dict(Ra=torch.randn(4, 3, requires_grad=True), Za=torch.tensor([1, 6, 7, 8]),
+                 batch_seg=torch.zeros(4, dtype=torch.long), idx_i=receivers, idx_j=senders)
+
+    def step(runner):
+        torch.manual_seed(52)
+        model.zero_grad(set_to_none=True)
+        out = runner(dict(batch))
+        (out["E"].square().sum() + out["Fa"].square().sum()).backward()
+        gradients = {n: p.grad.detach().clone() for n, p in model.named_parameters() if p.grad is not None}
+        return out["E"].detach(), out["Fa"].detach(), gradients
+
+    expected_e, expected_f, expected_g = step(model)
+    actual_e, actual_f, actual_g = step(torch.compile(model))
+    torch.testing.assert_close(actual_e, expected_e, atol=0, rtol=0)
+    torch.testing.assert_close(actual_f, expected_f, atol=0, rtol=0)
+    assert actual_g.keys() == expected_g.keys() and len(actual_g) > 1
+    for name in expected_g:
+        torch.testing.assert_close(actual_g[name], expected_g[name], atol=0, rtol=0)
+    # PyTorch's code cache can reuse a previous non-strict trace of the same
+    # method when only fullgraph changes. Exercise an independent strict trace.
+    torch.compiler.reset()
+    with pytest.raises((AssertionError, TorchRuntimeError), match="Fullgraph CPU force training"):
+        torch.compile(model, fullgraph=True)(dict(batch))
 
 
 def test_equiformer_v3_so3_scalar_invariance():
