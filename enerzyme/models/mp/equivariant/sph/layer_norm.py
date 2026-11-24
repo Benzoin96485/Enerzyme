@@ -218,6 +218,17 @@ class EquivariantDegreeRMSNorm(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if (torch.compiler.is_compiling() and not self.training
+                and x.device.type == "cpu" and x.dtype == torch.float64):
+            from ....layers.compiled_grad import compiling_fullgraph
+
+            if not compiling_fullgraph():
+                # This norm intentionally evaluates in FP32. Native reductions
+                # and their backward preserve its rounding in FP64 inference.
+                return self._native_normalize(x)
+        return self._normalize(x)
+
+    def _normalize(self, x: torch.Tensor) -> torch.Tensor:
         in_dtype = x.dtype
         x = x.float()
         x0 = x[:, :1]
@@ -242,3 +253,5 @@ class EquivariantDegreeRMSNorm(nn.Module):
             dim=1,
         )
         return x.to(dtype=in_dtype)
+
+    _native_normalize = torch.compiler.disable(_normalize)

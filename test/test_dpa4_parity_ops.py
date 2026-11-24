@@ -204,3 +204,27 @@ def test_indexing_fixture_roundtrip_optional():
     np.testing.assert_array_equal(payload["m_major_l"], data["m_major_l"])
     np.testing.assert_allclose(payload["rescale"], data["rescale"])
     np.testing.assert_array_equal(payload["gie_rows"], data["gie_rows"])
+
+
+def test_compiled_cpu_fp64_degree_norm_preserves_native_rounding_and_derivatives():
+    from enerzyme.models.mp.equivariant.sph.layer_norm import EquivariantDegreeRMSNorm
+
+    rng = torch.Generator().manual_seed(103)
+    norm = EquivariantDegreeRMSNorm(lmax=2, channels=96).double().eval()
+    x = torch.randn(7, 9, 1, 96, generator=rng, dtype=torch.float64, requires_grad=True)
+    weight = torch.randn(x.shape, generator=rng, dtype=x.dtype)
+
+    def energy(features):
+        return (norm(features) * weight).sum()
+
+    reference = energy(x)
+    expected, = torch.autograd.grad(reference, x)
+    value = torch.compile(energy)(x)
+    actual, = torch.autograd.grad(value, x)
+    torch.testing.assert_close(value, reference, rtol=1e-10, atol=1e-12)
+    torch.testing.assert_close(actual, expected, rtol=1e-10, atol=1e-12)
+
+    for training in (True, False):
+        norm.train(training)
+        strict = torch.compile(norm, backend="eager", fullgraph=True)
+        torch.testing.assert_close(strict(x), norm(x), rtol=0, atol=0)
