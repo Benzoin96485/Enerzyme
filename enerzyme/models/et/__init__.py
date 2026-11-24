@@ -6,16 +6,14 @@ in the shared layer stack. The neighbor embedding and the attention stack
 are the Core.
 """
 
-from .core import (
+from .defaults import (
     DEFAULT_BUILD_PARAMS,
     DEFAULT_LAYER_PARAMS,
     PUBLISHED_QM9_BUILD_PARAMS,
     PUBLISHED_QM9_CORE_PARAMS,
-    ETCore,
 )
 
 __all__ = [
-    "ETCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "PUBLISHED_QM9_BUILD_PARAMS",

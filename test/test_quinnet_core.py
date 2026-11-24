@@ -56,7 +56,7 @@ def _attach(core, num_rbf: int):
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
     radial = ExpNormalSmearing(num_rbf=num_rbf, cutoff_sr=5.0, trainable=False)
-    core._radial_holder = [radial]
+    core.embed._radial_holder = [radial]
     core.eval()
     return core
 
@@ -126,7 +126,7 @@ def test_registration_and_yaml_build():
 
     for name in ("quinnet", "QuinNet", "quin-net", "quin_net"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "QuinNetCore"
+        assert core_cls.__name__ == "quinnet"
         assert build_params["num_rbf"] == 32
         assert build_params["dim_embedding"] == 256
         assert build_params["cutoff_sr"] == 5.0
@@ -146,13 +146,13 @@ def test_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "QuinNetCore"
+    assert model.architecture == "quinnet"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.vector_feature_layout == "cartesian_n3f"
     assert model.angular_dim == 8
     assert model.lmax == 2
-    assert model._radial_holder[0].__class__.__name__ == "ExpNormalSmearing"
+    assert model.embed._radial_holder[0].__class__.__name__ == "ExpNormalSmearing"
     readout = next(layer for layer in model.post_sequence if isinstance(layer, SimpleReadout))
     assert readout.head_type == "two_layer"
     assert readout.head[0].dim_feature_out == 4
@@ -160,10 +160,10 @@ def test_registration_and_yaml_build():
 
 def test_unknown_width_and_cutoff_mismatch_raise():
     from enerzyme.models.ff import build_model
-    from enerzyme.models.quinnet import QuinNetCore
+    from enerzyme.models.presets.cartesian_vector import quinnet
 
     try:
-        QuinNetCore(dim_embedding=6, num_rbf=3, num_heads=4)
+        quinnet(dim_embedding=6, num_rbf=3, num_heads=4)
     except ValueError as exc:
         assert "divisible" in str(exc)
     else:
@@ -191,12 +191,12 @@ def test_unknown_width_and_cutoff_mismatch_raise():
 
 
 def test_features_rotation_parity_translation_and_batch():
-    from enerzyme.models.quinnet import QuinNetCore
+    from enerzyme.models.presets.cartesian_vector import quinnet
 
     torch.manual_seed(3)
     n, features, num_rbf = 4, 8, 4
     core = _attach(
-        QuinNetCore(
+        quinnet(
             dim_embedding=features,
             num_rbf=num_rbf,
             num_layers=2,
@@ -267,13 +267,13 @@ def test_features_rotation_parity_translation_and_batch():
 
 
 def test_neighbor_embedding_self_pairs_ratio_and_isolated_atom():
-    from enerzyme.models.quinnet import QuinNetCore
+    from enerzyme.models.presets.cartesian_vector import quinnet
 
     torch.manual_seed(6)
     n, features, num_rbf = 3, 8, 4
     graph = _graph(n, features, num_rbf, seed=6)
     with_neighbors = _attach(
-        QuinNetCore(
+        quinnet(
             dim_embedding=features,
             num_rbf=num_rbf,
             num_layers=2,
@@ -283,7 +283,7 @@ def test_neighbor_embedding_self_pairs_ratio_and_isolated_atom():
         num_rbf,
     )
     without = _attach(
-        QuinNetCore(
+        quinnet(
             dim_embedding=features,
             num_rbf=num_rbf,
             num_layers=2,
@@ -308,7 +308,7 @@ def test_neighbor_embedding_self_pairs_ratio_and_isolated_atom():
     )
 
     no_self = _attach(
-        QuinNetCore(
+        quinnet(
             dim_embedding=features,
             num_rbf=num_rbf,
             num_layers=2,
@@ -327,7 +327,7 @@ def test_neighbor_embedding_self_pairs_ratio_and_isolated_atom():
         rtol=1e-5,
     )
 
-    shifted_ratio = QuinNetCore(
+    shifted_ratio = quinnet(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_layers=2,
@@ -339,7 +339,7 @@ def test_neighbor_embedding_self_pairs_ratio_and_isolated_atom():
     with torch.no_grad():
         # The first block sees a zero angular state, so its ratio does not
         # enter the scalar update. The second block does.
-        shifted_ratio.quin_layers[1].ratio.copy_(
+        shifted_ratio.blocks[1].module.ratio.copy_(
             torch.tensor([0.0, 2.0, -1.0, 0.5, 3.0, -0.4])
         )
     _attach(shifted_ratio, num_rbf)

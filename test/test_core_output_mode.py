@@ -198,12 +198,12 @@ def test_hierachical_nse_readout_positive_fa_3d_atom_feature():
 
 
 def test_alphanet_feature_latent_shape():
-    from enerzyme.models.alphanet.core import AlphaNetCore
+    from enerzyme.models.presets.cartesian_vector import alphanet
 
     torch.manual_seed(0)
     n_atoms = 5
     hidden = 8
-    core = AlphaNetCore(
+    core = alphanet(
         dim_embedding=hidden,
         num_rbf=4,
         cutoff_sr=5.0,

@@ -1,6 +1,6 @@
 """ViSNet-LSRM Core (Li et al., ICLR 2024).
 
-Short-range message passing is :class:`~enerzyme.models.visnet.core.ViSNetCore`.
+Short-range message passing is :func:`~enerzyme.models.presets.cartesian_vector.visnet`.
 The long-range branch is the released serial ViSNet-LSRM block: after the
 short stack, fragment states are mean-pooled from that state and atoms attend
 to fragments inside ``cutoff_lr``. The two branches are normalized separately
@@ -24,15 +24,16 @@ the current coordinates. ``center='atomic_number'`` is the released
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Optional
 
 import torch
 from torch import Tensor
-from torch.nn import LayerNorm, Linear, ModuleList
+from torch.nn import LayerNorm, Linear
 from ..mp.ops import scatter_mean
 
 from ..layers.rbf import ExpNormalSmearing
-from .core import ViSNetCore
+from ..mp.block import Block, BlockState
+from ..mp.head import Head
 from .interaction import VecLayerNorm, _xavier_linear
 from .long_range import (
     FragmentBipartiteBlock,
@@ -117,126 +118,41 @@ def _batch_index(batch_seg: Optional[Tensor], n_atoms: int, device: torch.device
     return index
 
 
-class ViSNetLSRMCore(ViSNetCore):
-    """ViSNet short-range stack plus serial fragment long-range fusion."""
+class FragmentEdges(Block):
+    """Seed the long-range state and prepare the atom-to-fragment graph once."""
 
-    def __str__(self) -> str:
-        return """
-################################################################################
-# ViSNet-LSRM (Li et al., ICLR 2024)                                           #
-# short ViSNet, then atom–fragment long-range messages, late concat           #
-# atom_feature [N, 2F], atom_vector_feature [N, 3, 2F]                        #
-################################################################################
-"""
+    input_fields = ("Ra", "Za", "batch_seg", "cluster_ids")
 
-    def __init__(
-        self,
-        dim_embedding: int = 128,
-        num_rbf: int = 50,
-        max_Za: int = 100,
-        cutoff_sr: float = 4.0,
-        num_layers: int = 6,
-        long_layers: int = 2,
-        num_heads: int = 8,
-        lmax: int = 1,
-        vertex_type: object = "none",
-        vecnorm_type: object = "max_min",
-        trainable_vecnorm: bool = False,
-        neighbor_embedding: bool = True,
-        include_self: bool = False,
-        activation: object = "silu",
-        attn_activation: object = "silu",
-        cutoff_lr: float = 9.0,
-        fragment_mode: object = "kmeans",
-        center: object = "atomic_number",
-        min_nodes_per_group: int = 24,
-        kmeans_random_state: int = 0,
-        dropout: float = 0.0,
-        trainable_rbf_lr: bool = True,
-    ) -> None:
-        if int(long_layers) < 0:
-            raise ValueError(f"long_layers must be >= 0, got {long_layers}")
-        if float(cutoff_lr) <= 0.0:
-            raise ValueError(f"cutoff_lr must be positive, got {cutoff_lr}")
-        if not 0.0 <= float(dropout) < 1.0:
-            raise ValueError(f"dropout must lie in [0, 1), got {dropout}")
-        mode = normalize_fragment_mode(fragment_mode)
-        center_name = normalize_center(center)
-        super().__init__(
-            dim_embedding=dim_embedding,
-            num_rbf=num_rbf,
-            max_Za=max_Za,
-            cutoff_sr=cutoff_sr,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            lmax=lmax,
-            vertex_type=vertex_type,
-            vecnorm_type=vecnorm_type,
-            trainable_vecnorm=trainable_vecnorm,
-            neighbor_embedding=neighbor_embedding,
-            include_self=include_self,
-            activation=activation,
-            attn_activation=attn_activation,
-        )
-        self._input_fields |= {"Ra", "batch_seg", "cluster_ids"}
-        self._relevant_fields |= {"Ra", "batch_seg", "cluster_ids"}
-        for name in ("Ra", "batch_seg", "cluster_ids"):
-            self._name_mapping[name] = name
+    def __init__(self, num_rbf, width, cutoff_lr, trainable, mode, center, min_nodes, seed, active):
+        super().__init__()
+        self.dim_embedding = width
+        self.cutoff_lr = cutoff_lr
+        self.mode = mode
+        self.center = center
+        self.min_nodes_per_group = max(1, min_nodes)
+        self.kmeans_random_state = seed
+        self.active = active
+        self.long_rbf = ExpNormalSmearing(num_rbf=num_rbf, cutoff_sr=cutoff_lr, trainable=trainable)
+        self.long_rbf_proj = Linear(num_rbf, width)
 
-        self.long_layers = int(long_layers)
-        self.cutoff_lr = float(cutoff_lr)
-        self.fragment_mode = mode
-        self.center = center_name
-        self.min_nodes_per_group = max(int(min_nodes_per_group), 1)
-        self.kmeans_random_state = int(kmeans_random_state)
-        self.dropout = float(dropout)
-        self.trainable_rbf_lr = bool(trainable_rbf_lr)
-        # Late fusion concatenates the short and long invariants.
-        self.dim_feature_out = 2 * self.dim_embedding
-        self.feature_irreps = f"{self.dim_feature_out}x0e"
-
-        self.long_rbf = ExpNormalSmearing(
-            num_rbf=self.num_rbf,
-            cutoff_sr=self.cutoff_lr,
-            trainable=self.trainable_rbf_lr,
-        )
-        self.long_rbf_proj = Linear(self.num_rbf, self.dim_embedding)
-        self.long_blocks = ModuleList(
-            [
-                FragmentBipartiteBlock(
-                    self.dim_embedding, self.num_heads, self.dropout
-                )
-                for _ in range(self.long_layers)
-            ]
-        )
-        self.out_norm_long = LayerNorm(self.dim_embedding)
-        # Section 4.1 min-max vector norm, independent of the short-range setting.
-        self.vec_out_norm_long = VecLayerNorm(
-            self.dim_embedding, trainable=False, norm_type="max_min"
-        )
-        _xavier_linear(self.long_rbf_proj)
-
-    def _long_range(
-        self,
-        scalar: Tensor,
-        vector_l1: Tensor,
-        Ra: Tensor,
-        Za: Optional[Tensor],
-        batch_seg: Optional[Tensor],
-        cluster_ids: Optional[Tensor],
-    ) -> tuple[Tensor, Tensor]:
-        """Serial long-range residuals. ``long_layers == 0`` returns zeros."""
-        n_atoms = int(scalar.shape[0])
-        if self.long_layers == 0 or n_atoms == 0:
-            return (
-                scalar.new_zeros(n_atoms, self.dim_embedding),
-                vector_l1.new_zeros(n_atoms, 3, self.dim_embedding),
-            )
+    def forward(self, state, ctx):
+        scalar = state.scalar
+        vector = state.equi[:, :3].contiguous()
+        n_atoms = ctx.num_nodes
+        short = {"short": state}
+        Ra = ctx.inputs.get("Ra")
+        if self.active and Ra is None:
+            raise ValueError("long-range fragments require atomic positions Ra")
+        if not self.active or n_atoms == 0:
+            return BlockState(scalar.new_zeros(scalar.shape), vector.new_zeros(vector.shape), None, short)
+        Za = ctx.inputs.get("Za")
+        batch_seg = ctx.batch
+        cluster_ids = ctx.inputs.get("cluster_ids")
         batch = _batch_index(batch_seg, n_atoms, scalar.device)
         flat_ids, centers, cluster_batch = resolve_long_range_fragments(
             Ra.to(dtype=scalar.dtype),
             batch,
-            self.fragment_mode,
+            self.mode,
             self.center,
             None if Za is None else Za.reshape(-1),
             cluster_ids,
@@ -254,72 +170,32 @@ class ViSNetLSRMCore(ViSNetCore):
             edge_attr = scalar.new_zeros(0, self.dim_embedding)
         else:
             edge_attr = self.long_rbf_proj(self.long_rbf.get_rbf(distance))
-        long_scalar = scalar
-        long_vector = vector_l1
-        for block in self.long_blocks:
-            group_scalar = scatter_mean(long_scalar, flat_ids, dim=0)
-            group_vector = scatter_mean(
-                long_vector.reshape(n_atoms, -1), flat_ids, dim=0
-            ).reshape(-1, 3, self.dim_embedding)
-            delta_scalar, delta_vector = block(
-                long_scalar,
-                long_vector,
-                group_scalar,
-                group_vector,
-                idx_atom,
-                idx_fragment,
-                edge_attr,
-                direction,
-            )
-            long_scalar = long_scalar + delta_scalar
-            long_vector = long_vector + delta_vector
-        return long_scalar, long_vector
+        ctx.cache["fragment_graph"] = flat_ids, idx_atom, idx_fragment, edge_attr, direction
+        return BlockState(scalar, vector, None, short)
 
-    def get_output(
-        self,
-        atom_embedding: Tensor,
-        rbf: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
-        vij_sr: Tensor,
-        Dij_sr: Tensor,
-        cutoff_values_sr: Optional[Tensor] = None,
-        Za: Optional[Tensor] = None,
-        Ra: Optional[Tensor] = None,
-        batch_seg: Optional[Tensor] = None,
-        cluster_ids: Optional[Tensor] = None,
-    ) -> Dict[str, Tensor]:
-        """Short-range ViSNet, then serial long-range fusion.
 
-        ``Ra`` is required when ``long_layers > 0`` because fragment centers
-        are means of the current coordinates. ``cluster_ids`` is required only
-        for ``fragment_mode='precomputed'``.
-        """
-        if self.long_layers > 0 and Ra is None:
-            raise ValueError("long-range fragments require atomic positions Ra")
-        scalar, vector = self.encode_state(
-            atom_embedding,
-            rbf,
-            idx_i_sr,
-            idx_j_sr,
-            vij_sr,
-            Dij_sr,
-            cutoff_values_sr,
-            Za,
-        )
-        long_scalar, long_vector = self._long_range(
-            scalar, vector[:, :3].contiguous(), Ra, Za, batch_seg, cluster_ids
-        )
-        scalar = self.out_norm(scalar)
-        vector = self.vec_out_norm(vector)
-        long_scalar = self.out_norm_long(long_scalar)
-        long_vector = self.vec_out_norm_long(long_vector)
-        output = {
-            "atom_feature": torch.cat((scalar, long_scalar), dim=-1),
-            "atom_vector_feature": torch.cat(
-                (vector[:, :3], long_vector), dim=-1
-            ).contiguous(),
-        }
-        if self.lmax == 2:
-            output["atom_l2_feature"] = vector[:, 3:].contiguous()
-        return output
+def fragment_step(block, state, ctx):
+    if ctx.num_nodes == 0:
+        return state
+    ids, atoms, fragments, edges, directions = ctx.cache["fragment_graph"]
+    vector = state.equi
+    group_scalar = scatter_mean(state.scalar, ids, dim=0)
+    group_vector = scatter_mean(vector.reshape(ctx.num_nodes, -1), ids, dim=0).reshape(-1, 3, vector.shape[-1])
+    ds, dv = block(state.scalar, vector, group_scalar, group_vector, atoms, fragments, edges, directions)
+    return BlockState(state.scalar + ds, vector + dv, None, state.aux)
+
+
+class FragmentFusionHead(Head):
+    def __init__(self, short_head, width):
+        super().__init__()
+        self.short = short_head
+        self.output_fields = short_head.output_fields
+        self.out_norm_long = LayerNorm(width)
+        self.vec_out_norm_long = VecLayerNorm(width, trainable=False, norm_type="max_min")
+
+    def forward(self, state, ctx, taps, inputs):
+        out = self.short(state.aux["short"], ctx, taps, inputs)
+        out["atom_feature"] = torch.cat((out["atom_feature"], self.out_norm_long(state.scalar)), dim=-1)
+        out["atom_vector_feature"] = torch.cat((out["atom_vector_feature"], self.vec_out_norm_long(state.equi)),
+                                               dim=-1).contiguous()
+        return out

@@ -19,7 +19,11 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Identity, LayerNorm, Linear, Module, ModuleList, Parameter, Sequential
 
+from ..mp.block import Block, BlockState
+from ..mp.core import Embed
+from ..mp.head import Head
 from ..mp.ops import scatter_sum
+from .geometry import angular_dim, geodite_spherical_harmonics
 from ..layers.rejection import vector_rejection
 from .geometry import degree_widths, split_degrees
 
@@ -448,3 +452,68 @@ class InteractionBlock(Module):
                 sender = vector_rejection(sender, -axis)
             weight = weight + (receiver * sender).sum(dim=1)
         return self.edge_mlp(edges) * self.edge_gate(weight)
+
+
+class GeoditeEmbed(Embed):
+    input_fields = ("atom_embedding", "Za")
+
+    def __init__(self, width, num_rbf, max_Za, lmax):
+        super().__init__()
+        self.width = width
+        self.num_rbf = num_rbf
+        self.lmax = lmax
+        self.angular_dim = angular_dim(lmax)
+        self.node_init = NodeInit(width, num_rbf, max_Za)
+        self.edge_init = EdgeInit(width, num_rbf)
+
+    def forward(self, inputs, ctx):
+        x = inputs["atom_embedding"]
+        z = inputs["Za"].long()
+        if x.shape[-1] != self.width:
+            raise ValueError(f"atom_embedding width {x.shape[-1]} != dim_embedding {self.width}")
+        if ctx.rbf.ndim != 2 or ctx.rbf.shape[-1] != self.num_rbf:
+            raise ValueError(f"rbf must have shape [E, {self.num_rbf}], got {tuple(ctx.rbf.shape)}")
+        if x.shape[0] != z.shape[0]:
+            raise ValueError(f"atom_embedding has {x.shape[0]} atoms but Za has {z.shape[0]}")
+        scalar = self.node_init(x, z, ctx.rbf, ctx.receiver, ctx.sender)
+        edges = self.edge_init(scalar, ctx.rbf, ctx.receiver, ctx.sender)
+        vector = scalar.new_zeros((ctx.num_nodes, self.angular_dim, self.width))
+        harmonics = (geodite_spherical_harmonics(ctx.unit(), self.lmax) if ctx.num_edges else
+                     ctx.vec.new_zeros((0, self.angular_dim)))
+        ctx.cache["geodite_harmonics"] = harmonics
+
+        # Evaluate the isolated-atom reference once per species using the same learned updates.
+        unique, inverse = torch.unique(z, sorted=True, return_inverse=True)
+        choice = torch.empty_like(unique)
+        choice.scatter_(0, inverse, torch.arange(ctx.num_nodes, device=z.device))
+        empty = z.new_empty(0)
+        isolated = self.node_init(x.index_select(0, choice), unique, ctx.rbf[:0], empty, empty)
+        isolated_vector = isolated.new_zeros(unique.shape[0], self.angular_dim, self.width)
+        ctx.cache["isolated_species"] = inverse
+        return BlockState(scalar, vector, edges, {"isolated": isolated, "isolated_vector": isolated_vector})
+
+
+class GeoditeBlock(Block):
+    def __init__(self, message, coupling):
+        super().__init__()
+        self.message = message
+        self.coupling = coupling
+
+    def forward(self, state, ctx):
+        x, v, edges = self.message(state.scalar, state.equi, state.edge,
+                                   ctx.cache["geodite_harmonics"], ctx.rbf, ctx.receiver, ctx.sender)
+        x, v = self.coupling(x, v)
+        x0, v0 = self.message.norm(state.aux["isolated"], state.aux["isolated_vector"])
+        x0, v0 = self.coupling(x0, v0)
+        return BlockState(x, v, edges, {"isolated": x0, "isolated_vector": v0})
+
+
+class GeoditeHead(Head):
+    needs_taps = True
+    output_fields = ("atom_feature", "isolated_atom_feature", "atom_steerable_feature")
+
+    def forward(self, state, ctx, taps, inputs):
+        scalars = torch.stack([tap.scalar for tap in taps[1:]], dim=-1)
+        isolated = torch.stack([tap.aux["isolated"] for tap in taps[1:]], dim=-1)
+        return {"atom_feature": scalars, "isolated_atom_feature": isolated.index_select(0, ctx.cache["isolated_species"]),
+                "atom_steerable_feature": state.equi}

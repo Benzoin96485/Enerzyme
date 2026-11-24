@@ -35,7 +35,7 @@ def _rotation(seed: int = 0, improper: bool = False) -> torch.Tensor:
 
 
 def _core(**overrides):
-    from enerzyme.models.leftnet import LEFTNetCore
+    from enerzyme.models.presets.cartesian_vector import leftnet
 
     params = dict(
         dim_embedding=8,
@@ -45,7 +45,7 @@ def _core(**overrides):
         fte_scalarization="l2",
     )
     params.update(overrides)
-    return LEFTNetCore(**params).double().eval()
+    return leftnet(**params).double().eval()
 
 
 def _call(core, pos, embedding, rbf, idx_i, idx_j, batch=None):
@@ -80,7 +80,7 @@ def test_leftnet_registration_and_yaml_build():
 
     for name in ("leftnet", "LEFTNet"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "LEFTNetCore"
+        assert core_cls.__name__ == "leftnet"
         assert build_params["num_rbf"] == 32
         assert build_params["cutoff_sr"] == 5.0
         assert layers[1]["params"]["alpha"] == 1.0
@@ -94,7 +94,7 @@ def test_leftnet_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "LEFTNetCore"
+    assert model.architecture == "leftnet"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.vector_feature_layout == "cartesian_n3f"
@@ -104,18 +104,18 @@ def test_leftnet_registration_and_yaml_build():
 
 
 def test_leftnet_rejects_bad_settings():
-    from enerzyme.models.leftnet import LEFTNetCore
+    from enerzyme.models.presets.cartesian_vector import leftnet
 
     with pytest.raises(ValueError):
-        LEFTNetCore(dim_embedding=3)
+        leftnet(dim_embedding=3)
     with pytest.raises(ValueError):
-        LEFTNetCore(num_layers=0)
+        leftnet(num_layers=0)
     with pytest.raises(ValueError):
-        LEFTNetCore(num_rbf=0)
+        leftnet(num_rbf=0)
     with pytest.raises(ValueError):
-        LEFTNetCore(cutoff_sr=0.0)
+        leftnet(cutoff_sr=0.0)
     with pytest.raises(ValueError):
-        LEFTNetCore(fte_scalarization="l1")
+        leftnet(fte_scalarization="l1")
 
 
 @pytest.mark.parametrize("scalarization", ["l2", "frame"])

@@ -156,16 +156,16 @@ def test_block_rotation_and_empty_edges():
 
 
 def test_precomputed_requires_labels_and_unknown_mode_fails():
-    from enerzyme.models.visnet.lsr import ViSNetLSRMCore
+    from enerzyme.models.presets.cartesian_vector import visnet_lsrm
 
     try:
-        ViSNetLSRMCore(dim_embedding=4, num_rbf=2, num_heads=2, num_layers=1, fragment_mode="nope")
+        visnet_lsrm(dim_embedding=4, num_rbf=2, num_heads=2, num_layers=1, fragment_mode="nope")
     except ValueError as exc:
         assert "fragment_mode" in str(exc)
     else:
         raise AssertionError("expected an unknown fragment mode to fail")
 
-    core = ViSNetLSRMCore(
+    core = visnet_lsrm(
         dim_embedding=4,
         num_rbf=2,
         num_heads=2,

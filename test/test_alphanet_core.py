@@ -35,7 +35,7 @@ def _rotation(seed: int = 0, improper: bool = False) -> torch.Tensor:
 
 
 def _core(**overrides):
-    from enerzyme.models.alphanet import AlphaNetCore
+    from enerzyme.models.presets.cartesian_vector import alphanet
 
     params = dict(
         dim_embedding=8,
@@ -53,7 +53,7 @@ def _core(**overrides):
         reduce_mode="sum",
     )
     params.update(overrides)
-    return AlphaNetCore(**params).double()
+    return alphanet(**params).double()
 
 
 def _call(core, pos, embedding, rbf, idx_i, idx_j, batch=None):
@@ -86,7 +86,7 @@ def test_alphanet_registration_and_yaml_build():
 
     for name in ("alphanet", "AlphaNet"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "AlphaNetCore"
+        assert core_cls.__name__ == "alphanet"
         assert build_params["num_rbf"] == 96
         assert layers[1]["params"]["flavor"] == "equflash"
         assert layers[1]["params"]["apply_cutoff_fn"] is False
@@ -103,7 +103,7 @@ def test_alphanet_registration_and_yaml_build():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "AlphaNetCore"
+    assert model.architecture == "alphanet"
     assert model.dim_feature_out == 128
     assert model.vector_feature_layout == "cartesian_n3f"
     assert model.fte_scalarization == "l2"
@@ -111,20 +111,20 @@ def test_alphanet_registration_and_yaml_build():
 
 
 def test_alphanet_rejects_bad_settings():
-    from enerzyme.models.alphanet import AlphaNetCore
+    from enerzyme.models.presets.cartesian_vector import alphanet
 
     with pytest.raises(ValueError):
-        AlphaNetCore(dim_embedding=6)
+        alphanet(dim_embedding=6)
     with pytest.raises(ValueError):
-        AlphaNetCore(dim_embedding=8, head=3, hidden_channels_chi=8)
+        alphanet(dim_embedding=8, head=3, hidden_channels_chi=8)
     with pytest.raises(ValueError):
-        AlphaNetCore(dim_embedding=8, head=2, hidden_channels_chi=4, main_chi1=0)
+        alphanet(dim_embedding=8, head=2, hidden_channels_chi=4, main_chi1=0)
     with pytest.raises(ValueError):
-        AlphaNetCore(reduce_mode="max")
+        alphanet(reduce_mode="max")
     with pytest.raises(ValueError):
-        AlphaNetCore(fte_scalarization="frame")
+        alphanet(fte_scalarization="frame")
     with pytest.raises(ValueError):
-        AlphaNetCore(num_layers=0)
+        alphanet(num_layers=0)
 
 
 def test_alphanet_quantum_state_has_unit_modulus():
@@ -236,9 +236,9 @@ def test_alphanet_rejects_a_cross_molecule_edge_and_a_stale_distance():
 
 
 def test_alphanet_default_transition_is_equivariant():
-    from enerzyme.models.alphanet import AlphaNetCore
+    from enerzyme.models.presets.cartesian_vector import alphanet
 
-    core = AlphaNetCore(
+    core = alphanet(
         dim_embedding=8,
         num_rbf=4,
         num_layers=1,
@@ -250,7 +250,7 @@ def test_alphanet_default_transition_is_equivariant():
         has_dropout_flag=False,
     )
     assert core.fte_scalarization == "l2"
-    opted = AlphaNetCore(
+    opted = alphanet(
         dim_embedding=8,
         num_rbf=4,
         num_layers=1,

@@ -10,26 +10,22 @@ ViSNet-LSRM (Li et al., ICLR 2024) subclasses that Core. Register it as
 live in :mod:`enerzyme.models.visnet.lsr`.
 """
 
-from .core import (
+from .defaults import (
     DEFAULT_BUILD_PARAMS,
     DEFAULT_LAYER_PARAMS,
     PUBLISHED_MD17_BUILD_PARAMS,
     PUBLISHED_MD17_CORE_PARAMS,
     PUBLISHED_QM9_BUILD_PARAMS,
     PUBLISHED_QM9_CORE_PARAMS,
-    ViSNetCore,
 )
 from .lsr import (
     DEFAULT_BUILD_PARAMS as LSRM_DEFAULT_BUILD_PARAMS,
     DEFAULT_LAYER_PARAMS as LSRM_DEFAULT_LAYER_PARAMS,
     PUBLISHED_MD22_BUILD_PARAMS,
     PUBLISHED_MD22_CORE_PARAMS,
-    ViSNetLSRMCore,
 )
 
 __all__ = [
-    "ViSNetCore",
-    "ViSNetLSRMCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "PUBLISHED_MD17_BUILD_PARAMS",

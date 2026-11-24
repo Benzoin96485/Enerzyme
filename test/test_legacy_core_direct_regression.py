@@ -265,9 +265,9 @@ def test_spookynet_build_default_layers_forward_backward():
 
 def test_alphanet_core_emits_features_without_an_internal_head():
     """Energy and charge heads live in the layer stack, not on the Core."""
-    from enerzyme.models.alphanet.core import AlphaNetCore
+    from enerzyme.models.presets.cartesian_vector import alphanet
 
-    core = AlphaNetCore(
+    core = alphanet(
         dim_embedding=8,
         num_rbf=4,
         num_layers=1,

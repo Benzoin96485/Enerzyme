@@ -16,7 +16,7 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from ..mp.ops import scatter_sum
+from ...ops import scatter_sum
 
 
 def reduce_nodes(src: Tensor, index: Tensor, dim_size: int, reduce: str = "sum") -> Tensor:

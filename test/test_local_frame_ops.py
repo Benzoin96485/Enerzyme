@@ -8,8 +8,8 @@ import pytest
 import torch
 
 from enerzyme.models.layers.rbf import ExpNormalSmearing
-from enerzyme.models.local_frame.encoding import LocalSubstructure
-from enerzyme.models.local_frame.geometry import (
+from enerzyme.models.mp.message.frame.encoding import LocalSubstructure
+from enerzyme.models.mp.message.frame.geometry import (
     alphanet_edge_frame,
     leftnet_edge_frame,
     leftnet_node_frame,

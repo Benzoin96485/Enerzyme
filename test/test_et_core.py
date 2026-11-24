@@ -117,7 +117,7 @@ def test_et_registration_and_yaml_build():
 
     for name in ("et", "ET", "torchmd-et", "torchmd_et", "equivariant-transformer"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "ETCore"
+        assert core_cls.__name__ == "et"
         assert build_params["num_rbf"] == 32
         assert build_params["cutoff_sr"] == 5.0
         assert build_params["cutoff_fn"] == "cosine"
@@ -134,23 +134,23 @@ def test_et_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "ETCore"
+    assert model.architecture == "et"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.vector_feature_layout == "cartesian_n3f"
     assert model.num_heads == 8
-    assert model._radial_holder[0].__class__.__name__ == "ExpNormalSmearing"
+    assert model.embed._radial_holder[0].__class__.__name__ == "ExpNormalSmearing"
     readout = next(layer for layer in model.post_sequence if isinstance(layer, SimpleReadout))
     assert readout.head_type == "two_layer"
     assert readout.head[0].dim_feature_out == 4
 
 
 def test_unknown_width_and_cutoff_mismatch_raise():
-    from enerzyme.models.et import ETCore
+    from enerzyme.models.presets.cartesian_vector import et
     from enerzyme.models.ff import build_model
 
     try:
-        ETCore(dim_embedding=6, num_rbf=3, num_heads=4)
+        et(dim_embedding=6, num_rbf=3, num_heads=4)
     except ValueError as exc:
         assert "divisible" in str(exc)
     else:
@@ -178,12 +178,12 @@ def test_unknown_width_and_cutoff_mismatch_raise():
 
 
 def test_features_rotation_parity_translation_and_batch():
-    from enerzyme.models.et import ETCore
+    from enerzyme.models.presets.cartesian_vector import et
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
     torch.manual_seed(3)
     n, features, num_rbf = 4, 8, 4
-    core = ETCore(
+    core = et(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_layers=2,
@@ -192,7 +192,7 @@ def test_features_rotation_parity_translation_and_batch():
         max_Za=10,
     )
     radial = ExpNormalSmearing(num_rbf=num_rbf, cutoff_sr=5.0, trainable=False)
-    core._radial_holder = [radial]
+    core.embed._radial_holder = [radial]
     core.eval()
     graph = _graph(n, features, num_rbf, seed=3)
     out = core.get_output(**graph)
@@ -252,18 +252,18 @@ def test_features_rotation_parity_translation_and_batch():
 
 
 def test_neighbor_embedding_self_pairs_and_isolated_atom():
-    from enerzyme.models.et import ETCore
+    from enerzyme.models.presets.cartesian_vector import et
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
     torch.manual_seed(6)
     n, features, num_rbf = 3, 8, 4
     radial = ExpNormalSmearing(num_rbf=num_rbf, cutoff_sr=5.0, trainable=False)
     graph = _graph(n, features, num_rbf, seed=6)
-    with_neighbors = ETCore(
+    with_neighbors = et(
         dim_embedding=features, num_rbf=num_rbf, num_layers=2, num_heads=2, max_Za=10
     )
-    with_neighbors._radial_holder = [radial]
-    without = ETCore(
+    with_neighbors.embed._radial_holder = [radial]
+    without = et(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_layers=2,
@@ -271,7 +271,7 @@ def test_neighbor_embedding_self_pairs_and_isolated_atom():
         max_Za=10,
         neighbor_embedding=False,
     )
-    without._radial_holder = [radial]
+    without.embed._radial_holder = [radial]
     without.load_state_dict(with_neighbors.state_dict(), strict=False)
     plain = with_neighbors.get_output(**graph)["atom_feature"]
     ablated = without.get_output(**graph)["atom_feature"]
@@ -286,7 +286,7 @@ def test_neighbor_embedding_self_pairs_and_isolated_atom():
         ablated, without.get_output(**other_z)["atom_feature"], atol=1e-6, rtol=1e-6
     )
 
-    no_self = ETCore(
+    no_self = et(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_layers=2,
