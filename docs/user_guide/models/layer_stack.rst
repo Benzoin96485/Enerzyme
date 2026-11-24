@@ -260,10 +260,18 @@ FACTO
 
 With :code:`architecture: facto`, the Core owns the elemental descriptor, the radial filters, and the interaction blocks. Pre-core :code:`RangeSeparation` should use :code:`cutoff_fn: facto` (6 Å in the paper) so the shared ZBL term sees the same smooth outer window. The Core returns :code:`atom_feature` ``(N, D, K)`` and :code:`isolated_atom_feature`. The paper energy head is :code:`FACTOEnergyReadout`; :code:`SimpleReadout` still works and reads the last block. :code:`ZBLRepulsionEnergy` is summed into :code:`Ea` by :code:`EnergyReduce` because its field name is :code:`E_zbl_a`. Set Core :code:`preset` to ``S``, ``M``, ``L``, or ``XL`` for the published widths. ``L`` and ``XL`` enable tensor transport. Example: :code:`enerzyme/config/facto_layers_example.yaml`.
 
-GRACE
------
+CACE
+----
 
 With :code:`architecture: cace`, pre-core layers are :code:`RangeSeparation` (no ``cutoff_fn``), :code:`BesselRBF` (default flavor, ``apply_cutoff_fn: false``, trainable frequencies in the published fits), and :code:`RandomAtomEmbedding`. The Core applies the polynomial envelope of order :code:`envelope_p` and returns invariant ``atom_feature`` ``[N, F]``. :code:`CACEEnergyReadout` is a linear map plus a SiLU MLP. :code:`SimpleReadout` reads the same vector. :code:`EnergyReduce` and :code:`Force` are unchanged. Set Core :code:`preset` to ``water``, ``water-local``, ``ethanol``, ``bpa``, ``hea``, or ``custom``. ``water`` is the published liquid-water fit (embedding 3, 6 Bessel functions, 12 mixed radial channels, :math:`\ell_{\max}=3`, :math:`\nu_{\max}=3`, one ``b`` message, cutoff 5.5 Å, envelope order 6, ``avg_num_neighbors: 1``). An isolated atom has a zero descriptor; put elemental references in :code:`AtomicAffine` or the datahub. Example: :code:`enerzyme/config/cace_layers_example.yaml`.
+
+CAMP
+----
+
+With :code:`architecture: camp`, pre-core layers are :code:`RangeSeparation` (no ``cutoff_fn``) and :code:`RandomAtomEmbedding`. Each Core layer builds its own species-pair Chebyshev basis on ``r / cutoff`` and multiplies the polynomial envelope, so there is no :code:`BesselRBF` in the stack. The Core returns ``atom_feature`` ``[N, C, T]``. :code:`CAMPEnergyReadout` is a linear map on layers ``0 .. T-2`` and a SiLU MLP on layer ``T-1``. :code:`SimpleReadout` reads the last layer. :code:`EnergyReduce` and :code:`Force` are unchanged. Set Core :code:`preset` to ``water`` (the default), one of the Table S5 names, or ``custom``. ``water`` uses ``dim_embedding: 33``, ``max_v: 2``, 3 layers, and ``cutoff_sr: 5``. Pass ``atomic_numbers`` for the species-pair table and set ``avg_num_neighbors`` to the training-set mean. An isolated atom has a zero feature; put elemental references in :code:`AtomicAffine` or the datahub. Example: :code:`enerzyme/config/camp_layers_example.yaml`.
+
+GRACE
+-----
 
 With :code:`architecture: grace`, pre-core layers are :code:`RangeSeparation` and :code:`RandomAtomEmbedding`. The Core does not own the embedding table. It returns invariant densities :code:`atom_feature` ``[N, n_densities]``. The foundation energy head is :code:`GRACEEnergyReadout` (linear density plus an MLP, then a per-element shift). :code:`SimpleReadout` reads the same vector. :code:`EnergyReduce` and :code:`Force` are unchanged, so forces stay :code:`Fa = -∇E`. Optional :code:`ZBLRepulsionEnergy` is added by name, as for other stacks. Set Core :code:`preset` to ``1L``, ``1L-M``, ``1L-L``, ``2L``, ``2L-M``, ``2L-L``, ``1L-latest``, ``2L-latest``, ``FS``, or ``custom``. ``FS`` is the Finnis–Sinclair readout; set :code:`dim_embedding: 64` and :code:`cutoff_sr: 7`. Example: :code:`enerzyme/config/grace_layers_example.yaml`.
 

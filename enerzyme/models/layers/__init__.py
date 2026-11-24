@@ -56,6 +56,7 @@ from ..equiformer_v2.interaction import EquiformerV2FeedForwardReadout
 from ..facto.readout import FACTOEnergyReadout
 from ..grace.readout import GRACEEnergyReadout
 from ..cace.readout import CACEEnergyReadout
+from ..camp.readout import CAMPEnergyReadout
 from ..so3.sphere_sample_readout import SphereSampleReadout
 from .charge_spin_embedding import ChargeSpinEmbeddingLayer
 from ..m3gnet.basis import SphericalBesselRBFLayer
