@@ -563,7 +563,299 @@
         "float64": "segmentation fault (exit 139)"
       },
       "ordinary_cpu_force_training": "native derivatives",
-      "functional_recheck": "The FP32 abort was also observed after replacing indexed writes in the e3nn normalization and residual embedding with out-of-place slices."
+      "functional_recheck": "The FP32 abort was also observed after replacing indexed writes in the e3nn normalization and residual embedding with out-of-place slices.",
+      "residual_projection_diagnostic": {
+        "revision": "495bce9",
+        "job": "6318745",
+        "fixture_sha256": "a5a98734c1a0e5ad9855c70bacfeb9a1f2756594f8270da1e18bbfc3c95d0fd5",
+        "method": "A test-only replacement clones nonempty equal input/output layouts. Other outputs concatenate source slices and zero-filled new representations. The two empty irreps preserve the caller input object. The complete preset contains two same-layout and two expanding/contracting projections.",
+        "sparse_and_layout_checks": 32,
+        "checks": "Eight layouts, each with zero/four atoms in float32/64. Values, autograd participation and input gradients agree exactly. Output storage aliasing agrees with the original.",
+        "results": {
+          "float32": {
+            "FX_graph_without_lowering": {
+              "exit_code": 0,
+              "outputs": {
+                "E": {
+                  "max_abs": 0.0,
+                  "close": true
+                },
+                "Fa": {
+                  "max_abs": 1.862645149230957e-08,
+                  "close": true
+                }
+              },
+              "frozen_outputs": {
+                "E": {
+                  "max_abs": 1.430511474609375e-06,
+                  "close": true
+                },
+                "Fa": {
+                  "max_abs": 1.0058283805847168e-07,
+                  "close": true
+                }
+              },
+              "active": 34,
+              "missing": [],
+              "extra": [],
+              "failed_weights": [],
+              "max_grad_abs": 0.0001220703125,
+              "grad_fns": {
+                "E": "SliceBackward0",
+                "Fa": "NegBackward0"
+              },
+              "graphs": [
+                {
+                  "operations": 686,
+                  "learned": [
+                    "einsum",
+                    "index_add_",
+                    "linear",
+                    "tensordot"
+                  ]
+                }
+              ],
+              "kernels": 0
+            },
+            "Inductor": {
+              "exit_code": 134,
+              "last_completed_stage": "compiled energy and force forward; process terminated in weight backward"
+            },
+            "native_CPU_guard": {
+              "exit_code": 0,
+              "outputs": {
+                "E": {
+                  "max_abs": 0.0,
+                  "close": true
+                },
+                "Fa": {
+                  "max_abs": 2.2351741790771484e-08,
+                  "close": true
+                }
+              },
+              "frozen_outputs": {
+                "E": {
+                  "max_abs": 1.430511474609375e-06,
+                  "close": true
+                },
+                "Fa": {
+                  "max_abs": 1.0058283805847168e-07,
+                  "close": true
+                }
+              },
+              "active": 34,
+              "missing": [],
+              "extra": [],
+              "failed_weights": [],
+              "max_grad_abs": 0.0001220703125,
+              "grad_fns": {
+                "E": "ScatterAddBackward0",
+                "Fa": "NegBackward0"
+              },
+              "graphs": [],
+              "kernels": 0
+            }
+          },
+          "float64": {
+            "FX_graph_without_lowering": {
+              "exit_code": 0,
+              "outputs": {
+                "E": {
+                  "max_abs": 0.0,
+                  "close": true
+                },
+                "Fa": {
+                  "max_abs": 3.469446951953614e-17,
+                  "close": true
+                }
+              },
+              "frozen_outputs": {
+                "E": {
+                  "max_abs": 0.0,
+                  "close": true
+                },
+                "Fa": {
+                  "max_abs": 6.938893903907228e-17,
+                  "close": true
+                }
+              },
+              "active": 34,
+              "missing": [],
+              "extra": [],
+              "failed_weights": [],
+              "max_grad_abs": 5.684341886080802e-14,
+              "grad_fns": {
+                "E": "SliceBackward0",
+                "Fa": "NegBackward0"
+              },
+              "graphs": [
+                {
+                  "operations": 686,
+                  "learned": [
+                    "einsum",
+                    "index_add_",
+                    "linear",
+                    "tensordot"
+                  ]
+                }
+              ],
+              "kernels": 0
+            },
+            "Inductor": {
+              "exit_code": 139,
+              "last_completed_stage": "compiled energy and force forward; process terminated in weight backward"
+            },
+            "native_CPU_guard": {
+              "exit_code": 0,
+              "outputs": {
+                "E": {
+                  "max_abs": 0.0,
+                  "close": true
+                },
+                "Fa": {
+                  "max_abs": 3.469446951953614e-17,
+                  "close": true
+                }
+              },
+              "frozen_outputs": {
+                "E": {
+                  "max_abs": 0.0,
+                  "close": true
+                },
+                "Fa": {
+                  "max_abs": 6.938893903907228e-17,
+                  "close": true
+                }
+              },
+              "active": 34,
+              "missing": [],
+              "extra": [],
+              "failed_weights": [],
+              "max_grad_abs": 5.684341886080802e-14,
+              "grad_fns": {
+                "E": "ScatterAddBackward0",
+                "Fa": "NegBackward0"
+              },
+              "graphs": [],
+              "kernels": 0
+            }
+          }
+        }
+      },
+      "local_scalar_CPU_validation": {
+        "source_revision": "495bce9",
+        "reference_revision": "1aa0f8b",
+        "job": "6318789",
+        "method": "Original residual projections, e3nn_codegen=fx, CPU SIMD width restricted to one only while lowering the coordinate VJP. The AOTAutograd context forces backward lowering before that scope exits. The baseline process on the original 1aa0f8b checkout loaded the original snapshot strictly in FP32, converted to each precision, then evaluated energy, forces and all named gradients of sum(E**2) + sum(Fa**2). Explicit snapshot name rules matched the old parameter names before comparing.",
+        "snapshot_sha256": "a5a98734c1a0e5ad9855c70bacfeb9a1f2756594f8270da1e18bbfc3c95d0fd5",
+        "tolerances": {
+          "float32": {
+            "atol": 0.0005,
+            "rtol": 0.0005
+          },
+          "float64": {
+            "atol": 1e-08,
+            "rtol": 1e-08
+          }
+        },
+        "results": {
+          "float32": {
+            "outputs": {
+              "E": {
+                "max_abs": 1.9073486328125e-06,
+                "close": true
+              },
+              "Fa": {
+                "max_abs": 8.940696716308594e-08,
+                "close": true
+              }
+            },
+            "frozen_outputs": {
+              "E": {
+                "max_abs": 1.9073486328125e-06,
+                "close": true
+              },
+              "Fa": {
+                "max_abs": 7.078051567077637e-08,
+                "close": true
+              }
+            },
+            "active": 34,
+            "missing": [],
+            "extra": [],
+            "failed_weights": [],
+            "max_grad_abs": 0.00030517578125,
+            "grad_fns": {
+              "E": "CompiledFunctionBackward",
+              "Fa": "CompiledFunctionBackward"
+            },
+            "graphs": [
+              {
+                "operations": 695,
+                "learned": [
+                  "einsum",
+                  "index_add_",
+                  "linear",
+                  "tensordot"
+                ]
+              }
+            ],
+            "kernels": 509
+          },
+          "float64": {
+            "outputs": {
+              "E": {
+                "max_abs": 3.552713678800501e-15,
+                "close": true
+              },
+              "Fa": {
+                "max_abs": 1.5265566588595902e-16,
+                "close": true
+              }
+            },
+            "frozen_outputs": {
+              "E": {
+                "max_abs": 3.552713678800501e-15,
+                "close": true
+              },
+              "Fa": {
+                "max_abs": 1.942890293094024e-16,
+                "close": true
+              }
+            },
+            "active": 34,
+            "missing": [],
+            "extra": [],
+            "failed_weights": [],
+            "max_grad_abs": 6.252776074688882e-13,
+            "grad_fns": {
+              "E": "CompiledFunctionBackward",
+              "Fa": "CompiledFunctionBackward"
+            },
+            "graphs": [
+              {
+                "operations": 695,
+                "learned": [
+                  "einsum",
+                  "index_add_",
+                  "linear",
+                  "tensordot"
+                ]
+              },
+              {
+                "operations": 695,
+                "learned": [
+                  "einsum",
+                  "index_add_",
+                  "linear",
+                  "tensordot"
+                ]
+              }
+            ],
+            "kernels": 509
+          }
+        }
+      }
     },
     "equiformer": {
       "guard_revision": "395de43",
