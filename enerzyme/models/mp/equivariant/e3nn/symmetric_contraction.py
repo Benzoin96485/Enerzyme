@@ -163,7 +163,7 @@ class Contraction(Module):
         return out.view(out.shape[0], -1)
 
     def U_tensors(self, nu: int):
-        return dict(self.named_buffers())[f"U_matrix_{nu}"]
+        return getattr(self, f"U_matrix_{nu}")
 
 
 @compile_mode("script")

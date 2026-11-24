@@ -89,13 +89,12 @@ class TensorNetEmbedding(Module):
     ) -> Tensor:
         n_atoms = atom_embedding.shape[0]
         width = self.dim_embedding
-        if idx_i.numel() == 0:
-            pair_input = atom_embedding.new_zeros((0, 2 * width))
-        else:
-            pair_input = torch.cat(
-                (atom_embedding[idx_i], atom_embedding[idx_j]), dim=-1
-            )
-        pair = self.pair_mix(pair_input)
+        # The two halves of the affine pair map act independently on the
+        # receiver and sender embeddings, which are shared by incident edges.
+        receiver_w, sender_w = self.pair_mix.weight.split(width, dim=1)
+        receiver = F.linear(atom_embedding, receiver_w, self.pair_mix.bias)
+        sender = F.linear(atom_embedding, sender_w)
+        pair = receiver.index_select(0, idx_i) + sender.index_select(0, idx_j)
         radial = torch.stack(
             (
                 self.distance_proj1(rbf),
@@ -149,11 +148,11 @@ def tensor_message_update(
     normalized = features / (frobenius_squared(features) + 1.0)[:, None, None, :]
     iso, skew, traceless = decompose_tensor(normalized)
     iso = linears_tensor[0](iso)
-    skew = linears_tensor[1](skew)
+    # Each bias-free channel map commutes with the skew-matrix embedding.
+    vector = linears_tensor[1](skew_tensor_to_vector(skew))
     traceless = linears_tensor[2](traceless)
-    node = compose_tensor(iso, skew, traceless)
+    node = compose_tensor(iso, vector_to_skew_tensor(vector), traceless)
 
-    vector = skew_tensor_to_vector(skew)
     iso_m = scatter_sum(edge[:, 0, :] * iso[idx_j], idx_i, n_atoms)
     vector_m = scatter_sum(edge[:, 1, None, :] * vector[idx_j], idx_i, n_atoms)
     traceless_m = scatter_sum(edge[:, 2, None, None, :] * traceless[idx_j], idx_i, n_atoms)
@@ -168,7 +167,8 @@ def tensor_message_update(
     iso_c, skew_c, traceless_c = decompose_tensor(mixed)
     norm = frobenius_squared(mixed) + 1.0
     iso_c = linears_tensor[3](iso_c / norm)
-    skew_c = linears_tensor[4](skew_c / norm[:, None, None, :])
+    vector_c = linears_tensor[4](skew_tensor_to_vector(skew_c) / norm[:, None, :])
+    skew_c = vector_to_skew_tensor(vector_c)
     traceless_c = linears_tensor[5](traceless_c / norm[:, None, None, :])
     delta = compose_tensor(iso_c, skew_c, traceless_c)
     # Residual uses the normalized state. The square is charge-scaled for both groups.

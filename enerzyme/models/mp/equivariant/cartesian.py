@@ -63,14 +63,8 @@ def vector_to_skew_tensor(vector: Tensor) -> Tensor:
     y = vector[:, 1]
     z = vector[:, 2]
     zero = torch.zeros_like(x)
-    return torch.stack(
-        (
-            torch.stack((zero, -z, y), dim=1),
-            torch.stack((z, zero, -x), dim=1),
-            torch.stack((-y, x, zero), dim=1),
-        ),
-        dim=1,
-    )
+    matrix = torch.stack((zero, -z, y, z, zero, -x, -y, x, zero), dim=1)
+    return matrix.unflatten(1, (3, 3))
 
 
 def skew_tensor_to_vector(tensor: Tensor) -> Tensor:

@@ -11,7 +11,7 @@ from ..ops import scatter_sum
 
 def weighted_messages(tp, features, sender, edge_sh, weights):
     """Apply an externally weighted tensor product to each sender and edge."""
-    return tp(features.index_select(0, sender), edge_sh, weights)
+    return tp(features[sender], edge_sh, weights)
 
 
 def irreps_convolution(tp, radial, features, sender, receiver, edge_sh, rbf):
