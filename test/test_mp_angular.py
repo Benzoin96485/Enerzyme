@@ -53,3 +53,17 @@ def test_single_degree_matches_e3nn_and_cartesian_gradient(normalization, normal
         got, = torch.autograd.grad((actual * probe).sum(), vectors)
         ref, = torch.autograd.grad((expected * probe).sum(), vectors)
         torch.testing.assert_close(got, ref, rtol=1e-12, atol=1e-12)
+
+
+@pytest.mark.parametrize("degrees", [(0, 1, 2, 3), (3, 0, 2, 2)])
+@pytest.mark.parametrize("normalization", ["integral", "component", "norm"])
+def test_e3nn_multiplet_matches_module_values_and_gradients(degrees, normalization):
+    vectors = torch.randn(2, 4, 3, generator=torch.Generator().manual_seed(27),
+                          dtype=torch.float64, requires_grad=True)
+    actual = spherical_harmonics(vectors, degrees, layout="e3nn", normalization=normalization)
+    expected = o3.spherical_harmonics(list(degrees), vectors, normalize=True, normalization=normalization)
+    torch.testing.assert_close(actual, expected, rtol=1e-12, atol=1e-12)
+    probe = torch.cos(torch.arange(actual.numel(), dtype=actual.dtype)).reshape_as(actual)
+    got, = torch.autograd.grad((actual * probe).sum(), vectors)
+    ref, = torch.autograd.grad((expected * probe).sum(), vectors)
+    torch.testing.assert_close(got, ref, rtol=1e-12, atol=1e-12)

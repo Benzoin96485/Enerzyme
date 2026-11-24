@@ -259,12 +259,29 @@ def spherical_harmonics(
     max_l = max(degrees)
     if edge_sign != 1.0:
         vecs = vecs * edge_sign
-    if layout == "e3nn":
-        from e3nn.o3 import spherical_harmonics as e3nn_sh
-
-        return e3nn_sh(list(degrees), vecs, normalize=normalize_input, normalization=normalization or "component")
     if normalize_input:
         vecs = torch.nn.functional.normalize(vecs, dim=-1)
+    if layout == "e3nn":
+        from e3nn.o3._spherical_harmonics import _spherical_harmonics
+
+        if max_l > 11:
+            raise NotImplementedError("e3nn spherical harmonics support degrees up to 11")
+        x, y, z = vecs.unbind(dim=-1)
+        packed = _spherical_harmonics(max_l, x, y, z)
+        norm = normalization or "component"
+        if norm == "norm":
+            # Each degree is normalized independently, including repeats.
+            return torch.cat([
+                packed[..., l * l : (l + 1) ** 2] / math.sqrt(2 * l + 1)
+                for l in degrees
+            ], dim=-1)
+        if list(degrees) != list(range(max_l + 1)):
+            packed = torch.cat([packed[..., l * l : (l + 1) ** 2] for l in degrees], dim=-1)
+        if norm == "integral":
+            return packed / math.sqrt(4 * math.pi)
+        if norm == "component":
+            return packed
+        raise ValueError(f"unknown e3nn normalization {norm!r}")
     if layout == "polynomial":
         if normalization not in (None, "none") or max_l > 4:
             raise ValueError("polynomial harmonics require normalization='none' and lmax <= 4")
