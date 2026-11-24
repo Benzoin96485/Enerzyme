@@ -2,7 +2,7 @@
 
 import torch
 from torch import Tensor
-from torch.nn import functional as F
+from ..layers.atom_embedding import one_hot_species
 from e3nn.o3 import Irreps
 from typing import List, Optional, Sequence
 
@@ -30,10 +30,12 @@ class SpeciesEmbed(FieldEmbed):
         z = inputs["Za"].long().view(-1)
         if z.shape[0] != ctx.num_nodes:
             raise ValueError("Za and atom_embedding must have the same number of atoms")
-        if z.numel() and (int(z.min()) < 0 or int(z.max()) > self.max_Za):
-            raise ValueError(f"Za must lie in 0..{self.max_Za}")
+        if z.numel():
+            low, high = torch.stack(torch.aminmax(z)).tolist()
+            if low < 0 or high > self.max_Za:
+                raise ValueError(f"Za must lie in 0..{self.max_Za}")
         x = super().forward(inputs, ctx).equi
-        node_attrs = F.one_hot(z, self.max_Za + 1).to(x.dtype)
+        node_attrs = one_hot_species(z, self.max_Za + 1, x.dtype)
         # The BOTNet interaction uses i as sender but harmonics of R_j - R_i.
         return BlockState(scalar=node_attrs, equi=x, edge=self.sph(-ctx.vec))
 
@@ -52,11 +54,12 @@ class PlacedFeatureHead(Head):
     def __init__(self, layer_irreps, union):
         super().__init__()
         self.width = union.dim
+        self.identity = tuple(irreps.simplify() == union.simplify() for irreps in layer_irreps)
         for i, irreps in enumerate(layer_irreps):
             self.register_buffer(f"placement_{i}", _column_index(irreps, union), persistent=False)
 
     def forward(self, state, ctx, taps, inputs):
-        features = [_place(tap.equi, getattr(self, f"placement_{i}"), self.width)
+        features = [tap.equi if self.identity[i] else _place(tap.equi, getattr(self, f"placement_{i}"), self.width)
                     for i, tap in enumerate(taps[1:])]
         return {"atom_feature": torch.stack(features, dim=-1)}
 

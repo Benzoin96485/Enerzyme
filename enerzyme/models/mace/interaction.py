@@ -13,6 +13,7 @@ from e3nn.util.jit import compile_mode
 from ..mp.equivariant.body_order import SymmetricContraction
 from ..mp.block import BlockState
 from ..mp.graph import GraphContext
+from ..layers.atom_embedding import one_hot_species
 from ..mp.ops import scatter_sum
 from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions, reshape_irreps, linear_out_irreps
 
@@ -613,9 +614,7 @@ INTERACTION_CLASSES = {
 def element_one_hot(ctx: GraphContext, num_elements: int, dtype: torch.dtype) -> Tensor:
     """One-hot species ``(N, num_elements)`` from ``Za``, cached per forward."""
     def encode():
-        species = ctx.inputs["Za"]
-        rows = species.new_zeros((*species.shape, num_elements), dtype=dtype)
-        return rows.scatter_(-1, species.unsqueeze(-1), 1)
+        return one_hot_species(ctx.inputs["Za"], num_elements, dtype)
 
     return ctx.cached(("element_one_hot", int(num_elements), dtype), encode)
 
