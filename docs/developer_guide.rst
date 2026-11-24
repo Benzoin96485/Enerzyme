@@ -234,8 +234,8 @@ calls request reusable saved tensors with
 On CPU, ordinary Inductor compiles the CACE and GRACE force calculations with
 scalar C++ kernels. This preserves their coordinate and parameter derivatives
 on PyTorch 2.13, where the vectorized kernels can terminate the process. The
-default EquiformerV3 training graph and the Nequix and EquFlashV2 FX training
-graphs use the same setting. The model restores the compiler settings before returning. An
+default EquiformerV3 and CAMP training graphs and the Nequix and EquFlashV2 FX
+training graphs use the same setting. The model restores the compiler settings before returning. An
 explicit conflicting backend override uses native derivatives for that call.
 
 .. code-block:: shell
@@ -250,7 +250,9 @@ without a captured learned operator is recorded as native differentiation.
 The report keeps the original sweep and subsequent checks with corrected
 models or matched dropout masks. An auxiliary weight with an explicit zero
 gradient can receive an optimizer update even when the corresponding eager
-gradient is absent.
+gradient is absent. The inference results in
+:code:`test/fixtures/validation/compiled_inference_cpu.json` include the energy,
+forces, both coordinate derivatives, and the revision used for each check.
 The second command prepares the batch's discrete neighbors before compiling
 the graph that returns energy and forces for the loss. On CHGNet this leaves
 the magnetic-moment head's gradient absent during energy/force fitting.

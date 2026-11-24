@@ -1,0 +1,485 @@
+{
+  "torch": "2.13.0+cu126",
+  "device": "CPU",
+  "models": 58,
+  "precisions": ["float32", "float64"],
+  "protocol": "scripts/check_compiled_forces.py MODEL --mode inference. Same weights and seed, evaluation mode, two molecules of 5 and 4 atoms. Evaluate E and Fa through regular torch.compile with an instrumented Inductor backend, then compute the derivative of the returned energy with respect to positions twice. Errors are measured against the same eager call. A pass means the listed learned operators were captured; native gradients means no learned operator was captured.",
+  "tolerances": {
+    "float32": {
+      "atol": 0.0007,
+      "rtol": 0.001
+    },
+    "float64": {
+      "atol": 1e-10,
+      "rtol": 1e-08
+    }
+  },
+  "sources": {
+    "original": {
+      "revision": "2354ed0",
+      "jobs": ["6318417"]
+    },
+    "reusable_buffers": {
+      "revision": "719be7d",
+      "jobs": ["6318527", "6318583"]
+    },
+    "et_joint_vjp": {
+      "revision": "aadb4bd",
+      "jobs": ["6318546"]
+    },
+    "et_reusable_joint_vjp": {
+      "revision": "2859597",
+      "jobs": ["6318603"]
+    },
+    "cace_grace_dpa4": {
+      "revision": "42adcba",
+      "jobs": ["6318770"]
+    },
+    "merged_cpu_kernels": {
+      "revision": "87ff2f5",
+      "jobs": ["6318881"]
+    }
+  },
+  "reusable_buffers": "The original caller used PyTorch defaults for the two retained external backwards. Controls disable donated_buffer only during those two derivative calls, after the ordinary forward returns.",
+  "status_by_run": {
+    "original": {
+      "pass": 76,
+      "non-empty donated buffers": 30,
+      "exception": 6,
+      "native gradients": 2,
+      "mismatch": 2
+    },
+    "reusable_buffers": {
+      "pass": 30
+    },
+    "et_joint_vjp": {
+      "exception": 2
+    },
+    "et_reusable_joint_vjp": {
+      "pass": 2
+    },
+    "cace_grace_dpa4": {
+      "pass": 6
+    },
+    "merged_cpu_kernels": {
+      "pass": 10
+    }
+  },
+  "latest_status_by_case": {
+    "pass": 116
+  },
+  "related_checks": {
+    "training": "compiled_forces_cpu.json",
+    "dpa4": "dpa4_degree_norm_inference.json"
+  },
+  "cases": {
+    "schnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 175, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 2.384185791015625e-07, "relative_l2": 1.2275538584585434e-07}, "Fa": {"max_abs": 1.0728836059570312e-06, "relative_l2": 7.908852126894943e-07}, "energy_coordinate_gradient": {"max_abs": 1.0728836059570312e-06, "relative_l2": 7.908852126894943e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.0728836059570312e-06, "relative_l2": 7.908852126894943e-07}}}
+    },
+    "schnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 11, "captured_operations": 180, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.440892098500626e-16, "relative_l2": 2.286496891536166e-16}, "Fa": {"max_abs": 2.6645352591003757e-15, "relative_l2": 2.1528913728678446e-15}, "energy_coordinate_gradient": {"max_abs": 2.6645352591003757e-15, "relative_l2": 2.1528913728678446e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 2.6645352591003757e-15, "relative_l2": 2.1528913728678446e-15}}}
+    },
+    "physnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 501, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 0.0, "relative_l2": 0.0}, "energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": 0.0}, "repeated_energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": 0.0}}}
+    },
+    "physnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 11, "captured_operations": 513, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 6.938893903907228e-18, "relative_l2": 3.0466583355917e-16}, "Fa": {"max_abs": 3.469446951953614e-17, "relative_l2": 1.4491381989464735e-15}, "energy_coordinate_gradient": {"max_abs": 3.469446951953614e-17, "relative_l2": 1.4491381989464735e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 3.469446951953614e-17, "relative_l2": 1.4491381989464735e-15}}}
+    },
+    "spookynet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 14, "captured_operations": 983, "learned_operators": ["index_add_", "linear", "matmul", "scatter_add_"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 7.450580596923828e-09, "relative_l2": 2.992549477962739e-09}, "energy_coordinate_gradient": {"max_abs": 7.450580596923828e-09, "relative_l2": 2.992549477962739e-09}, "repeated_energy_coordinate_gradient": {"max_abs": 7.450580596923828e-09, "relative_l2": 2.992549477962739e-09}}}
+    },
+    "spookynet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 14, "captured_operations": 983, "learned_operators": ["index_add_", "linear", "matmul", "scatter_add_"], "errors": {"E": {"max_abs": 2.220446049250313e-16, "relative_l2": 3.5363780941419457e-16}, "Fa": {"max_abs": 1.1102230246251565e-16, "relative_l2": 5.720735563218297e-17}, "energy_coordinate_gradient": {"max_abs": 1.1102230246251565e-16, "relative_l2": 5.720735563218297e-17}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1102230246251565e-16, "relative_l2": 5.720735563218297e-17}}}
+    },
+    "mace/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 23, "captured_operations": 169, "learned_operators": ["einsum", "embedding", "index_add_", "matmul"], "errors": {"E": {"max_abs": 3.725290298461914e-09, "relative_l2": 1.0951181712981584e-07}, "Fa": {"max_abs": 1.1175870895385742e-08, "relative_l2": 3.9517292203415885e-07}, "energy_coordinate_gradient": {"max_abs": 1.1175870895385742e-08, "relative_l2": 3.9517292203415885e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1175870895385742e-08, "relative_l2": 3.9517292203415885e-07}}}
+    },
+    "mace/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 24, "captured_operations": 193, "learned_operators": ["einsum", "embedding", "index_add_", "matmul"], "errors": {"E": {"max_abs": 6.938893903907228e-18, "relative_l2": 2.0398159398886188e-16}, "Fa": {"max_abs": 2.42861286636753e-17, "relative_l2": 6.792339239947371e-16}, "energy_coordinate_gradient": {"max_abs": 2.42861286636753e-17, "relative_l2": 6.792339239947371e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 2.42861286636753e-17, "relative_l2": 6.792339239947371e-16}}}
+    },
+    "painn/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 204, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 3.5762786865234375e-07, "relative_l2": 1.2840698917556503e-07}, "Fa": {"max_abs": 2.3096799850463867e-07, "relative_l2": 3.788812552073996e-07}, "energy_coordinate_gradient": {"max_abs": 2.3096799850463867e-07, "relative_l2": 3.788812552073996e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.3096799850463867e-07, "relative_l2": 3.788812552073996e-07}}}
+    },
+    "painn/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 204, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 6.661338147750939e-16, "relative_l2": 2.391767329218999e-16}, "Fa": {"max_abs": 1.1657341758564144e-15, "relative_l2": 1.3739168288454836e-15}, "energy_coordinate_gradient": {"max_abs": 1.3877787807814457e-15, "relative_l2": 1.5118333289109516e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 1.3877787807814457e-15, "relative_l2": 1.5118333289109516e-15}}}
+    },
+    "newtonnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 199, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.7881393432617188e-07, "relative_l2": 2.7773380975030103e-07}, "Fa": {"max_abs": 2.980232238769531e-07, "relative_l2": 3.634294119663533e-07}, "energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 3.2488400686314326e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.980232238769531e-07, "relative_l2": 3.634294119663533e-07}}}
+    },
+    "newtonnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 11, "captured_operations": 205, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.440892098500626e-16, "relative_l2": 6.543631307952012e-16}, "Fa": {"max_abs": 1.3322676295501878e-15, "relative_l2": 1.2883075533096634e-15}, "energy_coordinate_gradient": {"max_abs": 1.3322676295501878e-15, "relative_l2": 1.2883075533096634e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 1.3322676295501878e-15, "relative_l2": 1.2883075533096634e-15}}}
+    },
+    "et/float32": {
+      "original": {"job": "6318417", "status": "exception", "stage": "model forward or process", "exit": 1, "exception": "UnboundLocalError: cannot access local variable 'buf45' where it is not associated with a value"},
+      "et_joint_vjp": {"job": "6318546", "status": "exception", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.FloatTensor [41]] is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its gradient, with torch.autograd.set_detect_anomaly(True, check_nan=False)."},
+      "et_reusable_joint_vjp": {"job": "6318603", "status": "pass", "graphs": 1, "captured_operations": 554, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 5.960464477539063e-08, "relative_l2": 6.764167245443894e-08}, "Fa": {"max_abs": 1.4528632164001465e-07, "relative_l2": 2.2351390387168697e-07}, "energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 3.2728438235224094e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 3.302268157483774e-07}}}
+    },
+    "et/float64": {
+      "original": {"job": "6318417", "status": "exception", "stage": "model forward or process", "exit": 1, "exception": "UnboundLocalError: cannot access local variable 'buf45' where it is not associated with a value"},
+      "et_joint_vjp": {"job": "6318546", "status": "exception", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.DoubleTensor [41]] is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its gradient, with torch.autograd.set_detect_anomaly(True, check_nan=False)."},
+      "et_reusable_joint_vjp": {"job": "6318603", "status": "pass", "graphs": 1, "captured_operations": 554, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 2.220446049250313e-16, "relative_l2": 2.817276917389248e-16}, "Fa": {"max_abs": 4.440892098500626e-16, "relative_l2": 5.877160123352577e-16}, "energy_coordinate_gradient": {"max_abs": 5.551115123125783e-16, "relative_l2": 6.17308728213836e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 5.551115123125783e-16, "relative_l2": 6.458809323445636e-16}}}
+    },
+    "visnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 22, "captured_operations": 935, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 2.384185791015625e-07, "relative_l2": 1.1832653197391883e-07}, "Fa": {"max_abs": 2.682209014892578e-07, "relative_l2": 4.885450712164259e-07}, "energy_coordinate_gradient": {"max_abs": 2.980232238769531e-07, "relative_l2": 4.84588322381804e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 3.2782554626464844e-07, "relative_l2": 5.467712140595508e-07}}}
+    },
+    "visnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 22, "captured_operations": 935, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.440892098500626e-16, "relative_l2": 1.5584658963207794e-16}, "Fa": {"max_abs": 7.216449660063518e-16, "relative_l2": 1.0639402427615183e-15}, "energy_coordinate_gradient": {"max_abs": 4.996003610813204e-16, "relative_l2": 7.353385981671983e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 7.216449660063518e-16, "relative_l2": 1.0930245849144e-15}}}
+    },
+    "freecg/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 22, "captured_operations": 1637, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.76837158203125e-07, "relative_l2": 2.2990009613250056e-07}, "Fa": {"max_abs": 3.5762786865234375e-07, "relative_l2": 1.274707895472184e-06}, "energy_coordinate_gradient": {"max_abs": 3.725290298461914e-07, "relative_l2": 1.3747259439505399e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 2.086162567138672e-07, "relative_l2": 8.641946532150153e-07}}}
+    },
+    "freecg/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 22, "captured_operations": 1637, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 6.661338147750939e-16, "relative_l2": 4.406370699050593e-16}, "Fa": {"max_abs": 3.0531133177191805e-16, "relative_l2": 1.0454311361086311e-15}, "energy_coordinate_gradient": {"max_abs": 6.522560269672795e-16, "relative_l2": 2.2518269961775306e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 2.636779683484747e-16, "relative_l2": 1.0303031359303207e-15}}}
+    },
+    "quinnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 22, "captured_operations": 820, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.172325134277344e-07, "relative_l2": 6.345578250619662e-07}, "Fa": {"max_abs": 1.1920928955078125e-07, "relative_l2": 2.2095314687680383e-07}, "energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 1.7611127007788657e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 2.2750500832876006e-07}}}
+    },
+    "quinnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 22, "captured_operations": 820, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 7.771561172376096e-16, "relative_l2": 1.000283935330266e-15}, "Fa": {"max_abs": 3.3306690738754696e-16, "relative_l2": 4.881788620686593e-16}, "energy_coordinate_gradient": {"max_abs": 3.0531133177191805e-16, "relative_l2": 3.9822790297484575e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 2.7755575615628914e-16, "relative_l2": 4.632810837627914e-16}}}
+    },
+    "visnet_lsrm/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 34, "captured_operations": 738, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 2.980232238769531e-07, "relative_l2": 1.7079496793193866e-06}, "Fa": {"max_abs": 8.940696716308594e-07, "relative_l2": 1.0686160567088804e-06}, "energy_coordinate_gradient": {"max_abs": 8.940696716308594e-07, "relative_l2": 1.0686160567088804e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 8.344650268554688e-07, "relative_l2": 9.783111253478705e-07}}}
+    },
+    "visnet_lsrm/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 34, "captured_operations": 738, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.1657341758564144e-15, "relative_l2": 6.427949954377786e-15}, "Fa": {"max_abs": 2.220446049250313e-15, "relative_l2": 2.808638649796584e-15}, "energy_coordinate_gradient": {"max_abs": 2.220446049250313e-15, "relative_l2": 2.808638649796584e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 2.220446049250313e-15, "relative_l2": 2.808638649796584e-15}}}
+    },
+    "geodite/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 13, "captured_operations": 853, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.00014495849609375, "relative_l2": 2.1475940869073323e-06}, "Fa": {"max_abs": 0.000762939453125, "relative_l2": 1.772490277198658e-06}, "energy_coordinate_gradient": {"max_abs": 0.000762939453125, "relative_l2": 1.772490277198658e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 0.000762939453125, "relative_l2": 1.772490277198658e-06}}}
+    },
+    "geodite/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 14, "captured_operations": 859, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 3.410605131648481e-13, "relative_l2": 5.052409981896875e-15}, "Fa": {"max_abs": 2.2737367544323206e-13, "relative_l2": 5.11692446143988e-16}, "energy_coordinate_gradient": {"max_abs": 2.2737367544323206e-13, "relative_l2": 5.11692446143988e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 2.2737367544323206e-13, "relative_l2": 5.11692446143988e-16}}}
+    },
+    "leftnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 16, "captured_operations": 387, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 5.066394805908203e-07, "relative_l2": 8.79266526740889e-07}, "Fa": {"max_abs": 2.384185791015625e-07, "relative_l2": 4.1332408577953786e-07}, "energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 4.1332408577953786e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 4.1332408577953786e-07}}}
+    },
+    "leftnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 16, "captured_operations": 387, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.3322676295501878e-15, "relative_l2": 2.1119017061394855e-15}, "Fa": {"max_abs": 7.771561172376096e-16, "relative_l2": 1.4357877461796378e-15}, "energy_coordinate_gradient": {"max_abs": 7.771561172376096e-16, "relative_l2": 1.4357877461796378e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 7.771561172376096e-16, "relative_l2": 1.4357877461796378e-15}}}
+    },
+    "alphanet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 11, "captured_operations": 534, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 6.67572021484375e-06, "relative_l2": 1.2300160160646205e-06}, "energy_coordinate_gradient": {"max_abs": 6.67572021484375e-06, "relative_l2": 1.2300160160646205e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 6.67572021484375e-06, "relative_l2": 1.2300160160646205e-06}}}
+    },
+    "alphanet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 12, "captured_operations": 550, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 1.7763568394002505e-15, "relative_l2": 1.4480704096130077e-16}, "Fa": {"max_abs": 3.3306690738754696e-14, "relative_l2": 5.431873412953948e-15}, "energy_coordinate_gradient": {"max_abs": 3.3306690738754696e-14, "relative_l2": 5.431873412953948e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 3.3306690738754696e-14, "relative_l2": 5.431873412953948e-15}}}
+    },
+    "reann/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 169, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 2.7939677238464355e-09, "relative_l2": 1.9788898493802578e-07}, "Fa": {"max_abs": 9.313225746154785e-10, "relative_l2": 1.3080318440618717e-07}, "energy_coordinate_gradient": {"max_abs": 9.313225746154785e-10, "relative_l2": 1.3080318440618717e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 9.313225746154785e-10, "relative_l2": 1.3080318440618717e-07}}}
+    },
+    "reann/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 169, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 3.469446951953614e-18, "relative_l2": 2.4984767184351664e-16}, "Fa": {"max_abs": 8.673617379884035e-19, "relative_l2": 1.3404950388173942e-16}, "energy_coordinate_gradient": {"max_abs": 8.673617379884035e-19, "relative_l2": 1.3404950388173942e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 8.673617379884035e-19, "relative_l2": 1.3404950388173942e-16}}}
+    },
+    "equireann/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 252, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 3.725290298461914e-09, "relative_l2": 2.1304444629244277e-07}, "Fa": {"max_abs": 1.1641532182693481e-09, "relative_l2": 2.410526452033914e-07}, "energy_coordinate_gradient": {"max_abs": 1.1641532182693481e-09, "relative_l2": 2.410526452033914e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1641532182693481e-09, "relative_l2": 2.410526452033914e-07}}}
+    },
+    "equireann/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 252, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 6.938893903907228e-18, "relative_l2": 3.8497799626215276e-16}, "Fa": {"max_abs": 2.0599841277224584e-18, "relative_l2": 4.473827259607295e-16}, "energy_coordinate_gradient": {"max_abs": 2.0599841277224584e-18, "relative_l2": 4.473827259607295e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 2.0599841277224584e-18, "relative_l2": 4.473827259607295e-16}}}
+    },
+    "dpa3/float32": {
+      "original": {"job": "6318417", "status": "native gradients", "graphs": 0, "captured_operations": 0, "learned_operators": [], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 0.0, "relative_l2": 0.0}, "energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": 0.0}, "repeated_energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": 0.0}}},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 18, "captured_operations": 295, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 5.960464477539063e-08, "relative_l2": 8.051282682387278e-08}, "Fa": {"max_abs": 1.4901161193847656e-08, "relative_l2": 6.298965064628979e-08}, "energy_coordinate_gradient": {"max_abs": 1.4901161193847656e-08, "relative_l2": 6.298965064628979e-08}, "repeated_energy_coordinate_gradient": {"max_abs": 1.4901161193847656e-08, "relative_l2": 6.298965064628979e-08}}}
+    },
+    "dpa3/float64": {
+      "original": {"job": "6318417", "status": "native gradients", "graphs": 0, "captured_operations": 0, "learned_operators": [], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 0.0, "relative_l2": 0.0}, "energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": 0.0}, "repeated_energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": 0.0}}},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 18, "captured_operations": 295, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 1.1102230246251565e-16, "relative_l2": 1.3413438035986326e-16}, "Fa": {"max_abs": 5.551115123125783e-17, "relative_l2": 2.122505314263514e-16}, "energy_coordinate_gradient": {"max_abs": 5.551115123125783e-17, "relative_l2": 2.122505314263514e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 5.551115123125783e-17, "relative_l2": 2.122505314263514e-16}}}
+    },
+    "allscaip/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 33, "captured_operations": 1122, "learned_operators": ["einsum", "index_add_", "linear", "mm"], "errors": {"E": {"max_abs": 0.0, "relative_l2": null}, "Fa": {"max_abs": 0.0, "relative_l2": null}, "energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": null}, "repeated_energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": null}}},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 33, "captured_operations": 1125, "learned_operators": ["einsum", "index_add_", "linear", "mm", "scatter_add_"], "errors": {"E": {"max_abs": 0.0, "relative_l2": null}, "Fa": {"max_abs": 0.0, "relative_l2": null}, "energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": null}, "repeated_energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": null}}}
+    },
+    "allscaip/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 34, "captured_operations": 1130, "learned_operators": ["einsum", "index_add_", "linear", "mm"], "errors": {"E": {"max_abs": 0.0, "relative_l2": null}, "Fa": {"max_abs": 0.0, "relative_l2": null}, "energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": null}, "repeated_energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": null}}},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 34, "captured_operations": 1133, "learned_operators": ["einsum", "index_add_", "linear", "mm", "scatter_add_"], "errors": {"E": {"max_abs": 0.0, "relative_l2": null}, "Fa": {"max_abs": 0.0, "relative_l2": null}, "energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": null}, "repeated_energy_coordinate_gradient": {"max_abs": 0.0, "relative_l2": null}}}
+    },
+    "so3krates/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 421, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.9073486328125e-06, "relative_l2": 1.1742826531452904e-07}, "Fa": {"max_abs": 1.1920928955078125e-07, "relative_l2": 4.553201729021906e-07}, "energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 4.553201729021906e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 4.553201729021906e-07}}}
+    },
+    "so3krates/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 421, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 3.552713678800501e-15, "relative_l2": 2.4454441066130586e-16}, "Fa": {"max_abs": 3.3306690738754696e-16, "relative_l2": 1.234404324428403e-15}, "energy_coordinate_gradient": {"max_abs": 3.3306690738754696e-16, "relative_l2": 1.234404324428403e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 3.3306690738754696e-16, "relative_l2": 1.234404324428403e-15}}}
+    },
+    "so3lr/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 591, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.9073486328125e-06, "relative_l2": 3.3280260816624276e-07}, "Fa": {"max_abs": 9.5367431640625e-07, "relative_l2": 5.151803084391455e-08}, "energy_coordinate_gradient": {"max_abs": 9.5367431640625e-07, "relative_l2": 5.151803084391455e-08}, "repeated_energy_coordinate_gradient": {"max_abs": 9.5367431640625e-07, "relative_l2": 5.151803084391455e-08}}}
+    },
+    "so3lr/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 591, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 5.329070518200751e-15, "relative_l2": 7.438717159808192e-16}, "Fa": {"max_abs": 1.7763568394002505e-15, "relative_l2": 8.753164872351167e-17}, "energy_coordinate_gradient": {"max_abs": 1.7763568394002505e-15, "relative_l2": 8.753164872351167e-17}, "repeated_energy_coordinate_gradient": {"max_abs": 1.7763568394002505e-15, "relative_l2": 8.753164872351167e-17}}}
+    },
+    "efa/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 516, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 9.5367431640625e-07, "relative_l2": 6.377132367524698e-08}, "Fa": {"max_abs": 1.1920928955078125e-07, "relative_l2": 3.7693718475564523e-07}, "energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 3.7693718475564523e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 3.7693718475564523e-07}}}
+    },
+    "efa/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 516, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.7763568394002505e-15, "relative_l2": 1.1878334234766144e-16}, "Fa": {"max_abs": 7.91033905045424e-16, "relative_l2": 1.9269838857566857e-15}, "energy_coordinate_gradient": {"max_abs": 7.91033905045424e-16, "relative_l2": 1.9269838857566857e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 7.91033905045424e-16, "relative_l2": 1.9269838857566857e-15}}}
+    },
+    "so3lr_efa/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 686, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 9.5367431640625e-07, "relative_l2": 3.2290218086253395e-07}, "Fa": {"max_abs": 1.4901161193847656e-07, "relative_l2": 1.4537925441551107e-08}, "energy_coordinate_gradient": {"max_abs": 1.4901161193847656e-07, "relative_l2": 1.4537925441551107e-08}, "repeated_energy_coordinate_gradient": {"max_abs": 1.4901161193847656e-07, "relative_l2": 1.4537925441551107e-08}}}
+    },
+    "so3lr_efa/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 686, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.884981308350689e-15, "relative_l2": 1.3715218261641931e-15}, "Fa": {"max_abs": 1.7763568394002505e-15, "relative_l2": 1.1828617669590754e-16}, "energy_coordinate_gradient": {"max_abs": 1.7763568394002505e-15, "relative_l2": 1.1828617669590754e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 1.7763568394002505e-15, "relative_l2": 1.1828617669590754e-16}}}
+    },
+    "botnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 21, "captured_operations": 134, "learned_operators": ["embedding", "index_add_", "matmul"], "errors": {"E": {"max_abs": 1.2386590242385864e-07, "relative_l2": 2.0131380274344072e-05}, "Fa": {"max_abs": 5.401670932769775e-07, "relative_l2": 3.189895627543772e-06}, "energy_coordinate_gradient": {"max_abs": 5.401670932769775e-07, "relative_l2": 3.189895627543772e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 5.401670932769775e-07, "relative_l2": 3.189895627543772e-06}}}
+    },
+    "botnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 22, "captured_operations": 158, "learned_operators": ["embedding", "index_add_", "matmul"], "errors": {"E": {"max_abs": 1.474514954580286e-16, "relative_l2": 2.408473646321497e-14}, "Fa": {"max_abs": 6.175615574477433e-16, "relative_l2": 4.9004017928521686e-15}, "energy_coordinate_gradient": {"max_abs": 6.175615574477433e-16, "relative_l2": 4.9004017928521686e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 6.175615574477433e-16, "relative_l2": 4.9004017928521686e-15}}}
+    },
+    "mace_polar/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 43, "captured_operations": 419, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 0.00018005073070526123, "relative_l2": 6.690375917596391e-05}, "Fa": {"max_abs": 0.0006115343421697617, "relative_l2": 1.2618374611125555e-05}, "energy_coordinate_gradient": {"max_abs": 0.0006115343421697617, "relative_l2": 1.2618374611125555e-05}, "repeated_energy_coordinate_gradient": {"max_abs": 0.0006103422492742538, "relative_l2": 1.261248259395388e-05}}}
+    },
+    "mace_polar/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 44, "captured_operations": 443, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 6.181166689600559e-14, "relative_l2": 2.2934868296082085e-14}, "Fa": {"max_abs": 1.8023083026008635e-13, "relative_l2": 4.858261121512238e-15}, "energy_coordinate_gradient": {"max_abs": 1.787320291768424e-13, "relative_l2": 4.849659422653856e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 1.7945367414284874e-13, "relative_l2": 4.851719639096234e-15}}}
+    },
+    "nequip/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 29, "captured_operations": 121, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 3.5390257835388184e-08, "relative_l2": 1.9035180979888614e-06}, "Fa": {"max_abs": 3.3527612686157227e-08, "relative_l2": 3.933072409784226e-07}, "energy_coordinate_gradient": {"max_abs": 3.3527612686157227e-08, "relative_l2": 3.933072409784226e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 3.3527612686157227e-08, "relative_l2": 3.933072409784226e-07}}}
+    },
+    "nequip/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 32, "captured_operations": 148, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.163336342344337e-17, "relative_l2": 1.924188955314905e-15}, "Fa": {"max_abs": 6.938893903907228e-17, "relative_l2": 1.0239849615850687e-15}, "energy_coordinate_gradient": {"max_abs": 6.938893903907228e-17, "relative_l2": 1.0239849615850687e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 6.938893903907228e-17, "relative_l2": 1.0239849615850687e-15}}}
+    },
+    "allegro/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 15, "captured_operations": 141, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 2.9802322387695312e-08, "relative_l2": 2.780495585052954e-07}, "Fa": {"max_abs": 2.384185791015625e-07, "relative_l2": 7.513347151744578e-07}, "energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 7.513347151744578e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 7.513347151744578e-07}}}
+    },
+    "allegro/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 18, "captured_operations": 215, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 9.71445146547012e-17, "relative_l2": 7.324317360908378e-16}, "Fa": {"max_abs": 4.718447854656915e-16, "relative_l2": 1.3066804656893332e-15}, "energy_coordinate_gradient": {"max_abs": 4.718447854656915e-16, "relative_l2": 1.3066804656893332e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 4.718447854656915e-16, "relative_l2": 1.3066804656893332e-15}}}
+    },
+    "equflash/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 25, "captured_operations": 173, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 2.0265579223632812e-06, "relative_l2": 2.572208435830453e-06}, "Fa": {"max_abs": 1.8596649169921875e-05, "relative_l2": 3.2578752278326895e-06}, "energy_coordinate_gradient": {"max_abs": 1.8596649169921875e-05, "relative_l2": 3.2578752278326895e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 1.8596649169921875e-05, "relative_l2": 3.2578752278326895e-06}}}
+    },
+    "equflash/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 26, "captured_operations": 191, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 1.0158540675320182e-14, "relative_l2": 1.2900697600863733e-14}, "Fa": {"max_abs": 4.440892098500626e-14, "relative_l2": 7.074473060176599e-15}, "energy_coordinate_gradient": {"max_abs": 4.440892098500626e-14, "relative_l2": 7.074473060176599e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 4.440892098500626e-14, "relative_l2": 7.074473060176599e-15}}}
+    },
+    "equflashv2/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 32, "captured_operations": 222, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.1920928955078125e-06, "relative_l2": 3.0346618774085455e-07}, "Fa": {"max_abs": 1.862645149230957e-08, "relative_l2": 2.662275231537488e-07}, "energy_coordinate_gradient": {"max_abs": 1.862645149230957e-08, "relative_l2": 2.662275231537488e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.862645149230957e-08, "relative_l2": 2.662275231537488e-07}}}
+    },
+    "equflashv2/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 33, "captured_operations": 240, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 2.6645352591003757e-15, "relative_l2": 7.114423036000621e-16}, "Fa": {"max_abs": 5.204170427930421e-17, "relative_l2": 7.889551695350362e-16}, "energy_coordinate_gradient": {"max_abs": 5.204170427930421e-17, "relative_l2": 7.889551695350362e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 5.204170427930421e-17, "relative_l2": 7.889551695350362e-16}}}
+    },
+    "nequix/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 24, "captured_operations": 151, "learned_operators": ["index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 1.1920928955078125e-07, "relative_l2": 9.640576180155779e-08}, "Fa": {"max_abs": 6.705522537231445e-08, "relative_l2": 6.09233117814029e-07}, "energy_coordinate_gradient": {"max_abs": 6.705522537231445e-08, "relative_l2": 6.09233117814029e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 7.450580596923828e-08, "relative_l2": 6.927643920413176e-07}}}
+    },
+    "nequix/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 26, "captured_operations": 178, "learned_operators": ["index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 2.0816681711721685e-17, "relative_l2": 2.984792890238466e-16}, "energy_coordinate_gradient": {"max_abs": 2.0816681711721685e-17, "relative_l2": 2.984792890238466e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 2.7755575615628914e-17, "relative_l2": 3.5606864321034896e-16}}}
+    },
+    "eqnorm/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 24, "captured_operations": 162, "learned_operators": ["index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 2.384185791015625e-07, "relative_l2": 5.385850839410544e-07}, "Fa": {"max_abs": 3.725290298461914e-08, "relative_l2": 1.8043325682294332e-07}, "energy_coordinate_gradient": {"max_abs": 3.725290298461914e-08, "relative_l2": 1.8043325682294332e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 3.725290298461914e-08, "relative_l2": 1.8043325682294332e-07}}}
+    },
+    "eqnorm/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 26, "captured_operations": 189, "learned_operators": ["index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 4.440892098500626e-16, "relative_l2": 9.248986926890223e-16}, "Fa": {"max_abs": 9.71445146547012e-17, "relative_l2": 4.3416479722474495e-16}, "energy_coordinate_gradient": {"max_abs": 9.71445146547012e-17, "relative_l2": 4.3416479722474495e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 9.71445146547012e-17, "relative_l2": 4.3416479722474495e-16}}}
+    },
+    "equiformer/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 32, "captured_operations": 339, "learned_operators": ["einsum", "index_add_", "linear"], "errors": {"E": {"max_abs": 7.152557373046875e-07, "relative_l2": 2.6012875843010494e-07}, "Fa": {"max_abs": 9.5367431640625e-07, "relative_l2": 1.0104375560066422e-06}, "energy_coordinate_gradient": {"max_abs": 9.5367431640625e-07, "relative_l2": 1.0104375560066422e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 9.5367431640625e-07, "relative_l2": 1.0104375560066422e-06}}}
+    },
+    "equiformer/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318527", "status": "pass", "graphs": 32, "captured_operations": 339, "learned_operators": ["einsum", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.3322676295501878e-15, "relative_l2": 4.845276409377608e-16}, "Fa": {"max_abs": 9.992007221626409e-16, "relative_l2": 1.490484784383161e-15}, "energy_coordinate_gradient": {"max_abs": 9.992007221626409e-16, "relative_l2": 1.490484784383161e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 9.992007221626409e-16, "relative_l2": 1.490484784383161e-15}}}
+    },
+    "escn/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 663, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 7.450580596923828e-09, "relative_l2": 1.2997311818363812e-07}, "Fa": {"max_abs": 1.1641532182693481e-10, "relative_l2": 2.6870788331182186e-07}, "energy_coordinate_gradient": {"max_abs": 1.1641532182693481e-10, "relative_l2": 2.6870788331182186e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1641532182693481e-10, "relative_l2": 2.6870788331182186e-07}}}
+    },
+    "escn/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 11, "captured_operations": 671, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 5.421010862427522e-19, "relative_l2": 1.2710724532892444e-15}, "energy_coordinate_gradient": {"max_abs": 5.421010862427522e-19, "relative_l2": 1.2710724532892444e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 5.421010862427522e-19, "relative_l2": 1.2710724532892444e-15}}}
+    },
+    "esen/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 728, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 4.76837158203125e-07, "relative_l2": 7.858739982963459e-08}, "Fa": {"max_abs": 2.086162567138672e-07, "relative_l2": 3.21516807719141e-07}, "energy_coordinate_gradient": {"max_abs": 2.086162567138672e-07, "relative_l2": 3.21516807719141e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.086162567138672e-07, "relative_l2": 3.21516807719141e-07}}}
+    },
+    "esen/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 11, "captured_operations": 733, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 8.881784197001252e-16, "relative_l2": 1.0350659387560638e-16}, "Fa": {"max_abs": 3.885780586188048e-16, "relative_l2": 6.054747699708777e-16}, "energy_coordinate_gradient": {"max_abs": 3.885780586188048e-16, "relative_l2": 6.054747699708777e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 3.885780586188048e-16, "relative_l2": 6.054747699708777e-16}}}
+    },
+    "equiformer_v2/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 803, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 5.960464477539062e-07, "relative_l2": 9.974416814249734e-07}, "Fa": {"max_abs": 3.8743019104003906e-07, "relative_l2": 4.005848233589986e-07}, "energy_coordinate_gradient": {"max_abs": 3.8743019104003906e-07, "relative_l2": 4.005848233589986e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 3.8743019104003906e-07, "relative_l2": 4.005848233589986e-07}}}
+    },
+    "equiformer_v2/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 11, "captured_operations": 808, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 1.4432899320127035e-15, "relative_l2": 2.030653974953817e-15}, "Fa": {"max_abs": 7.771561172376096e-16, "relative_l2": 7.380871287637001e-16}, "energy_coordinate_gradient": {"max_abs": 7.771561172376096e-16, "relative_l2": 7.380871287637001e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 7.771561172376096e-16, "relative_l2": 7.380871287637001e-16}}}
+    },
+    "equiformer_v3/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 10, "captured_operations": 790, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 9.5367431640625e-07, "relative_l2": 4.0496930250429527e-07}, "Fa": {"max_abs": 4.0978193283081055e-07, "relative_l2": 4.93912663801727e-07}, "energy_coordinate_gradient": {"max_abs": 4.0978193283081055e-07, "relative_l2": 4.93912663801727e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 4.0978193283081055e-07, "relative_l2": 4.93912663801727e-07}}}
+    },
+    "equiformer_v3/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 11, "captured_operations": 795, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 4.440892098500626e-16, "relative_l2": 2.5872760005598605e-16}, "Fa": {"max_abs": 8.638922910364499e-16, "relative_l2": 8.90656305267946e-16}, "energy_coordinate_gradient": {"max_abs": 8.638922910364499e-16, "relative_l2": 8.90656305267946e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 8.638922910364499e-16, "relative_l2": 8.90656305267946e-16}}}
+    },
+    "dpa4/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 1097, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul", "scatter_add_"], "errors": {"E": {"max_abs": 1.9073486328125e-06, "relative_l2": 1.966393192241092e-07}, "Fa": {"max_abs": 4.470348358154297e-08, "relative_l2": 2.956803715183602e-07}, "energy_coordinate_gradient": {"max_abs": 4.470348358154297e-08, "relative_l2": 2.956803715183602e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 4.470348358154297e-08, "relative_l2": 2.956803715183602e-07}}},
+      "cace_grace_dpa4": {"job": "6318770", "status": "pass", "graphs": 9, "captured_operations": 1097, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul", "scatter_add_"], "errors": {"E": {"max_abs": 1.9073486328125e-06, "relative_l2": 1.966393192241092e-07}, "Fa": {"max_abs": 4.470348358154297e-08, "relative_l2": 2.956803715183602e-07}, "energy_coordinate_gradient": {"max_abs": 4.470348358154297e-08, "relative_l2": 2.956803715183602e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 4.470348358154297e-08, "relative_l2": 2.956803715183602e-07}}}
+    },
+    "dpa4/float64": {
+      "original": {"job": "6318417", "status": "mismatch", "graphs": 9, "captured_operations": 1097, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul", "scatter_add_"], "errors": {"E": {"max_abs": 8.92751508274614e-08, "relative_l2": 1.25905376600011e-08}, "Fa": {"max_abs": 6.381202510841177e-10, "relative_l2": 5.233169603962016e-09}, "energy_coordinate_gradient": {"max_abs": 6.381202510841177e-10, "relative_l2": 5.233169603962016e-09}, "repeated_energy_coordinate_gradient": {"max_abs": 6.381202510841177e-10, "relative_l2": 5.233169603962016e-09}}, "outside_tolerance": ["E", "Fa", "energy_coordinate_gradient", "repeated_energy_coordinate_gradient"]},
+      "cace_grace_dpa4": {"job": "6318770", "status": "pass", "graphs": 13, "captured_operations": 702, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul", "scatter_add_"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 8.326672684688674e-17, "relative_l2": 5.198453871140874e-16}, "energy_coordinate_gradient": {"max_abs": 8.326672684688674e-17, "relative_l2": 5.198453871140874e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 8.326672684688674e-17, "relative_l2": 5.198453871140874e-16}}}
+    },
+    "tece/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 31, "captured_operations": 604, "learned_operators": ["bmm", "einsum", "index_add_", "linear"], "errors": {"E": {"max_abs": 9.5367431640625e-07, "relative_l2": 1.2484390260924604e-07}, "Fa": {"max_abs": 2.9802322387695312e-08, "relative_l2": 1.1475084545229934e-07}, "energy_coordinate_gradient": {"max_abs": 4.470348358154297e-08, "relative_l2": 1.801233468371777e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.9802322387695312e-08, "relative_l2": 1.1475084545229934e-07}}}
+    },
+    "tece/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 32, "captured_operations": 612, "learned_operators": ["bmm", "einsum", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 1.1102230246251565e-16, "relative_l2": 4.793449545230895e-16}, "energy_coordinate_gradient": {"max_abs": 1.1102230246251565e-16, "relative_l2": 4.793449545230895e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1102230246251565e-16, "relative_l2": 4.793449545230895e-16}}}
+    },
+    "e2former/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 29, "captured_operations": 557, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 9.5367431640625e-07, "relative_l2": 1.0032690024330527e-07}, "Fa": {"max_abs": 2.384185791015625e-07, "relative_l2": 2.411547413853895e-07}, "energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 2.411547413853895e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 2.411547413853895e-07}}}
+    },
+    "e2former/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 30, "captured_operations": 562, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.7763568394002505e-15, "relative_l2": 1.8687340471865983e-16}, "Fa": {"max_abs": 7.771561172376096e-16, "relative_l2": 7.779867620501436e-16}, "energy_coordinate_gradient": {"max_abs": 7.771561172376096e-16, "relative_l2": 7.779867620501436e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 7.771561172376096e-16, "relative_l2": 7.779867620501436e-16}}}
+    },
+    "e2former_v2/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 21, "captured_operations": 1007, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 9.5367431640625e-07, "relative_l2": 1.9917018242454003e-07}, "Fa": {"max_abs": 2.384185791015625e-07, "relative_l2": 2.728740978362166e-07}, "energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 2.728740978362166e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.384185791015625e-07, "relative_l2": 2.728740978362166e-07}}}
+    },
+    "e2former_v2/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 22, "captured_operations": 1012, "learned_operators": ["bmm", "einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 8.881784197001252e-16, "relative_l2": 1.8549164645851007e-16}, "Fa": {"max_abs": 8.881784197001252e-16, "relative_l2": 5.720912633811813e-16}, "energy_coordinate_gradient": {"max_abs": 8.881784197001252e-16, "relative_l2": 5.720912633811813e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 8.881784197001252e-16, "relative_l2": 5.720912633811813e-16}}}
+    },
+    "e2former_lsr/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 44, "captured_operations": 887, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 9.5367431640625e-07, "relative_l2": 1.9977265131718224e-07}, "Fa": {"max_abs": 4.76837158203125e-07, "relative_l2": 4.432432587872152e-07}, "energy_coordinate_gradient": {"max_abs": 4.76837158203125e-07, "relative_l2": 4.432432587872152e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 4.76837158203125e-07, "relative_l2": 4.432432587872152e-07}}}
+    },
+    "e2former_lsr/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 45, "captured_operations": 892, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.440892098500626e-15, "relative_l2": 9.486865808070935e-16}, "Fa": {"max_abs": 4.440892098500626e-16, "relative_l2": 6.526727602123973e-16}, "energy_coordinate_gradient": {"max_abs": 4.440892098500626e-16, "relative_l2": 6.526727602123973e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 4.440892098500626e-16, "relative_l2": 6.526727602123973e-16}}}
+    },
+    "dimenet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 16, "captured_operations": 671, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.00030517578125, "relative_l2": 7.069361166848135e-07}, "Fa": {"max_abs": 0.005126953125, "relative_l2": 1.6259077822621256e-06}, "energy_coordinate_gradient": {"max_abs": 0.005126953125, "relative_l2": 1.6259077822621256e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 0.005126953125, "relative_l2": 1.6259077822621256e-06}}}
+    },
+    "dimenet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 16, "captured_operations": 671, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 8.526512829121202e-13, "relative_l2": 1.9751466674879095e-15}, "Fa": {"max_abs": 1.0913936421275139e-11, "relative_l2": 2.8630096184845406e-15}, "energy_coordinate_gradient": {"max_abs": 1.0913936421275139e-11, "relative_l2": 2.8630096184845406e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 1.0913936421275139e-11, "relative_l2": 2.8630096184845406e-15}}}
+    },
+    "dimenet++/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 16, "captured_operations": 610, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 3.5762786865234375e-06, "relative_l2": 1.0547686012468988e-06}, "Fa": {"max_abs": 2.002716064453125e-05, "relative_l2": 1.997245459376721e-06}, "energy_coordinate_gradient": {"max_abs": 2.384185791015625e-05, "relative_l2": 2.429971961212641e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 2.384185791015625e-05, "relative_l2": 2.4318329221344317e-06}}}
+    },
+    "dimenet++/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 16, "captured_operations": 610, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.3322676295501878e-15, "relative_l2": 4.711995793571352e-16}, "Fa": {"max_abs": 5.684341886080802e-14, "relative_l2": 4.717890244055458e-15}, "energy_coordinate_gradient": {"max_abs": 5.684341886080802e-14, "relative_l2": 4.717890244055458e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 5.684341886080802e-14, "relative_l2": 4.717890244055458e-15}}}
+    },
+    "gemnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 25, "captured_operations": 942, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.3213367462158203e-07, "relative_l2": 1.4569364118908193e-06}, "Fa": {"max_abs": 1.0728836059570312e-06, "relative_l2": 5.380465325340246e-07}, "energy_coordinate_gradient": {"max_abs": 1.0728836059570312e-06, "relative_l2": 5.380465325340246e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.0728836059570312e-06, "relative_l2": 5.380465325340246e-07}}}
+    },
+    "gemnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 27, "captured_operations": 1781, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 6.661338147750939e-16, "relative_l2": 2.2114835824140322e-15}, "Fa": {"max_abs": 2.4424906541753444e-15, "relative_l2": 1.1116283897356523e-15}, "energy_coordinate_gradient": {"max_abs": 2.4424906541753444e-15, "relative_l2": 1.1116283897356523e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 2.4424906541753444e-15, "relative_l2": 1.1116283897356523e-15}}}
+    },
+    "gemnet-q/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 49, "captured_operations": 1759, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 4.76837158203125e-07, "relative_l2": 6.110996551004506e-07}, "Fa": {"max_abs": 7.152557373046875e-07, "relative_l2": 6.284962970815878e-07}, "energy_coordinate_gradient": {"max_abs": 7.152557373046875e-07, "relative_l2": 6.284962970815878e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 7.152557373046875e-07, "relative_l2": 6.284962970815878e-07}}}
+    },
+    "gemnet-q/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 52, "captured_operations": 2035, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 7.771561172376096e-16, "relative_l2": 9.691944914802678e-16}, "Fa": {"max_abs": 1.4432899320127035e-15, "relative_l2": 1.0945582522410498e-15}, "energy_coordinate_gradient": {"max_abs": 1.4432899320127035e-15, "relative_l2": 1.0945582522410498e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 1.3877787807814457e-15, "relative_l2": 9.641479724964027e-16}}}
+    },
+    "gemnet-oc/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 23, "captured_operations": 2196, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 2.980232238769531e-07, "relative_l2": 5.480303135891134e-07}, "Fa": {"max_abs": 9.238719940185547e-07, "relative_l2": 8.814177816488709e-07}, "energy_coordinate_gradient": {"max_abs": 9.238719940185547e-07, "relative_l2": 9.235935945890392e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 9.238719940185547e-07, "relative_l2": 9.073745552034307e-07}}}
+    },
+    "gemnet-oc/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 25, "captured_operations": 4289, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 6.661338147750939e-16, "relative_l2": 1.0082601856418331e-15}, "Fa": {"max_abs": 1.3877787807814457e-15, "relative_l2": 1.239571513327673e-15}, "energy_coordinate_gradient": {"max_abs": 1.3877787807814457e-15, "relative_l2": 1.239571513327673e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 1.3877787807814457e-15, "relative_l2": 1.239571513327673e-15}}}
+    },
+    "m3gnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 17, "captured_operations": 341, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 2.3283064365386963e-10, "relative_l2": 1.461453473449452e-07}, "energy_coordinate_gradient": {"max_abs": 2.3283064365386963e-10, "relative_l2": 1.461453473449452e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.3283064365386963e-10, "relative_l2": 1.461453473449452e-07}}}
+    },
+    "m3gnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 17, "captured_operations": 341, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 3.2526065174565133e-19, "relative_l2": 2.696592511853854e-16}, "energy_coordinate_gradient": {"max_abs": 3.2526065174565133e-19, "relative_l2": 2.696592511853854e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 3.2526065174565133e-19, "relative_l2": 2.696592511853854e-16}}}
+    },
+    "mattersim/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 18, "captured_operations": 469, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 2.9802322387695312e-08, "relative_l2": 6.010815886211981e-08}, "Fa": {"max_abs": 5.3551048040390015e-09, "relative_l2": 3.1525101391517377e-07}, "energy_coordinate_gradient": {"max_abs": 5.3551048040390015e-09, "relative_l2": 3.1525101391517377e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 5.3551048040390015e-09, "relative_l2": 3.1525101391517377e-07}}}
+    },
+    "mattersim/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 19, "captured_operations": 474, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 5.551115123125783e-17, "relative_l2": 1.1196018055472032e-16}, "Fa": {"max_abs": 1.0842021724855044e-17, "relative_l2": 6.36740974066398e-16}, "energy_coordinate_gradient": {"max_abs": 1.0842021724855044e-17, "relative_l2": 5.955135498163757e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 1.0842021724855044e-17, "relative_l2": 5.955135498163757e-16}}}
+    },
+    "chgnet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 29, "captured_operations": 421, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 8.940696716308594e-08, "relative_l2": 1.3766258477463273e-07}, "Fa": {"max_abs": 1.341104507446289e-07, "relative_l2": 3.9268162644712605e-07}, "energy_coordinate_gradient": {"max_abs": 1.341104507446289e-07, "relative_l2": 3.9268162644712605e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.341104507446289e-07, "relative_l2": 3.9268162644712605e-07}}}
+    },
+    "chgnet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 30, "captured_operations": 447, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 5.551115123125783e-16, "relative_l2": 7.252554973371929e-16}, "Fa": {"max_abs": 6.106226635438361e-16, "relative_l2": 1.2811602064017144e-15}, "energy_coordinate_gradient": {"max_abs": 6.106226635438361e-16, "relative_l2": 1.2811602064017144e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 6.106226635438361e-16, "relative_l2": 1.2811602064017144e-15}}}
+    },
+    "alignn/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 16, "captured_operations": 240, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.9073486328125e-06, "relative_l2": 1.857021814338609e-07}, "Fa": {"max_abs": 1.7881393432617188e-07, "relative_l2": 2.505710744727381e-07}, "energy_coordinate_gradient": {"max_abs": 1.7881393432617188e-07, "relative_l2": 2.555672531477749e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.7881393432617188e-07, "relative_l2": 3.1808047740896665e-07}}}
+    },
+    "alignn/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 18, "captured_operations": 436, "learned_operators": ["embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 1.7763568394002505e-15, "relative_l2": 2.372835743376097e-16}, "Fa": {"max_abs": 5.551115123125783e-16, "relative_l2": 7.489623067653597e-16}, "energy_coordinate_gradient": {"max_abs": 5.551115123125783e-16, "relative_l2": 7.953939190010253e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 5.551115123125783e-16, "relative_l2": 7.364519822246775e-16}}}
+    },
+    "spinconv/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 21, "captured_operations": 447, "learned_operators": ["bmm", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 7.450580596923828e-09, "relative_l2": 1.0159015501196378e-07}, "Fa": {"max_abs": 1.8189894035458565e-11, "relative_l2": 6.490629937561302e-07}, "energy_coordinate_gradient": {"max_abs": 1.8189894035458565e-11, "relative_l2": 6.490629937561302e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.8189894035458565e-11, "relative_l2": 6.490629937561302e-07}}}
+    },
+    "spinconv/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 23, "captured_operations": 736, "learned_operators": ["bmm", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 7.3608716344431e-11, "relative_l2": 8.470394759698717e-10}, "Fa": {"max_abs": 2.0845922582056698e-11, "relative_l2": 7.892669993931848e-07}, "energy_coordinate_gradient": {"max_abs": 2.0845922582056698e-11, "relative_l2": 7.892669993931848e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.0845922582056698e-11, "relative_l2": 7.892669993931848e-07}}}
+    },
+    "tensornet/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 17, "captured_operations": 468, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 2.0489096641540527e-08, "relative_l2": 1.3995431700773083e-06}, "Fa": {"max_abs": 1.1175870895385742e-07, "relative_l2": 1.5137535414866183e-06}, "energy_coordinate_gradient": {"max_abs": 1.1175870895385742e-07, "relative_l2": 1.5137535414866183e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1175870895385742e-07, "relative_l2": 1.535728411119292e-06}}}
+    },
+    "tensornet/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 17, "captured_operations": 468, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 1.0408340855860843e-17, "relative_l2": 8.697393291619896e-16}, "Fa": {"max_abs": 3.8163916471489756e-16, "relative_l2": 5.2554084471428975e-15}, "energy_coordinate_gradient": {"max_abs": 3.8163916471489756e-16, "relative_l2": 5.2554084471428975e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 3.8163916471489756e-16, "relative_l2": 5.2554084471428975e-15}}}
+    },
+    "tensornet2/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 32, "captured_operations": 478, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 7.450580596923828e-09, "relative_l2": 1.3399445953301192e-07}, "Fa": {"max_abs": 1.1920928955078125e-07, "relative_l2": 6.663353157828987e-07}, "energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 6.663353157828987e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 6.663353157828987e-07}}}
+    },
+    "tensornet2/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 32, "captured_operations": 478, "learned_operators": ["embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 6.938893903907228e-17, "relative_l2": 1.3016708522585918e-15}, "Fa": {"max_abs": 5.551115123125783e-17, "relative_l2": 3.654674235837093e-16}, "energy_coordinate_gradient": {"max_abs": 5.551115123125783e-17, "relative_l2": 3.654674235837093e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 5.551115123125783e-17, "relative_l2": 3.654674235837093e-16}}}
+    },
+    "cace/float32": {
+      "original": {"job": "6318417", "status": "exception", "stage": "model forward or process", "exit": -6, "exception": "SIGABRT: double free or corruption (!prev)"},
+      "cace_grace_dpa4": {"job": "6318770", "status": "pass", "graphs": 10, "captured_operations": 194, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 1.3504177331924438e-08, "relative_l2": 1.5531340106421895e-07}, "energy_coordinate_gradient": {"max_abs": 1.3504177331924438e-08, "relative_l2": 1.5531340106421895e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.3504177331924438e-08, "relative_l2": 1.5531340106421895e-07}}},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 10, "captured_operations": 194, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 1.4901161193847656e-08, "relative_l2": 1.8190454893291776e-07}, "energy_coordinate_gradient": {"max_abs": 1.4901161193847656e-08, "relative_l2": 1.8190454893291776e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.4901161193847656e-08, "relative_l2": 1.8190454893291776e-07}}}
+    },
+    "cace/float64": {
+      "original": {"job": "6318417", "status": "exception", "stage": "model forward or process", "exit": -11, "exception": "SIGSEGV"},
+      "cace_grace_dpa4": {"job": "6318770", "status": "pass", "graphs": 11, "captured_operations": 200, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 4.163336342344337e-17, "relative_l2": 4.288776297374397e-16}, "energy_coordinate_gradient": {"max_abs": 4.163336342344337e-17, "relative_l2": 4.288776297374397e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 4.163336342344337e-17, "relative_l2": 4.288776297374397e-16}}},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 11, "captured_operations": 200, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 4.163336342344337e-17, "relative_l2": 4.442642087773536e-16}, "energy_coordinate_gradient": {"max_abs": 4.163336342344337e-17, "relative_l2": 4.442642087773536e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 4.163336342344337e-17, "relative_l2": 4.632815774992604e-16}}}
+    },
+    "camp/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 539, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.00014096498489379883, "relative_l2": 0.00015033538964679758}, "Fa": {"max_abs": 1.8000719137489796e-08, "relative_l2": 9.067964803346102e-06}, "energy_coordinate_gradient": {"max_abs": 1.8000719137489796e-08, "relative_l2": 9.067964803346102e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 1.8000719137489796e-08, "relative_l2": 9.067964803346102e-06}}},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 9, "captured_operations": 584, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "scatter_add_"], "errors": {"E": {"max_abs": 5.960464477539063e-08, "relative_l2": 5.84768346667048e-08}, "Fa": {"max_abs": 1.6007106751203537e-09, "relative_l2": 6.910488296949195e-07}, "energy_coordinate_gradient": {"max_abs": 1.6880221664905548e-09, "relative_l2": 7.77444470090301e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.7462298274040222e-09, "relative_l2": 7.866665827036973e-07}}}
+    },
+    "camp/float64": {
+      "original": {"job": "6318417", "status": "mismatch", "graphs": 9, "captured_operations": 539, "learned_operators": ["einsum", "embedding", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0001409571060070336, "relative_l2": 0.00015031960713999499}, "Fa": {"max_abs": 1.876245174477827e-08, "relative_l2": 8.89484795444634e-06}, "energy_coordinate_gradient": {"max_abs": 1.876245174477827e-08, "relative_l2": 8.894847954466332e-06}, "repeated_energy_coordinate_gradient": {"max_abs": 1.876245174477827e-08, "relative_l2": 8.894847954466332e-06}}, "outside_tolerance": ["E", "Fa", "energy_coordinate_gradient", "repeated_energy_coordinate_gradient"]},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 9, "captured_operations": 584, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "scatter_add_"], "errors": {"E": {"max_abs": 1.1102230246251565e-16, "relative_l2": 1.0892159156324131e-16}, "Fa": {"max_abs": 1.3010426069826053e-18, "relative_l2": 8.054669689365549e-16}, "energy_coordinate_gradient": {"max_abs": 2.8189256484623115e-18, "relative_l2": 1.3847500472364694e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 2.8189256484623115e-18, "relative_l2": 1.4084676108325977e-15}}}
+    },
+    "grace/float32": {
+      "original": {"job": "6318417", "status": "exception", "stage": "model forward or process", "exit": -6, "exception": "SIGABRT"},
+      "cace_grace_dpa4": {"job": "6318770", "status": "pass", "graphs": 9, "captured_operations": 903, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 2.3283064365386963e-08, "relative_l2": 5.702426436979984e-07}, "energy_coordinate_gradient": {"max_abs": 2.3283064365386963e-08, "relative_l2": 5.702426436979984e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.3283064365386963e-08, "relative_l2": 5.702426436979984e-07}}},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 9, "captured_operations": 903, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 2.3283064365386963e-08, "relative_l2": 5.702426436979984e-07}, "energy_coordinate_gradient": {"max_abs": 2.3283064365386963e-08, "relative_l2": 5.702426436979984e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 2.3283064365386963e-08, "relative_l2": 5.702426436979984e-07}}}
+    },
+    "grace/float64": {
+      "original": {"job": "6318417", "status": "exception", "stage": "model forward or process", "exit": -6, "exception": "SIGABRT: corrupted size vs. prev_size"},
+      "cace_grace_dpa4": {"job": "6318770", "status": "pass", "graphs": 10, "captured_operations": 1764, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 1.1102230246251565e-16, "relative_l2": 1.3955529733969126e-16}, "Fa": {"max_abs": 7.112366251504909e-17, "relative_l2": 1.3385416549256005e-15}, "energy_coordinate_gradient": {"max_abs": 7.112366251504909e-17, "relative_l2": 1.3385416549256005e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 7.112366251504909e-17, "relative_l2": 1.3385416549256005e-15}}},
+      "merged_cpu_kernels": {"job": "6318881", "status": "pass", "graphs": 10, "captured_operations": 1764, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 1.1102230246251565e-16, "relative_l2": 1.3955529733969126e-16}, "Fa": {"max_abs": 7.112366251504909e-17, "relative_l2": 1.3385416549256005e-15}, "energy_coordinate_gradient": {"max_abs": 7.112366251504909e-17, "relative_l2": 1.3385416549256005e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 7.112366251504909e-17, "relative_l2": 1.3385416549256005e-15}}}
+    },
+    "facto/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 1168, "learned_operators": ["index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 1.1920928955078125e-07, "relative_l2": 5.678982026255077e-08}, "energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 5.678982026255077e-08}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1920928955078125e-07, "relative_l2": 5.678982026255077e-08}}}
+    },
+    "facto/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 1168, "learned_operators": ["index_add_", "linear"], "errors": {"E": {"max_abs": 1.1102230246251565e-16, "relative_l2": 1.6576257852897198e-16}, "Fa": {"max_abs": 2.220446049250313e-16, "relative_l2": 9.991642482861842e-17}, "energy_coordinate_gradient": {"max_abs": 2.220446049250313e-16, "relative_l2": 9.991642482861842e-17}, "repeated_energy_coordinate_gradient": {"max_abs": 2.220446049250313e-16, "relative_l2": 9.991642482861842e-17}}}
+    },
+    "dpa4c/float32": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 260, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 2.514570951461792e-06, "relative_l2": 4.859554221367889e-06}, "Fa": {"max_abs": 9.015202522277832e-07, "relative_l2": 6.326983625819425e-07}, "energy_coordinate_gradient": {"max_abs": 9.015202522277832e-07, "relative_l2": 6.326983625819425e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 9.015202522277832e-07, "relative_l2": 6.326983625819425e-07}}}
+    },
+    "dpa4c/float64": {
+      "original": {"job": "6318417", "status": "pass", "graphs": 9, "captured_operations": 260, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"], "errors": {"E": {"max_abs": 2.671474153004283e-15, "relative_l2": 5.23153893143734e-15}, "Fa": {"max_abs": 3.9968028886505635e-15, "relative_l2": 2.109602540389077e-15}, "energy_coordinate_gradient": {"max_abs": 3.9968028886505635e-15, "relative_l2": 2.109602540389077e-15}, "repeated_energy_coordinate_gradient": {"max_abs": 3.9968028886505635e-15, "relative_l2": 2.109602540389077e-15}}}
+    },
+    "tace/float32": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 31, "captured_operations": 178, "learned_operators": ["einsum", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 1.1641532182693481e-10, "relative_l2": 1.7624868106026106e-07}, "energy_coordinate_gradient": {"max_abs": 1.1641532182693481e-10, "relative_l2": 1.7624868106026106e-07}, "repeated_energy_coordinate_gradient": {"max_abs": 1.1641532182693481e-10, "relative_l2": 1.7624868106026106e-07}}}
+    },
+    "tace/float64": {
+      "original": {"job": "6318417", "status": "non-empty donated buffers", "stage": "external retained energy derivative", "exit": 1, "exception": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."},
+      "reusable_buffers": {"job": "6318583", "status": "pass", "graphs": 33, "captured_operations": 187, "learned_operators": ["einsum", "index_add_", "linear"], "errors": {"E": {"max_abs": 0.0, "relative_l2": 0.0}, "Fa": {"max_abs": 3.2526065174565133e-19, "relative_l2": 5.057245984393943e-16}, "energy_coordinate_gradient": {"max_abs": 3.2526065174565133e-19, "relative_l2": 5.057245984393943e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 3.2526065174565133e-19, "relative_l2": 5.057245984393943e-16}}}
+    }
+  },
+  "dpa3_inference_energy_weight_gradients": {
+    "model_revision": "42adcba",
+    "job": "6318837",
+    "method": "Two unmodified caller backwards for coordinates with retain_graph=True, then d(sum(E))/dw for every parameter. Both runs use CPU scalar kernels and the same seeded model and coordinates. The both setting also keeps endpoint reductions separate.",
+    "cases": {
+      "float32-both": {"energy": {"max_abs": 5.960464477539063e-08, "relative_l2": 8.051282682387278e-08}, "force": {"max_abs": 1.4901161193847656e-08, "relative_l2": 6.298965064628979e-08}, "repeated_energy_coordinate_gradient": {"max_abs": 1.4901161193847656e-08, "relative_l2": 6.298965064628979e-08}, "parameter_gradients_compared": 32, "maximum_parameter_abs_error": 4.76837158203125e-07, "outside_tolerance": [], "changed_gradient_participation": {}},
+      "float64-both": {"energy": {"max_abs": 0.0, "relative_l2": 0.0}, "force": {"max_abs": 5.551115123125783e-17, "relative_l2": 2.226674909879927e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 5.551115123125783e-17, "relative_l2": 2.226674909879927e-16}, "parameter_gradients_compared": 32, "maximum_parameter_abs_error": 8.881784197001252e-16, "outside_tolerance": [], "changed_gradient_participation": {}},
+      "float64-lazy": {"energy": {"max_abs": 0.0, "relative_l2": 0.0}, "force": {"max_abs": 5.551115123125783e-17, "relative_l2": 2.226674909879927e-16}, "repeated_energy_coordinate_gradient": {"max_abs": 5.551115123125783e-17, "relative_l2": 2.226674909879927e-16}, "parameter_gradients_compared": 32, "maximum_parameter_abs_error": 0.000516023520061748, "outside_tolerance": ["pre_sequence.2.embedding.weight"], "changed_gradient_participation": {}}
+    }
+  }
+}
