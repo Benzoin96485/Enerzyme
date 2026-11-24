@@ -317,7 +317,9 @@ With CHGNet's standard stack, ordinary compiled training also places the
 magnetic readout in a separate differentiable graph. An energy/force loss
 leaves its weight and bias gradients absent. Adding a magnetic loss trains
 both through the same atom features. Readout hooks use native derivatives
-so changes to their inputs and outputs take effect on the next call.
+so changes to their inputs and outputs take effect on the next call. Batches
+with an empty bond-angle table also use native derivatives, preserving
+absent gradients for radial basis weights that do not contribute to the loss.
 On PyTorch 2.13, a loss on magnetic moments alone can still give explicit
 zero gradients to unused parameters in the shared feature graph. Use eager
 training if the optimizer must skip those parameters for a magnetic-only step.

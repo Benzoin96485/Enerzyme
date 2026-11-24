@@ -489,3 +489,24 @@ def test_independent_magnetic_readout_checks_custom_fields_and_modes():
     moment.test_only = False
     energy.reset_field_name(atom_feature="Ma")
     assert independent_magnetic_readout(core) is None
+
+
+
+def test_compiled_moment_and_radial_gradients_without_angles():
+    from scripts.core_harness import build
+
+    model = build("chgnet").double()
+    runner = torch.compile(model, backend="aot_eager")
+
+    def step(target, distance, keys):
+        coordinates = torch.tensor([[0., 0., 0.], [distance, 0., 0.]], dtype=torch.float64, requires_grad=True)
+        fields = dict(Ra=coordinates, Za=torch.tensor([1, 8]), idx_i=torch.tensor([1, 0]),
+                      idx_j=torch.tensor([0, 1]), batch_seg=torch.tensor([0, 0]))
+        out = target(fields)
+        loss = sum(out[key].square().sum() for key in keys)
+        grads = torch.autograd.grad(loss, (*model.parameters(), coordinates), allow_unused=True)
+        return (out["E"], out["Fa"], out["Ma"]), grads
+
+    for distance in (2., 20.):
+        for keys in (("E", "Fa"), ("E", "Fa", "Ma"), ("Ma",)):
+            torch.testing.assert_close(step(runner, distance, keys), step(model, distance, keys))

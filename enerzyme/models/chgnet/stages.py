@@ -298,9 +298,16 @@ def independent_magnetic_readout(core):
 @torch.compiler.disable(recursive=False)
 def train_with_magnetic_readout(core, inputs, edges, topology, post_pairs):
     from ..layers.compiled_grad import forward_with_coordinate_gradients, has_module_hooks, native_forces
+    from ..mp.graph import PreparedTopology
 
     if has_module_hooks(core.post_sequence):
         return native_forces(core, inputs)
+    if isinstance(topology, PreparedTopology):
+        bond_graph = topology.root.get(BondGraphRequest.force_cache_key)
+        if bond_graph is not None and bond_graph[1].idx_ij.numel() == 0:
+            # Without angles, auxiliary radial bases receive no energy gradient.
+            # AOT can give these weights a zero gradient and trigger weight decay.
+            return native_forces(core, inputs)
     moment = independent_magnetic_readout(core)
     if moment is None:
         return forward_with_coordinate_gradients(core, inputs, edges, topology, post_pairs)
