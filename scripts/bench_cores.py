@@ -6,11 +6,15 @@ do not leak between models. Results are written as JSON; compare two runs with
 
     PYTHONPATH=. python scripts/bench_cores.py --out bench.json [--only a,b] [--compile]
     PYTHONPATH=. python scripts/bench_cores.py --out normalized.json --compile-reference
+    python scripts/bench_cores.py --out mace.json --fixture test/fixtures/main_legacy/mace_ff04.pt.gz
     python scripts/bench_cores.py --compare base.json new.json [--threshold 0.03]
 """
 import argparse
-import json
+import gzip
+import hashlib
 import importlib.util
+import io
+import json
 import math
 import os
 import resource
@@ -60,6 +64,19 @@ def _batch(name, sizes, dtype, cutoff):
     return batch
 
 
+def _fixture_configuration(path):
+    """Read the architecture and exact construction settings from a main-branch fixture."""
+    import torch
+    from torch.torch_version import TorchVersion
+
+    with gzip.open(path, "rb") as archive, torch.serialization.safe_globals([TorchVersion]):
+        payload = torch.load(io.BytesIO(archive.read()), map_location="cpu", weights_only=True)
+    config = {key: payload[key] for key in ("architecture", "layers", "build_params")}
+    config["architecture"] = config["architecture"].lower()
+    encoded = json.dumps(config, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    return config, hashlib.sha256(encoded).hexdigest()
+
+
 def _load_reference_module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -95,7 +112,7 @@ def compile_reference_model(model):
 
 
 def _worker(arch, reps, threads, use_compile, systems="default", precision="float32",
-            device_name="auto", model_tree=None, compile_reference=False):
+            device_name="auto", model_tree=None, compile_reference=False, fixture=None):
     import torch
     from core_harness import build, forward
 
@@ -112,9 +129,19 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
         device_name = "cuda" if torch.cuda.is_available() else "cpu"
     device = torch.device(device_name)
     dtype = getattr(torch, precision)
-    model = build(arch).to(device=device, dtype=dtype)
-    _, defaults, _ = get_ff_core(arch)
-    cutoff = max(float(defaults.get("cutoff_sr") or 0), float(defaults.get("cutoff_lr") or 0), 6.0)
+    metadata = {}
+    if fixture is None:
+        model = build(arch)
+        _, build_params, _ = get_ff_core(arch)
+    else:
+        config, digest = _fixture_configuration(fixture)
+        if config["architecture"] != arch.lower():
+            raise ValueError(f"Fixture builds {config['architecture']!r}, worker requested {arch!r}")
+        build_params = config["build_params"]
+        model = build(arch, layer_params=config["layers"], build_params=build_params)
+        metadata = {"fixture": Path(fixture).name, "config_sha256": digest}
+    model = model.to(device=device, dtype=dtype)
+    cutoff = max(float(build_params.get("cutoff_sr") or 0), float(build_params.get("cutoff_lr") or 0), 6.0)
     # AllScAIP builds its own neighbors. Its native option selects periodic images.
     graph_options = None
     if arch == "allscaip":
@@ -125,7 +152,7 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
         model = torch.compile(model)
     result = {"params": sum(p.numel() for p in model.parameters()), "device": device.type,
               "precision": precision, "compile": use_compile or compile_reference,
-              "compile_reference": compile_reference}
+              "compile_reference": compile_reference, **metadata}
     if device.type == "cuda":
         result["device_name"] = torch.cuda.get_device_name(device)
 
@@ -180,7 +207,7 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
 
 
 def run_all(archs, out_path, reps, threads, use_compile, timeout, systems="default",
-            precision="float32", device_name="auto", model_tree=None, compile_reference=False):
+            precision="float32", device_name="auto", model_tree=None, compile_reference=False, fixture=None):
     results = {}
     if os.path.exists(out_path):
         with open(out_path) as f:
@@ -196,6 +223,8 @@ def run_all(archs, out_path, reps, threads, use_compile, timeout, systems="defau
             cmd.append("--compile")
         cmd += ["--systems", systems]
         cmd += ["--dtype", precision, "--device", device_name]
+        if fixture:
+            cmd += ["--fixture", fixture]
         if model_tree:
             cmd += ["--model-tree", model_tree]
         try:
@@ -241,7 +270,7 @@ def compare(base_path, new_path, threshold):
         current = new.get(arch, {})
         if "error" in old or "error" in current:
             raise ValueError(f"{arch}: incomplete benchmark: {old.get('error') or current.get('error')}")
-        for field, default in (("params", None), ("device", None), ("device_name", None), ("precision", "float32"),
+        for field, default in (("params", None), ("config_sha256", None), ("device", None), ("device_name", None), ("precision", "float32"),
                                ("compile", False), ("compile_reference", False)):
             if old.get(field, default) != current.get(field, default):
                 raise ValueError(f"{arch}: different {field} in the two runs")
@@ -283,6 +312,7 @@ def main():
                        help="use the same full-graph force derivative and tensor table gather for both checkouts")
     parser.add_argument("--dtype", choices=("float32", "float64"), default="float32")
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument("--fixture", help="use the exact layer and build settings from a main_legacy .pt.gz fixture")
     parser.add_argument("--model-tree", help="load Enerzyme from this checkout using the same benchmark driver")
     parser.add_argument("--systems", choices=sorted(SYSTEM_SETS), default="default")
     parser.add_argument("--worker", default=None)
@@ -293,7 +323,7 @@ def main():
         parser.error("--reps, --threads and --timeout must be positive")
     if args.worker:
         print("BENCH " + json.dumps(_worker(args.worker, args.reps, args.threads, args.compile, args.systems,
-                                             args.dtype, args.device, args.model_tree, args.compile_reference)),
+                                             args.dtype, args.device, args.model_tree, args.compile_reference, args.fixture)),
               flush=True)
         return
     if args.compare:
@@ -301,9 +331,15 @@ def main():
         sys.exit(1 if worse else 0)
     from core_harness import ARCHITECTURES
 
-    archs = args.only.split(",") if args.only else ARCHITECTURES
+    if args.fixture:
+        config, _ = _fixture_configuration(args.fixture)
+        archs = [config["architecture"]]
+        if args.only and args.only.lower().split(",") != archs:
+            parser.error(f"--fixture builds {archs[0]!r}, incompatible with --only {args.only!r}")
+    else:
+        archs = args.only.split(",") if args.only else ARCHITECTURES
     ok = run_all(archs, args.out, args.reps, args.threads, args.compile, args.timeout, args.systems,
-                 args.dtype, args.device, args.model_tree, args.compile_reference)
+                 args.dtype, args.device, args.model_tree, args.compile_reference, args.fixture)
     sys.exit(0 if ok else 1)
 
 

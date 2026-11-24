@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from bench_cores import compare
+from bench_cores import _fixture_configuration, compare
 
 
 def _timings():
@@ -64,4 +64,24 @@ def test_compare_requires_matching_parameter_counts(tmp_path, before, after):
         path.write_text(json.dumps({"schnet": record}))
         paths.append(path)
     with pytest.raises(ValueError, match="params"):
+        compare(*paths, 0.03)
+
+
+def test_fixture_retains_shared_architecture_configuration():
+    fixture = Path(__file__).parent / "fixtures" / "main_legacy" / "mace_ff04.pt.gz"
+    config, digest = _fixture_configuration(fixture)
+    assert config["architecture"] == "mace"
+    assert len(config["layers"]) > 1
+    assert config["build_params"]["cutoff_sr"] > 0
+    assert len(digest) == 64
+
+
+def test_compare_rejects_different_fixture_configs_at_same_parameter_count(tmp_path):
+    paths = []
+    for label in ("left", "right"):
+        path = tmp_path / f"{label}.json"
+        record = dict(_timings(), params=7, config_sha256=label)
+        path.write_text(json.dumps({"mace": record}))
+        paths.append(path)
+    with pytest.raises(ValueError, match="config_sha256"):
         compare(*paths, 0.03)
