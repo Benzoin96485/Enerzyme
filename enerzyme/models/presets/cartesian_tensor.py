@@ -81,6 +81,7 @@ def camp(
         output_mlp_hidden_layers=spec["output_mlp_hidden_layers"],
         atomic_numbers=None if atomic_numbers is None else list(atomic_numbers),
         dim_feature_out=width, num_output_blocks=depth, feature_irreps=f"{width}x0e",
+        positional_fields=('atom_embedding', 'Za', 'Dij_sr', 'vij_sr', 'idx_i_sr', 'idx_j_sr'),
     )
 
 
@@ -182,6 +183,7 @@ def cace(
         envelope_p=envelope_p, avg_num_neighbors=avg_num_neighbors, readout_hidden=readout_hidden,
         shared_channels=shared_channels, shared_l=shared_l, separate_receiver=separate_receiver,
         bchi_layers=bchi_layers, n_channels=n_channels, n_invariants=n_invariants,
+        positional_fields=('atom_embedding', 'rbf', 'Dij_sr', 'vij_sr', 'idx_i_sr', 'idx_j_sr', 'cutoff_values_sr'),
     )
 
 
@@ -297,6 +299,7 @@ def grace(
         rms_epsilon=rms_epsilon, n_densities=n_densities, num_layers=num_layers,
         order_channels=order_channels, order_lmax=order_lmax, indicator_lmax=indicator_lmax,
         dim_feature_out=dim_feature_out, feature_irreps=feature_irreps, max_l=max_l,
+        positional_fields=('atom_embedding', 'Za', 'Dij_sr', 'vij_sr', 'idx_i_sr', 'idx_j_sr'),
     )
 
 
@@ -365,6 +368,7 @@ def facto(
         tensor_transport=tensor_transport, residual_scale=residual_scale, rms_epsilon=rms_epsilon,
         lmax=lmax, num_output_blocks=num_output_blocks, dim_feature_out=dim_feature_out,
         feature_irreps=feature_irreps,
+        positional_fields=('Za', 'Dij_sr', 'vij_sr', 'idx_i_sr', 'idx_j_sr'),
     )
 
 
@@ -489,4 +493,35 @@ def _orbital_core(
         activation=activation, layer_norm=layer_norm, dropout=dropout,
         elemental=elemental, atomic_numbers=atomic_numbers, coeff_init=coeff_init,
         dim_feature_out=dim_feature_out, feature_irreps=feature_irreps,
+        positional_fields=('atom_embedding', 'Za', 'idx_i_sr', 'idx_j_sr', 'vij_sr', 'Dij_sr'),
+    )
+
+
+def dpa4c(
+    dim_embedding: int,
+    channels: Optional[int] = None,
+    lmax: int = 2,
+    radial_modes: int = 0,
+    n_radial: int = 16,
+    basis_type: str = "bessel",
+    cutoff_sr: float = 6.0,
+) -> ComposableCore:
+    from ..dpa4c.blocks import DPA4CBlock, DPA4CHead, build_descriptor_stack
+    from ..mp.core import DelegatingCore, FieldEmbed
+
+    block = DPA4CBlock(dim_embedding, channels, lmax, radial_modes, n_radial, basis_type, cutoff_sr)
+    head = DPA4CHead(block.dim_feature_out, block.channels)
+    return DelegatingCore(
+        FieldEmbed(), [block], head, GraphRequires(distances=False, rbf=False, optional_cutoff_values=False),
+        builder=build_descriptor_stack, dim_embedding=dim_embedding, channels=block.channels, lmax=lmax,
+        radial_modes=radial_modes, n_radial=n_radial, cutoff_sr=cutoff_sr, degree_channels=block.degree_channels,
+        dim_feature_out=block.dim_feature_out, feature_irreps=block.feature_irreps,
+        delegates={
+            "raw_descriptor": "blocks.0.raw_descriptor",
+            "radial": "blocks.0.radial", "pair_film": "blocks.0.pair_film",
+            "fit_output_calibration": "head.fit_output_calibration",
+            "reset_output_calibration": "head.reset_output_calibration",
+            "calib_scale": "head.calib_scale", "calib_mean": "head.calib_mean",
+        },
+        positional_fields=("atom_embedding", "idx_i_sr", "idx_j_sr", "vij_sr"),
     )

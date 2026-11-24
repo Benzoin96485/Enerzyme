@@ -160,3 +160,37 @@ class ComposableCore(BaseFFCore):
             if taps is not None:
                 taps.append(state)
         return self.head(state, ctx, taps, inputs)
+
+
+class DelegatingCore(ComposableCore):
+    """Expose selected component settings and methods at their original Core paths.
+
+    Resolve each alias against the current module tree so assignments, device moves,
+    serialization and deepcopy all use the component's registered parameters/buffers.
+    """
+
+    def __init__(self, *args, delegates: Dict[str, str], **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        paths = {}
+        for public_name, target in delegates.items():
+            module_path, _, member = target.rpartition(".")
+            if not module_path or hasattr(self, public_name):
+                raise ValueError(f"Invalid Core alias {public_name!r} for {target!r}")
+            getattr(self.get_submodule(module_path), member)
+            paths[public_name] = (module_path, member)
+        self._delegates = paths
+
+    def __getattr__(self, name):
+        target = self.__dict__.get("_delegates", {}).get(name)
+        if target is None:
+            return super().__getattr__(name)
+        module_path, member = target
+        return getattr(self.get_submodule(module_path), member)
+
+    def __setattr__(self, name, value):
+        target = self.__dict__.get("_delegates", {}).get(name)
+        if target is None:
+            super().__setattr__(name, value)
+        else:
+            module_path, member = target
+            setattr(self.get_submodule(module_path), member, value)

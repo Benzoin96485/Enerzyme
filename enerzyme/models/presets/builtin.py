@@ -68,7 +68,7 @@ _add('e2former_v2', '.presets.so2:e2former', '.e2former.v2:DEFAULT_BUILD_PARAMS'
 _add('e2former_lsr', '.presets.so2:e2former_lsr', '.e2former.lsr:DEFAULT_BUILD_PARAMS', '.e2former.lsr:DEFAULT_LAYER_PARAMS', family='so2')
 _add('dpa3', '.presets.triplet_graphs:dpa3', '.dpa3:DEFAULT_BUILD_PARAMS', '.dpa3:DEFAULT_LAYER_PARAMS', family='triplet')
 _add('dpa4', '.presets.so2:dpa4', '.dpa4.defaults:DEFAULT_BUILD_PARAMS', '.dpa4.defaults:DEFAULT_LAYER_PARAMS', family='so2')
-_add('dpa4c', '.dpa4c.core:DPA4CCore', '.dpa4c.core:DEFAULT_BUILD_PARAMS', '.dpa4c.core:DEFAULT_LAYER_PARAMS', family='carttensor')
+_add('dpa4c', '.presets.cartesian_tensor:dpa4c', '.dpa4c.defaults:DEFAULT_BUILD_PARAMS', '.dpa4c.defaults:DEFAULT_LAYER_PARAMS', family='carttensor')
 _add('so3krates', '.presets.hybrid:so3krates', '.so3krates:DEFAULT_BUILD_PARAMS', '.so3krates:DEFAULT_LAYER_PARAMS', family='hybrid')
 _add('so3lr', '.presets.hybrid:so3krates', '.so3krates.so3lr:DEFAULT_BUILD_PARAMS', '.so3krates.so3lr:DEFAULT_LAYER_PARAMS', family='hybrid')
 _add('efa', '.presets.hybrid:so3krates', '.so3krates.efa:DEFAULT_BUILD_PARAMS', '.so3krates.efa:DEFAULT_LAYER_PARAMS', family='hybrid')
