@@ -92,6 +92,7 @@ class ComposableCore(BaseFFCore):
         builder: Optional[Callable[[BaseFFCore, List[nn.Module]], None]] = None,
         banner: Optional[str] = None,
         extra_input_fields: Iterable[str] = (),
+        positional_fields: Sequence[str] = (),
         **attributes: Any,
     ) -> None:
         input_fields: Set[str] = set(requires.input_fields())
@@ -110,6 +111,9 @@ class ComposableCore(BaseFFCore):
         if any(i < 0 or i >= len(self.blocks) for i in self.schedule):
             raise ValueError(f"schedule {self.schedule} indexes outside {len(self.blocks)} blocks")
         self.node_field = node_field
+        self.positional_fields = tuple(positional_fields)
+        if len(set(self.positional_fields)) != len(self.positional_fields):
+            raise ValueError("positional_fields must contain unique input names")
         self._builder = builder or radius_stack_builder
         self._banner = banner
         for key, value in attributes.items():
@@ -134,7 +138,14 @@ class ComposableCore(BaseFFCore):
         return GraphContext.from_inputs(inputs, self.requires, num_nodes=node.shape[0],
                                         dtype=self.compute_dtype(inputs))
 
-    def get_output(self, **inputs: Any) -> Dict[str, Tensor]:
+    def get_output(self, *args: Any, **inputs: Any) -> Dict[str, Tensor]:
+        if args:
+            if len(args) > len(self.positional_fields):
+                raise TypeError(f"get_output accepts at most {len(self.positional_fields)} positional inputs")
+            for field, value in zip(self.positional_fields, args):
+                if field in inputs:
+                    raise TypeError(f"get_output got multiple values for {field!r}")
+                inputs[field] = value
         ctx = self.context(inputs)
         state = self.embed(inputs, ctx)
         taps: Optional[List[BlockState]] = [state] if self.head.needs_taps else None
