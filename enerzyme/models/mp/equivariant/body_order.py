@@ -9,6 +9,7 @@ import torch
 from torch import Tensor, nn
 
 from ..basis.cartesian import multi_indices
+from .product_ladder import ProductLadder
 
 
 def contract_feature_dyad(

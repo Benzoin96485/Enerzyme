@@ -183,3 +183,118 @@ def cace(
         shared_channels=shared_channels, shared_l=shared_l, separate_receiver=separate_receiver,
         bchi_layers=bchi_layers, n_channels=n_channels, n_invariants=n_invariants,
     )
+
+
+def grace(
+    max_Za: int = 94,
+    dim_embedding: int = 128,
+    cutoff_sr: float = 6.0,
+    preset: Optional[str] = "1L",
+    avg_n_neigh: float = 1.0,
+    rms_epsilon: float = 1e-6,
+) -> ComposableCore:
+    """Recursive ACE order blocks with species-dependent density projection."""
+    from ..grace.blocks import GRACEBlock, GRACEEmbed, GRACEDensityHead
+    from ..grace.coupling import DensityProjection
+    from ..grace.presets import resolve_grace_preset
+
+    name, config = resolve_grace_preset(preset)
+    if dim_embedding < 1:
+        raise ValueError(f"dim_embedding must be >= 1, got {dim_embedding}")
+    if cutoff_sr <= 0:
+        raise ValueError(f"cutoff_sr must be positive, got {cutoff_sr}")
+    if avg_n_neigh <= 0:
+        raise ValueError(f"avg_n_neigh must be positive, got {avg_n_neigh}")
+    preset = name
+    max_Za = int(max_Za)
+    dim_embedding = int(dim_embedding)
+    cutoff_sr = float(cutoff_sr)
+    basis_type = str(config["basis"])
+    n_rad_base = int(config["n_rad_base"])
+    cutoff_order = int(config["cutoff_order"])
+    radial_hidden = int(config["radial_hidden"])
+    radial_activation = str(config["radial_activation"])
+    readout_head = str(config["readout"])
+    readout_hidden = int(config["readout_hidden"])
+    readout_activation = str(config["radial_activation"])
+    recommended_embedding = int(config["embedding_size"])
+    recommended_cutoff = float(config["cutoff"])
+    fs_terms = config["fs_terms"]
+    rms_epsilon = float(rms_epsilon)
+    layer_specs = list(config["layers"])
+    if readout_head == "linear_mlp":
+        n_densities = int(config["n_mlp_dens"]) + 1
+    elif readout_head == "finnis_sinclair":
+        n_densities = len(fs_terms)
+    else:
+        raise ValueError(f"Unknown readout {readout_head!r} in preset {name}")
+    if n_densities < 1:
+        raise ValueError("GRACE must emit at least one density")
+    num_layers = len(layer_specs)
+    order_channels = [
+        [order.channels for order in spec["orders"]] for spec in layer_specs
+    ]
+    order_lmax = [
+        [order.lmax for order in spec["orders"]] for spec in layer_specs
+    ]
+    indicator_lmax = [spec["indicator_lmax"] for spec in layer_specs]
+    dim_feature_out = n_densities
+    feature_irreps = f"{n_densities}x0e"
+
+    built = []
+    for index, spec in enumerate(layer_specs):
+        incoming = None
+        if index > 0:
+            incoming = layer_specs[index - 1]["indicator_lmax"]
+            if incoming is None:
+                raise ValueError(
+                    f"GRACE layer {index - 1} must set indicator_lmax to feed the next layer"
+                )
+            incoming = int(incoming)
+        outgoing_channels = None
+        outgoing_lmax = None
+        if index + 1 < len(layer_specs):
+            if spec["indicator_lmax"] is None:
+                raise ValueError(
+                    f"GRACE layer {index} must set indicator_lmax to feed the next layer"
+                )
+            outgoing_lmax = int(spec["indicator_lmax"])
+            outgoing_channels = int(layer_specs[index + 1]["orders"][0].channels)
+        built.append(
+            GRACEBlock(
+                spec["orders"],
+                n_basis=n_rad_base,
+                cutoff=cutoff_sr,
+                cutoff_order=cutoff_order,
+                basis=basis_type,
+                radial_hidden=radial_hidden,
+                radial_activation=radial_activation,
+                embedding_dim=dim_embedding,
+                incoming_lmax=incoming,
+                outgoing_lmax=outgoing_lmax,
+                indicator_channels=int(spec["indicator_channels"]),
+                indicator_out=outgoing_channels,
+                n_species=max_Za + 1,
+                epsilon=rms_epsilon,
+            )
+        )
+    flat_channels = [
+        channels for layer_channels in order_channels for channels in layer_channels
+    ]
+    density = DensityProjection(
+        flat_channels, n_densities, max_Za + 1
+    )
+    max_l = max(layer.lmax for layer in built)
+    return ComposableCore(
+        GRACEEmbed(dim_embedding, avg_n_neigh, max_l), built, GRACEDensityHead(density),
+        GraphRequires(rbf=False, optional_cutoff_values=False),
+        is_grace_core=True, num_blocks=1,
+        preset=preset, max_Za=max_Za, dim_embedding=dim_embedding,
+        cutoff_sr=cutoff_sr, basis_type=basis_type, n_rad_base=n_rad_base,
+        cutoff_order=cutoff_order, radial_hidden=radial_hidden, radial_activation=radial_activation,
+        readout_head=readout_head, readout_hidden=readout_hidden, readout_activation=readout_activation,
+        recommended_embedding=recommended_embedding, recommended_cutoff=recommended_cutoff, fs_terms=fs_terms,
+        rms_epsilon=rms_epsilon, n_densities=n_densities, num_layers=num_layers,
+        order_channels=order_channels, order_lmax=order_lmax, indicator_lmax=indicator_lmax,
+        dim_feature_out=dim_feature_out, feature_irreps=feature_irreps, max_l=max_l,
+    )

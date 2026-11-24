@@ -59,11 +59,11 @@ def _core_inputs(positions, atomic_numbers, embedding, cutoff):
 
 
 def _tiny(preset="custom", **overrides):
-    from enerzyme.models.grace import GRACECore
+    from enerzyme.models.presets.cartesian_tensor import grace
 
     params = dict(max_Za=10, dim_embedding=8, cutoff_sr=5.0, preset=preset)
     params.update(overrides)
-    return GRACECore(**params)
+    return grace(**params)
 
 
 def test_registration_presets_and_yaml():
@@ -73,7 +73,7 @@ def test_registration_presets_and_yaml():
 
     for name in ("grace", "GRACE"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "GRACECore"
+        assert core_cls.__name__ == "grace"
         assert build_params["cutoff_sr"] == 6.0
         assert build_params["dim_embedding"] == 128
         assert layers[1]["name"] == "RandomAtomEmbedding"
@@ -119,7 +119,7 @@ def test_registration_presets_and_yaml():
         build_params=dict(ff["build_params"], max_Za=12),
         verbose=0,
     )
-    assert model.__class__.__name__ == "GRACECore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.preset == "custom"
     assert model.n_densities == 3
     assert model.feature_irreps == "3x0e"
@@ -163,9 +163,9 @@ def test_custom_forward_shapes_and_isolated_atoms_depend_only_on_species():
     assert torch.allclose(separated["atom_feature"], torch.cat(alone, dim=0), atol=1e-6, rtol=1e-6)
     # No neighbors: the basis is zero, so the density is the species bias.
     with torch.no_grad():
-        core.density.linear.bias.zero_()
-        core.density.linear.bias[6, 0] = 0.3
-        core.density.linear.bias[1, 1] = -0.2
+        core.head.density.linear.bias.zero_()
+        core.head.density.linear.bias[6, 0] = 0.3
+        core.head.density.linear.bias[1, 1] = -0.2
     carbon = core.get_output(
         **_core_inputs(far[:1], atomic_numbers[:1], embedding[:1], 5.0)
     )["atom_feature"]
@@ -210,15 +210,15 @@ def test_second_layer_message_changes_the_densities():
     core = _tiny(preset="custom-2L").eval()
     assert core.num_layers == 2
     assert core.indicator_lmax[0] == 1
-    assert core.layers[0].indicator is not None
-    assert core.layers[1].atomic.edge_product is not None
+    assert core.blocks[0].indicator is not None
+    assert core.blocks[1].atomic.edge_product is not None
     positions = torch.tensor([[0.0, 0.0, 0.0], [1.2, 0.15, 0.0], [-0.2, 1.25, 0.3]])
     atomic_numbers = torch.tensor([6, 1, 8])
     embedding = torch.randn(3, 8)
     kwargs = _core_inputs(positions, atomic_numbers, embedding, 5.0)
     baseline = core.get_output(**kwargs)["atom_feature"]
     with torch.no_grad():
-        for parameter in core.layers[0].indicator.parameters():
+        for parameter in core.blocks[0].indicator.parameters():
             parameter.zero_()
     silenced = core.get_output(**kwargs)["atom_feature"]
     assert not torch.allclose(baseline, silenced, atol=1e-6, rtol=1e-6)
