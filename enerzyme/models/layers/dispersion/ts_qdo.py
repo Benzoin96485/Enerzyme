@@ -104,6 +104,10 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
         """Reject Z outside free-atom table (avoids silent CUDA OOB)."""
         if Za.numel() == 0:
             return
+        if torch.compiler.is_compiling():
+            torch._assert_async(((Za >= 1) & (Za <= MAX_ZA_TSQDO)).all(),
+                                f"TS–QDO free-atom tables cover Z=1..{MAX_ZA_TSQDO}")
+            return
         z_min = int(Za.min().item())
         z_max = int(Za.max().item())
         if z_min < 1 or z_max > MAX_ZA_TSQDO:

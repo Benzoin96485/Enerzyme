@@ -12,6 +12,11 @@ from ..equivariant.s2.lebedev import lebedev_tensors, recommend_max_frequency
 from .rope import frequency_init, linear_efa_aggregate
 
 
+@torch.compiler.assume_constant_result
+def _cpu_grid(order: int, dtype: torch.dtype):
+    return lebedev_tensors(order, device=torch.device("cpu"), dtype=dtype)
+
+
 class EuclideanFastAttention(Module):
     """Linear-scaling geometry-aware nonlocal attention (scalar features).
 
@@ -77,30 +82,27 @@ class EuclideanFastAttention(Module):
         else:
             self.register_buffer("frequencies", freqs, persistent=True)
 
-        # Cache empty; filled lazily per device/dtype.
-        self.register_buffer("_grid_u", torch.empty(0), persistent=False)
-        self.register_buffer("_grid_w", torch.empty(0), persistent=False)
-        self._grid_ready = False
+        # Load the quadrature outside any transformed forward. Widening a grid
+        # requires its original coefficients rather than rounded low-precision values.
+        grid_u, grid_w = lebedev_tensors(self.lebedev_num, device=freqs.device, dtype=freqs.dtype)
+        self.register_buffer("_grid_u", grid_u, persistent=False)
+        self.register_buffer("_grid_w", grid_w, persistent=False)
 
-    def _ensure_grid(self, device: torch.device, dtype: torch.dtype) -> None:
-        if (
-            self._grid_ready
-            and self._grid_u.device == device
-            and self._grid_u.dtype == dtype
-        ):
-            return
-        grid_u, grid_w = lebedev_tensors(
-            self.lebedev_num, device=device, dtype=dtype
-        )
-        self._grid_u = grid_u
-        self._grid_w = grid_w
-        self._grid_ready = True
+    def _apply(self, fn, recurse=True):
+        previous_dtype = self._grid_u.dtype
+        super()._apply(fn, recurse)
+        if torch.finfo(self._grid_u.dtype).bits > torch.finfo(previous_dtype).bits:
+            self._grid_u, self._grid_w = lebedev_tensors(
+                self.lebedev_num, device=self._grid_u.device, dtype=self._grid_u.dtype
+            )
+        return self
 
     def forward(
         self,
         features: Tensor,
         positions: Tensor,
         batch_seg: Tensor,
+        num_graphs: Optional[int] = None,
     ) -> Tensor:
         if features.ndim != 2:
             raise ValueError(
@@ -111,20 +113,24 @@ class EuclideanFastAttention(Module):
             raise ValueError(
                 "features, positions, and batch_seg must share atom dimension N"
             )
-        self._ensure_grid(features.device, features.dtype)
         if self.parametrized:
             q = self.proj_q(features)
             k = self.proj_k(features)
             v = self.proj_v(features)
         else:
             q = k = v = features
+        if self._grid_u.dtype == features.dtype:
+            grid_u, grid_w = self._grid_u, self._grid_w
+        else:
+            grid_u, grid_w = _cpu_grid(self.lebedev_num, features.dtype)
         return linear_efa_aggregate(
             q,
             k,
             v,
             positions.to(dtype=features.dtype),
             self.frequencies.to(dtype=features.dtype),
-            self._grid_u,
-            self._grid_w,
+            grid_u.to(features.device),
+            grid_w.to(features.device),
             batch_seg,
+            num_graphs=num_graphs,
         )

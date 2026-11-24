@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Module, Parameter, Sequential, SiLU
-from ..mp.ops import scatter_sum
+from ..mp.ops import batch_size_from_counts, scatter_sum
 
 from . import BaseFFLayer
 
@@ -37,7 +37,7 @@ class ChargeSpinEmbeddingLayer(BaseFFLayer):
     ) -> None:
         if attribute not in {"charge", "spin"}:
             raise ValueError("attribute must be 'charge' or 'spin'")
-        input_fields = {"Za", "batch_seg", "Q" if attribute == "charge" else "S"}
+        input_fields = {"Za", "batch_seg", "N", "Q" if attribute == "charge" else "S"}
         output_field = f"{attribute}_embedding"
         super().__init__(input_fields=input_fields, output_fields={output_field})
         self.attribute = attribute
@@ -71,12 +71,15 @@ class ChargeSpinEmbeddingLayer(BaseFFLayer):
                 std_m = 1.0 / (m.in_features ** 0.5)
                 torch.nn.init.normal_(m.weight, mean=0.0, std=std_m)
 
-    def _embed(self, Za: Tensor, psi: Tensor, batch_seg: Tensor) -> Tensor:
+    def _embed(self, Za: Tensor, psi: Optional[Tensor], batch_seg: Optional[Tensor], counts=None) -> Tensor:
         if batch_seg is None:
             batch_seg = torch.zeros(Za.shape[0], dtype=torch.long, device=Za.device)
         if psi is None:
+            size = batch_size_from_counts(counts)
+            if size is None:
+                size = int(batch_seg.max()) + 1 if batch_seg.numel() else 1
             psi = torch.zeros(
-                int(batch_seg.max().item()) + 1 if batch_seg.numel() else 1,
+                size,
                 dtype=torch.get_default_dtype(),
                 device=Za.device,
             )
@@ -95,8 +98,7 @@ class ChargeSpinEmbeddingLayer(BaseFFLayer):
         k = self.Wk[idx_atom]
         v = self.Wv[idx_atom]
         y = F.softplus((q * k).sum(dim=-1) / self.sqrt_dim)
-        num_graphs = int(batch_seg.max().item()) + 1 if batch_seg.numel() else 1
-        denom = scatter_sum(y, batch_seg, num_graphs) + 1e-6
+        denom = scatter_sum(y, batch_seg, psi.shape[0]) + 1e-6
         att = psi[batch_seg] * y / denom[batch_seg]
         v_att = att[:, None] * v
         return v_att + self.mlp(v_att)
@@ -107,7 +109,8 @@ class ChargeSpinEmbeddingLayer(BaseFFLayer):
         batch_seg: Optional[Tensor] = None,
         Q: Optional[Tensor] = None,
         S: Optional[Tensor] = None,
+        N=None,
     ):
         psi = Q if self.attribute == "charge" else S
-        emb = self._embed(Za, psi, batch_seg)
+        emb = self._embed(Za, psi, batch_seg, N)
         return {f"{self.attribute}_embedding": emb}

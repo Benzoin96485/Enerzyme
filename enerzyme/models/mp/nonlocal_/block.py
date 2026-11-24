@@ -69,8 +69,9 @@ class EFABlock(Module):
         features: Tensor,
         positions: Tensor,
         batch_seg: Tensor,
+        num_graphs: Optional[int] = None,
     ) -> Tensor:
-        y = self.efa(features, positions, batch_seg)
+        y = self.efa(features, positions, batch_seg, num_graphs=num_graphs)
         y = self.project_in(y) + features  # skip around EFA
         if self.post_mlp and self.mlp_1 is not None:
             y = self.mlp_2(self.act(self.mlp_1(y)))

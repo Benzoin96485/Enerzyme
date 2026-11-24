@@ -16,7 +16,7 @@ from ..mp.core import ComposableCore, Embed
 from ..mp.graph import GraphRequires
 from ..mp.head import FeatureHead, Head
 from ..mp.nonlocal_ import build_efa_blocks, parse_era_iterations
-from ..mp.ops import scatter_sum
+from ..mp.ops import batch_size_from_counts, scatter_sum
 from ..so3krates.defaults import _AVG_NUM_NEIGHBORS
 from ..so3krates.interaction import EuclideanTransformer
 
@@ -46,6 +46,7 @@ class SphericalAttentionEmbed(Embed):
             if pos is None:
                 raise ValueError("Ra is required when era_use_in_iterations is set")
             aux["positions"] = pos.to(scalar.dtype)
+            aux["num_graphs"] = batch_size_from_counts(inputs.get("N"))
             aux["batch"] = ctx.batch if ctx.batch is not None else ctx.receiver.new_zeros(ctx.num_nodes)
         return BlockState(scalar=scalar, equi=sphere, aux=aux)
 
@@ -57,7 +58,9 @@ class SphericalAttentionBlock(EuclideanTransformer):
             sh_vectors=state.aux["harmonics"], cutoffs=state.aux["cutoff"],
         )
         if self.nonlocal_update is not None:
-            scalar = scalar + self.nonlocal_update(scalar, state.aux["positions"], state.aux["batch"])
+            scalar = scalar + self.nonlocal_update(
+                scalar, state.aux["positions"], state.aux["batch"], num_graphs=state.aux["num_graphs"]
+            )
         return BlockState(scalar=scalar, equi=sphere, aux=state.aux)
 
 
@@ -156,7 +159,8 @@ def so3krates(
     embed = SphericalAttentionEmbed(degrees, cutoff_fn, cutoff_sr, initialize_ev_to_zeros, era_iters is not None)
     return ComposableCore(
         embed, layers, FeatureHead(equi_field="atom_sphere_feature"),
-        GraphRequires(optional_cutoff_values=False, fields=("Ra", "batch_seg") if era_iters is not None else ()),
+        GraphRequires(optional_cutoff_values=False, fields=("Ra", "batch_seg") if era_iters is not None else (),
+                      optional_fields=("N",) if era_iters is not None else ()),
         positional_fields=("atom_embedding", "rbf", "idx_i_sr", "idx_j_sr", "vij_sr", "Dij_sr", "Ra", "batch_seg"),
         architecture="so3krates", dim_embedding=dim_embedding, num_rbf=num_rbf, max_Za=max_Za,
         dim_feature_out=num_features, feature_irreps=f"{num_features}x0e", degrees=degrees,
