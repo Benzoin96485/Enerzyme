@@ -33,6 +33,7 @@ from torch.nn import Module, Parameter, init
 
 from ..mp.basis.angular import angular_dim
 from ..mp.equivariant.cg import coupling_paths
+from ..mp.equivariant.e3nn.tools import traceable_e3nn_kernels
 
 
 ANGULAR_DIM = angular_dim(2)
@@ -111,14 +112,15 @@ class GroupSparseCG(Module):
         irreps = o3.Irreps(f"{self.width}x1o + {self.width}x2e")
         degrees = tuple(ir for _, ir in irreps)
         paths = coupling_paths(degrees, degrees, degrees)
-        self.tp = o3.TensorProduct(
-            irreps,
-            irreps,
-            irreps,
-            [(i, j, k, "uvw", True, 1.0) for i, j, k in paths],
-            shared_weights=False,
-            internal_weights=False,
-        )
+        with traceable_e3nn_kernels():
+            self.tp = o3.TensorProduct(
+                irreps,
+                irreps,
+                irreps,
+                [(i, j, k, "uvw", True, 1.0) for i, j, k in paths],
+                shared_weights=False,
+                internal_weights=False,
+            )
         self.n_paths = len(self.tp.instructions)
         if self.n_paths != 4:
             raise RuntimeError(
