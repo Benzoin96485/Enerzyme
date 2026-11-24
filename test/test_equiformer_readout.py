@@ -264,7 +264,7 @@ def test_equiformer_mixed_irreps_simple_readout_stack():
     """Full stack: mixed-irreps Core → SimpleReadout 0e extract → two_layer MLP."""
     import copy
 
-    from enerzyme.models.equiformer.core import (
+    from enerzyme.models.equiformer.defaults import (
         DEFAULT_BUILD_PARAMS,
         DEFAULT_LAYER_PARAMS,
     )
@@ -324,7 +324,7 @@ def test_equiformer_mixed_irreps_simple_readout_stack():
 
 
 def test_equiformer_core_emits_full_irreps_feature():
-    from enerzyme.models.equiformer.core import EquiformerCore
+    from enerzyme.models.presets.irreps import equiformer
     from enerzyme.models.equiformer.embedding import EquiformerNodeEmbedding
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
@@ -334,7 +334,7 @@ def test_equiformer_core_emits_full_irreps_feature():
     feat = "8x0e+4x1e+2x2e"
     embed = EquiformerNodeEmbedding(max_Za=16, irreps_node_embedding=irreps)
     rbf_layer = ExpNormalSmearing(num_rbf=8, cutoff_sr=5.0)
-    core = EquiformerCore(
+    core = equiformer(
         num_rbf=8,
         irreps_node_embedding=irreps,
         irreps_feature=feat,

@@ -21,6 +21,18 @@ KEY_MAPS: Dict[str, List[Tuple[str, str]]] = {
         (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
         (r"^feedforwards\.(\d+)\.", r"blocks.\1.feedforward."),
     ],
+    "botnet": [(r"^interactions\.(\d+)\.", r"blocks.\1.module.")],
+    "allegro": [
+        (r"^(scalar_mlp|tensor_weight|pair_projection)\.", r"embed.\1."),
+        (r"^products\.(\d+)\.", r"blocks.\1.product."),
+        (r"^latents\.(\d+)\.", r"blocks.\1.latent."),
+    ],
+    "equiformer": [
+        (r"^edge_deg_embed\.", "embed.degree."),
+        (r"^blocks\.(\d+)\.", r"blocks.\1.module."),
+        (r"^head\.", "head.readout."),
+        (r"^norm\.", "head.norm."),
+    ],
     "nequip": [(r"^convs\.(\d+)\.", r"blocks.\1.module.")],
     "nequix": [(r"^layers\.(\d+)\.", r"blocks.\1.module.")],
     "eqnorm": [

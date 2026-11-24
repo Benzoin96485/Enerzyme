@@ -12,6 +12,7 @@ from typing import Dict, List, Literal, Optional, Sequence, Union
 from ..mp.core import ComposableCore, FeatureHead, FieldEmbed, ReadoutHead
 from ..mp.graph import GraphRequires
 
+from ..equiformer.defaults import _AVG_DEGREE, _AVG_NUM_NODES
 from ..eqnorm.defaults import PUBLISHED_MPTRJ_CORE_PARAMS
 from ..nequix.defaults import PUBLISHED_MP_CORE_PARAMS
 from ..mp.block import FnBlock
@@ -716,4 +717,439 @@ def eqnorm(
 # normalization={normalization}, message_envelope={message_envelope}
 ################################################################################
 """,
+    )
+
+
+def botnet(
+    max_Za: int,
+    dim_embedding: int,
+    num_rbf: int,
+    max_ell: int = 2,
+    num_interactions: int = 2,
+    avg_num_neighbors: float = 1.0,
+    hidden_irreps: Optional[str] = None,
+    additional_hidden_irreps: Optional[str] = None,
+    variant: str = "agnostic",
+    interaction_cls_first: Optional[str] = None,
+    interaction_cls: Optional[str] = None,
+    MLP_irreps: str = "16x0e",
+    radial_MLP: Optional[List[int]] = None,
+    gate: str = "silu",
+    output_mode: str = "layers",
+) -> ComposableCore:
+    """Stack the irreps from successive body-ordered convolutions."""
+    from e3nn.o3 import Irreps, SphericalHarmonics
+    from ..botnet.defaults import natural_hidden_irreps
+    from ..botnet.interaction import INTERACTION_CLASSES
+    from ..botnet.stages import PlacedFeatureHead, SpeciesEmbed, _resolve_interactions, _union_irreps, body_ordered_update
+    from ..mp.equivariant.e3nn import scalar_0e_dim
+
+    if output_mode not in {"layers", "feature"}:
+        raise ValueError(
+            f"output_mode must be 'layers' or 'feature', got {output_mode!r}"
+        )
+    max_Za = int(max_Za)
+    dim_embedding = int(dim_embedding)
+    num_rbf = int(num_rbf)
+    max_ell = int(max_ell)
+    num_interactions = int(num_interactions)
+    avg_num_neighbors = float(avg_num_neighbors)
+    if max_Za < 1:
+        raise ValueError(f"max_Za must be >= 1, got {max_Za}")
+    if dim_embedding < 1:
+        raise ValueError(f"dim_embedding must be >= 1, got {dim_embedding}")
+    if num_rbf < 1:
+        raise ValueError(f"num_rbf must be >= 1, got {num_rbf}")
+    if max_ell < 0:
+        raise ValueError(f"max_ell must be >= 0, got {max_ell}")
+    if num_interactions < 1:
+        raise ValueError(
+            f"num_interactions must be >= 1, got {num_interactions}"
+        )
+    if avg_num_neighbors <= 0:
+        raise ValueError(
+            f"avg_num_neighbors must be positive, got {avg_num_neighbors}"
+        )
+    if hidden_irreps is not None and additional_hidden_irreps:
+        raise ValueError(
+            "Pass hidden_irreps or additional_hidden_irreps, not both"
+        )
+    if hidden_irreps is None:
+        if additional_hidden_irreps:
+            hidden_irreps = f"{dim_embedding}x0e+{additional_hidden_irreps}"
+        else:
+            hidden_irreps = natural_hidden_irreps(dim_embedding, max_ell)
+    target = Irreps(hidden_irreps).simplify()
+    scalar_mul = scalar_0e_dim(target)
+    if scalar_mul != dim_embedding:
+        raise ValueError(
+            "dim_embedding must equal the 0e multiplicity of hidden_irreps "
+            f"({scalar_mul}), got {dim_embedding}. The species table is "
+            "the initial scalar state."
+        )
+    requested_hidden_irreps = str(target)
+    first_name, rest_name = _resolve_interactions(
+        variant, interaction_cls_first, interaction_cls
+    )
+    interaction_cls_first = first_name
+    interaction_cls = rest_name
+    if radial_MLP is None:
+        radial_MLP = [64, 64, 64]
+    radial_MLP = [int(width) for width in radial_MLP]
+    if any(width < 1 for width in radial_MLP):
+        raise ValueError(f"radial_MLP widths must be >= 1, got {radial_MLP}")
+    readout_mlp_irreps = str(Irreps(MLP_irreps).simplify())
+    readout_gate = str(gate)
+    # One interaction has only the linear head. A second interaction is
+    # what makes the final head the scalar MLP in NonLinearBodyOrderedModel.
+    last_readout = "nonlinear" if num_interactions > 1 else "linear"
+
+    sh_irreps = Irreps.spherical_harmonics(max_ell)
+    spherical_harmonics = SphericalHarmonics(
+        sh_irreps, normalize=True, normalization="component"
+    )
+    node_attrs_irreps = Irreps([(max_Za + 1, (0, 1))])
+    edge_feats_irreps = Irreps([(num_rbf, (0, 1))])
+    node_feats_irreps = Irreps([(dim_embedding, (0, 1))])
+    blocks = []
+    layer_irreps: List[Irreps] = []
+    for index in range(num_interactions):
+        name = first_name if index == 0 else rest_name
+        block = INTERACTION_CLASSES[name](
+            node_attrs_irreps=node_attrs_irreps,
+            node_feats_irreps=node_feats_irreps,
+            edge_attrs_irreps=sh_irreps,
+            edge_feats_irreps=edge_feats_irreps,
+            target_irreps=target,
+            hidden_irreps=target,
+            avg_num_neighbors=avg_num_neighbors,
+            radial_MLP=radial_MLP,
+        )
+        blocks.append(FnBlock(block, body_ordered_update))
+        produced = Irreps(block.irreps_out).simplify()
+        layer_irreps.append(produced)
+        node_feats_irreps = produced
+    uniform_irreps = all(irreps == layer_irreps[0] for irreps in layer_irreps)
+    union = layer_irreps[0] if uniform_irreps else _union_irreps(layer_irreps)
+    if output_mode == "layers":
+        feature_irreps = str(union)
+        num_output_blocks = num_interactions
+    else:
+        feature_irreps = str(layer_irreps[-1])
+        num_output_blocks = 1
+    dim_feature_out = scalar_0e_dim(feature_irreps)
+
+    head = FeatureHead(output_mode, source="equi")
+    if output_mode == "layers" and not uniform_irreps:
+        head = PlacedFeatureHead(layer_irreps, union)
+    return ComposableCore(
+        SpeciesEmbed(dim_embedding, num_rbf, max_Za, spherical_harmonics), blocks, head,
+        GraphRequires(distances=False, optional_cutoff_values=False, edge_convention="swap", fields=("Za",)),
+        positional_fields=("Za", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf",
+                           "atom_embedding", "charge_embedding", "spin_embedding"),
+        architecture="botnet", banner=f"BOTNet ({variant}, {num_interactions} interactions)",
+        max_Za=max_Za, dim_embedding=dim_embedding, num_rbf=num_rbf, max_ell=max_ell,
+        requested_hidden_irreps=requested_hidden_irreps, avg_num_neighbors=avg_num_neighbors,
+        interaction_cls_first=interaction_cls_first, interaction_cls=interaction_cls,
+        variant=variant, num_interactions=num_interactions, uniform_irreps=uniform_irreps,
+        num_output_blocks=num_output_blocks, layer_irreps=layer_irreps, output_mode=output_mode,
+        dim_feature_out=dim_feature_out, feature_irreps=feature_irreps, readout_gate=readout_gate,
+        readout_mlp_irreps=readout_mlp_irreps, last_readout=last_readout,
+    )
+
+
+def allegro(
+    dim_edge: int,
+    avg_num_neighbors: float,
+    preset: Optional[str] = None,
+    num_layers: Optional[int] = None,
+    l_max: Optional[int] = None,
+    parity: Optional[bool] = None,
+    num_scalar_features: Optional[int] = None,
+    num_tensor_features: Optional[int] = None,
+    scalar_embed_mlp_depth: Optional[int] = None,
+    scalar_embed_mlp_width: Optional[int] = None,
+    latent_mlp_depth: Optional[int] = None,
+    latent_mlp_width: Optional[int] = None,
+    nonlinearity: Optional[str] = None,
+    tp_path_channel_coupling: Optional[bool] = None,
+    weight_individual_irreps: Optional[bool] = None,
+) -> ComposableCore:
+    """Update scalar and tensor tracks on directed pairs within a fixed radius."""
+    from e3nn import o3
+    from ..mp.nn.mlp import VariancePreservingMLP
+    from ..allegro.defaults import _resolve
+    from ..allegro.interaction import ChannelTensorProduct, WeightedSphericalChannels
+    from ..allegro.irreps import allegro_layer_irreps, edge_sh_irreps
+    from ..allegro.stages import PairEmbed, PairHead, PairProduct, pair_stack
+
+    cfg = _resolve(
+        preset,
+        {
+            "num_layers": num_layers,
+            "l_max": l_max,
+            "parity": parity,
+            "num_scalar_features": num_scalar_features,
+            "num_tensor_features": num_tensor_features,
+            "scalar_embed_mlp_depth": scalar_embed_mlp_depth,
+            "scalar_embed_mlp_width": scalar_embed_mlp_width,
+            "latent_mlp_depth": latent_mlp_depth,
+            "latent_mlp_width": latent_mlp_width,
+            "nonlinearity": nonlinearity,
+            "tp_path_channel_coupling": tp_path_channel_coupling,
+            "weight_individual_irreps": weight_individual_irreps,
+        },
+    )
+    dim_edge = int(dim_edge)
+    num_layers = int(cfg["num_layers"])
+    l_max = int(cfg["l_max"])
+    parity = bool(cfg["parity"])
+    num_scalar_features = int(cfg["num_scalar_features"])
+    num_tensor_features = int(cfg["num_tensor_features"])
+    nonlinearity = str(cfg["nonlinearity"])
+    tp_path_channel_coupling = bool(cfg["tp_path_channel_coupling"])
+    weight_individual_irreps = bool(cfg["weight_individual_irreps"])
+    avg_num_neighbors = float(avg_num_neighbors)
+    scalar_embed_mlp_depth = int(cfg["scalar_embed_mlp_depth"])
+    latent_mlp_depth = int(cfg["latent_mlp_depth"])
+    scalar_width = cfg["scalar_embed_mlp_width"]
+    latent_width = cfg["latent_mlp_width"]
+    scalar_embed_mlp_width = (
+        num_scalar_features if scalar_width is None else int(scalar_width)
+    )
+    latent_mlp_width = (
+        num_scalar_features if latent_width is None else int(latent_width)
+    )
+    # EdgeReadout uses this when its hidden width is left unset.
+    readout_hidden_width = num_scalar_features
+    if dim_edge < 2 or dim_edge % 2 != 0:
+        raise ValueError(
+            f"dim_edge must be a positive even integer, got {dim_edge}"
+        )
+    if num_layers < 1:
+        raise ValueError(f"num_layers must be >= 1, got {num_layers}")
+    if l_max < 0:
+        raise ValueError(f"l_max must be >= 0, got {l_max}")
+    if num_scalar_features < 1:
+        raise ValueError(
+            f"num_scalar_features must be >= 1, got {num_scalar_features}"
+        )
+    if num_tensor_features < 1:
+        raise ValueError(
+            f"num_tensor_features must be >= 1, got {num_tensor_features}"
+        )
+    if avg_num_neighbors <= 0:
+        raise ValueError(
+            f"avg_num_neighbors must be positive, got {avg_num_neighbors}"
+        )
+    if scalar_embed_mlp_depth < 0 or latent_mlp_depth < 0:
+        raise ValueError("MLP depths must be >= 0")
+    if scalar_embed_mlp_depth > 0 and scalar_embed_mlp_width < 1:
+        raise ValueError("scalar_embed_mlp_width must be >= 1 when depth > 0")
+    if latent_mlp_depth > 0 and latent_mlp_width < 1:
+        raise ValueError("latent_mlp_width must be >= 1 when depth > 0")
+
+    def mlp(n_in: int, n_out: int, depth: int, width: int) -> VariancePreservingMLP:
+        return VariancePreservingMLP(
+            n_in,
+            n_out,
+            hidden_layers_depth=depth,
+            hidden_layers_width=width if depth > 0 else None,
+            nonlinearity=nonlinearity if depth > 0 else None,
+            bias=False,
+            forward_weight_init=True,
+        )
+
+    def linear(n_in: int, n_out: int) -> VariancePreservingMLP:
+        return VariancePreservingMLP(
+            n_in,
+            n_out,
+            hidden_layers_depth=0,
+            nonlinearity=None,
+            bias=False,
+            forward_weight_init=True,
+        )
+
+    irreps_edge_sh = edge_sh_irreps(l_max)
+    sph = o3.SphericalHarmonics(
+        irreps_edge_sh, normalize=True, normalization="component"
+    )
+    weighter = WeightedSphericalChannels(
+        irreps_edge_sh,
+        num_tensor_features,
+        weight_individual_irreps=weight_individual_irreps,
+    )
+    scalar_mlp = mlp(
+        dim_edge,
+        num_scalar_features,
+        scalar_embed_mlp_depth,
+        scalar_embed_mlp_width,
+    )
+    tensor_weight = linear(
+        num_scalar_features, weighter.weight_numel
+    )
+    pair_projection = linear(
+        num_scalar_features,
+        num_scalar_features + weighter.weight_numel,
+    )
+    pairs = allegro_layer_irreps(l_max, parity, num_layers)
+    products = []
+    latents = []
+    for layer, (irreps_in, irreps_out) in enumerate(pairs):
+        products.append(
+            ChannelTensorProduct(
+                irreps_in,
+                irreps_edge_sh,
+                irreps_out,
+                mul=num_tensor_features,
+                path_channel_coupling=tp_path_channel_coupling,
+            )
+        )
+        last = layer == num_layers - 1
+        latents.append(
+            mlp(
+                num_scalar_features * (layer + 1) + num_tensor_features,
+                num_scalar_features
+                + (0 if last else weighter.weight_numel),
+                latent_mlp_depth,
+                latent_mlp_width,
+            )
+        )
+    dim_feature_out = num_scalar_features * (num_layers + 1)
+    feature_irreps = f"{dim_feature_out}x0e"
+
+    embed = PairEmbed(scalar_mlp, tensor_weight, pair_projection, weighter, sph,
+                      dim_edge, num_scalar_features, avg_num_neighbors)
+    blocks = [PairProduct(tp, latent, weighter, num_scalar_features, num_tensor_features)
+              for tp, latent in zip(products, latents)]
+    return ComposableCore(
+        embed, blocks, PairHead(), GraphRequires(distances=False, rbf=False, optional_cutoff_values=False),
+        node_field="edge_embedding", builder=pair_stack,
+        positional_fields=("edge_embedding", "idx_i_sr", "idx_j_sr", "vij_sr"),
+        architecture="allegro", banner=f"Allegro ({num_layers} layers, l_max={l_max})",
+        dim_edge=dim_edge, num_layers=num_layers, l_max=l_max, parity=parity,
+        readout_hidden_width=readout_hidden_width, dim_feature_out=dim_feature_out,
+        feature_irreps=feature_irreps, avg_num_neighbors=avg_num_neighbors,
+        num_scalar_features=num_scalar_features, num_tensor_features=num_tensor_features,
+    )
+
+
+def equiformer(
+    num_rbf: int,
+    irreps_node_embedding: str = "32x0e+16x1e+8x2e",
+    irreps_feature: str = "64x0e",
+    irreps_node_attr: str = "1x0e",
+    irreps_sh: str = "1x0e+1x1e+1x2e",
+    irreps_head: str = "16x0e+8x1o+4x2e",
+    irreps_mlp_mid: str = "32x0e+16x1e+8x2e",
+    irreps_pre_attn: Optional[str] = None,
+    num_layers: int = 2,
+    num_heads: int = 2,
+    fc_neurons: Optional[List[int]] = None,
+    rescale_degree: bool = False,
+    nonlinear_message: bool = True,
+    use_attn_head: bool = False,
+    norm_layer: str = "layer",
+    alpha_drop: float = 0.0,
+    proj_drop: float = 0.0,
+    out_drop: float = 0.0,
+    drop_path_rate: float = 0.0,
+    avg_degree: float = _AVG_DEGREE,
+    avg_num_nodes: float = _AVG_NUM_NODES,
+    output_mode: Literal["direct", "feature"] = "feature",
+    **kwargs,
+) -> ComposableCore:
+    """Compose degree embeddings, graph attention, and a property or feature head."""
+    import torch
+    from e3nn import o3
+    from ..mp.equivariant.e3nn import Activation, EquivariantDropout, LinearRS, scalar_0e_dim
+    from ..equiformer.embedding import EdgeDegreeEmbeddingNetwork
+    from ..equiformer.interaction import GraphAttention, TransBlock, get_norm_layer, _RESCALE
+    from ..equiformer.stages import DegreeEmbed, graph_attention_update, AttentionHead
+
+    if fc_neurons is None:
+        fc_neurons = [64, 64]
+
+    irreps_node_embedding = o3.Irreps(irreps_node_embedding)
+    irreps_feature = o3.Irreps(irreps_feature)
+    irreps_node_attr = o3.Irreps(irreps_node_attr)
+    irreps_edge_attr = o3.Irreps(irreps_sh)
+    irreps_head = o3.Irreps(irreps_head)
+    irreps_mlp_mid = o3.Irreps(irreps_mlp_mid)
+    fc_neurons = [num_rbf] + list(fc_neurons)
+    # Scalar readout contract: dim_feature_out is 0e channel count.
+    feature_irreps = str(irreps_feature)
+    dim_feature_out = scalar_0e_dim(irreps_feature)
+
+    edge_deg_embed = EdgeDegreeEmbeddingNetwork(
+        irreps_node_embedding,
+        irreps_edge_attr,
+        fc_neurons,
+        avg_degree,
+    )
+    blocks = []
+    for i in range(num_layers):
+        irreps_block_output = (
+            irreps_node_embedding
+            if i != (num_layers - 1)
+            else irreps_feature
+        )
+        blocks.append(
+            TransBlock(
+                irreps_node_input=irreps_node_embedding,
+                irreps_node_attr=irreps_node_attr,
+                irreps_edge_attr=irreps_edge_attr,
+                irreps_node_output=irreps_block_output,
+                fc_neurons=fc_neurons,
+                irreps_head=irreps_head,
+                num_heads=num_heads,
+                irreps_pre_attn=irreps_pre_attn,
+                rescale_degree=rescale_degree,
+                nonlinear_message=nonlinear_message,
+                alpha_drop=alpha_drop,
+                proj_drop=proj_drop,
+                drop_path_rate=drop_path_rate,
+                irreps_mlp_mid=irreps_mlp_mid,
+                norm_layer=norm_layer,
+            )
+        )
+    norm = get_norm_layer(norm_layer)(irreps_feature)
+    out_dropout = None
+    if out_drop != 0.0:
+        out_dropout = EquivariantDropout(irreps_feature, out_drop)
+
+    readout = None
+    if output_mode == "direct":
+        if use_attn_head:
+            readout = GraphAttention(
+                irreps_node_input=irreps_feature,
+                irreps_node_attr=irreps_node_attr,
+                irreps_edge_attr=irreps_edge_attr,
+                irreps_node_output=o3.Irreps("1x0e"),
+                fc_neurons=fc_neurons,
+                irreps_head=irreps_head,
+                num_heads=num_heads,
+                irreps_pre_attn=irreps_pre_attn,
+                rescale_degree=rescale_degree,
+                nonlinear_message=nonlinear_message,
+                alpha_drop=alpha_drop,
+                proj_drop=proj_drop,
+            )
+        else:
+            readout = torch.nn.Sequential(
+                LinearRS(irreps_feature, irreps_feature, rescale=_RESCALE),
+                Activation(irreps_feature, acts=[torch.nn.SiLU()]),
+                LinearRS(irreps_feature, o3.Irreps("1x0e"), rescale=_RESCALE),
+            )
+
+    return ComposableCore(
+        DegreeEmbed(edge_deg_embed, irreps_edge_attr),
+        [FnBlock(block, graph_attention_update) for block in blocks],
+        AttentionHead(norm, out_dropout, readout, use_attn_head),
+        GraphRequires(distances=False, optional_cutoff_values=False, optional_fields=("batch_seg",)),
+        positional_fields=("vij_sr", "idx_i_sr", "idx_j_sr", "rbf", "atom_embedding", "batch_seg"),
+        architecture="equiformer", banner="Equiformer (ICLR 2023)",
+        output_mode=output_mode, feature_irreps=feature_irreps, dim_feature_out=dim_feature_out,
+        irreps_feature=irreps_feature, irreps_edge_attr=irreps_edge_attr, use_attn_head=use_attn_head,
+        num_layers=num_layers, num_heads=num_heads, num_rbf=num_rbf, irreps_node_embedding=irreps_node_embedding,
     )

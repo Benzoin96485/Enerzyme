@@ -6,6 +6,7 @@ import torch
 from e3nn import o3
 
 from equiformer_parity_utils import (
+    encode_irreps,
     assert_close,
     build_enerzyme_parts,
     build_official_md17,
@@ -68,7 +69,7 @@ def test_loss_grads_match_official():
     )
     rbf_vals = rbf.get_rbf(ez["Dij_sr"])
     atom_emb = embed.get_atom_embedding(za)
-    feats = core.encode_irreps(
+    feats = encode_irreps(core,
         vij_sr=ez["vij_sr"],
         idx_i_sr=ez["idx_i_sr"],
         idx_j_sr=ez["idx_j_sr"],
@@ -90,7 +91,7 @@ def test_loss_grads_match_official():
     loss_ours.backward()
 
     g_pos_ours = pos2.grad.detach().clone()
-    g_param_ours = core.blocks[0].ga.proj.tp.weight.grad.detach().clone()
+    g_param_ours = core.blocks[0].module.ga.proj.tp.weight.grad.detach().clone()
 
     assert_close(loss_ours.detach(), loss_off.detach(), atol=1e-5, rtol=1e-5, err_msg="L")
     assert_close(g_pos_ours, g_pos_off, atol=1e-4, rtol=1e-4, err_msg="dL/dRa")

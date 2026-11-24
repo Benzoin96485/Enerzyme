@@ -89,7 +89,7 @@ class EquiformerNodeEmbedding(BaseFFLayer):
     """Map atomic numbers ``Za`` to Equiformer irreps node embeddings.
 
     Unlike scalar :class:`~enerzyme.models.layers.atom_embedding.NuclearEmbedding`,
-    this produces an e3nn irreps feature used by :class:`EquiformerCore`.
+    this produces an e3nn irreps feature used by the Equiformer preset.
     """
 
     def __init__(

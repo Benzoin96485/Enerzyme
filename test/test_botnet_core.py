@@ -83,7 +83,7 @@ def test_registration_published_widths_and_yaml():
 
     for name in ("botnet", "BOTNet", "body_ordered", "body-ordered"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "BOTNetCore"
+        assert core_cls.__name__ == "botnet"
         assert build_params["cutoff_sr"] == 4.0
         assert build_params["num_rbf"] == 8
         assert layers[1]["params"]["flavor"] == "mace"
@@ -113,7 +113,7 @@ def test_registration_published_widths_and_yaml():
         },
         verbose=0,
     )
-    assert model.__class__.__name__ == "BOTNetCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.uniform_irreps
     assert not hasattr(model, "products")
     readout = next(layer for layer in model.post_sequence if isinstance(layer, BOTNetEnergyReadout))
@@ -122,11 +122,11 @@ def test_registration_published_widths_and_yaml():
 
 
 def test_readout_sums_linear_layers_and_a_final_mlp():
-    from enerzyme.models.botnet import BOTNetCore
+    from enerzyme.models.presets.irreps import botnet
     from enerzyme.models.botnet.readout import BOTNetEnergyReadout
 
     torch.manual_seed(0)
-    core = BOTNetCore(
+    core = botnet(
         max_Za=8,
         dim_embedding=4,
         num_rbf=3,
@@ -158,7 +158,7 @@ def test_readout_sums_linear_layers_and_a_final_mlp():
         + readout.heads[2](features[:, :, 2])
     )
     assert torch.allclose(energy, manual)
-    single = BOTNetCore(
+    single = botnet(
         max_Za=8,
         dim_embedding=4,
         num_rbf=3,
@@ -175,10 +175,10 @@ def test_readout_sums_linear_layers_and_a_final_mlp():
 
 
 def test_molecules_do_not_mix_and_charge_is_optional():
-    from enerzyme.models.botnet import BOTNetCore
+    from enerzyme.models.presets.irreps import botnet
 
     torch.manual_seed(4)
-    core = BOTNetCore(
+    core = botnet(
         max_Za=8,
         dim_embedding=4,
         num_rbf=3,
@@ -289,10 +289,10 @@ def test_stack_energy_is_conservative():
 
 
 def test_element_dependent_variant_runs():
-    from enerzyme.models.botnet import BOTNetCore
+    from enerzyme.models.presets.irreps import botnet
 
     torch.manual_seed(9)
-    core = BOTNetCore(
+    core = botnet(
         max_Za=6,
         dim_embedding=4,
         num_rbf=3,

@@ -17,7 +17,6 @@ MODEL_HEAD_NAMES = {
     "ComposableCore": {"head"},
     "AlphaNetCore": set(),
     "LEFTNetCore": set(),
-    "BOTNetCore": set(),
 }
 
 

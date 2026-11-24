@@ -1,5 +1,4 @@
-from .core import (
-    BOTNetCore,
+from .defaults import (
     DEFAULT_BUILD_PARAMS,
     DEFAULT_LAYER_PARAMS,
     PUBLISHED_3BPA_HIDDEN_IRREPS,
