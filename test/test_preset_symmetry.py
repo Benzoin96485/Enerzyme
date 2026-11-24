@@ -133,7 +133,14 @@ def test_dynamo_capture_of_energy_and_force(case):
     try:
         compiled = torch.compile(model, backend=capture)
         out = _run(compiled, sample, xyz, torch.arange(len(xyz)), capture_features=False)
-        assert any(node.op == "call_function" for graph in graphs for node in graph.graph.nodes)
+        operators = {
+            getattr(node.target, "__name__", str(node.target))
+            for graph in graphs for node in graph.graph.nodes
+            if node.op in ("call_function", "call_method")
+        }
+        message_ops = {"linear", "addmm", "mm", "matmul", "einsum", "bmm",
+                       "index_add", "index_add_", "scatter_add", "scatter_add_", "embedding"}
+        assert operators.intersection(message_ops), sorted(operators)
         for key in ("E", "Fa"):
             torch.testing.assert_close(out[key], ref[key], rtol=1e-8, atol=1e-8)
     finally:
