@@ -410,3 +410,23 @@ def test_stack_energy_force_translation_and_image():
     )
     assert torch.isfinite(isolated["E"]).all()
     assert not torch.allclose(isolated["E"], image["E"], atol=1e-6, rtol=1e-6)
+
+
+def test_prepared_coulomb_pairs_preserve_charge_and_coordinate_derivatives():
+    from enerzyme.models.layers.electrostatics import WeightedCoulombEnergyLayer, intramolecular_pair_indices
+
+    layer = WeightedCoulombEnergyLayer(layer_weights=[1.0, 2.0]).double()
+    positions = torch.randn(5, 3, dtype=torch.float64, requires_grad=True)
+    charges = torch.randn(5, 2, dtype=torch.float64, requires_grad=True)
+    membership = torch.tensor([4, 1, 4, 8, 1])
+    pairs = intramolecular_pair_indices(positions, membership)
+    assert list(zip(pairs[0].tolist(), pairs[1].tolist())) == [(0, 2), (1, 4)]
+
+    def energy_and_derivatives(indices):
+        energy = layer.get_E_coul_a(positions, charges, membership, _pair_indices=indices)
+        forces, = torch.autograd.grad(energy.sum(), positions, create_graph=True)
+        gradients = torch.autograd.grad(energy.square().sum() + forces.square().sum(), (charges, positions))
+        return energy, forces, *gradients
+
+    for actual, expected in zip(energy_and_derivatives(pairs), energy_and_derivatives(None)):
+        torch.testing.assert_close(actual, expected)

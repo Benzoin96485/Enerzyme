@@ -286,21 +286,26 @@ def require_uniform_molecular_charge(values: Tensor, batch_seg: Optional[Tensor]
             raise ValueError(
                 f"batch_seg length {index.numel()} != number of charge values {n_atoms}"
             )
-    if not torch.isfinite(flat).all():
-        raise ValueError("Q must be finite")
-    n_mol = int(index.max()) + 1
-    src = flat.detach().to(dtype=torch.float64)
-    lowest = torch.full((n_mol,), float("inf"), dtype=torch.float64, device=flat.device)
-    highest = torch.full((n_mol,), float("-inf"), dtype=torch.float64, device=flat.device)
-    lowest.scatter_reduce_(0, index, src, reduce="amin", include_self=True)
-    highest.scatter_reduce_(0, index, src, reduce="amax", include_self=True)
-    present = torch.zeros(n_mol, dtype=torch.bool, device=flat.device)
-    present.scatter_(0, index, torch.ones(n_atoms, dtype=torch.bool, device=flat.device))
-    if bool(((highest - lowest)[present] > 0).any()):
-        raise ValueError(
-            "Q must be one molecular total per molecule. A length-N Q has to "
-            "repeat that total on every atom of the molecule."
-        )
+    # Adjacent atoms in molecule order suffice, including sparse or
+    # interleaved molecule IDs. All intermediate shapes depend only on N.
+    labels, order = torch.sort(index)
+    ordered = flat.detach()[order]
+    finite = torch.isfinite(flat).all()
+    nonnegative = labels[0] >= 0
+    uniform = ((labels[1:] != labels[:-1]) | (ordered[1:] == ordered[:-1])).all()
+    message = ("Q must be one molecular total per molecule. A length-N Q has to "
+               "repeat that total on every atom of the molecule.")
+    if torch.compiler.is_compiling():
+        torch._assert_async(finite, "Q must be finite")
+        torch._assert_async(nonnegative, "batch_seg must be non-negative")
+        torch._assert_async(uniform, message)
+    else:
+        if not finite:
+            raise ValueError("Q must be finite")
+        if not nonnegative:
+            raise ValueError("batch_seg must be non-negative")
+        if not uniform:
+            raise ValueError(message)
 
 
 def neutral_charge_equilibration(
@@ -424,27 +429,30 @@ def expand_coulomb_weights(
         stage = like.new_tensor(values)
         weights = stage.repeat_interleave(n_channels // len(values))
     total = weights.sum()
-    if total == 0:
+    if torch.compiler.is_compiling():
+        torch._assert_async(total != 0, "layer_weights must not sum to zero")
+    elif total == 0:
         raise ValueError("layer_weights must not sum to zero")
     return weights / total
 
 
+def intramolecular_pair_indices(positions: Tensor, batch_seg: Optional[Tensor]) -> Tuple[Tensor, Tensor]:
+    """Distinct atom pairs in the same molecule, in upper-triangle order."""
+    n_atoms = positions.shape[0]
+    left, right = torch.triu_indices(n_atoms, n_atoms, offset=1, device=positions.device)
+    if batch_seg is not None:
+        same_molecule = torch.where(batch_seg[left] == batch_seg[right])[0]
+        left, right = left[same_molecule], right[same_molecule]
+    return left, right
+
+
 def intramolecular_upper_pairs(
-    positions: Tensor,
-    batch_seg: Optional[Tensor] = None,
+    positions: Tensor, batch_seg: Optional[Tensor] = None,
 ) -> Tuple[Tensor, Tensor, Tensor]:
     """Upper-triangle pairs that stay inside one molecule. No periodic images."""
-    n_atoms = int(positions.shape[0])
-    empty_index = torch.zeros(0, dtype=torch.long, device=positions.device)
-    empty_distance = positions.new_zeros(0)
-    if n_atoms <= 1:
-        return empty_index, empty_index, empty_distance
-    if batch_seg is None:
-        batch_seg = torch.zeros(n_atoms, dtype=torch.long, device=positions.device)
-    left, right = torch.triu_indices(n_atoms, n_atoms, offset=1, device=positions.device)
-    same_molecule = batch_seg[left] == batch_seg[right]
-    left = left[same_molecule]
-    right = right[same_molecule]
+    left, right = intramolecular_pair_indices(positions, batch_seg)
+    if positions.shape[0] <= 1:
+        return left, right, positions.new_zeros(0)
     distance = torch.linalg.vector_norm(positions[left] - positions[right], dim=-1)
     return left, right, distance
 
@@ -506,6 +514,7 @@ class WeightedCoulombEnergyLayer(BaseFFLayer):
         idx_i: Optional[Tensor] = None,
         idx_j: Optional[Tensor] = None,
         Dij_lr: Optional[Tensor] = None,
+        _pair_indices: Optional[Tuple[Tensor, Tensor]] = None,
     ) -> Tensor:
         if charge_channels.ndim == 1:
             charge_channels = charge_channels.unsqueeze(-1)
@@ -522,7 +531,11 @@ class WeightedCoulombEnergyLayer(BaseFFLayer):
             self.layer_weights, int(charge_channels.shape[-1]), Ra
         )
         if self.pairs == "all_to_all":
-            left, right, distance = intramolecular_upper_pairs(Ra, batch_seg)
+            if _pair_indices is None:
+                left, right, distance = intramolecular_upper_pairs(Ra, batch_seg)
+            else:
+                left, right = _pair_indices
+                distance = torch.linalg.vector_norm(Ra[left] - Ra[right], dim=-1)
             add_both = True
         else:
             if idx_i is None or idx_j is None or Dij_lr is None:

@@ -112,7 +112,10 @@ class TensorNetEmbed(Embed):
             raise ValueError(
                 f"batch_seg length {index.numel()} != number of atoms {n_atoms}"
             )
-        if index.numel() and int(index.max()) >= values.numel():
+        if torch.compiler.is_compiling():
+            torch._assert_async((index < values.numel()).all(),
+                                "batch_seg indexes outside the supplied molecular charges")
+        elif index.numel() and int(index.max()) >= values.numel():
             raise ValueError(
                 f"Q has {values.numel()} molecule values but batch_seg "
                 f"indexes {int(index.max())}"

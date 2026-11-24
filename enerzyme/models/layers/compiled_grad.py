@@ -84,6 +84,30 @@ def _topology_indices(core, ranges, fields, geometry, edges):
     return PreparedTopology.build(ctx, requires.topology)
 
 
+@torch.compiler.disable
+def _post_pair_indices(core, inputs):
+    """Prepare discrete all-pairs membership before differentiating the distances."""
+    from .electrostatics import WeightedCoulombEnergyLayer, intramolecular_pair_indices
+
+    prepared = {}
+    if not any(type(layer) is WeightedCoulombEnergyLayer for layer in core.post_sequence):
+        return prepared
+    preceding = [*core.pre_sequence, core]
+    for i, layer in enumerate(core.post_sequence):
+        if (type(layer) is WeightedCoulombEnergyLayer and layer.pairs == "all_to_all"
+                and layer.cutoff is None and not layer.eval_only and not layer._forward_hooks
+                and not layer._forward_pre_hooks):
+            pos = layer._name_mapping["Ra"]
+            batch = "batch" if isinstance(inputs, Data) else layer._name_mapping["batch_seg"]
+            # Respect stacks which replace the coordinate or membership fields.
+            changed = any(step._name_mapping[k] in (pos, batch)
+                          for step in preceding for k in step._output_fields)
+            if not changed and inputs.get(pos) is not None:
+                prepared[i] = intramolecular_pair_indices(inputs[pos], inputs.get(batch))
+        preceding.append(layer)
+    return prepared
+
+
 @torch.compiler.disable(recursive=False)
 def compiled_training(core, inputs):
     """Keep differentiable distances inside the VJP and discrete sizes outside it."""
@@ -92,8 +116,9 @@ def compiled_training(core, inputs):
     if getattr(core, "_scripted_force_kernels", False):
         return _scripted_force_training(core, inputs)
     edges, topology = _prepare_radius_graph(core, inputs)
+    post_pairs = _post_pair_indices(core, inputs)
     with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
-        return forward_with_coordinate_gradients(core, inputs, edges, topology)
+        return forward_with_coordinate_gradients(core, inputs, edges, topology, post_pairs)
 
 
 @torch.compiler.disable
@@ -131,7 +156,8 @@ def retained_inference(core, inputs):
         return core._run_layers(inputs)
 
 
-def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, topology=None) -> Dict[str, Any]:
+def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, topology=None,
+                                      post_pairs=None) -> Dict[str, Any]:
     """Functional coordinate VJPs make force fitting a single compiled backward.
 
     The prefix ending at each Force layer returns energy and tensor-valued
@@ -154,7 +180,12 @@ def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, 
         stages[1] = select_neighbors
     stages.append(core._forward if topology is None else
                   partial(core._forward, extra_inputs={"_prepared_topology": topology}))
-    stages.extend(layer for layer in core.post_sequence if active(layer))
+    for i, layer in enumerate(core.post_sequence):
+        if active(layer):
+            if post_pairs and i in post_pairs:
+                stages.append(partial(layer._forward, extra_inputs={"_pair_indices": post_pairs[i]}))
+            else:
+                stages.append(layer)
 
     def evaluate(net_input, stop):
         # A later Force layer can differentiate quantities produced by an earlier
