@@ -100,11 +100,17 @@ class DPA4CBlock(Block):
         center = idx_i_sr.long()
         neighbor = idx_j_sr.long()
         if center.numel():
-            if int(center.min()) < 0 or int(neighbor.min()) < 0:
+            # Transfer the validation results together, so valid GPU graphs
+            # incur a single synchronization regardless of their edge count.
+            i_min, i_max = torch.aminmax(center)
+            j_min, j_max = torch.aminmax(neighbor)
+            bounds = torch.stack((i_min, j_min, i_max, j_max, (center == neighbor).any()))
+            low_i, low_j, high_i, high_j, has_loop = bounds.tolist()
+            if min(low_i, low_j) < 0:
                 raise ValueError("edge indices must be non-negative")
-            if int(center.max()) >= nodes or int(neighbor.max()) >= nodes:
+            if max(high_i, high_j) >= nodes:
                 raise ValueError("edge indices must address rows of atom_embedding")
-            if bool(torch.any(center == neighbor)):
+            if has_loop:
                 raise ValueError(
                     "DPA4C edges must not contain self-loops; a zero displacement "
                     "has no direction for the Cartesian harmonics"
@@ -141,26 +147,22 @@ class DPA4CBlock(Block):
         enveloped = amplitude * envelope.unsqueeze(-1)
 
         chi2 = envelope * envelope
-        mass_0 = scatter_sum(chi2.unsqueeze(-1), center, nodes).reshape(nodes)
-        mass_1 = scatter_sum((chi2 * chi2).unsqueeze(-1), center, nodes).reshape(nodes)
-        divisor_0 = torch.sqrt(mass_0 + NORM_FLOOR)
-        divisor_1 = torch.sqrt(mass_1 + NORM_FLOOR)
-
-        scalar = scatter_sum(enveloped, center, nodes) / divisor_0.unsqueeze(-1)
+        powers = torch.stack((chi2, chi2 * chi2), dim=-1)
+        masses = torch.sqrt(scatter_sum(powers, center, nodes) + NORM_FLOOR)
+        scalar = scatter_sum(enveloped, center, nodes) / masses[:, :1]
+        angular_amplitude = enveloped[:, :self.degree_channels[1]] * envelope.unsqueeze(-1)
         harmonics = cartesian_harmonics(direction, self.lmax)
         angular_parts = []
         for degree, width in enumerate(self.degree_channels):
             if degree == 0:
                 continue
             block = harmonics[:, degree * degree : (degree + 1) * (degree + 1)]
-            message = block.unsqueeze(-1) * enveloped[:, None, :width]
-            message = message.reshape(message.shape[0], -1) * envelope.unsqueeze(-1)
-            angular_parts.append(message)
+            message = block.unsqueeze(-1) * angular_amplitude[:, None, :width]
+            angular_parts.append(message.flatten(1))
         angular = torch.cat(angular_parts, dim=-1)
         directional = scatter_sum(angular, center, nodes)
-        directional = directional / divisor_1.unsqueeze(-1)
+        directional = directional / masses[:, 1:]
         moments = torch.cat((scalar, directional), dim=-1)
-        masses = torch.stack((divisor_0, divisor_1), dim=-1)
         return moments, masses
 
 

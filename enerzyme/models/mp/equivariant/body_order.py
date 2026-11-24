@@ -332,7 +332,11 @@ def bispectrum_contraction(
     rank_1 = value_1.shape[-1]
     rank_2 = value_2.shape[-1]
     rank_3 = value_3.shape[-1]
-    full = torch.einsum("abc,naA,nbB,ncC->nABC", coupling, value_1, value_2, value_3)
+    # The highest degree has the smallest probe rank. Contract it first
+    # to bound the intermediate width and avoid planning this path per call.
+    third = torch.einsum("abc,ncC->nabC", coupling, value_3)
+    second = torch.einsum("nabC,nbB->naBC", third, value_2)
+    full = torch.einsum("naBC,naA->nABC", second, value_1)
     return full.reshape(nodes, rank_1 * rank_2 * rank_3)
 
 
