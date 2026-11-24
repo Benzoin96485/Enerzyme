@@ -4839,5 +4839,1132 @@
       "eager_formal_cases_with_1aa0f8b_direct_output_comparison": 24,
       "eager_formal_cases_matching_1aa0f8b_E_and_F": 24
     }
+  },
+  "compiled_performance": {
+    "baseline": "1aa0f8b",
+    "candidate": "5a994c4",
+    "systems": [
+      "mol_batch_32x20",
+      "bulk_256",
+      "large_2000"
+    ],
+    "method": "Same frozen FP32 checkpoint and physical V100 for both source checkouts in each pair. The ordinary torch.compile entry point runs the three systems in that order; inference and energy-plus-force training on each system precede the next. A fresh process loads each side. Times and peak allocated memory are medians of timed repetitions. Each ABBA side aggregates its two process medians. Missing baseline numbers remain unavailable.",
+    "historical_allegro_float64_2000_atom_inference": {
+      "baseline": "1aa0f8b",
+      "candidate": "c32ede3",
+      "job": "6317929",
+      "baseline_ms": 33.845250960439444,
+      "candidate_ms": 36.370481830090284,
+      "delta_percent": 7.461108421392693,
+      "baseline_MiB": 1401.9072265625,
+      "capture": "Both sides reported zero newly captured graph operations in this final shape after earlier Dynamo recompilation limits."
+    },
+    "rows": [
+      {
+        "architecture": "allegro",
+        "dtype": "float64",
+        "job": "6318510",
+        "GPU": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+        "attempt": "abba-full_51-allegro-float64_6318510_1795522427",
+        "kind": "abba-full",
+        "snapshot_sha256": "5e05a04015053aba14911156a32ddca45ba80841aa3b56f2acacfe2f231b06be",
+        "repetitions_per_process": 17,
+        "order": [
+          "new",
+          "base",
+          "base",
+          "new"
+        ],
+        "fixture_cross_eager": {
+          "large_2000/infer": {
+            "passed": true,
+            "E_max_abs": 7.105427357601002e-15,
+            "Fa_max_abs": 4.440892098500626e-16
+          },
+          "bulk_256/train": {
+            "passed": true,
+            "E_max_abs": 2.6645352591003757e-15,
+            "Fa_max_abs": 4.718447854656915e-16
+          },
+          "mol_batch_32x20/infer": {
+            "passed": true,
+            "E_max_abs": 4.440892098500626e-16,
+            "Fa_max_abs": 7.494005416219807e-16
+          },
+          "large_2000/train": {
+            "passed": true,
+            "E_max_abs": 2.1316282072803006e-14,
+            "Fa_max_abs": 4.996003610813204e-16
+          },
+          "bulk_256/infer": {
+            "passed": true,
+            "E_max_abs": 1.7763568394002505e-15,
+            "Fa_max_abs": 4.996003610813204e-16
+          },
+          "mol_batch_32x20/train": {
+            "passed": true,
+            "E_max_abs": 4.440892098500626e-16,
+            "Fa_max_abs": 7.771561172376096e-16
+          }
+        },
+        "systems": [
+          {
+            "system": "mol_batch_32x20",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "InternalTorchDynamoError: NotImplementedError: "
+              ]
+            },
+            "new": {
+              "times_ms": [
+                5.24943508207798,
+                5.689969984814525
+              ],
+              "peak_allocated_MiB": [
+                210.68359375,
+                210.68359375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0,
+                0
+              ],
+              "new_graphs": [
+                11,
+                11
+              ],
+              "new_graph_calls": [
+                424,
+                424
+              ]
+            }
+          },
+          {
+            "system": "mol_batch_32x20",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "InternalTorchDynamoError: NotImplementedError: "
+              ]
+            },
+            "new": {
+              "times_ms": [
+                7.267719134688377,
+                7.5855141039937735
+              ],
+              "peak_allocated_MiB": [
+                384.71875,
+                384.71826171875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                17,
+                17
+              ],
+              "new_graphs": [
+                1,
+                1
+              ],
+              "new_graph_calls": [
+                281,
+                281
+              ]
+            }
+          },
+          {
+            "system": "bulk_256",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "InternalTorchDynamoError: NotImplementedError: "
+              ]
+            },
+            "new": {
+              "times_ms": [
+                5.233195144683123,
+                5.1406980492174625
+              ],
+              "peak_allocated_MiB": [
+                178.85302734375,
+                179.09326171875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0,
+                0
+              ],
+              "new_graphs": [
+                1,
+                1
+              ],
+              "new_graph_calls": [
+                184,
+                184
+              ]
+            }
+          },
+          {
+            "system": "bulk_256",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "InternalTorchDynamoError: NotImplementedError: "
+              ]
+            },
+            "new": {
+              "times_ms": [
+                6.787439808249474,
+                7.026995997875929
+              ],
+              "peak_allocated_MiB": [
+                315.54541015625,
+                315.78564453125
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                17,
+                17
+              ],
+              "new_graphs": [
+                1,
+                1
+              ],
+              "new_graph_calls": [
+                298,
+                298
+              ]
+            }
+          },
+          {
+            "system": "large_2000",
+            "mode": "infer",
+            "base": {
+              "times_ms": [
+                31.93625807762146,
+                31.82175289839506
+              ],
+              "peak_allocated_MiB": [
+                1401.9072265625,
+                1401.9072265625
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0,
+                0
+              ],
+              "new_graphs": [
+                0,
+                0
+              ],
+              "new_graph_calls": [
+                0,
+                0
+              ]
+            },
+            "new": {
+              "times_ms": [
+                16.158956103026867,
+                16.182668041437864
+              ],
+              "peak_allocated_MiB": [
+                1062.171875,
+                1062.171875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0,
+                0
+              ],
+              "new_graphs": [
+                1,
+                1
+              ],
+              "new_graph_calls": [
+                184,
+                184
+              ]
+            },
+            "numeric_pair_validated": true,
+            "delta_percent": {
+              "times_ms": -49.27441485489488,
+              "times_ms_per_order": [
+                -49.40247519370513,
+                -49.14589371268092
+              ],
+              "peak_allocated_MiB": -24.233797010629353,
+              "peak_allocated_MiB_per_order": [
+                -24.233797010629353,
+                -24.233797010629353
+              ]
+            }
+          },
+          {
+            "system": "large_2000",
+            "mode": "train",
+            "base": {
+              "times_ms": [
+                104.49694702401757,
+                104.4732159934938
+              ],
+              "peak_allocated_MiB": [
+                2329.49072265625,
+                2329.49072265625
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                17,
+                17
+              ],
+              "new_graphs": [
+                0,
+                0
+              ],
+              "new_graph_calls": [
+                0,
+                0
+              ]
+            },
+            "new": {
+              "times_ms": [
+                34.039085963740945,
+                34.83245917595923
+              ],
+              "peak_allocated_MiB": [
+                1953.26318359375,
+                1953.36962890625
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                17,
+                17
+              ],
+              "new_graphs": [
+                1,
+                1
+              ],
+              "new_graph_calls": [
+                295,
+                295
+              ]
+            },
+            "numeric_pair_validated": true,
+            "delta_percent": {
+              "times_ms": -67.04240253957745,
+              "times_ms_per_order": [
+                -67.42576033736431,
+                -66.6589576622888
+              ],
+              "peak_allocated_MiB": -16.148350055556758,
+              "peak_allocated_MiB_per_order": [
+                -16.150634789113848,
+                -16.146065321999657
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "architecture": "allegro",
+        "dtype": "float32",
+        "job": "6318510",
+        "GPU": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+        "attempt": "pair_50-allegro-float32_6318510_1795525789",
+        "kind": "pair",
+        "snapshot_sha256": "5e05a04015053aba14911156a32ddca45ba80841aa3b56f2acacfe2f231b06be",
+        "repetitions_per_process": 5,
+        "order": [
+          "base",
+          "new"
+        ],
+        "fixture_cross_eager": {
+          "bulk_256/train": {
+            "passed": true,
+            "E_max_abs": 9.5367431640625e-07,
+            "Fa_max_abs": 2.3096799850463867e-07
+          },
+          "mol_batch_32x20/train": {
+            "passed": true,
+            "E_max_abs": 2.2351741790771484e-07,
+            "Fa_max_abs": 4.470348358154297e-07
+          },
+          "large_2000/infer": {
+            "passed": true,
+            "E_max_abs": 5.7220458984375e-06,
+            "Fa_max_abs": 2.5331974029541016e-07
+          },
+          "large_2000/train": {
+            "passed": true,
+            "E_max_abs": 1.9073486328125e-06,
+            "Fa_max_abs": 3.2782554626464844e-07
+          },
+          "bulk_256/infer": {
+            "passed": true,
+            "E_max_abs": 0.0,
+            "Fa_max_abs": 2.4586915969848633e-07
+          },
+          "mol_batch_32x20/infer": {
+            "passed": true,
+            "E_max_abs": 2.384185791015625e-07,
+            "Fa_max_abs": 4.172325134277344e-07
+          }
+        },
+        "systems": [
+          {
+            "system": "mol_batch_32x20",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "InternalTorchDynamoError: NotImplementedError: "
+              ]
+            },
+            "new": {
+              "times_ms": [
+                5.626199068501592
+              ],
+              "peak_allocated_MiB": [
+                117.32958984375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                11
+              ],
+              "new_graph_calls": [
+                424
+              ]
+            }
+          },
+          {
+            "system": "mol_batch_32x20",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "InternalTorchDynamoError: NotImplementedError: "
+              ]
+            },
+            "new": {
+              "times_ms": [
+                5.051551852375269
+              ],
+              "peak_allocated_MiB": [
+                206.38623046875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                17
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                281
+              ]
+            }
+          },
+          {
+            "system": "bulk_256",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "InternalTorchDynamoError: NotImplementedError: "
+              ]
+            },
+            "new": {
+              "times_ms": [
+                5.156884901225567
+              ],
+              "peak_allocated_MiB": [
+                100.8046875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                184
+              ]
+            }
+          },
+          {
+            "system": "bulk_256",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "InternalTorchDynamoError: NotImplementedError: "
+              ]
+            },
+            "new": {
+              "times_ms": [
+                5.662737181410193
+              ],
+              "peak_allocated_MiB": [
+                169.3935546875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                17
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                298
+              ]
+            }
+          },
+          {
+            "system": "large_2000",
+            "mode": "infer",
+            "base": {
+              "times_ms": [
+                26.400357019156218
+              ],
+              "peak_allocated_MiB": [
+                712.001953125
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                0
+              ],
+              "new_graph_calls": [
+                0
+              ]
+            },
+            "new": {
+              "times_ms": [
+                7.377285975962877
+              ],
+              "peak_allocated_MiB": [
+                541.46240234375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                184
+              ]
+            },
+            "numeric_pair_validated": true,
+            "delta_percent": {
+              "times_ms": -72.05611283737608,
+              "peak_allocated_MiB": -23.952118394162593
+            }
+          },
+          {
+            "system": "large_2000",
+            "mode": "train",
+            "base": {
+              "times_ms": [
+                73.78274202346802
+              ],
+              "peak_allocated_MiB": [
+                1175.779296875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                17
+              ],
+              "new_graphs": [
+                0
+              ],
+              "new_graph_calls": [
+                0
+              ]
+            },
+            "new": {
+              "times_ms": [
+                12.818838004022837
+              ],
+              "peak_allocated_MiB": [
+                987.16796875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                17
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                295
+              ]
+            },
+            "numeric_pair_validated": true,
+            "delta_percent": {
+              "times_ms": -82.62623798943991,
+              "peak_allocated_MiB": -16.041388773071052
+            }
+          }
+        ]
+      },
+      {
+        "architecture": "nequip",
+        "dtype": "float32",
+        "job": "6318510",
+        "GPU": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+        "attempt": "pair_48-nequip-float32_6318510_1795524536",
+        "kind": "pair",
+        "snapshot_sha256": "ec0fb0b8f18d6eaef1ff024bf23fd7c439df954f7e76ba7e0d2c0314a3acd21b",
+        "repetitions_per_process": 5,
+        "order": [
+          "base",
+          "new"
+        ],
+        "fixture_cross_eager": {
+          "bulk_256/train": {
+            "passed": true,
+            "E_max_abs": 0.0,
+            "Fa_max_abs": 9.685754776000977e-08
+          },
+          "mol_batch_32x20/train": {
+            "passed": true,
+            "E_max_abs": 9.12696123123169e-08,
+            "Fa_max_abs": 1.2293457984924316e-07
+          },
+          "large_2000/infer": {
+            "passed": true,
+            "E_max_abs": 1.9073486328125e-06,
+            "Fa_max_abs": 1.0803341865539551e-07
+          },
+          "large_2000/train": {
+            "passed": true,
+            "E_max_abs": 9.5367431640625e-07,
+            "Fa_max_abs": 1.341104507446289e-07
+          },
+          "bulk_256/infer": {
+            "passed": true,
+            "E_max_abs": 1.1920928955078125e-07,
+            "Fa_max_abs": 1.1734664440155029e-07
+          },
+          "mol_batch_32x20/infer": {
+            "passed": true,
+            "E_max_abs": 1.3317912817001343e-07,
+            "Fa_max_abs": 1.1362135410308838e-07
+          }
+        },
+        "systems": [
+          {
+            "system": "mol_batch_32x20",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                8.140977937728167
+              ],
+              "peak_allocated_MiB": [
+                182.88671875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                12
+              ],
+              "new_graph_calls": [
+                1456
+              ]
+            }
+          },
+          {
+            "system": "mol_batch_32x20",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation."
+              ]
+            },
+            "new": {
+              "times_ms": [
+                15.205302042886615
+              ],
+              "peak_allocated_MiB": [
+                377.50341796875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                23
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                783
+              ]
+            }
+          },
+          {
+            "system": "bulk_256",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                8.391221053898335
+              ],
+              "peak_allocated_MiB": [
+                138.189453125
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                759
+              ]
+            }
+          },
+          {
+            "system": "bulk_256",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                13.143471907824278
+              ],
+              "peak_allocated_MiB": [
+                292.224609375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                23
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                846
+              ]
+            }
+          },
+          {
+            "system": "large_2000",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                19.938810961320996
+              ],
+              "peak_allocated_MiB": [
+                798.359375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                759
+              ]
+            }
+          },
+          {
+            "system": "large_2000",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                47.69304487854242
+              ],
+              "peak_allocated_MiB": [
+                1789.2646484375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                23
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                843
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "architecture": "nequip",
+        "dtype": "float64",
+        "job": "6318510",
+        "GPU": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+        "attempt": "pair_49-nequip-float64_6318510_1795525143",
+        "kind": "pair",
+        "snapshot_sha256": "ec0fb0b8f18d6eaef1ff024bf23fd7c439df954f7e76ba7e0d2c0314a3acd21b",
+        "repetitions_per_process": 5,
+        "order": [
+          "base",
+          "new"
+        ],
+        "fixture_cross_eager": {
+          "bulk_256/train": {
+            "passed": true,
+            "E_max_abs": 1.1102230246251565e-16,
+            "Fa_max_abs": 1.8388068845354155e-16
+          },
+          "mol_batch_32x20/train": {
+            "passed": true,
+            "E_max_abs": 1.8041124150158794e-16,
+            "Fa_max_abs": 2.220446049250313e-16
+          },
+          "large_2000/infer": {
+            "passed": true,
+            "E_max_abs": 0.0,
+            "Fa_max_abs": 2.220446049250313e-16
+          },
+          "large_2000/train": {
+            "passed": true,
+            "E_max_abs": 4.440892098500626e-15,
+            "Fa_max_abs": 2.3418766925686896e-16
+          },
+          "bulk_256/infer": {
+            "passed": true,
+            "E_max_abs": 2.220446049250313e-16,
+            "Fa_max_abs": 2.1337098754514727e-16
+          },
+          "mol_batch_32x20/infer": {
+            "passed": true,
+            "E_max_abs": 2.5673907444456745e-16,
+            "Fa_max_abs": 2.7755575615628914e-16
+          }
+        },
+        "systems": [
+          {
+            "system": "mol_batch_32x20",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                11.53657608665526
+              ],
+              "peak_allocated_MiB": [
+                346.97509765625
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                12
+              ],
+              "new_graph_calls": [
+                1456
+              ]
+            }
+          },
+          {
+            "system": "mol_batch_32x20",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation."
+              ]
+            },
+            "new": {
+              "times_ms": [
+                22.94977894052863
+              ],
+              "peak_allocated_MiB": [
+                728.84521484375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                23
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                783
+              ]
+            }
+          },
+          {
+            "system": "bulk_256",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                9.566509164869785
+              ],
+              "peak_allocated_MiB": [
+                261.62451171875
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                759
+              ]
+            }
+          },
+          {
+            "system": "bulk_256",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                19.17453808709979
+              ],
+              "peak_allocated_MiB": [
+                565.40234375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                23
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                846
+              ]
+            }
+          },
+          {
+            "system": "large_2000",
+            "mode": "infer",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                33.490417059510946
+              ],
+              "peak_allocated_MiB": [
+                1576.34375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                0
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                759
+              ]
+            }
+          },
+          {
+            "system": "large_2000",
+            "mode": "train",
+            "base": {
+              "errors": [
+                "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorc"
+              ]
+            },
+            "new": {
+              "times_ms": [
+                83.11078604310751
+              ],
+              "peak_allocated_MiB": [
+                3552.69287109375
+              ],
+              "numerical_passed": true,
+              "active_parameters": [
+                23
+              ],
+              "new_graphs": [
+                1
+              ],
+              "new_graph_calls": [
+                843
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "requested_modes": 24,
+      "candidate_modes_completed": 24,
+      "candidate_modes_numerically_validated": 24,
+      "baseline_modes_completed": 4,
+      "comparable_metrics": 8,
+      "comparable_metrics_at_or_below_plus_3_percent": 8,
+      "cross_eager_cases": 24,
+      "cross_eager_validated": 24
+    },
+    "CPU_retained_energy_after_force": {
+      "method": "After ordinary compiled force evaluation on the snapshot, differentiate returned E twice using the same graph, first retaining and then releasing it. The gradient list includes input coordinates along with all active weights. The native model and the compiled model strictly loaded the same snapshot.",
+      "checks": [
+        {
+          "job": "6319045",
+          "requested_precision": "float32",
+          "architecture": "allegro",
+          "systems": [
+            "snapshot"
+          ],
+          "device": "cpu",
+          "source": "5a994c4246076fbfe349a29a35fb9e71e4da7b41",
+          "fixture_sha256": "5e05a04015053aba14911156a32ddca45ba80841aa3b56f2acacfe2f231b06be",
+          "passed": true,
+          "energy_backwards_after_force": [
+            {
+              "passed": true,
+              "active_parameters": 18,
+              "reference_active_parameters": 18,
+              "energy_max_abs": 8.940696716308594e-08,
+              "force_max_abs": 2.086162567138672e-07,
+              "gradient_max_abs": 5.960464477539062e-07
+            },
+            {
+              "passed": true,
+              "active_parameters": 18,
+              "reference_active_parameters": 18,
+              "energy_max_abs": 8.940696716308594e-08,
+              "force_max_abs": 2.086162567138672e-07,
+              "gradient_max_abs": 5.960464477539062e-07
+            }
+          ]
+        },
+        {
+          "job": "6319045",
+          "requested_precision": "float64",
+          "architecture": "allegro",
+          "systems": [
+            "snapshot"
+          ],
+          "device": "cpu",
+          "source": "5a994c4246076fbfe349a29a35fb9e71e4da7b41",
+          "fixture_sha256": "5e05a04015053aba14911156a32ddca45ba80841aa3b56f2acacfe2f231b06be",
+          "passed": true,
+          "energy_backwards_after_force": [
+            {
+              "passed": true,
+              "active_parameters": 18,
+              "reference_active_parameters": 18,
+              "energy_max_abs": 5.551115123125783e-17,
+              "force_max_abs": 4.3021142204224816e-16,
+              "gradient_max_abs": 1.1102230246251565e-15
+            },
+            {
+              "passed": true,
+              "active_parameters": 18,
+              "reference_active_parameters": 18,
+              "energy_max_abs": 5.551115123125783e-17,
+              "force_max_abs": 4.3021142204224816e-16,
+              "gradient_max_abs": 1.1102230246251565e-15
+            }
+          ]
+        },
+        {
+          "job": "6319045",
+          "requested_precision": "float32",
+          "architecture": "nequip",
+          "systems": [
+            "snapshot"
+          ],
+          "device": "cpu",
+          "source": "5a994c4246076fbfe349a29a35fb9e71e4da7b41",
+          "fixture_sha256": "ec0fb0b8f18d6eaef1ff024bf23fd7c439df954f7e76ba7e0d2c0314a3acd21b",
+          "passed": true,
+          "energy_backwards_after_force": [
+            {
+              "passed": true,
+              "active_parameters": 24,
+              "reference_active_parameters": 24,
+              "energy_max_abs": 8.568167686462402e-08,
+              "force_max_abs": 1.6391277313232422e-07,
+              "gradient_max_abs": 1.6391277313232422e-07
+            },
+            {
+              "passed": true,
+              "active_parameters": 24,
+              "reference_active_parameters": 24,
+              "energy_max_abs": 8.568167686462402e-08,
+              "force_max_abs": 1.6391277313232422e-07,
+              "gradient_max_abs": 1.6391277313232422e-07
+            }
+          ]
+        },
+        {
+          "job": "6319045",
+          "requested_precision": "float64",
+          "architecture": "nequip",
+          "systems": [
+            "snapshot"
+          ],
+          "device": "cpu",
+          "source": "5a994c4246076fbfe349a29a35fb9e71e4da7b41",
+          "fixture_sha256": "ec0fb0b8f18d6eaef1ff024bf23fd7c439df954f7e76ba7e0d2c0314a3acd21b",
+          "passed": true,
+          "energy_backwards_after_force": [
+            {
+              "passed": true,
+              "active_parameters": 24,
+              "reference_active_parameters": 24,
+              "energy_max_abs": 1.249000902703301e-16,
+              "force_max_abs": 1.5439038936193583e-16,
+              "gradient_max_abs": 5.204170427930421e-16
+            },
+            {
+              "passed": true,
+              "active_parameters": 24,
+              "reference_active_parameters": 24,
+              "energy_max_abs": 1.249000902703301e-16,
+              "force_max_abs": 1.5439038936193583e-16,
+              "gradient_max_abs": 5.204170427930421e-16
+            }
+          ]
+        }
+      ]
+    }
   }
 }
