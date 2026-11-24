@@ -1340,5 +1340,35 @@
    "pure_vector_remaining_unused_weights": ["post_sequence.0.head.0.weight", "post_sequence.0.head.0.bias", "post_sequence.0.head.1.weight", "post_sequence.0.head.1.bias", "head.out_norm.weight", "head.out_norm.bias"],
    "last_vector_only_parameters": ["blocks[-1].module.s_proj.weight", "blocks[-1].module.s_proj.bias", "blocks[-1].module.group_cg.tp_weight"]
   }
+ },
+ "lsrm_independent_fragment_vector_training": {
+  "reference": "3d94237 for original AOT supervision and coordinate controls. The isolated parent for both LSRM changes is a183c1e. f63606f guards singular fragment distances and e4e1d66 partitions the final vector update.",
+  "method": "PyTorch 2.13.0+cu126 on xeon-p8. Each run compares the entire model output and every participating parameter gradient to its own eager model on identical inputs. jobs 6319924/6319965 tested the full prototype before/after the zero-distance guard. The production full presets use job 6320003. Jobs 6319927/6319941/6319959/6319963 contain AOT small-model controls. The production Inductor small-model cases use job 6320005.",
+  "full_method": "Default published ViSNet-LSRM, six short-range and two long-range updates. scripts/check_compiled_forces.py visnet_lsrm --dtype float32 or float64. Default ordinary torch.compile, all public fields, energy and force squared loss, seed 142, 5+4 atoms.",
+  "small_method": "Two short and two long-range updates, width 8, two heads, FP64, model seed 42, structure seed 107, 3+2 atoms, atol 1e-10 and rtol 1e-8. The default and attached dipole heads use ordinary k-means. The energy case adds the squared Cartesian vector norm to Ea in a custom module so the joint execution order is retained. Empty long range uses precomputed one-fragment-per-molecule labels and cutoff_lr 1e-5. Isolated has one atom and zero short-range edges, which also selects the joint path.",
+  "loss_order": ["energy_forces", "combined_vector", "vector_only", "combined_dipole", "dipole_only"],
+  "losses": "Energy and forces use squared sums. Vector supervision sums sin(v)+v^2. Dipole supervision sums cos(M2). Combined losses include energy and forces. Cases without dipole report the first three entries.",
+  "unused": "Counts include the input coordinates when disconnected. Every zero-for-unused in a mixed or vector-only case is checked against the individual old AOT mask. An existing PyTorch issue on some isolated-node losses also gives a compiled zero gradient for an eager-absent tensor.",
+  "coordinate_singularity": "The Euclidean norm at the zero atom-to-own-fragment displacement previously introduced 0/0 in the second derivative. Eager and joint AOT had nine NaN components out of fifteen for the E/F loss on the normal sample. AOT also propagated these through zero force cotangents for vector-only supervision while eager was finite. The guard produces constant zero at exact coincidence. Other displacements use the unmodified Euclidean norm. The analytical regression checks energy, force and a Hessian-vector product against an explicit sum of the five nonzero relations and the constant singleton self relation.",
+  "native_reference": {
+   "normal/energy_forces": {"different_outputs": [], "different_presence": [], "finite_differences": ["Ra"], "max_finite_difference": 1.3877787807814457e-17, "nan_count_changes": {"Ra": [9, 0]}},
+   "normal/combined_vector": {"different_outputs": [], "different_presence": [], "finite_differences": ["Ra"], "max_finite_difference": 8.881784197001252e-16, "nan_count_changes": {"Ra": [9, 0]}},
+   "normal/vector_only": {"different_outputs": [], "different_presence": [], "finite_differences": [], "max_finite_difference": 0.0, "nan_count_changes": {}},
+   "precomputed/energy_forces": {"different_outputs": [], "different_presence": [], "finite_differences": ["Ra"], "max_finite_difference": 1.1102230246251565e-16, "nan_count_changes": {}},
+   "precomputed/combined_vector": {"different_outputs": [], "different_presence": [], "finite_differences": [], "max_finite_difference": 0.0, "nan_count_changes": {}},
+   "precomputed/vector_only": {"different_outputs": [], "different_presence": [], "finite_differences": [], "max_finite_difference": 0.0, "nan_count_changes": {}}
+  },
+  "full_preset": {
+   "float32": {"atol": 0.0007, "rtol": 0.001, "participating_weight_tensors": 182, "participation_differences": {}, "graphs": [{"operations": 1104, "learned_operators": ["embedding", "index_add_", "linear"]}, {"operations": 69, "learned_operators": ["index_add_", "linear"]}], "E_max_abs": 2.980232238769531e-07, "Fa_max_abs": 9.5367431640625e-07, "weights_outside_tolerance": ["embed.neighborhood.combine.weight", "embed.edge_embedding.edge_proj.bias", "blocks.0.module.s_proj.bias", "blocks.1.module.s_proj.bias", "blocks.1.module.o_proj.bias", "blocks.2.module.s_proj.bias", "blocks.3.module.s_proj.bias", "blocks.4.module.s_proj.bias"]},
+   "float64": {"atol": 1e-10, "rtol": 1e-08, "participating_weight_tensors": 182, "participation_differences": {}, "graphs": [{"operations": 1104, "learned_operators": ["embedding", "index_add_", "linear"]}, {"operations": 69, "learned_operators": ["index_add_", "linear"]}], "E_max_abs": 1.1657341758564144e-15, "Fa_max_abs": 2.0539125955565396e-15, "weights_outside_tolerance": []}
+  },
+  "ordinary_inductor": {
+   "default": {"operations": [684, 69], "joint_zero_for_unused": [10, 0, 12], "candidate_zero_for_unused": [0, 0, 12], "candidate_coordinate_max_abs": [2.375877272697835e-14, 2.842170943040401e-14, 6.039613253960852e-14]},
+   "before": {"operations": [684, 69, 29], "joint_zero_for_unused": [15, 5, 17, 0, 4], "candidate_zero_for_unused": [0, 0, 12, 0, 4], "candidate_coordinate_max_abs": [9.237055564881302e-14, 9.947598300641403e-14, 6.039613253960852e-14, 4.618527782440651e-14, 2.2648549702353193e-14]},
+   "after": {"operations": [684, 69, 29], "joint_zero_for_unused": [15, 5, 17, 0, 4], "candidate_zero_for_unused": [0, 0, 12, 0, 4], "candidate_coordinate_max_abs": [2.531308496145357e-14, 2.842170943040401e-14, 6.039613253960852e-14, 1.5987211554602254e-14, 8.881784197001252e-15]},
+   "energy": {"operations": [749], "joint_zero_for_unused": [0, 0, 12], "candidate_zero_for_unused": [0, 0, 12], "candidate_coordinate_max_abs": [1.7462298274040222e-10, 1.6916601452976465e-10, 4.973799150320701e-14]},
+   "empty_lr": {"operations": [685, 68], "joint_zero_for_unused": [54, 52, 60], "candidate_zero_for_unused": [44, 44, 52], "candidate_coordinate_max_abs": [4.996003610813204e-16, 2.842170943040401e-14, 1.7763568394002505e-14]},
+   "isolated": {"operations": [750], "joint_zero_for_unused": [22, 22, 72], "candidate_zero_for_unused": [22, 22, 72], "candidate_coordinate_max_abs": [0.0, 0.0, null]}
+  }
  }
 }
