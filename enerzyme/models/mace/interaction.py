@@ -612,8 +612,12 @@ INTERACTION_CLASSES = {
 
 def element_one_hot(ctx: GraphContext, num_elements: int, dtype: torch.dtype) -> Tensor:
     """One-hot species ``(N, num_elements)`` from ``Za``, cached per forward."""
-    return ctx.cached(("element_one_hot", int(num_elements), dtype),
-                      lambda: F.one_hot(ctx.inputs["Za"], num_classes=int(num_elements)).to(dtype))
+    def encode():
+        species = ctx.inputs["Za"]
+        rows = species.new_zeros((*species.shape, num_elements), dtype=dtype)
+        return rows.scatter_(-1, species.unsqueeze(-1), 1)
+
+    return ctx.cached(("element_one_hot", int(num_elements), dtype), encode)
 
 
 class MACEBlock(Module):
