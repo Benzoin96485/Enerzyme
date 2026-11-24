@@ -34,10 +34,15 @@ def center_positions_by_batch(Ra: Tensor, batch_seg: Tensor) -> Tensor:
 
 def _topk_slots(dst: Tensor, dist: Tensor, max_neighbors: int, num_nodes: int):
     """Return original edge IDs and their flattened slots in the padded neighborhood."""
-    if not dst.numel() or max_neighbors <= 0:
+    if max_neighbors <= 0 or (not torch.compiler.is_compiling() and not dst.numel()):
         return dst[:0], dst[:0]
     # Preserve the original distance sort and tie order; keep its span on-device.
-    span = dist.detach().max().clamp_min(1.0) + 1.0
+    if torch.compiler.is_compiling():
+        # A cutoff can remove every edge at runtime. Add the existing lower
+        # bound to the reduction so the compiled empty list also has a span.
+        span = torch.cat((dist.detach(), dist.new_ones(1))).amax() + 1.0
+    else:
+        span = dist.detach().max().clamp_min(1.0) + 1.0
     order = torch.argsort(dst.double() * span.double() + dist.double())
     grouped = dst[order]
     centers = torch.arange(num_nodes, device=dst.device)
@@ -133,7 +138,7 @@ def map_neighbor_list(
     else:
         squeeze = False
     out = x.new_zeros((num_nodes * max_neighbors, x.shape[-1]))
-    if index_mapping.numel() > 0:
+    if torch.compiler.is_compiling() or index_mapping.numel() > 0:
         out.scatter_(0, index_mapping.unsqueeze(1).expand(-1, x.shape[-1]), x)
     out = out.view(num_nodes, max_neighbors, x.shape[-1])
     return out.squeeze(-1) if squeeze else out
