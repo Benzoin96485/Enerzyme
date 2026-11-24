@@ -1,7 +1,5 @@
 """Rotational invariance of AllScAIP core atomic outputs Ea and Qa w.r.t. positions R.
 
-Graph preprocessing uses float32 internally; the core must match that dtype on inputs.
-
 The default AllScAIP steerable path (full spherical-harmonic edge channels and frequency
 masks) is not guaranteed to yield exactly rotation-invariant per-atom scalars for arbitrary
 weights. This regression test uses the **scalar angular limit** (only l=0 harmonics, no
@@ -333,3 +331,18 @@ def test_allscaip_equivariant_mode_l_gt_0_rotation_invariant():
         atol=atol,
         err_msg="atom_feature not rotation-invariant with equivariant_mode",
     )
+
+def test_allscaip_double_precision_periodic_graph_uses_cell():
+    core = allscaip(dim_embedding=16, num_layers=1, atten_num_heads=2,
+                    knn_k=3, cutoff_sr=2.0, pbc=True, equivariant_mode=True).double()
+    positions = torch.tensor([[0.1, 0.0, 0.0], [3.9, 0.1, 0.0], [0.2, 0.4, 0.1]],
+                             dtype=torch.float64, requires_grad=True)
+    inputs = dict(Ra=positions, Za=torch.tensor([1, 6, 8]), batch_seg=torch.zeros(3, dtype=torch.long),
+                  atom_embedding=torch.rand(3, 16, dtype=positions.dtype),
+                  cell=(4 * torch.eye(3, dtype=positions.dtype)).unsqueeze(0))
+    first = core.get_output(**inputs)["atom_feature"]
+    moved = positions.detach().clone()
+    moved[1, 0] -= 4.0
+    second = core.get_output(**dict(inputs, Ra=moved))["atom_feature"]
+    torch.testing.assert_close(first, second)
+    assert torch.isfinite(torch.autograd.grad(first.square().sum(), positions)[0]).all()

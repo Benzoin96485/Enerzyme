@@ -61,7 +61,6 @@ def get_frequency_vectors(
     )
     lmax = len(freequency_list) - 1
     repeat_dims = list(freequency_list)
-    edge_direction = edge_direction.to(torch.float32)
     harmonics = _spherical_harmonics(
         lmax, edge_direction[..., 0], edge_direction[..., 1], edge_direction[..., 2]
     )
@@ -80,7 +79,7 @@ def get_frequency_vectors(
         return torch.cat(components, dim=-1)
     return torch.zeros(
         (edge_direction.shape[0], edge_direction.shape[1], 0),
-        device=edge_direction.device,
+        device=edge_direction.device, dtype=edge_direction.dtype,
     )
 
 
@@ -90,7 +89,7 @@ def get_node_direction_expansion_neighbor(
     lmax: int,
 ) -> Tensor:
     """BOO-style node scalars per angular momentum block, shape ``(N, lmax + 1)``."""
-    neighbor_mask = neighbor_mask.float().unsqueeze(-1)
+    neighbor_mask = neighbor_mask.to(direction_vec.dtype).unsqueeze(-1)
     edge_sh = _spherical_harmonics(
         lmax=lmax,
         x=direction_vec[:, :, 0],
@@ -117,7 +116,10 @@ def get_node_attention_mask(
     r_max: float = 30.0,
     use_sincx_mask: bool = True,
     single_system_no_padding: bool = False,
+    dtype: torch.dtype | None = None,
 ) -> tuple[Tensor | None, Tensor | None, Tensor | None]:
+    if dtype is None:
+        dtype = dist_pairwise.dtype if dist_pairwise is not None else torch.get_default_dtype()
     N_pad = node_batch.size(0)
     if single_system_no_padding:
         if not use_sincx_mask:
@@ -129,7 +131,7 @@ def get_node_attention_mask(
         real = node_batch.unsqueeze(0) != -1
         real2 = node_batch.unsqueeze(1) != -1
         valid_mask = same_graph & real & real2
-        base_mask = torch.zeros((N_pad, N_pad), dtype=torch.float32, device=node_batch.device)
+        base_mask = torch.zeros((N_pad, N_pad), dtype=dtype, device=node_batch.device)
         neg_inf = torch.finfo(base_mask.dtype).min
         base_mask = base_mask.masked_fill(~valid_mask, neg_inf)
         base_mask = base_mask.unsqueeze(0)
@@ -144,7 +146,7 @@ def get_node_attention_mask(
         math.log10(omega_max),
         n_freq,
         device=node_batch.device,
-        dtype=torch.float32,
+        dtype=dtype,
     )
     x = dist_pairwise.unsqueeze(-1) * omega.view(1, 1, -1)
     sincx = torch.empty_like(x)
@@ -206,11 +208,11 @@ def pad_batch(
     if charge is not None:
         charge = F.pad(charge, (0, max_batch_size - num_graphs), value=0)
     else:
-        charge = torch.zeros(max_batch_size, dtype=torch.float, device=device)
+        charge = edge_distance.new_zeros(max_batch_size)
     if spin is not None:
         spin = F.pad(spin, (0, max_batch_size - num_graphs), value=0)
     else:
-        spin = torch.zeros(max_batch_size, dtype=torch.float, device=device)
+        spin = edge_distance.new_zeros(max_batch_size)
     return (
         atomic_numbers,
         charge,
@@ -296,7 +298,8 @@ def build_graph_attention_data(
     else:
         work_device = original_device
 
-    Ra = Ra.to(device=work_device, dtype=torch.float32)
+    if Ra.dtype in (torch.float16, torch.bfloat16):
+        Ra = Ra.float()
     Za = Za.to(device=work_device)
     batch_seg = batch_seg.to(device=work_device)
     num_graphs = int(batch_seg.max().item()) + 1
@@ -436,6 +439,7 @@ def build_graph_attention_data(
             hp.attn_num_freq,
             use_sincx_mask=hp.use_sincx_mask,
             single_system_no_padding=hp.single_system_no_padding,
+            dtype=Ra.dtype,
         )
     else:
         sincx = None
@@ -445,7 +449,7 @@ def build_graph_attention_data(
     node_batch = node_batch.masked_fill(node_batch == -1, 0)
 
     node_indices = torch.arange(max_num_nodes, device=work_device)
-    node_padding_mask = (node_indices < num_nodes).to(torch.float32)
+    node_padding_mask = (node_indices < num_nodes).to(Ra.dtype)
 
     x = GraphAttentionData(
         atomic_numbers=atomic_numbers,

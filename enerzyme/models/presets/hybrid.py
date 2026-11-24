@@ -167,7 +167,7 @@ def so3krates(
 
 
 class NeighborEmbed(Embed):
-    input_fields = ("atom_embedding", "charge_embedding", "spin_embedding", "Za", "Ra", "batch_seg")
+    input_fields = ("atom_embedding", "charge_embedding", "spin_embedding", "Za", "Ra", "batch_seg", "cell")
 
     def __init__(self, input_block, graph_params):
         super().__init__()
@@ -181,7 +181,7 @@ class NeighborEmbed(Embed):
                 node = node + inputs[field]
         graph = build_graph_attention_data(
             inputs["Ra"], inputs["Za"], ctx.batch, hparams=self.graph_params,
-            charge=None, spin=None, cell=None,
+            cell=inputs.get("cell"),
         )
         return BlockState(edge=self.input_block(graph, node), aux={"graph": graph})
 
