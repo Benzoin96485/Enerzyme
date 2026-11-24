@@ -44,7 +44,7 @@ def _basis(dist: torch.Tensor, num_rbf: int, cutoff: float):
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.chgnet import CHGNetCore
+    from enerzyme.models.presets.triplet_graphs import chgnet
 
     params = dict(
         dim_embedding=8,
@@ -60,7 +60,7 @@ def _tiny(**kwargs):
         readout_norm="layer",
     )
     params.update(kwargs)
-    return CHGNetCore(**params)
+    return chgnet(**params)
 
 
 def _inputs(n=4, seed=0, num_rbf=3):
@@ -97,7 +97,7 @@ def test_registration_and_example_yaml():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, defaults, layers = get_ff_core("chgnet")
-    assert core_cls.__name__ == "CHGNetCore"
+    assert core_cls.__name__ == "chgnet"
     assert defaults["cutoff_sr"] == 5.0
     assert defaults["bond_cutoff"] == 3.0
     assert defaults["num_rbf"] == 9
@@ -112,7 +112,7 @@ def test_registration_and_example_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "CHGNetCore"
+    assert model.architecture == "chgnet"
     assert model.num_blocks == 4
     assert model.bond_cutoff == 3.0
     assert model.dim_feature_out == 64
@@ -120,7 +120,7 @@ def test_registration_and_example_yaml():
     assert model.bond_basis._name_mapping["rbf"] == "rbf_bg"
     assert model.atom_basis.basis_cutoff == 5.0
     assert model.bond_basis.basis_cutoff == 3.0
-    assert model.fourier.learnable is True
+    assert model.embed.fourier.learnable is True
 
 
 def test_feature_shapes_and_isolated_atom():
@@ -147,7 +147,7 @@ def test_feature_shapes_and_isolated_atom():
     )
     assert_allclose(
         alone["atom_feature"].detach().numpy(),
-        core.readout_norm(emb).detach().numpy(),
+        core.head.norm(emb).detach().numpy(),
         atol=1e-6,
     )
 

@@ -11,7 +11,6 @@ convolution, and the species mixture stay inside the Core. The energy head
 is a linear ``SimpleReadout`` on the mixed node state.
 """
 
-from .core import SpinConvCore
 
 
 _READOUT = {
@@ -70,7 +69,6 @@ DEFAULT_LAYER_PARAMS = [
 ]
 
 __all__ = [
-    "SpinConvCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
 ]

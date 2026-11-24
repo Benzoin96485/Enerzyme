@@ -12,7 +12,6 @@ Core. The energy head is a linear ``SimpleReadout``. Summing it is the
 released average-pool times the atom count, including the bias.
 """
 
-from .core import ALIGNNCore
 
 
 # alignn_atomwise defaults: 2 ALIGNN layers, 2 gated convolutions, width 64,
@@ -73,7 +72,6 @@ DEFAULT_LAYER_PARAMS = [
 ]
 
 __all__ = [
-    "ALIGNNCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "PUBLISHED_PROPERTY_CORE_PARAMS",

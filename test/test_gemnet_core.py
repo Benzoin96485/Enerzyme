@@ -24,7 +24,7 @@ def _complete_edges(n: int):
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.gemnet import GemNetCore
+    from enerzyme.models.presets.triplet_graphs import gemnet
 
     params = dict(
         dim_embedding=4,
@@ -47,7 +47,7 @@ def _tiny(**kwargs):
         envelope_exponent=5,
     )
     params.update(kwargs)
-    return GemNetCore(**params)
+    return gemnet(**params)
 
 
 def _inputs(n=4, dim=4, num_rbf=3, seed=0, requires_grad=False):
@@ -108,16 +108,16 @@ def _forward(core, inp):
 
 def test_registration_names():
     from enerzyme.models.ff import get_ff_core
-    from enerzyme.models.gemnet import GemNetCore
+    from enerzyme.models.presets.triplet_graphs import gemnet
 
     for name in ("gemnet", "gemnet-t", "GemNetT"):
         core_cls, build, layers = get_ff_core(name)
-        assert core_cls is GemNetCore
+        assert core_cls is gemnet
         assert build["cutoff_sr"] == 5.0
         core_params = next(layer["params"] for layer in layers if layer["name"] == "Core")
         assert core_params["triplets_only"] is True
     core_cls, build, layers = get_ff_core("gemnet-q")
-    assert core_cls is GemNetCore
+    assert core_cls is gemnet
     assert build["cutoff_sr"] == 10.0
     core_params = next(layer["params"] for layer in layers if layer["name"] == "Core")
     assert core_params["triplets_only"] is False
@@ -375,7 +375,7 @@ def test_gemnet_q_uses_the_longer_bond_and_matches_yaml():
     force = torch.autograd.grad(out["E"].sum(), pos)[0]
     assert_allclose(out["Fa"].detach().numpy(), (-force).detach().numpy(), atol=1e-4, rtol=1e-4)
     assert model.triplets_only is False
-    assert model.interactions[0].quad is not None
+    assert model.blocks[0].interaction.quad is not None
 
     wrong = [
         {"name": "RangeSeparation"},

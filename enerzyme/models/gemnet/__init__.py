@@ -8,8 +8,6 @@ GemNet-Q defaults are ``DEFAULT_BUILD_PARAMS_Q`` and ``DEFAULT_LAYER_PARAMS_Q``.
 GemNet-OC defaults are ``DEFAULT_BUILD_PARAMS_OC`` and ``DEFAULT_LAYER_PARAMS_OC``.
 """
 
-from .core import GemNetCore
-from .core_oc import GemNetOCCore
 
 
 _SWISH = {
@@ -187,8 +185,6 @@ DEFAULT_BUILD_PARAMS_OC = {
 DEFAULT_LAYER_PARAMS_OC = _stack_oc()
 
 __all__ = [
-    "GemNetCore",
-    "GemNetOCCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "DEFAULT_BUILD_PARAMS_Q",

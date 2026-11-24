@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from ..mp.basis.envelope import cosine_transition
-from ..mp.graph import receiver_csr, receiver_rank
+from ..mp.graph import path_pairs, receiver_csr, receiver_rank
 
 
 def symmetric_neighbor_mask(
@@ -86,14 +86,7 @@ def source_neighbor_pairs(idx_i: Tensor, idx_j: Tensor, num_nodes: int) -> tuple
     sphere is being painted. ``source_edge`` is an incoming edge of
     ``idx_j[query_edge]``, the source atom.
     """
-    table = incoming_edge_table(idx_i, num_nodes)
-    if idx_i.numel() == 0 or table.shape[1] == 0:
-        empty = idx_i.new_zeros((0,))
-        return empty, empty
-    gathered = table[idx_j]
-    valid = gathered >= 0
-    query = torch.arange(idx_i.numel(), device=idx_i.device).unsqueeze(1).expand_as(gathered)
-    return gathered[valid], query[valid]
+    return path_pairs(idx_i, idx_j, num_nodes)
 
 
 # Sine of the angle between the bond and the second axis. Below this the
@@ -235,6 +228,18 @@ def bilinear_sphere_index(
     # bilinear weights). Holding the weights fixed keeps ``Fa = -∇E`` finite:
     # positions still enter through the distances and the message values.
     return index, weight.detach()
+
+
+@torch.no_grad()
+def sphere_projection(vij, receiver, sender, distance, cutoff, num_nodes, n_lat, n_long):
+    """Graph-dependent interpolation indices and fixed-coordinate weights for all spin blocks."""
+    source, query = source_neighbor_pairs(receiver, sender, num_nodes)
+    if source.numel() == 0:
+        return source.new_empty(4, 0), vij.new_empty(4, 0), source
+    frames = edge_spin_frames(vij, receiver, distance, cutoff, num_nodes)
+    local = project_neighbors(vij, frames, source, query)
+    index, weight = bilinear_sphere_index(local, query, n_lat, n_long)
+    return index, weight, source
 
 
 def splat_sphere(
