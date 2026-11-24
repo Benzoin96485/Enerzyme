@@ -18,7 +18,7 @@ from e3nn.o3 import Irreps, SphericalHarmonics
 from torch import Tensor
 from torch.nn import ModuleList
 
-from ..e3nn_nn import IrrepsLinear, scalar_0e_dim
+from ..mp.equivariant.e3nn import IrrepsLinear, scalar_0e_dim
 from ..layers import (
     BaseAtomEmbedding,
     BaseElectronEmbedding,

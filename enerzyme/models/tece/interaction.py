@@ -16,14 +16,14 @@ import torch
 from e3nn import o3
 from torch import Tensor, nn
 from torch.nn import Linear
-from torch_scatter import scatter_sum
+from ..mp.ops import scatter_sum
 
-from ..activation import get_scaled_activation
-from ..blocks.radial_mlp import RadialMLP
-from ..e3nn_nn import IrrepsLinear, get_gated_nonlinear, get_resnet_layer, to_possible_tp_irreps
-from ..so3 import (
+from ..mp.nn.activation import get_scaled_activation
+from ..mp.nn.radial_mlp import RadialMLP
+from ..mp.equivariant.e3nn import IrrepsLinear, get_gated_nonlinear, get_resnet_layer, to_possible_tp_irreps
+from ..mp.ops import GraphSoftmax
+from ..mp.equivariant import (
     ComplexProductBasis,
-    GraphSoftmax,
     LayoutTransform,
     SO2Gate,
     so2_expand_index,

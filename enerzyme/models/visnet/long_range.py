@@ -23,7 +23,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Dropout, LayerNorm, Linear, Module, ModuleList, Sequential, SiLU
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 from ..layers.fragments import (
     build_kmeans_fragments,
     build_spectral_fragments,
@@ -282,12 +282,8 @@ class FragmentBipartiteBlock(Module):
         fragment_vector = group_vector.index_select(0, idx_fragment)
         vector_message = self.mlp_pos(scalar_message).unsqueeze(1) * direction.unsqueeze(-1)
         vector_message = vector_message + self.mlp_vec(scalar_message).unsqueeze(1) * fragment_vector
-        aggregated_scalar = reduce_edge(
-            scalar_message, idx_atom, (n_atoms, self.hidden_channels)
-        )
-        aggregated_vector = reduce_edge(
-            vector_message, idx_atom, (n_atoms, 3, self.hidden_channels)
-        )
+        aggregated_scalar = scatter_sum(scalar_message, idx_atom, n_atoms)
+        aggregated_vector = scatter_sum(vector_message, idx_atom, n_atoms)
         left = self.mix[2](vector)
         right = self.mix[3](vector)
         dot = (left * right).sum(dim=1)

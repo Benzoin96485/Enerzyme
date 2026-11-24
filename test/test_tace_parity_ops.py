@@ -57,7 +57,7 @@ def test_o3_scatter_tp_matches_internal_e3nn_tp_scatter():
     ``O3ScatterTensorProduct`` wraps ``o3.TensorProduct``; this locks the scatter
     wiring against a manual edge expansion (upstream ACE-style message).
     """
-    from enerzyme.models.e3nn_nn import (
+    from enerzyme.models.mp.equivariant.e3nn import (
         O3ScatterTensorProduct,
         generate_paths,
         to_possible_tp_irreps,

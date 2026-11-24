@@ -16,7 +16,7 @@ from equiformer_v3_parity_utils import (  # noqa: E402
 
 
 def test_merge_layer_norm_matches_upstream():
-    from enerzyme.models.so3.layer_norm import EquivariantMergeLayerNorm as EZNorm
+    from enerzyme.models.mp.equivariant.sph.layer_norm import EquivariantMergeLayerNorm as EZNorm
     from layer_norm import EquivariantMergeLayerNorm as OffNorm
 
     torch.manual_seed(0)
@@ -31,7 +31,7 @@ def test_merge_layer_norm_matches_upstream():
 
 
 def test_so3_linear_matches_upstream():
-    from enerzyme.models.so3.linear import SO3Linear as EZLin
+    from enerzyme.models.mp.equivariant.sph.linear import SO3Linear as EZLin
     from eqv3_so3 import SO3Linear as OffLin
 
     torch.manual_seed(1)
@@ -47,7 +47,7 @@ def test_so3_linear_matches_upstream():
 
 
 def test_so2_linear_matches_upstream():
-    from enerzyme.models.so3.so2_ops import SO2Linear as EZLin
+    from enerzyme.models.mp.equivariant.so2.ops import SO2Linear as EZLin
     from so2_ops import SO2Linear as OffLin
 
     torch.manual_seed(2)
@@ -72,7 +72,7 @@ def test_so2_linear_matches_upstream():
 
 
 def test_polynomial_envelope_matches_upstream():
-    from enerzyme.models.cutoff import PolynomialEnvelope as EZEnv
+    from enerzyme.models.mp.basis.envelope import PolynomialEnvelope as EZEnv
     from envelope import PolynomialEnvelope as OffEnv
 
     torch.manual_seed(3)
@@ -84,7 +84,7 @@ def test_polynomial_envelope_matches_upstream():
 
 
 def test_graph_softmax_envelope_matches_upstream():
-    from enerzyme.models.so3.softmax import GraphSoftmax as EZSoft
+    from enerzyme.models.mp.ops import GraphSoftmax as EZSoft
     from softmax import GraphSoftmax as OffSoft
 
     torch.manual_seed(4)
@@ -102,7 +102,7 @@ def test_graph_softmax_envelope_matches_upstream():
 
 def test_swiglu_s2_mem_matches_eager():
     """Memory-efficient SwiGLU-S² must match the eager path (from_grid on activated grid)."""
-    from enerzyme.models.so3.activation_v3 import get_activation
+    from enerzyme.models.mp.equivariant.s2.activation_v3 import get_activation
 
     torch.manual_seed(5)
     dtype = torch.float64
@@ -130,7 +130,7 @@ def test_swiglu_s2_mem_matches_eager():
 
 def test_sep_merge_gates2_swiglu_mem_matches_eager():
     """Default-family mem activation must apply grid nonlinearity (not skip via from_grid(inputs))."""
-    from enerzyme.models.so3.activation_v3 import get_activation
+    from enerzyme.models.mp.equivariant.s2.activation_v3 import get_activation
 
     torch.manual_seed(6)
     dtype = torch.float64

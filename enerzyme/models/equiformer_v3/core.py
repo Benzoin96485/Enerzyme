@@ -23,7 +23,7 @@ from ..layers import (
     DistanceLayer,
     RangeSeparationLayer,
 )
-from ..so3 import (
+from ..mp.equivariant import (
     PolynomialEnvelope,
     SO3RotationFused,
     get_normalization_layer,

@@ -3,7 +3,7 @@
 The convolution is the NequIP / SevenNet message: a radial network produces
 weights for a Clebsch–Gordan product of neighbor features with spherical
 harmonics, and the messages are summed onto the receiver. Instructions come
-from the shared :func:`enerzyme.models.e3nn_nn.tp_out_irreps_with_instructions`.
+from the shared :func:`enerzyme.models.mp.equivariant.e3nn.tp_out_irreps_with_instructions`.
 The gate is :class:`e3nn.nn.Gate` (second-moment-normalized activations), which
 is the nonlinearity used by the reference EquFlash stack.
 
@@ -21,13 +21,13 @@ from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
 from torch import Tensor, nn
 
-from ..activation import resolve_scalar_activation
-from ..e3nn_nn import tp_out_irreps_with_instructions
-from ..functional import segment_sum_coo
+from ..mp.nn.activation import resolve_scalar_activation
+from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions
+from ..mp.ops import scatter_sum
 
 
 def resolve_activation(name: str):
-    """EquFlash name for :func:`enerzyme.models.activation.resolve_scalar_activation`."""
+    """EquFlash name for :func:`enerzyme.models.mp.nn.activation.resolve_scalar_activation`."""
     return resolve_scalar_activation(name)
 
 
@@ -143,7 +143,7 @@ class EquFlashConvolution(nn.Module):
             return features.new_zeros(n_atoms, self.irreps_out.dim)
         weights = self.weight_nn(rbf)
         messages = self.tp(features[idx_sender], sph, weights)
-        aggregated = segment_sum_coo(messages, idx_receiver, dim_size=n_atoms)
+        aggregated = scatter_sum(messages, idx_receiver, n_atoms)
         return aggregated / self.denominator
 
 

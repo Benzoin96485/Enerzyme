@@ -27,9 +27,10 @@ from e3nn import o3
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
-from ..blocks.mlp import VariancePreservingMLP
+from ..mp.nn.mlp import VariancePreservingMLP
 from ..layers import BaseFFCore
-from .interaction import ChannelTensorProduct, WeightedSphericalChannels, scatter_sum
+from ..mp.ops import scatter_sum
+from .interaction import ChannelTensorProduct, WeightedSphericalChannels
 from .irreps import allegro_layer_irreps, edge_sh_irreps
 
 

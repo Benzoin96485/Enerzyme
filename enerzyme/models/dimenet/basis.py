@@ -21,7 +21,7 @@ from scipy.special import spherical_jn as scipy_spherical_jn
 from torch import Tensor
 from torch.nn import Module
 
-from ..cutoff import DimeNetEnvelope
+from ..mp.basis.envelope import DimeNetEnvelope
 
 
 def spherical_bessel_zeros(n_order: int, n_radial: int) -> np.ndarray:

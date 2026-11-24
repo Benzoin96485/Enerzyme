@@ -32,7 +32,7 @@ def _rotation(seed: int = 0) -> torch.Tensor:
 
 
 def test_xplor_window_is_flat_then_zero():
-    from enerzyme.models.cutoff import xplor_transition
+    from enerzyme.models.mp.basis.envelope import xplor_transition
 
     distance = torch.tensor([0.0, 5.5, 5.75, 6.0, 7.0])
     window = xplor_transition(distance, cutoff=6.0, cuton=5.5)

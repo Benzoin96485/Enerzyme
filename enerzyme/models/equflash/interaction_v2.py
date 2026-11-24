@@ -15,9 +15,9 @@ import torch.nn.functional as F
 from e3nn import o3
 from torch import Tensor, nn
 
-from ..blocks.radial_mlp import RadialMLP
-from ..e3nn_nn.rms_norm import EquivariantRMSNormSH
-from ..functional import segment_sum_coo
+from ..mp.nn.radial_mlp import RadialMLP
+from ..mp.equivariant.e3nn.rms_norm import EquivariantRMSNormSH
+from ..mp.ops import scatter_sum
 from .irreps import scale_irreps
 
 
@@ -74,7 +74,7 @@ def _skip(kind: str, irreps_in, irreps_out) -> nn.Module:
 def _uvu_instructions(irreps_x, irreps_filter, irreps_out):
     """Channelwise paths whose multiplicity already matches the output.
 
-    Distinct from :func:`enerzyme.models.e3nn_nn.tp_out_irreps_with_instructions`,
+    Distinct from :func:`enerzyme.models.mp.equivariant.e3nn.tp_out_irreps_with_instructions`,
     which emits one output slot per path for a following linear (EquFlash and
     Nequix). Here an output irrep is kept only when its multiplicity equals
     the input multiplicity. A mismatch or a missing path raises.
@@ -177,7 +177,7 @@ class ChannelwiseConv(nn.Module):
             return features.new_zeros(features.shape[0], self.irreps_out.dim)
         weight = self.radial(rbf)
         message = self.tp(features[idx_j], edge_sh, weight)
-        aggregated = segment_sum_coo(message, idx_i, dim_size=features.shape[0])
+        aggregated = scatter_sum(message, idx_i, features.shape[0])
         return aggregated / self.denominator
 
 
@@ -186,7 +186,7 @@ class ScalarGate(nn.Module):
 
     def __init__(self, irreps) -> None:
         super().__init__()
-        from ..e3nn_nn.activation import Gate
+        from ..mp.equivariant.e3nn.activation import Gate
 
         irreps = o3.Irreps(irreps).simplify()
         odd, even, gated = [], [], []

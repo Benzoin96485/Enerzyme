@@ -57,7 +57,7 @@ def build_complete_graph(num_nodes: int) -> Tensor:
 
 
 def deterministic_edge_rot_mat(edge_distance_vec: Tensor) -> Tensor:
-    from enerzyme.models.so3 import init_edge_rot_mat
+    from enerzyme.models.mp.equivariant import init_edge_rot_mat
 
     return init_edge_rot_mat(edge_distance_vec)
 
@@ -89,8 +89,8 @@ def copy_state_dict(dst: torch.nn.Module, src: torch.nn.Module) -> None:
 
 def build_so2_convolution_pair(extra_m0: int | None = None):
     """Enerzyme vs upstream SO2_Convolution with shared mapping."""
-    from enerzyme.models.so3 import SO2_Convolution as EZConv
-    from enerzyme.models.so3 import CoefficientMapping as EZMap
+    from enerzyme.models.mp.equivariant import SO2_Convolution as EZConv
+    from enerzyme.models.mp.equivariant import CoefficientMapping as EZMap
     from so2_ops import SO2_Convolution as OffConv
     from eqv2_so3 import CoefficientMappingModule as OffMap
 
@@ -116,7 +116,7 @@ def build_so2_convolution_pair(extra_m0: int | None = None):
 
 def build_so3_grids_v2(lmax: int, resolution: int | None = None):
     """Component-normalized grids with mmax rescale (EquiformerV2 style)."""
-    from enerzyme.models.so3 import build_so3_grid_table
+    from enerzyme.models.mp.equivariant import build_so3_grid_table
     from eqv2_so3 import SO3_Grid as Off_Grid
 
     ez = build_so3_grid_table(

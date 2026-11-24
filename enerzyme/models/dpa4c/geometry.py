@@ -16,7 +16,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from ..so3.lebedev import load_lebedev_rule
+from ..mp.equivariant.s2.lebedev import load_lebedev_rule
 
 
 SUPPORTED_CHANNELS = (8, 16, 32, 64, 128)

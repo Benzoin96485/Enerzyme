@@ -5,14 +5,14 @@
 import math
 import torch
 import torch_geometric
-from torch_scatter import scatter
+from ..mp.ops import scatter_sum as scatter
 from e3nn import o3
 from e3nn.util.jit import compile_mode
 from e3nn.nn.models.v2106.gate_points_message_passing import tp_path_exists
 
-from ..e3nn_nn import EquivariantLayerNormV2
-from ..blocks.radial_mlp import RadialProfile
-from ..e3nn_nn import (
+from ..mp.equivariant.e3nn import EquivariantLayerNormV2
+from ..mp.nn.radial_mlp import RadialProfile
+from ..mp.equivariant.e3nn import (
     TensorProductRescale,
     LinearRS,
     FullyConnectedTensorProductRescale,
@@ -22,8 +22,8 @@ from ..e3nn_nn import (
     Gate,
     EquivariantDropout,
 )
-from ..blocks.drop import GraphDropPath
-from ..activation import SmoothLeakyReLU
+from ..mp.nn.drop import GraphDropPath
+from ..mp.nn.activation import SmoothLeakyReLU
 
 _RESCALE = True
 _USE_BIAS = True

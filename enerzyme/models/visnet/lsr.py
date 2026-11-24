@@ -29,7 +29,7 @@ from typing import Dict, Optional
 import torch
 from torch import Tensor
 from torch.nn import LayerNorm, Linear, ModuleList
-from torch_scatter import scatter_mean
+from ..mp.ops import scatter_mean
 
 from ..layers.rbf import ExpNormalSmearing
 from .core import ViSNetCore

@@ -7,7 +7,7 @@ degree: each spherical component is weighted by ``1 / (2l + 1)``, each
 channel is divided by how many degrees actually contain it, and those
 channel norms are averaged over the widest multiplicity.
 
-:class:`enerzyme.models.e3nn_nn.RMSLayerNorm` is a different formula (the
+:class:`enerzyme.models.mp.equivariant.e3nn.RMSLayerNorm` is a different formula (the
 eSEN / Nequix block mean) and is not a substitute here. The layout this
 norm accepts is one irrep per degree, ``l = 0, 1, ..., lmax``, in that
 order. The published schedules satisfy that.

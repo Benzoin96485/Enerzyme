@@ -20,7 +20,7 @@ from torch import Tensor
 from torch.nn import Module, ModuleList
 
 from ..layers import BaseFFCore
-from ..so3.spherical_harmonics import spherical_harmonics
+from ..mp.basis.angular import spherical_harmonics
 from .basis import AtomicBasis
 from .coupling import (
     DensityProjection,

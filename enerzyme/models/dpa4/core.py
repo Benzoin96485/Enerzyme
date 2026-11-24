@@ -27,11 +27,12 @@ from ..layers import (
     DistanceLayer,
     RangeSeparationLayer,
 )
-from ..so3 import C3CutoffEnvelope
-from ..so3.indexing import build_gie_zonal_index, get_so3_dim
-from ..so3.layer_norm import EquivariantDegreeRMSNorm
-from ..so3.radial import BesselC3RadialBasis, RadialMLP
-from ..so3.wigner_quaternion import WignerDCalculator
+from ..mp.equivariant import C3CutoffEnvelope
+from ..mp.equivariant.indexing import build_gie_zonal_index, get_so3_dim
+from ..mp.equivariant.sph.layer_norm import EquivariantDegreeRMSNorm
+from ..mp.basis.radial import BesselC3RadialBasis
+from ..mp.nn.radial_mlp import radial_mlp
+from ..mp.equivariant.rotation.wigner_quaternion import WignerDCalculator
 from .interaction import SeZMInteractionBlock
 from .so2 import EdgeCache, build_edge_cache
 
@@ -311,7 +312,7 @@ class DPA4Core(BaseFFCore):
         self.sphere_proj = nn.Linear(dim_embedding, channels)
 
         # Radial feature MLP: n_radial -> (lmax+1) * channels
-        self.radial_feat_mlp = RadialMLP(
+        self.radial_feat_mlp = radial_mlp(
             n_radial,
             (lmax + 1) * channels,
             hidden=[64],

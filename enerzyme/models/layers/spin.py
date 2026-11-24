@@ -3,7 +3,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module
 from . import BaseFFLayer
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 
 
 class SpinConservationLayer(BaseFFLayer):
@@ -41,9 +41,9 @@ class SpinConservationLayer(BaseFFLayer):
         if batch_seg is None:
             batch_seg = torch.zeros_like(Za, dtype=torch.long)
         #number of atoms per batch (needed for charge scaling)
-        N_per_batch = segment_sum_coo(torch.ones_like(batch_seg), batch_seg)
+        N_per_batch = scatter_sum(torch.ones_like(batch_seg), batch_seg)
         view_shape = (-1, ) if Sa.dim() == 1 else (-1, 1)
-        raw_S = segment_sum_coo(Sa, batch_seg)
+        raw_S = scatter_sum(Sa, batch_seg)
         if S is None: #assume desired total spin zero if not given
             S = torch.zeros_like(N_per_batch)
         #return scaled spins (such that they have the desired total spin)

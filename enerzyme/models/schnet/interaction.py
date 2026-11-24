@@ -1,8 +1,8 @@
 from torch import Tensor
 from torch.nn import Module, Sequential, Linear, init
 from torch_geometric.nn import MessagePassing
-from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, get_activation_fn
-from ..cutoff import cosine_transition
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, get_activation_fn
+from ..mp.basis.envelope import cosine_transition
 
 
 class InteractionBlock(Module):

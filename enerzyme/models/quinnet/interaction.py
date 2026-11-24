@@ -40,7 +40,7 @@ from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module, Parameter
 
 from ..et.interaction import normalize_distance_influence
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 from ..layers.rejection import vector_rejection
 from ..visnet.interaction import normalize_activation
 
@@ -242,9 +242,9 @@ class QuinNetInteraction(Module):
             vector, normal_i, edge, idx_i, idx_j, direction
         )
         node_shape = (n_atoms, self.hidden_channels)
-        five_iii = reduce_edge(five_iii_edge, idx_j, node_shape)
-        five_ii = reduce_edge(five_ii_edge, idx_j, node_shape)
-        torsion = reduce_edge(torsion_edge, idx_j, node_shape)
+        five_iii = scatter_sum(five_iii_edge, idx_j, node_shape[0])
+        five_ii = scatter_sum(five_ii_edge, idx_j, node_shape[0])
+        torsion = scatter_sum(torsion_edge, idx_j, node_shape[0])
 
         filter_key = None
         if self.dk_proj is not None:
@@ -274,10 +274,8 @@ class QuinNetInteraction(Module):
         )
         vector_message = vector.index_select(0, idx_j) * gate.unsqueeze(1)
         vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
-        aggregated_scalar = reduce_edge(scalar_message, idx_i, node_shape)
-        aggregated_vector = reduce_edge(
-            vector_message, idx_i, (n_atoms, angular, self.hidden_channels)
-        )
+        aggregated_scalar = scatter_sum(scalar_message, idx_i, node_shape[0])
+        aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
         out_scale, out_gate, out_bias = torch.split(
             self.o_proj(aggregated_scalar), self.hidden_channels, dim=-1
         )

@@ -9,8 +9,8 @@ import math
 import torch_geometric
 import copy
 
-from ..activation import SmoothLeakyReLU
-from ..so3.activation_v3 import (
+from ..mp.nn.activation import SmoothLeakyReLU
+from ..mp.equivariant.s2.activation_v3 import (
     check_activation_name,
     get_activation,
     has_scalars,
@@ -20,15 +20,15 @@ from ..so3.activation_v3 import (
     LinearSquare,
     SwiGLU,
 )
-from ..so3.layer_norm import get_normalization_layer, RMSNorm
-from ..blocks.radial_mlp import RadialFunctionExpand as RadialFunction
-from ..so3.so2_ops import SO2Linear
-from ..so3.linear import SO3Linear
-from ..so3.grid import SO3Grid
-from ..functional import reduce_edge
-from ..blocks.drop import GraphDropPath
-from ..so3.drop import EquivariantDegreeDropout
-from ..so3.softmax import GraphSoftmax
+from ..mp.equivariant.sph.layer_norm import get_normalization_layer, RMSNorm
+from ..mp.nn.radial_mlp import RadialFunctionExpand as RadialFunction
+from ..mp.equivariant.so2.ops import SO2Linear
+from ..mp.equivariant.sph.linear import SO3Linear
+from ..mp.equivariant.s2.grid import SO3Grid
+from ..mp.ops import scatter_sum
+from ..mp.nn.drop import GraphDropPath
+from ..mp.equivariant.sph.drop import EquivariantDegreeDropout
+from ..mp.ops import GraphSoftmax
 
 
 class EquivariantGraphAttention(torch.nn.Module):
@@ -333,11 +333,7 @@ class EquivariantGraphAttention(torch.nn.Module):
         x_message = self.so3_rotation.rotate_inv(x_message)
         
         # Compute the sum of the incoming neighboring messages for each target node
-        x_message = reduce_edge(
-            inputs=x_message,
-            edge_index=edge_index[1], 
-            output_shape=(num_nodes, x_message.shape[1], x_message.shape[2])
-        )
+        x_message = scatter_sum(x_message, edge_index[1], num_nodes)
 
         # Project
         outputs = self.proj(x_message)

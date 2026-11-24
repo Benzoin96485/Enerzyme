@@ -22,17 +22,11 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 from .geometry import FACTOEdgeGeometry
 
 RESIDUAL_SCALE = 40.0 ** -0.5
 
-
-def scatter_neighbors(src: Tensor, index: Tensor, dim_size: int) -> Tensor:
-    """Sum ``src`` onto receivers. An empty neighbor list yields zeros."""
-    if index.numel() == 0:
-        return src.new_zeros((dim_size,) + tuple(src.shape[1:]))
-    return segment_sum_coo(src, index, dim_size=dim_size)
 
 
 class CoupledRMSNorm(nn.Module):
@@ -103,7 +97,7 @@ class FactorizedScalarAttention(nn.Module):
         else:
             radial = rho.view(-1, self.num_groups, self.group_dim)
             messages = radial * source[idx_j].unsqueeze(1)
-            aggregated = scatter_neighbors(messages, idx_i, n_atom)
+            aggregated = scatter_sum(messages, idx_i, n_atom)
         mixed = (F.silu(query) * aggregated).reshape(n_atom, -1)
         return F.silu(self.mix(mixed))
 
@@ -168,7 +162,7 @@ class GeometricTensorInjection(nn.Module):
                 continue
             message = source[idx_j] * radial
             weighted = message.unsqueeze(1) * angular.unsqueeze(-1)
-            injected.append(scatter_neighbors(weighted, idx_i, n_atom))
+            injected.append(scatter_sum(weighted, idx_i, n_atom))
         return injected
 
 
@@ -218,7 +212,7 @@ class TensorTransport(nn.Module):
             payload = message(features)
             gated = chi.unsqueeze(-1) * gate(scalar_intermediate)[idx_j] * score
             weighted = gated.unsqueeze(1) * payload[idx_j]
-            transported.append(scatter_neighbors(weighted, idx_i, n_atom))
+            transported.append(scatter_sum(weighted, idx_i, n_atom))
         return transported
 
 

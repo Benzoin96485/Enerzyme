@@ -3,11 +3,11 @@ import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import Dropout, Parameter
-from ..functional import segment_sum_coo
-from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
-from ..blocks.mlp import DenseLayer as _DenseLayer
-from ..blocks.mlp import ResidualStack as _ResidualStack
-from ..blocks.mlp import INITIAL_WEIGHT_TYPE, INITIAL_BIAS_TYPE, NeuronLayer, ResidualMLP
+from ..mp.ops import scatter_sum
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
+from ..mp.nn.mlp import DenseLayer as _DenseLayer
+from ..mp.nn.mlp import ResidualStack as _ResidualStack
+from ..mp.nn.mlp import INITIAL_WEIGHT_TYPE, INITIAL_BIAS_TYPE, NeuronLayer, ResidualMLP
 
 
 DEFAULT_TYPE = Optional[Union[Tensor, np.ndarray, str]]
@@ -97,7 +97,7 @@ class InteractionLayer(NeuronLayer):
         g = self.k2f(rbf)
         #calculate contribution of neighbors and central atom
         xi = self.dense_i(xa)
-        xj = segment_sum_coo(g * self.dense_j(xa)[idx_j], idx_i, dim_size=xi.shape[0])
+        xj = scatter_sum(g * self.dense_j(xa)[idx_j], idx_i, xi.shape[0])
         #add contributions to get the "message" 
         m = xi + xj
         m = self.residual_stack(m)

@@ -3,7 +3,7 @@
 Features are lists indexed by angular momentum ``l``. Entry ``l`` has shape
 ``[N, channels, 2l+1]`` in the e3nn real-spherical-harmonic ``m`` order
 (``m = -l ... l``, channel-major). That is the layout produced by
-:func:`enerzyme.models.so3.spherical_harmonics.spherical_harmonics` with
+:func:`enerzyme.models.mp.basis.angular.spherical_harmonics` with
 ``layout="e3nn"`` and by :func:`e3nn.o3.wigner_3j`.
 """
 
@@ -15,7 +15,7 @@ from typing import List, Optional, Sequence
 import torch
 from torch import Tensor
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 
 
 def rms_norm(features: Tensor, epsilon: float) -> Tensor:
@@ -46,7 +46,7 @@ def scatter_blocks(
 ) -> List[Tensor]:
     """Sum edge features onto receiver atoms. ``index`` has one entry per edge."""
     return [
-        reduce_edge(block, index, (n_atoms, block.shape[1], block.shape[2]))
+        scatter_sum(block, index, n_atoms)
         for block in blocks
     ]
 

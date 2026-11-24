@@ -27,7 +27,7 @@ import torch
 from e3nn import o3
 from torch import Tensor, nn
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 from ..layers._base_layer import BaseFFLayer
 from ..layers.gto_electrostatics import GaussianMultipoleEnergy, GaussianPotentialFeatures
 from .blocks import (
@@ -343,7 +343,7 @@ class PolarFieldLayer(BaseFFLayer):
         )
 
     def _normalize_fukui(self, fukui: Tensor, batch: Tensor, n_graphs: int) -> Tensor:
-        totals = segment_sum_coo(fukui.double(), batch, dim_size=n_graphs)
+        totals = scatter_sum(fukui.double(), batch, n_graphs)
         denom = totals[batch].to(dtype=fukui.dtype)
         denom = torch.where(denom == 0, torch.ones_like(denom), denom)
         return fukui / denom
@@ -358,7 +358,7 @@ class PolarFieldLayer(BaseFFLayer):
     ) -> Tensor:
         n_graphs = int(charge.shape[0])
         weights = self._normalize_fukui(fukui, batch, n_graphs)
-        predicted = segment_sum_coo(density[:, :, 0].double(), batch, dim_size=n_graphs)
+        predicted = scatter_sum(density[:, :, 0].double(), batch, n_graphs)
         predicted = predicted[batch].to(dtype=density.dtype)
         target_up = (0.5 * (charge + spin))[batch]
         target_down = (0.5 * (charge - spin))[batch]
@@ -374,9 +374,9 @@ class PolarFieldLayer(BaseFFLayer):
 
     def _dipole(self, total_density: Tensor, positions: Tensor, batch: Tensor, n_graphs: int) -> Tensor:
         moment = positions * total_density[:, :1]
-        dipole = segment_sum_coo(moment, batch, dim_size=n_graphs)
+        dipole = scatter_sum(moment, batch, n_graphs)
         if total_density.shape[-1] > 1:
-            angular = segment_sum_coo(total_density[:, 1:4], batch, dim_size=n_graphs)
+            angular = scatter_sum(total_density[:, 1:4], batch, n_graphs)
             dipole = dipole + angular[:, [2, 0, 1]]
         return dipole
 

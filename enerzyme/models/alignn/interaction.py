@@ -20,7 +20,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import BatchNorm1d, LayerNorm, Linear, Module, Sequential
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 
 
 def normalization(name: Optional[str], features: int) -> Optional[Module]:
@@ -118,8 +118,8 @@ class EdgeGatedGraphConv(Module):
         message = self.src_gate(node)[src] + self.dst_gate(node)[dst] + self.edge_gate(edge)
         gate = torch.sigmoid(message)
         neighbor = self.dst_update(node)[src] * gate
-        summed = segment_sum_coo(neighbor, dst, dim_size=node.shape[0])
-        gate_sum = segment_sum_coo(gate, dst, dim_size=node.shape[0])
+        summed = scatter_sum(neighbor, dst, node.shape[0])
+        gate_sum = scatter_sum(gate, dst, node.shape[0])
         updated = updated + summed / (gate_sum + self.gate_eps)
         updated = F.silu(_apply_norm(self.norm_nodes, updated))
         updated_edge = F.silu(_apply_norm(self.norm_edges, message))

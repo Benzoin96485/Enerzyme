@@ -16,10 +16,10 @@ from typing import Dict, List, Optional
 import torch
 from torch import Tensor, nn
 
-from ..cutoff import C3CutoffEnvelope
-from ..functional import reduce_edge
+from ..mp.basis.envelope import C3CutoffEnvelope
+from ..mp.ops import scatter_sum
 from ..layers import BaseAtomEmbedding, BaseFFCore, RangeSeparationLayer
-from ..so3.radial import BesselC3RadialBasis
+from ..mp.basis.radial import BesselC3RadialBasis
 from .geometry import derive_degree_channels, invariant_width, require_profile
 from .geometry import cartesian_harmonics
 from .radial import OrderedPairFiLM, RadialAmplitude
@@ -317,12 +317,12 @@ class DPA4CCore(BaseFFCore):
         enveloped = amplitude * envelope.unsqueeze(-1)
 
         chi2 = envelope * envelope
-        mass_0 = reduce_edge(chi2.unsqueeze(-1), center, (nodes, 1)).reshape(nodes)
-        mass_1 = reduce_edge((chi2 * chi2).unsqueeze(-1), center, (nodes, 1)).reshape(nodes)
+        mass_0 = scatter_sum(chi2.unsqueeze(-1), center, nodes).reshape(nodes)
+        mass_1 = scatter_sum((chi2 * chi2).unsqueeze(-1), center, nodes).reshape(nodes)
         divisor_0 = torch.sqrt(mass_0 + NORM_FLOOR)
         divisor_1 = torch.sqrt(mass_1 + NORM_FLOOR)
 
-        scalar = reduce_edge(enveloped, center, (nodes, self.channels)) / divisor_0.unsqueeze(-1)
+        scalar = scatter_sum(enveloped, center, nodes) / divisor_0.unsqueeze(-1)
         harmonics = cartesian_harmonics(direction, self.lmax)
         angular_parts = []
         for degree, width in enumerate(self.degree_channels):
@@ -333,7 +333,7 @@ class DPA4CCore(BaseFFCore):
             message = message.reshape(message.shape[0], -1) * envelope.unsqueeze(-1)
             angular_parts.append(message)
         angular = torch.cat(angular_parts, dim=-1)
-        directional = reduce_edge(angular, center, (nodes, angular.shape[-1]))
+        directional = scatter_sum(angular, center, nodes)
         directional = directional / divisor_1.unsqueeze(-1)
         moments = torch.cat((scalar, directional), dim=-1)
         masses = torch.stack((divisor_0, divisor_1), dim=-1)

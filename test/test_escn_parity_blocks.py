@@ -19,7 +19,7 @@ from escn_parity_utils import (  # noqa: E402
 
 
 def _prep_inputs(h):
-    from enerzyme.models.so3 import CoefficientMapping, SO3_Embedding, SO3_Rotation
+    from enerzyme.models.mp.equivariant import CoefficientMapping, SO3_Embedding, SO3_Rotation
 
     mol = load_parity_mol()
     pos = mol["pos"]
@@ -64,7 +64,7 @@ def _prep_inputs(h):
 
 
 def test_message_block_matches_upstream():
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
     from so3 import SO3_Embedding as OffEmb
     from so3 import SO3_Rotation as OffRot
     from so3 import CoefficientMapping as OffMap
@@ -107,7 +107,7 @@ def test_message_block_matches_upstream():
 
 
 def test_layer_block_matches_upstream():
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
     from so3 import SO3_Embedding as OffEmb
     from so3 import SO3_Rotation as OffRot
     from so3 import CoefficientMapping as OffMap

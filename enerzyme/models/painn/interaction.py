@@ -12,7 +12,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module, Sequential
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 from ..layers.gated_equivariant import cartesian_dense
 
 
@@ -46,11 +46,11 @@ class PaiNNInteraction(Module):
         x = self.interatomic_context_net(q)[idx_j]
         x = wij * x
         dq, dmu_r, dmu_mu = torch.split(x, self.n_atom_basis, dim=-1)
-        dq = segment_sum_coo(dq, idx_i, dim_size=n_atoms)
+        dq = scatter_sum(dq, idx_i, n_atoms)
         dmu = dmu_r.unsqueeze(-2) * dir_ij.unsqueeze(-1)
         if self.propagate_vectors:
             dmu = dmu + dmu_mu.unsqueeze(-2) * mu[idx_j]
-        dmu = segment_sum_coo(dmu, idx_i, dim_size=n_atoms)
+        dmu = scatter_sum(dmu, idx_i, n_atoms)
         return q + dq, mu + dmu
 
 

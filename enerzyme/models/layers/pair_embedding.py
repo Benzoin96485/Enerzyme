@@ -15,7 +15,7 @@ import torch
 from torch import Tensor
 from torch.nn import Embedding
 
-from ..blocks.mlp import VariancePreservingMLP
+from ..mp.nn.mlp import VariancePreservingMLP
 from . import BaseFFLayer
 
 

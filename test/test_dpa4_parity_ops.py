@@ -18,7 +18,7 @@ FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "dpa4_upstream"
 
 
 def test_m_major_index_matches_published_layout():
-    from enerzyme.models.so3.indexing import (
+    from enerzyme.models.mp.equivariant.indexing import (
         build_m_major_index,
         build_m_major_l_index,
         build_rotate_inv_rescale,
@@ -34,7 +34,7 @@ def test_m_major_index_matches_published_layout():
 
 
 def test_c3_envelope_matches_closed_form_p5():
-    from enerzyme.models.so3 import C3CutoffEnvelope
+    from enerzyme.models.mp.equivariant import C3CutoffEnvelope
 
     rcut = 6.0
     env = C3CutoffEnvelope(rcut=rcut, exponent=5).double()
@@ -55,7 +55,7 @@ def test_so2_convolution_uses_radial_feat():
     """Changing Core radial_feat must change SO2Convolution messages."""
     import torch.nn as nn
     from enerzyme.models.dpa4.so2 import EdgeCache, SO2Convolution
-    from enerzyme.models.so3.wigner_quaternion import (
+    from enerzyme.models.mp.equivariant.rotation.wigner_quaternion import (
         WignerDCalculator,
         build_edge_quaternion,
     )
@@ -103,7 +103,7 @@ def test_so2_convolution_uses_radial_feat():
 
 
 def test_s2_lebedev_projector_loads_and_roundtrips_l0():
-    from enerzyme.models.so3 import S2LebedevProjector
+    from enerzyme.models.mp.equivariant import S2LebedevProjector
 
     proj = S2LebedevProjector(lmax=2)
     x = torch.zeros(3, 9, 4)
@@ -115,7 +115,7 @@ def test_s2_lebedev_projector_loads_and_roundtrips_l0():
 
 
 def test_s2_lebedev_missing_rule_raises():
-    from enerzyme.models.so3.lebedev import load_lebedev_rule
+    from enerzyme.models.mp.equivariant.s2.lebedev import load_lebedev_rule
     import pytest
 
     with pytest.raises(ValueError, match="not packaged"):
@@ -124,7 +124,7 @@ def test_s2_lebedev_missing_rule_raises():
 
 def test_so2_linear_complex_multiply_equivariance():
     """Rotating (±m) inputs by φ must rotate outputs by the same angle."""
-    from enerzyme.models.so3.so2_focus import FocusSO2Linear
+    from enerzyme.models.mp.equivariant.so2.focus import FocusSO2Linear
 
     torch.manual_seed(0)
     dtype = torch.float64
@@ -154,7 +154,7 @@ def test_so2_linear_complex_multiply_equivariance():
 
 
 def test_envelope_gated_softmax_sums_with_null_mass():
-    from enerzyme.models.so3.softmax import segment_envelope_gated_softmax
+    from enerzyme.models.mp.ops import segment_envelope_gated_softmax
 
     torch.manual_seed(1)
     dtype = torch.float64
@@ -179,7 +179,7 @@ def test_envelope_gated_softmax_sums_with_null_mass():
 
 def test_indexing_fixture_roundtrip_optional():
     """If a fixture npz exists, compare against it; otherwise generate & skip soft."""
-    from enerzyme.models.so3.indexing import (
+    from enerzyme.models.mp.equivariant.indexing import (
         build_gie_zonal_index,
         build_m_major_index,
         build_m_major_l_index,

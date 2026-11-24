@@ -16,9 +16,9 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Parameter, init
-from torch_scatter import segment_sum_coo
+from ..mp.ops import scatter_sum
 
-from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
+from ..mp.basis.envelope import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 from ..functional import softplus_inverse
 from . import BaseFFLayer
 
@@ -107,8 +107,4 @@ class ZBLRepulsionEnergyLayer(BaseFFLayer):
         if self.switch_off is not None:
             # SO3LR: smooth decay to ~0 by switch_off (Å), on top of NN cutoff envelope.
             f = f * self._switch(Dij_sr, self.switch_off, 0.0)
-        return segment_sum_coo(
-            self.kehalf * f * zizj / Dij_sr.clamp_min(1e-6),
-            idx_i_sr,
-            dim_size=len(Za),
-        )
+        return scatter_sum(self.kehalf * f * zizj / Dij_sr.clamp_min(1e-6), idx_i_sr, len(Za))

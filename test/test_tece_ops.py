@@ -4,7 +4,7 @@ import math
 
 import torch
 
-from enerzyme.models.so3 import (
+from enerzyme.models.mp.equivariant import (
     ComplexProductBasis,
     LayoutTransform,
     SO2Gate,
@@ -12,7 +12,7 @@ from enerzyme.models.so3 import (
     so2_expand_index,
     uvSO2Linear,
 )
-from enerzyme.models.activation import ScaledSigmoid
+from enerzyme.models.mp.nn.activation import ScaledSigmoid
 from enerzyme.models.tece.interaction import UvSO2TensorProduct
 
 

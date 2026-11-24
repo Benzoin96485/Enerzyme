@@ -15,9 +15,9 @@ import torch
 from torch import Tensor
 from torch.nn import Identity, Module, Sequential, SiLU
 from torch.nn import Linear, LayerNorm
-from torch_scatter import scatter_sum
+from ..mp.ops import scatter_sum
 
-from ..so3 import L0Contraction
+from ..mp.equivariant import L0Contraction
 
 
 def _lecun_normal_(tensor: Tensor) -> None:

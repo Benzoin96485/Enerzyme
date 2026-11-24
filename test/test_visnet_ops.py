@@ -7,7 +7,7 @@ import math
 import torch
 import torch.nn.functional as F
 
-from enerzyme.models.functional import reduce_edge
+from enerzyme.models.mp.ops import scatter_sum
 from enerzyme.models.layers.polynomial_harmonics import polynomial_spherical_harmonics
 from enerzyme.models.layers.rejection import vector_rejection
 from enerzyme.models.visnet.interaction import (
@@ -139,17 +139,13 @@ def _reference(layer, scalar, vector, edge, idx_i, idx_j, window, direction):
     gate, coeff = torch.split(gates, layer.hidden_channels, dim=-1)
     vector_message = vector_n[idx_j] * gate.unsqueeze(1)
     vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
-    aggregated_scalar = reduce_edge(
-        scalar_message, idx_i, (n_atoms, layer.hidden_channels)
-    )
+    aggregated_scalar = scatter_sum(scalar_message, idx_i, n_atoms)
     angular = vector.shape[1]
-    aggregated_vector = reduce_edge(
-        vector_message, idx_i, (n_atoms, angular, layer.hidden_channels)
-    )
+    aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
     mixed = F.linear(aggregated_scalar, layer.o_proj.weight, layer.o_proj.bias)
     if layer.vertex_type == "node":
         angle = _angle(layer, vector_n[idx_i], direction)
-        aggregated_angle = reduce_edge(angle, idx_i, (n_atoms, layer.hidden_channels))
+        aggregated_angle = scatter_sum(angle, idx_i, n_atoms)
         out_scale, out_dot, out_angle, out_bias = torch.split(
             mixed, layer.hidden_channels, dim=-1
         )

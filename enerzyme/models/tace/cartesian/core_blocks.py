@@ -12,10 +12,10 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 from torch import Tensor, nn
-from torch_scatter import scatter_sum
+from ...mp.ops import scatter_sum
 
 from ..cartnn import ICTD, CartesianHarmonics
-from ...blocks.radial_mlp import RadialMLP
+from ...mp.nn.radial_mlp import RadialMLP
 from ..interaction import EDGE_UPDATE
 
 

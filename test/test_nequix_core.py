@@ -45,7 +45,7 @@ def test_mptrj_vocabulary_matches_published_list():
 
 
 def test_nequip_envelope_is_polynomial_p6():
-    from enerzyme.models.cutoff import PolynomialEnvelope, nequip_envelope
+    from enerzyme.models.mp.basis.envelope import PolynomialEnvelope, nequip_envelope
 
     distance = torch.tensor([0.0, 1.0, 3.0, 6.0, 6.5])
     got = nequip_envelope(distance, cutoff=6.0, cuton=0.0)
@@ -57,7 +57,7 @@ def test_nequip_envelope_is_polynomial_p6():
 
 
 def test_bessel_times_nequip_envelope_matches_nequix_basis():
-    from enerzyme.models.cutoff import nequip_envelope
+    from enerzyme.models.mp.basis.envelope import nequip_envelope
     from enerzyme.models.layers.rbf import BesselRBFLayer
 
     cutoff = 6.0
@@ -111,7 +111,7 @@ def _reference_rms(irreps: o3.Irreps, features: torch.Tensor, centering: bool) -
 
 
 def test_rms_layer_norm_matches_reference_formula():
-    from enerzyme.models.e3nn_nn import RMSLayerNorm
+    from enerzyme.models.mp.equivariant.e3nn import RMSLayerNorm
 
     irreps = o3.Irreps("8x0e + 4x1o + 2x2e")
     features = torch.randn(5, irreps.dim)

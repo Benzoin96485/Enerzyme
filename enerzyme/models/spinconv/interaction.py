@@ -14,7 +14,7 @@ import torch
 from torch import Tensor
 from torch.nn import AvgPool1d, Conv1d, Embedding, GroupNorm, Linear, Module
 
-from ..activation import get_activation_fn
+from ..mp.nn.activation import get_activation_fn
 from .geometry import (
     bilinear_sphere_index,
     edge_spin_frames,

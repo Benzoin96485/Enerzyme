@@ -27,7 +27,7 @@ from ..layers import (
     DistanceLayer,
     RangeSeparationLayer,
 )
-from ..so3 import (
+from ..mp.equivariant import (
     CoefficientMapping,
     SO3_Embedding,
     SO3_Rotation,

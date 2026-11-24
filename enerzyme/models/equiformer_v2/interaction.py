@@ -5,8 +5,8 @@ import math
 import torch_geometric
 import copy
 
-from ..activation import SmoothLeakyReLU
-from ..so3 import (
+from ..mp.nn.activation import SmoothLeakyReLU
+from ..mp.equivariant import (
     GateActivation,
     SeparableS2Activation,
     S2Activation,
@@ -16,8 +16,8 @@ from ..so3 import (
     SO3_LinearV2,
     EquivariantDropoutArraySphericalHarmonics,
 )
-from ..blocks.radial_mlp import RadialFunction
-from ..blocks.drop import GraphDropPath
+from ..mp.nn.radial_mlp import RadialFunction
+from ..mp.nn.drop import GraphDropPath
 
 
 class SO2EquivariantGraphAttention(torch.nn.Module):
@@ -666,7 +666,7 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
                 "EquiformerV2FeedForwardReadout requires a preceding EquiformerV2 Core"
             )
 
-        from ..so3 import SO3_Embedding
+        from ..mp.equivariant import SO3_Embedding
 
         self._SO3_Embedding = SO3_Embedding
         n_out = self.dim_feature_out * self.shallow_ensemble_size

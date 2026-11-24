@@ -19,7 +19,7 @@ import torch.nn.functional as F
 from e3nn.util.jit import compile_mode
 from e3nn.o3 import Irreps, SphericalHarmonics
 from .interaction import INTERACTION_CLASSES, EquivariantProductBasisBlock, LinearReadoutBlock, NonLinearReadoutBlock
-from ..e3nn_nn import scalar_0e_dim
+from ..mp.equivariant.e3nn import scalar_0e_dim
 from ..layers import BaseFFCore
 
 # Small stack. MACE-MP / MACE-POLAR-1-L use 512 channels, correlation 3,

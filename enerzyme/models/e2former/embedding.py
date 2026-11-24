@@ -9,7 +9,7 @@ import torch
 from e3nn import o3
 from torch import Tensor, nn
 
-from ..blocks.radial_mlp import RadialProfile
+from ..mp.nn.radial_mlp import RadialProfile
 
 
 class EdgeDegreeEmbeddingHigherOrder(nn.Module):

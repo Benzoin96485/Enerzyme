@@ -10,7 +10,7 @@ from enerzyme.models.et.interaction import (
     EquivariantMultiHeadAttention,
     normalize_distance_influence,
 )
-from enerzyme.models.functional import reduce_edge
+from enerzyme.models.mp.ops import scatter_sum
 from enerzyme.models.layers.self_pairs import insert_missing_self_pairs, unit_direction
 from enerzyme.models.tensornet.ops import unit_vectors
 
@@ -52,7 +52,7 @@ def test_neighbor_embedding_drops_self_and_matches_formula():
     weight = F.linear(rbf[keep], block.distance_proj.weight, block.distance_proj.bias)
     weight = weight * window[keep].unsqueeze(-1)
     message = weight * species[idx_j[keep]]
-    aggregated = reduce_edge(message, idx_i[keep], (n, features))
+    aggregated = scatter_sum(message, idx_i[keep], n)
     mixed = torch.cat((scalar, aggregated), dim=-1)
     reference = F.linear(mixed, block.combine.weight, block.combine.bias)
     assert torch.allclose(got, reference, atol=1e-6, rtol=1e-6)
@@ -101,12 +101,8 @@ def _attention_reference(layer, scalar, vector, idx_i, idx_j, rbf, window, direc
     vector_message = heads[idx_j] * gate.unsqueeze(1) + coeff.unsqueeze(1) * direction.reshape(
         -1, 3, 1, 1
     )
-    aggregated_scalar = reduce_edge(
-        scalar_message, idx_i, (n_atoms, layer.num_heads, layer.head_dim)
-    ).reshape(n_atoms, layer.hidden_channels)
-    aggregated_vector = reduce_edge(
-        vector_message, idx_i, (n_atoms, 3, layer.num_heads, layer.head_dim)
-    ).reshape(n_atoms, 3, layer.hidden_channels)
+    aggregated_scalar = scatter_sum(scalar_message, idx_i, n_atoms).reshape(n_atoms, layer.hidden_channels)
+    aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms).reshape(n_atoms, 3, layer.hidden_channels)
     mixed = F.linear(aggregated_scalar, layer.o_proj.weight, layer.o_proj.bias)
     out_scalar, out_gate, out_bias = torch.split(mixed, layer.hidden_channels, dim=-1)
     return vector_dot * out_gate + out_bias, vec3 * out_scalar.unsqueeze(1) + aggregated_vector

@@ -20,11 +20,11 @@ import torch
 import torch.nn.functional as F
 from e3nn import o3
 from torch import Tensor, nn
-from torch_scatter import scatter_sum
+from ..mp.ops import scatter_sum
 
-from ..e3nn_nn import tp_out_irreps_with_instructions
-from ..e3nn_nn.activation import Activation
-from ..e3nn_nn.rms_norm import RMSLayerNorm
+from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions
+from ..mp.equivariant.e3nn.activation import Activation
+from ..mp.equivariant.e3nn.rms_norm import RMSLayerNorm
 
 
 def _keep(irreps: o3.Irreps, keep: Sequence[str]) -> o3.Irreps:

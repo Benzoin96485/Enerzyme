@@ -10,7 +10,7 @@ from e3nn import o3
 from torch import Tensor, nn
 
 from ..equiformer_v2.interaction import FeedForwardNetwork
-from ..so3 import SO3_Embedding, get_normalization_layer
+from ..mp.equivariant import SO3_Embedding, get_normalization_layer
 from .attention import E2AttentionClusterSparse, E2AttentionSparse
 
 

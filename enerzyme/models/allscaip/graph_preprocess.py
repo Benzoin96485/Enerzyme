@@ -14,32 +14,11 @@ import torch.nn.functional as F
 from e3nn.o3._spherical_harmonics import _spherical_harmonics
 from torch import Tensor
 
-from .radius_utils import envelope_fn, safe_normalize
+from ..mp.ops import safe_normalize, scatter_sum
+from .radius_utils import envelope_fn
 from .radius_graph import biknn_radius_graph_from_batch
 from .smearing import GaussianSmearing, LinearSigmoidSmearing, SigmoidSmearing, SiLUSmearing
 from .types import GraphAttentionData
-
-
-def _broadcast_scatter_index(index: Tensor, ref: Tensor, dim: int) -> Tensor:
-    dim = ref.dim() + dim if dim < 0 else dim
-    size = ((1,) * dim) + (-1,) + ((1,) * (ref.dim() - dim - 1))
-    return index.view(size).expand_as(ref).to(torch.long)
-
-
-def compilable_scatter(
-    src: Tensor,
-    index: Tensor,
-    dim_size: int,
-    dim: int = 0,
-    reduce: str = "sum",
-) -> Tensor:
-    """Scatter-reduce matching fairchem ``compilable_scatter`` (sum along ``dim``)."""
-    dim = src.dim() + dim if dim < 0 else dim
-    size = src.size()[:dim] + (dim_size,) + src.size()[dim + 1 :]
-    if reduce not in ("sum", "add"):
-        raise ValueError(f"reduce={reduce} not supported")
-    idx = _broadcast_scatter_index(index.long(), src, dim)
-    return src.new_zeros(size).scatter_add_(dim, idx, src)
 
 
 def get_edge_distance_expansion(
@@ -126,9 +105,7 @@ def get_node_direction_expansion_neighbor(
     neighbor_count = torch.clamp(neighbor_count, min=1)
     node_boo = masked_sh.sum(dim=1) / neighbor_count
     node_boo_squared = node_boo**2
-    node_boo = compilable_scatter(
-        node_boo_squared, sh_index, dim_size=lmax + 1, dim=-1, reduce="sum"
-    )
+    node_boo = scatter_sum(node_boo_squared, sh_index, lmax + 1, dim=-1)
     return torch.clamp(node_boo, min=1e-6).sqrt()
 
 

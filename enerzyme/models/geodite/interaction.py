@@ -19,7 +19,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Identity, LayerNorm, Linear, Module, ModuleList, Parameter, Sequential
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 from ..layers.rejection import vector_rejection
 from .geometry import degree_widths, split_degrees
 
@@ -216,10 +216,8 @@ class NodeInit(Module):
             neighbor = self.neighbor_embedding(atomic_numbers.long())
             radial = self.radial_proj(rbf)
             density = torch.tanh(self.density(rbf).square())
-            pooled = reduce_edge(
-                neighbor[idx_j] * radial, idx_i, (number, channels)
-            )
-            norm = reduce_edge(density, idx_i, (number, 1))
+            pooled = scatter_sum(neighbor[idx_j] * radial, idx_i, number)
+            norm = scatter_sum(density, idx_i, number)
             message = pooled / (norm + 1)
         return self.update(torch.cat([atom_embedding, message], dim=-1))
 
@@ -414,11 +412,9 @@ class InteractionBlock(Module):
             + feature_gate.unsqueeze(1) * steerable[idx_j]
         )
         density = torch.tanh(self.density(rbf / self.num_rbf).square())
-        scalar_sum = reduce_edge(scalar_message, idx_i, (number, self.channels))
-        steerable_sum = reduce_edge(
-            steerable_message, idx_i, (number, steerable.shape[1], self.channels)
-        )
-        density_sum = reduce_edge(density, idx_i, (number, 1))
+        scalar_sum = scatter_sum(scalar_message, idx_i, number)
+        steerable_sum = scatter_sum(steerable_message, idx_i, number)
+        density_sum = scatter_sum(density, idx_i, number)
         scale = density_sum + 1
         scalars = scalars + scalar_sum / scale
         steerable = steerable + steerable_sum / scale.unsqueeze(-1)

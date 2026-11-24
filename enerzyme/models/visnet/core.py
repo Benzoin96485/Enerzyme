@@ -32,7 +32,7 @@ from typing import Dict, List, Optional
 from torch import Tensor
 from torch.nn import LayerNorm, Module, ModuleList
 
-from ..cutoff import cosine_transition
+from ..mp.basis.envelope import cosine_transition
 from ..et.interaction import ETNeighborEmbedding
 from ..layers import BaseFFCore
 from ..layers.atom_embedding import RandomAtomEmbedding

@@ -2,7 +2,7 @@
 # https://github.com/IQuestLab/UBio-MolFM
 """On-the-fly Wigner-D frames for E2Former-V2 SO2 / EAAS attention.
 
-Uses the shared e3nn/Jd backend in :mod:`enerzyme.models.so3.wigner_jd` together
+Uses the shared e3nn/Jd backend in :mod:`enerzyme.models.mp.equivariant.rotation.wigner_jd` together
 with UBio-MolFM's Euler convention (z-align absolute positions). Do **not** mix
 with eSCN ``init_edge_rot_mat`` frames unless a numerical parity test exists.
 """
@@ -14,7 +14,7 @@ from typing import List, Optional, Sequence, Tuple
 import torch
 from torch import Tensor
 
-from ..so3.wigner_jd import wigner_D
+from ..mp.equivariant.rotation.wigner_jd import wigner_D
 
 
 def init_edge_rot_euler_angles(

@@ -32,7 +32,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module, ModuleList
 
-from ..cutoff import cosine_transition
+from ..mp.basis.envelope import cosine_transition
 from ..layers import BaseFFCore
 from ..layers.self_pairs import insert_missing_self_pairs
 from .interaction import TensorNetEmbedding, TensorNetInteraction

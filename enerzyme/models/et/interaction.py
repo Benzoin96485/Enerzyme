@@ -23,7 +23,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 from ..layers.atom_embedding import RandomAtomEmbedding
 
 
@@ -92,9 +92,7 @@ class ETNeighborEmbedding(Module):
         species = self.species.get_embedding(atomic_numbers).to(dtype=scalar.dtype)
         weight = self.distance_proj(rbf) * window.unsqueeze(-1)
         message = weight * species.index_select(0, idx_j)
-        aggregated = reduce_edge(
-            message, idx_i, (n_atoms, self.hidden_channels)
-        )
+        aggregated = scatter_sum(message, idx_i, n_atoms)
         return self.combine(torch.cat((scalar, aggregated), dim=-1))
 
 
@@ -212,14 +210,8 @@ class EquivariantMultiHeadAttention(Module):
             -1, 3, 1, 1
         )
 
-        aggregated_scalar = reduce_edge(
-            scalar_message, idx_i, (n_atoms, self.num_heads, self.head_dim)
-        ).reshape(n_atoms, self.hidden_channels)
-        aggregated_vector = reduce_edge(
-            vector_message,
-            idx_i,
-            (n_atoms, 3, self.num_heads, self.head_dim),
-        ).reshape(n_atoms, 3, self.hidden_channels)
+        aggregated_scalar = scatter_sum(scalar_message, idx_i, n_atoms).reshape(n_atoms, self.hidden_channels)
+        aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms).reshape(n_atoms, 3, self.hidden_channels)
 
         out_scalar, out_gate, out_bias = torch.split(
             self.o_proj(aggregated_scalar), self.hidden_channels, dim=-1

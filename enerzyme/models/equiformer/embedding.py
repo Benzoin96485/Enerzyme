@@ -4,11 +4,11 @@
 
 import torch
 from torch import Tensor
-from torch_scatter import scatter
+from ..mp.ops import scatter_sum as scatter
 from e3nn import o3
 
-from ..e3nn_nn import LinearRS
-from ..blocks.radial_mlp import RadialProfile
+from ..mp.equivariant.e3nn import LinearRS
+from ..mp.nn.radial_mlp import RadialProfile
 from ..layers._base_layer import BaseFFLayer
 from .interaction import DepthwiseTensorProduct, _RESCALE, _USE_BIAS
 

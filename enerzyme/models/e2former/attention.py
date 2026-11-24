@@ -13,9 +13,9 @@ import torch
 from e3nn import o3
 from torch import Tensor, nn
 
-from ..activation import SmoothLeakyReLU
-from ..blocks.radial_mlp import RadialFunction
-from ..so3.linear import SO3Linear
+from ..mp.nn.activation import SmoothLeakyReLU
+from ..mp.nn.radial_mlp import RadialFunction
+from ..mp.equivariant.sph.linear import SO3Linear
 from .so3_ops import SO3Linear2Scalar
 from .so2_tensor_product import E2TensorProductSO2_FirstOrder
 from .triton_sparse import (

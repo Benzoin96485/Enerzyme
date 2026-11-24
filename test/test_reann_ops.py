@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from numpy.testing import assert_allclose
 
-from enerzyme.models.activation import ReluLike, Swish, TanhLike
+from enerzyme.models.mp.nn.activation import ReluLike, Swish, TanhLike
 from enerzyme.models.layers.response import (
     DerivativePolarizabilityLayer,
     assemble_polarizability,

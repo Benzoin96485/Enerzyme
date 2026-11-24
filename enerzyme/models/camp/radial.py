@@ -4,7 +4,7 @@
 the MTP argument. GRACE evaluates the same polynomials on ``2r/cutoff - 1``.
 The linear map is a separate weight for every species pair and every channel.
 The degree-``p`` polynomial envelope is
-:func:`enerzyme.models.cutoff.polynomial_envelope`, so the basis and its first
+:func:`enerzyme.models.mp.basis.envelope.polynomial_envelope`, so the basis and its first
 ``p - 1`` derivatives vanish at the cutoff.
 """
 
@@ -15,7 +15,7 @@ from typing import List, Optional, Sequence, Union
 import torch
 from torch import Tensor, nn
 
-from ..cutoff import polynomial_envelope
+from ..mp.basis.envelope import polynomial_envelope
 
 
 HiddenSpec = Union[int, Sequence[int], None]

@@ -23,7 +23,7 @@ import torch
 from torch import Tensor
 from torch.nn import Identity, Module, ModuleList, SiLU
 
-from ..cutoff import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
+from ..mp.basis.envelope import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
 from ..efa import apply_efa_if_configured, build_efa_blocks, parse_era_iterations
 from ..layers import (
     BaseAtomEmbedding,
@@ -32,7 +32,7 @@ from ..layers import (
     DistanceLayer,
     RangeSeparationLayer,
 )
-from ..so3 import RealSphericalHarmonics
+from ..mp.equivariant import RealSphericalHarmonics
 from .interaction import EuclideanTransformer
 
 # Typical MD17 / small-molecule average degree (shared ballpark with Equiformer).
@@ -277,7 +277,7 @@ class So3kratesCore(BaseFFCore):
             ev_features = atom_embedding.new_zeros(num_atoms, self.m_tot)
         else:
             # Scatter cutoff-weighted SH to receivers (optional non-default path).
-            from torch_scatter import scatter_sum
+            from ..mp.ops import scatter_sum
 
             ev_features = scatter_sum(
                 cutoffs[:, None] * sh_vectors,

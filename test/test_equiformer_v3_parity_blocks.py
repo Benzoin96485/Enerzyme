@@ -59,7 +59,7 @@ def test_ffn_matches_upstream():
 
 def test_transblock_matches_upstream():
     from enerzyme.models.equiformer_v3.interaction import TransBlockV3 as EZBlock
-    from enerzyme.models.so3 import SO3RotationFused, init_edge_rot_mat
+    from enerzyme.models.mp.equivariant import SO3RotationFused, init_edge_rot_mat
     from eqv3_so3 import SO3Rotation as OffRot
     from transformer_block import TransBlockV3 as OffBlock
 

@@ -42,7 +42,7 @@ def pyg_dimenet():
 def test_envelope_matches_pyg():
     from torch_geometric.nn.models.dimenet import Envelope as PygEnvelope
 
-    from enerzyme.models.cutoff import DimeNetEnvelope
+    from enerzyme.models.mp.basis.envelope import DimeNetEnvelope
 
     dtype = torch.float64
     x = torch.linspace(1e-3, 1.2, 64, dtype=dtype)
@@ -182,7 +182,7 @@ def test_output_block_matches_pyg():
     from torch.nn import Sequential
     from torch_geometric.nn.models.dimenet import OutputBlock as PygOut
 
-    from enerzyme.models.blocks.mlp import DenseLayer
+    from enerzyme.models.mp.nn.mlp import DenseLayer
     from enerzyme.models.dimenet.interaction import DimeNetAtomReadout
 
     hp = PARITY_HPARAMS

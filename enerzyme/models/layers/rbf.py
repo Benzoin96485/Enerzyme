@@ -7,7 +7,7 @@ from torch import Tensor
 from torch.nn import Parameter
 import torch.nn.functional as F
 from . import BaseFFLayer
-from ..cutoff import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
+from ..mp.basis.envelope import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
 from ..functional import softplus_inverse
 
 
@@ -142,10 +142,10 @@ def gemnet_oc_gaussian(
 ) -> Tensor:
     """``u_p(r/c) · exp(-½ ((r/c - μ) / Δ)²)`` with centers on ``[0, 1]``.
 
-    ``u_p`` is :func:`enerzyme.models.cutoff.polynomial_envelope`. Distances
+    ``u_p`` is :func:`enerzyme.models.mp.basis.envelope.polynomial_envelope`. Distances
     at or beyond ``cutoff`` are zero. An empty distance returns ``(0, num_rbf)``.
     """
-    from ..cutoff import polynomial_envelope
+    from ..mp.basis.envelope import polynomial_envelope
 
     width = int(center.shape[0])
     if distance.numel() == 0:
@@ -783,7 +783,7 @@ class BesselRBFLayer(BaseRBF):
         self.envelope_exponent = int(envelope_exponent)
         dtype = torch.get_default_dtype()
         if flavor == "dimenet":
-            from ..cutoff import DimeNetEnvelope
+            from ..mp.basis.envelope import DimeNetEnvelope
 
             self.envelope = DimeNetEnvelope(self.envelope_exponent)
             frequencies = math.pi * torch.arange(
@@ -795,7 +795,7 @@ class BesselRBFLayer(BaseRBF):
                 self.register_buffer("bessel_weights", frequencies)
             self.register_buffer("prefactor", torch.tensor(1.0, dtype=dtype))
         elif flavor == "nequip":
-            from ..cutoff import PolynomialEnvelope
+            from ..mp.basis.envelope import PolynomialEnvelope
 
             self.envelope = PolynomialEnvelope(cutoff_sr, self.polynomial_p)
             frequencies = torch.arange(1, num_rbf + 1, dtype=dtype)
@@ -808,7 +808,7 @@ class BesselRBFLayer(BaseRBF):
                 torch.tensor(2.0 * math.pi / (cutoff_sr * cutoff_sr), dtype=dtype),
             )
         elif flavor == "esen":
-            from ..cutoff import polynomial_envelope
+            from ..mp.basis.envelope import polynomial_envelope
 
             self.envelope = None
             frequencies = math.pi * torch.arange(1, num_rbf + 1, dtype=dtype)
@@ -822,7 +822,7 @@ class BesselRBFLayer(BaseRBF):
             )
             self._esen_envelope = polynomial_envelope
         elif flavor == "gemnet":
-            from ..cutoff import polynomial_envelope
+            from ..mp.basis.envelope import polynomial_envelope
 
             basis_c = float(cutoff_sr if basis_cutoff is None else basis_cutoff)
             if basis_c <= 0:
@@ -889,7 +889,7 @@ class BesselRBFLayer(BaseRBF):
             return env * self.prefactor * quotient
         if self.flavor == "mace":
             # √(2/c) sin(nπr/c) / r × polynomial envelope. Limit nπ√(2/c) / c.
-            from ..cutoff import polynomial_envelope
+            from ..mp.basis.envelope import polynomial_envelope
 
             env = polynomial_envelope(dist, self.cutoff_sr, self.polynomial_p)
             weights = self.bessel_weights.view(1, -1)

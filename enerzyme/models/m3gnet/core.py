@@ -18,7 +18,7 @@ from typing import List, Optional
 from torch import Tensor
 from torch.nn import Linear, Module, ModuleList, SiLU, Sequential
 
-from ..cutoff import polynomial_envelope
+from ..mp.basis.envelope import polynomial_envelope
 from ..layers._base_layer import BaseFFCore
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.rbf import BaseRBF

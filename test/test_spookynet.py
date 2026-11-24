@@ -104,13 +104,13 @@ def test_initialize():
 
 
 def test_cutoff_function():
-    from enerzyme.models.cutoff import bump_transition
+    from enerzyme.models.mp.basis.envelope import bump_transition
     from spookynet.functional import cutoff_function
     assert_tensor_allclose(bump_transition(D, 5), cutoff_function(D, 5))
 
 
 def test_shifted_softplus():
-    from enerzyme.models.activation import ShiftedSoftplus as F1
+    from enerzyme.models.mp.nn.activation import ShiftedSoftplus as F1
     from spookynet.modules.shifted_softplus import ShiftedSoftplus as F2
     f1 = F1(dim_feature, initial_alpha, initial_beta).type(dtype)
     f2 = F2(dim_feature, initial_alpha, initial_beta).type(dtype)
@@ -118,7 +118,7 @@ def test_shifted_softplus():
 
 
 def test_swish():
-    from enerzyme.models.activation import Swish as F1
+    from enerzyme.models.mp.nn.activation import Swish as F1
     from spookynet.modules.swish import Swish as F2
     f1 = F1(dim_feature, initial_alpha, initial_beta).type(dtype)
     f2 = F2(dim_feature, initial_alpha, initial_beta).type(dtype)
@@ -126,7 +126,7 @@ def test_swish():
 
 
 def test_residual_layer():
-    from enerzyme.models.blocks.mlp import ResidualLayer as F1
+    from enerzyme.models.mp.nn.mlp import ResidualLayer as F1
     from spookynet.modules.residual import Residual as F2
     f1 = F1(
         dim_feature_in=dim_feature, dim_feature_out=dim_feature, 
@@ -141,7 +141,7 @@ def test_residual_layer():
 
 
 def test_residual_stack():
-    from enerzyme.models.blocks.mlp import ResidualStack as F1
+    from enerzyme.models.mp.nn.mlp import ResidualStack as F1
     from spookynet.modules.residual_stack import ResidualStack as F2
     f1 = F1(
         dim_feature=dim_feature, num_residual=3, 
@@ -156,7 +156,7 @@ def test_residual_stack():
 
 
 def test_residual_mlp():
-    from enerzyme.models.blocks.mlp import ResidualMLP as F1
+    from enerzyme.models.mp.nn.mlp import ResidualMLP as F1
     from spookynet.modules.residual_mlp import ResidualMLP as F2
     f2 = F2(dim_feature, 3).type(dtype)
     f1 = F1(
@@ -287,7 +287,7 @@ def test_local_interaction():
 
 
 def test_attention():
-    from enerzyme.models.blocks.attention import Attention as F1
+    from enerzyme.models.mp.nn.attention import Attention as F1
     from spookynet.modules.attention import Attention as F2
     f2 = F2(dim_feature, dim_feature, dim_feature).type(dtype)
     f1 = F1(dim_feature, dim_feature).type(dtype)
@@ -359,7 +359,7 @@ def test_zbl_repulsion_energy():
 
 
 def test_switch_function():
-    from enerzyme.models.cutoff import smooth_transition
+    from enerzyme.models.mp.basis.envelope import smooth_transition
     from spookynet.functional import switch_function
     assert_tensor_allclose(
         smooth_transition(D, 10, 1),

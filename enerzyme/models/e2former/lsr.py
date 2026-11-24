@@ -14,8 +14,8 @@ import torch
 from torch import Tensor
 from torch.nn import ModuleList
 
-from ..so3 import get_normalization_layer
-from ..so3.linear import SO3Linear
+from ..mp.equivariant import get_normalization_layer
+from ..mp.equivariant.sph.linear import SO3Linear
 from .cluster import (
     build_atom_fragment_topk,
     pool_fragment_irreps,

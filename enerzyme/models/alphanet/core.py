@@ -37,7 +37,7 @@ from typing import Dict, List, Optional
 import torch
 from torch import Tensor, nn
 
-from ..cutoff import cosine_transition
+from ..mp.basis.envelope import cosine_transition
 from ..layers import BaseFFCore
 from ..local_frame.encoding import LocalSubstructure, RadialFilter, aggregate_neighbors
 from ..local_frame.geometry import (

@@ -1,7 +1,7 @@
 """SO(2)-equivariant convolution for DPA4 EMFA.
 
 EdgeCache, DynamicRadialDegreeMixer, and SO2Convolution stay local.
-Focus-major SO(2) linear lives in ``enerzyme.models.so3.so2_focus``.
+Focus-major SO(2) linear lives in ``enerzyme.models.mp.equivariant.so2.focus``.
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from ..so3.gated import SO3GatedActivation
-from ..so3.indexing import (
+from ..mp.equivariant.sph.gated import SO3GatedActivation
+from ..mp.equivariant.indexing import (
     build_m_major_index,
     build_m_major_l_index,
     build_rotate_inv_rescale,
@@ -24,9 +24,9 @@ from ..so3.indexing import (
     project_D_to_m,
     project_Dt_from_m,
 )
-from ..so3.so2_focus import FocusSO2Linear
-from ..so3.softmax import segment_envelope_gated_softmax
-from ..so3.wigner_quaternion import (
+from ..mp.equivariant.so2.focus import FocusSO2Linear
+from ..mp.ops import segment_envelope_gated_softmax
+from ..mp.equivariant.rotation.wigner_quaternion import (
     WignerDCalculator,
     build_edge_quaternion,
     quaternion_multiply,

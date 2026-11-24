@@ -14,7 +14,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
-from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 from ..layers import (
     BaseAtomEmbedding,
     BaseFFCore,

@@ -67,7 +67,7 @@ def test_channel_aligned_product_is_rotation_equivariant():
 
     from enerzyme.models.grace.coupling import SparseCGProduct
     from enerzyme.models.grace.features import pack_features
-    from enerzyme.models.so3.spherical_harmonics import spherical_harmonics
+    from enerzyme.models.mp.basis.angular import spherical_harmonics
 
     torch.manual_seed(0)
     product = SparseCGProduct(channels=2, lmax_left=1, lmax_right=1, Lmax=1)

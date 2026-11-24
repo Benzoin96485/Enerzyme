@@ -66,7 +66,7 @@ def _forward_inputs(n, seed=0):
 
 
 def test_bessel_mace_flavor_matches_envelope():
-    from enerzyme.models.cutoff import polynomial_envelope
+    from enerzyme.models.mp.basis.envelope import polynomial_envelope
     from enerzyme.models.layers.rbf import BesselRBFLayer
 
     cutoff = 5.0

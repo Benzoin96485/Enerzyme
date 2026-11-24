@@ -90,7 +90,7 @@ def test_escn_simple_readout_resolves_feature_irreps():
 
 
 def test_init_edge_rot_mat_keeps_grad():
-    from enerzyme.models.so3 import init_edge_rot_mat
+    from enerzyme.models.mp.equivariant import init_edge_rot_mat
 
     vij = torch.randn(5, 3, requires_grad=True)
     rot = init_edge_rot_mat(vij)

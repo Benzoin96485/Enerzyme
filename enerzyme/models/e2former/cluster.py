@@ -13,7 +13,7 @@ from typing import Dict, Optional, Tuple
 
 import torch
 from torch import Tensor
-from torch_scatter import scatter_mean
+from ..mp.ops import scatter_mean
 
 from ..layers.fragments import (
     build_kmeans_fragments,

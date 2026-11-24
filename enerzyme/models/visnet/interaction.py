@@ -25,7 +25,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 from ..layers.rejection import vector_rejection
 
 
@@ -402,16 +402,12 @@ class ViSInteraction(Module):
         vector_message = vector_n.index_select(0, idx_j) * gate.unsqueeze(1)
         vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
 
-        aggregated_scalar = reduce_edge(
-            scalar_message, idx_i, (n_atoms, self.hidden_channels)
-        )
-        aggregated_vector = reduce_edge(
-            vector_message, idx_i, (n_atoms, angular, self.hidden_channels)
-        )
+        aggregated_scalar = scatter_sum(scalar_message, idx_i, n_atoms)
+        aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
         mixed = self.o_proj(aggregated_scalar)
         if self.vertex_type == "node":
             angle = self._receiver_angle(vector_n.index_select(0, idx_i), direction)
-            aggregated_angle = reduce_edge(angle, idx_i, (n_atoms, self.hidden_channels))
+            aggregated_angle = scatter_sum(angle, idx_i, n_atoms)
             out_scale, out_dot, out_angle, out_bias = torch.split(
                 mixed, self.hidden_channels, dim=-1
             )

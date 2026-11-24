@@ -2,7 +2,7 @@
 
 Edge Cluster Expansion + Radial Rotary Attention (Xu et al., arXiv:2607.10664),
 adapted from https://github.com/xvzemin/tace (MIT). Reuses TACE edge embed /
-``CgtpACE`` and shared ``enerzyme.models.so3`` SO(2) primitives.
+``CgtpACE`` and shared ``enerzyme.models.mp.equivariant`` SO(2) primitives.
 """
 
 from .core import TECECore, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

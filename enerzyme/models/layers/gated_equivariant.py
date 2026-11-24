@@ -17,7 +17,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module, Sequential, SiLU
 
-from ..blocks.mlp import DenseLayer
+from ..mp.nn.mlp import DenseLayer
 
 
 # Exact SiLU via BaseScaledTemperedActivation's parameter-free branch.

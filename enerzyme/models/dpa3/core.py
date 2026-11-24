@@ -18,8 +18,8 @@ from typing import Dict, List, Optional
 import torch
 from torch import Tensor, nn
 
-from ..activation import resolve_scalar_activation
-from ..cutoff import exponential_switch, polynomial_transition
+from ..mp.nn.activation import resolve_scalar_activation
+from ..mp.basis.envelope import exponential_switch, polynomial_transition
 from ..layers import BaseAtomEmbedding, BaseFFCore, RangeSeparationLayer
 from .geometry import AnglePairs, angle_pairs
 from .interaction import RepFlowBlock

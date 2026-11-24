@@ -24,7 +24,7 @@ from e3nn import o3
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
-from ..e3nn_nn import scalar_0e_dim
+from ..mp.equivariant.e3nn import scalar_0e_dim
 from ..layers import BaseFFCore
 from .interaction import NequIPConv, hidden_irreps
 

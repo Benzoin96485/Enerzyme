@@ -46,7 +46,7 @@ def test_gaussian_rbf_schnet_flavor_matches_pyg():
 
 
 def test_cosine_transition_matches_pyg_inline():
-    from enerzyme.models.cutoff import cosine_transition
+    from enerzyme.models.mp.basis.envelope import cosine_transition
 
     cutoff = PARITY_HPARAMS["cutoff"]
     dtype = torch.float64

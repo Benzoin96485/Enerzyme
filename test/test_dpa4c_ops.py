@@ -74,8 +74,8 @@ def test_harmonics_addition_theorem_and_stf_isometry():
 
 
 def test_envelope_is_flat_at_the_cutoff_and_raw_bessel_is_not():
-    from enerzyme.models.cutoff import C3CutoffEnvelope
-    from enerzyme.models.so3.radial import BesselC3RadialBasis
+    from enerzyme.models.mp.basis.envelope import C3CutoffEnvelope
+    from enerzyme.models.mp.basis.radial import BesselC3RadialBasis
 
     radius = torch.tensor([0.0, 6.0], dtype=torch.float64, requires_grad=True)
     envelope = C3CutoffEnvelope(6.0, exponent=5).double()

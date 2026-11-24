@@ -3,7 +3,7 @@
 Zhang, Xia, and Jiang, J. Chem. Phys. 156, 114801 (2022), Eqs. 1–4, and the
 contraction in https://github.com/zhangylch/REANN ``src/density.py``. The
 printed cutoff ``[cos(pi r / rc) + 1]^2`` is four times
-:func:`enerzyme.models.cutoff.cosine_transition` squared. The repository uses
+:func:`enerzyme.models.mp.basis.envelope.cosine_transition` squared. The repository uses
 the squared cosine, which is 1 at the origin, and this module follows that.
 Higher angular channels are ordered Cartesian products of the raw displacement,
 not unique monomials and not divided by the multinomial ``l! / (lx! ly! lz!)``.
@@ -21,7 +21,7 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from ..cutoff import cosine_transition
+from ..mp.basis.envelope import cosine_transition
 
 
 def default_n_orbit(nwave: int, lmax: int) -> int:

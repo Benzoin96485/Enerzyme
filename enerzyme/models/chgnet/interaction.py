@@ -15,8 +15,8 @@ import torch
 from torch import Tensor
 from torch.nn import Linear, Module
 
-from ..blocks.mlp import GatedMLP
-from ..functional import segment_sum_coo
+from ..mp.nn.mlp import GatedMLP
+from ..mp.ops import scatter_sum
 
 
 def _feature_norm(name: Optional[str], dim: int) -> Optional[Module]:
@@ -88,7 +88,7 @@ class AtomConv(Module):
                 dim=-1,
             )
             messages = self.message(packed) * bond_weight[directed_to_undirected]
-            updated = segment_sum_coo(messages, idx_i, dim_size=atom.shape[0])
+            updated = scatter_sum(messages, idx_i, atom.shape[0])
             updated = self.mlp_out(updated)
         updated = updated + atom
         if self.norm is not None:
@@ -140,7 +140,7 @@ class BondConv(Module):
             )
             weight = bond_weight[left] * bond_weight[right]
             messages = self.message(packed) * weight
-            updated = segment_sum_coo(messages, left, dim_size=bond.shape[0])
+            updated = scatter_sum(messages, left, bond.shape[0])
             updated = self.mlp_out(updated)
         updated = updated + bond
         if self.norm is not None:

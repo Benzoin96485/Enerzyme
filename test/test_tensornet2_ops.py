@@ -213,7 +213,7 @@ def test_charge_conditioned_interaction_uses_both_endpoints():
 def test_standard_zbl_matches_fixed_pair_formula():
     from ase.data import covalent_radii
 
-    from enerzyme.models.cutoff import polynomial_envelope
+    from enerzyme.models.mp.basis.envelope import polynomial_envelope
     from enerzyme.models.layers.screened_zbl import StandardZBLRepulsionEnergyLayer
 
     bohr = 0.5291772105638411

@@ -1,7 +1,7 @@
 """eSEN edgewise / nodewise blocks (Fu et al., 2025).
 
 The edgewise path is two fairchem-style SO(2) convolutions
-(:class:`~enerzyme.models.so3.SO2_Convolution`) with a SiLU gate between
+(:class:`~enerzyme.models.mp.equivariant.SO2_Convolution`) with a SiLU gate between
 them and a polynomial envelope on the message. The nodewise path is an
 equivariant linear pair plus the same gate (:class:`SO3Linear`,
 :class:`GateActivation`). Neither path samples an S² grid unless the
@@ -18,9 +18,9 @@ from typing import List, Optional
 import torch
 from torch import Tensor, nn
 
-from ...blocks.radial_mlp import RadialFunction
-from ...cutoff import polynomial_envelope
-from ...so3 import (
+from ...mp.nn.radial_mlp import RadialFunction
+from ...mp.basis.envelope import polynomial_envelope
+from ...mp.equivariant import (
     CoefficientMapping,
     GateActivation,
     SO2_Convolution,
@@ -276,7 +276,7 @@ class eSENBlock(nn.Module):
         SO3_grid=None,
     ) -> None:
         super().__init__()
-        from ...so3 import get_normalization_layer
+        from ...mp.equivariant import get_normalization_layer
 
         self.norm_1 = get_normalization_layer(
             norm_type, lmax=lmax, num_channels=sphere_channels

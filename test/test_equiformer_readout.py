@@ -12,7 +12,7 @@ from e3nn import o3
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from enerzyme.models.ff import build_model
-from enerzyme.models.e3nn_nn import extract_scalar_0e, scalar_0e_dim
+from enerzyme.models.mp.equivariant.e3nn import extract_scalar_0e, scalar_0e_dim
 from enerzyme.models.equiformer.interaction import EquiformerGraphAttentionReadout
 from enerzyme.models.layers.readout import SimpleReadout
 

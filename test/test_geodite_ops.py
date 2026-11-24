@@ -6,7 +6,7 @@ import math
 
 import torch
 
-from enerzyme.models.cutoff import polynomial_envelope
+from enerzyme.models.mp.basis.envelope import polynomial_envelope
 
 
 def test_polynomial_envelope_is_flat_at_the_cutoff_and_accepts_per_edge_radii():

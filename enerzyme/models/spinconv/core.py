@@ -23,7 +23,7 @@ import torch
 from torch import Tensor
 from torch.nn import Linear, Module, ModuleList
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 from ..layers._base_layer import BaseFFCore
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.rbf import GaussianRBFLayer, gaussian_expansion, spinconv_gaussian_terms
@@ -300,7 +300,7 @@ class SpinConvCore(BaseFFCore):
         if num_nodes == 0:
             aggregated = atom_embedding.new_zeros((0, self.hidden_channels))
         else:
-            aggregated = segment_sum_coo(messages, idx_i, dim_size=num_nodes)
+            aggregated = scatter_sum(messages, idx_i, num_nodes)
             aggregated = aggregated / self.message_divisor
         nodes = torch.arange(num_nodes, device=atom_embedding.device)
         atom_feature = self.energy_mix(aggregated, atom_embedding, nodes, nodes)

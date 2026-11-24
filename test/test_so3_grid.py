@@ -6,7 +6,7 @@ import torch
 
 
 def test_so3_grid_roundtrip_is_near_identity():
-    from enerzyme.models.so3.grid import SO3Grid
+    from enerzyme.models.mp.equivariant.s2.grid import SO3Grid
 
     torch.manual_seed(0)
     grid = SO3Grid(2, 2, normalization="component")
@@ -20,9 +20,9 @@ def test_so3_grid_roundtrip_is_near_identity():
 
 
 def test_so3_grid_implements_s2_projector_protocol():
-    from enerzyme.models.so3.grid import SO3Grid
-    from enerzyme.models.so3.lebedev import S2LebedevProjector
-    from enerzyme.models.so3.s2_projector import S2GridProjector
+    from enerzyme.models.mp.equivariant.s2.grid import SO3Grid
+    from enerzyme.models.mp.equivariant.s2.lebedev import S2LebedevProjector
+    from enerzyme.models.mp.equivariant.s2.projector import S2GridProjector
 
     lat = SO3Grid(1, 1)
     leb = S2LebedevProjector(1)
@@ -34,7 +34,7 @@ def test_so3_grid_implements_s2_projector_protocol():
 
 
 def test_build_so3_grid_table_shapes():
-    from enerzyme.models.so3.grid import build_so3_grid_table
+    from enerzyme.models.mp.equivariant.s2.grid import build_so3_grid_table
 
     table = build_so3_grid_table(2, normalization="integral", rescale_by_mmax=False)
     assert len(table) == 3 and len(table[1]) == 3
@@ -45,7 +45,7 @@ def test_build_so3_grid_table_shapes():
 
 
 def test_so3_grid_aliases():
-    from enerzyme.models.so3.grid import SO3Grid, SO3GridResolved, SO3_Grid
+    from enerzyme.models.mp.equivariant.s2.grid import SO3Grid, SO3GridResolved, SO3_Grid
 
     assert SO3_Grid is SO3Grid
     assert SO3GridResolved is SO3Grid

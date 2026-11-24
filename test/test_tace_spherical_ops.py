@@ -3,7 +3,7 @@
 import torch
 from e3nn import o3
 
-from enerzyme.models.e3nn_nn import (
+from enerzyme.models.mp.equivariant.e3nn import (
     O3ScatterTensorProduct,
     UUUTensorProduct,
     generate_paths,

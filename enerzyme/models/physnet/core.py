@@ -4,7 +4,7 @@ from torch import Tensor
 from torch.nn import Module, Sequential
 from .interaction import InteractionBlock, OutputBlock
 from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore
-from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
 
 
 DEFAULT_BUILD_PARAMS = {

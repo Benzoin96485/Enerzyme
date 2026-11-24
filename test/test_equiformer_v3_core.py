@@ -253,7 +253,7 @@ def test_equiformer_v3_force_finite_difference_conservation():
 
 def test_equiformer_v3_wigner_stays_in_autograd_graph():
     """SO3RotationFused Wigner must not be detached when use_rotation_mask=False."""
-    from enerzyme.models.so3 import SO3RotationFused, init_edge_rot_mat
+    from enerzyme.models.mp.equivariant import SO3RotationFused, init_edge_rot_mat
 
     torch.manual_seed(0)
     dtype = torch.float64

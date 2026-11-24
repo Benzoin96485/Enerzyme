@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 
 from . import BaseFFLayer
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 
 
 class NeuralSpinChargeEquilibrationLayer(BaseFFLayer):
@@ -55,12 +55,12 @@ class NeuralSpinChargeEquilibrationLayer(BaseFFLayer):
             batch_seg = torch.zeros_like(Qa_alpha_tilde, dtype=torch.long)
 
         # Per-graph sums of tilde charges and weights
-        sum_q_alpha_tilde = segment_sum_coo(Qa_alpha_tilde, batch_seg)
-        sum_q_beta_tilde = segment_sum_coo(Qa_beta_tilde, batch_seg)
+        sum_q_alpha_tilde = scatter_sum(Qa_alpha_tilde, batch_seg)
+        sum_q_beta_tilde = scatter_sum(Qa_beta_tilde, batch_seg)
         raw_Q = sum_q_alpha_tilde + sum_q_beta_tilde
         raw_S = sum_q_alpha_tilde - sum_q_beta_tilde
-        sum_f_alpha = segment_sum_coo(fa_alpha, batch_seg)
-        sum_f_beta = segment_sum_coo(fa_beta, batch_seg)
+        sum_f_alpha = scatter_sum(fa_alpha, batch_seg)
+        sum_f_beta = scatter_sum(fa_beta, batch_seg)
 
         # Spin-resolved target total charges (per graph)
         Q_alpha_target = 0.5 * (Q + S)
@@ -84,8 +84,8 @@ class NeuralSpinChargeEquilibrationLayer(BaseFFLayer):
         Qa = Qa_alpha + Qa_beta
         Sa = Qa_alpha - Qa_beta
 
-        Q_alpha = segment_sum_coo(Qa_alpha, batch_seg)
-        Q_beta = segment_sum_coo(Qa_beta, batch_seg)
+        Q_alpha = scatter_sum(Qa_alpha, batch_seg)
+        Q_beta = scatter_sum(Qa_beta, batch_seg)
 
         return {
             "Qa_alpha": Qa_alpha,

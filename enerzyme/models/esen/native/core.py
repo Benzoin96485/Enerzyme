@@ -10,12 +10,12 @@ Distinct from ``uma_qs`` / ``UMAWrapperQS`` in the parent package, which
 wrap a fairchem UMA checkpoint. This module does not import fairchem and
 does not load those checkpoints.
 
-Reuses :class:`~enerzyme.models.so3.so2_ops.SO2_Convolution`,
-:class:`~enerzyme.models.so3.linear.SO3Linear`,
-:class:`~enerzyme.models.so3.activation.GateActivation`,
-:func:`~enerzyme.models.so3.layer_norm.get_normalization_layer`,
-:class:`~enerzyme.models.blocks.radial_mlp.RadialFunction`, and
-:func:`~enerzyme.models.cutoff.polynomial_envelope`.
+Reuses :class:`~enerzyme.models.mp.equivariant.so2.ops.SO2_Convolution`,
+:class:`~enerzyme.models.mp.equivariant.sph.linear.SO3Linear`,
+:class:`~enerzyme.models.mp.equivariant.s2.activation.GateActivation`,
+:func:`~enerzyme.models.mp.equivariant.sph.layer_norm.get_normalization_layer`,
+:class:`~enerzyme.models.mp.nn.radial_mlp.RadialFunction`, and
+:func:`~enerzyme.models.mp.basis.envelope.polynomial_envelope`.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from ...layers import (
     DistanceLayer,
     RangeSeparationLayer,
 )
-from ...so3 import (
+from ...mp.equivariant import (
     CoefficientMapping,
     SO3_Rotation,
     build_so3_grid_table,

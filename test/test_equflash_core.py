@@ -80,7 +80,7 @@ def test_equflash_irreps_match_published_natural_parity():
 
 
 def test_xplor_window_and_equflash_bessel():
-    from enerzyme.models.cutoff import xplor_transition
+    from enerzyme.models.mp.basis.envelope import xplor_transition
     from enerzyme.models.layers.rbf import BesselRBFLayer
 
     cutoff, cuton = 6.0, 5.5

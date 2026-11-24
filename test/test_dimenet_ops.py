@@ -14,7 +14,7 @@ from enerzyme.models.dimenet.basis import (
     spherical_jn,
 )
 from enerzyme.models.dimenet.triplets import directed_triplets, triplet_angles
-from enerzyme.models.cutoff import DimeNetEnvelope
+from enerzyme.models.mp.basis.envelope import DimeNetEnvelope
 
 
 def test_spherical_bessel_j0_zeros_are_n_pi():

@@ -6,8 +6,9 @@ from torch import Tensor
 from torch.nn import Parameter
 from torch.nn.functional import softmax
 from .. import BaseFFLayer
-from ...cutoff import polynomial_transition
-from ...functional import gather_nd, segment_sum_coo
+from ...mp.basis.envelope import polynomial_transition
+from ...functional import gather_nd
+from ...mp.ops import scatter_sum
 
 # parameters
 # grimme_d3_tables from https://github.com/MMunibas/PhysNet/commit/e243e2c383b4ac0a9d7062e654d9b4feb76ca859
@@ -77,7 +78,7 @@ def _ncoord(Zi: Tensor, Zj: Tensor, Dij: Tensor, idx_i: Tensor, N: int, cutoff: 
     damp = 1.0 / (1.0 + torch.exp(-k1 * (rr - 1.0)))
     if cutoff is not None:
         damp *= polynomial_transition(Dij, cutoff, cutoff-1)
-    return segment_sum_coo(damp, idx_i, dim_size=N)
+    return scatter_sum(damp, idx_i, N)
 
 
 def _getc6(Zi: Tensor, Zj: Tensor, nci: Tensor, ncj: Tensor, c6ab: Tensor=d3_c6ab, k3: float=d3_k3) -> Tensor:
@@ -244,7 +245,7 @@ def edisp(Za: Tensor, Dij: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: Optiona
 
     e6 = -0.5 * s6 * c6 * e6
     e8 = -0.5 * s8 * c8 * e8
-    return segment_sum_coo(e6 + e8, idx_i, dim_size=N)
+    return scatter_sum(e6 + e8, idx_i, N)
 
 
 class GrimmeD3EnergyLayer(BaseFFLayer):

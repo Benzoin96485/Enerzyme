@@ -17,8 +17,8 @@ from e3nn.o3 import Irreps, SphericalHarmonics
 from torch import Tensor
 from torch.nn import ModuleList
 
-from ..blocks.radial_mlp import RadialMLP
-from ..e3nn_nn import IrrepsLinear, O3ScatterTensorProduct, scalar_0e_dim
+from ..mp.nn.radial_mlp import RadialMLP
+from ..mp.equivariant.e3nn import IrrepsLinear, O3ScatterTensorProduct, scalar_0e_dim
 from ..layers import (
     BaseAtomEmbedding,
     BaseElectronEmbedding,
@@ -28,7 +28,7 @@ from ..layers import (
     DistanceLayer,
     RangeSeparationLayer,
 )
-from ..so3 import WignerD
+from ..mp.equivariant import WignerD
 from ..tace.interaction import EDGE_EMBEDDING, EDGE_UPDATE, CgtpACE
 from .interaction import UvSO2Interaction
 

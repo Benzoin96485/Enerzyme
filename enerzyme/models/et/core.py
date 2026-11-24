@@ -28,7 +28,7 @@ import torch
 from torch import Tensor
 from torch.nn import LayerNorm, Module, ModuleList
 
-from ..cutoff import cosine_transition
+from ..mp.basis.envelope import cosine_transition
 from ..layers import BaseFFCore
 from ..layers.atom_embedding import RandomAtomEmbedding
 from ..layers.self_pairs import insert_missing_self_pairs, unit_direction

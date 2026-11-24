@@ -3,7 +3,7 @@ from typing import Dict, List, Set
 import torch
 from torch import Tensor
 from . import BaseFFLayer
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 
 
 class EnergyReduceLayer(BaseFFLayer):
@@ -26,7 +26,7 @@ class EnergyReduceLayer(BaseFFLayer):
             batch_seg = relevant_input["batch_seg"]
         else:
             batch_seg = torch.zeros_like(relevant_input["Za"])
-        return {"E": segment_sum_coo(Ea, batch_seg), "Ea": Ea}
+        return {"E": scatter_sum(Ea, batch_seg), "Ea": Ea}
 
 
 class EdgeEnergyReduceLayer(BaseFFLayer):

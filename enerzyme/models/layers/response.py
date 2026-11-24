@@ -35,8 +35,8 @@ from torch import Tensor
 from torch.autograd import grad
 from torch.nn import Module, Sequential
 
-from ..blocks.mlp import DenseLayer
-from ..functional import segment_sum_coo
+from ..mp.nn.mlp import DenseLayer
+from ..mp.ops import scatter_sum
 from ._base_layer import BaseFFLayer
 
 
@@ -141,8 +141,8 @@ def assemble_polarizability(
         atomic = mixed + mixed.transpose(-1, -2)
     else:
         raise ValueError(f"variant must be 'paper' or 'repo', got {variant!r}")
-    alpha = segment_sum_coo(atomic, batch_seg, dim_size=n_graph)
-    scalar = segment_sum_coo(isotropic.reshape(-1), batch_seg, dim_size=n_graph)
+    alpha = scatter_sum(atomic, batch_seg, n_graph)
+    scalar = scatter_sum(isotropic.reshape(-1), batch_seg, n_graph)
     eye = torch.eye(3, device=alpha.device, dtype=alpha.dtype)
     return alpha + scalar.reshape(-1, 1, 1) * eye
 
@@ -202,13 +202,13 @@ class DerivativePolarizabilityLayer(BaseFFLayer):
             )
         create_graph = bool(self.training)
         if self.variant == "paper":
-            energy = segment_sum_coo(latent[:, 0], batch)
+            energy = scatter_sum(latent[:, 0], batch)
             grad_a = _coordinate_gradient(energy, Ra, create_graph)
             grad_b = grad_a
             isotropic = latent[:, 1]
         else:
-            energy_a = segment_sum_coo(latent[:, 0], batch)
-            energy_b = segment_sum_coo(latent[:, 1], batch)
+            energy_a = scatter_sum(latent[:, 0], batch)
+            energy_b = scatter_sum(latent[:, 1], batch)
             grad_a = _coordinate_gradient(energy_a, Ra, create_graph)
             grad_b = _coordinate_gradient(energy_b, Ra, create_graph)
             isotropic = latent[:, 2]

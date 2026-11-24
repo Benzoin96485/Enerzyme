@@ -23,10 +23,11 @@ from typing import Dict, Optional
 import torch
 from torch import Tensor, nn
 
-from ..cutoff import polynomial_envelope
+from ..mp.basis.envelope import polynomial_envelope
 from ..layers._base_layer import BaseFFCore
 from .basis import CartesianAngularBasis, InvariantSymmetrizer
-from .interaction import MessagePassing, RadialChannelMix, parse_messages, scatter_sum
+from ..mp.ops import scatter_sum
+from .interaction import MessagePassing, RadialChannelMix, parse_messages
 from .presets import resolve_cace_preset
 
 

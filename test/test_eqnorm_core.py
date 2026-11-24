@@ -58,7 +58,7 @@ def _small_core(**overrides):
 
 
 def test_registration_and_yaml_build():
-    from enerzyme.models.blocks.mlp import VariancePreservingMLP
+    from enerzyme.models.mp.nn.mlp import VariancePreservingMLP
     from enerzyme.models.eqnorm import PUBLISHED_MPTRJ_CORE_PARAMS
     from enerzyme.models.ff import build_model, get_ff_core
     from enerzyme.models.layers.atom_embedding import OneHotAtomEmbedding

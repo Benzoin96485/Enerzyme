@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Module, Parameter, Sequential, SiLU
-from torch_scatter import segment_sum_coo
+from ..mp.ops import scatter_sum
 
 from . import BaseFFLayer
 
@@ -96,7 +96,7 @@ class ChargeSpinEmbeddingLayer(BaseFFLayer):
         v = self.Wv[idx_atom]
         y = F.softplus((q * k).sum(dim=-1) / self.sqrt_dim)
         num_graphs = int(batch_seg.max().item()) + 1 if batch_seg.numel() else 1
-        denom = segment_sum_coo(y, batch_seg, dim_size=num_graphs) + 1e-6
+        denom = scatter_sum(y, batch_seg, num_graphs) + 1e-6
         att = psi[batch_seg] * y / denom[batch_seg]
         v_att = att[:, None] * v
         return v_att + self.mlp(v_att)

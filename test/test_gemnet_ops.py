@@ -7,7 +7,7 @@ import math
 import torch
 from numpy.testing import assert_allclose
 
-from enerzyme.models.cutoff import polynomial_envelope
+from enerzyme.models.mp.basis.envelope import polynomial_envelope
 from enerzyme.models.dimenet.basis import real_sph_harm_l0
 from enerzyme.models.gemnet.basis import (
     SphericalBesselRadial,

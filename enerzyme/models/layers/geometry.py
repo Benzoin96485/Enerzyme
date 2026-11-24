@@ -2,7 +2,7 @@ from typing import Optional, Dict, Literal
 from torch import Tensor
 import torch.nn.functional as F
 from . import BaseFFLayer
-from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
+from ..mp.basis.envelope import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
 class DistanceLayer(BaseFFLayer):

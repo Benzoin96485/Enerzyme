@@ -7,7 +7,7 @@ tensor product with real spherical harmonics, a residual linear, and
 Receivers are ``idx_i`` and senders are ``idx_j``. ``edge_sh`` is ``Y(R_j - R_i)``.
 
 Path instructions stay in creation order. That is the radial-weight layout
-of the reference ``get_path``. :func:`enerzyme.models.e3nn_nn.tp_out_irreps_with_instructions`
+of the reference ``get_path``. :func:`enerzyme.models.mp.equivariant.e3nn.tp_out_irreps_with_instructions`
 sorts the same paths, which would move those weights; Nequix wants the
 sorted layout, so this module keeps its own enumeration.
 
@@ -28,7 +28,7 @@ from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
 from torch import Tensor, nn
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 from ..nequip.interaction import tp_path_exists
 from .layernorm import EqnormRMSNorm, one_irrep_per_degree
 
@@ -175,9 +175,7 @@ class EqnormConv(nn.Module):
             if envelope is not None:
                 window = envelope.reshape(-1, 1).to(dtype=messages.dtype)
                 messages = messages * window
-            aggregated = reduce_edge(
-                messages, idx_i, (n_atoms, messages.shape[-1])
-            )
+            aggregated = scatter_sum(messages, idx_i, n_atoms)
         if self.normalization == "degree":
             degree = features.new_zeros(n_atoms)
             if idx_i.numel():

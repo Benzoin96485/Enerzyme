@@ -452,8 +452,8 @@ def build_linear_rs_energy_head(
         from nets.tensor_product_rescale import LinearRS
     elif flavor == "enerzyme":
         from enerzyme.models.equiformer.interaction import _RESCALE
-        from enerzyme.models.e3nn_nn import Activation
-        from enerzyme.models.e3nn_nn import LinearRS
+        from enerzyme.models.mp.equivariant.e3nn import Activation
+        from enerzyme.models.mp.equivariant.e3nn import LinearRS
     else:
         raise ValueError(f"unknown flavor {flavor!r}")
     head = torch.nn.Sequential(

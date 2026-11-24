@@ -20,7 +20,7 @@ from typing import List, Optional
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
-from ..cutoff import polynomial_envelope
+from ..mp.basis.envelope import polynomial_envelope
 from ..layers.rbf import BaseRBF, GaussianRBFLayer
 from ..m3gnet.core import M3GNetCore
 from .attention import CentralityEncoding, GraphormerBlock

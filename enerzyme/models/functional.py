@@ -4,17 +4,6 @@ import torch
 from torch import Tensor
 
 
-USE_SEGMENT_COO = False
-
-
-if USE_SEGMENT_COO:
-    from torch_scatter import segment_sum_coo
-else:
-    from torch_scatter import scatter_sum
-    def segment_sum_coo(src: Tensor, idx: Tensor, dim_size: Optional[int]=None) -> Tensor:
-        return scatter_sum(src, idx, dim=idx.dim() - 1, dim_size=dim_size)
-
-
 def softplus_inverse(x: Union[Tensor, np.ndarray]) -> Tensor:
     """
     Inverse of the softplus function. This is useful for initialization of
@@ -57,20 +46,3 @@ def gather_nd(params: Tensor, indices: Tensor) -> Tensor:
     indices = indices.reshape((num_samples, m)).transpose(0, 1).tolist()
     output = params[indices]    # (num_samples, ...)
     return output.reshape(out_shape).contiguous()
-
-
-def reduce_edge(inputs: Tensor, edge_index: Tensor, output_shape) -> Tensor:
-    """Scatter-add ``inputs`` onto node slots indexed by ``edge_index``.
-
-    Args:
-        inputs: Edge features ``(E, ...)``.
-        edge_index: Destination node indices ``(E,)``.
-        output_shape: Full output shape starting with ``num_nodes``.
-    """
-    outputs = torch.zeros(
-        *output_shape,
-        device=inputs.device,
-        dtype=inputs.dtype,
-    )
-    outputs.index_add_(0, edge_index, inputs)
-    return outputs

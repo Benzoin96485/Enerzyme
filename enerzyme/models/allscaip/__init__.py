@@ -3,7 +3,6 @@ from .equivariant_input import EquivariantInputBlock, scalarize_irreps
 from .graph_preprocess import (
     AllScAIPGraphHParams,
     build_graph_attention_data,
-    compilable_scatter,
     get_edge_distance_expansion,
     get_frequency_vectors,
     get_node_attention_mask,
@@ -22,7 +21,6 @@ __all__ = [
     "GraphAttentionData",
     "biknn_radius_graph_from_batch",
     "build_graph_attention_data",
-    "compilable_scatter",
     "get_edge_distance_expansion",
     "get_frequency_vectors",
     "get_node_attention_mask",

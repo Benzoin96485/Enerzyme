@@ -14,7 +14,7 @@ from typing import Callable, List, Optional, Sequence
 import torch
 from torch import Tensor, nn
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 from ..layers.symmetrize import dp_symmetrize
 
 
@@ -64,12 +64,6 @@ def _residual(dim: int, scale: float, mode: str) -> nn.Parameter:
         raise ValueError(f"update_residual_init must be 'const' or 'norm', got {mode!r}")
     return weight
 
-
-def _scatter(messages: Tensor, index: Tensor, num_nodes: int) -> Tensor:
-    width = int(messages.shape[-1]) if messages.ndim else 0
-    if messages.shape[0] == 0:
-        return messages.new_zeros(num_nodes, width)
-    return reduce_edge(messages, index, (num_nodes, width))
 
 
 class RepFlowBlock(nn.Module):
@@ -199,7 +193,7 @@ class RepFlowBlock(nn.Module):
         sym_message = self._act(self.node_sym(torch.cat([sym_edge, sym_node], dim=-1)))
 
         pair = torch.cat([node_i, node_j, edge], dim=-1)
-        gathered = _scatter(self._act(self.node_edge(pair)) * gated, idx_i, num_nodes)
+        gathered = scatter_sum(self._act(self.node_edge(pair)) * gated, idx_i, num_nodes)
         gathered = gathered / self.neighbor_scale
         heads = gathered.view(num_nodes, self.n_multi_edge_message, self.n_dim)
         messages = [self_message, sym_message]
@@ -250,7 +244,7 @@ class RepFlowBlock(nn.Module):
     ) -> Tensor:
         assert self.edge_from_angle is not None
         weight = angle_switch[edge_ij] * angle_switch[edge_ik]
-        reduced = _scatter(hidden * weight.unsqueeze(-1), edge_ij, num_edges)
+        reduced = scatter_sum(hidden * weight.unsqueeze(-1), edge_ij, num_edges)
         reduced = reduced / self.angular_scale
         if not self.smooth_edge_update:
             reduced = torch.where(angular_edge.unsqueeze(-1), reduced, edge)

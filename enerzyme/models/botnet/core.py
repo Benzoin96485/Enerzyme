@@ -25,7 +25,7 @@ import torch.nn.functional as F
 from e3nn.o3 import Irreps, SphericalHarmonics
 from torch import Tensor
 
-from ..e3nn_nn import scalar_0e_dim
+from ..mp.equivariant.e3nn import scalar_0e_dim
 from ..layers import BaseFFCore
 from .interaction import INTERACTION_CLASSES, VARIANTS
 

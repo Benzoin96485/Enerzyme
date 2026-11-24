@@ -14,7 +14,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from ..cutoff import cosine_transition
+from ..mp.basis.envelope import cosine_transition
 
 
 def symmetric_neighbor_mask(

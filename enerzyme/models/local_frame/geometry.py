@@ -16,7 +16,7 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 
 
 def reduce_nodes(src: Tensor, index: Tensor, dim_size: int, reduce: str = "sum") -> Tensor:
@@ -24,12 +24,10 @@ def reduce_nodes(src: Tensor, index: Tensor, dim_size: int, reduce: str = "sum")
     if index.numel() == 0:
         return src.new_zeros((dim_size, *src.shape[1:]))
     if reduce == "sum":
-        return segment_sum_coo(src, index, dim_size=dim_size)
+        return scatter_sum(src, index, dim_size)
     if reduce == "mean":
-        total = segment_sum_coo(src, index, dim_size=dim_size)
-        count = segment_sum_coo(
-            src.new_ones(index.shape[0]), index, dim_size=dim_size
-        ).clamp_min(1)
+        total = scatter_sum(src, index, dim_size)
+        count = scatter_sum(src.new_ones(index.shape[0]), index, dim_size).clamp_min(1)
         view = (dim_size,) + (1,) * (src.ndim - 1)
         return total / count.reshape(view)
     raise ValueError(f"reduce must be 'sum' or 'mean', got {reduce!r}")
@@ -47,8 +45,8 @@ def neighbor_mean(pos: Tensor, idx_i: Tensor, idx_j: Tensor) -> tuple[Tensor, Te
     count = pos.new_zeros(n_atoms)
     if idx_i.numel() == 0:
         return mean, count
-    total = segment_sum_coo(pos[idx_j], idx_i, dim_size=n_atoms)
-    count = segment_sum_coo(pos.new_ones(idx_i.shape[0]), idx_i, dim_size=n_atoms)
+    total = scatter_sum(pos[idx_j], idx_i, n_atoms)
+    count = scatter_sum(pos.new_ones(idx_i.shape[0]), idx_i, n_atoms)
     present = count > 0
     filled = total / count.clamp_min(1).unsqueeze(-1)
     mean = torch.where(present.unsqueeze(-1), filled, mean)
@@ -97,8 +95,8 @@ def subtract_graph_mean(pos: Tensor, batch: Tensor | None) -> Tensor:
     if batch is None:
         batch = torch.zeros(n_atoms, dtype=torch.long, device=pos.device)
     n_graph = int(batch.max().item()) + 1
-    total = segment_sum_coo(pos, batch, dim_size=n_graph)
-    count = segment_sum_coo(pos.new_ones(n_atoms), batch, dim_size=n_graph).clamp_min(1)
+    total = scatter_sum(pos, batch, n_graph)
+    count = scatter_sum(pos.new_ones(n_atoms), batch, n_graph).clamp_min(1)
     return pos - (total / count.unsqueeze(-1))[batch]
 
 

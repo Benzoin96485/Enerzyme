@@ -1,8 +1,8 @@
 from typing import Set, Literal, Dict, Optional, List, Callable
 from . import BaseFFLayer
-from ..blocks.mlp import DenseLayer, GatedMLP, ResidualMLP, ResidualLayer, VariancePreservingMLP
-from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, POSITIVE_ACTIVATION_KEY_TYPE, get_positive_activation_fn
-from ..e3nn_nn import extract_scalar_0e
+from ..mp.nn.mlp import DenseLayer, GatedMLP, ResidualMLP, ResidualLayer, VariancePreservingMLP
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, POSITIVE_ACTIVATION_KEY_TYPE, get_positive_activation_fn
+from ..mp.equivariant.e3nn import extract_scalar_0e
 import math
 import torch
 from torch.nn import Embedding, Identity, Linear, ModuleList, Module, Sequential
@@ -92,7 +92,7 @@ def split_readout_field_outputs(
 ) -> Dict[str, Tensor]:
     """Map head tensor columns onto named fields.
 
-    Head layout matches :class:`~enerzyme.models.blocks.mlp.DenseLayer`:
+    Head layout matches :class:`~enerzyme.models.mp.nn.mlp.DenseLayer`:
     ``(N, fields)`` when ``shallow_ensemble_size == 1``, or
     ``(N, fields, ensemble)`` when ``shallow_ensemble_size > 1``.
 
@@ -379,7 +379,7 @@ class BaseReadout(BaseFFLayer):
             # in split_readout_field_outputs via reshape_ensemble_head_output.
             from e3nn import o3
             from ..equiformer.interaction import _RESCALE
-            from ..e3nn_nn import Activation, LinearRS
+            from ..mp.equivariant.e3nn import Activation, LinearRS
 
             ir_hid = o3.Irreps(f"{self.dim_feature_in}x0e")
             n_out = self.dim_feature_out * self.shallow_ensemble_size

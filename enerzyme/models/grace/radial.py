@@ -6,8 +6,8 @@ Information A). The Finnis–Sinclair student uses a linear map on spherical
 Bessel functions, the same ``l = 0`` basis as :class:`~enerzyme.models.layers.rbf.BesselRBFLayer`
 with ``flavor="default"``. The cutoff is applied to the radial functions
 themselves so they vanish at ``cutoff`` independently of the MLP bias.
-The window is :func:`enerzyme.models.cutoff.powered_cosine_window`. Neighbor
-sums use :func:`enerzyme.models.functional.reduce_edge`. The spherical Bessel
+The window is :func:`enerzyme.models.mp.basis.envelope.powered_cosine_window`. Neighbor
+sums use :func:`enerzyme.models.mp.ops.scatter_sum`. The spherical Bessel
 formula matches ``BesselRBF(flavor="default")`` and fills the ``r → 0`` limit,
 which that layer leaves as a division by ``r``.
 """
@@ -21,7 +21,7 @@ import torch
 from torch import Tensor
 from torch.nn import Linear, Module, Sequential, SiLU, Tanh
 
-from ..cutoff import powered_cosine_window
+from ..mp.basis.envelope import powered_cosine_window
 
 
 def chebyshev_basis(distance: Tensor, n_basis: int, cutoff: float) -> Tensor:

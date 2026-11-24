@@ -5,9 +5,9 @@ from torch import Tensor
 from torch.nn import Module, ModuleList, Linear
 import torch.nn.functional as F
 from .interaction import InteractionModule
-from ..blocks.mlp import DenseLayer
+from ..mp.nn.mlp import DenseLayer
 from ..layers import DistanceLayer, RangeSeparationLayer, BaseFFCore, BaseAtomEmbedding, BaseElectronEmbedding, BaseRBF, ChargeConservationLayer, GatherAtomEmbedding
-from ..activation import ACTIVATION_KEY_TYPE
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE
 
 
 DEFAULT_BUILD_PARAMS = {'dim_embedding': 64,
@@ -169,7 +169,7 @@ class SpookyNetCore(BaseFFCore):
     def _atomic_properties_static(self, Dij_sr: Tensor, vij_sr: Tensor, batch_seg: Optional[Tensor]=None) -> Tuple[Tensor, Tensor, Optional[Tensor], int]:
         pij = vij_sr / Dij_sr.unsqueeze(-1)
         if self.use_irreps:  # irreducible representation (chemistry d-orbital order)
-            from ..so3 import spherical_harmonics
+            from ..mp.equivariant import spherical_harmonics
 
             # Unit directions already; tesseral core + spookynet_d layout (no e3nn remap).
             dij = spherical_harmonics(

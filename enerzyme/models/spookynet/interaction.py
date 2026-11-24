@@ -1,11 +1,11 @@
 from typing import Optional, Tuple
 import torch
 from torch.nn import Module, Linear, init
-from ..functional import segment_sum_coo
-from ..activation import ACTIVATION_KEY_TYPE
+from ..mp.ops import scatter_sum
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE
 from ..layers.electron_embedding import ResidualMLP
-from ..blocks.mlp import ResidualStack as _ResidualStack
-from ..blocks.attention import Attention
+from ..mp.nn.mlp import ResidualStack as _ResidualStack
+from ..mp.nn.attention import Attention
 from ..efa import EFABlock
 
 
@@ -131,9 +131,9 @@ class LocalInteraction(Module):
             xd = torch.gather(xd, 0, j)  # L=2
         # sum over neighbors
         N = len(x)
-        s = xx + segment_sum_coo(gs * xs, idx_i, dim_size=N)
-        p = segment_sum_coo(gp * xp.unsqueeze(-2), idx_i, dim_size=N)
-        d = segment_sum_coo(gd * xd.unsqueeze(-2), idx_i, dim_size=N)
+        s = xx + scatter_sum(gs * xs, idx_i, N)
+        p = scatter_sum(gp * xp.unsqueeze(-2), idx_i, N)
+        d = scatter_sum(gd * xd.unsqueeze(-2), idx_i, N)
         # project tensorial features to scalars
         pa, pb = torch.split(self.projection_p(p), p.shape[-1], dim=-1)
         da, db = torch.split(self.projection_d(d), d.shape[-1], dim=-1)

@@ -7,7 +7,7 @@ import torch
 
 
 def test_wigner_from_rotation_matrix_is_orthogonal():
-    from enerzyme.models.so3.wigner_jd import wigner_from_rotation_matrix
+    from enerzyme.models.mp.equivariant.rotation.wigner_jd import wigner_from_rotation_matrix
 
     torch.manual_seed(0)
     q, _ = torch.linalg.qr(torch.randn(5, 3, 3, dtype=torch.float64))
@@ -18,8 +18,8 @@ def test_wigner_from_rotation_matrix_is_orthogonal():
 
 
 def test_wigner_from_quaternion_matches_calculator():
-    from enerzyme.models.so3.wigner_jd import wigner_from_rotation_matrix
-    from enerzyme.models.so3.wigner_quaternion import (
+    from enerzyme.models.mp.equivariant.rotation.wigner_jd import wigner_from_rotation_matrix
+    from enerzyme.models.mp.equivariant.rotation.wigner_quaternion import (
         WignerDCalculator,
         _DPA4_CARTESIAN_BASIS,
         build_edge_quaternion,
@@ -39,8 +39,8 @@ def test_wigner_from_quaternion_matches_calculator():
 
 
 def test_so3_rotation_matches_shared_packed_wigner():
-    from enerzyme.models.so3.rotation import SO3_Rotation, init_edge_rot_mat
-    from enerzyme.models.so3.wigner_jd import wigner_from_rotation_matrix
+    from enerzyme.models.mp.equivariant.rotation.so3_rotation import SO3_Rotation, init_edge_rot_mat
+    from enerzyme.models.mp.equivariant.rotation.wigner_jd import wigner_from_rotation_matrix
 
     torch.manual_seed(2)
     vij = torch.randn(4, 3, dtype=torch.float64)
@@ -51,9 +51,9 @@ def test_so3_rotation_matches_shared_packed_wigner():
 
 
 def test_fused_packed_core_matches_shared_before_m_primary():
-    from enerzyme.models.so3.rotation import init_edge_rot_mat
-    from enerzyme.models.so3.rotation_fused import SO3RotationFused
-    from enerzyme.models.so3.wigner_jd import wigner_from_rotation_matrix
+    from enerzyme.models.mp.equivariant.rotation.so3_rotation import init_edge_rot_mat
+    from enerzyme.models.mp.equivariant.rotation.fused import SO3RotationFused
+    from enerzyme.models.mp.equivariant.rotation.wigner_jd import wigner_from_rotation_matrix
 
     torch.manual_seed(3)
     vij = torch.randn(3, 3, dtype=torch.float64)
@@ -66,8 +66,8 @@ def test_fused_packed_core_matches_shared_before_m_primary():
 
 
 def test_wigner_d_rejects_l_above_jd_max():
-    from enerzyme.models.so3.wigner_jd import max_wigner_lmax, wigner_D
-    from enerzyme.models.so3.wigner_quaternion import WignerDCalculator
+    from enerzyme.models.mp.equivariant.rotation.wigner_jd import max_wigner_lmax, wigner_D
+    from enerzyme.models.mp.equivariant.rotation.wigner_quaternion import WignerDCalculator
 
     bad = max_wigner_lmax() + 1
     with pytest.raises(NotImplementedError):

@@ -14,34 +14,8 @@ import torch
 from torch import Tensor
 from torch.nn import Dropout, GELU, LayerNorm, Linear, Module, Sequential
 
-from ..cutoff import polynomial_envelope
-from ..functional import segment_sum_coo
-
-
-def segment_softmax(logits: Tensor, index: Tensor, dim_size: int) -> Tensor:
-    """Softmax over edges that share a receiver.
-
-    ``logits`` is ``(E, H)``. ``index`` is the receiver of each edge.
-    Rows that belong to one receiver sum to one along the edge axis.
-    """
-    if logits.numel() == 0:
-        return logits
-    if logits.ndim != 2:
-        raise ValueError(f"logits must be (E, H), got {tuple(logits.shape)}")
-    if index.shape[0] != logits.shape[0]:
-        raise ValueError(
-            f"index rows {index.shape[0]} != logit rows {logits.shape[0]}"
-        )
-    heads = int(logits.shape[-1])
-    floor = torch.finfo(logits.dtype).min
-    maxima = logits.new_full((dim_size, heads), floor)
-    expanded = index.view(-1, 1).expand_as(logits)
-    maxima = maxima.scatter_reduce(
-        0, expanded, logits, reduce="amax", include_self=True
-    )
-    weights = (logits - maxima.index_select(0, index)).exp()
-    normalizer = segment_sum_coo(weights, index, dim_size=dim_size).clamp_min(1e-12)
-    return weights / normalizer.index_select(0, index)
+from ..mp.basis.envelope import polynomial_envelope
+from ..mp.ops import scatter_sum, segment_softmax
 
 
 class CentralityEncoding(Module):
@@ -67,7 +41,7 @@ class CentralityEncoding(Module):
         if idx_i.numel() == 0:
             return basis.new_zeros(n_atoms, self.linear.out_features)
         mapped = self.linear(basis * mask.unsqueeze(-1))
-        return segment_sum_coo(mapped, idx_i, dim_size=n_atoms)
+        return scatter_sum(mapped, idx_i, n_atoms)
 
 
 class GraphormerBlock(Module):
@@ -125,10 +99,10 @@ class GraphormerBlock(Module):
         query, key, value = qkv.unbind(dim=1)
         logits = (query[idx_i] * key[idx_j]).sum(dim=-1) * self.scale
         logits = logits + self.distance_bias(basis)
-        weights = segment_softmax(logits, idx_i, n_atoms) * mask.unsqueeze(-1)
+        weights = segment_softmax(logits, idx_i, n_atoms, clamp_min=1e-12) * mask.unsqueeze(-1)
         message = weights.unsqueeze(-1) * value[idx_j]
         flat = message.reshape(message.shape[0], self.dim)
-        return self.out(segment_sum_coo(flat, idx_i, dim_size=n_atoms))
+        return self.out(scatter_sum(flat, idx_i, n_atoms))
 
     def forward(
         self,

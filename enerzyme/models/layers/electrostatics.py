@@ -3,8 +3,8 @@ import math
 import torch
 from torch import Tensor
 from . import BaseFFLayer
-from ..functional import segment_sum_coo
-from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
+from ..mp.ops import scatter_sum
+from ..mp.basis.envelope import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
 class ChargeConservationLayer(BaseFFLayer):
@@ -46,9 +46,9 @@ class ChargeConservationLayer(BaseFFLayer):
         if batch_seg is None:
             batch_seg = torch.zeros_like(Za, dtype=torch.long)
         #number of atoms per batch (needed for charge scaling)
-        N_per_batch = segment_sum_coo(torch.ones_like(batch_seg), batch_seg)
+        N_per_batch = scatter_sum(torch.ones_like(batch_seg), batch_seg)
         view_shape = (-1, ) if Qa.dim() == 1 else (-1, 1)
-        raw_Q = segment_sum_coo(Qa, batch_seg)
+        raw_Q = scatter_sum(Qa, batch_seg)
         if Q is None: #assume desired total charge zero if not given
             Q = torch.zeros_like(N_per_batch)
         #return scaled charges (such that they have the desired total charge)
@@ -71,9 +71,9 @@ class VelocityConservationLayer(BaseFFLayer):
         self, batch_seg: Tensor, Q_vel_a: Tensor, S_vel_a: Tensor
     ) -> Dict[str, Tensor]:
         ones = torch.ones(batch_seg.shape[0], dtype=Q_vel_a.dtype, device=Q_vel_a.device)
-        N_per = segment_sum_coo(ones, batch_seg)
-        mean_q = segment_sum_coo(Q_vel_a, batch_seg) / N_per
-        mean_s = segment_sum_coo(S_vel_a, batch_seg) / N_per
+        N_per = scatter_sum(ones, batch_seg)
+        mean_q = scatter_sum(Q_vel_a, batch_seg) / N_per
+        mean_s = scatter_sum(S_vel_a, batch_seg) / N_per
         return {
             "Q_vel_a": Q_vel_a - mean_q[batch_seg],
             "S_vel_a": S_vel_a - mean_s[batch_seg],
@@ -224,7 +224,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             blended = f * energy_shifted + (1.0 - f) * force_shifted
             edge = self.pair_kehalf * qi * qj * blended / self.dielectric_constant
             edge = torch.where(r < cutoff, edge, torch.zeros_like(edge))
-        return segment_sum_coo(edge, idx_i, dim_size=len(Qa))
+        return scatter_sum(edge, idx_i, len(Qa))
 
     def get_E_ele_a(self, Dij_lr: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:
         '''
@@ -263,7 +263,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             # combine shielded and ordinary interactions and apply prefactors
             Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary).view(view_shape)
             Eele = torch.where(condition, Eele, zeros)
-        return segment_sum_coo(Eele, idx_i, dim_size=len(Qa))
+        return scatter_sum(Eele, idx_i, len(Qa))
 
 
 def require_uniform_molecular_charge(values: Tensor, batch_seg: Optional[Tensor]) -> None:
@@ -343,21 +343,18 @@ def neutral_charge_equilibration(
             f"total_charge must have 1 or {n_atoms} values, got {target.numel()}"
         )
     require_uniform_molecular_charge(target, batch_seg)
-    counts = segment_sum_coo(
-        torch.ones(n_atoms, 1, dtype=charges.dtype, device=charges.device),
-        batch_seg,
-    )
-    raw_sum = segment_sum_coo(weights, batch_seg)
+    counts = scatter_sum(torch.ones(n_atoms, 1, dtype=charges.dtype, device=charges.device), batch_seg)
+    raw_sum = scatter_sum(weights, batch_seg)
     dead = raw_sum <= 0
     uniform = torch.ones_like(weights) / counts[batch_seg].clamp_min(1)
     effective = torch.where(dead[batch_seg], uniform, weights)
-    summed_weights = segment_sum_coo(effective, batch_seg)
+    summed_weights = scatter_sum(effective, batch_seg)
     summed_weights = summed_weights + torch.where(
         dead,
         torch.zeros_like(summed_weights),
         summed_weights.new_full((), float(eps)),
     )
-    summed_charges = segment_sum_coo(charges, batch_seg)
+    summed_charges = scatter_sum(charges, batch_seg)
     delta = target.unsqueeze(-1) - summed_charges[batch_seg]
     updated = charges + effective / summed_weights[batch_seg] * delta
     return updated.squeeze(-1) if squeezed else updated
@@ -558,4 +555,4 @@ class AtomicCharge2DipoleLayer(BaseFFLayer):
         if batch_seg is None:
             batch_seg = torch.zeros_like(Qa, dtype=torch.long)
         Pa = Qa.unsqueeze(1) * Ra.view((-1, 3, 1) if Qa.dim() > 1 else (-1, 3))
-        return segment_sum_coo(Pa, batch_seg)
+        return scatter_sum(Pa, batch_seg)

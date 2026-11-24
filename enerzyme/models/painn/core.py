@@ -22,7 +22,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
-from ..cutoff import cosine_transition
+from ..mp.basis.envelope import cosine_transition
 from ..layers import BaseFFCore
 from ..layers.gated_equivariant import cartesian_dense
 from .interaction import PaiNNInteraction, PaiNNMixing

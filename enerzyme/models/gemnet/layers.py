@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Module, ModuleList, init
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 
 
 _INV_SQRT_2 = 1.0 / math.sqrt(2.0)
@@ -139,7 +139,7 @@ class BilinearAggregate(Module):
         gathered = msg[idx_src]
         contrib = angular.unsqueeze(-1) * gathered.unsqueeze(1)
         flat = contrib.reshape(contrib.shape[0], -1)
-        summed = segment_sum_coo(flat, idx_dst, dim_size=num_edges)
+        summed = scatter_sum(flat, idx_dst, num_edges)
         sum_k = summed.view(num_edges, angular.shape[-1], self.emb_in)
         mixed = torch.einsum("eil,els->eis", radial_w, sum_k)
         return torch.einsum("eis,sio->eo", mixed, self.weight)
@@ -188,9 +188,7 @@ class AtomUpdate(Module):
         if messages.numel() == 0:
             scattered = messages.new_zeros(num_nodes, self.emb_edge)
         else:
-            scattered = segment_sum_coo(
-                messages * self.dense_rbf(rbf), idx_i, dim_size=num_nodes
-            )
+            scattered = scatter_sum(messages * self.dense_rbf(rbf), idx_i, num_nodes)
         hidden = self.dense(self.scale(scattered))
         for layer in self.residuals:
             hidden = layer(hidden)

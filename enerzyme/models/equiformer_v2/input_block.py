@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import copy
 
-from ..so3 import SO3_Embedding
-from ..blocks.radial_mlp import RadialFunction
+from ..mp.equivariant import SO3_Embedding
+from ..mp.nn.radial_mlp import RadialFunction
 
 
 class EdgeDegreeEmbedding(torch.nn.Module):

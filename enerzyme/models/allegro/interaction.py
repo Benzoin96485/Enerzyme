@@ -16,15 +16,8 @@ import math
 import torch
 from e3nn import o3
 from torch import Tensor, nn
+from ..mp.ops import scatter_sum
 
-
-def scatter_sum(src: Tensor, index: Tensor, n_nodes: int) -> Tensor:
-    """Sum ``src`` onto ``n_nodes`` rows. Empty ``index`` yields zeros."""
-    out = src.new_zeros((n_nodes,) + tuple(src.shape[1:]))
-    if index.numel() == 0:
-        return out
-    out.index_add_(0, index.long(), src)
-    return out
 
 
 class WeightedSphericalChannels(nn.Module):

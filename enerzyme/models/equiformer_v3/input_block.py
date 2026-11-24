@@ -3,8 +3,8 @@
 import torch
 import copy
 
-from ..blocks.radial_mlp import RadialFunctionExpand as RadialFunction
-from ..functional import reduce_edge
+from ..mp.nn.radial_mlp import RadialFunctionExpand as RadialFunction
+from ..mp.ops import scatter_sum
 
 
 class EdgeDegreeEmbedding(torch.nn.Module):
@@ -105,11 +105,7 @@ class EdgeDegreeEmbedding(torch.nn.Module):
         #    x_edge_m0
         #)   # (num_edges, (self.lmax + 1) ** 2, self.num_channels)
 
-        outputs = reduce_edge(
-            inputs=x_edge,
-            edge_index=edge_index[1],
-            output_shape=[atomic_numbers.shape[0], x_edge.shape[1], x_edge.shape[2]]
-        )
+        outputs = scatter_sum(x_edge, edge_index[1], atomic_numbers.shape[0])
         outputs = outputs / self.rescale_factor
         return outputs
     

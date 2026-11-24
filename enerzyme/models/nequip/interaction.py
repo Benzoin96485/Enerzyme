@@ -18,9 +18,9 @@ from e3nn import o3
 from e3nn.nn import Gate, NormActivation
 from torch import Tensor, nn
 
-from ..activation import resolve_scalar_activation
-from ..e3nn_nn import tp_out_irreps_with_instructions
-from ..so3.radial import RadialMLP
+from ..mp.nn.activation import resolve_scalar_activation
+from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions
+from ..mp.nn.radial_mlp import radial_mlp
 
 
 def _parity_key(parity: int) -> str:
@@ -154,7 +154,7 @@ class NequIPInteraction(nn.Module):
                 f"radial_mlp_width must be >= 1 when depth > 0, got {radial_mlp_width}"
             )
         hidden = [int(radial_mlp_width)] * int(radial_mlp_depth)
-        self.radial_mlp = RadialMLP(
+        self.radial_mlp = radial_mlp(
             int(num_rbf), self.tp.weight_numel, hidden=hidden, bias=False
         )
         self.sc: Optional[o3.FullyConnectedTensorProduct]

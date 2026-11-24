@@ -55,7 +55,7 @@ def build_complete_graph(num_nodes: int) -> Tensor:
 
 def deterministic_edge_rot_mat(edge_distance_vec: Tensor) -> Tensor:
     """Shared frame builder for parity (Enerzyme-style least-aligned helper)."""
-    from enerzyme.models.so3 import init_edge_rot_mat
+    from enerzyme.models.mp.equivariant import init_edge_rot_mat
 
     return init_edge_rot_mat(edge_distance_vec)
 
@@ -71,7 +71,7 @@ def assert_close(a: Tensor, b: Tensor, atol: float = 1e-5, rtol: float = 1e-5) -
 
 def build_so3_grids(lmax: int, resolution: int | None = None):
     """Parallel ModuleLists of SO3 grids for official and Enerzyme."""
-    from enerzyme.models.so3 import build_so3_grid_table
+    from enerzyme.models.mp.equivariant import build_so3_grid_table
     from so3 import SO3_Grid as Off_Grid
 
     ez = build_so3_grid_table(
@@ -111,7 +111,7 @@ def copy_state_dict(dst: torch.nn.Module, src: torch.nn.Module) -> None:
 
 
 def build_so2_pair(hparams: Dict | None = None):
-    from enerzyme.models.so3 import SO2Block as EZ_SO2
+    from enerzyme.models.mp.equivariant import SO2Block as EZ_SO2
     from escn_blocks import SO2Block as Off_SO2
 
     h = {**PARITY_HPARAMS, **(hparams or {})}

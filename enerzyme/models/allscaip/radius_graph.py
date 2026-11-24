@@ -9,10 +9,10 @@ from typing import Sequence
 
 import torch
 
+from ..mp.ops import safe_norm
 from .radius_utils import (
     envelope_fn,
     hard_rank,
-    safe_norm,
     soft_rank,
     soft_rank_low_mem,
 )

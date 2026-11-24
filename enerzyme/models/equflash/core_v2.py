@@ -25,7 +25,7 @@ from e3nn import o3
 from torch import Tensor
 from torch.nn import Identity, Module, ModuleList
 
-from ..e3nn_nn import scalar_0e_dim
+from ..mp.equivariant.e3nn import scalar_0e_dim
 from ..layers import BaseFFCore
 from .interaction_v2 import INTERACTION_TYPES, FeedForwardBlock
 from .irreps import equflash_schedule, parse_schedule, spherical_harmonics_irreps

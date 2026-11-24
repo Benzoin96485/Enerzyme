@@ -67,7 +67,7 @@ def test_dpa4_shapes_and_geometry_autograd():
 
 
 def test_dpa4_wigner_blocks_are_orthogonal_and_differentiable():
-    from enerzyme.models.so3.wigner_quaternion import (
+    from enerzyme.models.mp.equivariant.rotation.wigner_quaternion import (
         WignerDCalculator,
         quaternion_normalize,
     )

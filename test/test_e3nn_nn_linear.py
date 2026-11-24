@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from e3nn import o3
 
-from enerzyme.models.e3nn_nn.linear import (
+from enerzyme.models.mp.equivariant.e3nn.linear import (
     ElementIrrepsLinear,
     IrrepsLinear,
     _add_0e_bias,

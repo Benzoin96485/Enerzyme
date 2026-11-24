@@ -16,7 +16,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module
 
-from ..cutoff import polynomial_envelope
+from ..mp.basis.envelope import polynomial_envelope
 from ..dimenet.basis import (
     real_sph_harm_l0,
     spherical_bessel_normalizer,

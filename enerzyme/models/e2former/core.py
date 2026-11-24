@@ -23,7 +23,7 @@ from ..layers import (
     DistanceLayer,
     RangeSeparationLayer,
 )
-from ..so3 import build_so3_grid_table, get_normalization_layer
+from ..mp.equivariant import build_so3_grid_table, get_normalization_layer
 from .embedding import EdgeDegreeEmbeddingHigherOrder
 from .graph import build_topk_neighborhood
 from .interaction import TransBlock

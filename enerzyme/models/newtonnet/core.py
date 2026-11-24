@@ -27,7 +27,7 @@ from typing import Dict, List
 import torch
 from torch import Tensor, nn
 
-from ..cutoff import polynomial_envelope
+from ..mp.basis.envelope import polynomial_envelope
 from ..layers import BaseFFCore
 from .interaction import NewtonNetPaperInteraction, NewtonNetRepoInteraction
 

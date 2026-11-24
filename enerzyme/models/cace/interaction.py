@@ -18,6 +18,7 @@ from typing import FrozenSet, Iterable, Union
 
 import torch
 from torch import Tensor, nn
+from ..mp.ops import scatter_sum
 
 
 MessageSpec = Union[str, Iterable[str]]
@@ -56,13 +57,6 @@ def parse_messages(spec: MessageSpec) -> FrozenSet[str]:
         raise ValueError("CACE message passing needs at least one message")
     return frozenset(kinds)
 
-
-def scatter_sum(src: Tensor, index: Tensor, n_nodes: int) -> Tensor:
-    """Sum ``src`` onto ``n_nodes`` rows. An empty edge list yields zeros."""
-    out = src.new_zeros((n_nodes,) + tuple(src.shape[1:]))
-    if index.numel() == 0:
-        return out
-    return out.index_add_(0, index.long(), src)
 
 
 class RadialChannelMix(nn.Module):

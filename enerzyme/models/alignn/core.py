@@ -10,7 +10,7 @@ stay outside.
 ``vij_sr = R[source] - R[destination]``. The neighbor list is the graph
 cutoff. The released force field does not put a smooth envelope on the
 messages; ``multiply_envelope`` scales only the initial bond embedding by
-:func:`enerzyme.models.cutoff.polynomial_envelope`, the same optional
+:func:`enerzyme.models.mp.basis.envelope.polynomial_envelope`, the same optional
 cutoff as ``ALIGNNAtomWise``.
 """
 
@@ -22,7 +22,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
-from ..cutoff import polynomial_envelope
+from ..mp.basis.envelope import polynomial_envelope
 from ..layers._base_layer import BaseFFCore
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.geometry import RangeSeparationLayer

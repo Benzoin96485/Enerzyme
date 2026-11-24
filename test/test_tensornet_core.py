@@ -172,7 +172,7 @@ def test_unknown_group_and_cutoff_mismatch_raise():
 
 
 def test_embedding_and_interaction_match_reference_wiring():
-    from enerzyme.models.functional import reduce_edge
+    from enerzyme.models.mp.ops import scatter_sum
     from enerzyme.models.tensornet.interaction import TensorNetEmbedding, TensorNetInteraction
     from enerzyme.models.tensornet.ops import (
         compose_tensor,
@@ -218,18 +218,10 @@ def test_embedding_and_interaction_match_reference_wiring():
         dim=1,
     )
     processed = window[:, None, None] * pair[:, None, :] * radial
-    iso = reduce_edge(processed[:, 0], graph["idx_i_sr"], (n, features))
-    vector = reduce_edge(
-        processed[:, 1, None, :] * hat[:, :, None],
-        graph["idx_i_sr"],
-        (n, 3, features),
-    )
+    iso = scatter_sum(processed[:, 0], graph["idx_i_sr"], n)
+    vector = scatter_sum(processed[:, 1, None, :] * hat[:, :, None], graph["idx_i_sr"], n)
     outer = hat[:, :, None] * hat[:, None, :]
-    symmetric = reduce_edge(
-        processed[:, 2, None, None, :] * outer[:, :, :, None],
-        graph["idx_i_sr"],
-        (n, 3, 3, features),
-    )
+    symmetric = scatter_sum(processed[:, 2, None, None, :] * outer[:, :, :, None], graph["idx_i_sr"], n)
     skew = vector_to_skew_tensor(vector)
     traceless = symmetric_traceless(symmetric)
     features_t = compose_tensor(iso, skew, traceless)
@@ -264,19 +256,9 @@ def test_embedding_and_interaction_match_reference_wiring():
     traceless_n = interaction.linears_tensor[2](traceless_n)
     node = compose_tensor(iso_n, skew_n, traceless_n)
     vec = skew_tensor_to_vector(skew_n)
-    iso_m = reduce_edge(
-        edge[:, 0] * iso_n[graph["idx_j_sr"]], graph["idx_i_sr"], (n, features)
-    )
-    vec_m = reduce_edge(
-        edge[:, 1, None, :] * vec[graph["idx_j_sr"]],
-        graph["idx_i_sr"],
-        (n, 3, features),
-    )
-    traceless_m = reduce_edge(
-        edge[:, 2, None, None, :] * traceless_n[graph["idx_j_sr"]],
-        graph["idx_i_sr"],
-        (n, 3, 3, features),
-    )
+    iso_m = scatter_sum(edge[:, 0] * iso_n[graph["idx_j_sr"]], graph["idx_i_sr"], n)
+    vec_m = scatter_sum(edge[:, 1, None, :] * vec[graph["idx_j_sr"]], graph["idx_i_sr"], n)
+    traceless_m = scatter_sum(edge[:, 2, None, None, :] * traceless_n[graph["idx_j_sr"]], graph["idx_i_sr"], n)
     message = compose_tensor(iso_m, vector_to_skew_tensor(vec_m), traceless_m)
     scale = (1 + 0.1 * charge)[:, None, None, None]
     mixed = scale * tensor_anticommutator(node, message)

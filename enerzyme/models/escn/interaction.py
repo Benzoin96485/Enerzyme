@@ -10,7 +10,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from ..so3 import SO2Block, SO3Grid
+from ..mp.equivariant import SO2Block, SO3Grid
 
 
 class EdgeBlock(torch.nn.Module):

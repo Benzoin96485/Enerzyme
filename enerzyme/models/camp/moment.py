@@ -15,6 +15,7 @@ from torch import Tensor, nn
 
 from .radial import SpeciesPairChebyshev, resolve_hidden_layers, silu_mlp
 from .rules import atomic_paths, hyper_moment_rules
+from ..mp.ops import scatter_sum
 
 
 def cartesian_dyads(vectors: Tensor, max_rank: int, eps: float = 1e-12) -> Dict[int, Tensor]:
@@ -94,16 +95,6 @@ def contract_moments(moments: Dict[int, Tensor], ranks: Sequence[int]) -> Tensor
         return reduced.squeeze(-1)
     return reduced.reshape(channels, nodes, *([3] * out_rank))
 
-
-def scatter_sum(src: Tensor, index: Tensor, n_nodes: int) -> Tensor:
-    """Sum ``src`` of shape ``(C, E, ...)`` onto nodes along the edge axis."""
-    channels, edges = src.shape[:2]
-    rest = src.shape[2:]
-    out = src.new_zeros(n_nodes, channels, *rest)
-    if edges:
-        message = src.movedim(1, 0).contiguous()
-        out.index_add_(0, index.long(), message)
-    return out.movedim(0, 1)
 
 
 class ChannelMix(nn.Module):
@@ -199,7 +190,7 @@ class AtomicMoment(nn.Module):
                     feature, dyads[dyad_rank], feature_rank, dyad_rank
                 )
                 view = weight.reshape(weight.shape + (1,) * rank)
-                pieces.append(scatter_sum(view * contracted, receivers, n_atoms) / self.norm)
+                pieces.append(scatter_sum(view * contracted, receivers, n_atoms, dim=1) / self.norm)
             combined = pieces[0] if len(pieces) == 1 else self.path_mix[str(rank)](torch.stack(pieces))
             moments[rank] = self.channel_mix[str(rank)](combined)
         return moments

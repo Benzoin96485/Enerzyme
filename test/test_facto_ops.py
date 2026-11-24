@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 
 def test_facto_polynomial_matches_closed_form_and_derivative():
-    from enerzyme.models.cutoff import facto_pair_window, facto_polynomial_cutoff
+    from enerzyme.models.mp.basis.envelope import facto_pair_window, facto_polynomial_cutoff
 
     cutoff = 6.0
     distance = torch.tensor([0.0, 1e-6, 0.5, 3.0, 5.9, 6.0, 7.0], dtype=torch.float64)
@@ -72,7 +72,7 @@ def test_gaussian_centers_width_and_filters_vanish_with_the_window():
     assert torch.allclose(edge.xi[0][[0, 3]], torch.zeros(2, 4), atol=1e-6)
     assert torch.isfinite(edge.harmonics[0]).all()
     # Between Rs and Rc the inner window is closed, so χ is the outer cutoff.
-    from enerzyme.models.cutoff import facto_polynomial_cutoff
+    from enerzyme.models.mp.basis.envelope import facto_polynomial_cutoff
 
     assert torch.allclose(
         edge.chi[2], facto_polynomial_cutoff(distance[2], 6.0), atol=1e-12

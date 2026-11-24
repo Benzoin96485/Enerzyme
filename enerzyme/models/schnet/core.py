@@ -8,9 +8,9 @@ import torch
 from torch import Tensor
 from torch.nn import Linear, Module, ModuleList
 from .interaction import InteractionBlock
-from ..blocks.mlp import DenseLayer
+from ..mp.nn.mlp import DenseLayer
 from ..layers import BaseFFCore, DistanceLayer, RangeSeparationLayer
-from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, get_activation_fn
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, get_activation_fn
 
 
 DEFAULT_BUILD_PARAMS = {

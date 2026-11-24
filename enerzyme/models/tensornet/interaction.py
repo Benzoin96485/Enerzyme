@@ -19,7 +19,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, LayerNorm, Module, ModuleList
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 from .ops import (
     compose_tensor,
     decompose_tensor,
@@ -45,18 +45,10 @@ def aggregate_edge_tensors(
     product is symmetrized and made traceless after the sum.
     """
     width = int(processed.shape[-1])
-    iso = reduce_edge(processed[:, 0, :], idx_i, (n_atoms, width))
-    vector = reduce_edge(
-        processed[:, 1, None, :] * hat.unsqueeze(-1),
-        idx_i,
-        (n_atoms, 3, width),
-    )
+    iso = scatter_sum(processed[:, 0, :], idx_i, n_atoms)
+    vector = scatter_sum(processed[:, 1, None, :] * hat.unsqueeze(-1), idx_i, n_atoms)
     outer = hat.unsqueeze(-1) * hat.unsqueeze(-2)
-    symmetric = reduce_edge(
-        processed[:, 2, None, None, :] * outer.unsqueeze(-1),
-        idx_i,
-        (n_atoms, 3, 3, width),
-    )
+    symmetric = scatter_sum(processed[:, 2, None, None, :] * outer.unsqueeze(-1), idx_i, n_atoms)
     return iso, vector_to_skew_tensor(vector), symmetric_traceless(symmetric)
 
 
@@ -162,15 +154,9 @@ def tensor_message_update(
     node = compose_tensor(iso, skew, traceless)
 
     vector = skew_tensor_to_vector(skew)
-    iso_m = reduce_edge(edge[:, 0, :] * iso[idx_j], idx_i, (n_atoms, width))
-    vector_m = reduce_edge(
-        edge[:, 1, None, :] * vector[idx_j], idx_i, (n_atoms, 3, width)
-    )
-    traceless_m = reduce_edge(
-        edge[:, 2, None, None, :] * traceless[idx_j],
-        idx_i,
-        (n_atoms, 3, 3, width),
-    )
+    iso_m = scatter_sum(edge[:, 0, :] * iso[idx_j], idx_i, n_atoms)
+    vector_m = scatter_sum(edge[:, 1, None, :] * vector[idx_j], idx_i, n_atoms)
+    traceless_m = scatter_sum(edge[:, 2, None, None, :] * traceless[idx_j], idx_i, n_atoms)
     message = compose_tensor(iso_m, vector_to_skew_tensor(vector_m), traceless_m)
     scale = charge_scale[:, None, None, None]
     if equivariance_group == "O(3)":

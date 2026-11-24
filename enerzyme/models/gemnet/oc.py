@@ -17,7 +17,7 @@ import torch
 from torch import Tensor
 from torch.nn import Module, ModuleList
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 from .layers import (
     AtomUpdate,
     BilinearAggregate,
@@ -130,7 +130,7 @@ class EdgeAtomInteraction(Module):
             aggregated = self.scale_cbf(
                 self.bilinear(x, idx_other, idx_edge, angular, radial_w, n_aux)
             )
-            scattered = segment_sum_coo(aggregated, receiver, dim_size=num_nodes)
+            scattered = scatter_sum(aggregated, receiver, num_nodes)
         return self.up(scattered)
 
 
@@ -159,9 +159,7 @@ class AtomPairInteraction(Module):
         else:
             sender = self.down(h)[idx_j]
             outer = rbf.unsqueeze(-1) * sender.unsqueeze(-2)
-            mixed = segment_sum_coo(
-                outer.reshape(outer.shape[0], -1), idx_i, dim_size=num_nodes
-            )
+            mixed = scatter_sum(outer.reshape(outer.shape[0], -1), idx_i, num_nodes)
         return self.up(self.scale(self.bilinear(mixed)))
 
 

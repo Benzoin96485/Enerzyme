@@ -5,8 +5,9 @@ from torch import Tensor
 from torch.nn import Parameter
 import torch.nn.functional as F
 from .. import BaseFFLayer
-from ...functional import softplus_inverse, segment_sum_coo
-from ...cutoff import smooth_transition
+from ...functional import softplus_inverse
+from ...mp.ops import scatter_sum
+from ...mp.basis.envelope import smooth_transition
 
 
 """
@@ -221,7 +222,7 @@ class GrimmeD4EnergyLayer(BaseFFLayer):
         if self.cutoff is not None:
             tmp = tmp * smooth_transition(Dij_lr_, self.cutoff, self.cuton)
 
-        covcn = segment_sum_coo(tmp, idx_i, dim_size=len(Za))
+        covcn = scatter_sum(tmp, idx_i, len(Za))
 
         # calculate gaussian weights
         gweights = torch.sum(
@@ -299,5 +300,5 @@ class GrimmeD4EnergyLayer(BaseFFLayer):
         s6 = F.softplus(self._s6)
         s8 = F.softplus(self._s8)
         pairwise = -c6ij * (s6 * oor6 + s8 * sqrt_r4r2ij ** 2 * oor8) * self.Hartree_in_E / 2
-        edisp = segment_sum_coo(pairwise, idx_i, dim_size=len(Za))
+        edisp = scatter_sum(pairwise, idx_i, len(Za))
         return edisp
