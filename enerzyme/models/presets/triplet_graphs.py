@@ -374,6 +374,7 @@ def chgnet(
     )
     from torch.nn import Linear
     from ..chgnet.basis import FourierExpansion
+    from ..chgnet.geometry import BondGraphRequest
     from ..chgnet.interaction import AtomConv, BondConv, AngleUpdate, _feature_norm
 
     if int(dim_embedding) < 1:
@@ -498,9 +499,7 @@ def chgnet(
         embed,
         blocks,
         head,
-        GraphRequires(optional_cutoff_values=False, fields=("rbf_bg",), topology=(
-            ReverseEdgeRequest(rtol=1e-5, metric="max", distinct=True),
-            TripletRequest("receiver", cutoff=bond_cutoff))),
+        GraphRequires(optional_cutoff_values=False, fields=("rbf_bg",), topology=(BondGraphRequest(bond_cutoff),)),
         builder=build_stack,
         positional_fields=("atom_embedding", "rbf", "rbf_bg", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         architecture="chgnet",
@@ -809,7 +808,8 @@ def gemnet(
     )
     blocks = [GemNetBlock(interaction) for interaction in interactions]
     head = GemNetHead(readouts, output_mode, include_nodes=False)
-    topology = (ReverseEdgeRequest(emb_cutoff), TripletRequest("receiver", edge_cutoff=emb_cutoff))
+    topology = (ReverseEdgeRequest(emb_cutoff), TripletRequest("receiver", edge_cutoff=emb_cutoff,
+                                                             exclude_same_sender=True))
     if not triplets_only:
         topology += (QuadrupletRequest(emb_cutoff, int_cutoff),)
     return ComposableCore(

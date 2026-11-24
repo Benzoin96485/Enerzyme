@@ -27,8 +27,7 @@ from torch.nn import Module
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.geometry import RangeSeparationLayer
 from ..layers.rbf import BaseRBF, BesselRBFLayer
-from ..m3gnet.geometry import ThreeBodyPairs
-from .geometry import directed_bond_angle, undirected_bonds
+from .geometry import BondGraphRequest, directed_bond_angle
 
 
 HiddenSpec = Union[int, Sequence[int], None]
@@ -111,10 +110,7 @@ class CHGNetEmbed(Embed):
                 raise ValueError(
                     f"{name} must be (E, {self.num_rbf}), got {tuple(basis.shape)} " f"for {n_edges} edges"
                 )
-        bonds = undirected_bonds(ctx)
-        first, second = ctx.triplets("receiver", cutoff=self.bond_cutoff)
-        keep = Dij_sr[second] < self.bond_cutoff
-        angles = ThreeBodyPairs(first[keep], second[keep])
+        bonds, angles = BondGraphRequest(self.bond_cutoff).prepare(ctx)
         if bonds.representative.numel() == 0:
             bond = self.bond_embed(rbf.new_zeros(0, self.num_rbf))
             atom_weight = self.atom_weight(rbf.new_zeros(0, self.num_rbf))

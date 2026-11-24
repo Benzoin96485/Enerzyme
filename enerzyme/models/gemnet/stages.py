@@ -99,9 +99,7 @@ class GemNetEmbed(Embed):
         idx_i, idx_j = embedding.receiver, embedding.sender
         rbf_emb = embedding.rbf
         swap = embedding.reverse_edge()
-        edge, other = embedding.triplets("receiver")
-        distinct = idx_j[edge] != idx_j[other]
-        edge, other = edge[distinct], other[distinct]
+        edge, other = embedding.triplets("receiver", exclude_same_sender=True)
         angles = angle_between(embedding.vec[edge], embedding.vec[other])
         angular3 = y_lm0(angles, self.num_spherical)
         radial_w3 = self.mlp_cbf3(self.triplet_radial(embedding.dist))

@@ -13,7 +13,7 @@ share those results and can cache additional quantities for this forward pass.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Any, Callable, Dict, Hashable, NamedTuple, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Hashable, NamedTuple, Optional, Protocol, Set, Tuple
 
 import torch
 from torch import Tensor
@@ -26,6 +26,10 @@ EDGE_CONVENTIONS = ("receiver_i", "swap")
 _OPPOSITE_TOL = 1e-4
 
 
+class TopologyRequest(Protocol):
+    def prepare(self, ctx: "GraphContext") -> Any: ...
+
+
 @dataclass(frozen=True)
 class TripletRequest:
     """A path, receiver or line graph; indices refer to the selected edge list."""
@@ -36,11 +40,12 @@ class TripletRequest:
     include_self: bool = False
     strict: bool = False
     exclude_backtracking: bool = False
+    exclude_same_sender: bool = False
 
     def prepare(self, ctx):
         return ctx.within(self.edge_cutoff).triplets(
             self.kind, cutoff=self.cutoff, include_self=self.include_self, strict=self.strict,
-            exclude_backtracking=self.exclude_backtracking)
+            exclude_backtracking=self.exclude_backtracking, exclude_same_sender=self.exclude_same_sender)
 
 
 @dataclass(frozen=True)
@@ -56,14 +61,9 @@ class QuadrupletRequest:
 @dataclass(frozen=True)
 class ReverseEdgeRequest:
     edge_cutoff: Optional[float] = None
-    atol: float = _OPPOSITE_TOL
-    rtol: float = 0.0
-    metric: str = "l2"
-    distinct: bool = False
 
     def prepare(self, ctx):
-        return ctx.within(self.edge_cutoff).reverse_edge(
-            atol=self.atol, rtol=self.rtol, metric=self.metric, distinct=self.distinct)
+        return ctx.within(self.edge_cutoff).reverse_edge()
 
 
 @dataclass(frozen=True)
@@ -113,7 +113,7 @@ class GraphRequires:
     fields: Tuple[str, ...] = ()
     optional_fields: Tuple[str, ...] = ()
     path_triplets: bool = False
-    topology: tuple[TripletRequest | QuadrupletRequest | ReverseEdgeRequest, ...] = ()
+    topology: tuple[TopologyRequest, ...] = ()
     csr: bool = False
     unit: bool = False
     harmonics: Tuple[HarmonicsRequest, ...] = ()
@@ -595,9 +595,16 @@ class GraphContext:
         return self.cached(("cross_pairs", other), lambda: cross_receiver_pairs(
             self.receiver, other.receiver, self.num_nodes, csr=other.csr()))
 
-    def triplets(self, kind, *, cutoff=None, include_self=False, strict=False, exclude_backtracking=False):
+    def triplets(self, kind, *, cutoff=None, include_self=False, strict=False, exclude_backtracking=False,
+                 exclude_same_sender=False):
         """Ordered edge pairs in receiver, directed path, or DGL line-graph order."""
         if kind == "receiver":
+            if exclude_same_sender:
+                def distinct():
+                    first, second = self.receiver_pairs(cutoff, include_self, strict)
+                    keep = self.sender[first] != self.sender[second]
+                    return EdgePairs(first[keep], second[keep])
+                return self.cached(("receiver_pairs", cutoff, include_self, strict, "distinct_sender"), distinct)
             return self.receiver_pairs(cutoff, include_self, strict)
         if kind in ("path", "line_graph"):
             return self.path_pairs("atom" if kind == "line_graph" else "outgoing", exclude_backtracking)

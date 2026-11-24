@@ -10,6 +10,7 @@ the reference code's strict cutoff on the second edge.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import NamedTuple
 
 import torch
@@ -71,6 +72,22 @@ def undirected_bonds(ctx, atol=_PAIR_ATOL):
     directed[representative] = bonds
     directed[reverse[representative]] = bonds
     return UndirectedBonds(directed, representative)
+
+
+@dataclass(frozen=True)
+class BondGraphRequest:
+    """CHGNet's undirected bond and ordered angle indices at its bond cutoff."""
+
+    cutoff: float
+    force_cache_key = "chgnet_bonds"
+
+    def prepare(self, ctx):
+        def indices():
+            bonds = undirected_bonds(ctx)
+            first, second = ctx.triplets("receiver", cutoff=self.cutoff)
+            keep = ctx.dist[second] < self.cutoff
+            return bonds, ThreeBodyPairs(first[keep], second[keep])
+        return ctx.cached(self.force_cache_key, indices)
 
 
 def bond_graph(
