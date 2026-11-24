@@ -24,15 +24,21 @@ class FilterMessage(nn.Module):
         filter: nn.Module,
         pre: Optional[nn.Module] = None,
         envelope: Optional[Callable[[Tensor], Tensor]] = None,
+        edge_envelope: bool = False,
     ) -> None:
         super().__init__()
         self.filter = filter
         self.pre = pre
+        if edge_envelope and envelope is not None:
+            raise ValueError("choose one source for the edge envelope")
+        self.edge_envelope = edge_envelope
         self.envelope = envelope
 
     def forward(self, state: BlockState, ctx: GraphContext) -> Tensor:
         weight = self.filter(ctx.rbf)
-        if self.envelope is not None:
+        if self.edge_envelope:
+            weight = weight * state.edge
+        elif self.envelope is not None:
             weight = weight * self.envelope(ctx.dist).view(-1, 1)
         x = state.scalar if self.pre is None else self.pre(state.scalar)
         # index_select backpropagates through index_add_; x[sender] would use the much slower accumulating index_put_ on CPU.

@@ -161,7 +161,7 @@ class BaseFFCore(BaseFFModule):
                 net_output = layer(net_output)
         return net_output
     
-    def adopt_radius_stack(self, built_layers: List[Module]) -> None:
+    def adopt_radius_stack(self, built_layers: List[Module], *, vectors: bool = True) -> None:
         """Place radius geometry, embeddings, and post-core heads around this Core.
 
         The Core inserts its own :class:`DistanceLayer` (``vij_lr``). A
@@ -174,7 +174,8 @@ class BaseFFCore(BaseFFModule):
         from .geometry import DistanceLayer, RangeSeparationLayer
 
         self.calculate_distance = DistanceLayer()
-        self.calculate_distance.with_vector_on("vij_lr")
+        if vectors:
+            self.calculate_distance.with_vector_on("vij_lr")
         self.calculate_distance.reset_field_name(Dij="Dij_lr")
         self.pre_sequence.append(self.calculate_distance)
         pre_core = True
