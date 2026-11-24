@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import math
 from pathlib import Path
 
@@ -423,3 +424,46 @@ def test_layer_stack_energy_forces_and_wrong_basis():
         assert "SimpleReadout" in str(exc)
     else:
         raise AssertionError("HierachicalReadout must be rejected")
+
+
+def test_compiled_spin_force_training_uses_live_pruned_edges_and_preserves_empty_gradients():
+    from enerzyme.models.ff import build_model, get_ff_core
+
+    torch.manual_seed(31)
+    _, defaults, layers = get_ff_core("spinconv")
+    layers = copy.deepcopy(layers)
+    core = next(layer["params"] for layer in layers if layer["name"] == "Core")
+    core.update(num_interactions=1, sphere_size_lat=4, sphere_size_long=4,
+                max_num_neighbors=1, num_embedding_basis=4, scale_distances=True)
+    dimensions = dict(defaults, dim_embedding=8, num_rbf=4, hidden_channels=8, mid_hidden_channels=16)
+    model = build_model("spinconv", layers, dimensions, verbose=0).double().train()
+    calls = []
+    def capture(graph, _):
+        calls.extend(getattr(n.target, "__name__", str(n.target)) for n in graph.graph.nodes)
+        return graph.forward
+    compiled = torch.compile(model, backend=capture)
+
+    pos = torch.tensor([[0., 0., 0.], [0.7, 0.1, 0.], [1.9, 0., 0.1], [0.1, 2.2, 0.3]], dtype=torch.double)
+    i, j = _edges(len(pos))
+    def step(runner, edges):
+        model.zero_grad(set_to_none=True)
+        output = runner({"Ra": pos.clone().requires_grad_(), "Za": torch.tensor([1, 6, 7, 8]),
+                         "batch_seg": torch.zeros(4, dtype=torch.long), "N": torch.tensor([4]),
+                         "idx_i": i[:edges], "idx_j": j[:edges]})
+        (output["E"].square().sum() + output["Fa"].square().sum()).backward()
+        grads = {name: p.grad.clone() for name, p in model.named_parameters() if p.grad is not None}
+        return output["E"], output["Fa"], grads
+
+    for count in (len(i), 0):
+        energy, forces, grads = step(model, count)
+        actual_energy, actual_forces, actual_grads = step(compiled, count)
+        torch.testing.assert_close((actual_energy, actual_forces), (energy, forces))
+        assert set(actual_grads) == set(grads)
+        for name, gradient in grads.items():
+            torch.testing.assert_close(actual_grads[name], gradient)
+        if count:
+            gain = next(gradient for name, gradient in grads.items() if "pair_scale.gain" in name)
+            assert torch.count_nonzero(gain)
+        else:
+            assert not torch.count_nonzero(actual_forces)
+    assert "conv1d" in calls and "linear" in calls

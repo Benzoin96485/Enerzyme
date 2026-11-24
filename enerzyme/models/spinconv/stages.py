@@ -30,7 +30,7 @@ from torch.nn import Module
 from ..mp.ops import scatter_sum
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.rbf import GaussianRBFLayer, gaussian_expansion
-from .geometry import symmetric_neighbor_mask, sphere_projection
+from .geometry import SpinProjectionRequest
 
 
 class SpinConvEmbed(Embed):
@@ -54,10 +54,7 @@ class SpinConvEmbed(Embed):
         super().__init__()
         self.dim_embedding = dim_embedding
         self.num_rbf = num_rbf
-        self.max_num_neighbors = max_num_neighbors
-        self.cutoff = cutoff
-        self.n_lat = n_lat
-        self.n_long = n_long
+        self.projection = SpinProjectionRequest(max_num_neighbors, cutoff, n_lat, n_long)
         self.act = act
         self.distance_map = distance_map
         self.init_fc1 = init_fc1
@@ -100,31 +97,16 @@ class SpinConvEmbed(Embed):
                 f"Dij_sr {tuple(Dij_sr.shape)}, vij_sr {tuple(vij_sr.shape)}, "
                 f"idx_i_sr {tuple(idx_i_sr.shape)}, idx_j_sr {tuple(idx_j_sr.shape)}"
             )
-        if edges and (
-            int(idx_i_sr.min()) < 0
-            or int(idx_j_sr.min()) < 0
-            or int(idx_i_sr.max()) >= num_nodes
-            or int(idx_j_sr.max()) >= num_nodes
-        ):
-            raise ValueError("edge indices are outside the atom range")
 
     def forward(self, inputs, ctx):
         self._check_inputs(
             inputs["atom_embedding"], ctx.rbf, ctx.dist, ctx.vec, ctx.receiver, ctx.sender, inputs["Za"]
         )
         num_nodes = int(inputs["atom_embedding"].shape[0])
-        idx_i = ctx.receiver.long()
-        idx_j = ctx.sender.long()
-        distance = ctx.dist
-        vij = ctx.vec
-        basis = ctx.rbf
-        edges = ctx
-        if idx_i.numel():
-            keep = symmetric_neighbor_mask(idx_i, idx_j, distance, num_nodes, self.max_num_neighbors)
-            if not bool(keep.all()):
-                edges = ctx.subset(keep)
-                idx_i, idx_j = edges.receiver, edges.sender
-                distance, vij, basis = edges.dist, edges.vec, edges.rbf
+        selected, projection = self.projection.prepare(ctx)
+        edges = ctx if selected is None else ctx.subset(selected)
+        idx_i, idx_j = edges.receiver, edges.sender
+        distance, vij, basis = edges.dist, edges.vec, edges.rbf
 
         if self.pair_scale is not None:
             scaled = self.pair_scale(distance, inputs["Za"][idx_j], inputs["Za"][idx_i])
@@ -132,10 +114,6 @@ class SpinConvEmbed(Embed):
         distance_embed = self.distance_map(basis)
         hidden = self.act(self.init_fc2(self.act(self.init_fc1(distance_embed))))
         messages = self.init_mix(hidden, inputs["atom_embedding"], idx_j, idx_i)
-        projection = sphere_projection(
-            vij, idx_i, idx_j, distance, self.cutoff, num_nodes, self.n_lat, self.n_long,
-            pairs=edges.triplets("path"),
-        )
         ctx.cache["spin_graph"] = (
             distance_embed,
             inputs["atom_embedding"],

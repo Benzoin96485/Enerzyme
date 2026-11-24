@@ -649,7 +649,7 @@ def spinconv(
         embed,
         blocks,
         head,
-        GraphRequires(optional_cutoff_values=False, fields=("Za",)),
+        GraphRequires(optional_cutoff_values=False, fields=("Za",), topology=(embed.projection,)),
         builder=build_stack,
         positional_fields=("atom_embedding", "rbf", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr", "Za"),
         architecture="spinconv",

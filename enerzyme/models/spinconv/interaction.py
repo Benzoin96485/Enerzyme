@@ -103,6 +103,9 @@ class EmbeddingBlock(Module):
 
 def _reject_atomic_numbers(za: Tensor, span: int) -> None:
     """Require every atomic number to index the species-pair table."""
+    if torch.compiler.is_compiling():
+        torch._assert_async(((za >= 0) & (za < span)).all(), f"atomic numbers must lie in 0..max_Za ({span - 1})")
+        return
     if za.numel() == 0:
         return
     low = int(za.min())
