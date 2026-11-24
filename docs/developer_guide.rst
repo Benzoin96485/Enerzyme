@@ -234,8 +234,8 @@ calls request reusable saved tensors with
 On CPU, ordinary Inductor compiles the CACE and GRACE force calculations with
 scalar C++ kernels. This preserves their coordinate and parameter derivatives
 on PyTorch 2.13, where the vectorized kernels can terminate the process. The
-default EquiformerV3 training graph and the Nequix FX training graph use the
-same setting. The model restores the compiler settings before returning. An
+default EquiformerV3 training graph and the Nequix and EquFlashV2 FX training
+graphs use the same setting. The model restores the compiler settings before returning. An
 explicit conflicting backend override uses native derivatives for that call.
 
 .. code-block:: shell

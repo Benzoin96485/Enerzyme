@@ -45,6 +45,7 @@ def test_fx_codegen_preserves_checkpoint_derivatives_and_captures_contractions(a
 
 
 @pytest.mark.parametrize("architecture,dtype", [
+    ("equflash_v2", torch.float32),
     ("equflash_v2", torch.float64),
     ("equiformer", torch.float32),
     ("equiformer", torch.float64),
@@ -67,7 +68,7 @@ def test_fx_cpu_force_training_matches_scripted_derivatives(architecture, dtype)
         from torch._functorch import config as autograd_config
         from torch._inductor import config
 
-        compiled_expected = (architecture == "nequix" and hasattr(config.cpp, "simdlen")
+        compiled_expected = (architecture in ("nequix", "equflash_v2") and hasattr(config.cpp, "simdlen")
                              and hasattr(autograd_config, "force_non_lazy_backward_lowering"))
         for key in ("E", "Fa"):
             torch.testing.assert_close(actual[key], expected[key])
