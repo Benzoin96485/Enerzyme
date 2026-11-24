@@ -230,6 +230,13 @@ KEY_MAPS["allscaip"] = [
 ]
 
 
+_ORBITAL_KEYS = [
+    (r"^(rs|inta|hyper|coeff)\b", r"embed.\1"),
+    (r"^updates\.", "blocks."),
+]
+KEY_MAPS["reann"] = KEY_MAPS["equireann"] = _ORBITAL_KEYS
+
+
 def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:
     out = {}
     for key, value in state.items():

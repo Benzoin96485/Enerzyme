@@ -8,11 +8,10 @@ The Core is the map from a chemical embedding to invariant ACE densities.
 stay outside it. The reference TensorPotential package is not a dependency.
 """
 
-from .core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS, GRACECore
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 from .presets import PAPER_PRESETS
 
 __all__ = [
-    "GRACECore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "PAPER_PRESETS",

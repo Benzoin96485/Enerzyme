@@ -37,7 +37,7 @@ def _edges(positions: torch.Tensor, cutoff: float):
 
 
 def _tiny_core(**overrides):
-    from enerzyme.models.facto import FACTOCore
+    from enerzyme.models.presets.cartesian_tensor import facto
 
     params = dict(
         max_Za=10,
@@ -52,7 +52,7 @@ def _tiny_core(**overrides):
         tensor_transport=True,
     )
     params.update(overrides)
-    return FACTOCore(**params)
+    return facto(**params)
 
 
 def _core_inputs(positions: torch.Tensor, atomic_numbers: torch.Tensor, cutoff: float = 6.0):
@@ -83,7 +83,7 @@ def test_registration_presets_and_yaml():
 
     for name in ("facto", "FACTO"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "FACTOCore"
+        assert core_cls.__name__ == "facto"
         assert build_params["cutoff_sr"] == 6.0
         assert build_params["cutoff_fn"] == "facto"
         assert layers[1]["params"]["preset"] == "S"
@@ -104,7 +104,7 @@ def test_registration_presets_and_yaml():
         build_params=dict(ff["build_params"], max_Za=12),
         verbose=0,
     )
-    assert model.__class__.__name__ == "FACTOCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.scalar_dim == 16
     assert model.num_blocks == 3
     assert model.lmax == 2
@@ -131,10 +131,10 @@ def test_registration_presets_and_yaml():
 
 
 def test_paper_small_backbone_forward_and_last_block_is_scalar_only():
-    from enerzyme.models.facto import FACTOCore
+    from enerzyme.models.presets.cartesian_tensor import facto
 
     torch.manual_seed(0)
-    core = FACTOCore(max_Za=8, preset="S")
+    core = facto(max_Za=8, preset="S")
     core.eval()
     assert core.scalar_dim == 384
     assert core.num_radial == 32

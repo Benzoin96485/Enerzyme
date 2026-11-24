@@ -21,6 +21,7 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
+from ..mp.basis.cartesian import cartesian_powers
 from ..mp.basis.envelope import cosine_transition
 
 
@@ -70,13 +71,8 @@ def cartesian_angular(vectors: Tensor, window: Tensor, lmax: int) -> Tensor:
     n_edges = vectors.shape[0]
     if n_edges == 0:
         return vectors.new_zeros((n_angular, 0))
-    current = window.reshape(1, n_edges)
-    parts = [current]
-    direction = vectors.transpose(0, 1)
-    for _ in range(int(lmax)):
-        current = (current.unsqueeze(1) * direction.unsqueeze(0)).reshape(-1, n_edges)
-        parts.append(current)
-    return torch.cat(parts, dim=0)
+    powers = cartesian_powers(vectors, lmax, weight=window)
+    return torch.cat([part.reshape(n_edges, -1) for part in powers.values()], dim=1).transpose(0, 1)
 
 
 def pair_gaussian_orbitals(
