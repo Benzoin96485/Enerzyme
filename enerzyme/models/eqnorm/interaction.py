@@ -24,6 +24,7 @@ from typing import List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
+from ..mp.message.irreps import weighted_messages
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
 from torch import Tensor, nn
@@ -169,7 +170,7 @@ class EqnormConv(nn.Module):
         if idx_i.numel() == 0:
             aggregated = features.new_zeros(n_atoms, self.tp.irreps_out.dim)
         else:
-            messages = self.tp(mixed[idx_j], edge_sh, self.fc(radial_basis))
+            messages = weighted_messages(self.tp, mixed, idx_j, edge_sh, self.fc(radial_basis))
             if self.normalization == "constant":
                 messages = messages / math.sqrt(self.avg_num_neighbors)
             if envelope is not None:

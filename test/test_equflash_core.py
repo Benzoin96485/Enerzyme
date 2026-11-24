@@ -33,7 +33,7 @@ def _rotation(seed: int = 0) -> torch.Tensor:
 
 
 def _tiny_core(**overrides):
-    from enerzyme.models.equflash import EquFlashCore
+    from enerzyme.models.presets.irreps import equflash
 
     params = dict(
         dim_embedding=4,
@@ -44,7 +44,7 @@ def _tiny_core(**overrides):
         conv_denominator=1.0,
     )
     params.update(overrides)
-    core = EquFlashCore(**params)
+    core = equflash(**params)
     core.eval()
     return core
 
@@ -134,7 +134,7 @@ def test_equflash_registration_and_yaml_metadata():
 
     for name in ("equflash", "EquFlash"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "EquFlashCore"
+        assert core_cls.__name__ == "equflash"
         assert build_params["cutoff_fn"] == "xplor"
         assert build_params["cuton"] == 5.5
         assert layers[1]["params"]["flavor"] == "equflash"

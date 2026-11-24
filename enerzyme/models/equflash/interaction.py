@@ -17,13 +17,13 @@ from __future__ import annotations
 from typing import List, Sequence
 
 import torch
+from ..mp.message.irreps import irreps_convolution
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
 from torch import Tensor, nn
 
 from ..mp.nn.activation import resolve_scalar_activation
 from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions
-from ..mp.ops import scatter_sum
 
 
 def resolve_activation(name: str):
@@ -138,12 +138,7 @@ class EquFlashConvolution(nn.Module):
         idx_sender: Tensor,
         idx_receiver: Tensor,
     ) -> Tensor:
-        n_atoms = features.shape[0]
-        if idx_sender.numel() == 0:
-            return features.new_zeros(n_atoms, self.irreps_out.dim)
-        weights = self.weight_nn(rbf)
-        messages = self.tp(features[idx_sender], sph, weights)
-        aggregated = scatter_sum(messages, idx_receiver, n_atoms)
+        aggregated = irreps_convolution(self.tp, self.weight_nn, features, idx_sender, idx_receiver, sph, rbf)
         return aggregated / self.denominator
 
 

@@ -18,9 +18,9 @@ from typing import List, Optional, Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
+from ..mp.message.irreps import irreps_convolution
 from e3nn import o3
 from torch import Tensor, nn
-from ..mp.ops import scatter_sum
 
 from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions
 from ..mp.equivariant.e3nn.activation import Activation
@@ -303,14 +303,16 @@ class NequixConvolution(nn.Module):
         edge_sh: Tensor,
     ) -> Tensor:
         messages = self.linear_1(features)
-        weights = self.radial_mlp(radial_basis)
-        if idx_i.numel() == 0:
-            aggregated = features.new_zeros(features.shape[0], self.tp.irreps_out.dim)
-        else:
-            sent = self.tp(messages[idx_j], edge_sh, weights)
-            aggregated = scatter_sum(sent, idx_i, dim=0, dim_size=features.shape[0])
+        aggregated = irreps_convolution(self.tp, self.radial_mlp, messages, idx_j, idx_i, edge_sh, radial_basis)
         aggregated = aggregated * self.inv_sqrt_neighbors
         hidden = self.linear_2(aggregated) + self.skip(features)
         if self.layer_norm is not None:
             hidden = self.layer_norm(hidden)
         return self.gate(hidden)
+
+
+def _keep_even_scalars(irreps: o3.Irreps) -> o3.Irreps:
+    kept = [(mul, ir) for mul, ir in irreps if ir.l == 0 and ir.p == 1]
+    if not kept:
+        raise ValueError(f"{irreps} has no even scalars for the final Nequix layer")
+    return o3.Irreps(kept)

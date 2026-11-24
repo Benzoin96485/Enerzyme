@@ -14,6 +14,7 @@ import math
 from typing import Dict, List, Optional, Sequence
 
 import torch
+from ..mp.message.irreps import irreps_convolution
 from e3nn import o3
 from e3nn.nn import Gate, NormActivation
 from torch import Tensor, nn
@@ -184,14 +185,7 @@ class NequIPInteraction(nn.Module):
         else:
             skip = None
         mixed = self.linear_1(features) * self.neighbor_scale.to(dtype=features.dtype)
-        n_atoms = features.shape[0]
-        if edge_src.numel() == 0:
-            aggregated = features.new_zeros(n_atoms, self.tp.irreps_out.dim)
-        else:
-            weights = self.radial_mlp(edge_embed)
-            messages = self.tp(mixed[edge_src], edge_attr, weights)
-            aggregated = features.new_zeros(n_atoms, messages.shape[-1])
-            aggregated.index_add_(0, edge_dst, messages)
+        aggregated = irreps_convolution(self.tp, self.radial_mlp, mixed, edge_src, edge_dst, edge_attr, edge_embed)
         out = self.linear_2(aggregated)
         if skip is not None:
             out = out + skip

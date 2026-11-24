@@ -15,7 +15,19 @@ from typing import Dict, List, Tuple
 
 import torch
 
-KEY_MAPS: Dict[str, List[Tuple[str, str]]] = {}
+KEY_MAPS: Dict[str, List[Tuple[str, str]]] = {
+    "equflash": [(r"^interactions\.(\d+)\.", r"blocks.\1.module.")],
+    "equflashv2": [
+        (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
+        (r"^feedforwards\.(\d+)\.", r"blocks.\1.feedforward."),
+    ],
+    "nequip": [(r"^convs\.(\d+)\.", r"blocks.\1.module.")],
+    "nequix": [(r"^layers\.(\d+)\.", r"blocks.\1.module.")],
+    "eqnorm": [
+        (r"^species_linear\.", "embed.projection."),
+        (r"^layers\.(\d+)\.", r"blocks.\1.module."),
+    ],
+}
 
 
 def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:

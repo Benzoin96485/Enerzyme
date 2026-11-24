@@ -88,7 +88,7 @@ def test_equflash_registration_and_yaml_build():
 
     for name in ("equflashv2", "equflash_v2", "EquFlashV2"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "EquFlashV2Core"
+        assert core_cls.__name__ == "equflashv2"
         assert build_params["cutoff_fn"] == "xplor"
         assert build_params["cuton"] == 5.5
         assert layers[1]["params"]["flavor"] == "equflash"
@@ -101,7 +101,7 @@ def test_equflash_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "EquFlashV2Core"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.num_layers == 2
@@ -114,7 +114,7 @@ def test_equflash_registration_and_yaml_build():
 
 
 def _core(**overrides):
-    from enerzyme.models.equflash import EquFlashV2Core
+    from enerzyme.models.presets.irreps import equflashv2
 
     params = dict(
         dim_embedding=4,
@@ -125,7 +125,7 @@ def _core(**overrides):
         denominator=1.0,
     )
     params.update(overrides)
-    return EquFlashV2Core(**params)
+    return equflashv2(**params)
 
 
 def _pack(core, pos, embedding=None):
@@ -177,13 +177,13 @@ def test_equflash_hidden_irreps_rotate_with_coordinates():
     pos = torch.randn(4, 3)
     kwargs = _pack(core, pos)
     reference = core.get_output(**kwargs)["atom_feature"]
-    assert reference.shape[-1] == core.schedule[-1].dim
+    assert reference.shape[-1] == core.irreps_schedule[-1].dim
     rotation = _rotation(2)
     rotated = dict(kwargs)
     # Row vectors: x' = x @ R.T matches e3nn's column action y' = R @ y.
     rotated["vij_sr"] = kwargs["vij_sr"] @ rotation.T
     got = core.get_output(**rotated)["atom_feature"]
-    transform = core.schedule[-1].D_from_matrix(rotation)
+    transform = core.irreps_schedule[-1].D_from_matrix(rotation)
     assert torch.allclose(reference @ transform.T, got, atol=1e-4, rtol=1e-4)
 
 
