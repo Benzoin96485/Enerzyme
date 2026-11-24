@@ -416,7 +416,7 @@
    "outcome": "PyTorch AOTAutograd fails while computing the first force. Its backward tries to restride a leaf tensor via copy_ while higher derivatives are enabled.",
    "error": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation."
   },
-  "production_training": "The published FP32 accumulations remain in the compiled VJP. Native degree normalization matches all 60 parameter gradients, but the VJP loses all learned operators. The CPU code-generation controls retain learned contractions and reductions, with errors above the stated FP64 tolerances."
+  "production_training": "Before the dtype-specific native force dispatch, the published FP32 accumulations remain in the compiled VJP. Native degree normalization matches all 60 parameter gradients, but the VJP loses all learned operators. The CPU code-generation controls retain learned contractions and reductions, with errors above the stated FP64 tolerances."
  },
  "opaque_operator_training_controls": {
   "source": "9ee12e4",
@@ -716,6 +716,382 @@
    },
    "inductor": "The compiled call reaches the opaque native VJP, which fails inside torch.func.vjp with NotImplementedError: Cannot access storage of TensorWrapper.",
    "ordinary_autograd_replay": "Calling torch.autograd.grad under torch.enable_grad() inside an opaque CPU kernel fails even in isolation: element 0 of tensors does not require grad and does not have a grad_fn."
+  }
+ },
+ "native_force_dispatch": {
+  "source": "61a9976",
+  "original_revision": "11e93d4",
+  "device": "CPU",
+  "default_job": 6319123,
+  "ordinary": {
+   "training": {
+    "float64": {
+     "dtype": "float64",
+     "mode": "training",
+     "fields": {
+      "E": 0.0,
+      "Fa": 0.0
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "pre_sequence.2.embedding.weight",
+      "max_abs": 0.0
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": {},
+     "graphs": 0,
+     "captured_operations": 0,
+     "learned_operations": []
+    },
+    "float32": {
+     "dtype": "float32",
+     "mode": "training",
+     "fields": {
+      "E": 1.9073486328125e-06,
+      "Fa": 2.9802322387695312e-08
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "post_sequence.0.head.weight",
+      "max_abs": 9.1552734375e-05
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": {},
+     "graphs": 1,
+     "captured_operations": 1171,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    }
+   },
+   "inference": {
+    "float64": {
+     "dtype": "float64",
+     "mode": "inference",
+     "fields": {
+      "E": 0.0,
+      "Fa": 8.326672684688674e-17,
+      "energy_coordinate_gradient": 8.326672684688674e-17,
+      "repeated_energy_coordinate_gradient": 8.326672684688674e-17
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": {},
+     "graphs": 13,
+     "captured_operations": 702,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    },
+    "float32": {
+     "dtype": "float32",
+     "mode": "inference",
+     "fields": {
+      "E": 1.9073486328125e-06,
+      "Fa": 4.470348358154297e-08,
+      "energy_coordinate_gradient": 4.470348358154297e-08,
+      "repeated_energy_coordinate_gradient": 4.470348358154297e-08
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": {},
+     "graphs": 9,
+     "captured_operations": 1097,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    }
+   }
+  },
+  "fullgraph": {
+   "original_default_job": 6319106,
+   "original_default": "With data-dependent neighbor counts, strict tracing reaches segment_softmax and fails on Eq(u0,0) before lowering.",
+   "fixed_neighbor_method": "For the static-neighbor control, compute the actual cutoff indices for the same positions before the compiled call, keep them in the range layer and run its original index selection. Model weights and differentiable geometry remain identical.",
+   "original_fixed_neighbor_job": 6319142,
+   "original_inductor": {
+    "inference": {
+     "dtype": "float64",
+     "mode": "inference",
+     "fields": {
+      "E": 8.92751508274614e-08,
+      "Fa": 6.381202510841177e-10,
+      "energy_coordinate_gradient": 6.381202510841177e-10,
+      "repeated_energy_coordinate_gradient": 6.381202510841177e-10
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [
+      "E",
+      "Fa",
+      "energy_coordinate_gradient",
+      "repeated_energy_coordinate_gradient"
+     ],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1126,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    },
+    "training": {
+     "dtype": "float64",
+     "mode": "training",
+     "fields": {
+      "E": 8.92751508274614e-08,
+      "Fa": 6.381205251704269e-10
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "blocks.0.module.post_so2_norm.bias",
+      "max_abs": 1.52587890625e-05
+     },
+     "outside_tolerance": [
+      "E",
+      "Fa",
+      "pre_sequence.2.embedding.weight",
+      "post_sequence.0.head.weight",
+      "post_sequence.0.head.bias",
+      "embed.radial_basis.freqs",
+      "embed.sphere_proj.weight",
+      "embed.sphere_proj.bias",
+      "embed.radial_feat_mlp.net.0.weight",
+      "embed.radial_feat_mlp.net.2.weight",
+      "embed.env_embed.output_proj.weight",
+      "blocks.0.module.post_so2_norm.bias",
+      "blocks.0.module.so2_conv.post_mix.weight",
+      "blocks.0.module.ffns.0.so3_linear_2.weight",
+      "blocks.1.module.post_so2_norm.bias",
+      "blocks.1.module.so2_conv.post_mix.weight",
+      "blocks.1.module.ffns.0.so3_linear_2.weight",
+      "head.norm.scale",
+      "head.norm.bias"
+     ],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1171,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    }
+   },
+   "guarded_inductor_job": 6319128,
+   "guarded_inductor": {
+    "training": {
+     "exception": "AssertionError",
+     "message": "Fullgraph torch.float64 CPU forces for dpa4 require native derivatives. Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'."
+    },
+    "inference": {
+     "exception": "AssertionError",
+     "message": "Fullgraph torch.float64 CPU forces for dpa4 require native derivatives. Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'."
+    }
+   },
+   "float32_inductor_job": 6319142,
+   "float32_inductor": {
+    "training": {
+     "dtype": "float32",
+     "mode": "training",
+     "fields": {
+      "E": 1.9073486328125e-06,
+      "Fa": 2.9802322387695312e-08
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "post_sequence.0.head.weight",
+      "max_abs": 9.1552734375e-05
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1171,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    },
+    "inference": {
+     "dtype": "float32",
+     "mode": "inference",
+     "fields": {
+      "E": 1.9073486328125e-06,
+      "Fa": 4.470348358154297e-08,
+      "energy_coordinate_gradient": 4.470348358154297e-08,
+      "repeated_energy_coordinate_gradient": 4.470348358154297e-08
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1126,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    }
+   },
+   "float64_eager_backend_job": 6319153,
+   "float64_eager_backends": {
+    "eager/training": {
+     "dtype": "float64",
+     "mode": "training",
+     "fields": {
+      "E": 0.0,
+      "Fa": 0.0
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "pre_sequence.2.embedding.weight",
+      "max_abs": 0.0
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1171
+    },
+    "aot_eager/training": {
+     "dtype": "float64",
+     "mode": "training",
+     "fields": {
+      "E": 0.0,
+      "Fa": 0.0
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "pre_sequence.2.embedding.weight",
+      "max_abs": 0.0
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1171
+    },
+    "eager/inference": {
+     "dtype": "float64",
+     "mode": "inference",
+     "fields": {
+      "E": 0.0,
+      "Fa": 2.6020852139652106e-18,
+      "energy_coordinate_gradient": 0.0,
+      "repeated_energy_coordinate_gradient": 0.0
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1126
+    },
+    "aot_eager/inference": {
+     "dtype": "float64",
+     "mode": "inference",
+     "fields": {
+      "E": 0.0,
+      "Fa": 2.6020852139652106e-18,
+      "energy_coordinate_gradient": 0.0,
+      "repeated_energy_coordinate_gradient": 0.0
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1126
+    }
+   },
+   "guarded_fixed_neighbors": {
+    "inference": "Fullgraph torch.float64 CPU forces for dpa4 require native derivatives. Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'.",
+    "training": "Fullgraph torch.float64 CPU forces for dpa4 require native derivatives. Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'."
+   }
+  },
+  "force_activation_and_device": {
+   "tests": "test_dpa4_core.py exercises the mapped coordinate key on CPU and CUDA FakeTensors in both dtypes, and the evaluation-only and missing ForceLayer cases. No CUDA hardware was allocated for this dispatch check.",
+   "none": {
+    "dtype": "float64",
+    "mode": "training",
+    "fields": {
+     "E": 8.92751508274614e-08,
+     "Fa_present": 0.0
+    },
+    "gradients_compared": 0,
+    "outside_tolerance": [
+     "E"
+    ],
+    "changed_gradient_participation": [],
+    "graphs": 1,
+    "captured_operations": 1140,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "inactive": {
+    "dtype": "float64",
+    "mode": "inference",
+    "fields": {
+     "E": 0.0,
+     "Fa_present": 0.0
+    },
+    "gradients_compared": 0,
+    "outside_tolerance": [],
+    "changed_gradient_participation": [],
+    "graphs": 7,
+    "captured_operations": 710,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "ordinary_job": 6319134
+  },
+  "pytest_with_force_hooks": {
+   "passed": 22,
+   "scope": "DPA4 core, normalization, frozen snapshots and shared ForceLayer hook regression."
   }
  }
 }
