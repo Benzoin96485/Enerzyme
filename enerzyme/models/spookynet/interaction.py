@@ -115,8 +115,8 @@ class LocalInteraction(Module):
         """
         # interaction functions
         gs = self.radial_s(rbf)
-        gp = self.radial_p(rbf).unsqueeze(-2) * pij.unsqueeze(-1)
-        gd = self.radial_d(rbf).unsqueeze(-2) * dij.unsqueeze(-1)
+        gp = self.radial_p(rbf)
+        gd = self.radial_d(rbf)
         # atom featurizations
         xx = self.resblock_x(x)
         xs = self.resblock_s(x)
@@ -135,8 +135,10 @@ class LocalInteraction(Module):
         # sum over neighbors
         N = len(x)
         s = xx + scatter_sum(gs * xs, idx_i, N)
-        p = scatter_sum(gp * xp.unsqueeze(-2), idx_i, N)
-        d = scatter_sum(gd * xd.unsqueeze(-2), idx_i, N)
+        # Contract the two scalar channels before expanding them over the
+        # angular basis, so the backward saves only one edge-by-channel product.
+        p = scatter_sum((gp * xp).unsqueeze(-2) * pij.unsqueeze(-1), idx_i, N)
+        d = scatter_sum((gd * xd).unsqueeze(-2) * dij.unsqueeze(-1), idx_i, N)
         # project tensorial features to scalars
         pa, pb = torch.split(self.projection_p(p), p.shape[-1], dim=-1)
         da, db = torch.split(self.projection_d(d), d.shape[-1], dim=-1)
