@@ -127,9 +127,7 @@ def build_so2_wigner_frames(
     wigner = wigner.to(dtype=out_dtype)
     wigner_inv = wigner_inv.to(dtype=out_dtype)
 
-    if exp_node_pos.data_ptr() == node_pos.data_ptr() or torch.equal(
-        exp_node_pos, node_pos
-    ):
+    if exp_node_pos is node_pos or torch.equal(exp_node_pos, node_pos):
         wigner_exp, wigner_inv_exp = wigner, wigner_inv
     else:
         wigner_exp, wigner_inv_exp = eulers_to_wigner(

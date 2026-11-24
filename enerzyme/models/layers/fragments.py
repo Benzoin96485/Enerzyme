@@ -31,6 +31,38 @@ def num_clusters_for_graph(num_atoms: int, min_nodes_per_group: int) -> int:
     return max(min(count, num_atoms), 1)
 
 
+@torch.library.custom_op("enerzyme::fit_fragments", mutates_args=())
+def _fit_fragments(positions: Tensor, n_clusters: int, seed: int, spectral: bool) -> Tuple[Tensor, Tensor]:
+    """Fit discrete sklearn labels on detached coordinates, outside tensor autodiff."""
+    try:
+        from sklearn.cluster import KMeans, SpectralClustering
+    except ImportError as exc:
+        raise ImportError("Online fragment assignment requires scikit-learn. "
+                          "Supply precomputed cluster_ids for offline fragments.") from exc
+
+    xyz = positions.cpu().numpy()
+    if spectral:
+        model = SpectralClustering(
+            n_clusters=n_clusters, random_state=seed, affinity="nearest_neighbors",
+            n_neighbors=min(10, len(xyz) - 1), eigen_solver="arpack", assign_labels="kmeans",
+        )
+        ids = torch.as_tensor(model.fit_predict(xyz), dtype=torch.long, device=positions.device)
+        centers = []
+        for cluster in range(n_clusters):
+            members = positions[ids == cluster]
+            centers.append((members if members.shape[0] else positions).mean(dim=0))
+        return ids, torch.stack(centers)
+    model = KMeans(n_clusters=n_clusters, random_state=seed, n_init=10)
+    ids = torch.as_tensor(model.fit_predict(xyz), dtype=torch.long, device=positions.device)
+    centers = torch.as_tensor(model.cluster_centers_, dtype=positions.dtype, device=positions.device)
+    return ids, centers
+
+
+@_fit_fragments.register_fake
+def _fit_fragments_shape(positions, n_clusters, seed, spectral):
+    return positions.new_empty(positions.shape[0], dtype=torch.long), positions.new_empty((n_clusters, 3))
+
+
 def build_kmeans_fragments(
     Ra: Tensor,
     batch_seg: Tensor,
@@ -50,15 +82,6 @@ def build_kmeans_fragments(
     cluster_batch : LongTensor [U]
         Graph id for each cluster.
     """
-    try:
-        from sklearn.cluster import KMeans
-    except ImportError as exc:
-        raise ImportError(
-            "fragment_mode='kmeans' requires scikit-learn "
-            "(pip install scikit-learn). For offline BRICS labels use "
-            "fragment_mode='precomputed' with cluster_ids instead."
-        ) from exc
-
     device = Ra.device
     dtype = Ra.dtype
     num_atoms = Ra.shape[0]
@@ -78,13 +101,7 @@ def build_kmeans_fragments(
             ids = torch.zeros(n_atoms, dtype=torch.long)
             center = pos.mean(dim=0, keepdim=True)
         else:
-            model = KMeans(
-                n_clusters=n_clusters, random_state=random_state, n_init=10
-            )
-            ids = torch.as_tensor(
-                model.fit_predict(pos.detach().cpu().numpy()), dtype=torch.long
-            )
-            center = torch.as_tensor(model.cluster_centers_, dtype=dtype)
+            ids, center = _fit_fragments(pos.detach(), n_clusters, random_state, False)
         local_ids[mask] = ids.to(device=device)
         centers.append(center.to(device=device, dtype=dtype))
         cluster_batch.append(
@@ -112,15 +129,6 @@ def build_spectral_fragments(
     LSR-MP ``group_builder=spectral`` path uses this affinity. Graphs too
     small for a nearest-neighbor Laplacian collapse to one fragment.
     """
-    try:
-        from sklearn.cluster import SpectralClustering
-    except ImportError as exc:
-        raise ImportError(
-            "fragment_mode='spectral' requires scikit-learn "
-            "(pip install scikit-learn). For offline BRICS labels use "
-            "fragment_mode='precomputed' with cluster_ids instead."
-        ) from exc
-
     device = Ra.device
     dtype = Ra.dtype
     num_atoms = Ra.shape[0]
@@ -140,26 +148,7 @@ def build_spectral_fragments(
             ids = torch.zeros(n_atoms, dtype=torch.long)
             center = pos.mean(dim=0, keepdim=True)
         else:
-            n_neighbors = min(10, n_atoms - 1)
-            model = SpectralClustering(
-                n_clusters=n_clusters,
-                random_state=random_state,
-                affinity="nearest_neighbors",
-                n_neighbors=n_neighbors,
-                eigen_solver="arpack",
-                assign_labels="kmeans",
-            )
-            ids = torch.as_tensor(
-                model.fit_predict(pos.detach().cpu().numpy()), dtype=torch.long
-            )
-            center = torch.zeros(n_clusters, 3, dtype=dtype, device=pos.device)
-            ids_device = ids.to(device=pos.device)
-            for cluster in range(n_clusters):
-                members = pos[ids_device == cluster]
-                if members.shape[0] == 0:
-                    center[cluster] = pos.mean(dim=0).detach()
-                else:
-                    center[cluster] = members.mean(dim=0).detach()
+            ids, center = _fit_fragments(pos.detach(), n_clusters, random_state, True)
         local_ids[mask] = ids.to(device=device)
         centers.append(center.to(device=device, dtype=dtype))
         cluster_batch.append(
