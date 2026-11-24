@@ -42,7 +42,8 @@ def _cpu_backend_may_use_inductor() -> bool:
     return all(compiler is not lookup_backend(name) for name in ("eager", "aot_eager"))
 
 
-def uses_cpu_inductor_forces(core, inputs, *, include_eval=False):
+def uses_cpu_inductor_forces(core, inputs, *, include_eval=False, dtype=None):
+    """Detect an active force layer on CPU coordinates, optionally of the given dtype."""
     for stages in (core.pre_sequence, core.post_sequence):
         for layer in stages:
             if type(layer) is not ForceLayer:
@@ -52,7 +53,8 @@ def uses_cpu_inductor_forces(core, inputs, *, include_eval=False):
             if (layer.test_only and not core.test_mode) or (layer.test_exclude and core.test_mode):
                 continue
             coordinates = inputs.get(layer._name_mapping["Ra"])
-            if coordinates is not None and coordinates.device.type == "cpu":
+            if (coordinates is not None and coordinates.device.type == "cpu"
+                    and (dtype is None or coordinates.dtype == dtype)):
                 return _cpu_backend_may_use_inductor()
     return False
 

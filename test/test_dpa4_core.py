@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 import torch
 import yaml
 from numpy.testing import assert_allclose
@@ -215,3 +216,61 @@ def test_dpa4_force_finite_difference_conservation():
             )["E"]
             fd[i, d] = -(ep - em) / (2 * eps)
     torch.testing.assert_close(fa, fd, atol=5e-3, rtol=5e-3)
+
+def test_cpu_double_force_training_preserves_native_weight_gradients():
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    model = build("dpa4").double()
+    weights = tuple(model.parameters())
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
+
+    def step(runner):
+        out = forward(runner, batch, torch.float64, train=True)
+        gradients = torch.autograd.grad(out["E"].square().sum() + out["Fa"].square().sum(),
+                                        weights, allow_unused=True)
+        return out["E"], out["Fa"], gradients
+
+    reference = step(model)
+    torch.compiler.reset()
+    torch.testing.assert_close(step(torch.compile(model)), reference, rtol=1e-12, atol=1e-13)
+
+
+@pytest.mark.parametrize("training", [True, False])
+def test_cpu_double_force_fullgraph_explains_the_required_native_derivatives(training):
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    model = build("dpa4").double()
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
+    torch.compiler.reset()
+    with pytest.raises((AssertionError, torch._dynamo.exc.TorchRuntimeError),
+                       match="Fullgraph torch.float64 CPU forces for dpa4"):
+        forward(torch.compile(model, fullgraph=True), batch, torch.float64, train=training)
+
+
+def test_native_force_routing_uses_the_active_layers_mapped_coordinate_dtype_and_device(monkeypatch):
+    from torch._subclasses.fake_tensor import FakeTensorMode
+    from enerzyme.models.layers import compiled_grad
+    from enerzyme.models.layers.gradient import ForceLayer
+
+    core = _core()
+    layer = ForceLayer()
+    layer._name_mapping["Ra"] = "xyz"
+    core.post_sequence = torch.nn.Sequential(layer)
+    monkeypatch.setattr(compiled_grad, "_cpu_backend_may_use_inductor", lambda: True)
+    with FakeTensorMode():
+        coordinates = {device: {dtype: torch.empty(4, 3, dtype=dtype, device=device)
+                                for dtype in (torch.float32, torch.float64)}
+                       for device in ("cpu", "cuda")}
+
+    def uses_native(position):
+        return compiled_grad.uses_cpu_inductor_forces(core, {"xyz": position}, dtype=core._native_cpu_inductor_forces)
+
+    assert uses_native(coordinates["cpu"][torch.float64])
+    assert not uses_native(coordinates["cpu"][torch.float32])
+    assert not uses_native(coordinates["cuda"][torch.float64])
+    assert not uses_native(coordinates["cuda"][torch.float32])
+    layer.eval_only = True
+    assert not uses_native(coordinates["cpu"][torch.float64])
+    core.post_sequence = torch.nn.Sequential()
+    assert not uses_native(coordinates["cpu"][torch.float64])

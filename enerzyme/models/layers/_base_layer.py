@@ -150,11 +150,22 @@ class BaseFFCore(BaseFFModule):
             # of a break and autograd can differentiate the compiled pieces.
             native = (getattr(self, "_native_cpu_inductor_forces", False) if self.training else
                       getattr(self, "_native_cpu_inductor_force_inference", False))
-            if native and uses_cpu_inductor_forces(self, net_input, include_eval=not self.training):
-                torch._assert(not compiling_fullgraph(),
-                              "Fullgraph CPU force training requires an eager backend for this model"
-                              if self.training else "Fullgraph CPU force inference requires an eager backend "
-                              "for reusable energy derivatives in this model")
+            partitioned = getattr(self, "_partitioned_cpu_inductor_force_inference", None)
+            if not self.training and partitioned is not None and compiling_fullgraph():
+                native = partitioned
+            dtype = native if isinstance(native, torch.dtype) else None
+            if (native is True or dtype is not None) and uses_cpu_inductor_forces(
+                self, net_input, include_eval=not self.training, dtype=dtype
+            ):
+                if dtype is not None:
+                    name = getattr(self, "architecture", type(self).__name__)
+                    message = (f"Fullgraph {dtype} CPU forces for {name} require native derivatives. "
+                               "Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'.")
+                else:
+                    message = ("Fullgraph CPU force training requires an eager backend for this model"
+                               if self.training else "Fullgraph CPU force inference requires an eager backend "
+                               "for reusable energy derivatives in this model")
+                torch._assert(not compiling_fullgraph(), message)
                 return native_forces(self, net_input)
             option = getattr(self, "_cpu_force_training_option" if self.training
                              else "_cpu_force_inference_option", None)

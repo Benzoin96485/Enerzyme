@@ -591,6 +591,7 @@ def dpa4(
         GraphRequires(distances=False, rbf=False, optional_cutoff_values=False, fields=("Za",),
                       optional_fields=("batch_seg",), edge_convention="swap"),
         positional_fields=("atom_embedding", "Za", "idx_i_sr", "idx_j_sr", "vij_sr", "batch_seg"), architecture="dpa4", builder=internal_radial_stack,
+        _native_cpu_inductor_forces=torch.float64, _partitioned_cpu_inductor_force_inference=torch.float64,
         lmax=lmax, mmax=mmax, channels=channels,
         dim_embedding=dim_embedding, max_Za=max_Za, n_blocks=n_blocks,
         cutoff_sr=cutoff_sr, n_radial=n_radial, dim_feature_out=dim_feature_out,
