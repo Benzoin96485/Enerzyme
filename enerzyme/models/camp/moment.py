@@ -107,19 +107,25 @@ class AtomicMoment(nn.Module):
         radial = self.radial(distance, zi, zj)
         if dyads is None:
             dyads = cartesian_dyads(vectors, self.max_v)
+        # All output ranks read the same sender features for an input rank.
+        edge_features = {
+            rank: features[rank].index_select(1, senders)
+            for rank in range(min(self.max_feature_rank, self.max_v) + 1)
+        }
         moments: Dict[int, Tensor] = {}
         for rank, paths in self.paths.items():
             pieces = []
             for feature_rank, dyad_rank in paths:
                 weight = self.radial_mlp[f"{rank}_{feature_rank}_{dyad_rank}"](radial)
                 weight = weight.transpose(0, 1)
-                feature = features[feature_rank].index_select(1, senders)
                 contracted = contract_feature_dyad(
-                    feature, dyads[dyad_rank], feature_rank, dyad_rank
+                    edge_features[feature_rank], dyads[dyad_rank], feature_rank, dyad_rank
                 )
                 view = weight.reshape(weight.shape + (1,) * rank)
-                pieces.append(scatter_sum(view * contracted, receivers, n_atoms, dim=1) / self.norm)
+                pieces.append(scatter_sum(view * contracted, receivers, n_atoms, dim=1))
             combined = pieces[0] if len(pieces) == 1 else self.path_mix[str(rank)](torch.stack(pieces))
+            if self.norm != 1.0:
+                combined = combined / self.norm
             moments[rank] = self.channel_mix[str(rank)](combined)
         return moments
 

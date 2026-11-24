@@ -173,12 +173,12 @@ class EqnormConv(nn.Module):
             aggregated = features.new_zeros(n_atoms, self.tp_width)
         else:
             messages = weighted_messages(self.tp, mixed, idx_j, edge_sh, self.fc(radial_basis))
-            if self.normalization == "constant":
-                messages = messages / math.sqrt(self.avg_num_neighbors)
             if envelope is not None:
                 window = envelope.reshape(-1, 1).to(dtype=messages.dtype)
                 messages = messages * window
             aggregated = scatter_sum(messages, idx_i, n_atoms)
+            if self.normalization == "constant":
+                aggregated = aggregated / math.sqrt(self.avg_num_neighbors)
         if self.normalization == "degree":
             degree = features.new_zeros(n_atoms)
             if idx_i.numel():
