@@ -661,6 +661,8 @@
       "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "0",
+      "selected_candidate": true,
+      "attempt_started_unix": 1795515814,
       "systems": ["mol_batch_32x20"],
       "modes": ["infer"],
       "cross_eager": {
@@ -679,6 +681,8 @@
       "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "0",
+      "selected_candidate": true,
+      "attempt_started_unix": 1795516053,
       "systems": ["mol_batch_32x20"],
       "modes": ["infer"],
       "cross_eager": {
@@ -689,6 +693,98 @@
         }
       },
       "legs": [{"side": "new", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[6.487814011052251, 333.59814453125, 12, 510]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.6653345369377348e-16, "force_max_abs": 8.326672684688674e-17, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[7.293660892173648, 280.85986328125, 19, 200]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.220446049250313e-16, "force_max_abs": 8.326672684688674e-17, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[7.2896459605544806, 280.85986328125, 19, 200]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.6653345369377348e-16, "force_max_abs": 1.1102230246251565e-16, "gradient_max_abs": 0.0}}}}, {"side": "new", "exit": 0, "reps": 17, "timings": {"mol_batch_32x20": [[6.309004034847021, 333.59814453125, 12, 510]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.440892098500626e-16, "force_max_abs": 1.1102230246251565e-16, "gradient_max_abs": 0.0}}}}]
+    },
+    "tace/float32/c32ede3/pair": {
+      "job": "6317929",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "fd61da6eec032943fd02d71a4a01906fe6e7f91881d89db56877065bb86a2978",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "0",
+      "selected_candidate": true,
+      "attempt_started_unix": 1795516171,
+      "ordinary_cuda_training_route": "explicit native backward for scripted e3nn kernels",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 9.5367431640625e-07,
+          "Fa_max_abs": 5.238689482212067e-10
+        },
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 3.0517578125e-05,
+          "Fa_max_abs": 1.1641532182693481e-10
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 9.5367431640625e-07,
+          "Fa_max_abs": 2.3283064365386963e-10
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 7.275957614183426e-11
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 1.1641532182693481e-10
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 4.57763671875e-05,
+          "Fa_max_abs": 1.7462298274040222e-10
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "reps": 5, "timings": {"mol_batch_32x20": ["err6", "err6"], "bulk_256": ["err6", "err6"], "large_2000": ["err6", "err6"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "reps": 5, "timings": {"mol_batch_32x20": [[49.21695287339389, 1087.2890625, 32, 198], [117.17740097083151, 1676.68017578125, 0, 0]], "bulk_256": [[52.053344901651144, 1093.0107421875, 17, 117], [120.87864382192492, 1581.56982421875, 0, 0]], "large_2000": [[143.25679698958993, 6745.73291015625, 0, 0], [490.568108856678, 9927.70751953125, 0, 0]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.9073486328125e-06, "force_max_abs": 9.313225746154785e-10, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 43, "reference_active_parameters": 43, "energy_max_abs": 9.5367431640625e-07, "force_max_abs": 2.9103830456733704e-10, "gradient_max_abs": 0.00048828125}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 5.7220458984375e-06, "force_max_abs": 1.8917489796876907e-10, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 43, "reference_active_parameters": 43, "energy_max_abs": 1.52587890625e-05, "force_max_abs": 1.1641532182693481e-10, "gradient_max_abs": 0.013671875}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.0517578125e-05, "force_max_abs": 2.6193447411060333e-10, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 43, "reference_active_parameters": 43, "energy_max_abs": 9.1552734375e-05, "force_max_abs": 1.1641532182693481e-10, "gradient_max_abs": 0.75}}}}]
+    },
+    "tace/float64/c32ede3/pair": {
+      "job": "6317929",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "fd61da6eec032943fd02d71a4a01906fe6e7f91881d89db56877065bb86a2978",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "0",
+      "selected_candidate": true,
+      "attempt_started_unix": 1795516305,
+      "ordinary_cuda_training_route": "explicit native backward for scripted e3nn kernels",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 1.7763568394002505e-15,
+          "Fa_max_abs": 5.421010862427522e-19
+        },
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 1.1368683772161603e-13,
+          "Fa_max_abs": 2.168404344971009e-19
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 1.7763568394002505e-15,
+          "Fa_max_abs": 4.336808689942018e-19
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 1.6263032587282567e-19
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 2.168404344971009e-19
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 2.842170943040401e-14,
+          "Fa_max_abs": 2.168404344971009e-19
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "reps": 5, "timings": {"mol_batch_32x20": ["err6", "err6"], "bulk_256": ["err6", "err6"], "large_2000": ["err6", "err6"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "reps": 5, "timings": {"mol_batch_32x20": [[58.62361611798406, 2157.900390625, 32, 198], [162.8369060344994, 3331.73046875, 0, 0]], "bulk_256": [[61.56616611406207, 2166.173828125, 17, 117], [165.43591697700322, 3131.7138671875, 0, 0]], "large_2000": [[269.98877082951367, 13443.94775390625, 0, 0], [933.8424848392606, 19789.025390625, 0, 0]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.7763568394002505e-15, "force_max_abs": 1.3010426069826053e-18, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 43, "reference_active_parameters": 43, "energy_max_abs": 1.7763568394002505e-15, "force_max_abs": 8.131516293641283e-19, "gradient_max_abs": 9.094947017729282e-13}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 3.8624702394796095e-19, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 43, "reference_active_parameters": 43, "energy_max_abs": 0.0, "force_max_abs": 1.3552527156068805e-19, "gradient_max_abs": 1.1102230246251565e-16}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.7053025658242404e-13, "force_max_abs": 4.0657581468206416e-19, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 43, "reference_active_parameters": 43, "energy_max_abs": 2.842170943040401e-14, "force_max_abs": 2.168404344971009e-19, "gradient_max_abs": 2.3283064365386963e-10}}}}]
     }
   },
   "errors": {
@@ -706,12 +802,13 @@
     "attempted_architecture_precision_pairs": 46,
     "expected_architecture_precision_pairs": 116,
     "historical_architecture_precision_pairs": 46,
-    "completed_frozen_attempts": 2,
+    "completed_frozen_attempts": 4,
     "comparable_mode_system_cells": 23,
     "comparable_metrics": 46,
     "above_3_percent": 2,
-    "frozen_mode_system_cells": 2,
-    "frozen_candidate_only_cells": 0,
+    "frozen_mode_system_cells": 14,
+    "frozen_candidate_only_cells": 12,
+    "frozen_candidate_only_native_training_cells": 6,
     "frozen_candidate_timing_incomplete_baseline_cells": 0,
     "frozen_baseline_only_cells": 0,
     "frozen_both_unavailable_cells": 0,
