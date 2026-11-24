@@ -275,7 +275,7 @@ after the norm embedding).
 Adding an external wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-External models (XPaiNN) live under :code:`enerzyme/models/xpainn/`. NequIP is internal (:code:`enerzyme/models/nequip/`). Requirements for a wrapper:
+The optional xPaiNN preset in :code:`enerzyme/models/presets/xpainn.py` composes XequiNet's embedding, message/update pairs, and output head. Its defaults live in :code:`enerzyme/models/xpainn/`. The two UMA wrappers load their external models directly. A wrapper should meet the following requirements.
 
 - Lazy or guarded imports so core install still works
 - Add package names to :code:`autosummary_mock_imports` in :code:`docs/conf.py` if autodoc cannot import them on RTD

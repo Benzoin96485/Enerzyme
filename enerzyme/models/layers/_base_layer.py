@@ -137,9 +137,13 @@ class BaseFFCore(BaseFFModule):
 
     def forward(self, net_input):
         if torch.compiler.is_compiling():
-            from .compiled_grad import forward_with_coordinate_gradients
+            from .compiled_grad import compiling_fullgraph, forward_with_coordinate_gradients
 
-            return forward_with_coordinate_gradients(self, net_input)
+            # A graph break inside a VJP discards the whole energy trace. In
+            # normal inference the ordinary stack can compile on both sides
+            # of a break and autograd can differentiate the compiled pieces.
+            if self.training or compiling_fullgraph():
+                return forward_with_coordinate_gradients(self, net_input)
         for layer in self.pre_sequence:
             if layer.test_only and not self.test_mode:
                 continue
@@ -157,7 +161,7 @@ class BaseFFCore(BaseFFModule):
                 net_output = layer(net_output)
         return net_output
     
-    def adopt_radius_stack(self, built_layers: List[Module]) -> None:
+    def adopt_radius_stack(self, built_layers: List[Module], *, vectors: bool = True) -> None:
         """Place radius geometry, embeddings, and post-core heads around this Core.
 
         The Core inserts its own :class:`DistanceLayer` (``vij_lr``). A
@@ -170,7 +174,8 @@ class BaseFFCore(BaseFFModule):
         from .geometry import DistanceLayer, RangeSeparationLayer
 
         self.calculate_distance = DistanceLayer()
-        self.calculate_distance.with_vector_on("vij_lr")
+        if vectors:
+            self.calculate_distance.with_vector_on("vij_lr")
         self.calculate_distance.reset_field_name(Dij="Dij_lr")
         self.pre_sequence.append(self.calculate_distance)
         pre_core = True

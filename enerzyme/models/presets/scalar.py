@@ -13,7 +13,7 @@ from torch import nn
 from torch.nn import Linear, init
 
 from ..mp.basis.envelope import Envelope
-from ..mp.block import InteractionBlock
+from ..mp.block import BlockState, InteractionBlock
 from ..mp.core import ComposableCore, FeatureHead, FieldEmbed, ReadoutHead
 from ..mp.graph import GraphRequires
 from ..mp.message import FilterMessage
@@ -47,7 +47,30 @@ def _xavier(*layers: Linear) -> None:
             layer.bias.data.fill_(0)
 
 
-def schnet_block(hidden_channels: int, num_rbf: int, num_filters: int, cutoff: float) -> InteractionBlock:
+class _SchNetEmbed(FieldEmbed):
+    def __init__(self, cutoff: float):
+        super().__init__("atom_embedding")
+        self.envelope = Envelope("cosine", cutoff)
+
+    def forward(self, inputs, ctx):
+        return BlockState(scalar=inputs[self.field], edge=self.envelope(ctx.dist).view(-1, 1))
+
+
+def _scalar_radius_builder(core: ComposableCore, layers: List[nn.Module]) -> None:
+    from ..layers import DistanceLayer, RangeSeparationLayer
+
+    # RangeSeparation accepts an optional vector. Generate it only when the
+    # configured stack requests it explicitly, as in the original scalar models.
+    vectors = any(
+        (isinstance(layer, DistanceLayer) and layer._with_vector) or
+        any(layer._name_mapping.get(key, key) in ("vij", "vij_lr", "vij_sr") for key in layer._input_fields)
+        for layer in layers if not isinstance(layer, RangeSeparationLayer)
+    )
+    core.adopt_radius_stack(layers, vectors=vectors)
+
+
+def schnet_block(hidden_channels: int, num_rbf: int, num_filters: int, cutoff: float, *,
+                 edge_envelope: bool = False) -> InteractionBlock:
     """CFConv with a cosine-cutoff filter, then ``x + lin(ssp(lin2(·)))``."""
     filter_net = nn.Sequential(
         Linear(num_rbf, num_filters), get_activation_fn("shifted_softplus", {}), Linear(num_filters, num_filters),
@@ -59,7 +82,8 @@ def schnet_block(hidden_channels: int, num_rbf: int, num_filters: int, cutoff: f
     )
     _xavier(filter_net[0], filter_net[2], pre, post[0], post[2])
     return InteractionBlock(
-        message=FilterMessage(filter_net, pre=pre, envelope=Envelope("cosine", cutoff)),
+        message=FilterMessage(filter_net, pre=pre, envelope=None if edge_envelope else Envelope("cosine", cutoff),
+                              edge_envelope=edge_envelope),
         update=ResidualUpdate(post),
     )
 
@@ -76,7 +100,7 @@ def schnet(
     output_mode: Literal["direct", "feature"] = "direct",
 ) -> ComposableCore:
     """SchNet: ``num_interactions`` CFConv blocks; messages flow ``idx_i → idx_j`` as in PyG."""
-    blocks = [schnet_block(hidden_channels, num_rbf, dim_embedding, cutoff_sr) for _ in range(num_interactions)]
+    blocks = [schnet_block(hidden_channels, num_rbf, dim_embedding, cutoff_sr, edge_envelope=True) for _ in range(num_interactions)]
     if output_mode == "direct":
         lin1 = Linear(hidden_channels, hidden_channels // 2)
         _xavier(lin1)
@@ -90,7 +114,7 @@ def schnet(
         head = FeatureHead("feature")
     requires = GraphRequires(vectors=False, edge_convention="swap", optional_cutoff_values=False)
     return ComposableCore(
-        FieldEmbed("atom_embedding"), blocks, head, requires,
+        _SchNetEmbed(cutoff_sr), blocks, head, requires, builder=_scalar_radius_builder,
         banner=SCHNET_BANNER, architecture="schnet", output_mode=output_mode,
         shallow_ensemble_size=shallow_ensemble_size, hidden_channels=hidden_channels,
         dim_feature_out=hidden_channels,
@@ -133,7 +157,7 @@ def physnet(
     requires = GraphRequires(vectors=False, distances=False, optional_cutoff_values=False)
     return ComposableCore(
         FieldEmbed("atom_embedding"), blocks, head, requires,
-        banner=PHYSNET_BANNER, architecture="physnet", output_mode=output_mode,
+        builder=_scalar_radius_builder, banner=PHYSNET_BANNER, architecture="physnet", output_mode=output_mode,
         num_blocks=num_blocks, shallow_ensemble_size=shallow_ensemble_size,
         dim_feature_out=dim_embedding, num_output_blocks=num_blocks,
     )
@@ -190,7 +214,7 @@ def spookynet(
                            block_keep_prob=keep_prob)
     else:
         head = FeatureHead("sum", source="y")
-    requires = GraphRequires(optional_cutoff_values=False, optional_fields=("batch_seg",) + (("Ra",) if use_efa else ()))
+    requires = GraphRequires(optional_cutoff_values=False, optional_fields=("batch_seg", "N") + (("Ra",) if use_efa else ()))
     return ComposableCore(
         FieldEmbed("atom_embedding"), blocks, head, requires,
         builder=_spookynet_builder, banner=SPOOKYNET_BANNER, architecture="spookynet",

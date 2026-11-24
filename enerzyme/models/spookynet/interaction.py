@@ -1,7 +1,6 @@
 import math
 from typing import Optional, Tuple
 import torch
-import torch.nn.functional as F
 from torch.nn import Module, Linear, init
 from ..mp.block import BlockState
 from ..mp.graph import GraphContext
@@ -244,10 +243,15 @@ def molecule_mask(ctx: GraphContext, dtype: torch.dtype):
     """``(num_batch, mask)`` for batch-restricted attention; ``mask`` is None for one molecule."""
     def build():
         batch_seg = ctx.batch
-        num_batch = 1 if batch_seg is None else batch_seg[-1] + 1
+        if batch_seg is None or not batch_seg.numel():
+            return 1, None
+        sizes = ctx.inputs.get("N")
+        if isinstance(sizes, (list, tuple)) or (torch.is_tensor(sizes) and sizes.ndim > 0):
+            num_batch = len(sizes)
+        else:
+            num_batch = int(batch_seg.max()) + 1
         if num_batch > 1:
-            one_hot = F.one_hot(batch_seg).to(dtype=dtype, device=batch_seg.device)
-            return num_batch, one_hot @ one_hot.transpose(-1, -2)
+            return num_batch, (batch_seg[:, None] == batch_seg).to(dtype)
         return num_batch, None
 
     return ctx.cached("spookynet_molecule_mask", build)
