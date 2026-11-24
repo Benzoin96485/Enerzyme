@@ -1,0 +1,909 @@
+{
+ "torch": "2.13.0+cu126",
+ "device": "cpu",
+ "method": "One eager and one ordinary Inductor force-loss backward on the same published preset weights. Atoms 5 + 4, coordinate seed 107, initialization seed 142, loss E.square().sum() + Fa.square().sum(). The output tolerance was atol/rtol 3e-4. Parameter tensors used atol 7e-4 and rtol 1e-3. A missing gradient counted as numerical zero when comparing values. Presence is also reported for the corrected edge preset runs.",
+ "precision_control": "The same initialized weights and coordinates were used across precisions. Stochastic dropout was disabled in this comparison. The elementwise failure count here includes energies, forces and parameter gradients. Empty or absent auxiliary gradients are excluded from relative-L2 comparisons in the precision reference runs.",
+ "precision_control_revisions": {
+  "alphanet": "ca4e604",
+  "quinnet": "ca4e604",
+  "visnet_lsrm": "2b52632"
+ },
+ "gradient_participation": "For some final layers the energy/force loss in eager produces no gradient. AOTAutograd can produce an explicit all-zero tensor for the same parameters when it returns auxiliary outputs. The numerical comparison treats these as equal. Optimizers that update parameters with explicit zero gradients can behave differently.",
+ "baseline": {
+  "et": {
+   "revision": "7be9a60",
+   "status": "pass",
+   "details": {
+    "calls": 553,
+    "graphs": 1,
+    "learned": [
+     "embedding",
+     "index_add_",
+     "linear"
+    ],
+    "compared_parameter_gradients": 102
+   }
+  },
+  "visnet": {
+   "revision": "7be9a60",
+   "status": "pass",
+   "details": {
+    "calls": 1072,
+    "graphs": 1,
+    "learned": [
+     "embedding",
+     "index_add_",
+     "linear"
+    ],
+    "compared_parameter_gradients": 199
+   }
+  },
+  "freecg": {
+   "revision": "7be9a60",
+   "status": "failure",
+   "details": {
+    "error": "AssertionError: embed.neighborhood.combine.bias: Tensor-likes are not close!\n\nMismatched elements: 252 / 256 (98.4%)\nGreatest absolute difference: 0.18603050708770752 at index (60,) (up to 0.0007 allowed)\nGreatest relative difference: 5.416370868682861 at index (80,) (up to 0.001 allowed)"
+   }
+  },
+  "quinnet": {
+   "revision": "7be9a60",
+   "status": "failure",
+   "details": {
+    "error": "AssertionError: blocks.1.module.s_proj.bias: Tensor-likes are not close!\n\nMismatched elements: 7 / 512 (1.4%)\nGreatest absolute difference: 0.0008553930092602968 at index (417,) (up to 0.0007 allowed)\nGreatest relative difference: 2.746096134185791 at index (324,) (up to 0.001 allowed)"
+   }
+  },
+  "visnet_lsrm": {
+   "revision": "7be9a60",
+   "status": "failure",
+   "details": {
+    "error": "AssertionError: blocks.3.module.s_proj.bias: Tensor-likes are not close!\n\nMismatched elements: 1 / 256 (0.4%)\nGreatest absolute difference: 0.011933326721191406 at index (154,) (up to 0.0007 allowed)\nGreatest relative difference: 0.0011730750557035208 at index (154,) (up to 0.001 allowed)"
+   }
+  },
+  "geodite": {
+   "revision": "7be9a60",
+   "status": "failure",
+   "details": {
+    "error": "AssertionError: Tensor-likes are not close!\n\nMismatched elements: 1 / 2 (50.0%)\nGreatest absolute difference: 0.06288798153400421 at index (1,) (up to 0.0003 allowed)\nGreatest relative difference: 22.203731536865234 at index (1,) (up to 0.0003 allowed)"
+   }
+  },
+  "leftnet": {
+   "revision": "7be9a60",
+   "status": "pass",
+   "details": {
+    "calls": 421,
+    "graphs": 1,
+    "learned": [
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear"
+    ],
+    "compared_parameter_gradients": 73
+   }
+  },
+  "alphanet": {
+   "revision": "7be9a60",
+   "status": "failure",
+   "details": {
+    "error": "AssertionError: blocks.0.message.norm_before.bias: Tensor-likes are not close!\n\nMismatched elements: 3 / 152 (2.0%)\nGreatest absolute difference: 0.002835988998413086 at index (38,) (up to 0.0007 allowed)\nGreatest relative difference: 0.0030561930034309626 at index (49,) (up to 0.001 allowed)"
+   }
+  },
+  "alphanet/eager_rng": {
+   "revision": "c91c153",
+   "outputs_close": true,
+   "outputs_max_abs": {
+    "E": 0.0,
+    "Fa": 1.0013580322265625e-05
+   },
+   "compared": 121,
+   "gradients_failed": {
+    "blocks.0.transition.mix.2.weight": [
+     0.0039196014404296875,
+     74.83528137207031
+    ],
+    "blocks.0.transition.mix.2.bias": [
+     0.0017242431640625,
+     45.564422607421875
+    ],
+    "blocks.0.transition.mix.0.weight": [
+     0.003421783447265625,
+     126.26998901367188
+    ],
+    "blocks.0.message.norm_before.bias": [
+     0.00437164306640625,
+     116.01283264160156
+    ],
+    "blocks.1.message.norm_before.bias": [
+     0.0024347305297851562,
+     65.11055755615234
+    ]
+   }
+  },
+  "alphanet/zero_dropout": {
+   "revision": "c91c153",
+   "outputs_close": true,
+   "outputs_max_abs": {
+    "E": 0.0,
+    "Fa": 1.1771917343139648e-05
+   },
+   "compared": 121,
+   "gradients_failed": {
+    "blocks.0.transition.mix.2.weight": [
+     0.005359649658203125,
+     76.36555480957031
+    ],
+    "blocks.0.transition.mix.0.weight": [
+     0.0046443939208984375,
+     129.10369873046875
+    ],
+    "embed.radial.net.2.bias": [
+     0.0072536468505859375,
+     199.2509307861328
+    ],
+    "blocks.0.transition.mix.2.bias": [
+     0.002475261688232422,
+     46.60901641845703
+    ],
+    "blocks.1.message.norm_before.bias": [
+     0.0034961700439453125,
+     66.3145751953125
+    ],
+    "embed.radial.net.0.bias": [
+     0.0021877288818359375,
+     106.95540618896484
+    ],
+    "blocks.0.message.norm_before.bias": [
+     0.005054473876953125,
+     117.24873352050781
+    ]
+   }
+  }
+ },
+ "corrected": {
+  "freecg": {
+   "revision": "2b52632",
+   "precision": "float32",
+   "outputs_close": true,
+   "outputs_max_abs": {
+    "E": 1.1920928955078125e-07,
+    "Fa": 1.1920928955078125e-07
+   },
+   "compared": 226,
+   "gradients_failed": {},
+   "gradient_presence": {
+    "eager_only": [],
+    "compiled_only": [
+     "blocks.8.module.group_cg.tp_weight",
+     "blocks.8.module.s_proj.bias",
+     "blocks.8.module.s_proj.weight"
+    ]
+   }
+  },
+  "quinnet": {
+   "model": "quinnet",
+   "precision": "float32",
+   "compared_parameter_tensors": 184,
+   "outputs_max_abs": {
+    "E": 2.980232238769531e-07,
+    "Fa": 2.980232238769531e-07
+   },
+   "max_relative_l2": 3.6177194448081684e-06,
+   "worst_relative_l2": [
+    [
+     "blocks.1.module.ratio",
+     3.6177194448081684e-06
+    ],
+    [
+     "blocks.3.module.ratio",
+     2.871584110736781e-06
+    ],
+    [
+     "blocks.1.module.vec_proj_improper2.weight",
+     2.2042746284588137e-06
+    ],
+    [
+     "blocks.1.module.vec_proj_improper4.weight",
+     1.526094814707149e-06
+    ],
+    [
+     "blocks.2.module.f_proj2.bias",
+     1.36297549846538e-06
+    ]
+   ],
+   "elementwise_failures": {},
+   "strict_float64_failures": {},
+   "gradients_only_in_eager": [],
+   "gradients_only_in_compiled": [
+    "blocks.4.module.s_proj.bias",
+    "blocks.4.module.s_proj.weight"
+   ],
+   "revision": "e956f75"
+  },
+  "visnet_lsrm": {
+   "revision": "2b52632",
+   "precision": "float32",
+   "outputs_close": true,
+   "outputs_max_abs": {
+    "E": 1.7881393432617188e-07,
+    "Fa": 1.4603137969970703e-06
+   },
+   "compared": 192,
+   "gradients_failed": {
+    "blocks.1.module.o_proj.bias": [
+     0.0280609130859375,
+     1460.556884765625
+    ],
+    "blocks.1.module.s_proj.bias": [
+     0.07177734375,
+     4749.30810546875
+    ],
+    "blocks.0.module.s_proj.bias": [
+     0.072265625,
+     4825.26416015625
+    ],
+    "blocks.2.module.s_proj.bias": [
+     0.0712890625,
+     4752.3037109375
+    ]
+   },
+   "gradient_presence": {
+    "eager_only": [],
+    "compiled_only": [
+     "blocks.8.module.mix.0.weight",
+     "blocks.8.module.mix.1.weight",
+     "blocks.8.module.mlp_pos.0.bias",
+     "blocks.8.module.mlp_pos.0.weight",
+     "blocks.8.module.mlp_pos.2.bias",
+     "blocks.8.module.mlp_pos.2.weight",
+     "blocks.8.module.mlp_vec.0.bias",
+     "blocks.8.module.mlp_vec.0.weight",
+     "blocks.8.module.mlp_vec.2.bias",
+     "blocks.8.module.mlp_vec.2.weight"
+    ]
+   }
+  },
+  "visnet": {
+   "revision": "2b52632",
+   "precision": "float32",
+   "outputs_close": true,
+   "outputs_max_abs": {
+    "E": 2.384185791015625e-07,
+    "Fa": 1.7881393432617188e-07
+   },
+   "compared": 199,
+   "gradients_failed": {},
+   "gradient_presence": {
+    "eager_only": [],
+    "compiled_only": [
+     "blocks.8.module.s_proj.bias",
+     "blocks.8.module.s_proj.weight"
+    ]
+   }
+  },
+  "spinconv": {
+   "revision": "2bdbea0",
+   "outputs_max_abs": {
+    "E": 7.450580596923828e-09,
+    "Fa": 1.4551915228366852e-11
+   },
+   "reference_max": {
+    "E": 0.08088064938783646,
+    "Fa": 2.8265101718716323e-05
+   },
+   "compared": 113,
+   "gradients_failed": {}
+  },
+  "geodite": {
+   "revision": "41e46fd",
+   "matched_dropout_masks": true,
+   "outputs_close": true,
+   "outputs_max_abs": {
+    "E": 0.0001373291015625,
+    "Fa": 0.000732421875
+   },
+   "compared": 93,
+   "gradients_failed": {}
+  },
+  "quinnet/float64": {
+   "model": "quinnet",
+   "precision": "float64",
+   "compared_parameter_tensors": 184,
+   "outputs_max_abs": {
+    "E": 3.3306690738754696e-16,
+    "Fa": 6.661338147750939e-16
+   },
+   "max_relative_l2": 5.7010338269970775e-15,
+   "worst_relative_l2": [
+    [
+     "blocks.1.module.ratio",
+     5.7010338269970775e-15
+    ],
+    [
+     "blocks.3.module.ratio",
+     4.554253734707422e-15
+    ],
+    [
+     "blocks.1.module.vec_proj_improper2.weight",
+     4.012546176352513e-15
+    ],
+    [
+     "blocks.1.module.vec_proj_improper4.weight",
+     3.964586562198687e-15
+    ],
+    [
+     "blocks.4.module.vec_proj_improper4.weight",
+     3.599591737360629e-15
+    ]
+   ],
+   "elementwise_failures": {},
+   "strict_float64_failures": {},
+   "gradients_only_in_eager": [],
+   "gradients_only_in_compiled": [
+    "blocks.4.module.s_proj.bias",
+    "blocks.4.module.s_proj.weight"
+   ],
+   "revision": "e956f75"
+  },
+  "freecg/float32": {
+   "model": "freecg",
+   "precision": "float32",
+   "compared_parameter_tensors": 226,
+   "outputs_max_abs": {
+    "E": 1.1920928955078125e-07,
+    "Fa": 9.685754776000977e-08
+   },
+   "max_relative_l2": 1.3373872648020196e-06,
+   "worst_relative_l2": [
+    [
+     "blocks.5.module.f_proj.bias",
+     1.3373872648020196e-06
+    ],
+    [
+     "blocks.7.module.f_proj.bias",
+     1.2891766170512483e-06
+    ],
+    [
+     "blocks.1.module.vec_proj.weight",
+     1.2544118447852412e-06
+    ],
+    [
+     "blocks.6.module.group_cg.tp_weight",
+     1.2507257665138979e-06
+    ],
+    [
+     "blocks.1.module.group_cg.tp_weight",
+     1.2493713267390704e-06
+    ]
+   ],
+   "elementwise_failures": {},
+   "strict_float64_failures": {},
+   "gradients_only_in_eager": [],
+   "gradients_only_in_compiled": [
+    "blocks.8.module.group_cg.tp_weight",
+    "blocks.8.module.s_proj.bias",
+    "blocks.8.module.s_proj.weight"
+   ],
+   "revision": "e956f75"
+  },
+  "visnet_lsrm/float64": {
+   "model": "visnet_lsrm",
+   "precision": "float64",
+   "compared_parameter_tensors": 192,
+   "outputs_max_abs": {
+    "E": 2.220446049250313e-16,
+    "Fa": 2.0539125955565396e-15
+   },
+   "max_relative_l2": 1.3851930632607694e-13,
+   "worst_relative_l2": [
+    [
+     "blocks.4.module.k_proj.bias",
+     1.3851930632607694e-13
+    ],
+    [
+     "blocks.4.module.k_proj.weight",
+     1.300685881103666e-13
+    ],
+    [
+     "blocks.4.module.dv_proj.weight",
+     1.2589379933647387e-13
+    ],
+    [
+     "blocks.3.module.vec_proj.weight",
+     1.1950125167915088e-13
+    ],
+    [
+     "blocks.4.module.o_proj.weight",
+     1.1195956167505341e-13
+    ]
+   ],
+   "elementwise_failures": {},
+   "strict_float64_failures": {},
+   "gradients_only_in_eager": [],
+   "gradients_only_in_compiled": [
+    "blocks.8.module.mix.0.weight",
+    "blocks.8.module.mix.1.weight",
+    "blocks.8.module.mlp_pos.0.bias",
+    "blocks.8.module.mlp_pos.0.weight",
+    "blocks.8.module.mlp_pos.2.bias",
+    "blocks.8.module.mlp_pos.2.weight",
+    "blocks.8.module.mlp_vec.0.bias",
+    "blocks.8.module.mlp_vec.0.weight",
+    "blocks.8.module.mlp_vec.2.bias",
+    "blocks.8.module.mlp_vec.2.weight"
+   ],
+   "revision": "e956f75"
+  }
+ },
+ "precision": {
+  "alphanet": {
+   "eager32": {
+    "gradients_compared": 121,
+    "tensors_with_elementwise_failures": 9,
+    "max_relative_l2": 9.13768356426919e-05,
+    "largest_relative_l2": [
+     [
+      "blocks.0.message.fc_mps.bias",
+      9.13768356426919e-05
+     ],
+     [
+      "blocks.0.message.kernel_imag",
+      6.503846717242205e-05
+     ],
+     [
+      "blocks.0.message.scale.bias",
+      6.37196242917885e-05
+     ]
+    ],
+    "E": {
+     "max_abs": 5.017681026231458e-07,
+     "reference_max": 8.940368150575647,
+     "relative_l2": 4.4511639777822675e-08,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 2.1515729807575212e-05,
+     "reference_max": 7.016203938367747,
+     "relative_l2": 3.259516897016719e-06,
+     "failed": 0,
+     "numel": 27
+    }
+   },
+   "compiled32": {
+    "gradients_compared": 121,
+    "tensors_with_elementwise_failures": 15,
+    "max_relative_l2": 8.72973062101744e-05,
+    "largest_relative_l2": [
+     [
+      "embed.kernels_imag",
+      8.72973062101744e-05
+     ],
+     [
+      "embed.kernels_real",
+      8.693012596361623e-05
+     ],
+     [
+      "blocks.1.message.norm_before.bias",
+      7.976121105335193e-05
+     ]
+    ],
+    "E": {
+     "max_abs": 5.017681026231458e-07,
+     "reference_max": 8.940368150575647,
+     "relative_l2": 4.4511639777822675e-08,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 2.1992566965778337e-05,
+     "reference_max": 7.016203938367747,
+     "relative_l2": 3.986944993315338e-06,
+     "failed": 0,
+     "numel": 27
+    }
+   },
+   "compiled32_vs_eager32": {
+    "gradients_compared": 121,
+    "tensors_with_elementwise_failures": 7,
+    "max_relative_l2": 5.069067569395307e-05,
+    "largest_relative_l2": [
+     [
+      "blocks.1.message.norm_before.bias",
+      5.069067569395307e-05
+     ],
+     [
+      "blocks.0.transition.mix.2.bias",
+      5.060559824103876e-05
+     ],
+     [
+      "embed.kernels_imag",
+      5.0033799335011945e-05
+     ]
+    ],
+    "E": {
+     "max_abs": 0.0,
+     "reference_max": 8.94036865234375,
+     "relative_l2": 0.0,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 1.1771917343139648e-05,
+     "reference_max": 7.0161824226379395,
+     "relative_l2": 1.8894117910602263e-06,
+     "failed": 0,
+     "numel": 27
+    }
+   },
+   "compiled64": {
+    "gradients_compared": 121,
+    "tensors_with_elementwise_failures": 0,
+    "max_relative_l2": 1.9576555222782788e-13,
+    "largest_relative_l2": [
+     [
+      "blocks.1.message.kernel_real",
+      1.9576555222782788e-13
+     ],
+     [
+      "blocks.1.message.scale.bias",
+      1.9521929498041667e-13
+     ],
+     [
+      "blocks.1.message.fc_mps.bias",
+      1.9222156887719554e-13
+     ]
+    ],
+    "E": {
+     "max_abs": 1.7763568394002505e-15,
+     "reference_max": 8.940368150575647,
+     "relative_l2": 1.4480704096130077e-16,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 3.9968028886505635e-14,
+     "reference_max": 7.016203938367747,
+     "relative_l2": 5.442983325959789e-15,
+     "failed": 0,
+     "numel": 27
+    }
+   }
+  },
+  "quinnet": {
+   "eager32": {
+    "gradients_compared": 182,
+    "tensors_with_elementwise_failures": 0,
+    "max_relative_l2": 5.180814851435818e-06,
+    "largest_relative_l2": [
+     [
+      "blocks.1.module.ratio",
+      5.180814851435818e-06
+     ],
+     [
+      "blocks.1.module.vec_proj_improper4.weight",
+      2.519310513129275e-06
+     ],
+     [
+      "blocks.2.module.ratio",
+      2.503324458695654e-06
+     ]
+    ],
+    "E": {
+     "max_abs": 2.637342174649504e-07,
+     "reference_max": 0.5983826533779986,
+     "relative_l2": 3.9543674765426525e-07,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 2.4457636915720116e-07,
+     "reference_max": 0.6432589950150593,
+     "relative_l2": 3.4580614316904367e-07,
+     "failed": 0,
+     "numel": 27
+    }
+   },
+   "compiled32": {
+    "gradients_compared": 182,
+    "tensors_with_elementwise_failures": 2,
+    "max_relative_l2": 0.2649416398118876,
+    "largest_relative_l2": [
+     [
+      "blocks.0.module.s_proj.bias",
+      0.2649416398118876
+     ],
+     [
+      "blocks.1.module.s_proj.bias",
+      0.24053290774913408
+     ],
+     [
+      "blocks.2.module.s_proj.bias",
+      0.19088803387282263
+     ]
+    ],
+    "E": {
+     "max_abs": 5.617574413419035e-07,
+     "reference_max": 0.5983826533779986,
+     "relative_l2": 6.993330712563313e-07,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 1.1305149949514259e-07,
+     "reference_max": 0.6432589950150593,
+     "relative_l2": 1.895036875377383e-07,
+     "failed": 0,
+     "numel": 27
+    }
+   },
+   "compiled32_vs_eager32": {
+    "gradients_compared": 182,
+    "tensors_with_elementwise_failures": 2,
+    "max_relative_l2": 0.2649415643278619,
+    "largest_relative_l2": [
+     [
+      "blocks.0.module.s_proj.bias",
+      0.2649415643278619
+     ],
+     [
+      "blocks.1.module.s_proj.bias",
+      0.24053281952561054
+     ],
+     [
+      "blocks.2.module.s_proj.bias",
+      0.19088803745421212
+     ]
+    ],
+    "E": {
+     "max_abs": 2.980232238769531e-07,
+     "reference_max": 0.5983824729919434,
+     "relative_l2": 3.97241252979301e-07,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 3.5762786865234375e-07,
+     "reference_max": 0.6432587504386902,
+     "relative_l2": 4.896953279445514e-07,
+     "failed": 0,
+     "numel": 27
+    }
+   },
+   "compiled64": {
+    "gradients_compared": 182,
+    "tensors_with_elementwise_failures": 2,
+    "max_relative_l2": 0.264941619285616,
+    "largest_relative_l2": [
+     [
+      "blocks.0.module.s_proj.bias",
+      0.264941619285616
+     ],
+     [
+      "blocks.1.module.s_proj.bias",
+      0.2405329285578695
+     ],
+     [
+      "blocks.2.module.s_proj.bias",
+      0.1908880436745947
+     ]
+    ],
+    "E": {
+     "max_abs": 3.3306690738754696e-16,
+     "reference_max": 0.5983826533779986,
+     "relative_l2": 4.95401114142518e-16,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 4.440892098500626e-16,
+     "reference_max": 0.6432589950150593,
+     "relative_l2": 5.304472544082431e-16,
+     "failed": 0,
+     "numel": 27
+    }
+   }
+  },
+  "visnet_lsrm": {
+   "eager32": {
+    "gradients_compared": 182,
+    "tensors_with_elementwise_failures": 10,
+    "max_relative_l2": 0.00013421960553520093,
+    "largest_relative_l2": [
+     [
+      "blocks.1.module.dv_proj.weight",
+      0.00013421960553520093
+     ],
+     [
+      "blocks.4.module.k_proj.bias",
+      0.00012818636660358275
+     ],
+     [
+      "blocks.4.module.k_proj.weight",
+      0.00012249827913841748
+     ]
+    ],
+    "E": {
+     "max_abs": 2.9517684740909544e-07,
+     "reference_max": 0.12962256383787174,
+     "relative_l2": 1.6712741011114606e-06,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 2.599166377348361e-06,
+     "reference_max": 0.8649852510228316,
+     "relative_l2": 2.452442532098793e-06,
+     "failed": 0,
+     "numel": 27
+    }
+   },
+   "compiled32": {
+    "gradients_compared": 182,
+    "tensors_with_elementwise_failures": 9,
+    "max_relative_l2": 0.00012516125339278886,
+    "largest_relative_l2": [
+     [
+      "blocks.4.module.k_proj.bias",
+      0.00012516125339278886
+     ],
+     [
+      "blocks.4.module.k_proj.weight",
+      0.00011985614453998218
+     ],
+     [
+      "blocks.4.module.dv_proj.weight",
+      0.00011583148462267745
+     ]
+    ],
+    "E": {
+     "max_abs": 4.739907817352673e-07,
+     "reference_max": 0.12962256383787174,
+     "relative_l2": 2.6031145436667988e-06,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 3.076003535551486e-06,
+     "reference_max": 0.8649852510228316,
+     "relative_l2": 2.3942994491126737e-06,
+     "failed": 0,
+     "numel": 27
+    }
+   },
+   "compiled32_vs_eager32": {
+    "gradients_compared": 182,
+    "tensors_with_elementwise_failures": 4,
+    "max_relative_l2": 4.1562237499507887e-05,
+    "largest_relative_l2": [
+     [
+      "blocks.1.module.o_proj.weight",
+      4.1562237499507887e-05
+     ],
+     [
+      "blocks.2.module.vec_proj.weight",
+      3.171729409994973e-05
+     ],
+     [
+      "blocks.1.module.dv_proj.bias",
+      3.168286866250785e-05
+     ]
+    ],
+    "E": {
+     "max_abs": 1.7881393432617188e-07,
+     "reference_max": 0.12962248921394348,
+     "relative_l2": 1.0974083486009435e-06,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 1.4603137969970703e-06,
+     "reference_max": 0.864987850189209,
+     "relative_l2": 1.4260084849658798e-06,
+     "failed": 0,
+     "numel": 27
+    }
+   },
+   "compiled64": {
+    "gradients_compared": 182,
+    "tensors_with_elementwise_failures": 0,
+    "max_relative_l2": 1.3851939757056017e-13,
+    "largest_relative_l2": [
+     [
+      "blocks.4.module.k_proj.bias",
+      1.3851939757056017e-13
+     ],
+     [
+      "blocks.4.module.k_proj.weight",
+      1.3006890847823935e-13
+     ],
+     [
+      "blocks.4.module.dv_proj.weight",
+      1.2589375650262525e-13
+     ]
+    ],
+    "E": {
+     "max_abs": 2.220446049250313e-16,
+     "reference_max": 0.12962256383787174,
+     "relative_l2": 1.2563682630467714e-15,
+     "failed": 0,
+     "numel": 2
+    },
+    "Fa": {
+     "max_abs": 2.0539125955565396e-15,
+     "reference_max": 0.8649852510228316,
+     "relative_l2": 2.3352350324152517e-15,
+     "failed": 0,
+     "numel": 27
+    }
+   }
+  }
+ },
+ "quinnet_before_correcting_angular_endpoints": {
+  "revision": "2b52632",
+  "precision": "float32",
+  "outputs_close": true,
+  "outputs_max_abs": {
+   "E": 2.980232238769531e-07,
+   "Fa": 5.364418029785156e-07
+  },
+  "compared": 184,
+  "gradients_failed": {
+   "blocks.0.module.s_proj.bias": [
+    0.0011005275882780552,
+    0.0037148918490856886
+   ],
+   "blocks.1.module.s_proj.bias": [
+    0.0008553871884942055,
+    0.003858737414702773
+   ]
+  },
+  "gradient_presence": {
+   "eager_only": [],
+   "compiled_only": [
+    "blocks.4.module.s_proj.bias",
+    "blocks.4.module.s_proj.weight"
+   ]
+  }
+ },
+ "quinnet_selected_energy_force_outputs": {
+  "revision": "e956f75",
+  "compiled_boundary": "Return just E and Fa from the model inside torch.compile.",
+  "model": "quinnet",
+  "precision": "float32",
+  "compared_parameter_tensors": 184,
+  "outputs_max_abs": {
+   "E": 2.980232238769531e-07,
+   "Fa": 4.76837158203125e-07
+  },
+  "max_relative_l2": 5.581781574379318e-06,
+  "worst_relative_l2": [
+   [
+    "blocks.1.module.ratio",
+    5.581781574379318e-06
+   ],
+   [
+    "blocks.1.module.vec_proj_improper2.weight",
+    1.829881710407831e-06
+   ],
+   [
+    "blocks.1.module.vec_proj_improper4.weight",
+    1.6689256840903367e-06
+   ],
+   [
+    "blocks.2.module.f_proj2.bias",
+    1.4804433830034061e-06
+   ],
+   [
+    "blocks.4.module.vec_proj_improper4.weight",
+    1.4631600748113886e-06
+   ]
+  ],
+  "elementwise_failures": {},
+  "strict_float64_failures": {},
+  "gradients_only_in_eager": [],
+  "gradients_only_in_compiled": [
+   "blocks.4.module.s_proj.bias",
+   "blocks.4.module.s_proj.weight"
+  ]
+ }
+}
