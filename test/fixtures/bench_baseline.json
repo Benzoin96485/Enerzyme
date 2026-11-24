@@ -12,7 +12,9 @@
    "bench_gpu/scalar_legacy_eager_v100_rechecks.json",
    "bench_gpu/shared_attention_eager.json",
    "bench_gpu/compile_v100_smoke.json",
-   "bench_gpu/raw_compile_v100.json"
+   "bench_gpu/raw_compile_v100.json",
+   "bench_gpu/schnet_fullgraph_acceptance.json",
+   "bench_gpu/freecg_generated_kernels.json"
   ],
   "python": "3.13.5",
   "reps": 5,
