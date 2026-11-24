@@ -15,6 +15,19 @@ def _timings():
     return {"device": "cpu", "mol_batch": {"infer_ms": 10.0, "train_ms": 20.0}}
 
 
+def test_force_check_requires_matching_tensor_shapes_dtypes_and_finite_values():
+    import torch
+    from check_compiled_forces import compare_fields
+
+    expected = {"E": torch.ones(2), "Fa": torch.ones(2, 3), "weight": torch.tensor(float("inf"))}
+    actual = {"E": torch.ones(2, 1), "Fa": torch.ones(2, 3, dtype=torch.float64), "weight": expected["weight"]}
+    errors, changed, failed = compare_fields(expected, actual, atol=1e-5, rtol=1e-5)
+    assert failed == ["E", "Fa", "weight"] and not changed
+    assert errors["E"]["actual_shape"] == [2, 1] and errors["E"]["reference_shape"] == [2]
+    assert errors["Fa"]["actual_dtype"] == "torch.float64" and errors["Fa"]["reference_dtype"] == "torch.float32"
+    assert errors["weight"]["max_abs"] is None
+
+
 @pytest.mark.parametrize("entry", [
     {}, {"error": "timeout"},
     {"device": "cpu", "mol_large": {"infer_ms": 10.0, "train_ms": 20.0}},
