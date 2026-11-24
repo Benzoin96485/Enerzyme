@@ -216,5 +216,5 @@ def test_compiled_fragment_geometry_preserves_indices_and_center_force_derivativ
 
     with torch._dynamo.config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
         compiled = torch.compile(geometry, backend="eager", fullgraph=True)
-        for mode in ("precomputed", "kmeans"):
+        for mode in ("precomputed", "kmeans", "spectral"):
             torch.testing.assert_close(evaluate(compiled, mode), evaluate(geometry, mode))
