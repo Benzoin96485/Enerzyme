@@ -2979,6 +2979,32 @@
         "e2former_lsr-float32": {"graphs": [{"operations": 2807, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"]}], "gradients_compared": 359, "energy": {"max_abs": 0.0, "relative_l2": 0.0}, "forces": {"max_abs": 4.76837158203125e-07, "relative_l2": 6.093274087684172e-07}, "largest_parameter_relative_l2": [2.6670911731154924e-06, "blocks.2.module.ga.alpha_module.fc_easy.net.3.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"},
         "e2former_lsr-float64": {"graphs": [{"operations": 2807, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"]}, {"operations": 2807, "learned_operators": ["einsum", "embedding", "index_add_", "linear", "matmul"]}], "gradients_compared": 359, "energy": {"max_abs": 2.6645352591003757e-15, "relative_l2": 6.708227145093755e-16}, "forces": {"max_abs": 7.771561172376096e-16, "relative_l2": 9.456366383440515e-16}, "largest_parameter_relative_l2": [4.511525922421913e-15, "blocks.2.module.ga.alpha_module.fc_easy.net.0.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"}
       }
+    },
+    "dimenet_precision": {
+      "candidate": "3e65250",
+      "job": "6317701",
+      "method": "Identical initial weights and coordinates. Relative L2 distances to fp64 eager. Near-cancelling elements can exceed elementwise tolerances even when the whole tensor agrees closely.",
+      "energy": {
+        "eager_fp32": 1.9296613046115396e-07,
+        "inductor_fp32": 5.183923069270031e-08
+      },
+      "forces": {
+        "eager_fp32": 2.5279609802620962e-06,
+        "inductor_fp32": 1.6101185677358732e-06
+      },
+      "largest_parameter_error": {
+        "eager_fp32": [0.00016076197902236406, "post_sequence.0.heads.6.1.bias"],
+        "inductor_fp32": [0.00015081424732732877, "post_sequence.0.heads.6.1.bias"]
+      }
+    },
+    "dpa3": {
+      "candidate": "2fa0e3d",
+      "job": "6318265",
+      "method": "Scoped single horizontal reduction during the forward and the weight backward of ordinary compiled CPU force training.",
+      "cases": {
+        "dpa3-float32": {"graphs": [{"operations": 302, "learned_operators": ["embedding", "index_add_", "linear", "matmul"]}], "gradients_compared": 32, "energy": {"max_abs": 0.0, "relative_l2": 0.0}, "forces": {"max_abs": 1.4901161193847656e-08, "relative_l2": 8.013962305403779e-08}, "largest_parameter_relative_l2": [3.055106506554888e-07, "blocks.0.module.angle_to_edge.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"},
+        "dpa3-float64": {"graphs": [{"operations": 302, "learned_operators": ["embedding", "index_add_", "linear", "matmul"]}], "gradients_compared": 32, "energy": {"max_abs": 0.0, "relative_l2": 0.0}, "forces": {"max_abs": 5.551115123125783e-17, "relative_l2": 2.979969135431394e-16}, "largest_parameter_relative_l2": [6.033876553717554e-16, "blocks.0.module.angle_to_edge.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"}
+      }
     }
   }
 }
