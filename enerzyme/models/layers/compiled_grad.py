@@ -30,6 +30,7 @@ def compiling_fullgraph() -> bool:
 @torch.compiler.assume_constant_result
 def _cpu_backend_may_use_inductor() -> bool:
     """Custom backends may delegate to Inductor. Eager backends do no kernel lowering."""
+    from torch._dynamo.backends.registry import lookup_backend
     from torch._dynamo.symbolic_convert import InstructionTranslator
 
     try:
@@ -37,8 +38,8 @@ def _cpu_backend_may_use_inductor() -> bool:
     except AttributeError:
         return True
     backend = getattr(wrapper, "_torchdynamo_orig_backend", wrapper)
-    name = getattr(backend, "compiler_name", getattr(backend, "__name__", None))
-    return name not in ("eager", "aot_eager")
+    compiler = getattr(backend, "compiler_fn", backend)
+    return all(compiler is not lookup_backend(name) for name in ("eager", "aot_eager"))
 
 
 def uses_cpu_inductor_forces(core, inputs, *, include_eval=False):
@@ -63,7 +64,7 @@ def native_cpu_forces(core, inputs):
 
 
 @torch.compiler.assume_constant_result
-def cpu_horizontal_fusion_option():
+def cpu_inductor_option(option):
     """Read an explicit Inductor backend override before entering its lowering."""
     from torch._dynamo.symbolic_convert import InstructionTranslator
 
@@ -72,25 +73,23 @@ def cpu_horizontal_fusion_option():
     except AttributeError:
         return None
     backend = getattr(wrapper, "_torchdynamo_orig_backend", wrapper)
-    return getattr(backend, "config", {}).get("cpp.max_horizontal_fusion_size")
+    return getattr(backend, "config", {}).get(option)
 
 
 @torch.compiler.disable(recursive=False)
-def compiled_training_with_separate_reductions(core, inputs):
-    """Lower both DPA3 derivative graphs before leaving the CPU fusion scope."""
+def compiled_cpu_forces_with_option(core, inputs, option):
+    """Lower the forward and backward under the preset's required CPU kernel option."""
     from torch._functorch import config as autograd_config
     from torch._inductor import config
 
-    if not (hasattr(config.cpp, "max_horizontal_fusion_size")
+    if not (hasattr(config.cpp, option.removeprefix("cpp."))
             and hasattr(autograd_config, "force_non_lazy_backward_lowering")):
         return native_cpu_forces(core, inputs)
-    # RepFlow reduces contributions from both endpoints of an edge. CPU
-    # horizontal fusion can drop one term in the force or its weight gradient.
-    # AOT normally defers the weight backward until after this scope exits.
-    with config.patch({"cpp.max_horizontal_fusion_size": 1}), autograd_config.patch(
-        force_non_lazy_backward_lowering=True
-    ):
-        return compiled_training(core, inputs)
+    # Deferred lowering would use the caller's settings for a later backward.
+    with config.patch({option: 1}), autograd_config.patch(force_non_lazy_backward_lowering=True):
+        if core.training:
+            return compiled_coordinate_vjp(core, inputs)
+        return retained_inference(core, inputs)
 
 
 @torch.compiler.disable
@@ -194,7 +193,7 @@ def _post_pair_indices(core, inputs):
 
 
 @torch.compiler.disable(recursive=False)
-def compiled_training(core, inputs):
+def compiled_coordinate_vjp(core, inputs):
     """Keep differentiable distances inside the VJP and discrete sizes outside it."""
     from torch._dynamo import config
 
@@ -213,8 +212,8 @@ def _scripted_force_training(core, inputs):
 
 
 @torch.compiler.disable(recursive=False)
-def retained_inference(core, inputs):
-    """Compile each inference partition with reusable backward activations.
+def retained_inference(core, inputs, *, joint=False):
+    """Compile inference with reusable backward activations.
 
     Force evaluation keeps the energy graph for other response heads and for
     subsequent gradients requested by the caller. An eagerly lowered dynamic
@@ -224,8 +223,9 @@ def retained_inference(core, inputs):
     from contextlib import nullcontext
     from torch._functorch import config
 
+    run = partial(compiled_coordinate_vjp, core) if joint else core._run_layers
     if not hasattr(config, "donated_buffer"):
-        return core._run_layers(inputs)
+        return run(inputs)
 
     # The Inductor FX cache key on PyTorch 2.13 omits AOTAutograd's donated
     # input indices. A cached single-use backward can overwrite buffers even
@@ -238,7 +238,7 @@ def retained_inference(core, inputs):
     else:
         cache_scope = nullcontext()
     with config.patch(donated_buffer=False), cache_scope:
-        return core._run_layers(inputs)
+        return run(inputs)
 
 
 def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, topology=None,

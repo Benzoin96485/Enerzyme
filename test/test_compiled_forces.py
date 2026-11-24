@@ -18,7 +18,7 @@ def isolate_compiler_cache():
     torch.compiler.reset()
 
 
-@pytest.mark.parametrize("architecture", ["equiformer_v3", "camp", "cace", "grace"])
+@pytest.mark.parametrize("architecture", ["equiformer_v3", "camp", "grace"])
 def test_cpu_compiled_force_training_uses_native_gradients(monkeypatch, architecture):
     from torch._dynamo.exc import TorchRuntimeError
 
@@ -225,7 +225,7 @@ def test_compiled_topology_preserves_force_and_parameter_gradients(architecture)
     assert "linear" in operators
 
 
-@pytest.mark.parametrize("architecture", ["so3krates", "mattersim", "dpa3", "facto"])
+@pytest.mark.parametrize("architecture", ["so3krates", "mattersim", "dpa3", "facto", "cace"])
 def test_cpu_compiler_keeps_force_gradients(architecture):
     from scripts.core_harness import build, forward, make_batch, random_molecules
 
@@ -237,9 +237,11 @@ def test_cpu_compiler_keeps_force_gradients(architecture):
     from torch._inductor import config
 
     fusion = getattr(config.cpp, "max_horizontal_fusion_size", None)
+    simdlen = getattr(config.cpp, "simdlen", None)
     eager_backward = getattr(autograd_config, "force_non_lazy_backward_lowering", None)
     actual = forward(torch.compile(model), batch, torch.float64, train=True)
     assert getattr(config.cpp, "max_horizontal_fusion_size", None) == fusion
+    assert getattr(config.cpp, "simdlen", None) == simdlen
     assert getattr(autograd_config, "force_non_lazy_backward_lowering", None) == eager_backward
     for field in ("E", "Fa"):
         torch.testing.assert_close(actual[field], reference[field], rtol=1e-9, atol=1e-12)
@@ -271,9 +273,35 @@ def test_dpa3_cpu_inference_keeps_reusable_coordinate_gradients(monkeypatch, dty
 
     expected = differentiate(model)
     monkeypatch.setattr(torch._inductor, "compile", unexpected_lowering)
-    actual = differentiate(torch.compile(model))
+    # A custom compiler can delegate to Inductor under any Python name.
+    def eager(graph, inputs):
+        return torch._inductor.compile(graph, inputs)
+
+    backend = eager if dtype == torch.float64 else "inductor"
+    actual = differentiate(torch.compile(model, backend=backend))
     for value, target in zip(actual, expected):
         torch.testing.assert_close(value, target, rtol=0, atol=0)
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+@pytest.mark.parametrize("architecture", ["et", "cace"])
+def test_cpu_inference_matches_force_and_repeated_energy_derivatives(architecture, dtype):
+    from torch._functorch import config
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    model = build(architecture).float().to(dtype)
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
+    expected = forward(model, batch, dtype)
+    result = forward(torch.compile(model), batch, dtype)
+    torch.testing.assert_close(result["E"], expected["E"])
+    torch.testing.assert_close(result["Fa"], expected["Fa"])
+    assert not result["Fa"].requires_grad
+    scope = config.patch(donated_buffer=False) if hasattr(config, "donated_buffer") else nullcontext()
+    with scope:
+        for retain in (True, False):
+            grad, = torch.autograd.grad(result["E"].sum(), result["Ra"], retain_graph=retain)
+            torch.testing.assert_close(grad, -expected["Fa"])
 
 
 def _batch(distance):

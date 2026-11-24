@@ -119,7 +119,9 @@ def test_force_is_energy_derivative(case):
     torch.testing.assert_close(slope, force_slope, rtol=2e-4, atol=5e-5 if name == "dpa4" else 3e-6)
 
 
-def test_dynamo_capture_of_energy_and_force(case):
+def test_dynamo_capture_of_energy_and_force(case, monkeypatch):
+    from torch._dynamo.backends import registry
+
     name, model, sample, xyz, ref = case
     if name in ("allscaip", "equflashv2", "mace_polar"):
         torch.manual_seed(83)
@@ -127,15 +129,16 @@ def test_dynamo_capture_of_energy_and_force(case):
         ref = _run(model, sample, xyz, torch.arange(len(xyz)), capture_features=False)
     graphs = []
 
-    def eager(graph, _examples):
-        # Execute the recorded FX graph directly. Presets with an Inductor
-        # fallback can still expose their learned operations to this backend.
-        graphs.append(graph)
-        return graph.forward
+    eager = registry.lookup_backend("eager")
 
+    def capture(graph, examples):
+        graphs.append(graph)
+        return eager(graph, examples)
+
+    monkeypatch.setitem(registry._COMPILER_FNS, "eager", capture)
     torch.compiler.reset()
     try:
-        compiled = torch.compile(model, backend=eager)
+        compiled = torch.compile(model, backend="eager")
         out = _run(compiled, sample, xyz, torch.arange(len(xyz)), capture_features=False)
         operators = {
             getattr(node.target, "__name__", str(node.target))

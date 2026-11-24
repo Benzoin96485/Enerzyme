@@ -140,9 +140,9 @@ class BaseFFCore(BaseFFModule):
     def forward(self, net_input):
         if torch.compiler.is_compiling():
             from .compiled_grad import (
-                compiled_training, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
+                compiled_coordinate_vjp, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
                 uses_cpu_inductor_forces, native_cpu_forces,
-                compiled_training_with_separate_reductions, cpu_horizontal_fusion_option,
+                compiled_cpu_forces_with_option, cpu_inductor_option,
             )
 
             # A graph break inside a VJP discards the whole energy trace. In
@@ -156,21 +156,24 @@ class BaseFFCore(BaseFFModule):
                               if self.training else "Fullgraph CPU force inference requires an eager backend "
                               "for reusable energy derivatives in this model")
                 return native_cpu_forces(self, net_input)
-            if (self.training and getattr(self, "_separate_cpu_force_reductions", False)
-                    and uses_cpu_inductor_forces(self, net_input)):
-                fusion = cpu_horizontal_fusion_option()
+            option = getattr(self, "_cpu_force_training_option" if self.training
+                             else "_cpu_force_inference_option", None)
+            if option and uses_cpu_inductor_forces(self, net_input, include_eval=not self.training):
+                override = cpu_inductor_option(option)
                 if compiling_fullgraph():
-                    torch._assert(fusion == 1, "Fullgraph DPA3 CPU force training requires "
-                                  "torch.compile options={'cpp.max_horizontal_fusion_size': 1}")
-                elif fusion is None or fusion == 1:
-                    return compiled_training_with_separate_reductions(self, net_input)
+                    torch._assert(override == 1, "Fullgraph CPU forces for this preset require "
+                                  f"torch.compile options={{'{option}': 1}}")
+                elif override is None or override == 1:
+                    return compiled_cpu_forces_with_option(self, net_input, option)
                 else:
                     return native_cpu_forces(self, net_input)
             if compiling_fullgraph():
                 return forward_with_coordinate_gradients(self, net_input)
             if self.training:
-                return compiled_training(self, net_input)
-            return retained_inference(self, net_input)
+                return compiled_coordinate_vjp(self, net_input)
+            joint = (getattr(self, "_joint_cpu_force_inference", False)
+                     and uses_cpu_inductor_forces(self, net_input, include_eval=True))
+            return retained_inference(self, net_input, joint=joint)
         return self._run_layers(net_input)
 
     def _run_layers(self, net_input):

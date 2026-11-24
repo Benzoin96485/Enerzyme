@@ -125,8 +125,26 @@ def summarize(phase, main):
             lines.append(f"- Phase 0 {' '.join(key)} +{value:.2f}% (run {job})")
 
     missing = Counter((name, dtype) for (name, dtype, _, _), (value, _) in phase.items() if value is None)
-    lines += ["", "## Missing paired measurements", "",
-              "Each model and precision has 12 possible comparisons. Individual exceptions are preserved "
+    lines += ["", "## Missing paired measurements", ""]
+    baseline = {dtype: load("baseline_eager_" + dtype) for dtype in PRECISIONS}
+    oom = 0
+    for (model, dtype, system, metric), (value, _) in phase.items():
+        if value is None:
+            row = baseline[dtype][model]
+            error = row.get(system, {}).get(metric.split("_")[0] + "_error", row.get("error", ""))
+            oom += "out of memory" in error.lower()
+    if oom:
+        lines.append(f"The Phase 0 model ran out of memory on the 32 GB V100 for {oom} missing "
+                     "timing or memory comparisons.")
+    if any(missing["allscaip", dtype] for dtype in PRECISIONS):
+        lines += ["", "A separate frozen-weight AllScAIP run (6317546) recorded the exception for each "
+                  "system. On the molecular batch and the 2,000-atom cluster, the old model modified a "
+                  "tensor that its force calculation needed. On the periodic system its graph builder "
+                  "received an empty cell argument. Both attention backends reproduced these failures."]
+    if any(missing["e2former_v2", dtype] for dtype in PRECISIONS):
+        lines += ["", "The old E2Former-V2 raised a module-call error in FP32 and rejected the FP64 "
+                  "dtype. Neither old run returned timing or memory measurements."]
+    lines += ["", "Each model and precision has 12 possible comparisons. Individual exceptions are preserved "
               "in the baseline and candidate archives.", "",
               "| Preset | float32 | float64 |", "| --- | ---: | ---: |"]
     for name in sorted({name for name, _ in missing}):

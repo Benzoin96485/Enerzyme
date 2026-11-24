@@ -148,7 +148,10 @@ def et(
     embed = _attention_embed(dim_embedding, num_rbf, max_Za, cutoff_sr, include_self, 1, neighbor_embedding, False)
     layers = [EquivariantMultiHeadAttention(dim_embedding, num_rbf, num_heads, influence, vector_cutoff)
               for _ in range(num_layers)]
-    return _attention_core("et", embed, layers, AngularFeatureHead(dim_embedding, 1), num_heads)
+    # Inductor's partitioned CPU backward can miscompute the forces from the
+    # neighbor embedding. Compile the energy and coordinate VJP together.
+    return _attention_core("et", embed, layers, AngularFeatureHead(dim_embedding, 1), num_heads,
+                           _joint_cpu_force_inference=neighbor_embedding)
 
 
 def quinnet(
