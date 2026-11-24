@@ -5,7 +5,7 @@ from typing import Optional
 from torch import Tensor, nn
 
 from .graph import GraphContext
-from .ops import scatter_count, scatter_sum
+from .ops import scatter_count, scatter_sum, segment_envelope_gated_softmax, segment_softmax
 
 
 class Aggregate(nn.Module):
@@ -68,3 +68,28 @@ class Aggregate(nn.Module):
 
     def extra_repr(self) -> str:
         return f"mode={self.mode}, divisor={self.divisor}"
+
+
+class SoftmaxAttention(nn.Module):
+    """Sum per-head values [edge, head, channel] with receiver-normalized weights."""
+
+    def __init__(self, clamp_min: Optional[float] = None):
+        super().__init__()
+        self.clamp_min = clamp_min
+
+    def forward(self, values: Tensor, logits: Tensor, index: Tensor, num_nodes: int,
+                value_gate: Optional[Tensor] = None) -> Tensor:
+        weights = segment_softmax(logits, index, num_nodes, clamp_min=self.clamp_min)
+        if value_gate is not None:
+            weights = weights * value_gate
+        return scatter_sum(weights.unsqueeze(-1) * values, index, num_nodes)
+
+
+class EnvelopeGated(nn.Module):
+    """DPA4 receiver aggregation of [edge, coefficient, focus, channel] values."""
+
+    def forward(self, values: Tensor, logits: Tensor, envelope: Tensor, index: Tensor,
+                num_nodes: int, null_bias: Tensor, eps: float = 1e-6) -> Tensor:
+        weights = segment_envelope_gated_softmax(logits, envelope, index, num_nodes, null_bias, eps)
+        weights = weights.mean(dim=-1)[:, None, :, None]
+        return scatter_sum(values * weights, index, num_nodes)

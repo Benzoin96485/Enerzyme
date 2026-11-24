@@ -24,6 +24,7 @@ from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module
 
 from ..mp.ops import scatter_sum
+from ..mp.message.attention import dot_product_attention_logits
 from ..layers.atom_embedding import RandomAtomEmbedding
 
 
@@ -192,11 +193,7 @@ class EquivariantMultiHeadAttention(Module):
         key_j = key.index_select(0, idx_j)
         value_j = value.index_select(0, idx_j)
         vector_j = vector_heads.index_select(0, idx_j)
-        if filter_key is None:
-            attention = (query_i * key_j).sum(dim=-1)
-        else:
-            attention = (query_i * key_j * filter_key).sum(dim=-1)
-        attention = F.silu(attention)
+        attention = dot_product_attention_logits(query_i, key_j, filter_key, activation=F.silu)
         cutoff = window.reshape(-1, 1)
         if self.vector_cutoff:
             value_j = value_j * cutoff.unsqueeze(-1)

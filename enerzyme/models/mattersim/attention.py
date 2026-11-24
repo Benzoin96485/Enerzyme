@@ -15,7 +15,15 @@ from torch import Tensor
 from torch.nn import Dropout, GELU, LayerNorm, Linear, Module, Sequential
 
 from ..mp.basis.envelope import polynomial_envelope
-from ..mp.ops import scatter_sum, segment_softmax
+from ..mp.aggregate import SoftmaxAttention
+from ..mp.message.attention import dot_product_attention_logits
+from ..mp.ops import scatter_sum
+from ..mp.ops import segment_softmax as receiver_softmax
+
+
+def segment_softmax(logits: Tensor, index: Tensor, dim_size: int) -> Tensor:
+    """MatterSim receiver weights with its original denominator floor."""
+    return receiver_softmax(logits, index, dim_size, clamp_min=1e-12)
 
 
 class CentralityEncoding(Module):
@@ -68,6 +76,7 @@ class GraphormerBlock(Module):
         self.num_heads = int(num_heads)
         self.head_dim = self.dim // self.num_heads
         self.scale = self.head_dim ** -0.5
+        self.aggregate = SoftmaxAttention(clamp_min=1e-12)
         self.qkv = Linear(self.dim, 3 * self.dim, bias=True)
         self.distance_bias = Linear(int(num_basis), self.num_heads, bias=False)
         # No bias: a zero aggregate (every mask is zero, or there is no edge)
@@ -97,12 +106,10 @@ class GraphormerBlock(Module):
             return node.new_zeros(n_atoms, self.dim)
         qkv = self.qkv(node).view(n_atoms, 3, self.num_heads, self.head_dim)
         query, key, value = qkv.unbind(dim=1)
-        logits = (query[idx_i] * key[idx_j]).sum(dim=-1) * self.scale
+        logits = dot_product_attention_logits(query[idx_i], key[idx_j], scale=self.scale)
         logits = logits + self.distance_bias(basis)
-        weights = segment_softmax(logits, idx_i, n_atoms, clamp_min=1e-12) * mask.unsqueeze(-1)
-        message = weights.unsqueeze(-1) * value[idx_j]
-        flat = message.reshape(message.shape[0], self.dim)
-        return self.out(scatter_sum(flat, idx_i, n_atoms))
+        message = self.aggregate(value[idx_j], logits, idx_i, n_atoms, mask.unsqueeze(-1))
+        return self.out(message.reshape(n_atoms, self.dim))
 
     def forward(
         self,

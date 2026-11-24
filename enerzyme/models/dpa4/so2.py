@@ -25,7 +25,8 @@ from ..mp.equivariant.indexing import (
     project_Dt_from_m,
 )
 from ..mp.equivariant.so2.focus import FocusSO2Linear
-from ..mp.ops import segment_envelope_gated_softmax
+from ..mp.aggregate import EnvelopeGated
+from ..mp.ops import scatter_sum
 from ..mp.equivariant.rotation import edge_rotation
 from ..mp.equivariant.rotation.wigner_quaternion import (
     WignerDCalculator,
@@ -307,6 +308,7 @@ class SO2Convolution(nn.Module):
         self.mixing_layers = mixing_layers
         self.n_atten_head = n_atten_head
         self.eps = eps
+        self.aggregate = EnvelopeGated()
         self.message_node_so3 = message_node_so3
         # n_radial kept for API compatibility with interaction/core builders.
         del n_radial
@@ -386,7 +388,6 @@ class SO2Convolution(nn.Module):
             (N, D, C) updated features
         """
         N, D, C = x.shape
-        device = x.device
         src = edge_cache.src
         dst = edge_cache.dst
         E = src.shape[0]
@@ -449,18 +450,7 @@ class SO2Convolution(nn.Module):
             logits = self.attn_radial_bias(rad_m[:, 0, :]).reshape(
                 E, self.n_focus, self.n_atten_head
             )
-            attn_w = segment_envelope_gated_softmax(
-                logits,
-                edge_cache.edge_env,
-                dst,
-                N,
-                self.z_bias,
-                self.eps,
-            )
-            attn_w = attn_w.mean(dim=-1)  # (E, F)
-            msg = msg * attn_w.unsqueeze(1).unsqueeze(-1)
-
-        msg_flat = msg.reshape(E, D, H)
-        out = torch.zeros(N, D, H, device=device, dtype=msg_flat.dtype)
-        out.index_add_(0, dst, msg_flat)
-        return self.post_mix(out)
+            out = self.aggregate(msg, logits, edge_cache.edge_env, dst, N, self.z_bias, self.eps)
+        else:
+            out = scatter_sum(msg, dst, N)
+        return self.post_mix(out.reshape(N, D, H))
