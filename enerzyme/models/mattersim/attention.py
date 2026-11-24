@@ -120,3 +120,11 @@ class GraphormerBlock(Module):
         if self.dropout is not None:
             hidden = self.dropout(hidden)
         return self.norm_ffn(node + hidden)
+
+
+class GraphormerMessage(GraphormerBlock):
+    def forward(self, state, ctx):
+        node = super().forward(
+            state.scalar, ctx.inputs["graphormer_rbf"], state.aux["attention_mask"], ctx.receiver, ctx.sender
+        )
+        return state._replace(scalar=node)

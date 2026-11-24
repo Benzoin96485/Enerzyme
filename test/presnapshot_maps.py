@@ -36,6 +36,14 @@ KEY_MAPS["dimenet"] = KEY_MAPS["dimenet++"] = [
 ]
 
 
+KEY_MAPS["m3gnet"] = [(r"^edge_embed\.", "embed.edge_embed.")]
+KEY_MAPS["mattersim"] = KEY_MAPS["m3gnet"] + [
+    (r"^centrality\.", "embed.centrality."),
+    (r"^attention\.0\.", "blocks.3."),
+    (r"^attention\.1\.", "blocks.4."),
+]
+
+
 def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:
     out = {}
     for key, value in state.items():

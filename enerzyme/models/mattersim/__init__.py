@@ -1,7 +1,6 @@
 """MatterSim potential: Graphormer-extended M3GNet.
 
-Yang et al., arXiv:2405.04967. The Core subclasses
-:class:`~enerzyme.models.m3gnet.core.M3GNetCore` and adds the materials
+Yang et al., arXiv:2405.04967. The preset extends M3GNet with the materials
 Graphormer structural encoder. ``SphericalBesselRBF`` is the M3GNet bond
 basis. ``GaussianRBF`` (SchNet width, no envelope) is the attention basis;
 the Core renames its output to ``graphormer_rbf``. The potential head is
@@ -10,9 +9,6 @@ the Core renames its output to ``graphormer_rbf``. The potential head is
 ``microsoft/mattersim`` checkpoints (MatterSim-v1 M3GNet) do not load. The
 public repository does not ship the Graphormer weights.
 """
-
-from .core import MatterSimCore
-
 
 _GATED = {
     "output_fields": ["Ea"],
@@ -63,7 +59,6 @@ DEFAULT_LAYER_PARAMS = [
 ]
 
 __all__ = [
-    "MatterSimCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
 ]

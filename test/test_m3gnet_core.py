@@ -38,7 +38,7 @@ def _basis(dist: torch.Tensor, max_l: int = 2, num_rbf: int = 2, cutoff: float =
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.m3gnet import M3GNetCore
+    from enerzyme.models.presets.triplet import m3gnet
 
     params = dict(
         dim_embedding=8,
@@ -51,7 +51,7 @@ def _tiny(**kwargs):
         n_conv_hidden=1,
     )
     params.update(kwargs)
-    return M3GNetCore(**params)
+    return m3gnet(**params)
 
 
 def _inputs(n=4, seed=0, max_l=2, num_rbf=2):
@@ -86,7 +86,7 @@ def test_registration_and_example_yaml():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, defaults, layers = get_ff_core("m3gnet")
-    assert core_cls.__name__ == "M3GNetCore"
+    assert core_cls.__name__ == "m3gnet"
     assert defaults["cutoff_sr"] == 5.0
     assert defaults["threebody_cutoff"] == 4.0
     assert defaults["num_rbf"] == 3
@@ -99,7 +99,7 @@ def test_registration_and_example_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "M3GNetCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.degree == 9
     assert model.threebody_cutoff == 4.0
     assert model.dim_feature_out == 64

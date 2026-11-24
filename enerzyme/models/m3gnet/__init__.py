@@ -8,9 +8,6 @@ The Core reads ``SphericalBesselRBF`` and ``RandomAtomEmbedding``. The
 potential head is ``SimpleReadout`` with ``head_type: gated``.
 """
 
-from .core import M3GNetCore
-
-
 _GATED = {
     "output_fields": ["Ea"],
     "head_type": "gated",
@@ -47,7 +44,6 @@ DEFAULT_LAYER_PARAMS = [
 ]
 
 __all__ = [
-    "M3GNetCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
 ]
