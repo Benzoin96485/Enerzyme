@@ -270,6 +270,9 @@ class InteractionBlock(Module):
         self.lmax = int(lmax)
         self.num_heads = int(num_heads)
         self.head_dim = self.channels // self.num_heads
+        self.register_buffer(
+            "_value_head", torch.arange(3 * self.channels) // (3 * self.head_dim), persistent=False
+        )
         self.dropout = float(dropout)
         self.update_edges = bool(update_edges)
         self.edge_spec = edge_spec
@@ -369,10 +372,15 @@ class InteractionBlock(Module):
         logits = (query[idx_i] * key[idx_j] * attended).sum(dim=-1, keepdim=True)
         attention = F.silu(logits) / math.sqrt(self.channels)
         attention = F.dropout(attention, p=self.dropout, training=self.training)
-        value_heads = values[idx_j].reshape(
-            -1, self.num_heads, (3 * self.channels) // self.num_heads
-        )
-        mixed = (attention * value_heads).reshape(-1, 3 * self.channels)
+        neighbor_values = values[idx_j]
+        if torch.compiler.is_compiling() and values.device.type == "cpu":
+            # A scalar/vector split can cut through a head. CPU Inductor drops
+            # the partial head when fusing the flattened broadcast into a scatter.
+            channel_weights = attention.squeeze(-1).index_select(1, self._value_head)
+            mixed = channel_weights * neighbor_values
+        else:
+            value_heads = neighbor_values.reshape(-1, self.num_heads, 3 * self.head_dim)
+            mixed = (attention * value_heads).reshape(-1, 3 * self.channels)
         mixed = mixed + self.edge_filter(edges) * filtered[idx_j]
         scalar_message, direction_gate, feature_gate = mixed.split(self.channels, dim=-1)
         steerable_message = (

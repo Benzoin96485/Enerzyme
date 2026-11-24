@@ -354,3 +354,26 @@ def test_two_molecules_keep_separate_total_energies():
     assert torch.allclose(both["E"][1], right["E"][0], atol=1e-8, rtol=1e-8)
     assert torch.allclose(both["Ea"][:3], left["Ea"], atol=1e-8, rtol=1e-8)
     assert torch.allclose(both["Ea"][3:], right["Ea"], atol=1e-8, rtol=1e-8)
+
+
+def test_compiled_attention_preserves_channels_split_across_heads():
+    from enerzyme.models.presets.cartesian_vector import geodite
+
+    torch.manual_seed(19)
+    width, heads = 24, 8
+    block = geodite(dim_embedding=width, num_heads=heads, num_layers=1, num_rbf=4,
+                    attn_dropout=0).blocks[0].message.double()
+    idx_i = torch.tensor([0, 0, 1, 1, 2, 2])
+    idx_j = torch.tensor([1, 2, 2, 0, 0, 1])
+    data = [torch.randn(*shape, dtype=torch.float64, requires_grad=True) for shape in
+            [(3, width), (3, 8, width), (6, width), (6, 8), (6, 4)]]
+
+    def gradients(run):
+        out = run(*data, idx_i, idx_j)
+        loss = sum(field.square().sum() for field in out)
+        return (*out, *torch.autograd.grad(loss, (*data, block.value[0].linear.weight)))
+
+    expected = gradients(block)
+    compiled = torch.compile(block, backend="eager", fullgraph=True)
+    for actual, reference in zip(gradients(compiled), expected):
+        torch.testing.assert_close(actual, reference, rtol=2e-12, atol=2e-12)
