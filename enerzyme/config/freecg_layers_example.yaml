@@ -1,0 +1,60 @@
+# FreeCG (Shao et al., arXiv:2407.02263).
+# Core: ViSNet neighbor embedding and edge state, plus a grouped sparse
+# Clebsch–Gordan product on the aggregated abstract edges.
+# ExpNormalSmearing, the first species table, and the scalar energy head stay outside.
+#
+# Widths are Table 7 (9 layers, 8 heads, 256 channels, 8 groups, 5 Å).
+# The repository yaml uses 32 groups of 8; the ablation prefers 8 groups.
+# shuffle_scale 1.5 rolls each channel forward by 1.5 * C / G (48 here).
+# attention_enhancer: linear is the released head projection. max is Eq. 8.
+# lmax is fixed at 2. atom_vector_feature is the Cartesian l = 1 slice, so
+# EquivariantDipole and EquivariantPolarizability apply. atom_l2_feature is
+# the five even channels. Checkpoints from ShihaoShao-GH/FreeCG do not load.
+# Enerzymette: set architecture: freecg in the resolved config.yaml.
+
+Modelhub:
+  internal_FFs:
+    FF01:
+      architecture: freecg
+      active: true
+      build_params:
+        dim_embedding: 256
+        num_rbf: 32
+        max_Za: 100
+        cutoff_sr: 5.0
+        cutoff_fn: cosine
+      layers:
+        - name: RangeSeparation
+        - name: ExpNormalSmearing
+          params:
+            trainable: false
+        - name: RandomAtomEmbedding
+        - name: Core
+          params:
+            num_layers: 9
+            num_heads: 8
+            lmax: 2
+            vertex_type: none
+            vecnorm_type: none
+            trainable_vecnorm: false
+            neighbor_embedding: true
+            include_self: true
+            activation: silu
+            attn_activation: silu
+            num_groups: 8
+            shuffle_scale: 1.5
+            attention_enhancer: linear
+        - name: SimpleReadout
+          params:
+            output_fields: [Ea]
+            head_type: two_layer
+            pyramidal: true
+            activation_fn: swish
+            activation_params:
+              dim_feature: 1
+              initial_alpha: 1
+              initial_beta: 1
+              learnable: false
+            keep_feature: false
+        - name: EnergyReduce
+        - name: Force

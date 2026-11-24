@@ -306,6 +306,38 @@ class ViSInteraction(Module):
         first, second = torch.split(filtered, self.hidden_channels, dim=-1)
         return first * dihedral + second * angle
 
+    def _attention(
+        self,
+        query_i: Tensor,
+        key_j: Tensor,
+        filter_key: Tensor,
+        vector: Tensor,
+        idx_j: Tensor,
+        direction: Tensor,
+        window: Tensor,
+    ) -> Tensor:
+        """SiLU of the edge-filtered query-key product, times the cosine window.
+
+        ``vector``, ``idx_j``, and ``direction`` are unused. FreeCG overrides
+        this method and adds an invariant built from the sender and the bond.
+        """
+        del vector, idx_j, direction
+        attention = (query_i * key_j * filter_key).sum(dim=-1)
+        return F.silu(attention) * window.reshape(-1, 1)
+
+    def _vector_residual(
+        self,
+        vector_gate: Tensor,
+        out_scale: Tensor,
+        aggregated_vector: Tensor,
+    ) -> Tensor:
+        """ViSNet's vector update: gated node state plus the aggregated message.
+
+        FreeCG replaces this with a group Clebsch–Gordan product. The residual
+        added by the caller is this tensor, not a second copy of the node state.
+        """
+        return vector_gate * out_scale.unsqueeze(1) + aggregated_vector
+
     def forward(
         self,
         scalar: Tensor,
@@ -359,8 +391,9 @@ class ViSInteraction(Module):
         query_i = query.index_select(0, idx_i)
         key_j = key.index_select(0, idx_j)
         value_j = value.index_select(0, idx_j)
-        attention = (query_i * key_j * filter_key).sum(dim=-1)
-        attention = F.silu(attention) * window.reshape(-1, 1)
+        attention = self._attention(
+            query_i, key_j, filter_key, vector_n, idx_j, direction, window
+        )
         value_j = value_j * filter_value
         scalar_message = (value_j * attention.unsqueeze(-1)).reshape(
             n_edges, self.hidden_channels
@@ -388,7 +421,7 @@ class ViSInteraction(Module):
                 mixed, self.hidden_channels, dim=-1
             )
             delta_scalar = vector_dot * out_dot + out_bias
-        delta_vector = vec3 * out_scale.unsqueeze(1) + aggregated_vector
+        delta_vector = self._vector_residual(vec3, out_scale, aggregated_vector)
         delta_edge = None
         if not self.last_layer:
             delta_edge = self._edge_residual(
