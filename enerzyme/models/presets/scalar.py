@@ -93,6 +93,7 @@ def schnet(
         FieldEmbed("atom_embedding"), blocks, head, requires,
         banner=SCHNET_BANNER, architecture="schnet", output_mode=output_mode,
         shallow_ensemble_size=shallow_ensemble_size, hidden_channels=hidden_channels,
+        dim_feature_out=hidden_channels,
     )
 
 
@@ -134,6 +135,7 @@ def physnet(
         FieldEmbed("atom_embedding"), blocks, head, requires,
         banner=PHYSNET_BANNER, architecture="physnet", output_mode=output_mode,
         num_blocks=num_blocks, shallow_ensemble_size=shallow_ensemble_size,
+        dim_feature_out=dim_embedding, num_output_blocks=num_blocks,
     )
 
 
@@ -193,5 +195,5 @@ def spookynet(
         FieldEmbed("atom_embedding"), blocks, head, requires,
         builder=_spookynet_builder, banner=SPOOKYNET_BANNER, architecture="spookynet",
         output_mode=output_mode, use_irreps=use_irreps, use_efa=bool(use_efa),
-        module_keep_prob=keep_prob, shallow_ensemble_size=shallow_ensemble_size,
+        module_keep_prob=keep_prob, shallow_ensemble_size=shallow_ensemble_size, dim_feature_out=dim_embedding,
     )

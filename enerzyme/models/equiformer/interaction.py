@@ -642,7 +642,8 @@ from torch import Tensor
 from torch.nn import Module
 
 from ..layers._base_layer import BaseFFLayer
-from ..layers.readout import _resolve_feature_irreps, split_readout_field_outputs
+from ..layers.readout import split_readout_field_outputs
+from ..mp.repr import IrrepsSpec
 
 
 class EquiformerGraphAttentionReadout(BaseFFLayer):
@@ -697,7 +698,7 @@ class EquiformerGraphAttentionReadout(BaseFFLayer):
         irreps_str = (
             feature_irreps
             if feature_irreps is not None
-            else _resolve_feature_irreps(built_layers)
+            else IrrepsSpec.from_layers(built_layers, 0).irreps
         )
         if irreps_str is None:
             raise ValueError(

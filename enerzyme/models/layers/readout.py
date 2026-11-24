@@ -1,5 +1,6 @@
 from typing import Set, Literal, Dict, Optional, List, Callable
 from . import BaseFFLayer
+from ..mp.repr import IrrepsSpec
 from ..mp.nn.mlp import DenseLayer, GatedMLP, ResidualMLP, ResidualLayer, VariancePreservingMLP
 from ..mp.nn.activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, POSITIVE_ACTIVATION_KEY_TYPE, get_positive_activation_fn
 from ..mp.equivariant.e3nn import extract_scalar_0e
@@ -33,37 +34,6 @@ class _IdentityResidual(Module):
         if y.shape == x.shape:
             return x + y
         return y
-
-
-def _resolve_feature_irreps(built_layers: List[Module]) -> Optional[str]:
-    """Find ``feature_irreps`` on the nearest prior Core (or any layer)."""
-    for layer in reversed(built_layers):
-        irreps = getattr(layer, "feature_irreps", None)
-        if irreps is not None:
-            return str(irreps)
-    return None
-
-
-def _resolve_feature_width(built_layers: List[Module], dim_embedding: Optional[int]) -> int:
-    """Width of ``atom_feature`` for a property head.
-
-    A preceding readout stores the property count in ``dim_feature_out``.
-    Skip those heads and use the Core latent, so a second ``SimpleReadout``
-    still maps the same ``atom_feature``.
-    """
-    for layer in reversed(built_layers):
-        fields = getattr(layer, "_output_fields", None) or set()
-        width = getattr(layer, "dim_feature_out", None)
-        if "atom_feature" not in fields or not width:
-            continue
-        if "Ea" in fields or "Qa" in fields:
-            continue
-        return int(width)
-    if built_layers and hasattr(built_layers[-1], "dim_feature_out"):
-        return int(built_layers[-1].dim_feature_out)
-    if dim_embedding is not None:
-        return int(dim_embedding)
-    raise ValueError("dim_embedding or dim_feature_out from the last layer must be provided")
 
 
 def reshape_ensemble_head_output(
@@ -157,12 +127,9 @@ class BaseReadout(BaseFFLayer):
         self.shallow_ensemble_size = shallow_ensemble_size
         self.ordered_output_fields = sorted(list(output_fields))
         self.head_type = head_type
-        self.feature_irreps = (
-            feature_irreps
-            if feature_irreps is not None
-            else _resolve_feature_irreps(built_layers)
-        )
-        self.dim_feature_in = _resolve_feature_width(built_layers, dim_embedding)
+        spec = IrrepsSpec.from_layers(built_layers, dim_embedding)
+        self.feature_irreps = feature_irreps if feature_irreps is not None else spec.irreps
+        self.dim_feature_in = spec.scalar_width
         self._hinted_hidden_width = None
         for layer in reversed(built_layers):
             hinted = getattr(layer, "readout_hidden_width", None)

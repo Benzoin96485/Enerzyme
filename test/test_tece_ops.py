@@ -122,3 +122,22 @@ def test_uv_so2_tensor_product_ece_rra_forward():
     assert out.shape == x.shape
     out.sum().backward()
     assert math.isfinite(out.detach().sum().item())
+
+
+def test_layout_transform_preserves_component_order_and_views():
+    from e3nn.o3 import Irreps
+    from enerzyme.models.mp.equivariant.layout import LayoutTransform
+
+    for label, is_view in [("3x1o", True), ("1x0e + 1x1o", True), ("2x0e + 2x1o", False)]:
+        irreps = Irreps(label)
+        transform = LayoutTransform(irreps)
+        flat = torch.arange(2 * irreps.dim, dtype=torch.float64).reshape(2, -1).requires_grad_()
+        reference = torch.cat([flat[:, sl].reshape(2, mul, ir.dim).transpose(1, 2)
+                               for (mul, ir), sl in zip(irreps, irreps.slices())], dim=1)
+        sphere = transform(flat)
+        assert torch.equal(sphere, reference)
+        if is_view:
+            assert sphere.untyped_storage().data_ptr() == flat.untyped_storage().data_ptr()
+        reconstructed = transform.inverse(sphere)
+        assert torch.equal(reconstructed, flat)
+        torch.testing.assert_close(torch.autograd.grad(reconstructed.sum(), flat)[0], torch.ones_like(flat))

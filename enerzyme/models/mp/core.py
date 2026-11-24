@@ -15,6 +15,7 @@ from torch import Tensor, nn
 from ..layers import BaseFFCore
 from .block import BlockState
 from .graph import GraphContext, GraphRequires
+from .repr import IrrepsSpec
 from .head import FeatureHead, Head, ReadoutHead  # noqa: F401
 
 
@@ -118,6 +119,11 @@ class ComposableCore(BaseFFCore):
         self._banner = banner
         for key, value in attributes.items():
             setattr(self, key, value)
+        self.feature_spec = None
+        if "atom_feature" in head.output_fields and hasattr(self, "dim_feature_out"):
+            self.feature_spec = IrrepsSpec.atom_feature(
+                self.dim_feature_out, getattr(self, "feature_irreps", None), getattr(self, "num_output_blocks", 1)
+            )
 
     def __str__(self) -> str:
         return self._banner if self._banner is not None else super().__str__()
