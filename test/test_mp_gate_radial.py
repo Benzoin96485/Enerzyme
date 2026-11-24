@@ -1,4 +1,4 @@
-"""Reference coverage for shared radial kernels and spherical gates."""
+"""Reference coverage for shared radial kernels and spherical nonlinearities."""
 
 import pytest
 import torch
@@ -78,3 +78,44 @@ def test_spherical_gates_match_degree_loop(m_major):
         torch.testing.assert_close(out, expected)
         for a, b in zip(torch.autograd.grad(out, (x, gates), probe), gradients):
             torch.testing.assert_close(a, b)
+
+
+@pytest.mark.parametrize("family,m_major", [("v2", False), ("v3", False), ("v3", True)])
+def test_separable_grid_preserves_scalar_and_grid_dropout_order(family, m_major):
+    from enerzyme.models.mp.equivariant.s2.activation import SeparableS2Activation as V2
+    from enerzyme.models.mp.equivariant.s2.activation_v3 import SeparableS2Activation as V3
+    from enerzyme.models.mp.equivariant.s2.grid import SO3Grid
+
+    grid_act = torch.nn.Sequential(torch.nn.SiLU(), torch.nn.Dropout(0.25))
+    if family == "v2":
+        grid = SO3Grid(2, 1).double()
+        activation = V2(2, 1)
+        scalar_act = torch.nn.Sequential(torch.nn.Tanh(), torch.nn.Dropout(0.125))
+        activation.scalar_act = scalar_act
+        activation.s2_act.act = grid_act
+        scalar_shape = (3, 1, 4)
+    else:
+        activation = V3(2, 1, grid_resolution_list=[6, 5], use_m_primary=m_major).double()
+        grid = activation.so3_grid
+        activation.act = scalar_act = grid_act
+        scalar_shape = (3, 4)
+
+    tensors = torch.randn(3, grid.n_coeff, 4, dtype=torch.float64, requires_grad=True)
+    scalars = torch.randn(scalar_shape, dtype=torch.float64, requires_grad=True)
+    torch.manual_seed(73)
+    scalar_output = scalar_act(scalars).reshape(3, 1, 4)
+    samples = torch.einsum("gd,ndc->ngc", grid.to_grid_mat, tensors)
+    coefficients = torch.einsum("dg,ngc->ndc", grid.from_grid_mat, grid_act(samples))
+    expected = torch.cat((scalar_output, coefficients[:, 1:]), dim=1)
+
+    torch.manual_seed(73)
+    if family == "v2":
+        actual = activation(input_scalars=scalars, input_tensors=tensors, SO3_grid={2: {1: grid}})
+    else:
+        actual = activation(inputs=tensors, scalars=scalars)
+    torch.testing.assert_close(actual, expected)
+    probe = torch.randn_like(actual)
+    actual_grads = torch.autograd.grad(actual, (scalars, tensors), probe)
+    expected_grads = torch.autograd.grad(expected, (scalars, tensors), probe)
+    for result, reference in zip(actual_grads, expected_grads):
+        torch.testing.assert_close(result, reference)

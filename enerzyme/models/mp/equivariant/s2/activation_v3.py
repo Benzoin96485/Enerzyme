@@ -9,7 +9,7 @@ import copy
 from .grid import SO3Grid
 from ...nn.activation import SmoothLeakyReLU, SwiGLU as ChannelSwiGLU
 from ...nn.activation import swiglu as swiglu_torch  # noqa: F401
-from ..s2grid import SphericalGate, activate_grid
+from ..s2grid import S2Activation, SeparableS2Activation, SphericalGate, activate_separable_grid
 
 
 def check_activation_name(act_name):
@@ -118,36 +118,6 @@ class GateActivation(SphericalGate):
         return self.gate(inputs, scalars)
 
 
-class S2Activation(torch.nn.Module):
-    def __init__(self, lmax, mmax, grid_resolution_list=None, use_m_primary=False):
-        super().__init__()
-        self.lmax = lmax
-        self.mmax = mmax
-        self.so3_grid = SO3Grid(self.lmax, self.mmax, resolution_list=grid_resolution_list, use_m_primary=use_m_primary)
-        self.act = torch.nn.SiLU()
-        
-
-    def forward(self, inputs):
-        return activate_grid(inputs, self.so3_grid, self.act)
-
-
-
-class SeparableS2Activation(S2Activation):
-    def __init__(self, lmax, mmax, grid_resolution_list=None, use_m_primary=False):
-        super().__init__(lmax, mmax, grid_resolution_list, use_m_primary)
-
-
-    def forward(self, inputs, scalars):
-        output_scalars = self.act(scalars)
-        output_scalars = output_scalars.reshape(output_scalars.shape[0], 1, output_scalars.shape[1])
-        output_vectors = super().forward(inputs)
-        outputs = torch.cat(
-            (output_scalars, output_vectors.narrow(1, 1, output_vectors.shape[1] - 1)),
-            dim=1
-        )
-        return outputs
-
-
 class SwiGLU(ChannelSwiGLU):
     def __init__(self, backend="torch"):
         if backend != "torch":
@@ -193,10 +163,7 @@ class S2Activation_SwiGLU_MemoryEfficient(S2Activation_SwiGLU):
     
 
     def kernel(self, inputs):
-        x_grid = self.so3_grid.to_grid(inputs)
-        x_grid = self.act(x_grid)
-        outputs = self.so3_grid.from_grid(x_grid)
-        return outputs
+        return super().forward(inputs)
     
     
     def forward(self, inputs):
@@ -214,14 +181,7 @@ class SeparableS2Activation_SwiGLU(S2Activation_SwiGLU):
 
 
     def forward(self, inputs, scalars):
-        output_scalars = self.act(scalars)
-        output_scalars = output_scalars.reshape(output_scalars.shape[0], 1, output_scalars.shape[1])
-        output_vectors = super().forward(inputs)
-        outputs = torch.cat(
-            (output_scalars, output_vectors.narrow(1, 1, output_vectors.shape[1] - 1)),
-            dim=1
-        )
-        return outputs
+        return activate_separable_grid(scalars, inputs, self.act, super().forward)
     
 
 class SeparableS2Activation_SwiGLU_Merge(S2Activation_SwiGLU):
@@ -244,14 +204,7 @@ class SeparableS2Activation_SwiGLU_MemoryEfficient(S2Activation_SwiGLU_MemoryEff
 
 
     def forward(self, inputs, scalars):
-        output_scalars = self.act(scalars)
-        output_scalars = output_scalars.reshape(output_scalars.shape[0], 1, output_scalars.shape[1])
-        output_vectors = super().forward(inputs)
-        outputs = torch.cat(
-            (output_scalars, output_vectors.narrow(1, 1, output_vectors.shape[1] - 1)),
-            dim=1
-        )
-        return outputs
+        return activate_separable_grid(scalars, inputs, self.act, super().forward)
 
 
 class SeparableS2Activation_SwiGLU_Merge_MemoryEfficient(S2Activation_SwiGLU_MemoryEfficient):
