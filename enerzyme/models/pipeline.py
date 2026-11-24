@@ -44,6 +44,22 @@ def build_model(
         layer_params = default_layer_params
     if build_params is None:
         build_params = default_build_params
+    if architecture.casefold() == "mace":
+        e3nn_codegen = build_params.get("e3nn_codegen", "default")
+        if e3nn_codegen == "fx":
+            from .mace.compile import prepare_edge_tensor_products
+            from .mp.equivariant.e3nn.tools import traceable_e3nn_kernels
+
+            with traceable_e3nn_kernels():
+                core = _build_layers(Core, layer_params, build_params, verbose)
+            prepare_edge_tensor_products(core)
+            return core
+        if e3nn_codegen != "default":
+            raise ValueError("MACE e3nn_codegen must be 'default' or 'fx'")
+    return _build_layers(Core, layer_params, build_params, verbose)
+
+
+def _build_layers(Core, layer_params, build_params, verbose):
     built_layers = []
     core = None
     for layer_param in layer_params:
