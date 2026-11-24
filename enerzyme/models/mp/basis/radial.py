@@ -471,10 +471,10 @@ class ExponentialBasis(DistanceBasis):
         cutoff_fn: Literal["polynomial", "bump"]="bump"
     ) -> None:
         '''
-        The base class of radial basis functions with a general exponential form. 
-        It entails the physical knowledge that 
+        The base class of radial basis functions with a general exponential form.
+        It entails the physical knowledge that
         bound state wave functions in two-body systems decay exponentially. [1,2,3]
-        
+
         RBF(r; alpha) = cutoff_fn(r) * exp(inner_fn(r; alpha)) * (exp(-alpha*r) if exp_weighting)
 
         Params:
@@ -486,17 +486,17 @@ class ExponentialBasis(DistanceBasis):
 
         init_alpha: Initial value for scaling parameter alpha (Default value corresponds
         to 0.5 1/Bohr converted to 1/Angstrom).
-        
+
         exp_weighting: If `True`, basis functions are weighted with a factor exp(-alpha*r).
 
         learnable_shape: If `True`, shape parameters of exponentials are learnable.
 
         cutoff: Short range cutoff threshold for radial base functions.
 
-        cutoff_fn: Short range cutoff function, whose are called by `cutoff_fn(x, cutoff=cutoff)` 
+        cutoff_fn: Short range cutoff function, whose are called by `cutoff_fn(x, cutoff=cutoff)`
         where x is the distance.
 
-        References: 
+        References:
         ----------
         [1] Commun. Math. Phys. 1973, 32, 319−340.
 
@@ -512,7 +512,7 @@ class ExponentialBasis(DistanceBasis):
         self.register_parameter(
             "alpha", Parameter(softplus_inverse(torch.tensor(init_alpha, dtype=torch.float64)))
         )
-    
+
     @abstractmethod
     def inner_fn(self, alphar: Optional[Tensor]=None, expalphar: Optional[Tensor]=None) -> Tensor:
         ...
@@ -525,7 +525,7 @@ class ExponentialBasis(DistanceBasis):
         ----------
         r: Float tensor of distances, shape [M]
 
-        cutoff_values: Float tensor of pre-calculated cutoff distances, shape [M]. 
+        cutoff_values: Float tensor of pre-calculated cutoff distances, shape [M].
         If not provided, the cutoff distances are calculated by `cutoff_fn`.
 
         Returns:
@@ -567,25 +567,25 @@ class ExponentialGaussianBasis(ExponentialBasis):
         to 0.5 1/Bohr converted to 1/Angstrom).
 
         init_width_flavor: Initialization flavor for width of the exponentials. Options:
-        
+
         - `PhysNet`: A constant number (2K^{-1}(1-\exp(-`cutoff`)))^{-2}, where K is `num_basis_functions`
         - `SpookyNet`: A constant number K or K+1 (`no_basis_function_at_infinity=True`)
-        
+
         exp_weighting: If `True`, basis functions are weighted with a factor exp(-alpha*r).
 
         learnable_shape: If `True`, centers and widths of exponentials are learnable.
 
         cutoff: Short range cutoff threshold for radial base functions.
 
-        cutoff_fn: Short range cutoff function, whose are called by `cutoff_fn(x, cutoff=cutoff)` 
+        cutoff_fn: Short range cutoff function, whose are called by `cutoff_fn(x, cutoff=cutoff)`
         where x is the distance.
 
         init_width_flavor: Initialization flavor for width of the exponentials. Options:
-        
+
         - `PhysNet`: A constant number (2K^{-1}(1-\exp(-`cutoff`)))^{-2}, where K is `num_basis_functions` [1].
         - `SpookyNet`: A constant number K or K+1 (`no_basis_function_at_infinity=True`).
 
-        References: 
+        References:
         ----------
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         '''
@@ -603,7 +603,7 @@ class ExponentialGaussianBasis(ExponentialBasis):
                 "centers", Parameter(
                     softplus_inverse(torch.linspace(
                         1, 0, num_rbf + 1, dtype=torch.float64
-                    )[:-1]), 
+                    )[:-1]),
                     requires_grad=self.learnable_shape
                 )
             )
@@ -612,7 +612,7 @@ class ExponentialGaussianBasis(ExponentialBasis):
                 "centers", Parameter(
                     softplus_inverse(torch.linspace(
                         1, math.exp(-cutoff_sr), num_rbf, dtype=torch.float64
-                    )), 
+                    )),
                     requires_grad=self.learnable_shape
                 )
             )
@@ -667,7 +667,7 @@ class ExponentialBernsteinBasis(ExponentialBasis):
         b_{v,n}(x) = (n over v) * exp(-alpha*x)**v * (1-exp(-alpha*x))**(n-v)
         (see https://en.wikipedia.org/wiki/Bernstein_polynomial)
 
-        For n to infinity, linear combination of b_{v,n}s can approximate 
+        For n to infinity, linear combination of b_{v,n}s can approximate
         any continuous function on the interval [0, 1] uniformly [1].
 
         NOTE: There is a problem for x = 0, as log(-expm1(0)) will be log(0) = -inf.
@@ -702,7 +702,7 @@ class ExponentialBernsteinBasis(ExponentialBasis):
 
     def inner_fn(self, alphar: Tensor, expalphar: Tensor) -> Tensor:
         return self.logc + self.n * alphar + self.v * torch.log(-torch.expm1(alphar))
-    
+
 
 class BesselBasis(DistanceBasis):
     """Spherical Bessel radial basis (``l = 0``).

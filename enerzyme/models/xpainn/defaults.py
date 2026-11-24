@@ -22,6 +22,6 @@ DEFAULT_LAYER_PARAMS = [
         'output_mode': "grad",                    # task type (`scalar` is for energy like, `grad` is for force like, etc.)
         'output_dim': 1,                            # output dimension of multi-task (only for `scalar` mode)
         'node_average': False,                      # whether to add the node average to the output (only for `scalar` mode)
-        'default_dtype': "float32"                 # default data type      
+        'default_dtype': "float32"                 # default data type
     }}
 ]

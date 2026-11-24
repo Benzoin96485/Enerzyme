@@ -32,8 +32,8 @@ def build_layer(layer: Callable, layer_params: Dict[str, Any], build_params: Dic
 
 
 def build_model(
-    architecture: str, 
-    layer_params: Optional[List[Dict[Literal["name", "params"], Any]]]=None, 
+    architecture: str,
+    layer_params: Optional[List[Dict[Literal["name", "params"], Any]]]=None,
     build_params: Optional[Dict]=None,
     verbose: int=1
 ) -> Module:
@@ -60,14 +60,14 @@ def build_model(
             if layer_name not in LEGACY_LAYERS:
                 raise NotImplementedError(f"Layer {layer_name} not implemented")
             Layer = LEGACY_LAYERS[layer_name]
-        
+
         layer = build_layer(Layer, params, build_params, built_layers)
         if layer_name == "Core":
             core = layer
         if verbose:
             logger.info(f"built {layer_name}")
         built_layers.append(layer)
-    
+
     if hasattr(core, "build"):
         core.build(built_layers)
     return core

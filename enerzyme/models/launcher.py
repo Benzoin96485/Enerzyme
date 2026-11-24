@@ -22,10 +22,10 @@ from .pipeline import build_model
 
 
 class FFDataset(Dataset):
-    def __init__(self, 
-        features: Dict[str, FieldDataset], 
-        targets: Dict[str, FieldDataset], 
-        indices: Optional[Union[OrderedDict[str, Iterable[int]], List[int]]]=None, 
+    def __init__(self,
+        features: Dict[str, FieldDataset],
+        targets: Dict[str, FieldDataset],
+        indices: Optional[Union[OrderedDict[str, Iterable[int]], List[int]]]=None,
         data_in_memory: bool=True,
         bisect_search: bool=False
     ) -> None:
@@ -67,7 +67,7 @@ class FFDataset(Dataset):
         else:
             residue_idx = idx - self.prefix_sum[data_key_idx - 1]
         return data_key, residue_idx
-    
+
     def _indices_to_key_indices(self, indices: Iterable[int]) -> Dict[str, np.ndarray[int]]:
         _indices = np.array(indices)
         data_key_indices = self.indices_map[_indices]
@@ -81,7 +81,7 @@ class FFDataset(Dataset):
 
     def __len__(self) -> int:
         return 0 if len(self.prefix_sum) == 0 else int(self.prefix_sum[-1])
-    
+
     def __getitem__(self, idx: int) -> Tuple[Dict[str, Iterable], Dict[str, Iterable]]:
         if len(self) == 0:
             raise IndexError("Cannot index into empty FFDataset")
@@ -125,12 +125,12 @@ class MetaStateDict(dict):
 
 
 class BaseFFLauncher(ABC):
-    def __init__(self, 
-        datahub: DataHub, 
-        trainer: Trainer, 
-        model_str: str, 
-        loss: Dict, 
-        architecture: str, 
+    def __init__(self,
+        datahub: DataHub,
+        trainer: Trainer,
+        model_str: str,
+        loss: Dict,
+        architecture: str,
         build_params: Optional[Dict]=None, layers: Optional[List[Dict]]=None,
         pretrain_path: Optional[str]=None
     ) -> None:
@@ -177,20 +177,20 @@ class BaseFFLauncher(ABC):
         for k in empty_keys:
             partitions.pop(k)
         return partitions
-    
+
     def _init_default_partition(self) -> Tuple[FFDataset, Optional[FFDataset], Optional[FFDataset]]:
         partitions = self._init_partition()
         return partitions["training"], partitions.get("validation", None), partitions.get("test", None)
-    
+
     @abstractmethod
     def _init_pretrain_path(self) -> None:
         ...
-    
+
     @abstractmethod
     def _train(
-        self, 
-        train_dataset: FFDataset, 
-        valid_dataset: Optional[FFDataset]=None, 
+        self,
+        train_dataset: FFDataset,
+        valid_dataset: Optional[FFDataset]=None,
         test_dataset: Optional[FFDataset]=None,
         max_epoch_per_iter: int=-1,
         **kwargs
@@ -215,7 +215,7 @@ class BaseFFLauncher(ABC):
         if not os.path.exists(dump_dir):
             os.makedirs(dump_dir)
         joblib.dump(data, path)
-        
+
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
 
@@ -242,7 +242,7 @@ class BaseFFLauncher(ABC):
         else:
             self.dump({}, self.dump_dir, checkpoint_name)
             partitions = self._init_partition()
-        
+
         training_set = partitions["training"]
         validation_set = partitions.get("validation", None)
         test_set = partitions.get("test", None)
@@ -260,9 +260,9 @@ class BaseFFLauncher(ABC):
                 picking_params[name] = picking_params_[name]
             elif name != "y_preds" and attr.default is attr.empty:
                 raise ValueError(f"Parameter {name} is missing in picking_params!")
-        
+
         picking_func = partial(picking_func_, mode=self.uq_mode)
-        
+
         if data_source == "withheld":
             withheld_size = {k: len(v) for k, v in withheld_set.raw_indices.items()}
             withheld_mask = {k: np.full(withheld_size[k], True) for k in withheld_size.keys()}
@@ -276,7 +276,7 @@ class BaseFFLauncher(ABC):
             iter_count = al_state_dict.get("iter_count", 0)
             if iter_count > 0:
                 logger.info(f"Active learning iteration {iter_count + 1} resumed!")
-            while iter_count < max_iter:   
+            while iter_count < max_iter:
                 unmasked_relative_indices = withheld_set._key_indices_to_indices({k: np.flatnonzero(v) for k, v in withheld_mask.items()})
                 unmasked_size = len(unmasked_relative_indices)
                 if unmasked_size == 0:
@@ -313,7 +313,7 @@ class BaseFFLauncher(ABC):
                         })
                     picking_params["error_lower_bound"] = picking_params_["relative_error_lower_bound"] * estimated_error_mean
                     picking_params["error_upper_bound"] = picking_params_["relative_error_upper_bound"] * estimated_error_mean
-                
+
                 n_part = (unmasked_size + sample_size - 1) // sample_size
                 masked_relative_indices = []
                 for j in range(n_part):
@@ -324,7 +324,7 @@ class BaseFFLauncher(ABC):
                     masked_relative_indices += [part_relative_indices[idx] for idx in picking_func(y_pred, **picking_params)["picked_indices"]]
                     if len(masked_relative_indices) >= sample_size:
                         break
-                
+
                 if len(masked_relative_indices) == 0:
                     logger.info(f"No uncertain samples are found and active learning stops at iteration {iter_count + 1}!")
                     break
@@ -360,12 +360,12 @@ class BaseFFLauncher(ABC):
             raise NotImplementedError
 
 class FF_single(BaseFFLauncher):
-    def __init__(self, 
-        datahub: DataHub, 
-        trainer: Trainer, 
-        model_str: str, 
-        loss: Dict, 
-        architecture: str, 
+    def __init__(self,
+        datahub: DataHub,
+        trainer: Trainer,
+        model_str: str,
+        loss: Dict,
+        architecture: str,
         build_params=None, layers=None,
         pretrain_path=None, **params
     ) -> None:
@@ -374,7 +374,7 @@ class FF_single(BaseFFLauncher):
         self._init_pretrain_path()
         self.model = self._init_model()
         self.uq_mode = "single"
-    
+
     def _init_pretrain_path(self, base_pretrain_path: Optional[str]=None) -> None:
         from .modelhub import get_pretrain_path
         if self.trainer.resume:
@@ -389,9 +389,9 @@ class FF_single(BaseFFLauncher):
             self.pretrain_path = get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "best", None)
 
     def _train(
-        self, 
-        train_dataset: FFDataset, 
-        valid_dataset: Optional[FFDataset]=None, 
+        self,
+        train_dataset: FFDataset,
+        valid_dataset: Optional[FFDataset]=None,
         test_dataset: Optional[FFDataset]=None,
         max_epoch_per_iter=-1,
         meta_state_dict: MetaStateDict=dict(),
@@ -401,12 +401,12 @@ class FF_single(BaseFFLauncher):
     ) -> None:
         logger.info("start training FF: {}".format(self.model_str))
         predict_result = self.trainer.fit_predict(
-            model=self.model, 
+            model=self.model,
             pretrain_path=self.pretrain_path,
-            train_dataset=train_dataset, 
-            valid_dataset=valid_dataset, 
+            train_dataset=train_dataset,
+            valid_dataset=valid_dataset,
             test_dataset=test_dataset,
-            loss_terms=self.loss_terms, 
+            loss_terms=self.loss_terms,
             transform=self.datahub.transform,
             dump_dir=self.dump_dir,
             max_epoch_per_iter=max_epoch_per_iter,
@@ -426,12 +426,12 @@ class FF_single(BaseFFLauncher):
     def _evaluate(self, dataset: FFDataset) -> Dict[Literal["y_pred", "y_truth", "metric_score"], Any]:
         logger.info("start evaluate FF:{}".format(self.model_str))
         predict_result = self.trainer.predict(
-            model=self.model, 
-            dataset=dataset, 
-            loss_terms=self.loss_terms, 
-            dump_dir=self.dump_dir, 
-            transform=self.datahub.transform, 
-            epoch=1, 
+            model=self.model,
+            dataset=dataset,
+            loss_terms=self.loss_terms,
+            dump_dir=self.dump_dir,
+            transform=self.datahub.transform,
+            epoch=1,
             load_model=True,
             test_mode=True
         )
@@ -445,18 +445,18 @@ class FF_single(BaseFFLauncher):
 
 
 class FF_committee(BaseFFLauncher):
-    def __init__(self, 
+    def __init__(self,
         committee_size: int,
-        datahub: DataHub, 
-        trainer: Trainer, 
-        model_str: str, 
-        loss: Dict, 
-        architecture: str, 
+        datahub: DataHub,
+        trainer: Trainer,
+        model_str: str,
+        loss: Dict,
+        architecture: str,
         build_params: Optional[Dict]=None, layers: Optional[List[Dict]]=None,
         pretrain_path: Optional[str]=None, **params
     ) -> None:
         super().__init__(
-            datahub, trainer, model_str, loss, architecture, build_params, layers, 
+            datahub, trainer, model_str, loss, architecture, build_params, layers,
             pretrain_path=None
         )
         self.size = committee_size
@@ -475,20 +475,20 @@ class FF_committee(BaseFFLauncher):
                     self.pretrain_path = None
             else:
                 self.pretrain_path = [
-                    get_pretrain_path(base_pretrain_path, "last", i) 
+                    get_pretrain_path(base_pretrain_path, "last", i)
                     for i in range(self.size)
                 ]
         else:
             self.pretrain_path = [
-                get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "best", i) 
+                get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "best", i)
                 for i in range(self.size)
             ]
 
-    def _train(self, 
-        train_dataset: FFDataset, 
-        valid_dataset: Optional[FFDataset]=None, 
-        test_dataset: Optional[FFDataset]=None, 
-        max_epoch_per_iter: int=-1, 
+    def _train(self,
+        train_dataset: FFDataset,
+        valid_dataset: Optional[FFDataset]=None,
+        test_dataset: Optional[FFDataset]=None,
+        max_epoch_per_iter: int=-1,
         meta_state_dict: MetaStateDict=dict(),
         refresh_patience: bool=False,
         refresh_best_score: bool=False,
@@ -504,12 +504,12 @@ class FF_committee(BaseFFLauncher):
             self.model = self._init_model(self.verbose)
             self.verbose = 0
             predict_result = self.trainer.fit_predict(
-                model=self.model, 
+                model=self.model,
                 pretrain_path=self.pretrain_path[i],
-                train_dataset=train_dataset, 
-                valid_dataset=valid_dataset, 
+                train_dataset=train_dataset,
+                valid_dataset=valid_dataset,
                 test_dataset=test_dataset,
-                loss_terms=self.loss_terms, 
+                loss_terms=self.loss_terms,
                 transform=self.datahub.transform,
                 dump_dir=self.dump_dir,
                 model_rank=i,
@@ -537,12 +537,12 @@ class FF_committee(BaseFFLauncher):
             self.model = self._init_model(self.verbose)
             logger.info(f"start evaluate FF: {self.model_str} ({i})")
             predict_result = self.trainer.predict(
-                model=self.model, 
-                dataset=dataset, 
-                loss_terms=self.loss_terms, 
-                dump_dir=self.dump_dir, 
-                transform=self.datahub.transform, 
-                epoch=1, 
+                model=self.model,
+                dataset=dataset,
+                loss_terms=self.loss_terms,
+                dump_dir=self.dump_dir,
+                transform=self.datahub.transform,
+                epoch=1,
                 load_model=True,
                 model_rank=i,
                 test_mode=True
