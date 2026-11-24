@@ -178,12 +178,12 @@ class ViSInteraction(Module):
             if isinstance(layer, Linear):
                 _xavier_linear(layer)
 
-    def _receiver_angle(self, receiver: Tensor, direction: Tensor) -> Tensor:
+    def _receiver_angle(self, vector: Tensor, idx_i: Tensor, direction: Tensor) -> Tensor:
         if self.t_src_proj is None or self.t_trg_proj is None:
             raise RuntimeError("receiver angle requested without t projections")
         return rejection_inner(
-            self.t_trg_proj(receiver),
-            self.t_src_proj(receiver),
+            self.t_trg_proj(vector).index_select(0, idx_i),
+            self.t_src_proj(vector).index_select(0, idx_i),
             direction,
         )
 
@@ -202,14 +202,14 @@ class ViSInteraction(Module):
         ):
             raise RuntimeError("edge residual requested on the last layer")
         dihedral = rejection_inner(
-            self.w_trg_proj(vector.index_select(0, idx_i)),
-            self.w_src_proj(vector.index_select(0, idx_j)),
+            self.w_trg_proj(vector).index_select(0, idx_i),
+            self.w_src_proj(vector).index_select(0, idx_j),
             direction,
         )
         filtered = F.silu(self.f_proj(edge))
         if self.vertex_type != "edge":
             return filtered * dihedral
-        angle = self._receiver_angle(vector.index_select(0, idx_i), direction)
+        angle = self._receiver_angle(vector, idx_i, direction)
         first, second = torch.split(filtered, self.hidden_channels, dim=-1)
         return first * dihedral + second * angle
 
@@ -313,7 +313,7 @@ class ViSInteraction(Module):
         aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
         mixed = self.o_proj(aggregated_scalar)
         if self.vertex_type == "node":
-            angle = self._receiver_angle(vector_n.index_select(0, idx_i), direction)
+            angle = self._receiver_angle(vector_n, idx_i, direction)
             aggregated_angle = scatter_sum(angle, idx_i, n_atoms)
             out_scale, out_dot, out_angle, out_bias = torch.split(
                 mixed, self.hidden_channels, dim=-1
