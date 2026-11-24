@@ -72,7 +72,7 @@ def build_radius_graph(
         dst_ranks = hard_rank(dist_T.view(N, N * M)).view(N, N, M).transpose(0, 1)
         env = torch.stack([src_ranks / k, dst_ranks / k, dist / cutoff], dim=0)
         env = torch.amax(env, dim=0)
-    env.masked_fill_(dist == 0.0, 0.0)
+    env = env.masked_fill(dist == 0.0, 0.0)
 
     index = torch.arange(N, device=device)[:, None]
     ranks = torch.arange(M * N, device=device, dtype=torch.long)[None, :]
