@@ -9,7 +9,7 @@ module keeps the padded atom–fragment neighborhood used by E2Former attention.
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, NamedTuple, Optional, Tuple
 
 import torch
 from torch import Tensor
@@ -26,6 +26,50 @@ from ..layers.fragments import (
 _num_clusters_for_graph = num_clusters_for_graph
 from .graph import map_neighbor_list, packed_neighbors
 
+
+class FragmentNeighbors(NamedTuple):
+    """Occupied slots in the padded atom-to-fragment neighborhood."""
+
+    neighbors: Tensor
+    occupied: Tensor
+    atoms: Tensor
+    sources: Tensor
+    slots: Tensor
+
+    def geometry(self, positions, centers):
+        n, k = self.neighbors.shape
+        if self.slots.numel():
+            vectors = centers[self.sources] - positions[self.atoms]
+            edge_vec = map_neighbor_list(vectors, self.slots, k, n)
+            edge_dis = map_neighbor_list(vectors.norm(dim=-1), self.slots, k, n)
+        else:
+            edge_vec = positions.new_zeros(n, k, 3)
+            edge_dis = positions.new_zeros(n, k)
+        graph = {"f_sparse_idx_expnode": self.neighbors, "f_sparse_idx_node": self.neighbors,
+                 "edge_vec": edge_vec, "edge_dis": edge_dis, "present": self.occupied,
+                 "attn_mask": (~self.occupied).unsqueeze(-1), "f_cluster_pos": centers,
+                 "max_neighbors": self.neighbors.new_tensor(k)}
+        if self.slots.numel():
+            graph["f_exp_node_pos"] = centers
+        return graph
+
+
+class FragmentTopology(NamedTuple):
+    """Reuse the discrete assignments while differentiating positions and centers."""
+
+    ids: Tensor
+    counts: Tensor
+    neighbors: FragmentNeighbors
+
+    def apply(self, ctx):
+        ctx.cache["lsr_fragments"] = self
+
+    def geometry(self, positions):
+        centers = positions.new_zeros(self.counts.shape[0], 3).index_add(0, self.ids, positions)
+        centers = centers / self.counts.clamp_min(1).to(positions.dtype).unsqueeze(-1)
+        return centers, self.neighbors.geometry(positions, centers)
+
+
 __all__ = [
     "build_atom_fragment_topk",
     "build_kmeans_fragments",
@@ -37,11 +81,11 @@ __all__ = [
 ]
 
 
-def pool_fragment_irreps(node_irreps: Tensor, flat_cluster_ids: Tensor) -> Tensor:
+def pool_fragment_irreps(node_irreps: Tensor, flat_cluster_ids: Tensor, num_clusters: Optional[int] = None) -> Tensor:
     """Mean-pool atom SH features onto fragments: ``[N,M,C] → [U,M,C]``."""
     n, m, c = node_irreps.shape
     flat = node_irreps.reshape(n, m * c)
-    pooled = scatter_mean(flat, flat_cluster_ids.long(), dim=0)
+    pooled = scatter_mean(flat, flat_cluster_ids.long(), dim_size=num_clusters)
     return pooled.reshape(-1, m, c)
 
 
@@ -61,32 +105,31 @@ def build_atom_fragment_topk(
     top-K nearest fragments within ``radius``, optionally excluding an atom's
     own fragment (``remove_self_cluster``).
     """
+    neighbors = select_fragment_neighbors(atom_pos, cluster_pos, flat_cluster_ids, batch_seg,
+                                         cluster_batch, radius, max_neighbors, remove_self_cluster)
+    return neighbors.geometry(atom_pos, cluster_pos)
+
+
+@torch.no_grad()
+def select_fragment_neighbors(
+    atom_pos: Tensor,
+    cluster_pos: Tensor,
+    flat_cluster_ids: Tensor,
+    batch_seg: Tensor,
+    cluster_batch: Tensor,
+    radius: float,
+    max_neighbors: int = 64,
+    remove_self_cluster: bool = True,
+) -> FragmentNeighbors:
+    """Rank pairs once. Excluded zero-length pairs never enter coordinate derivatives."""
     device = atom_pos.device
-    dtype = atom_pos.dtype
     num_atoms = atom_pos.shape[0]
     num_clusters = cluster_pos.shape[0]
-
-    if num_atoms == 0 or num_clusters == 0 or max_neighbors <= 0:
-        k = max(max_neighbors, 1)
-        empty_idx = torch.zeros(num_atoms, k, dtype=torch.long, device=device)
-        present = torch.zeros(num_atoms, k, dtype=torch.bool, device=device)
-        return {
-            "f_sparse_idx_expnode": empty_idx,
-            "f_sparse_idx_node": empty_idx,
-            "edge_vec": atom_pos.new_zeros(num_atoms, k, 3),
-            "edge_dis": atom_pos.new_zeros(num_atoms, k),
-            "attn_mask": (~present).unsqueeze(-1),
-            "present": present,
-            "f_cluster_pos": cluster_pos,
-            "max_neighbors": torch.tensor(k, device=device),
-        }
-
     src_list = []
     dst_list = []
     dist_list = []
-    vec_list = []
 
-    num_graphs = int(batch_seg.max().item()) + 1
+    num_graphs = int(batch_seg.max().item()) + 1 if num_atoms and num_clusters and max_neighbors > 0 else 0
     for g in range(num_graphs):
         atom_mask = batch_seg == g
         cluster_mask = cluster_batch == g
@@ -121,44 +164,15 @@ def build_atom_fragment_topk(
         src_list.append(cluster_idx[local_c])
         dst_list.append(atom_idx[atom_local])
         dist_list.append(sorted_dist[within])
-        vec_list.append(delta[atom_local, local_c])
 
     if not src_list:
-        k = max_neighbors
-        empty_idx = torch.zeros(num_atoms, k, dtype=torch.long, device=device)
-        present = torch.zeros(num_atoms, k, dtype=torch.bool, device=device)
-        return {
-            "f_sparse_idx_expnode": empty_idx,
-            "f_sparse_idx_node": empty_idx,
-            "edge_vec": atom_pos.new_zeros(num_atoms, k, 3),
-            "edge_dis": atom_pos.new_zeros(num_atoms, k),
-            "attn_mask": (~present).unsqueeze(-1),
-            "present": present,
-            "f_cluster_pos": cluster_pos,
-            "max_neighbors": torch.tensor(k, device=device),
-        }
+        neighbors = torch.zeros(num_atoms, max(max_neighbors, 1), dtype=torch.long, device=device)
+        empty = neighbors.new_empty(0)
+        return FragmentNeighbors(neighbors, torch.zeros_like(neighbors, dtype=torch.bool), empty, empty, empty)
 
-    src = torch.cat(src_list)
-    dst = torch.cat(dst_list)
-    dist = torch.cat(dist_list)
-    vec = torch.cat(vec_list)
-
-    selected, index_mapping, safe, present = packed_neighbors(src, dst, dist, max_neighbors, num_atoms)
-    attn_mask = (~present).unsqueeze(-1)
-    edge_vec = map_neighbor_list(vec[selected], index_mapping, max_neighbors, num_atoms)
-    edge_dis = map_neighbor_list(dist[selected], index_mapping, max_neighbors, num_atoms)
-
-    return {
-        "f_sparse_idx_expnode": safe,
-        "f_sparse_idx_node": safe,
-        "edge_vec": edge_vec,
-        "edge_dis": edge_dis,
-        "attn_mask": attn_mask,
-        "present": present,
-        "f_cluster_pos": cluster_pos,
-        "f_exp_node_pos": cluster_pos,
-        "max_neighbors": torch.tensor(max_neighbors, device=device),
-    }
+    src, dst = torch.cat(src_list), torch.cat(dst_list)
+    selected, slots, neighbors, present = packed_neighbors(src, dst, torch.cat(dist_list), max_neighbors, num_atoms)
+    return FragmentNeighbors(neighbors, present, dst[selected], src[selected], slots)
 
 
 def resolve_fragments(

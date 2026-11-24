@@ -79,15 +79,22 @@ def _prepare_radius_graph(core, inputs):
         geometry = distance.get_output(**fields)
         edges = torch.where(geometry["Dij"] < ranges.cutoff_sr)[0]
         embed = getattr(core, "embed", None)
-        if getattr(embed, "prepare_force_topology", None) is not None:
-            names = [core._name_mapping.get(k, k) for k in embed.topology_fields]
+        block_index = getattr(core, "_force_topology_block", None)
+        provider = embed if block_index is None else core.blocks[block_index]
+        if getattr(provider, "prepare_force_topology", None) is not None:
+            names = [core._name_mapping.get(k, k) for k in provider.topology_fields]
             if isinstance(inputs, Data):
-                names = ["batch" if k == "batch_seg" else name for k, name in zip(embed.topology_fields, names)]
+                names = ["batch" if k == "batch_seg" else name for k, name in zip(provider.topology_fields, names)]
             changed = any(layer._forward_hooks or layer._forward_pre_hooks or
                           any(layer._name_mapping[k] in names for k in layer._output_fields)
                           for layer in core.pre_sequence)
+            if block_index is not None:
+                changed |= any(stage._forward_hooks or stage._forward_pre_hooks
+                               for stage in (embed, *core.blocks[:block_index + 1]))
+                changed |= any(p.is_floating_point() and p.dtype != geometry["Dij"].dtype
+                               for p in core.parameters())
             if not changed and not embed._forward_pre_hooks:
-                return edges, embed.prepare_force_topology(*(inputs.get(name) for name in names))
+                return edges, provider.prepare_force_topology(*(inputs.get(name) for name in names))
         return edges, _topology_indices(core, ranges, fields, geometry, edges)
 
 

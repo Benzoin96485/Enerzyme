@@ -5,8 +5,8 @@ import torch
 from ..mp.block import Block, BlockState
 from ..mp.core import Embed
 from ..mp.message.so2 import SphereHead
-from .cluster import build_atom_fragment_topk, pool_fragment_irreps, resolve_fragments
-from .graph import build_topk_neighborhood
+from .cluster import FragmentTopology, pool_fragment_irreps, resolve_fragments, select_fragment_neighbors
+from .graph import build_topk_neighborhood, center_positions_by_batch
 from .wigner_otf import build_so2_wigner_frames
 
 
@@ -45,6 +45,8 @@ def neighborhood_attention(layer, state, ctx):
 
 
 class FragmentGraph(Block):
+    topology_fields = ("Ra", "batch_seg", "cluster_ids")
+
     def __init__(self, radial, cutoff, max_neighbors, mode, min_nodes, random_state, use_frames, lmax, paths):
         super().__init__()
         self.radial = radial
@@ -57,16 +59,33 @@ class FragmentGraph(Block):
         self.lmax = lmax
         self.paths = paths
 
+    def _fragments(self, pos, batch, cluster_ids):
+        ids, centers, cluster_batch, _ = resolve_fragments(
+            pos, batch, fragment_mode=self.mode, cluster_ids=cluster_ids,
+            min_nodes_per_group=self.min_nodes, random_state=self.random_state,
+        )
+        neighbors = select_fragment_neighbors(pos, centers, ids, batch, cluster_batch,
+                                              self.cutoff, self.max_neighbors)
+        return ids, centers, neighbors
+
+    def prepare_force_topology(self, Ra, batch_seg, cluster_ids):
+        if Ra is None:
+            return None
+        if batch_seg is None:
+            batch_seg = Ra.new_zeros(len(Ra), dtype=torch.long)
+        pos = center_positions_by_batch(Ra, batch_seg)
+        ids, centers, neighbors = self._fragments(pos, batch_seg, cluster_ids)
+        return FragmentTopology(ids, torch.bincount(ids, minlength=len(centers)), neighbors)
+
     def forward(self, state, ctx):
         pos, batch = state.aux["pos"], state.aux["batch"]
-        ids, centers, cluster_batch, _ = resolve_fragments(
-            pos, batch, fragment_mode=self.mode, cluster_ids=ctx.inputs.get("cluster_ids"),
-            cluster_centers=ctx.inputs.get("cluster_centers"), min_nodes_per_group=self.min_nodes,
-            random_state=self.random_state,
-        )
-        graph = build_atom_fragment_topk(atom_pos=pos, cluster_pos=centers, flat_cluster_ids=ids,
-                                         batch_seg=batch, cluster_batch=cluster_batch,
-                                         radius=self.cutoff, max_neighbors=self.max_neighbors, remove_self_cluster=True)
+        topology = ctx.cache.get("lsr_fragments")
+        if topology is None:
+            ids, centers, neighbors = self._fragments(pos, batch, ctx.inputs.get("cluster_ids"))
+            graph = neighbors.geometry(pos, centers)
+        else:
+            ids = topology.ids
+            centers, graph = topology.geometry(pos)
         weights = self.radial(graph["edge_dis"]).masked_fill(graph["attn_mask"], 0.0)
         if self.use_frames and centers.shape[0]:
             graph.update(build_so2_wigner_frames(pos, centers, self.lmax,
@@ -80,7 +99,7 @@ def fragment_attention(layer, state, ctx):
     if aux["centers"].shape[0] == 0:
         return state
     graph = aux["graph"]
-    clusters = pool_fragment_irreps(state.equi, aux["ids"])
+    clusters = pool_fragment_irreps(state.equi, aux["ids"], aux["centers"].shape[0])
     x, weight = layer(node_pos=aux["pos"], node_irreps=state.equi, edge_dis=graph["edge_dis"],
                       edge_vec=graph["edge_vec"], attn_weight=state.edge, atomic_numbers=aux["Za"],
                       attn_mask=graph["attn_mask"], batched_data=graph,

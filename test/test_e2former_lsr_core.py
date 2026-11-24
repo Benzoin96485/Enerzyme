@@ -607,3 +607,34 @@ def test_e2former_lsr_example_yaml_loads():
         verbose=0,
     )
     assert model is not None
+
+
+def test_prepared_fragment_topology_preserves_coordinate_derivatives():
+    from enerzyme.models.e2former.graph import center_positions_by_batch
+    from enerzyme.models.e2former.stages import FragmentGraph
+
+    positions = torch.tensor([[0.0, 0.0, 0.0], [2.8, 1.0, 0.0], [1.0, 0.2, 0.0],
+                              [3.0, 1.8, 0.0], [2.1, 0.0, 0.4], [4.8, 2.0, 0.1]],
+                             dtype=torch.float64, requires_grad=True)
+    batch = torch.tensor([0, 1, 0, 1, 0, 1])
+    labels = torch.tensor([2, 1, 2, 3, 4, 3])
+    direction = torch.arange(18, dtype=positions.dtype).reshape(-1, 3).sin()
+    for mode in ("precomputed", "kmeans"):
+        for cutoff in (0.01, 8.0):
+            layer = FragmentGraph(torch.nn.Identity(), cutoff, 2, mode, 2, 0, False, 1, ())
+            with torch.no_grad():
+                topology = layer.prepare_force_topology(positions, batch, labels)
+            centered = center_positions_by_batch(positions, batch)
+            ids, centers, neighbors = layer._fragments(centered, batch, labels)
+            ref = neighbors.geometry(centered, centers)
+            actual_centers, actual = topology.geometry(centered)
+            torch.testing.assert_close(topology.ids, ids)
+            torch.testing.assert_close(actual_centers, centers)
+            for key in ("present", "attn_mask", "f_sparse_idx_node", "edge_vec", "edge_dis"):
+                torch.testing.assert_close(actual[key], ref[key])
+            def derivatives(c, graph):
+                loss = c.square().sum() + graph["edge_dis"].sin().sum() + graph["edge_vec"].square().sum()
+                grad, = torch.autograd.grad(loss, positions, create_graph=True, retain_graph=True)
+                second, = torch.autograd.grad((grad * direction).sum(), positions, retain_graph=True)
+                return grad, second
+            torch.testing.assert_close(derivatives(actual_centers, actual), derivatives(centers, ref))

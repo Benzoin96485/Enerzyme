@@ -1003,7 +1003,8 @@ def e2former_lsr(
         GraphRequires(distances=False, optional_cutoff_values=False, fields=("Za", "Ra"),
                       optional_fields=("batch_seg", "cluster_ids", "cluster_centers")),
         positional_fields=(*short.positional_fields, "cluster_ids", "cluster_centers"),
-        architecture="e2former_lsr", dim_feature_out=short.dim_feature_out, feature_irreps=short.feature_irreps,
+        architecture="e2former_lsr", _force_topology_block=len(short.blocks),
+        dim_feature_out=short.dim_feature_out, feature_irreps=short.feature_irreps,
         dim_embedding=dim_embedding, scalar_dim=short.scalar_dim, num_layers=num_layers, num_rbf=num_rbf,
         min_nodes_per_group=min_nodes_per_group, attn_type=attn_type, long_layers=long_layers, lmax=short.lmax,
     )
