@@ -263,14 +263,20 @@ class NuclearEmbedding(BaseAtomEmbedding):
         """
         if self.training:  # during training, the embedding needs to be recomputed
             if self.use_electron_config:
-                self.embedding = self.element_embedding + self.config_linear(
+                embedding = self.element_embedding + self.config_linear(
                     self.electron_config
                 )
             else:
-                self.embedding = self.element_embedding
-        if self.embedding.device.type == "cpu":  # indexing is faster on CPUs
-            return self.embedding[Za]
+                embedding = self.element_embedding
+            # A functional coordinate VJP wraps its tensors for the duration
+            # of the transform. Its temporary table must not escape as a buffer.
+            if not torch.compiler.is_compiling():
+                self.embedding = embedding
+        else:
+            embedding = self.embedding
+        if embedding.device.type == "cpu":  # indexing is faster on CPUs
+            return embedding[Za]
         else:  # gathering is faster on GPUs
             return torch.gather(
-                self.embedding, 0, Za.view(-1, 1).expand(-1, self.dim_embedding)
+                embedding, 0, Za.view(-1, 1).expand(-1, self.dim_embedding)
             )

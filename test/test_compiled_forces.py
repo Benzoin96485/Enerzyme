@@ -9,6 +9,15 @@ import torch
 from enerzyme.models.ff import build_model
 
 
+@pytest.fixture(autouse=True)
+def isolate_compiler_cache():
+    # These tests compile the same forward method with different model classes
+    # and backends. Each case needs the compiler's normal specialization budget.
+    torch.compiler.reset()
+    yield
+    torch.compiler.reset()
+
+
 def test_batched_charge_dipole_and_energy_keep_empty_structures_in_fullgraph():
     from enerzyme.models.layers.electrostatics import AtomicCharge2DipoleLayer, ChargeConservationLayer
     from enerzyme.models.layers.reduce import EnergyReduceLayer
@@ -91,6 +100,32 @@ def test_compiled_mace_preserves_scripted_parameter_gradients():
     for loss_gradients, expected in zip(compiled, reference):
         for gradient, target in zip(loss_gradients, expected):
             torch.testing.assert_close(gradient, target)
+
+
+def test_nuclear_embedding_keeps_vjp_tensors_out_of_its_eval_cache():
+    from enerzyme.models.layers.atom_embedding import NuclearEmbedding
+
+    model = NuclearEmbedding(max_Za=86, dim_embedding=3, zero_init=False).double()
+    species = torch.tensor([1, 6, 8])
+    coords = torch.randn(3, 3, dtype=torch.float64, requires_grad=True)
+
+    def energy(pos):
+        return (model.get_embedding(species) * pos.square()).sum()
+
+    def force_loss(pos):
+        potential, pullback = torch.func.vjp(energy, pos)
+        forces, = pullback(torch.ones_like(potential))
+        return potential + forces.square().sum()
+
+    reference = energy(coords)
+    forces, = torch.autograd.grad(reference, coords, create_graph=True)
+    weights = tuple(model.parameters())
+    expected = torch.autograd.grad(reference + forces.square().sum(), weights)
+    table = model.embedding
+    loss = torch.compile(force_loss, fullgraph=True, backend="aot_eager")(coords)
+    assert model.embedding is table
+    for grad, target in zip(torch.autograd.grad(loss, weights), expected):
+        torch.testing.assert_close(grad, target)
 
 
 @pytest.mark.parametrize("architecture", ["dimenet", "m3gnet"])
