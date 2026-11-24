@@ -1,0 +1,796 @@
+{
+  "revision": "72f0816",
+  "extended_cpu_job": "6317747",
+  "participation_recheck_cpu_job": "6317849",
+  "torch": "2.13.0+cu126",
+  "e3nn": "0.5.6",
+  "python": "3.13.5",
+  "input": "core_harness.make_batch(random_molecules(107, [5, 4], density=0.12), measured_dtype)",
+  "weights": "Build the default preset after torch.manual_seed(21) and strictly load its entire state into the FX model.",
+  "operation": "Ordinary torch.compile force training, sum(E**2) + sum(Fa**2), followed by backward. Each worker uses a separate process and two threads.",
+  "compiled_check": "The recording backend counts each FX graph and then runs the Inductor backend. Strict success requires the same parameters to receive gradients as in eager, matching energy, forces and every parameter gradient, a captured learned operator, generated kernels, and CompiledFunctionBackward for both energy and forces.",
+  "numerical_recheck": "When strict participation or a tensor comparison failed, an independent worker tested each additional gradient for exact zero and checked every common element against the same tolerance. A zero gradient where eager left None can change optimizer behavior with weight decay.",
+  "tolerance": {
+    "float32": {
+      "rtol": 0.0005,
+      "atol": 0.0005
+    },
+    "float64": {
+      "rtol": 1e-08,
+      "atol": 1e-08
+    }
+  },
+  "device_groups": {
+    "login": "Intel Xeon Gold 6130",
+    "compute": "Intel Xeon Platinum 8260"
+  },
+  "results": [
+    {
+      "model": "nequip",
+      "dtype": "float32",
+      "device_group": "login",
+      "exit_code": 0,
+      "status": "validated_inductor",
+      "max_abs_error": {
+        "E": 1.5366822481155396e-08,
+        "Fa": 2.9802322387695312e-08,
+        "parameter_gradients": 5.820766091346741e-08
+      },
+      "parameter_gradients": 23,
+      "captured_calls_by_graph": [
+        767
+      ],
+      "learned_operators": [
+        "einsum",
+        "embedding",
+        "index_add_",
+        "linear",
+        "tensordot"
+      ],
+      "generated_kernels": 475
+    },
+    {
+      "model": "nequip",
+      "dtype": "float64",
+      "device_group": "login",
+      "exit_code": 0,
+      "status": "validated_inductor",
+      "max_abs_error": {
+        "E": 7.632783294297951e-17,
+        "Fa": 5.551115123125783e-17,
+        "parameter_gradients": 3.0531133177191805e-16
+      },
+      "parameter_gradients": 23,
+      "captured_calls_by_graph": [
+        767,
+        767
+      ],
+      "learned_operators": [
+        "einsum",
+        "embedding",
+        "index_add_",
+        "linear",
+        "tensordot"
+      ],
+      "generated_kernels": 473
+    },
+    {
+      "model": "allegro",
+      "dtype": "float32",
+      "device_group": "login",
+      "exit_code": 0,
+      "status": "validated_inductor",
+      "max_abs_error": {
+        "E": 2.086162567138672e-07,
+        "Fa": 2.5331974029541016e-07,
+        "parameter_gradients": 1.7881393432617188e-06
+      },
+      "parameter_gradients": 17,
+      "captured_calls_by_graph": [
+        271
+      ],
+      "learned_operators": [
+        "einsum",
+        "embedding",
+        "index_add_",
+        "linear"
+      ],
+      "generated_kernels": 173
+    },
+    {
+      "model": "allegro",
+      "dtype": "float64",
+      "device_group": "login",
+      "exit_code": 0,
+      "status": "validated_inductor",
+      "max_abs_error": {
+        "E": 5.551115123125783e-17,
+        "Fa": 3.3306690738754696e-16,
+        "parameter_gradients": 9.992007221626409e-16
+      },
+      "parameter_gradients": 17,
+      "captured_calls_by_graph": [
+        271
+      ],
+      "learned_operators": [
+        "einsum",
+        "embedding",
+        "index_add_",
+        "linear"
+      ],
+      "generated_kernels": 174
+    },
+    {
+      "model": "botnet",
+      "dtype": "float32",
+      "device_group": "compute",
+      "exit_code": 0,
+      "status": "validated_inductor",
+      "max_abs_error": {
+        "E": 2.2351741790771484e-08,
+        "Fa": 4.76837158203125e-07,
+        "parameter_gradients": 1.3113021850585938e-06
+      },
+      "parameter_gradients": 20,
+      "captured_calls_by_graph": [
+        522
+      ],
+      "learned_operators": [
+        "einsum",
+        "embedding",
+        "index_add_",
+        "matmul",
+        "tensordot"
+      ],
+      "generated_kernels": 335
+    },
+    {
+      "model": "botnet",
+      "dtype": "float64",
+      "device_group": "compute",
+      "exit_code": 0,
+      "status": "validated_inductor",
+      "max_abs_error": {
+        "E": 7.28583859910259e-17,
+        "Fa": 8.326672684688674e-17,
+        "parameter_gradients": 3.3306690738754696e-16
+      },
+      "parameter_gradients": 20,
+      "captured_calls_by_graph": [
+        522,
+        522
+      ],
+      "learned_operators": [
+        "einsum",
+        "embedding",
+        "index_add_",
+        "matmul",
+        "tensordot"
+      ],
+      "generated_kernels": 335
+    },
+    {
+      "model": "eqnorm",
+      "dtype": "float32",
+      "device_group": "compute",
+      "exit_code": 0,
+      "status": "validated_inductor",
+      "max_abs_error": {
+        "E": 7.152557373046875e-07,
+        "Fa": 3.725290298461914e-08,
+        "parameter_gradients": 2.288818359375e-05
+      },
+      "parameter_gradients": 35,
+      "captured_calls_by_graph": [
+        640
+      ],
+      "learned_operators": [
+        "einsum",
+        "index_add_",
+        "linear",
+        "matmul",
+        "tensordot"
+      ],
+      "generated_kernels": 393
+    },
+    {
+      "model": "eqnorm",
+      "dtype": "float64",
+      "device_group": "compute",
+      "exit_code": 0,
+      "status": "validated_inductor",
+      "max_abs_error": {
+        "E": 3.3306690738754696e-16,
+        "Fa": 1.0408340855860843e-16,
+        "parameter_gradients": 2.6645352591003757e-15
+      },
+      "parameter_gradients": 35,
+      "captured_calls_by_graph": [
+        640,
+        640
+      ],
+      "learned_operators": [
+        "einsum",
+        "index_add_",
+        "linear",
+        "matmul",
+        "tensordot"
+      ],
+      "generated_kernels": 394
+    },
+    {
+      "model": "equiformer",
+      "dtype": "float32",
+      "device_group": "compute",
+      "exit_code": 1,
+      "status": "outside_numeric_tolerance",
+      "reason": "Parameter gradient participation differed for the atomic charge scale and shift.",
+      "participation_recheck_exit_code": 1,
+      "recheck_reason": "Parameter gradient participation differed for the atomic charge scale and shift.",
+      "participation_recheck": {
+        "output_errors": {
+          "E": {
+            "abs": 1.4261230379343033,
+            "rel": 0.7769255410997068,
+            "ref_max": 1.5418062210083008,
+            "numel": 2,
+            "num_outside": 2
+          },
+          "Fa": {
+            "abs": 812.6935526281595,
+            "rel": 2873.7426917542107,
+            "ref_max": 0.27929842472076416,
+            "numel": 27,
+            "num_outside": 27
+          }
+        },
+        "parameters_compared": 90,
+        "max_parameter_relative_l2": 7774297447.311585,
+        "max_parameter_abs_error": 47687032830.41719,
+        "parameter_elements_compared": 112738,
+        "elements_outside_tolerance_by_tensor": {
+          "E": 2,
+          "Fa": 27,
+          "pre_sequence.3.embed.atom_type_lin.tp.weight": 128,
+          "pre_sequence.3.embed.atom_type_lin.bias.0": 32,
+          "post_sequence.0.head.0.weight": 4096,
+          "post_sequence.0.head.0.bias": 64,
+          "post_sequence.0.head.0.activation_fn.alpha": 1,
+          "post_sequence.0.head.0.activation_fn.beta": 1,
+          "post_sequence.0.head.1.weight": 64,
+          "post_sequence.0.head.1.bias": 1,
+          "post_sequence.1.shifts.Ea": 4,
+          "post_sequence.1.scales.Ea": 4,
+          "embed.degree.exp.tp.weight": 32,
+          "embed.degree.exp.bias.0": 32,
+          "embed.degree.rad.offset": 96,
+          "embed.degree.rad.net.0.weight": 990,
+          "embed.degree.rad.net.0.bias": 64,
+          "embed.degree.rad.net.1.weight": 64,
+          "embed.degree.rad.net.1.bias": 64,
+          "embed.degree.rad.net.3.weight": 4096,
+          "embed.degree.rad.net.3.bias": 64,
+          "embed.degree.rad.net.4.weight": 64,
+          "embed.degree.rad.net.4.bias": 64,
+          "embed.degree.rad.net.6.weight": 6144,
+          "embed.degree.proj.tp.weight": 1792,
+          "embed.degree.proj.bias.0": 32,
+          "blocks.0.module.norm_1.affine_weight": 56,
+          "blocks.0.module.norm_1.affine_bias": 32,
+          "blocks.0.module.ga.alpha_dot": 32,
+          "blocks.0.module.ga.merge_src.tp.weight": 1344,
+          "blocks.0.module.ga.merge_src.bias.0": 32,
+          "blocks.0.module.ga.merge_dst.tp.weight": 1344,
+          "blocks.0.module.ga.sep_act.dtp_rad.offset": 240,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.0.weight": 860,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.0.bias": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.1.weight": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.1.bias": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.3.weight": 4096,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.3.bias": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.4.weight": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.4.bias": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.6.weight": 15360,
+          "blocks.0.module.ga.sep_act.lin.tp.weight": 5376,
+          "blocks.0.module.ga.sep_act.lin.bias.0": 56,
+          "blocks.0.module.ga.sep_alpha.tp.weight": 1792,
+          "blocks.0.module.ga.sep_alpha.bias.0": 32,
+          "blocks.0.module.ga.sep_value.dtp.tp.weight": 144,
+          "blocks.0.module.ga.sep_value.lin.tp.weight": 2496,
+          "blocks.0.module.ga.sep_value.lin.bias.0": 32,
+          "blocks.0.module.ga.proj.tp.weight": 1088,
+          "blocks.0.module.ga.proj.bias.0": 32,
+          "blocks.0.module.norm_2.affine_weight": 56,
+          "blocks.0.module.norm_2.affine_bias": 32,
+          "blocks.0.module.ffn.fctp_1.tp.weight": 2112,
+          "blocks.0.module.ffn.fctp_1.bias.0": 56,
+          "blocks.0.module.ffn.fctp_2.tp.weight": 1344,
+          "blocks.0.module.ffn.fctp_2.bias.0": 32,
+          "blocks.1.module.norm_1.affine_weight": 56,
+          "blocks.1.module.norm_1.affine_bias": 32,
+          "blocks.1.module.ga.alpha_dot": 32,
+          "blocks.1.module.ga.merge_src.tp.weight": 1344,
+          "blocks.1.module.ga.merge_src.bias.0": 32,
+          "blocks.1.module.ga.merge_dst.tp.weight": 1344,
+          "blocks.1.module.ga.sep_act.dtp_rad.offset": 239,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.0.weight": 890,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.0.bias": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.1.weight": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.1.bias": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.3.weight": 4096,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.3.bias": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.4.weight": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.4.bias": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.6.weight": 14943,
+          "blocks.1.module.ga.sep_act.lin.tp.weight": 5270,
+          "blocks.1.module.ga.sep_act.lin.bias.0": 56,
+          "blocks.1.module.ga.sep_alpha.tp.weight": 1792,
+          "blocks.1.module.ga.sep_alpha.bias.0": 32,
+          "blocks.1.module.ga.sep_value.dtp.tp.weight": 56,
+          "blocks.1.module.ga.sep_value.lin.tp.weight": 1792,
+          "blocks.1.module.ga.sep_value.lin.bias.0": 32,
+          "blocks.1.module.ga.proj.tp.weight": 1024,
+          "blocks.1.module.ga.proj.bias.0": 32,
+          "blocks.1.module.norm_2.affine_weight": 32,
+          "blocks.1.module.norm_2.affine_bias": 32,
+          "blocks.1.module.ffn.fctp_1.tp.weight": 1024,
+          "blocks.1.module.ffn.fctp_1.bias.0": 32,
+          "blocks.1.module.ffn.fctp_2.tp.weight": 2048,
+          "blocks.1.module.ffn.fctp_2.bias.0": 64,
+          "blocks.1.module.ffn_shortcut.tp.weight": 2048,
+          "blocks.1.module.ffn_shortcut.bias.0": 64,
+          "head.norm.affine_weight": 64,
+          "head.norm.affine_bias": 64
+        },
+        "missing_gradient_parameters": [],
+        "additional_zero_gradients": [
+          "post_sequence.1.scales.Qa",
+          "post_sequence.1.shifts.Qa"
+        ],
+        "captured_calls_by_graph": [
+          2000
+        ],
+        "generated_kernels": 1318
+      }
+    },
+    {
+      "model": "equiformer",
+      "dtype": "float64",
+      "device_group": "compute",
+      "exit_code": 1,
+      "status": "outside_numeric_tolerance",
+      "reason": "Parameter gradient participation differed for the atomic charge scale and shift.",
+      "participation_recheck_exit_code": 1,
+      "recheck_reason": "Parameter gradient participation differed for the atomic charge scale and shift.",
+      "participation_recheck": {
+        "output_errors": {
+          "E": {
+            "abs": 0.4626423737744183,
+            "rel": 0.1271389806118781,
+            "ref_max": 3.4295731752350394,
+            "numel": 2,
+            "num_outside": 2
+          },
+          "Fa": {
+            "abs": 860.559752035717,
+            "rel": 1666.6029339493907,
+            "ref_max": 0.5934718659948266,
+            "numel": 27,
+            "num_outside": 27
+          }
+        },
+        "parameters_compared": 90,
+        "max_parameter_relative_l2": 2807567740.9017487,
+        "max_parameter_abs_error": 47078156584.03669,
+        "parameter_elements_compared": 112738,
+        "elements_outside_tolerance_by_tensor": {
+          "E": 2,
+          "Fa": 27,
+          "pre_sequence.3.embed.atom_type_lin.tp.weight": 128,
+          "pre_sequence.3.embed.atom_type_lin.bias.0": 32,
+          "post_sequence.0.head.0.weight": 4096,
+          "post_sequence.0.head.0.bias": 64,
+          "post_sequence.0.head.0.activation_fn.alpha": 1,
+          "post_sequence.0.head.0.activation_fn.beta": 1,
+          "post_sequence.0.head.1.weight": 64,
+          "post_sequence.0.head.1.bias": 1,
+          "post_sequence.1.shifts.Ea": 4,
+          "post_sequence.1.scales.Ea": 4,
+          "embed.degree.exp.tp.weight": 32,
+          "embed.degree.exp.bias.0": 32,
+          "embed.degree.rad.offset": 96,
+          "embed.degree.rad.net.0.weight": 1024,
+          "embed.degree.rad.net.0.bias": 64,
+          "embed.degree.rad.net.1.weight": 64,
+          "embed.degree.rad.net.1.bias": 64,
+          "embed.degree.rad.net.3.weight": 4096,
+          "embed.degree.rad.net.3.bias": 64,
+          "embed.degree.rad.net.4.weight": 64,
+          "embed.degree.rad.net.4.bias": 64,
+          "embed.degree.rad.net.6.weight": 6144,
+          "embed.degree.proj.tp.weight": 1792,
+          "embed.degree.proj.bias.0": 32,
+          "blocks.0.module.norm_1.affine_weight": 56,
+          "blocks.0.module.norm_1.affine_bias": 32,
+          "blocks.0.module.ga.alpha_dot": 32,
+          "blocks.0.module.ga.merge_src.tp.weight": 1344,
+          "blocks.0.module.ga.merge_src.bias.0": 32,
+          "blocks.0.module.ga.merge_dst.tp.weight": 1344,
+          "blocks.0.module.ga.sep_act.dtp_rad.offset": 240,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.0.weight": 1021,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.0.bias": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.1.weight": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.1.bias": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.3.weight": 4096,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.3.bias": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.4.weight": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.4.bias": 64,
+          "blocks.0.module.ga.sep_act.dtp_rad.net.6.weight": 15360,
+          "blocks.0.module.ga.sep_act.lin.tp.weight": 5376,
+          "blocks.0.module.ga.sep_act.lin.bias.0": 56,
+          "blocks.0.module.ga.sep_alpha.tp.weight": 1792,
+          "blocks.0.module.ga.sep_alpha.bias.0": 32,
+          "blocks.0.module.ga.sep_value.dtp.tp.weight": 144,
+          "blocks.0.module.ga.sep_value.lin.tp.weight": 2496,
+          "blocks.0.module.ga.sep_value.lin.bias.0": 32,
+          "blocks.0.module.ga.proj.tp.weight": 1088,
+          "blocks.0.module.ga.proj.bias.0": 32,
+          "blocks.0.module.norm_2.affine_weight": 56,
+          "blocks.0.module.norm_2.affine_bias": 32,
+          "blocks.0.module.ffn.fctp_1.tp.weight": 2112,
+          "blocks.0.module.ffn.fctp_1.bias.0": 56,
+          "blocks.0.module.ffn.fctp_2.tp.weight": 1344,
+          "blocks.0.module.ffn.fctp_2.bias.0": 32,
+          "blocks.1.module.norm_1.affine_weight": 56,
+          "blocks.1.module.norm_1.affine_bias": 32,
+          "blocks.1.module.ga.alpha_dot": 32,
+          "blocks.1.module.ga.merge_src.tp.weight": 1344,
+          "blocks.1.module.ga.merge_src.bias.0": 32,
+          "blocks.1.module.ga.merge_dst.tp.weight": 1344,
+          "blocks.1.module.ga.sep_act.dtp_rad.offset": 192,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.0.weight": 1021,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.0.bias": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.1.weight": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.1.bias": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.3.weight": 4096,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.3.bias": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.4.weight": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.4.bias": 64,
+          "blocks.1.module.ga.sep_act.dtp_rad.net.6.weight": 12288,
+          "blocks.1.module.ga.sep_act.lin.tp.weight": 4800,
+          "blocks.1.module.ga.sep_act.lin.bias.0": 56,
+          "blocks.1.module.ga.sep_alpha.tp.weight": 1792,
+          "blocks.1.module.ga.sep_alpha.bias.0": 32,
+          "blocks.1.module.ga.sep_value.dtp.tp.weight": 56,
+          "blocks.1.module.ga.sep_value.lin.tp.weight": 1792,
+          "blocks.1.module.ga.sep_value.lin.bias.0": 32,
+          "blocks.1.module.ga.proj.tp.weight": 1024,
+          "blocks.1.module.ga.proj.bias.0": 32,
+          "blocks.1.module.norm_2.affine_weight": 32,
+          "blocks.1.module.norm_2.affine_bias": 32,
+          "blocks.1.module.ffn.fctp_1.tp.weight": 1024,
+          "blocks.1.module.ffn.fctp_1.bias.0": 32,
+          "blocks.1.module.ffn.fctp_2.tp.weight": 2048,
+          "blocks.1.module.ffn.fctp_2.bias.0": 64,
+          "blocks.1.module.ffn_shortcut.tp.weight": 2048,
+          "blocks.1.module.ffn_shortcut.bias.0": 64,
+          "head.norm.affine_weight": 64,
+          "head.norm.affine_bias": 64
+        },
+        "missing_gradient_parameters": [],
+        "additional_zero_gradients": [
+          "post_sequence.1.scales.Qa",
+          "post_sequence.1.shifts.Qa"
+        ],
+        "captured_calls_by_graph": [
+          2000
+        ],
+        "generated_kernels": 1318
+      }
+    },
+    {
+      "model": "equflash",
+      "dtype": "float32",
+      "device_group": "compute",
+      "exit_code": 1,
+      "status": "outside_numeric_tolerance",
+      "reason": "The tensor comparison exceeded the stated tolerance.",
+      "participation_recheck_exit_code": 1,
+      "recheck_reason": "The tensor comparison exceeded the stated tolerance.",
+      "participation_recheck": {
+        "output_errors": {
+          "E": {
+            "abs": 2.6226043701171875e-06,
+            "rel": 1.0898653393414929e-06,
+            "ref_max": 2.1450393199920654,
+            "numel": 2,
+            "num_outside": 0
+          },
+          "Fa": {
+            "abs": 2.765655517578125e-05,
+            "rel": 1.2386479579482192e-06,
+            "ref_max": 23.147682189941406,
+            "numel": 27,
+            "num_outside": 0
+          }
+        },
+        "parameters_compared": 66,
+        "max_parameter_relative_l2": 4.831263360099646e-06,
+        "max_parameter_abs_error": 0.009521484375,
+        "parameter_elements_compared": 28775689,
+        "elements_outside_tolerance_by_tensor": {
+          "post_sequence.0.head.0.weight": 2
+        },
+        "missing_gradient_parameters": [],
+        "additional_zero_gradients": [],
+        "captured_calls_by_graph": [
+          4852
+        ],
+        "generated_kernels": 2961
+      }
+    },
+    {
+      "model": "equflash",
+      "dtype": "float64",
+      "device_group": "compute",
+      "exit_code": 0,
+      "status": "validated_inductor",
+      "max_abs_error": {
+        "E": 2.1760371282653068e-14,
+        "Fa": 1.1901590823981678e-13,
+        "parameter_gradients": 5.88897819397971e-11
+      },
+      "parameter_gradients": 66,
+      "captured_calls_by_graph": [
+        4852,
+        4852
+      ],
+      "learned_operators": [
+        "einsum",
+        "embedding",
+        "index_add_",
+        "linear",
+        "matmul",
+        "tensordot"
+      ],
+      "generated_kernels": 2964
+    }
+  ],
+  "protected_cpu_force_training": {
+    "equflashv2": {
+      "pre_guard": {
+        "float32": "native allocator abort (exit 134)",
+        "float64": "segmentation fault (exit 139)"
+      },
+      "ordinary_cpu_force_training": "native derivatives",
+      "functional_recheck": "The FP32 abort was also observed after replacing indexed writes in the e3nn normalization and residual embedding with out-of-place slices."
+    },
+    "equiformer": {
+      "guard_revision": "395de43",
+      "pre_guard": {
+        "float32": "The FX CPU lowering changed energy and forces and materialized two exact-zero charge-calibration gradients.",
+        "float64": "The same lowering changed energy and forces and materialized two exact-zero charge-calibration gradients."
+      },
+      "ordinary_cpu_force_training": "Native derivatives match eager in both precisions; the eight public FX registration/lowering tests pass."
+    },
+    "nequix": {
+      "pre_guard": {
+        "float32": "native allocator abort (exit 134)"
+      },
+      "ordinary_cpu_force_training": "native derivatives",
+      "float64_check": "Energy, forces and 18 parameter gradients matched eager with zero graphs submitted to the recording backend."
+    }
+  },
+  "mace_polar": {
+    "revision": "fd739ef",
+    "backend": "displaced",
+    "pair_preparation": "The ordinary FX force path prepares the same directed open-boundary molecular pairs before tracing derivatives. An earlier trace at 72f0816 recorded only the final force sign.",
+    "unit_checks": "18 passed, including original GTO finite differences, arbitrary field mappings, periodic boundary rejection, disjoint graph memberships and mapped preceding layers.",
+    "results": [
+      {
+        "dtype": "float32",
+        "exit_code": 0,
+        "status": "validated_inductor",
+        "max_abs_error": {
+          "E": 2.175569534301758e-06,
+          "Fa": 8.851289749145508e-06,
+          "parameter_gradients": 0.0004253387451171875
+        },
+        "parameter_gradients": 86,
+        "captured_calls_by_graph": [
+          2127
+        ],
+        "learned_operators": [
+          "einsum",
+          "embedding",
+          "index_add_",
+          "linear",
+          "matmul",
+          "tensordot"
+        ],
+        "generated_kernels": 1287,
+        "max_parameter_gradient_relative_l2": 0.0005297665623011931,
+        "diagnostic": {
+          "output_errors": {
+            "E": {
+              "abs": 7.510185241699219e-06,
+              "rel": 2.2007660140725766e-05,
+              "close": true,
+              "scale": 0.31729772686958313
+            },
+            "Fa": {
+              "abs": 1.0982155799865723e-05,
+              "rel": 5.563869288659615e-05,
+              "close": true,
+              "scale": 0.19847434759140015
+            }
+          },
+          "parameter_gradients": 86,
+          "max_parameter_gradient_abs_error": 0.0002951622009277344,
+          "max_parameter_gradient_relative_l2": 0.0007324235958715396,
+          "outside_tolerance": [],
+          "missing_gradients": [],
+          "additional_gradients": []
+        }
+      },
+      {
+        "dtype": "float64",
+        "exit_code": 0,
+        "status": "validated_inductor",
+        "max_abs_error": {
+          "E": 7.538414337204813e-14,
+          "Fa": 2.9114488597770105e-12,
+          "parameter_gradients": 6.924383342266083e-07
+        },
+        "parameter_gradients": 86,
+        "captured_calls_by_graph": [
+          2127,
+          2127
+        ],
+        "learned_operators": [
+          "einsum",
+          "embedding",
+          "index_add_",
+          "linear",
+          "matmul",
+          "tensordot"
+        ],
+        "generated_kernels": 1281,
+        "diagnostic": {
+          "output_errors": {
+            "E": {
+              "abs": 1.176836406102666e-14,
+              "rel": 1.2315673168464646e-14,
+              "close": true,
+              "scale": 0.9244790642855734
+            },
+            "Fa": {
+              "abs": 3.2933655802480644e-12,
+              "rel": 2.7340630548720753e-13,
+              "close": true,
+              "scale": 12.271386582444132
+            }
+          },
+          "parameter_gradients": 86,
+          "max_parameter_gradient_abs_error": 7.757917046546936e-07,
+          "max_parameter_gradient_relative_l2": 8.815227519537926e-13,
+          "outside_tolerance": [],
+          "missing_gradients": [],
+          "additional_gradients": []
+        }
+      }
+    ]
+  },
+  "combined_mace_regression": {
+    "revision": "b5203e9",
+    "changes": [
+      "1bb445c (MACE-POLAR molecular image pairs)",
+      "32b86cd (MACE element-indexed contractions)"
+    ],
+    "device_group": "login",
+    "operation": "The optimized default eager model and compiled FX model from the same revision load identical weights. They follow the same two-molecule training comparison as the registry cases.",
+    "unit_summary": "30 passed, 673 warnings in 62.45s (0:01:02)",
+    "results": [
+      {
+        "model": "mace",
+        "dtype": "float32",
+        "exit_code": 0,
+        "status": "validated_inductor",
+        "max_abs_error": {
+          "E": 7.450580596923828e-09,
+          "Fa": 1.30385160446167e-08,
+          "parameter_gradients": 5.960464477539063e-08
+        },
+        "parameter_gradients": 33,
+        "captured_calls_by_graph": [
+          579
+        ],
+        "learned_operators": [
+          "einsum",
+          "embedding",
+          "index_add_",
+          "matmul",
+          "tensordot"
+        ],
+        "generated_kernels": 386,
+        "max_parameter_gradient_relative_l2": 5.690705833043993e-07
+      },
+      {
+        "model": "mace",
+        "dtype": "float64",
+        "exit_code": 0,
+        "status": "validated_inductor",
+        "max_abs_error": {
+          "E": 3.469446951953614e-17,
+          "Fa": 5.551115123125783e-17,
+          "parameter_gradients": 1.6653345369377348e-16
+        },
+        "parameter_gradients": 33,
+        "captured_calls_by_graph": [
+          579,
+          579
+        ],
+        "learned_operators": [
+          "einsum",
+          "embedding",
+          "index_add_",
+          "matmul",
+          "tensordot"
+        ],
+        "generated_kernels": 386,
+        "max_parameter_gradient_relative_l2": 2.042327919288808e-15
+      },
+      {
+        "model": "mace_polar",
+        "dtype": "float32",
+        "exit_code": 0,
+        "status": "validated_inductor",
+        "max_abs_error": {
+          "E": 5.5730342864990234e-06,
+          "Fa": 2.03549861907959e-05,
+          "parameter_gradients": 0.00025916099548339844
+        },
+        "parameter_gradients": 86,
+        "captured_calls_by_graph": [
+          2127
+        ],
+        "learned_operators": [
+          "einsum",
+          "embedding",
+          "index_add_",
+          "linear",
+          "matmul",
+          "tensordot"
+        ],
+        "generated_kernels": 1287,
+        "max_parameter_gradient_relative_l2": 0.0006244831207401517
+      },
+      {
+        "model": "mace_polar",
+        "dtype": "float64",
+        "exit_code": 0,
+        "status": "validated_inductor",
+        "max_abs_error": {
+          "E": 1.0880185641326534e-14,
+          "Fa": 2.6894042548519792e-12,
+          "parameter_gradients": 6.246846169233322e-07
+        },
+        "parameter_gradients": 86,
+        "captured_calls_by_graph": [
+          2127,
+          2127
+        ],
+        "learned_operators": [
+          "einsum",
+          "embedding",
+          "index_add_",
+          "linear",
+          "matmul",
+          "tensordot"
+        ],
+        "generated_kernels": 1281,
+        "max_parameter_gradient_relative_l2": 7.983916413635053e-13
+      }
+    ]
+  }
+}
