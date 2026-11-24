@@ -12,6 +12,7 @@ import math
 
 import torch
 from torch import Tensor, nn
+from torch.utils.checkpoint import checkpoint
 
 from .geometry import reduce_nodes, scalarize
 
@@ -105,8 +106,14 @@ class LocalSubstructure(nn.Module):
 
     def _endpoint(self, environment: Tensor, frame: Tensor, nodes: Tensor) -> Tensor:
         projected = scalarize(environment[nodes], frame)
-        mixed = self.lin(projected.transpose(1, 2)).squeeze(-1)
-        return (mixed + projected[:, 0, :]) / self.scale
+        local_axes = projected.transpose(1, 2)
+        if torch.compiler.is_compiling() and local_axes.is_cuda and not self.training:
+            # Force evaluation retains the energy graph. Keep the three input
+            # coordinates and recompute the much wider hidden activations.
+            mixed = checkpoint(self.lin, local_axes, use_reentrant=False)
+        else:
+            mixed = self.lin(local_axes)
+        return (mixed.squeeze(-1) + projected[:, 0, :]) / self.scale
 
     def forward(
         self,
