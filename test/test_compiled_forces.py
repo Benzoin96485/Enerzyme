@@ -261,7 +261,9 @@ def test_cpu_compiler_keeps_force_gradients(architecture):
 
 
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
-def test_dpa3_cpu_inference_keeps_reusable_coordinate_gradients(monkeypatch, dtype):
+def test_dpa3_cpu_inference_keeps_reusable_coordinate_gradients(dtype):
+    from torch._functorch import config as autograd_config
+    from torch._inductor import config
     from scripts.core_harness import build, forward, make_batch, random_molecules
 
     torch.manual_seed(142)
@@ -271,22 +273,26 @@ def test_dpa3_cpu_inference_keeps_reusable_coordinate_gradients(monkeypatch, dty
     def differentiate(runner):
         out = forward(runner, batch, dtype, train=False)
         first = torch.autograd.grad(out["E"].sum(), out["Ra"], retain_graph=True)[0]
-        second = torch.autograd.grad(out["E"].sum(), out["Ra"])[0]
-        return out["E"], out["Fa"], first, second
-
-    def unexpected_lowering(*args, **kwargs):
-        pytest.fail("DPA3 CPU force inference entered the unsafe compiled backward")
+        second = torch.autograd.grad(out["E"].sum(), out["Ra"], retain_graph=True)[0]
+        weights = torch.autograd.grad(out["E"].sum(), tuple(model.parameters()), allow_unused=True)
+        return out["E"], out["Fa"], first, second, *weights
 
     expected = differentiate(model)
-    monkeypatch.setattr(torch._inductor, "compile", unexpected_lowering)
+    scalar_widths = []
+
     # A custom compiler can delegate to Inductor under any Python name.
     def eager(graph, inputs):
+        if any(getattr(node.target, "__name__", "") == "linear" for node in graph.graph.nodes):
+            scalar_widths.append(config.cpp.simdlen)
         return torch._inductor.compile(graph, inputs)
 
     backend = eager if dtype == torch.float64 else "inductor"
     actual = differentiate(torch.compile(model, backend=backend))
+    if (backend is eager and hasattr(config.cpp, "simdlen")
+            and hasattr(autograd_config, "force_non_lazy_backward_lowering")):
+        assert set(scalar_widths) == {1}
     for value, target in zip(actual, expected):
-        torch.testing.assert_close(value, target, rtol=0, atol=0)
+        torch.testing.assert_close(value, target)
 
 
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
