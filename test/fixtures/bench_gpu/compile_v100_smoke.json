@@ -1,0 +1,552 @@
+{
+  "hardware": {
+    "python": "3.13.5",
+    "torch": "2.13.0+cu126",
+    "triton": "3.7.1",
+    "built_cuda": "12.6",
+    "driver": "580.178.04",
+    "name": "Tesla V100-PCIE-32GB",
+    "capability": [
+      7,
+      0
+    ],
+    "visible_devices": 1,
+    "built_arches": [
+      "sm_50",
+      "sm_60",
+      "sm_70",
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90"
+    ]
+  },
+  "kernel_smoke": [
+    {
+      "dtype": "torch.float32",
+      "subject": "Inductor differentiated tensor calculation",
+      "grad_fn": "CompiledFunctionBackward",
+      "generated_kernels": 2,
+      "max_energy_error": 2.384185791015625e-07,
+      "max_force_error": 0.0,
+      "weight_grad_error": 3.814697265625e-06
+    },
+    {
+      "dtype": "torch.float64",
+      "subject": "Inductor differentiated tensor calculation",
+      "grad_fn": "CompiledFunctionBackward",
+      "generated_kernels": 2,
+      "max_energy_error": 4.440892098500626e-16,
+      "max_force_error": 0.0,
+      "weight_grad_error": 3.552713678800501e-15
+    }
+  ],
+  "schnet": {
+    "revisions": {
+      "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "candidate_and_benchmark_driver": "079ae55723972f1dca7343464881c1df5e2dbba4"
+    },
+    "validation": {
+      "inputs": "random_molecules(71, [4, 3])",
+      "model_seed": 37,
+      "reference": "same seeded weights and coordinates, eager in the same dtype",
+      "loss": "sum(E**2) + sum(Fa**2)",
+      "errors": "maximum absolute difference",
+      "tolerances": {
+        "float32": {
+          "output_atol": 2e-05,
+          "rtol": 0.0003,
+          "grad_atol": 8e-05
+        },
+        "float64": {
+          "output_atol": 2e-10,
+          "rtol": 1e-09,
+          "grad_atol": 8e-10
+        }
+      }
+    },
+    "benchmark": {
+      "driver": "scripts/bench_cores.py",
+      "options": "--only schnet --systems tiny --device cuda --threads 2 --reps 1 --timeout 300",
+      "modes": {
+        "compile": "native torch.compile",
+        "compile-reference": "shared functional forces and tensor table gather, fullgraph=True"
+      },
+      "warmups": 2,
+      "timed_repeats": 1,
+      "systems": {
+        "mol_batch_tiny": [
+          8,
+          8,
+          8,
+          8
+        ],
+        "mol_large_tiny": [
+          12
+        ]
+      }
+    },
+    "results": [
+      {
+        "precision": "float32",
+        "side": "baseline",
+        "mode": "compile",
+        "numeric": {
+          "passed": false,
+          "error": "AOTAutograd does not currently support double backward."
+        },
+        "parameters": 1027719,
+        "mol_batch_tiny": {
+          "infer_ms": 12.141580926254392,
+          "infer_peak_mb": 24.701171875,
+          "train_error": "AOTAutograd does not currently support double backward."
+        },
+        "mol_large_tiny": {
+          "infer_error": "AOTAutograd donated buffers require create_graph=False and retain_graph=False.",
+          "train_error": "AOTAutograd donated buffers require create_graph=False and retain_graph=False."
+        }
+      },
+      {
+        "precision": "float32",
+        "side": "baseline",
+        "mode": "compile-reference",
+        "numeric": {
+          "passed": true,
+          "max_error": {
+            "E": 1.1920928955078125e-07,
+            "Fa": 4.291534423828125e-06
+          },
+          "max_grad_error": 4.76837158203125e-05,
+          "weight_tensors_checked": 48
+        },
+        "parameters": 1027719,
+        "mol_batch_tiny": {
+          "infer_ms": 3.2754039857536554,
+          "infer_peak_mb": 15.00927734375,
+          "train_ms": 7.108651101589203,
+          "train_peak_mb": 27.041015625
+        },
+        "mol_large_tiny": {
+          "infer_ms": 3.033864079043269,
+          "infer_peak_mb": 21.76611328125,
+          "train_ms": 7.2546349838376045,
+          "train_peak_mb": 24.21728515625
+        }
+      },
+      {
+        "precision": "float32",
+        "side": "candidate",
+        "mode": "compile",
+        "numeric": {
+          "passed": true,
+          "max_error": {
+            "E": 2.384185791015625e-07,
+            "Fa": 2.384185791015625e-07
+          },
+          "max_grad_error": 7.62939453125e-06,
+          "weight_tensors_checked": 48
+        },
+        "parameters": 1027719,
+        "mol_batch_tiny": {
+          "infer_ms": 13.364295940846205,
+          "infer_peak_mb": 26.208984375,
+          "train_ms": 26.326297083869576,
+          "train_peak_mb": 26.9736328125
+        },
+        "mol_large_tiny": {
+          "infer_ms": 13.5224349796772,
+          "infer_peak_mb": 23.435546875,
+          "train_ms": 26.928297011181712,
+          "train_peak_mb": 24.27685546875
+        }
+      },
+      {
+        "precision": "float32",
+        "side": "candidate",
+        "mode": "compile-reference",
+        "numeric": {
+          "passed": true,
+          "max_error": {
+            "E": 0.0,
+            "Fa": 3.337860107421875e-06
+          },
+          "max_grad_error": 8.58306884765625e-05,
+          "weight_tensors_checked": 48
+        },
+        "parameters": 1027719,
+        "mol_batch_tiny": {
+          "infer_ms": 3.1715058721601963,
+          "infer_peak_mb": 15.01220703125,
+          "train_ms": 7.354851113632321,
+          "train_peak_mb": 27.048828125
+        },
+        "mol_large_tiny": {
+          "infer_ms": 2.863554051145911,
+          "infer_peak_mb": 21.76953125,
+          "train_ms": 7.520684041082859,
+          "train_peak_mb": 24.220703125
+        }
+      },
+      {
+        "precision": "float64",
+        "side": "baseline",
+        "mode": "compile",
+        "numeric": {
+          "passed": false,
+          "error": "AOTAutograd does not currently support double backward."
+        },
+        "parameters": 1027719,
+        "mol_batch_tiny": {
+          "infer_ms": 12.131321942433715,
+          "infer_peak_mb": 33.1083984375,
+          "train_error": "AOTAutograd does not currently support double backward."
+        },
+        "mol_large_tiny": {
+          "infer_error": "AOTAutograd donated buffers require create_graph=False and retain_graph=False.",
+          "train_error": "AOTAutograd donated buffers require create_graph=False and retain_graph=False."
+        }
+      },
+      {
+        "precision": "float64",
+        "side": "baseline",
+        "mode": "compile-reference",
+        "numeric": {
+          "passed": true,
+          "max_error": {
+            "E": 6.661338147750939e-16,
+            "Fa": 7.882583474838611e-15
+          },
+          "max_grad_error": 5.1514348342607263e-14,
+          "weight_tensors_checked": 48
+        },
+        "parameters": 1027719,
+        "mol_batch_tiny": {
+          "infer_ms": 3.3479630947113037,
+          "infer_peak_mb": 21.640625,
+          "train_ms": 7.665604120120406,
+          "train_peak_mb": 38.27685546875
+        },
+        "mol_large_tiny": {
+          "infer_ms": 3.5789310932159424,
+          "infer_peak_mb": 27.11474609375,
+          "train_ms": 7.822314044460654,
+          "train_peak_mb": 32.16015625
+        }
+      },
+      {
+        "precision": "float64",
+        "side": "candidate",
+        "mode": "compile",
+        "numeric": {
+          "passed": true,
+          "max_error": {
+            "E": 0.0,
+            "Fa": 8.881784197001252e-16
+          },
+          "max_grad_error": 1.7763568394002505e-14,
+          "weight_tensors_checked": 48
+        },
+        "parameters": 1027719,
+        "mol_batch_tiny": {
+          "infer_ms": 13.032389106228948,
+          "infer_peak_mb": 36.11669921875,
+          "train_ms": 26.234047021716833,
+          "train_peak_mb": 37.6201171875
+        },
+        "mol_large_tiny": {
+          "infer_ms": 12.66009802930057,
+          "infer_peak_mb": 30.53955078125,
+          "train_ms": 25.258801877498627,
+          "train_peak_mb": 32.20654296875
+        }
+      },
+      {
+        "precision": "float64",
+        "side": "candidate",
+        "mode": "compile-reference",
+        "numeric": {
+          "passed": true,
+          "max_error": {
+            "E": 1.5543122344752192e-15,
+            "Fa": 7.105427357601002e-15
+          },
+          "max_grad_error": 1.4921397450962104e-13,
+          "weight_tensors_checked": 48
+        },
+        "parameters": 1027719,
+        "mol_batch_tiny": {
+          "infer_ms": 3.417090978473425,
+          "infer_peak_mb": 21.6494140625,
+          "train_ms": 8.820682065561414,
+          "train_peak_mb": 38.29443359375
+        },
+        "mol_large_tiny": {
+          "infer_ms": 3.2163779251277447,
+          "infer_peak_mb": 27.12158203125,
+          "train_ms": 7.947423029690981,
+          "train_peak_mb": 32.16650390625
+        }
+      }
+    ],
+    "cache": "The first attempt at some tiny cells exceeded the node-local temporary cache quota. Every affected cell used the same driver, arguments, inputs and GPU on retry with the dedicated cache moved to RAM.",
+    "training_32x20": {
+      "precision": "float32",
+      "sizes": [
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "atoms": 640,
+      "directed_edges": 12160,
+      "model_seed": 0,
+      "coordinates_seed": 11,
+      "validation": "Step one compares energies, forces and all trainable gradients with nonempty eager gradients. Each of steps two through seven recomputes the loss and backward pass with unchanged weights.",
+      "counters": "Process-wide Dynamo counter snapshot after the first training backward pass, including prior inference warmups when present.",
+      "results": [
+        {
+          "revision": "3b77a618b91cb083fe527815156883e4ad111c32",
+          "mode": "eval-then-train",
+          "inference_warmups": 7,
+          "fullgraph": false,
+          "training-forward": {
+            "E_error": 2.384185791015625e-06,
+            "Fa_error": 2.6226043701171875e-06,
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "NegBackward0"
+          },
+          "error": "AOTAutograd does not currently support double backward."
+        },
+        {
+          "revision": "3b77a618b91cb083fe527815156883e4ad111c32",
+          "mode": "train-first",
+          "inference_warmups": 0,
+          "fullgraph": false,
+          "training-forward": {
+            "E_error": 1.430511474609375e-06,
+            "Fa_error": 1.9073486328125e-06,
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "CompiledFunctionBackward"
+          },
+          "training-backward": {
+            "weights_checked": 48,
+            "worst_relative_l2": 1.8987324210684164e-06,
+            "worst_weight": "post_sequence.4.d3_c6ab",
+            "max_abs_gradient_error": 0.00048828125
+          },
+          "graph-capture": {
+            "counters": {
+              "calls_captured": 2,
+              "unique_graphs": 2
+            }
+          },
+          "training_steps_completed": 7
+        },
+        {
+          "revision": "413117753669a3f9875c29f42b53e8b7ee53b65a",
+          "mode": "eval-then-train",
+          "inference_warmups": 7,
+          "fullgraph": false,
+          "training-forward": {
+            "E_error": 1.7881393432617188e-06,
+            "Fa_error": 1.9669532775878906e-06,
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "CompiledFunctionBackward"
+          },
+          "training-backward": {
+            "weights_checked": 48,
+            "worst_relative_l2": 2.7378646336728707e-06,
+            "worst_weight": "post_sequence.4.d3_c6ab",
+            "max_abs_gradient_error": 0.00030517578125
+          },
+          "graph-capture": {
+            "counters": {
+              "calls_captured": 294,
+              "unique_graphs": 19
+            }
+          },
+          "training_steps_completed": 7
+        },
+        {
+          "revision": "413117753669a3f9875c29f42b53e8b7ee53b65a",
+          "mode": "train-first",
+          "inference_warmups": 0,
+          "fullgraph": false,
+          "training-forward": {
+            "E_error": 1.7881393432617188e-06,
+            "Fa_error": 2.2649765014648438e-06,
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "CompiledFunctionBackward"
+          },
+          "training-backward": {
+            "weights_checked": 48,
+            "worst_relative_l2": 3.0281605631898856e-06,
+            "worst_weight": "post_sequence.4.d3_rcov",
+            "max_abs_gradient_error": 0.00048828125
+          },
+          "graph-capture": {
+            "counters": {
+              "calls_captured": 2,
+              "unique_graphs": 2
+            }
+          },
+          "training_steps_completed": 7
+        },
+        {
+          "revision": "413117753669a3f9875c29f42b53e8b7ee53b65a",
+          "mode": "strict-train",
+          "inference_warmups": 0,
+          "fullgraph": true,
+          "training-forward": {
+            "E_error": 2.1457672119140625e-06,
+            "Fa_error": 1.9073486328125e-05,
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "CompiledFunctionBackward"
+          },
+          "training-backward": {
+            "weights_checked": 48,
+            "worst_relative_l2": 1.1986294339294545e-05,
+            "worst_weight": "post_sequence.4.d3_rcov",
+            "max_abs_gradient_error": 0.001129150390625
+          },
+          "graph-capture": {
+            "counters": {
+              "calls_captured": 348,
+              "unique_graphs": 1
+            }
+          },
+          "training_steps_completed": 7
+        }
+      ]
+    }
+  },
+  "xpainn": {
+    "source": "XequiNet",
+    "upstream_revision": "23b902debc1d21b3443056d387df6b0674b26383",
+    "candidate_revision": "5f459caef1b135112b7392ed06400325f1805818",
+    "validation": "Two molecules (3 and 2 atoms), same construction and input seed (71), raw CUDA energy, forces and node_lin.weight derivative of sum(E**2)+sum(Fa**2).",
+    "fx_mode": "e3nn.set_optimization_defaults(jit_script_fx=False) before construction on both sides",
+    "results": [
+      {
+        "precision": "float32",
+        "mode": "eager",
+        "passed": true,
+        "max_errors": {
+          "energy": 0.0,
+          "forces": 0.0,
+          "weight_gradient": 0.0
+        }
+      },
+      {
+        "precision": "float32",
+        "mode": "compile-upstream",
+        "passed": false,
+        "error": "Dynamo cannot trace the e3nn TensorProduct TorchScript submodule _compiled_main_left_right."
+      },
+      {
+        "precision": "float32",
+        "mode": "compile-candidate",
+        "passed": false,
+        "error": "Dynamo cannot trace the e3nn TensorProduct TorchScript submodule _compiled_main_left_right."
+      },
+      {
+        "precision": "float64",
+        "mode": "eager",
+        "passed": true,
+        "max_errors": {
+          "energy": 0.0,
+          "forces": 0.0,
+          "weight_gradient": 0.0
+        }
+      },
+      {
+        "precision": "float64",
+        "mode": "compile-upstream",
+        "passed": false,
+        "error": "Dynamo cannot trace the e3nn TensorProduct TorchScript submodule _compiled_main_left_right."
+      },
+      {
+        "precision": "float64",
+        "mode": "compile-candidate",
+        "passed": false,
+        "error": "Dynamo cannot trace the e3nn TensorProduct TorchScript submodule _compiled_main_left_right."
+      },
+      {
+        "precision": "float64",
+        "mode": "fx-compile-upstream",
+        "passed": false,
+        "error": "Dynamo cannot trace the XequiNet output torch.autograd.grad call with trace_autograd_ops=False."
+      },
+      {
+        "precision": "float64",
+        "mode": "fx-compile-candidate",
+        "passed": false,
+        "error": "Dynamo cannot trace the PyG Data edge_index property setter in XPaiNNHead."
+      }
+    ],
+    "production": {
+      "revision": "771d0917be99123a357d862530fcc57d16faeb73",
+      "mode": "torch.compile(model, fullgraph=True), Inductor",
+      "settings": {
+        "capture_dynamic_output_shape_ops": true,
+        "capture_scalar_outputs": true
+      },
+      "inputs": "random_molecules(4, [3, 2], density=0.14)",
+      "model_seed": 72,
+      "loss": "sum(E**2) + sum(Fa**2)",
+      "reference": "same model in eager mode on CUDA in the same dtype",
+      "results": [
+        {
+          "precision": "float32",
+          "passed": true,
+          "atol_and_rtol": 0.0005,
+          "max_error": {
+            "E": 1.1175870895385742e-08,
+            "Fa": 1.4901161193847656e-08,
+            "weight_gradient": 2.0294100977480412e-07
+          },
+          "weight_tensors_checked": 52
+        },
+        {
+          "precision": "float64",
+          "passed": true,
+          "atol_and_rtol": 3e-08,
+          "max_error": {
+            "E": 1.3877787807814457e-17,
+            "Fa": 1.3877787807814457e-17,
+            "weight_gradient": 9.067128558387649e-14
+          },
+          "weight_tensors_checked": 52
+        }
+      ]
+    }
+  }
+}
