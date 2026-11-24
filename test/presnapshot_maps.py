@@ -11,11 +11,13 @@ sides; a buffer only the new model has must be a deterministic constant.
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Match, Tuple, Union
 
 import torch
 
-KEY_MAPS: Dict[str, List[Tuple[str, str]]] = {
+KeyRule = Tuple[str, Union[str, Callable[[Match[str]], str]]]
+
+KEY_MAPS: Dict[str, List[KeyRule]] = {
     "equflash": [(r"^interactions\.(\d+)\.", r"blocks.\1.module.")],
     "equflashv2": [
         (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
@@ -234,10 +236,23 @@ _ORBITAL_KEYS = [
     (r"^(rs|inta|hyper|coeff)\b", r"embed.\1"),
     (r"^updates\.", "blocks."),
 ]
-KEY_MAPS["reann"] = KEY_MAPS["equireann"] = _ORBITAL_KEYS
+_TENSORNET_KEYS = [
+    (r"^embedding\.", "embed.embedding."),
+    (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
+    (r"^(out_linear|out_norm)\.", r"head.\1."),
+]
+KEY_MAPS.update({
+    "tensornet": _TENSORNET_KEYS,
+    "tensornet2": _TENSORNET_KEYS + [
+        (r"^charge_heads\.0\.", "embed.charge_head."),
+        (r"^charge_heads\.(\d+)\.", lambda m: f"blocks.{int(m[1])-1}.charge_head."),
+    ],
+    "reann": _ORBITAL_KEYS,
+    "equireann": _ORBITAL_KEYS,
+})
 
 
-def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:
+def _rename(state: Dict[str, torch.Tensor], rules: List[KeyRule]) -> Dict[str, torch.Tensor]:
     out = {}
     for key, value in state.items():
         for pattern, repl in rules:

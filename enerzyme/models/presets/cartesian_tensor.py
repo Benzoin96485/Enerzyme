@@ -525,3 +525,70 @@ def dpa4c(
         },
         positional_fields=("atom_embedding", "idx_i_sr", "idx_j_sr", "vij_sr"),
     )
+
+
+def _tensornet(dim_embedding, num_rbf, cutoff_sr, num_interactions, equivariance_group,
+               include_self, charge_scale, q_dim):
+    from ..mp.core import DelegatingCore
+    from ..tensornet.blocks import (
+        TensorNetEmbed, TensorNetBlock, TensorNetHead, build_tensornet, build_tensornet2,
+        normalize_equivariance_group,
+    )
+    from ..tensornet.charge import TensorChargeHead
+    from ..tensornet.interaction import TensorNetInteraction, TensorNet2Interaction
+
+    width, basis_size, depth = int(dim_embedding), int(num_rbf), int(num_interactions)
+    if depth < 0:
+        raise ValueError(f"num_interactions must be >= 0, got {num_interactions}")
+    if width < 1:
+        raise ValueError(f"dim_embedding must be >= 1, got {dim_embedding}")
+    if basis_size < 1:
+        raise ValueError(f"num_rbf must be >= 1, got {num_rbf}")
+    if float(cutoff_sr) <= 0:
+        raise ValueError(f"cutoff_sr must be positive, got {cutoff_sr}")
+    group = normalize_equivariance_group(equivariance_group)
+    embed = TensorNetEmbed(width, basis_size, cutoff_sr, include_self, charge_scale)
+    charged = q_dim is not None
+    attributes = {}
+    if charged:
+        if int(q_dim) < 1:
+            raise ValueError(f"q_dim must be >= 1, got {q_dim}")
+        q_dim = int(q_dim)
+        head = TensorNetHead(width, charged)
+        interactions = [TensorNet2Interaction(width, basis_size, q_dim, group) for _ in range(depth)]
+        embed.charge_head = TensorChargeHead(width, q_dim)
+        blocks = [TensorNetBlock(interaction, TensorChargeHead(width, q_dim)) for interaction in interactions]
+        attributes.update(q_dim=q_dim, num_charge_blocks=depth + 1, charge_channels_dim=(depth + 1) * q_dim)
+    else:
+        blocks = [TensorNetBlock(TensorNetInteraction(width, basis_size, group)) for _ in range(depth)]
+        head = TensorNetHead(width, charged)
+    return DelegatingCore(
+        embed, blocks, head, GraphRequires(optional_fields=("Q", "batch_seg")),
+        builder=build_tensornet2 if charged else build_tensornet,
+        dim_embedding=width, num_rbf=basis_size, cutoff_sr=float(cutoff_sr), num_interactions=depth,
+        equivariance_group=group, dim_feature_out=width, feature_irreps=f"{width}x0e",
+        vector_feature_layout="cartesian_n3f", tensor_feature_layout="cartesian_n33f",
+        delegates={
+            "include_self": "embed.include_self", "charge_scale": "embed.charge_scale",
+            "_radial_holder": "embed._radial_holder", "resolve_total_charge": "embed.resolve_total_charge",
+        },
+        positional_fields=("atom_embedding", "rbf", "idx_i_sr", "idx_j_sr", "vij_sr", "Dij_sr",
+                           "cutoff_values_sr", "Q", "batch_seg"),
+        **attributes,
+    )
+
+
+def tensornet(dim_embedding: int = 128, num_rbf: int = 32, cutoff_sr: float = 4.5,
+              num_interactions: int = 2, equivariance_group: str = "O(3)",
+              charge_scale: float = 0.1, include_self: bool = True) -> ComposableCore:
+    """Normalized rank-two tensor updates conditioned on the molecular charge."""
+    return _tensornet(dim_embedding, num_rbf, cutoff_sr, num_interactions, equivariance_group,
+                      include_self, charge_scale, None)
+
+
+def tensornet2(dim_embedding: int = 128, num_rbf: int = 32, cutoff_sr: float = 4.5,
+               num_interactions: int = 2, equivariance_group: str = "O(3)",
+               include_self: bool = True, q_dim: int = 16) -> ComposableCore:
+    """Charge-conditioned tensor interactions with equilibrated per-layer charge taps."""
+    return _tensornet(dim_embedding, num_rbf, cutoff_sr, num_interactions, equivariance_group,
+                      include_self, 0.0, q_dim)

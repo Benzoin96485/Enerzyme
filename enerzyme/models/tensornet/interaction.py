@@ -20,7 +20,7 @@ from torch import Tensor
 from torch.nn import Linear, LayerNorm, Module, ModuleList
 
 from ..mp.ops import scatter_sum
-from .ops import (
+from ..mp.equivariant.cartesian import (
     compose_tensor,
     decompose_tensor,
     frobenius_squared,
