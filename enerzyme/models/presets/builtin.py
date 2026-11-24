@@ -26,7 +26,7 @@ _add('equflash', '.equflash:EquFlashCore', '.equflash:DEFAULT_BUILD_PARAMS', '.e
 _add('facto', '.facto:FACTOCore', '.facto:DEFAULT_BUILD_PARAMS', '.facto:DEFAULT_LAYER_PARAMS', family='carttensor')
 _add('grace', '.grace:GRACECore', '.grace:DEFAULT_BUILD_PARAMS', '.grace:DEFAULT_LAYER_PARAMS', family='carttensor')
 _add('cace', '.cace:CACECore', '.cace:DEFAULT_BUILD_PARAMS', '.cace:DEFAULT_LAYER_PARAMS', family='carttensor')
-_add('camp', '.camp:CAMPCore', '.camp:DEFAULT_BUILD_PARAMS', '.camp:DEFAULT_LAYER_PARAMS', family='carttensor')
+_add('camp', '.presets.cartesian_tensor:camp', '.camp:DEFAULT_BUILD_PARAMS', '.camp:DEFAULT_LAYER_PARAMS', family='carttensor')
 _add('geodite', '.geodite:GeoditeCore', '.geodite:DEFAULT_BUILD_PARAMS', '.geodite:DEFAULT_LAYER_PARAMS', family='vector')
 _add('dimenet', '.dimenet:DimeNetCore', '.dimenet:DEFAULT_BUILD_PARAMS', '.dimenet:DEFAULT_LAYER_PARAMS', family='triplet')
 _add('dimenet++', '.dimenet.core_pp:DimeNetPPCore', '.dimenet.core_pp:DEFAULT_BUILD_PARAMS', '.dimenet.core_pp:DEFAULT_LAYER_PARAMS', aliases=('dimenetpp',), family='triplet')

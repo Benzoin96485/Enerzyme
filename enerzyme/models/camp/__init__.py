@@ -9,11 +9,10 @@ scalar features of every message-passing layer. ``RandomAtomEmbedding`` and
 dependency.
 """
 
-from .core import CAMPCore, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 from .presets import PAPER_PRESETS
 
 __all__ = [
-    "CAMPCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "PAPER_PRESETS",
