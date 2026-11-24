@@ -94,6 +94,25 @@ class DegreeMix(Module):
         return mixed
 
 
+def _couple_channels(left: Tensor, right: Tensor, coefficients: Tensor) -> Tensor:
+    """Contract each (atom, channel) pair using the smallest intermediate."""
+    li, lj, lm = coefficients.shape
+    if li == 1:
+        return left * (right @ coefficients[0])
+    if lj == 1:
+        return (left @ coefficients[:, 0]) * right
+    if lm == 1:
+        return ((left @ coefficients[..., 0]) * right).sum(dim=-1, keepdim=True)
+    if lm >= max(li, lj):
+        pairs = left.unsqueeze(-1) * right.unsqueeze(-2)
+        return pairs.flatten(-2) @ coefficients.flatten(0, 1)
+    if li >= lj:
+        projected = torch.einsum("nci,ijm->ncjm", left, coefficients)
+        return torch.einsum("ncjm,ncj->ncm", projected, right)
+    projected = torch.einsum("ncj,ijm->ncim", right, coefficients)
+    return torch.einsum("ncim,nci->ncm", projected, left)
+
+
 class SparseCGProduct(Module):
     """Channel-aligned Clebsch–Gordan product of two equivariant features.
 
@@ -154,9 +173,7 @@ class SparseCGProduct(Module):
             coefficients = getattr(self, f"cg_{index}").to(
                 dtype=left[l1].dtype, device=left[l1].device
             )
-            coupled = torch.einsum(
-                "nci,ncj,ijm->ncm", left[l1], right[l2], coefficients
-            )
+            coupled = _couple_channels(left[l1], right[l2], coefficients)
             coupled = coupled * weight[index].to(dtype=coupled.dtype)
             if accumulated[out] is None:
                 accumulated[out] = coupled
