@@ -1,9 +1,11 @@
-"""TACE (Tensor Atomic Cluster Expansion) for Enerzyme.
+"""TACE — Tensor Atomic Cluster Expansion (spherical + Cartesian).
 
-Supports spherical (e3nn CGTP) and Cartesian (ICT / Cartesian-3j) backends via
-``tensor_basis``. TECE (ECE + RRA) lives under ``architecture: tece``.
+Papers:
+- Xu et al., arXiv:2509.14961 (Cartesian TACE)
+- Xu et al., Cartesian-3j, arXiv:2512.16882
+
+Upstream: https://github.com/xvzemin/tace (MIT). TECE / SO2 / RRA live under
+``architecture: tece``.
 """
 
-from .core import TACECore, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-
-__all__ = ["TACECore", "DEFAULT_BUILD_PARAMS", "DEFAULT_LAYER_PARAMS"]
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS

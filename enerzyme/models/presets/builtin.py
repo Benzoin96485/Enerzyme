@@ -47,7 +47,7 @@ _add('reann', '.presets.cartesian_tensor:reann', '.reann:DEFAULT_BUILD_PARAMS', 
 _add('equireann', '.presets.cartesian_tensor:equireann', '.equireann:DEFAULT_BUILD_PARAMS', '.equireann:DEFAULT_LAYER_PARAMS', aliases=('equi-reann', 'equi_reann'), family='carttensor')
 _add('botnet', '.presets.irreps:botnet', '.botnet:DEFAULT_BUILD_PARAMS', '.botnet:DEFAULT_LAYER_PARAMS', aliases=('body_ordered', 'body-ordered'), family='irreps')
 _add('mace_polar', '.presets.irreps:mace', '.mace.polar:DEFAULT_BUILD_PARAMS_POLAR', '.mace.polar:DEFAULT_LAYER_PARAMS_POLAR', aliases=('mace-polar', 'mace-polar-1'), family='irreps')
-_add('tace', '.tace:TACECore', '.tace:DEFAULT_BUILD_PARAMS', '.tace:DEFAULT_LAYER_PARAMS', family='carttensor')
+_add('tace', '.presets.cartesian_tensor:tace', '.tace:DEFAULT_BUILD_PARAMS', '.tace:DEFAULT_LAYER_PARAMS', family='carttensor')
 _add('tece', '.presets.so2:tece', '.tece:DEFAULT_BUILD_PARAMS', '.tece:DEFAULT_LAYER_PARAMS', family='so2')
 _add('allscaip', '.presets.hybrid:allscaip', '.allscaip:DEFAULT_BUILD_PARAMS', '.allscaip:DEFAULT_LAYER_PARAMS', family='hybrid')
 _add('nequip', '.presets.irreps:nequip', '.nequip:DEFAULT_BUILD_PARAMS', '.nequip:DEFAULT_LAYER_PARAMS', family='irreps')

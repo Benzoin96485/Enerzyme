@@ -242,6 +242,13 @@ _TENSORNET_KEYS = [
     (r"^(out_linear|out_norm)\.", r"head.\1."),
 ]
 KEY_MAPS.update({
+    "tace": [
+        (r"^node_proj\.", "embed.node_proj."),
+        (r"^edge_embedding_mod\.", "embed.edge_embedding."),
+        (r"^edge_updates\.(\d+)\.", r"blocks.\1.edge_update."),
+        (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
+        (r"^products\.(\d+)\.", r"blocks.\1.product."),
+    ],
     "tensornet": _TENSORNET_KEYS,
     "tensornet2": _TENSORNET_KEYS + [
         (r"^charge_heads\.0\.", "embed.charge_head."),
