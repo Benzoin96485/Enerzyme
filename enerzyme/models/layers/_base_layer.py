@@ -142,7 +142,7 @@ class BaseFFCore(BaseFFModule):
             from .compiled_grad import (
                 compiled_coordinate_vjp, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
                 uses_cpu_inductor_forces, native_cpu_forces,
-                compiled_cpu_forces_with_option, cpu_inductor_option,
+                compiled_cpu_forces_with_options, cpu_inductor_options,
             )
 
             # A graph break inside a VJP discards the whole energy trace. In
@@ -159,12 +159,13 @@ class BaseFFCore(BaseFFModule):
             option = getattr(self, "_cpu_force_training_option" if self.training
                              else "_cpu_force_inference_option", None)
             if option and uses_cpu_inductor_forces(self, net_input, include_eval=not self.training):
-                override = cpu_inductor_option(option)
+                required = (option,) if isinstance(option, str) else option
+                overrides = cpu_inductor_options(required)
                 if compiling_fullgraph():
-                    torch._assert(override == 1, "Fullgraph CPU forces for this preset require "
-                                  f"torch.compile options={{'{option}': 1}}")
-                elif override is None or override == 1:
-                    return compiled_cpu_forces_with_option(self, net_input, option)
+                    for name, value in zip(required, overrides):
+                        torch._assert(value == 1, f"Fullgraph CPU forces for this preset require {name}=1")
+                elif all(value is None or value == 1 for value in overrides):
+                    return compiled_cpu_forces_with_options(self, net_input, required)
                 else:
                     return native_cpu_forces(self, net_input)
             if compiling_fullgraph():

@@ -201,7 +201,7 @@ def dpa3(
         architecture="dpa3",
         # Fusing both endpoint reductions can drop a RepFlow force-gradient term.
         _cpu_force_training_option="cpp.max_horizontal_fusion_size",
-        _native_cpu_inductor_force_inference=True,
+        _cpu_force_inference_option=("cpp.simdlen", "cpp.max_horizontal_fusion_size"),
         dim_embedding=dim_embedding,
         dim_feature_out=dim_feature_out,
         feature_irreps=feature_irreps,

@@ -64,33 +64,39 @@ def native_cpu_forces(core, inputs):
 
 
 @torch.compiler.assume_constant_result
-def cpu_inductor_option(option):
-    """Read an explicit Inductor backend override before entering its lowering."""
+def cpu_inductor_options(options):
+    """Read explicit Inductor backend overrides before entering its lowering."""
     from torch._dynamo.symbolic_convert import InstructionTranslator
 
     try:
         wrapper = InstructionTranslator.current_tx().output.compiler_fn
     except AttributeError:
-        return None
+        return (None,) * len(options)
     backend = getattr(wrapper, "_torchdynamo_orig_backend", wrapper)
     overrides = getattr(backend, "config", None)
     if overrides is None:
         # torch.compile forwards options to custom backends as keyword arguments.
         overrides = getattr(backend, "kwargs", {}).get("options", {})
-    return overrides.get(option) if isinstance(overrides, dict) else None
+    if not isinstance(overrides, dict):
+        overrides = {}
+    return tuple(overrides.get(key) for key in options)
 
 
 @torch.compiler.disable(recursive=False)
-def compiled_cpu_forces_with_option(core, inputs, option):
-    """Lower the forward and backward under the preset's required CPU kernel option."""
+def compiled_cpu_forces_with_options(core, inputs, options):
+    """Lower the forward and backward under the preset's required CPU kernel options."""
     from torch._functorch import config as autograd_config
     from torch._inductor import config
 
-    if not (hasattr(config.cpp, option.removeprefix("cpp."))
+    if not (all(hasattr(config.cpp, key.removeprefix("cpp.")) for key in options)
             and hasattr(autograd_config, "force_non_lazy_backward_lowering")):
         return native_cpu_forces(core, inputs)
-    # Deferred lowering would use the caller's settings for a later backward.
-    with config.patch({option: 1}), autograd_config.patch(force_non_lazy_backward_lowering=True):
+    # Training's weight backward happens after this scope. During inference
+    # the Force layer runs its retained backward here. Let AOT lower that
+    # backward on its first use so it records that the caller can reuse it.
+    with config.patch(dict.fromkeys(options, 1)), autograd_config.patch(
+        force_non_lazy_backward_lowering=core.training
+    ):
         if core.training:
             return compiled_coordinate_vjp(core, inputs)
         return retained_inference(core, inputs)

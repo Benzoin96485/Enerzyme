@@ -218,6 +218,24 @@ three acceptance systems in both precisions. Run
 :code:`python scripts/report_eager_gates.py` to summarize the archived ratios
 against Phase 0 and the main checkpoints, including missing comparisons.
 
+For ordinary :code:`torch.compile`, the paired V100 results are in
+:code:`test/fixtures/bench_gpu/raw_compile_v100.json`. Its :code:`assessment`
+counts comparable timings and peak allocations and identifies values over
+the 3% threshold. To reproduce a pair, run the same driver in two fresh
+processes on the same GPU. Set :code:`BASELINE_TREE` to a checkout of
+:code:`1aa0f8b` and use the original frozen snapshot for both runs.
+
+.. code-block:: shell
+
+   python scripts/bench_frozen_compile.py --model-tree "$BASELINE_TREE" --snapshot test/fixtures/presnapshot/schnet.pt --precision float64 --out baseline.json
+   python scripts/bench_frozen_compile.py --model-tree . --snapshot test/fixtures/presnapshot/schnet.pt --precision float64 --out candidate.json
+
+Each process runs the molecular batch, periodic cell and 2,000-atom cluster
+in order. It checks the first compiled run against its own eager energy,
+forces and active weight gradients, then records the median time and peak
+allocation after warmup. A model can reuse a graph captured for a previous
+system. The per-system graph counters report only newly captured operations.
+
 To check force training with the installed Inductor backend, run the following
 from the checkout. The report compares the energy, forces, and every parameter
 gradient for identical initial weights and coordinates. It records captured
@@ -234,9 +252,10 @@ calls request reusable saved tensors with
 On CPU, ordinary Inductor compiles the CACE and GRACE force calculations with
 scalar C++ kernels. This preserves their coordinate and parameter derivatives
 on PyTorch 2.13, where the vectorized kernels can terminate the process. The
-default EquiformerV3 training graph and the Nequix FX training graph use the
-same setting. The model restores the compiler settings before returning. An
-explicit conflicting backend override uses native derivatives for that call.
+default EquiformerV3 and CAMP training graphs and the Nequix and EquFlashV2 FX
+training graphs use the same setting. The model restores the compiler settings
+before returning. An explicit conflicting backend override uses native
+derivatives for that call.
 
 .. code-block:: shell
 
@@ -250,7 +269,9 @@ without a captured learned operator is recorded as native differentiation.
 The report keeps the original sweep and subsequent checks with corrected
 models or matched dropout masks. An auxiliary weight with an explicit zero
 gradient can receive an optimizer update even when the corresponding eager
-gradient is absent.
+gradient is absent. The inference results in
+:code:`test/fixtures/validation/compiled_inference_cpu.json` include the energy,
+forces, both coordinate derivatives, and the revision used for each check.
 The second command prepares the batch's discrete neighbors before compiling
 the graph that returns energy and forces for the loss. On CHGNet this leaves
 the magnetic-moment head's gradient absent during energy/force fitting.
