@@ -127,13 +127,15 @@ def test_dynamo_capture_of_energy_and_force(case):
         ref = _run(model, sample, xyz, torch.arange(len(xyz)), capture_features=False)
     graphs = []
 
-    def capture(graph, _examples):
+    def eager(graph, _examples):
+        # Execute the recorded FX graph directly. Presets with an Inductor
+        # fallback can still expose their learned operations to this backend.
         graphs.append(graph)
         return graph.forward
 
     torch.compiler.reset()
     try:
-        compiled = torch.compile(model, backend=capture)
+        compiled = torch.compile(model, backend=eager)
         out = _run(compiled, sample, xyz, torch.arange(len(xyz)), capture_features=False)
         operators = {
             getattr(node.target, "__name__", str(node.target))
