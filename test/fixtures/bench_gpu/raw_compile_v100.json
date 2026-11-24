@@ -1202,6 +1202,44 @@
       },
       "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "dfe8f963ce450bba089fd24afda03f2fb7b731fe805496c31010ce85a4f20e91", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[109.08462293446064, 7180.974609375, 26, 795], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.1920928955078125e-06, "force_max_abs": 1.9371509552001953e-06, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "0fc888cc93f163fc6ff558f33e2d1bb103f82fd80a90ac561dcd1677de087e1c", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[106.86958697624505, 7195.3544921875, 23, 882], [228.2403539866209, 9569.04541015625, 1, 978]], "bulk_256": [[84.52074811793864, 4265.8681640625, 13, 896], [179.18947897851467, 7377.615234375, 1, 1011]], "large_2000": [[497.55183001980186, 27853.30712890625, 0, 0], "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 2.1457672119140625e-06, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 184, "reference_active_parameters": 182, "energy_max_abs": 1.5497207641601562e-06, "force_max_abs": 1.7583370208740234e-06, "gradient_max_abs": 0.00048828125, "different_gradient_names": ["blocks.4.module.s_proj.bias", "blocks.4.module.s_proj.weight"]}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.1444091796875e-05, "force_max_abs": 7.450580596923828e-08, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 184, "reference_active_parameters": 182, "energy_max_abs": 3.814697265625e-06, "force_max_abs": 1.7881393432617188e-07, "gradient_max_abs": 0.00390625, "different_gradient_names": ["blocks.4.module.s_proj.bias", "blocks.4.module.s_proj.weight"]}}, "large_2000": {"infer": {"reference_error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 308.25 MiB is free. Including non-PyTorch memory, this process has 31.43 GiB memory in use. Of the allocated memory 28.50 GiB is allocated by PyTorch, and 2.55 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)"}}}}]
     },
+    "quinnet/float64/aadb4bd/pair": {
+      "job": "6318565",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "07a02b4c04bea4bb56ad87b7bfdbc5f1d07ebb00700af10fc18703d377bbf289",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795528022,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 2.1316282072803006e-14,
+          "Fa_max_abs": 1.3877787807814457e-16
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 2.6645352591003757e-15,
+          "Fa_max_abs": 1.1102230246251565e-15
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 7.105427357601002e-15,
+          "Fa_max_abs": 1.5265566588595902e-16
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 2.220446049250313e-15,
+          "Fa_max_abs": 1.3877787807814457e-15
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "a85569c20adb00ea15429dd8dd7926851fcb44f31ac6e987db377551a88bcd9e", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[212.627133121714, 14406.66748046875, 26, 795], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.552713678800501e-15, "force_max_abs": 2.886579864025407e-15, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "5f946149124b396049cd459d95ea29e6feaf10d67d799f78a60a5d4530cf86f5", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[211.69988997280598, 14432.50732421875, 23, 882], [443.7767369672656, 19262.88525390625, 1, 978]], "bulk_256": [[169.60215801373124, 8506.8125, 13, 896], [353.24589908123016, 14729.65771484375, 1, 1011]], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.7763568394002505e-15, "force_max_abs": 1.8318679906315083e-15, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 184, "reference_active_parameters": 182, "energy_max_abs": 2.220446049250313e-15, "force_max_abs": 2.55351295663786e-15, "gradient_max_abs": 4.547473508864641e-13, "different_gradient_names": ["blocks.4.module.s_proj.bias", "blocks.4.module.s_proj.weight"]}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.973799150320701e-14, "force_max_abs": 1.3877787807814457e-16, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 184, "reference_active_parameters": 182, "energy_max_abs": 0.0, "force_max_abs": 4.440892098500626e-16, "gradient_max_abs": 3.637978807091713e-12, "different_gradient_names": ["blocks.4.module.s_proj.bias", "blocks.4.module.s_proj.weight"]}}, "large_2000": {}}}]
+    },
     "equireann/float32/bf7725d/pair": {
       "job": "6318510",
       "host": "d-7-5-2",
@@ -3830,7 +3868,64 @@
     }
   },
   "frozen_visnet_eager_split": {},
-  "frozen_compiled_cpu_oracles": {},
+  "frozen_compiled_cpu_oracles": {
+    "quinnet/float32/aadb4bd/large_2000/infer": {
+      "architecture": "quinnet",
+      "precision": "float32",
+      "system": "large_2000",
+      "mode": "infer",
+      "candidate": "aadb4bd3ece1e2493e4c6a20815609f08ed41011",
+      "gpu_job": "6319582",
+      "gpu_uuid": "2c6a0c04-8630-be10-f0e0-b467c595f452",
+      "fixture_sha256": "07a02b4c04bea4bb56ad87b7bfdbc5f1d07ebb00700af10fc18703d377bbf289",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "measured_job": "6318565",
+      "cpu_reference": {
+        "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+        "torch": "2.13.0+cu126",
+        "device": "cpu",
+        "job": "6319656",
+        "fixture_sha256": "07a02b4c04bea4bb56ad87b7bfdbc5f1d07ebb00700af10fc18703d377bbf289",
+        "errors": {},
+        "systems": {
+          "large_2000": {
+            "atoms": 2000,
+            "edges": 83828
+          }
+        },
+        "requested_systems": ["large_2000"],
+        "requested_modes": ["infer"],
+        "complete": true
+      },
+      "original_gpu_reference_error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 308.25 MiB is free. Including non-PyTorch memory, this process has 31.43 GiB memory in use. Of the allocated memory 28.50 GiB is allocated by PyTorch, and 2.55 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "reused_verified_inductor_cache": true,
+      "replayed_prior_modes": ["mol_batch_32x20/infer", "mol_batch_32x20/train", "bulk_256/infer", "bulk_256/train"],
+      "fields": {
+        "E": {
+          "shape": [1],
+          "native_shape": [1],
+          "dtype": "torch.float32",
+          "native_dtype": "torch.float32",
+          "max_abs": 0.00042724609375,
+          "elements_outside": 0,
+          "passed": true
+        },
+        "Fa": {
+          "shape": [2000, 3],
+          "native_shape": [2000, 3],
+          "dtype": "torch.float32",
+          "native_dtype": "torch.float32",
+          "max_abs": 3.2782554626464844e-07,
+          "elements_outside": 0,
+          "passed": true
+        }
+      },
+      "passed": true,
+      "graphs": 38,
+      "captured_calls": 3767,
+      "finished": true
+    }
+  },
   "frozen_precision_controls": {
     "equflash/1aa0f8b/base_native_gpu_repeat": {
       "architecture": "equflash",
@@ -4564,27 +4659,27 @@
     "err10": "timeout after 131s"
   },
   "assessment": {
-    "attempted_architecture_precision_pairs": 49,
+    "attempted_architecture_precision_pairs": 50,
     "expected_architecture_precision_pairs": 116,
     "expected_mode_system_cells": 696,
-    "selected_frozen_full_architecture_precision_pairs": 23,
-    "current_source_full_architecture_precision_pairs": 23,
+    "selected_frozen_full_architecture_precision_pairs": 24,
+    "current_source_full_architecture_precision_pairs": 24,
     "terminal_partial_frozen_attempts": 3,
     "selected_partial_cells": 0,
     "historical_architecture_precision_pairs": 46,
-    "completed_frozen_attempts": 40,
-    "comparable_mode_system_cells": 32,
-    "comparable_metrics": 64,
+    "completed_frozen_attempts": 41,
+    "comparable_mode_system_cells": 33,
+    "comparable_metrics": 66,
     "above_3_percent": 1,
-    "frozen_mode_system_cells": 139,
-    "frozen_candidate_only_cells": 99,
+    "frozen_mode_system_cells": 145,
+    "frozen_candidate_only_cells": 101,
     "frozen_candidate_only_native_training_cells": 15,
-    "frozen_candidate_only_direct_cpu_oracle_cells": 0,
+    "frozen_candidate_only_direct_cpu_oracle_cells": 1,
     "frozen_candidate_timing_incomplete_baseline_cells": 0,
     "frozen_baseline_only_cells": 0,
-    "frozen_both_unavailable_cells": 13,
-    "frozen_numerical_or_reference_failures": 13,
+    "frozen_both_unavailable_cells": 15,
+    "frozen_numerical_or_reference_failures": 14,
     "excesses": [{"model_precision": "alphanet/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.936, "baseline_value": 2673.1318359375, "candidate_value": 3259.520263671875}],
-    "frozen_failed_cells": [{"model_precision": "equflash/float32", "system": "mol_batch_32x20", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflash/float32", "system": "bulk_256", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "e2former/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "e2former_v2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "large_2000", "mode": "infer", "candidate": "aadb4bd", "cross_eager": null, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "native reference unavailable: OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 308.25 MiB is free. Including non"}]
+    "frozen_failed_cells": [{"model_precision": "equflash/float32", "system": "mol_batch_32x20", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflash/float32", "system": "bulk_256", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "e2former/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "e2former_v2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}]
   }
 }
