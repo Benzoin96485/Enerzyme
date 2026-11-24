@@ -225,15 +225,22 @@ def test_compiled_topology_preserves_force_and_parameter_gradients(architecture)
     assert "linear" in operators
 
 
-@pytest.mark.parametrize("architecture", ["so3krates", "mattersim"])
-def test_cpu_compiler_keeps_attention_force_gradients(architecture):
+@pytest.mark.parametrize("architecture", ["so3krates", "mattersim", "dpa3"])
+def test_cpu_compiler_keeps_force_gradients(architecture):
     from scripts.core_harness import build, forward, make_batch, random_molecules
 
     torch.manual_seed(142)
     model = build(architecture).double()
     batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float64)
     reference = forward(model, batch, torch.float64, train=True)
+    from torch._functorch import config as autograd_config
+    from torch._inductor import config
+
+    fusion = getattr(config.cpp, "max_horizontal_fusion_size", None)
+    eager_backward = getattr(autograd_config, "force_non_lazy_backward_lowering", None)
     actual = forward(torch.compile(model), batch, torch.float64, train=True)
+    assert getattr(config.cpp, "max_horizontal_fusion_size", None) == fusion
+    assert getattr(autograd_config, "force_non_lazy_backward_lowering", None) == eager_backward
     for field in ("E", "Fa"):
         torch.testing.assert_close(actual[field], reference[field], rtol=1e-9, atol=1e-12)
     weights = tuple(model.parameters())

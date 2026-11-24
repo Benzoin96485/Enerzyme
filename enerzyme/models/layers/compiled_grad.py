@@ -41,7 +41,7 @@ def _cpu_backend_may_use_inductor() -> bool:
     return name not in ("eager", "aot_eager")
 
 
-def needs_native_cpu_force_training(core, inputs):
+def uses_cpu_inductor_force_training(core, inputs):
     for stages in (core.pre_sequence, core.post_sequence):
         for layer in stages:
             if type(layer) is not ForceLayer or not layer.training or layer.eval_only:
@@ -58,6 +58,37 @@ def needs_native_cpu_force_training(core, inputs):
 def native_cpu_force_training(core, inputs):
     # Force-loss double backward in the affected CPU kernels can abort the process.
     return core._run_layers(inputs)
+
+
+@torch.compiler.assume_constant_result
+def cpu_horizontal_fusion_option():
+    """Read an explicit Inductor backend override before entering its lowering."""
+    from torch._dynamo.symbolic_convert import InstructionTranslator
+
+    try:
+        wrapper = InstructionTranslator.current_tx().output.compiler_fn
+    except AttributeError:
+        return None
+    backend = getattr(wrapper, "_torchdynamo_orig_backend", wrapper)
+    return getattr(backend, "config", {}).get("cpp.max_horizontal_fusion_size")
+
+
+@torch.compiler.disable(recursive=False)
+def compiled_training_with_separate_reductions(core, inputs):
+    """Lower both DPA3 derivative graphs before leaving the CPU fusion scope."""
+    from torch._functorch import config as autograd_config
+    from torch._inductor import config
+
+    if not (hasattr(config.cpp, "max_horizontal_fusion_size")
+            and hasattr(autograd_config, "force_non_lazy_backward_lowering")):
+        return native_cpu_force_training(core, inputs)
+    # RepFlow reduces contributions from both endpoints of an edge. CPU
+    # horizontal fusion can drop one term in the force or its weight gradient.
+    # AOT normally defers the weight backward until after this scope exits.
+    with config.patch({"cpp.max_horizontal_fusion_size": 1}), autograd_config.patch(
+        force_non_lazy_backward_lowering=True
+    ):
+        return compiled_training(core, inputs)
 
 
 @torch.compiler.disable
