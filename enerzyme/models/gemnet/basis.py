@@ -10,10 +10,9 @@ DimeNet's ``u(x)/x`` basis.
 
 from __future__ import annotations
 
-import math
-
 import torch
 from torch import Tensor
+from ..mp.basis.angular import spherical_harmonics
 from ..mp.basis.fourier_bessel import SphericalBesselRadial, real_sph_harm_l0
 
 
@@ -51,56 +50,11 @@ def real_spherical_harmonics(theta: Tensor, phi: Tensor, num_spherical: int) -> 
     """
     if num_spherical < 1:
         raise ValueError("num_spherical must be >= 1")
-    n_out = num_spherical * num_spherical
-    if theta.numel() == 0:
-        return theta.new_empty(0, n_out)
     if theta.shape != phi.shape:
-        raise ValueError(
-            f"theta and phi shapes differ: {tuple(theta.shape)} vs {tuple(phi.shape)}"
-        )
-
-    cos_t = torch.cos(theta)
-    sin_t = torch.sin(theta)
-    legendre: list[list[Tensor | None]] = [
-        [None] * num_spherical for _ in range(num_spherical)
-    ]
-    diagonal = torch.ones_like(cos_t)
-    legendre[0][0] = diagonal
-    for order in range(1, num_spherical):
-        diagonal = -(2 * order - 1) * sin_t * diagonal
-        legendre[order][order] = diagonal
-    for order in range(num_spherical - 1):
-        previous = legendre[order][order]
-        assert previous is not None
-        legendre[order + 1][order] = (2 * order + 1) * cos_t * previous
-    for degree in range(2, num_spherical):
-        for order in range(degree - 1):
-            lower = legendre[degree - 1][order]
-            lower2 = legendre[degree - 2][order]
-            assert lower is not None and lower2 is not None
-            legendre[degree][order] = (
-                (2 * degree - 1) * cos_t * lower - (degree + order - 1) * lower2
-            ) / (degree - order)
-
-    out = theta.new_empty(theta.shape[0], n_out)
-    for degree in range(num_spherical):
-        zonal = legendre[degree][0]
-        assert zonal is not None
-        norm0 = math.sqrt((2 * degree + 1) / (4.0 * math.pi))
-        out[:, degree * degree + degree] = norm0 * zonal
-        for order in range(1, degree + 1):
-            associated = legendre[degree][order]
-            assert associated is not None
-            norm = math.sqrt(
-                (2 * degree + 1)
-                / (4.0 * math.pi)
-                * math.factorial(degree - order)
-                / math.factorial(degree + order)
-            )
-            base = math.sqrt(2.0) * ((-1) ** order) * norm * associated
-            out[:, degree * degree + degree + order] = base * torch.cos(order * phi)
-            out[:, degree * degree + degree - order] = base * torch.sin(order * phi)
-    return out
+        raise ValueError(f"theta and phi shapes differ: {tuple(theta.shape)} vs {tuple(phi.shape)}")
+    sin_theta = torch.sin(theta)
+    direction = torch.stack((sin_theta * torch.cos(phi), sin_theta * torch.sin(phi), torch.cos(theta)), dim=-1)
+    return spherical_harmonics(direction, lmax=num_spherical - 1, layout="gemnet", normalize_input=False)
 
 
 def joint_zonal(radial: Tensor, angular: Tensor) -> Tensor:
