@@ -6,6 +6,28 @@ import torch
 sys.path.extend(["..", "."])
 
 
+@pytest.mark.parametrize("correlation", [1, 2, 3])
+def test_species_indexed_mace_contraction_matches_one_hot_force_training(correlation):
+    from e3nn.o3 import Irreps
+    from enerzyme.models.mp.equivariant.e3nn.symmetric_contraction import SymmetricContraction
+
+    torch.manual_seed(42)
+    product = SymmetricContraction(Irreps("3x0e+3x1o"), Irreps("3x0e+3x1o"),
+                                   correlation, num_elements=5).double()
+    labels = torch.tensor([3, 1, 3, 0])
+    attrs = torch.nn.functional.one_hot(labels, num_classes=5).double()
+    channels = torch.randn(4, 3, 4, dtype=torch.float64, requires_grad=True)
+
+    def quantities(species):
+        result = product(channels, attrs, species)
+        force, = torch.autograd.grad(result.square().sum(), channels, create_graph=True)
+        derivatives = torch.autograd.grad(force.square().sum(), tuple(product.parameters()))
+        return (result, force, *derivatives)
+
+    for actual, expected in zip(quantities(labels), quantities(None)):
+        torch.testing.assert_close(actual, expected, atol=1e-10, rtol=1e-10)
+
+
 def test_coefficient_mapping_shapes():
     from enerzyme.models.mp.equivariant import CoefficientMapping
 

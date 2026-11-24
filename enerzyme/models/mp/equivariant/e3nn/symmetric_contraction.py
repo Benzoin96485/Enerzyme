@@ -142,7 +142,9 @@ class Contraction(Module):
             self.weights = weights[:-1]
             self.weights_max = weights[-1]
 
-    def forward(self, x: Tensor, y: Tensor):
+    def forward(self, x: Tensor, y: Tensor, species: Optional[Tensor] = None):
+        if species is not None:
+            return self._species_contraction(x, species)
         out = self.graph_opt_main(
             self.U_tensors(self.correlation),
             self.weights_max,
@@ -161,6 +163,23 @@ class Contraction(Module):
             out = contract_features(c_tensor, x)
 
         return out.view(out.shape[0], -1)
+
+    def _species_contraction(self, x: Tensor, species: Tensor) -> Tensor:
+        """Evaluate the same recursive product with integer element labels."""
+        n_atoms, channels, angular = x.shape
+        weights = self.weights_max[species].transpose(1, 2)
+        matrix = self.U_tensors(self.correlation).reshape(-1, angular * weights.shape[-1])
+        weighted = (x.unsqueeze(-1) * weights.unsqueeze(2)).flatten(2)
+        out = torch.nn.functional.linear(weighted, matrix)
+        features = x.reshape(n_atoms * channels, angular, 1)
+        for i, weight in enumerate(self.weights):
+            coefficient = self.U_tensors(self.correlation - i - 1).reshape(-1, weight.shape[1])
+            selected = weight[species].transpose(1, 2)
+            polynomial = torch.nn.functional.linear(selected, coefficient) + out
+            width = coefficient.shape[0] // angular
+            out = polynomial.reshape(n_atoms * channels, width, angular).bmm(features)
+            out = out.reshape(n_atoms, channels, width)
+        return out.flatten(1)
 
     def U_tensors(self, nu: int):
         return getattr(self, f"U_matrix_{nu}")
@@ -224,6 +243,6 @@ class SymmetricContraction(nn.Module):
                 )
             )
 
-    def forward(self, x: Tensor, y: Tensor):
-        outs = [contraction(x, y) for contraction in self.contractions]
+    def forward(self, x: Tensor, y: Tensor, species: Optional[Tensor] = None):
+        outs = [contraction(x, y, species) for contraction in self.contractions]
         return torch.cat(outs, dim=-1)

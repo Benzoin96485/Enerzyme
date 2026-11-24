@@ -50,8 +50,9 @@ class EquivariantProductBasisBlock(nn.Module):
         node_feats: Tensor,
         sc: Optional[Tensor],
         node_attrs: Tensor,
+        species: Optional[Tensor] = None,
     ) -> Tensor:
-        node_feats = self.symmetric_contractions(node_feats, node_attrs)
+        node_feats = self.symmetric_contractions(node_feats, node_attrs, species)
         if self.use_sc and sc is not None:
             return self.linear(node_feats) + sc
         return self.linear(node_feats)
@@ -648,4 +649,5 @@ class MACEBlock(Module):
             node_attrs=node_attrs, node_feats=node_feats, edge_attrs=edge_attrs,
             edge_feats=ctx.rbf, sender=ctx.sender, receiver=ctx.receiver,
         )
-        return state._replace(equi=self.product(node_feats=node_feats, sc=sc, node_attrs=node_attrs))
+        species = None if torch.compiler.is_compiling() else ctx.inputs["Za"]
+        return state._replace(equi=self.product(node_feats=node_feats, sc=sc, node_attrs=node_attrs, species=species))
