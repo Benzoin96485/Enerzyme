@@ -118,20 +118,23 @@ def test_dimenet_feature_shape_hierarchical_and_last():
     assert out_last["atom_feature"].shape == (n, 8)
 
 
-def test_dimenet_rotation_invariance():
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_dimenet_rotation_invariance(dtype):
     torch.manual_seed(1)
+    np.random.seed(14)
     n = 5
-    core = _tiny_core()
+    core = _tiny_core().to(dtype)
     core.eval()
     idx_i, idx_j = _complete_graph_edges(n)
-    pos = torch.randn(n, 3)
-    q, _ = torch.linalg.qr(torch.randn(3, 3))
+    pos = torch.randn(n, 3).to(dtype)
+    # Construct the same orthogonal transformation in both tests. A QR
+    # computed in float32 can change distances before the model sees them.
+    q, _ = torch.linalg.qr(torch.randn(3, 3).double())
     if torch.det(q) < 0:
-        q = q.clone()
         q[:, 0] *= -1
-    pos_r = pos @ q
-    atom_embedding = torch.randn(n, 8)
-    rbf = torch.randn(idx_i.numel(), 4)
+    pos_r = (pos.double() @ q).to(dtype)
+    atom_embedding = torch.randn(n, 8).to(dtype)
+    rbf = torch.randn(idx_i.numel(), 4).to(dtype)
 
     def _feat(p):
         vij = p[idx_j] - p[idx_i]
@@ -147,7 +150,8 @@ def test_dimenet_rotation_invariance():
 
     f0 = _feat(pos)
     f1 = _feat(pos_r)
-    assert torch.allclose(f0, f1, atol=1e-5, rtol=1e-5)
+    tolerance = 1e-10 if dtype == torch.float64 else 1e-5
+    torch.testing.assert_close(f0, f1, atol=tolerance, rtol=tolerance)
 
 
 @pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
