@@ -13,8 +13,7 @@ From :code:`enerzyme/models/layers/`:
 
 **Cutoff / envelopes**
     Transition functions and :code:`PolynomialEnvelope` / :code:`DimeNetEnvelope` /
-    :code:`C3CutoffEnvelope` in :code:`enerzyme/models/cutoff.py` (also re-exported
-    from :code:`enerzyme.models.so3` for equivariant cores).
+    :code:`C3CutoffEnvelope` in :code:`enerzyme/models/mp/basis/envelope.py` and the registered layers in :code:`enerzyme.models.layers`.
 
 **Radial basis**
     :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet / esen / alignn / spinconv / gemnet-oc; optional ``apply_cutoff_fn``; ``basis_width_scalar`` for spinconv; ``envelope_exponent`` for gemnet-oc), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash / nequip / esen / gemnet), :code:`SphericalBesselRBFLayer` (M3GNet ``j_l`` stack, width ``max_l * num_rbf``, no envelope), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`. Cutoff key :code:`nequip` is the polynomial envelope (``p = 6``) that Nequix and EQNorm multiply onto the equflash Bessel basis. Bessel flavor :code:`nequip` is the separate mir-group basis, with that envelope already inside the layer.
@@ -136,7 +135,7 @@ as spherical :code:`l=0` scalars (advertised as :code:`feature_irreps: "Cx0e"`) 
 not e3nn-flat; reduced :code:`mmax` applies only inside edge SO(2) messages). Default
 stacks use :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` for
 energy-conserving forces, which needs differentiable edge frames / Wigner-D in
-:code:`enerzyme.models.so3.rotation` (unlike fairchem v1, which detached frames for a
+:code:`enerzyme.models.mp.equivariant.rotation` (unlike fairchem v1, which detached frames for a
 direct force head). Opt-in :code:`SphereSampleReadout` integrates
 :code:`atom_sphere_feature` over fixed S² samples (Passaro & Zitnick energy-head
 pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …); use
@@ -150,7 +149,7 @@ eSEN
 With :code:`architecture: esen`, pre-core layers are :code:`RangeSeparation` (no neighbor cap), :code:`GaussianRBF` (``flavor: esen``, ``apply_cutoff_fn: false``) or :code:`BesselRBF` (``flavor: esen``), and :code:`RandomAtomEmbedding`. The Core returns :code:`atom_feature` (``l=0``) and :code:`atom_sphere_feature`. Energy uses :code:`SimpleReadout` (``head_type: mlp``, ``num_hidden_layers: 2``, ``use_bias_out: true``, SiLU / ``swish``) → :code:`EnergyReduce` → :code:`Force`. The message envelope and the SO(2) blocks stay inside the Core. Example: :code:`enerzyme/config/esen_layers_example.yaml`. :code:`uma_qs` is unchanged and still needs fairchem.
 
 EquiformerV2 / EquiformerV3 and modular readouts
------------------------------------------------
+------------------------------------------------
 
 With :code:`architecture: equiformer_v2`, :code:`equiformer_v3`, :code:`dpa4`,
 :code:`e2former`, :code:`e2former_v2`, or :code:`e2former_lsr`, the Core returns the same latent pair as eSCN

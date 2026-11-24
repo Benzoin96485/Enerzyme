@@ -51,7 +51,7 @@ Modelhub:
           learnable_shape: true
           no_basis_at_infinity: false
       - name: RandomAtomEmbedding
-      - name: Core
+      - name: Core  # Configure the physnet message-passing blocks here.
         params:
           activation_fn: shifted_softplus
           activation_params:

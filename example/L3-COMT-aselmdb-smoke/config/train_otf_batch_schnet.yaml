@@ -39,7 +39,7 @@ Modelhub:
           flavor: SchNet
           apply_cutoff_fn: false
       - name: RandomAtomEmbedding
-      - name: Core
+      - name: Core  # Configure the schnet message-passing blocks here.
         params:
           num_interactions: 1
           hidden_channels: 32
