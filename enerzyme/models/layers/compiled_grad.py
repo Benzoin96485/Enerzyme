@@ -65,6 +65,13 @@ def native_forces(core, inputs):
     return core._run_layers(inputs)
 
 
+@torch.compiler.disable
+def has_module_hooks(root):
+    """Read live callbacks before using a compiled path that moves an output head."""
+    return any(module._forward_hooks or module._forward_pre_hooks or
+               module._backward_hooks or module._backward_pre_hooks for module in root.modules())
+
+
 def has_force_hooks(core):
     """The joint VJP replaces ForceLayer.forward, including its hook boundary."""
     from torch.nn.modules import module
