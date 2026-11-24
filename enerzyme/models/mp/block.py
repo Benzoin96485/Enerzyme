@@ -23,7 +23,7 @@ from typing import Any, Callable, Dict, NamedTuple, Optional
 from torch import Tensor, nn
 
 from .graph import GraphContext
-from .ops import scatter_sum
+from .aggregate import Aggregate
 
 
 class BlockState(NamedTuple):
@@ -46,37 +46,6 @@ class Block(nn.Module):
 
     def forward(self, state: BlockState, ctx: GraphContext) -> BlockState:  # pragma: no cover - interface
         raise NotImplementedError
-
-
-class Aggregate(nn.Module):
-    """Sum messages onto receivers, then divide by a fixed ``divisor``.
-
-    ``divisor`` covers the usual normalisations: ``avg_num_neighbors`` (MACE),
-    ``sqrt(avg_num_neighbors)`` (NequIP, Equiformer). ``mode="mean"`` divides by
-    the per-receiver count instead.
-    """
-
-    def __init__(self, divisor: Optional[float] = None, mode: str = "sum") -> None:
-        super().__init__()
-        if mode not in ("sum", "mean"):
-            raise ValueError(f"mode must be 'sum' or 'mean', got {mode!r}")
-        self.divisor = None if divisor is None else float(divisor)
-        self.mode = mode
-
-    def forward(self, message: Tensor, ctx: GraphContext, index: Optional[Tensor] = None) -> Tensor:
-        index = ctx.receiver if index is None else index
-        out = scatter_sum(message, index, ctx.num_nodes)
-        if self.mode == "mean":
-            from .ops import scatter_count
-
-            count = scatter_count(index, ctx.num_nodes, out.dtype).clamp_min(1)
-            out = out / count.view((-1,) + (1,) * (out.dim() - 1))
-        if self.divisor is not None:
-            out = out / self.divisor
-        return out
-
-    def extra_repr(self) -> str:
-        return f"mode={self.mode}, divisor={self.divisor}"
 
 
 class InteractionBlock(Block):

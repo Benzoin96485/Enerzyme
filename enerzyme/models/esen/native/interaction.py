@@ -18,6 +18,7 @@ from typing import List, Optional
 import torch
 from torch import Tensor, nn
 
+from ...mp.aggregate import Aggregate
 from ...mp.nn.radial_mlp import RadialFunction
 from ...mp.basis.envelope import polynomial_envelope
 from ...mp.equivariant import (
@@ -75,6 +76,7 @@ class EdgeDegreeEmbedding(nn.Module):
         self.lmax_list = list(lmax_list)
         self.mmax_list = list(mmax_list)
         self.mapping = mapping
+        self.aggregate = Aggregate(divisor=rescale_factor)
         self.rescale_factor = float(rescale_factor)
         self.cutoff = float(cutoff)
         self.use_envelope = bool(use_envelope)
@@ -108,8 +110,7 @@ class EdgeDegreeEmbedding(nn.Module):
         if self.use_envelope:
             env = polynomial_envelope(edge_distance, self.cutoff, 5)
             emb.embedding = emb.embedding * env.view(-1, 1, 1)
-        emb._reduce_edge(edge_index[1], num_nodes)
-        return emb.embedding / self.rescale_factor
+        return self.aggregate.reduce(emb.embedding, edge_index[1], num_nodes)
 
 
 class Edgewise(nn.Module):
