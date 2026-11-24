@@ -1,5 +1,6 @@
 """Compile force-field inference partitions or joint force-training derivatives."""
 
+from functools import partial
 from typing import Any, Dict
 
 import torch
@@ -27,23 +28,65 @@ def compiling_fullgraph() -> bool:
 
 
 @torch.compiler.disable
-def _short_range_edges(core, inputs):
+def _prepare_radius_graph(core, inputs):
     """Choose discrete neighbors once, before tracing the differentiable geometry."""
     if len(core.pre_sequence) < 2:
-        return None
+        return None, None
     distance, ranges = core.pre_sequence[0], core.pre_sequence[1]
     if type(distance) is not DistanceLayer or type(ranges) is not RangeSeparationLayer:
-        return None
+        return None, None
     for layer in (distance, ranges):
         if (layer.train_only or layer.eval_only or layer.test_only or layer.test_exclude
                 or layer._forward_hooks or layer._forward_pre_hooks):
-            return None
+            return None, None
     if distance._name_mapping["Dij"] != ranges._name_mapping["Dij_lr"]:
-        return None
+        return None, None
     with torch.no_grad():
         fields = {k: inputs.get(distance._name_mapping[k]) for k in distance._input_fields}
-        distances = distance.get_output(**fields)["Dij"]
-        return torch.where(distances < ranges.cutoff_sr)[0]
+        geometry = distance.get_output(**fields)
+        edges = torch.where(geometry["Dij"] < ranges.cutoff_sr)[0]
+        return edges, _triplet_indices(core, ranges, fields, geometry, edges)
+
+
+def _triplet_indices(core, ranges, fields, geometry, edges):
+    """Build the declared integer triplets for an unmodified short-range graph."""
+    from ..mp.graph import GraphContext, TripletRequest
+
+    requires = getattr(core, "requires", None)
+    if requires is None or requires.edge_set != "sr":
+        return None
+    requests = [r for r in requires.topology if type(r) is TripletRequest and r.edge_cutoff is None]
+    if not requests:
+        return None
+    # A user-defined preprocessing layer can replace the original geometry.
+    # Only reuse indices when the Core consumes these exact distance-layer edges.
+    names = ("idx_i_sr", "idx_j_sr", "vij_sr", "Dij_sr")
+    if any(core._name_mapping.get(k, k) != ranges._name_mapping[k] for k in names):
+        return None
+    geometry_names = {ranges._name_mapping[n] for n in names}
+    if any(layer._name_mapping[k] in geometry_names
+           for layer in list(core.pre_sequence)[2:] for k in layer._output_fields):
+        return None
+    distance = core.pre_sequence[0]
+    if any(ranges._name_mapping[dst] != distance._name_mapping[src] for src, dst in (
+        ("idx_i", "idx_i_lr"), ("idx_j", "idx_j_lr"), ("vij", "vij_lr")
+    )):
+        return None
+    if any(p.is_floating_point() and p.dtype != geometry["Dij"].dtype for p in core.parameters()):
+        return None
+    dist = geometry["Dij"][edges]
+    vec = geometry["vij"][edges] if "vij" in geometry else None
+    receiver, sender = fields["idx_i"][edges].long(), fields["idx_j"][edges].long()
+    if requires.edge_convention == "swap":
+        receiver, sender = sender, receiver
+        vec = -vec if vec is not None else None
+    ctx = GraphContext(receiver, sender, fields["Ra"].shape[0], dist=dist, vec=vec)
+    for req in requests:
+        req.prepare(ctx)
+    # Only primitive keys are needed to look up the final indexing tensors.
+    # Intermediate CSR entries keyed by a particular tensor belong to this pass.
+    return {k: v for k, v in ctx.cache.items()
+            if isinstance(k, str) or all(not isinstance(x, Tensor) for x in k)}
 
 
 @torch.compiler.disable(recursive=False)
@@ -53,9 +96,9 @@ def compiled_training(core, inputs):
 
     if getattr(core, "_scripted_force_kernels", False):
         return _scripted_force_training(core, inputs)
-    edges = _short_range_edges(core, inputs)
+    edges, topology = _prepare_radius_graph(core, inputs)
     with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
-        return forward_with_coordinate_gradients(core, inputs, edges)
+        return forward_with_coordinate_gradients(core, inputs, edges, topology)
 
 
 @torch.compiler.disable
@@ -93,7 +136,7 @@ def retained_inference(core, inputs):
         return core._run_layers(inputs)
 
 
-def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None) -> Dict[str, Any]:
+def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, topology=None) -> Dict[str, Any]:
     """Functional coordinate VJPs make force fitting a single compiled backward.
 
     The prefix ending at each Force layer returns energy and tensor-valued
@@ -114,7 +157,8 @@ def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None) 
             return {**state, **{ranges._name_mapping[k]: v for k, v in selected.items()}}
 
         stages[1] = select_neighbors
-    stages.append(core._forward)
+    stages.append(core._forward if topology is None else
+                  partial(core._forward, extra_inputs={"_prepared_topology": topology}))
     stages.extend(layer for layer in core.post_sequence if active(layer))
 
     def evaluate(net_input, stop):

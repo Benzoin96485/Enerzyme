@@ -431,6 +431,8 @@ class GraphContext:
             receiver=receiver, sender=sender, num_nodes=int(num_nodes), vec=vec, dist=dist, rbf=rbf,
             cutoff_values=cutoff_values, batch=inputs.get("batch_seg"), inputs=inputs,
         )
+        if "_prepared_topology" in inputs:
+            ctx.cache.update(inputs["_prepared_topology"])
 
         if requires.csr:
             ctx.csr()

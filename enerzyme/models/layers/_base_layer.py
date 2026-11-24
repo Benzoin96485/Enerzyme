@@ -67,7 +67,7 @@ class BaseFFModule(ABC, Module):
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         ...
 
-    def _forward(self, net_input: Union[Dict[str, Tensor], Data]) -> Dict[str, Tensor]:
+    def _forward(self, net_input: Union[Dict[str, Tensor], Data], extra_inputs=None) -> Dict[str, Tensor]:
         relevant_input = dict()
         if not self.adapted_relevant_fields:
             self._get_relevant_input_fields(net_input.keys())
@@ -83,6 +83,8 @@ class BaseFFModule(ABC, Module):
             net_output = net_input.copy()
             for k in relevant_input_fields:
                 relevant_input[k] = net_input.get(self._name_mapping[k], None)
+        if extra_inputs is not None:
+            relevant_input.update(extra_inputs)
         relevant_output = self.get_output(**relevant_input)
         for k in self._output_fields:
             new_k = self._name_mapping[k]
