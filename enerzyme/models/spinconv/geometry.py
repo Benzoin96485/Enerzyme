@@ -8,6 +8,7 @@ destination and ``idx_j`` is the source, with ``vij = R[source] - R[destination]
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import math
 
 import torch
@@ -240,6 +241,43 @@ def sphere_projection(vij, receiver, sender, distance, cutoff, num_nodes, n_lat,
     local = project_neighbors(vij, frames, source, query)
     index, weight = bilinear_sphere_index(local, query, n_lat, n_long)
     return index, weight, source
+
+
+@dataclass(frozen=True)
+class SpinProjectionRequest:
+    """Symmetric neighbor cap and detached grid interpolation for all spin blocks."""
+
+    max_neighbors: int
+    cutoff: float
+    n_lat: int
+    n_long: int
+    force_cache_key = "spin_projection"
+
+    def prepare(self, ctx):
+        return ctx.cached(self.force_cache_key, lambda: self._projection(ctx))
+
+    def _projection(self, ctx):
+        i, j = ctx.receiver, ctx.sender
+        if i.ndim != 1 or j.shape != i.shape or ctx.dist.shape != i.shape or ctx.vec.shape != (i.shape[0], 3):
+            raise ValueError("neighbor indices, distances and vectors must describe the same edges")
+        valid = ((i >= 0) & (j >= 0) & (i < ctx.num_nodes) & (j < ctx.num_nodes)).all()
+        if torch.compiler.is_compiling():
+            torch._assert_async(valid, "edge indices are outside the atom range")
+        elif not bool(valid):
+            raise ValueError("edge indices are outside the atom range")
+
+        selected = None
+        edges = ctx
+        if i.numel():
+            mask = symmetric_neighbor_mask(i, j, ctx.dist, ctx.num_nodes, self.max_neighbors)
+            if not bool(mask.all()):
+                selected = torch.where(mask)[0]
+                edges = ctx.subset(selected)
+        projection = sphere_projection(
+            edges.vec, edges.receiver, edges.sender, edges.dist, self.cutoff, ctx.num_nodes,
+            self.n_lat, self.n_long, pairs=edges.triplets("path"),
+        )
+        return selected, projection
 
 
 def splat_sphere(
