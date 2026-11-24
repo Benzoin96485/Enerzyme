@@ -23,7 +23,7 @@ _add('freecg', '.freecg:FreeCGCore', '.freecg:DEFAULT_BUILD_PARAMS', '.freecg:DE
 _add('quinnet', '.quinnet:QuinNetCore', '.quinnet:DEFAULT_BUILD_PARAMS', '.quinnet:DEFAULT_LAYER_PARAMS', aliases=('quin-net', 'quin_net'), family='vector')
 _add('visnet_lsrm', '.visnet.lsr:ViSNetLSRMCore', '.visnet.lsr:DEFAULT_BUILD_PARAMS', '.visnet.lsr:DEFAULT_LAYER_PARAMS', aliases=('visnet-lsrm', 'visnet_lsr', 'visnet-lsr'), family='vector')
 _add('equflash', '.equflash:EquFlashCore', '.equflash:DEFAULT_BUILD_PARAMS', '.equflash:DEFAULT_LAYER_PARAMS', family='irreps')
-_add('facto', '.facto:FACTOCore', '.facto:DEFAULT_BUILD_PARAMS', '.facto:DEFAULT_LAYER_PARAMS', family='carttensor')
+_add('facto', '.presets.cartesian_tensor:facto', '.facto:DEFAULT_BUILD_PARAMS', '.facto:DEFAULT_LAYER_PARAMS', family='carttensor')
 _add('grace', '.presets.cartesian_tensor:grace', '.grace:DEFAULT_BUILD_PARAMS', '.grace:DEFAULT_LAYER_PARAMS', family='carttensor')
 _add('cace', '.presets.cartesian_tensor:cace', '.cace:DEFAULT_BUILD_PARAMS', '.cace:DEFAULT_LAYER_PARAMS', family='carttensor')
 _add('camp', '.presets.cartesian_tensor:camp', '.camp:DEFAULT_BUILD_PARAMS', '.camp:DEFAULT_LAYER_PARAMS', family='carttensor')

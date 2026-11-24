@@ -77,5 +77,5 @@ def _find_facto_core(built_layers: List[Module]) -> Module:
         if getattr(layer, "emits_isolated_atom_feature", False):
             return layer
     raise TypeError(
-        "FACTOEnergyReadout must follow a FACTOCore in the layer list"
+        "FACTOEnergyReadout must follow the FACTO preset in the layer list"
     )

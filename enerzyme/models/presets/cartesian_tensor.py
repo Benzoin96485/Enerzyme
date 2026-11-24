@@ -298,3 +298,71 @@ def grace(
         order_channels=order_channels, order_lmax=order_lmax, indicator_lmax=indicator_lmax,
         dim_feature_out=dim_feature_out, feature_irreps=feature_irreps, max_l=max_l,
     )
+
+
+def facto(
+    max_Za: int = 94,
+    cutoff_sr: float = 6.0,
+    r_short: float = 1.0,
+    preset: Optional[str] = "S",
+    scalar_dim: Optional[int] = None,
+    num_groups: Optional[int] = None,
+    tensor_channels: Optional[Sequence[int]] = None,
+    num_radial: Optional[int] = None,
+    num_blocks: Optional[int] = None,
+    tensor_transport: Optional[bool] = None,
+    residual_scale: Optional[float] = None,
+    rms_epsilon: float = 1e-6,
+) -> ComposableCore:
+    """Hierarchical atom-centered tensor updates with matching isolated-atom taps."""
+    from ..facto.blocks import FACTOBlock, FACTOEmbed, FACTOHead
+    from ..facto.defaults import resolve_facto_config, _validate_config
+    from ..facto.interaction import RESIDUAL_SCALE
+
+    config = resolve_facto_config(
+        preset,
+        scalar_dim=scalar_dim,
+        num_groups=num_groups,
+        tensor_channels=tensor_channels,
+        num_radial=num_radial,
+        num_blocks=num_blocks,
+        tensor_transport=tensor_transport,
+    )
+    _validate_config(config, cutoff_sr, r_short)
+    max_Za = int(max_Za)
+    cutoff_sr = float(cutoff_sr)
+    r_short = float(r_short)
+    preset = None if preset is None else str(preset)
+    scalar_dim = int(config["scalar_dim"])
+    num_groups = int(config["num_groups"])
+    tensor_channels = tuple(config["tensor_channels"])
+    num_radial = int(config["num_radial"])
+    num_blocks = int(config["num_blocks"])
+    tensor_transport = bool(config["tensor_transport"])
+    residual_scale = (
+        RESIDUAL_SCALE if residual_scale is None else float(residual_scale)
+    )
+    rms_epsilon = float(rms_epsilon)
+    lmax = len(tensor_channels)
+    num_output_blocks = num_blocks
+    dim_feature_out = scalar_dim
+    feature_irreps = f"{scalar_dim}x0e"
+
+    embed = FACTOEmbed(max_Za, scalar_dim, num_radial, tensor_channels, cutoff_sr, r_short)
+    blocks = [
+        FACTOBlock(
+            scalar_dim, tensor_channels, num_groups, update_tensors=index + 1 < num_blocks,
+            tensor_transport=tensor_transport, residual_scale=residual_scale, rms_epsilon=rms_epsilon,
+        )
+        for index in range(num_blocks)
+    ]
+    return ComposableCore(
+        embed, blocks, FACTOHead(), GraphRequires(rbf=False, optional_cutoff_values=False),
+        node_field="Za", emits_isolated_atom_feature=True,
+        max_Za=max_Za, cutoff_sr=cutoff_sr, r_short=r_short,
+        preset=preset, scalar_dim=scalar_dim, num_groups=num_groups,
+        tensor_channels=tensor_channels, num_radial=num_radial, num_blocks=num_blocks,
+        tensor_transport=tensor_transport, residual_scale=residual_scale, rms_epsilon=rms_epsilon,
+        lmax=lmax, num_output_blocks=num_output_blocks, dim_feature_out=dim_feature_out,
+        feature_irreps=feature_irreps,
+    )
