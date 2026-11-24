@@ -792,5 +792,201 @@
         "max_parameter_gradient_relative_l2": 7.983916413635053e-13
       }
     ]
+  },
+  "equiformer_fx_inference": {
+    "revision": "b5203e9",
+    "cpu_job": "6318271",
+    "device_group": "compute",
+    "operation": "Ordinary torch.compile eval, default Equiformer, original scripted eager vs FX eager vs real Inductor, same weights and two-molecule input. Charges and coordinate-derived forces checked alongside energy.",
+    "results": [
+      {
+        "dtype": "float32",
+        "native": {
+          "E": {
+            "abs": 0.0,
+            "rel": 0.0,
+            "close": true
+          },
+          "Fa": {
+            "abs": 2.9802322387695312e-08,
+            "rel": 9.34186150107519e-08,
+            "close": true
+          },
+          "Qa": {
+            "abs": 0.0,
+            "rel": 0.0,
+            "close": true
+          }
+        },
+        "compiled": {
+          "E": {
+            "abs": 4.76837158203125e-07,
+            "rel": 2.3507170132433874e-07,
+            "close": true
+          },
+          "Fa": {
+            "abs": 4.76837158203125e-07,
+            "rel": 1.3780742107133542e-06,
+            "close": true
+          },
+          "Qa": {
+            "abs": 2.0116567611694336e-07,
+            "rel": 5.18801030563122e-07,
+            "close": true
+          }
+        },
+        "graphs": [
+          {
+            "len": 4,
+            "learned": []
+          },
+          {
+            "len": 1,
+            "learned": []
+          },
+          {
+            "len": 21,
+            "learned": []
+          },
+          {
+            "len": 19,
+            "learned": []
+          },
+          {
+            "len": 29,
+            "learned": [
+              "einsum",
+              "tensordot"
+            ]
+          },
+          {
+            "len": 1843,
+            "learned": [
+              "einsum",
+              "index_add_",
+              "linear",
+              "tensordot"
+            ]
+          },
+          {
+            "len": 10,
+            "learned": [
+              "linear"
+            ]
+          },
+          {
+            "len": 12,
+            "learned": []
+          },
+          {
+            "len": 18,
+            "learned": [
+              "index_add_"
+            ]
+          },
+          {
+            "len": 5,
+            "learned": [
+              "index_add_"
+            ]
+          }
+        ],
+        "kernels": 799
+      },
+      {
+        "dtype": "float64",
+        "native": {
+          "E": {
+            "abs": 0.0,
+            "rel": 0.0,
+            "close": true
+          },
+          "Fa": {
+            "abs": 5.551115123125783e-17,
+            "rel": 9.396570932121704e-17,
+            "close": true
+          },
+          "Qa": {
+            "abs": 0.0,
+            "rel": 0.0,
+            "close": true
+          }
+        },
+        "compiled": {
+          "E": {
+            "abs": 1.3322676295501878e-15,
+            "rel": 3.2070057664204564e-16,
+            "close": true
+          },
+          "Fa": {
+            "abs": 9.43689570931383e-16,
+            "rel": 1.7230765783436085e-15,
+            "close": true
+          },
+          "Qa": {
+            "abs": 5.551115123125783e-16,
+            "rel": 5.230097107866718e-16,
+            "close": true
+          }
+        },
+        "graphs": [
+          {
+            "len": 4,
+            "learned": []
+          },
+          {
+            "len": 1,
+            "learned": []
+          },
+          {
+            "len": 21,
+            "learned": []
+          },
+          {
+            "len": 19,
+            "learned": []
+          },
+          {
+            "len": 29,
+            "learned": [
+              "einsum",
+              "tensordot"
+            ]
+          },
+          {
+            "len": 1843,
+            "learned": [
+              "einsum",
+              "index_add_",
+              "linear",
+              "tensordot"
+            ]
+          },
+          {
+            "len": 10,
+            "learned": [
+              "linear"
+            ]
+          },
+          {
+            "len": 12,
+            "learned": []
+          },
+          {
+            "len": 18,
+            "learned": [
+              "index_add_"
+            ]
+          },
+          {
+            "len": 5,
+            "learned": [
+              "index_add_"
+            ]
+          }
+        ],
+        "kernels": 799
+      }
+    ]
   }
 }
