@@ -40,6 +40,39 @@ def _schnet(ensemble):
     ).double()
 
 
+def test_default_compiled_training_captures_the_learned_interactions():
+    from torch._dynamo import config
+
+    graphs = []
+
+    def capture(graph, _inputs):
+        graphs.append(graph)
+        return graph.forward
+
+    torch.compiler.reset()
+    try:
+        torch.manual_seed(705)
+        reference = _schnet(1).train()
+        candidate = copy.deepcopy(reference)
+        with config.patch(capture_dynamic_output_shape_ops=False, capture_scalar_outputs=False):
+            compiled = torch.compile(candidate, backend=capture)
+            for separation in (1.1, 2.5):
+                actual, expected = compiled(_batch(separation)), reference(_batch(separation))
+                for key in ("E", "Fa"):
+                    torch.testing.assert_close(actual[key], expected[key])
+                a = torch.autograd.grad(actual["E"].sum() + actual["Fa"].square().sum(),
+                                        candidate.parameters(), allow_unused=True)
+                b = torch.autograd.grad(expected["E"].sum() + expected["Fa"].square().sum(),
+                                        reference.parameters(), allow_unused=True)
+                for x, y in zip(a, b):
+                    torch.testing.assert_close(x, y)
+            assert not config.capture_dynamic_output_shape_ops and not config.capture_scalar_outputs
+        operators = {getattr(node.target, "__name__", "") for graph in graphs for node in graph.graph.nodes}
+        assert "linear" in operators
+    finally:
+        torch.compiler.reset()
+
+
 def _batch(distance):
     return {
         "Ra": torch.tensor([[0., 0., 0.], [distance, .1, -.2], [2.7, -.4, .3]],

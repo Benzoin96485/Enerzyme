@@ -26,6 +26,15 @@ def compiling_fullgraph() -> bool:
 
 
 @torch.compiler.disable(recursive=False)
+def compiled_training(core, inputs):
+    """Trace the energy VJP through data-dependent neighbor-list lengths."""
+    from torch._dynamo import config
+
+    with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+        return forward_with_coordinate_gradients(core, inputs)
+
+
+@torch.compiler.disable(recursive=False)
 def retained_inference(core, inputs):
     """Compile each inference partition with reusable backward activations.
 
