@@ -440,6 +440,68 @@
           }
         }
       }
+    },
+    "6317837": {
+      "baseline": "b05ea1a",
+      "candidate": "72b2738",
+      "weights": "identical main checkpoints and external atomic features",
+      "repetitions": 17,
+      "cases": {
+        "mace_ff04-float32": {
+          "precision": "float32",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[21.490256, 55.655077, 187.882324, 310.748535], [22.520734, 58.124067, 190.319824, 313.641602], [23.981264, 63.707637, 190.319824, 313.641602], [21.44665, 57.625214, 187.882324, 310.748535]],
+            "delta_percent": [-7.6665, -7.019, -1.2807, -0.9224]
+          },
+          "bulk_256": {
+            "samples": [[20.724762, 55.360517, 119.460938, 184.07959], [24.755245, 65.921974, 124.427246, 191.349609], [23.642673, 63.288539, 124.427246, 191.349609], [21.371402, 57.450024, 119.460938, 184.07959]],
+            "delta_percent": [-13.0207, -12.6924, -3.9913, -3.7993]
+          },
+          "large_2000": {
+            "samples": [[30.975135, 85.044339, 696.858398, 1143.490723], [35.979297, 93.7505, 700.421875, 1153.990723], [35.846484, 92.5521, 700.421875, 1153.990723], [30.997194, 84.814291, 696.858398, 1143.490723]],
+            "delta_percent": [-13.7185, -8.8265, -0.5088, -0.9099]
+          }
+        },
+        "mace_ff04-float64": {
+          "precision": "float64",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[21.049202, 56.223562, 362.333496, 610.222656], [25.203639, 61.147379, 367.3125, 618.247559], [24.243989, 57.895863, 367.3125, 618.247559], [20.969464, 55.852006, 362.333496, 610.222656]],
+            "delta_percent": [-15.0239, -5.8531, -1.3555, -1.298]
+          },
+          "bulk_256": {
+            "samples": [[20.804777, 57.905674, 221.690918, 351.673828], [22.915095, 60.364975, 228.858398, 357.793945], [22.200295, 59.546314, 228.858398, 357.793945], [20.777834, 56.312034, 221.690918, 351.673828]],
+            "delta_percent": [-7.8305, -4.7482, -3.1318, -1.7105]
+          },
+          "large_2000": {
+            "samples": [[52.002877, 147.935891, 1370.566895, 2256.373535], [56.156766, 153.056045, 1370.980957, 2267.163574], [55.859364, 151.818907, 1370.980957, 2267.163574], [51.065642, 147.090245, 1370.566895, 2256.373535]],
+            "delta_percent": [-7.9878, -3.2304, -0.0302, -0.4759]
+          }
+        }
+      },
+      "trained_checkpoint_gradient_parity": {
+        "loss": "sum(E^2) + sum(F^2), CPU, checkpoint training batch",
+        "columns": ["precision", "energy_max_absolute_error", "force_max_absolute_error", "active_parameter_gradients", "parameter_gradient_max_absolute_error"],
+        "results": [["torch.float32", 2.9802322387695312e-08, 4.470348358154297e-08, 60, 2.384185791015625e-07], ["torch.float64", 5.551115123125783e-17, 9.367506770274758e-17, 60, 4.440892098500626e-16]]
+      },
+      "gpu_profile": {
+        "configuration": "One profiled periodic fp64 training iteration including energy, forces and loss backward, after three warmups.",
+        "columns": ["operator", "calls", "total_device_ms"],
+        "revisions": {
+          "b05ea1a": [["MACE_LEGACY_Contraction", 3, 2.8018], ["MACE_LEGACY_ForceLayer", 1, 22.7762], ["aten::mm", 241, 8.727], ["aten::bmm", 90, 4.1602], ["aten::copy_", 321, 1.5154]],
+          "3e65250": [["MACE_LEGACY_Contraction", 3, 2.8279], ["MACE_LEGACY_ForceLayer", 1, 22.8104], ["aten::mm", 241, 9.6537], ["aten::bmm", 90, 4.5576], ["aten::copy_", 319, 1.6023]],
+          "72b2738": [["MACE_LEGACY_Contraction", 3, 2.2623], ["MACE_LEGACY_ForceLayer", 1, 22.0053], ["aten::mm", 217, 8.6503], ["aten::bmm", 96, 4.9231], ["aten::copy_", 310, 1.2431]]
+        }
+      }
     }
   }
 }
