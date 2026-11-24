@@ -133,14 +133,13 @@ class InvariantReadout(nn.Module):
     def _grams(self, blocks: Sequence[Tensor]) -> List[Tensor]:
         index = self.gram_index.to(device=blocks[0].device)
         offdiag = self.gram_offdiag.to(device=blocks[0].device)
+        scale = torch.ones_like(offdiag, dtype=blocks[0].dtype).masked_fill_(offdiag, math.sqrt(2.0))
         parts = []
         for degree, block in enumerate(blocks[1:], start=1):
             gram = torch.matmul(block.transpose(-1, -2), block)
             flat = gram.reshape(block.shape[0], self.degree_channels[degree] ** 2)
             start, stop = self.gram_offsets[degree - 1 : degree + 1]
-            scale = torch.ones(stop - start, dtype=block.dtype, device=block.device)
-            scale[offdiag[start:stop]] = math.sqrt(2.0)
-            parts.append(flat.index_select(1, index[start:stop]) * scale)
+            parts.append(flat.index_select(1, index[start:stop]) * scale[start:stop])
         return parts
 
     def _bispectrum(self, projected: Sequence[Tensor]) -> Tuple[List[Tensor], Tensor]:
