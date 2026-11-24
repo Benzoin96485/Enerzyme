@@ -1,0 +1,53 @@
+{
+  "cpu": {
+    "revision": "2fa0e3d",
+    "job": "6318263",
+    "test_files_and_shards": 170,
+    "results": {
+      "passed": 1573,
+      "skipped": 61,
+      "errors": 0,
+      "failures": 0
+    },
+    "skip_reasons": {
+      "preset does not declare inversion symmetry": 42,
+      "CUDA + Triton required": 2,
+      "CUDA and Triton required": 2,
+      "set UMA_CHECKPOINT to a local uma-*.pt for live train smoke": 1,
+      "CUDA not available": 6,
+      "set UMA_CHECKPOINT to a local uma-*.pt for live flow train smoke": 1,
+      "fixture has no Muon trajectory": 7
+    }
+  },
+  "cuda": {
+    "revision": "67d7a1b",
+    "job": "6318243",
+    "device": "Tesla V100-PCIE-32GB (sm70)",
+    "pytest_files": [
+      "test/test_scatter.py",
+      "test/test_e2former_triton_parity.py"
+    ],
+    "results": {
+      "passed": 22,
+      "skipped": 1,
+      "errors": 0,
+      "failures": 0
+    },
+    "cpu_skips_passed_on_cuda": [
+      "test.test_e2former_triton_parity::test_attention_triton_qk_matches_qk_alpha_module_on_cuda",
+      "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype0]",
+      "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype1]",
+      "test.test_e2former_triton_parity::test_triton_sparse_qk_v_match_pytorch_on_cuda",
+      "test.test_scatter::test_scatter_sum_basic_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_empty_input_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_grad_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_infer_dim_size_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_negative_dim_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_rank_broadcast_equivalence[cuda]"
+    ],
+    "gpu_skips_passed_on_cpu": {
+      "test.test_e2former_triton_parity::test_want_triton_cpu_fallback_matches_pytorch_sparse_ops": "CUDA Triton available; CPU fallback path not exercised here"
+    }
+  },
+  "notes": "The two runs use different recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run."
+}
