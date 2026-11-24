@@ -1,12 +1,13 @@
 """Registry wiring for uma_qs without loading fairchem."""
-import ast
 from pathlib import Path
+
+from enerzyme.models.presets import get_architecture
 
 
 def test_ff_registers_uma_qs_string():
-    src = Path("enerzyme/models/ff.py").read_text()
-    assert 'architecture.lower() == "uma_qs"' in src
-    assert "from .esen import UMAWrapperQS" in src
+    spec = get_architecture("uma_qs")
+    assert spec.core == ".esen:UMAWrapperQS"
+    assert spec.family == "wrapper"
 
 
 def test_esen_exports_uma_wrapper_symbol():
@@ -21,9 +22,8 @@ def test_shared_readout_and_spin_layers_exported():
 
 
 def test_ff_registers_nse_related_architectures():
-    src = Path("enerzyme/models/ff.py").read_text()
-    assert 'architecture.lower() == "allscaip"' in src
-    assert 'architecture.lower() == "uma_flow_qs"' in src
+    assert get_architecture("allscaip").name == "allscaip"
+    assert get_architecture("uma_flow_qs").core == ".esen:UMAFlowWrapperQS"
 
 
 def test_nse_layers_exported():

@@ -58,7 +58,7 @@ def _pair_inputs(core, vij, rbf_scale=1.0):
 
 
 def test_esen_gaussian_and_bessel_flavors():
-    from enerzyme.models.cutoff import polynomial_envelope
+    from enerzyme.models.mp.basis.envelope import polynomial_envelope
     from enerzyme.models.layers.rbf import BesselRBFLayer, GaussianRBFLayer
 
     cutoff = 6.0
@@ -256,6 +256,6 @@ def test_get_ff_core_registers_esen_and_keeps_uma():
     core, _, layers = get_ff_core("esen")
     assert core.__name__ == "eSENCore"
     assert any(layer["name"] == "Force" for layer in layers)
-    src = __import__("pathlib").Path("enerzyme/models/ff.py").read_text()
-    assert 'architecture.lower() == "uma_qs"' in src
-    assert "UMAWrapperQS" in src
+    from enerzyme.models.presets import get_architecture
+
+    assert get_architecture("uma_qs").core == ".esen:UMAWrapperQS"
