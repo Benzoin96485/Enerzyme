@@ -77,14 +77,14 @@ def test_scatter_sum_empty_and_inferred_size():
     assert scatter_sum(src, index).shape[0] == int(index.max()) + 1
 
 
-@pytest.mark.parametrize("width", [None, 3])
+@pytest.mark.parametrize("shape, dim", [((0,), 0), ((0, 3), 0), ((3, 0, 9), -2)])
 @pytest.mark.parametrize("size", [None, 4])
-def test_compiled_static_empty_scatter_is_an_independent_zero(width, size):
-    values = torch.empty((0,) if width is None else (0, width), requires_grad=True)
+def test_compiled_static_empty_scatter_is_an_independent_zero(shape, dim, size):
+    values = torch.empty(shape, requires_grad=True)
     index = torch.empty(0, dtype=torch.long)
     compiled = torch.compile(scatter_sum, backend="eager", fullgraph=True)
-    expected = scatter_sum(values, index, size)
-    actual = compiled(values, index, size)
+    expected = scatter_sum(values, index, size, dim=dim)
+    actual = compiled(values, index, size, dim=dim)
     torch.testing.assert_close(actual, expected)
     assert not actual.requires_grad and actual.grad_fn is None
 
@@ -147,6 +147,36 @@ def test_inductor_cpu_single_destination_scalar_sum():
             torch.testing.assert_close(result, expected)
             probe = torch.arange(1, len(result) + 1, dtype=values.dtype)
             torch.testing.assert_close(torch.autograd.grad(result, values, probe)[0], probe[index])
+
+
+@pytest.mark.parametrize("shape, dim", [((33, 32, 3), 1), ((9, 16), -1)])
+def test_inductor_cpu_nonleading_scatter_gradients(shape, dim):
+    generator = torch.Generator().manual_seed(107)
+    values = torch.randn(shape, dtype=torch.float64, generator=generator)
+    direction = torch.randn(shape, dtype=values.dtype, generator=generator)
+    index = torch.randint(0, 7, (shape[dim],), generator=generator)
+    incidence = torch.nn.functional.one_hot(index, num_classes=7).to(values.dtype)
+
+    def scatter(x):
+        return scatter_sum(x, index, 7, dim=dim)
+
+    def dense(x):
+        edges = x.movedim(dim, 0)
+        total = incidence.T @ edges.flatten(1)
+        return total.unflatten(1, edges.shape[1:]).movedim(0, dim)
+
+    def outputs(reduce, x):
+        def loss(z):
+            return reduce(z.sin()).square().sum()
+
+        gradient = torch.func.grad(loss)
+        curvature = torch.func.grad(lambda z: (gradient(z) * direction).sum())
+        return reduce(x.sin()), gradient(x), curvature(x)
+
+    expected = outputs(dense, values)
+    compiled = torch.compile(lambda x: outputs(scatter, x), fullgraph=True)
+    for result, reference in zip(compiled(values), expected):
+        torch.testing.assert_close(result, reference, atol=1e-12, rtol=1e-12)
 
 
 def test_segment_softmax_normalises_and_matches_pyg_style():
