@@ -98,17 +98,24 @@ def summarize(phase, main):
         "| Reference | Within +3% | Above +3% | Unavailable | Total |",
         "| --- | ---: | ---: | ---: | ---: |",
     ]
-    for label, cells in (("Phase 0 defaults", phase), ("Main checkpoints", main)):
-        values = [value for value, _ in cells.values() if value is not None]
+    xpainn = load("xpainn_v100")["eager_graph_pruning"]["selected_metrics"]
+    for label, percentages in (
+        ("Phase 0 defaults", [value for value, _ in phase.values()]),
+        ("Main checkpoints", [value for value, _ in main.values()]),
+        ("XequiNet xPaiNN", [row["change_percent"] for row in xpainn.values()]),
+    ):
+        values = [value for value in percentages if value is not None]
         above = sum(value > 3 for value in values)
-        lines.append(f"| {label} | {len(values) - above} | {above} | {len(cells) - len(values)} | {len(cells)} |")
+        lines.append(f"| {label} | {len(values) - above} | {above} | "
+                     f"{len(percentages) - len(values)} | {len(percentages)} |")
+    lines += ["", "The original xPaiNN wrapper omitted periodic image offsets. The periodic timing compares "
+              "the two wrappers. Independent energy, force and weight-gradient checks use the upstream "
+              "XequiNet model with the correct periodic offsets on CPU and V100."]
 
     slower = [(key, value, job) for key, (value, job) in main.items()
               if key[-1].endswith("_ms") and value is not None and value > 0]
     total_times = sum(key[-1].endswith("_ms") and v is not None for key, (v, _) in main.items())
-    lines += ["", f"Of the {total_times} directly comparable main-checkpoint timings, "
-              f"{total_times - len(slower)} were as fast or faster. " +
-              ("The following medians were slower." if slower else "All met the separate main speed criterion.")]
+    lines += ["", f"{total_times - len(slower)} of {total_times} main-checkpoint timing medians were as fast as or faster than main."]
     if slower:
         lines.append("")
     for (model, dtype, system, metric), value, job in sorted(slower):

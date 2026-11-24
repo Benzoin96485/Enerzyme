@@ -7,14 +7,12 @@ Each revised measurement uses the paired run for that case, with its own candida
 | Reference | Within +3% | Above +3% | Unavailable | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Phase 0 defaults | 1180 | 0 | 212 | 1392 |
-| Main checkpoints | 95 | 1 | 0 | 96 |
+| Main checkpoints | 96 | 0 | 0 | 96 |
+| XequiNet xPaiNN | 24 | 0 | 0 | 24 |
 
-Of the 48 directly comparable main-checkpoint timings, 44 were as fast or faster. The following medians were slower.
+The original xPaiNN wrapper omitted periodic image offsets. The periodic timing compares the two wrappers. Independent energy, force and weight-gradient checks use the upstream XequiNet model with the correct periodic offsets on CPU and V100.
 
-- spookynet_ff02 float64, bulk_256, infer_ms +1.08% (run 6317925)
-- spookynet_ff02 float64, bulk_256, train_ms +5.14% (run 6317925)
-- spookynet_ff02 float64, large_2000, train_ms +1.59% (run 6317925)
-- spookynet_ff02 float64, mol_batch_32x20, train_ms +1.50% (run 6317925)
+48 of 48 main-checkpoint timing medians were as fast as or faster than main.
 
 ## Missing paired measurements
 
