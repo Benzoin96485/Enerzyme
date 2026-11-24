@@ -18,8 +18,10 @@ from ..mp.block import BlockState
 from ..mp.core import Embed
 from ..mp.message.triplet_graph import check_gemnet_edges
 
-from typing import List
+from dataclasses import dataclass
+from typing import List, NamedTuple
 
+import torch
 from torch import Tensor
 from torch.nn import Module
 
@@ -28,8 +30,11 @@ from ..layers.geometry import RangeSeparationLayer
 from ..layers.rbf import GaussianRBFLayer
 from .basis import legendre_outer, y_lm0
 from ..mp.graph import GraphContext
+from ..mp.quadruplets import dihedral_geometry, quadruplet_indices
 from .geometry import (
+    canonical_edge_indices,
     mixed_graph_triplets,
+    mixed_triplet_indices,
     symmetrize_edges,
 )
 from .layers import BasisDownProjection
@@ -39,6 +44,73 @@ def _cutoff(name: str, value: float) -> float:
     if float(value) <= 0:
         raise ValueError(f"{name} must be positive, got {value}")
     return float(value)
+
+
+class OCIndices(NamedTuple):
+    capped: Tensor
+    canonical: Tensor
+    atom_edge: Tensor | None
+    atom_atom: Tensor | None
+    quad_edges: Tensor | None
+    triplets: tuple
+    atom_to_edge: tuple | None
+    edge_to_atom: tuple | None
+    quadruplets: tuple | None
+
+
+def _main_graph(ctx, capped, canonical):
+    def build():
+        i, j, d, v, swap = symmetrize_edges(
+            capped.receiver, capped.sender, capped.dist, capped.vec, canonical)
+        return GraphContext(i, j, ctx.num_nodes, vec=v, dist=d), swap
+
+    return ctx.cached("gemnet_oc_main", build)
+
+
+@dataclass(frozen=True)
+class GemNetOCGraphRequest:
+    """Neighbor caps, periodic image matches and integer interaction tables."""
+
+    main: tuple
+    atom_edge: tuple | None
+    atom_atom: tuple | None
+    quadruplet: tuple | None
+    use_a2e: bool
+    use_e2a: bool
+    force_cache_key = "gemnet_oc_indices"
+
+    def prepare(self, ctx):
+        return ctx.cached(self.force_cache_key, lambda: self._indices(ctx))
+
+    def _indices(self, ctx):
+        num_nodes = ctx.num_nodes
+        if torch.compiler.is_compiling():
+            torch._assert_async(((ctx.receiver >= 0) & (ctx.receiver < num_nodes)
+                                 & (ctx.sender >= 0) & (ctx.sender < num_nodes)).all(),
+                                "edge index is outside atom_embedding")
+        elif ctx.receiver.numel() and (
+            int(ctx.receiver.min()) < 0
+            or int(ctx.sender.min()) < 0
+            or int(ctx.receiver.max()) >= num_nodes
+            or int(ctx.sender.max()) >= num_nodes
+        ):
+            raise ValueError("edge index is outside atom_embedding")
+
+        capped_ids = ctx.closest_indices(*self.main)
+        capped = ctx.subset(capped_ids)
+        canonical = canonical_edge_indices(capped.receiver, capped.sender, capped.vec)
+        main, _ = _main_graph(ctx, capped, canonical)
+        atom_edge = ctx.closest_indices(*self.atom_edge) if self.atom_edge else None
+        atom_atom = ctx.closest_indices(*self.atom_atom) if self.atom_atom else None
+        quad_edges = ctx.closest_indices(*self.quadruplet) if self.quadruplet else None
+        ae = ctx.subset(atom_edge) if atom_edge is not None else None
+        return OCIndices(
+            capped_ids, canonical, atom_edge, atom_atom, quad_edges,
+            mixed_triplet_indices(main, main),
+            mixed_triplet_indices(main, ae) if self.use_a2e else None,
+            mixed_triplet_indices(ae, main) if self.use_e2a else None,
+            quadruplet_indices(main, ctx.subset(quad_edges), images=True) if quad_edges is not None else None,
+        )
 
 
 class GemNetOCEmbed(Embed):
@@ -89,6 +161,13 @@ class GemNetOCEmbed(Embed):
         self.max_neighbors_qint = max_neighbors_qint
         self.max_neighbors_aeaint = max_neighbors_aeaint
         self.max_neighbors_aint = max_neighbors_aint
+        self.graph_request = GemNetOCGraphRequest(
+            (cutoff, max_neighbors),
+            (cutoff_aeaint, max_neighbors_aeaint) if atom_edge_interaction or edge_atom_interaction else None,
+            (cutoff_aint, max_neighbors_aint) if atom_interaction else None,
+            (cutoff_qint, max_neighbors_qint) if quad_interaction else None,
+            atom_edge_interaction, edge_atom_interaction,
+        )
         self.num_spherical = num_spherical
         self.emb_size_cbf = emb_size_cbf
         self.radial_basis = None
@@ -128,14 +207,14 @@ class GemNetOCEmbed(Embed):
         projected = self._down(layer, self._basis(distance, cutoff))
         return (projected * y_lm0(angle, self.num_spherical).unsqueeze(1)).sum(dim=-1)
 
-    def _quadruplet_basis(self, main, interaction, rbf_main) -> dict:
+    def _quadruplet_basis(self, main, interaction, rbf_main, indices) -> dict:
         assert self.mlp_rbf_qint is not None
         assert self.mlp_cbf_qint is not None
         assert self.mlp_sbf_qint is not None
         n_sph = self.num_spherical * self.num_spherical
         radial_w4 = self._down(self.mlp_sbf_qint, rbf_main)
         rbf_q = self.mlp_rbf_qint(rbf_main)
-        quads = main.quadruplets(interaction, images=True)
+        quads = dihedral_geometry(main, interaction, indices)
         if quads.edge_ca.numel() == 0:
             cbf_q = rbf_main.new_zeros(0, self.emb_size_cbf)
             angular4 = rbf_main.new_zeros(0, n_sph)
@@ -163,30 +242,20 @@ class GemNetOCEmbed(Embed):
                 "atom_embedding must be "
                 f"(N, {self.dim_embedding}), got {tuple(inputs["atom_embedding"].shape)}"
             )
-        num_nodes = int(inputs["atom_embedding"].shape[0])
-        if ctx.receiver.numel() and (
-            int(ctx.receiver.min()) < 0
-            or int(ctx.sender.min()) < 0
-            or int(ctx.receiver.max()) >= num_nodes
-            or int(ctx.sender.max()) >= num_nodes
-        ):
-            raise ValueError("edge index is outside atom_embedding")
-
-        capped = ctx.closest(self.cutoff, self.max_neighbors)
-        main_i, main_j, main_d, main_v, swap = symmetrize_edges(
-            capped.receiver, capped.sender, capped.dist, capped.vec)
-        main = GraphContext(main_i, main_j, num_nodes, vec=main_v, dist=main_d)
+        indices = self.graph_request.prepare(ctx)
+        main, swap = _main_graph(ctx, ctx.subset(indices.capped), indices.canonical)
+        main_i, main_j, main_d = main.receiver, main.sender, main.dist
         if self.atom_edge_interaction or self.edge_atom_interaction:
-            ae = ctx.closest(self.cutoff_aeaint, self.max_neighbors_aeaint)
+            ae = ctx.subset(indices.atom_edge)
         if self.atom_interaction:
-            a2a = ctx.closest(self.cutoff_aint, self.max_neighbors_aint)
+            a2a = ctx.subset(indices.atom_atom)
 
         rbf_main = self._basis(main_d, self.cutoff)
         rbf_e2e = self.mlp_rbf_tint(rbf_main)
         rbf_h = self.mlp_rbf_h(rbf_main)
         rbf_out = self.mlp_rbf_out(rbf_main)
         radial_w3 = self._down(self.mlp_cbf_tint, rbf_main)
-        trips = mixed_graph_triplets(main, main)
+        trips = mixed_graph_triplets(main, main, indices.triplets)
         angular3 = y_lm0(trips.angle, self.num_spherical)
 
         quad_kwargs: dict = {}
@@ -194,12 +263,12 @@ class GemNetOCEmbed(Embed):
             assert self.mlp_rbf_qint is not None
             assert self.mlp_cbf_qint is not None
             assert self.mlp_sbf_qint is not None
-            interaction = ctx.closest(self.cutoff_qint, self.max_neighbors_qint)
-            quad_kwargs = self._quadruplet_basis(main, interaction, rbf_main)
+            interaction = ctx.subset(indices.quad_edges)
+            quad_kwargs = self._quadruplet_basis(main, interaction, rbf_main, indices.quadruplets)
         ae_kwargs: dict = {}
         if self.atom_edge_interaction:
             assert self.mlp_rbf_aeint is not None and self.mlp_cbf_aeint is not None
-            a2e = mixed_graph_triplets(main, ae)
+            a2e = mixed_graph_triplets(main, ae, indices.atom_to_edge)
             ae_kwargs.update(
                 rbf_a2e=self.mlp_rbf_aeint(self._basis(ae.dist, self.cutoff_aeaint)),
                 radial_a2e=self._down(self.mlp_cbf_aeint, rbf_main),
@@ -210,7 +279,7 @@ class GemNetOCEmbed(Embed):
             )
         if self.edge_atom_interaction:
             assert self.mlp_rbf_eaint is not None and self.mlp_cbf_eaint is not None
-            e2a = mixed_graph_triplets(ae, main)
+            e2a = mixed_graph_triplets(ae, main, indices.edge_to_atom)
             raw_ae = self._basis(ae.dist, self.cutoff_aeaint)
             ae_kwargs.update(
                 rbf_e2a=self.mlp_rbf_eaint(rbf_main),

@@ -1022,7 +1022,7 @@ def gemnet_oc(
         embed,
         blocks,
         head,
-        GraphRequires(optional_cutoff_values=False),
+        GraphRequires(optional_cutoff_values=False, topology=(embed.graph_request,)),
         builder=build_stack,
         positional_fields=("atom_embedding", "rbf", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         architecture="gemnet-oc",

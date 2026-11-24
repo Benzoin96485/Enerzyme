@@ -149,11 +149,22 @@ def _lexicographic_negative(vij: Tensor) -> Tensor:
     return any_nonzero & (component < 0)
 
 
+def canonical_edge_indices(idx_i: Tensor, idx_j: Tensor, vij: Tensor) -> Tensor:
+    same = idx_j == idx_i
+    canonical = idx_j < idx_i
+    if bool(same.any()):
+        length = vij.detach().square().sum(dim=-1).sqrt()
+        image = _lexicographic_negative(vij) & ~(length <= _OPPOSITE_TOL)
+        canonical = canonical | (same & image)
+    return torch.where(canonical)[0]
+
+
 def symmetrize_edges(
     idx_i: Tensor,
     idx_j: Tensor,
     dist: Tensor,
     vij: Tensor,
+    canonical: Tensor | None = None,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
     """Mirror the canonical half of a directed neighbor list.
 
@@ -172,11 +183,8 @@ def symmetrize_edges(
         raise ValueError("idx_i, idx_j, and dist must share a shape")
     if vij.ndim != 2 or vij.shape[0] != idx_i.shape[0] or vij.shape[-1] != 3:
         raise ValueError(f"vij must have shape ({idx_i.shape[0]}, 3), got {tuple(vij.shape)}")
-    same = idx_j == idx_i
-    canonical = (idx_j < idx_i) | (same & _lexicographic_negative(vij))
-    if bool(same.any()):
-        zero = same & (vij.detach().square().sum(dim=-1).sqrt() <= _OPPOSITE_TOL)
-        canonical = canonical & ~zero
+    if canonical is None:
+        canonical = canonical_edge_indices(idx_i, idx_j, vij)
     kept_i = idx_i[canonical]
     kept_j = idx_j[canonical]
     if kept_i.numel() == 0:
@@ -217,15 +225,19 @@ def mixed_triplets(
     return mixed_graph_triplets(query, keys)
 
 
-def mixed_graph_triplets(query, keys) -> MixedTriplets:
-    """Filter cross-graph receiver pairs by sender image and compute their angles."""
+def mixed_triplet_indices(query, keys) -> Tuple[Tensor, Tensor]:
+    """Filter cross-graph receiver pairs by sender image."""
     idx_edge, idx_other = query.cross_pairs(keys)
     same = keys.sender[idx_other] == query.sender[idx_edge]
     if bool(same.any()):
         residual = (keys.vec[idx_other] - query.vec[idx_edge]).detach().norm(dim=-1)
         same = same & (residual <= _OPPOSITE_TOL)
     keep = ~same
-    idx_edge = idx_edge[keep]
-    idx_other = idx_other[keep]
+    return idx_edge[keep], idx_other[keep]
+
+
+def mixed_graph_triplets(query, keys, indices=None) -> MixedTriplets:
+    """Compute each angle from its two current displacement vectors."""
+    idx_edge, idx_other = mixed_triplet_indices(query, keys) if indices is None else indices
     angle = angle_between(query.vec[idx_edge], keys.vec[idx_other])
     return MixedTriplets(idx_edge, idx_other, angle)

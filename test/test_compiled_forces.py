@@ -160,8 +160,8 @@ def test_nuclear_embedding_keeps_vjp_tensors_out_of_its_eval_cache():
         torch.testing.assert_close(grad, target)
 
 
-@pytest.mark.parametrize("architecture", ["dimenet", "m3gnet"])
-def test_compiled_triplet_forces_match_parameter_gradients(architecture):
+@pytest.mark.parametrize("architecture", ["dimenet", "m3gnet", "gemnet-oc", "dpa3", "tensornet2"])
+def test_compiled_topology_preserves_force_and_parameter_gradients(architecture):
     from scripts.core_harness import build, forward, make_batch, random_molecules
 
     torch.manual_seed(142)
