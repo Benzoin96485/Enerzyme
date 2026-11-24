@@ -75,7 +75,14 @@ def _fixture_configuration(path):
     config = {key: payload[key] for key in ("architecture", "layers", "build_params")}
     config["architecture"] = config["architecture"].lower()
     encoded = json.dumps(config, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    return config, hashlib.sha256(encoded).hexdigest(), payload["checkpoint"]["model_state_dict"]
+    batch = payload["train_batch"]
+    fields = {layer["params"]["embed_field"] for layer in config["layers"]
+              if "embed_field" in layer.get("params", {})}
+    atom_features = {field: batch[field] for field in fields}
+    for field, values in atom_features.items():
+        if values.shape[0] != batch["Za"].shape[0]:
+            raise ValueError(f"expected one fixture {field} per atom")
+    return config, hashlib.sha256(encoded).hexdigest(), payload["checkpoint"]["model_state_dict"], atom_features
 
 
 def _load_reference_module(name, path):
@@ -134,11 +141,12 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
     device = torch.device(device_name)
     dtype = getattr(torch, precision)
     metadata = {}
+    atom_features = {}
     if fixture is None:
         model = build(arch)
         _, build_params, _ = get_ff_core(arch)
     else:
-        config, digest, state = _fixture_configuration(fixture)
+        config, digest, state, atom_features = _fixture_configuration(fixture)
         if config["architecture"] != arch.lower():
             raise ValueError(f"Fixture builds {config['architecture']!r}, worker requested {arch!r}")
         build_params = config["build_params"]
@@ -149,7 +157,8 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
             state, _ = convert_state_dict(arch, state)
         model.load_state_dict(state, strict=True)
         metadata = {"fixture": Path(fixture).name, "config_sha256": digest,
-                    "fixture_sha256": hashlib.sha256(Path(fixture).read_bytes()).hexdigest()}
+                    "fixture_sha256": hashlib.sha256(Path(fixture).read_bytes()).hexdigest(),
+                    "tiled_atom_features": sorted(atom_features)}
     model = model.to(device=device, dtype=dtype)
     cutoff = max(float(build_params.get("cutoff_sr") or 0), float(build_params.get("cutoff_lr") or 0), 6.0)
     # AllScAIP builds its own neighbors. Its native option selects periodic images.
@@ -207,6 +216,12 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
         if graph_options is not None:
             graph_options.pbc = name == "bulk_256"
         batch = _batch(name, sizes, dtype, cutoff)
+        # These timing inputs use the fixture's external atomic features (e.g.
+        # xTB charges), repeated in the same order for both model versions.
+        for field, values in atom_features.items():
+            if field not in batch:
+                indices = torch.arange(batch["Za"].shape[0]) % values.shape[0]
+                batch[field] = values[indices].to(dtype=dtype)
         batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
         entry = result[name] = {}
         for mode in ("infer", "train"):
@@ -375,7 +390,7 @@ def main():
     from core_harness import ARCHITECTURES
 
     if args.fixture:
-        config, _, _ = _fixture_configuration(args.fixture)
+        config, _, _, _ = _fixture_configuration(args.fixture)
         archs = [config["architecture"]]
         if args.only and args.only.lower().split(",") != archs:
             parser.error(f"--fixture builds {archs[0]!r}, incompatible with --only {args.only!r}")
