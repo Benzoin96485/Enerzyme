@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import e3nn
 import torch
 from e3nn.o3 import Irrep
 
@@ -180,3 +181,17 @@ def test_zero_node_vector_matches_visnet_and_enhancer_changes_a_real_vector():
     assert not torch.allclose(base_v, linear_v, atol=1e-5, rtol=1e-5)
     assert not torch.allclose(base_s, max_s, atol=1e-5, rtol=1e-5)
     assert not torch.allclose(linear_v, max_v, atol=1e-5, rtol=1e-5)
+
+def test_group_product_compiles_with_weight_gradients_and_restores_defaults():
+    previous = e3nn.get_optimization_defaults()
+    block = GroupSparseCG(channels=8, num_groups=2).double()
+    assert e3nn.get_optimization_defaults() == previous
+
+    left, right = (torch.randn(5, 8, 8, dtype=torch.double, requires_grad=True) for _ in range(2))
+    def evaluate(model):
+        mixed = model(left, right)
+        gradients = torch.autograd.grad(mixed.square().sum(), (block.tp_weight, left, right))
+        return mixed, gradients
+
+    compiled = torch.compile(block, backend="eager", fullgraph=True)
+    torch.testing.assert_close(evaluate(compiled), evaluate(block))

@@ -1,7 +1,10 @@
+from contextlib import contextmanager
+from threading import RLock
 from typing import List, Optional, Tuple, Union
 from collections import namedtuple
 import torch
 from torch import Tensor
+import e3nn
 import e3nn.o3 as o3
 from e3nn.util.jit import compile_mode
 from e3nn.o3 import Irreps
@@ -10,6 +13,21 @@ from ..cg import wigner_3j
 
 _INPUT = namedtuple("_INPUT", "tensor, start, stop")
 _TP = namedtuple("_TP", "op, args")
+
+
+_construction_lock = RLock()
+
+
+@contextmanager
+def traceable_e3nn_kernels():
+    """Keep generated kernels as FX graphs during construction, then restore e3nn."""
+    with _construction_lock:
+        previous = e3nn.get_optimization_defaults()["jit_script_fx"]
+        try:
+            e3nn.set_optimization_defaults(jit_script_fx=False)
+            yield
+        finally:
+            e3nn.set_optimization_defaults(jit_script_fx=previous)
 
 
 def scalar_0e_dim(irreps: Union[str, Irreps, None]) -> Optional[int]:

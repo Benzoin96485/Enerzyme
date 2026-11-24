@@ -1,6 +1,5 @@
 """Compose XequiNet's optional xPaiNN embedding, message/update pairs and property head."""
 
-from threading import RLock
 from typing import Union
 
 import torch
@@ -12,9 +11,6 @@ from ..mp.core import ComposableCore, Embed
 from ..mp.graph import GraphRequires
 from ..mp.head import Head
 from ..mp.ops import batch_size_from_counts, scatter_sum
-
-
-_construction_lock = RLock()
 
 
 class XPaiNNEmbed(Embed):
@@ -89,7 +85,7 @@ def xpainn(
     output_dim: int, node_average: Union[bool, float], default_dtype: str,
 ) -> ComposableCore:
     try:
-        import e3nn
+        from ..mp.equivariant.e3nn.tools import traceable_e3nn_kernels
         from xequinet.nn.model import XPaiNN
         from xequinet.utils.config import NetConfig
     except ImportError as exc:
@@ -102,15 +98,8 @@ def xpainn(
         action_blocks=action_blocks, activation=activation, norm_type=norm_type, output_mode=output_mode,
         output_dim=output_dim, node_average=node_average, default_dtype=default_dtype,
     )
-    # Keep e3nn's generated tensor products as FX modules that Dynamo can trace.
-    # This construction setting is global in e3nn, so restore it even on failure.
-    with _construction_lock:
-        previous = e3nn.get_optimization_defaults()["jit_script_fx"]
-        try:
-            e3nn.set_optimization_defaults(jit_script_fx=False)
-            external = XPaiNN(config)
-        finally:
-            e3nn.set_optimization_defaults(jit_script_fx=previous)
+    with traceable_e3nn_kernels():
+        external = XPaiNN(config)
     return XPaiNNCore(
         XPaiNNEmbed(external.embed),
         [XPaiNNBlock(message, update) for message, update in zip(external.message, external.update)],

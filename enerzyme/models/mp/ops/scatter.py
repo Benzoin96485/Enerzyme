@@ -57,11 +57,9 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
     """Sum slices of ``src`` along ``dim`` into ``dim_size`` rows given by 1-D ``index``."""
     dim = dim + src.dim() if dim < 0 else dim
     size = _dim_size(index, dim_size)
-    shape = list(src.shape)
-    shape[dim] = size
     if torch.compiler.is_compiling() and statically_known_true(index.numel() == 0):
         # Match eager's independent zero: an unused parameter must keep grad=None.
-        return src.new_zeros(shape)
+        return src.new_zeros((*src.shape[:dim], size, *src.shape[dim + 1:]))
     if index.dtype != torch.long:
         index = index.long()
     if src.device.type != "cuda" and _use_torch_scatter(src) and index.numel():
@@ -75,6 +73,8 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
             index = index + (index == size)
         padded = src.new_zeros(size + 1)
         return padded.index_add_(dim, index, src).narrow(dim, 0, size)
+    shape = list(src.shape)
+    shape[dim] = size
     out = src.new_zeros(shape)
     if torch.compiler.is_compiling() or index.numel():
         if src.device.type == "cuda":
