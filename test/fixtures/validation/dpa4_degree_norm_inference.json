@@ -1,0 +1,242 @@
+{
+ "torch": "2.13.0+cu126",
+ "device": "CPU",
+ "model": "dpa4",
+ "source_parent": "8279050",
+ "corrected_source": "3a4dd07",
+ "method": "Run check_compiled_forces.py on the published DPA4 preset, built with the default weights (seed 142). Inputs have five and four atoms (seed 107). Inference measures energy, force and the first and repeated energy-coordinate gradients. FP32 atol/rtol are 7e-4/1e-3 and FP64 atol/rtol are 1e-10/1e-8.",
+ "initial_fp64_inference": {
+  "revision": "2354ed0",
+  "job": 6318417,
+  "outside_tolerance": [
+   "E",
+   "Fa",
+   "energy_coordinate_gradient",
+   "repeated_energy_coordinate_gradient"
+  ],
+  "checked": {
+   "E": {
+    "max_abs": 8.92751508274614e-08,
+    "relative_l2": 1.25905376600011e-08
+   },
+   "Fa": {
+    "max_abs": 6.381202510841177e-10,
+    "relative_l2": 5.233169603962016e-09
+   },
+   "energy_coordinate_gradient": {
+    "max_abs": 6.381202510841177e-10,
+    "relative_l2": 5.233169603962016e-09
+   },
+   "repeated_energy_coordinate_gradient": {
+    "max_abs": 6.381202510841177e-10,
+    "relative_l2": 5.233169603962016e-09
+   }
+  },
+  "graphs": 9,
+  "operations": 1097,
+  "learned_operators": [
+   "bmm",
+   "einsum",
+   "embedding",
+   "index_add_",
+   "linear",
+   "matmul",
+   "scatter_add_"
+  ]
+ },
+ "controls": {
+  "job": 6318568,
+  "statistics": "Compute the upstream FP32 centering and two degree-balanced variance reductions with native CPU operations. The rescaling, affine map and their derivatives still use Inductor.",
+  "whole_norm": "Compute the full published FP32 degree normalization and its derivatives with native CPU operations. Embeddings, attention, contractions and readout retain compiled kernels.",
+  "statistics_only_fp64": {
+   "outside_tolerance": [
+    "Fa",
+    "energy_coordinate_gradient",
+    "repeated_energy_coordinate_gradient"
+   ],
+   "checked": {
+    "E": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "Fa": {
+     "max_abs": 5.797907015603343e-09,
+     "relative_l2": 4.092140203607374e-08
+    },
+    "energy_coordinate_gradient": {
+     "max_abs": 5.797907015603343e-09,
+     "relative_l2": 4.092140203607374e-08
+    },
+    "repeated_energy_coordinate_gradient": {
+     "max_abs": 5.797907015603343e-09,
+     "relative_l2": 4.092140203607374e-08
+    }
+   },
+   "graphs": 15,
+   "operations": 721,
+   "learned_operators": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ]
+  },
+  "whole_norm_fp64": {
+   "outside_tolerance": [],
+   "checked": {
+    "E": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "Fa": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    },
+    "energy_coordinate_gradient": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    },
+    "repeated_energy_coordinate_gradient": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    }
+   },
+   "graphs": 13,
+   "operations": 702,
+   "learned_operators": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ]
+  }
+ },
+ "corrected_inference": {
+  "float32": {
+   "outside_tolerance": [],
+   "checked": {
+    "E": {
+     "max_abs": 1.9073486328125e-06,
+     "relative_l2": 1.966393192241092e-07
+    },
+    "Fa": {
+     "max_abs": 4.470348358154297e-08,
+     "relative_l2": 2.956803715183602e-07
+    },
+    "energy_coordinate_gradient": {
+     "max_abs": 4.470348358154297e-08,
+     "relative_l2": 2.956803715183602e-07
+    },
+    "repeated_energy_coordinate_gradient": {
+     "max_abs": 4.470348358154297e-08,
+     "relative_l2": 2.956803715183602e-07
+    }
+   },
+   "graphs": 9,
+   "operations": 1097,
+   "learned_operators": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ],
+   "job": 6318588
+  },
+  "float64": {
+   "outside_tolerance": [],
+   "checked": {
+    "E": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "Fa": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    },
+    "energy_coordinate_gradient": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    },
+    "repeated_energy_coordinate_gradient": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    }
+   },
+   "graphs": 13,
+   "operations": 702,
+   "learned_operators": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ],
+   "job": 6318588
+  }
+ },
+ "training_controls": {
+  "job": 6318588,
+  "prior_data": "compiled_forces_cpu.json / cases / dpa4",
+  "cases": {
+   "float32": {
+    "gradients_compared": 60,
+    "energy": {
+     "max_abs": 1.9073486328125e-06,
+     "relative_l2": 1.966393192241092e-07
+    },
+    "forces": {
+     "max_abs": 2.9802322387695312e-08,
+     "relative_l2": 2.3465660482246005e-07
+    },
+    "outside_tolerance": [],
+    "same_failing_fields_as_previous_training": true,
+    "changed_gradient_participation": {}
+   },
+   "float64": {
+    "gradients_compared": 60,
+    "energy": {
+     "max_abs": 8.92751508274614e-08,
+     "relative_l2": 1.25905376600011e-08
+    },
+    "forces": {
+     "max_abs": 6.381205251704269e-10,
+     "relative_l2": 5.2331708935515914e-09
+    },
+    "outside_tolerance": [
+     "E",
+     "Fa",
+     "blocks.0.module.ffns.0.so3_linear_2.weight",
+     "blocks.0.module.post_so2_norm.bias",
+     "blocks.0.module.so2_conv.post_mix.weight",
+     "blocks.1.module.ffns.0.so3_linear_2.weight",
+     "blocks.1.module.post_so2_norm.bias",
+     "blocks.1.module.so2_conv.post_mix.weight",
+     "embed.env_embed.output_proj.weight",
+     "embed.radial_basis.freqs",
+     "embed.radial_feat_mlp.net.0.weight",
+     "embed.radial_feat_mlp.net.2.weight",
+     "embed.sphere_proj.bias",
+     "embed.sphere_proj.weight",
+     "head.norm.bias",
+     "head.norm.scale",
+     "post_sequence.0.head.bias",
+     "post_sequence.0.head.weight",
+     "pre_sequence.2.embedding.weight"
+    ],
+    "same_failing_fields_as_previous_training": true,
+    "changed_gradient_participation": {}
+   }
+  }
+ }
+}
