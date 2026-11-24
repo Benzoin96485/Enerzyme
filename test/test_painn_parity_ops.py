@@ -112,7 +112,7 @@ def test_cartesian_dense_is_silu_and_keeps_vector_axis():
 
 
 def test_interaction_mixing_and_core_match_schnetpack_layout():
-    from enerzyme.models.painn.core import PaiNNCore
+    from enerzyme.models.presets.cartesian_vector import painn
     from enerzyme.models.painn.interaction import PaiNNInteraction, PaiNNMixing
 
     torch.manual_seed(0)
@@ -135,13 +135,13 @@ def test_interaction_mixing_and_core_match_schnetpack_layout():
     mu0 = torch.randn(n_atoms, 3, n_basis, dtype=torch.float64)
 
     ref_filter = nn.Linear(n_rbf, n_layers * 3 * n_basis).double()
-    our_filter_owner = PaiNNCore(
+    our_filter_owner = painn(
         dim_embedding=n_basis,
         num_rbf=n_rbf,
         num_interactions=n_layers,
         cutoff_sr=5.0,
     ).double()
-    _copy_dense(our_filter_owner.filter_net, ref_filter)
+    _copy_dense(our_filter_owner.embed.filter_net, ref_filter)
 
     ref_interactions = nn.ModuleList([_RefInteraction(n_basis).double() for _ in range(n_layers)])
     ref_mixings = nn.ModuleList([_RefMixing(n_basis).double() for _ in range(n_layers)])
@@ -177,31 +177,31 @@ def test_interaction_mixing_and_core_match_schnetpack_layout():
         assert torch.allclose(q, q_ref.squeeze(1), atol=1e-8, rtol=1e-8)
         assert torch.allclose(mu, mu_ref, atol=1e-8, rtol=1e-8)
 
-    # Wire the same weights through PaiNNCore, including its filter and cutoff.
+    # Wire the same weights through painn, including its filter and cutoff.
     for step in range(n_layers):
         _copy_dense(
-            our_filter_owner.interactions[step].interatomic_context_net[0],
+            our_filter_owner.blocks[step].message.interatomic_context_net[0],
             ref_interactions[step].interatomic_context_net[0],
         )
         _copy_dense(
-            our_filter_owner.interactions[step].interatomic_context_net[1],
+            our_filter_owner.blocks[step].message.interatomic_context_net[1],
             ref_interactions[step].interatomic_context_net[2],
         )
         _copy_dense(
-            our_filter_owner.mixings[step].intraatomic_context_net[0],
+            our_filter_owner.blocks[step].update.intraatomic_context_net[0],
             ref_mixings[step].intraatomic_context_net[0],
         )
         _copy_dense(
-            our_filter_owner.mixings[step].intraatomic_context_net[1],
+            our_filter_owner.blocks[step].update.intraatomic_context_net[1],
             ref_mixings[step].intraatomic_context_net[2],
         )
         _copy_dense(
-            our_filter_owner.mixings[step].mu_channel_mix, ref_mixings[step].mu_channel_mix
+            our_filter_owner.blocks[step].update.mu_channel_mix, ref_mixings[step].mu_channel_mix
         )
     # Restart the reference from the embedding with zero vectors, as the Core does.
     q_ref = q0[:, None, :]
     mu_ref = torch.zeros_like(mu0)
-    owned_filters = (our_filter_owner.filter_net(rbf) * cutoff).split(width, dim=-1)
+    owned_filters = (our_filter_owner.embed.filter_net(rbf) * cutoff).split(width, dim=-1)
     for step, (ref_block, ref_mix) in enumerate(zip(ref_interactions, ref_mixings)):
         q_ref, mu_ref = ref_block(
             q_ref,

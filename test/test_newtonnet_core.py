@@ -84,7 +84,7 @@ def test_newtonnet_registration_and_yaml_build():
 
     for name in ("newtonnet", "NewtonNet"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "NewtonNetCore"
+        assert core_cls.__name__ == "newtonnet"
         assert build_params["num_rbf"] == 20
         assert build_params["cutoff_sr"] == 5.0
         assert layers[1]["params"]["flavor"] == "default"
@@ -102,7 +102,7 @@ def test_newtonnet_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "NewtonNetCore"
+    assert model.architecture == "newtonnet"
     assert model.variant == "paper"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
@@ -134,12 +134,12 @@ def test_newtonnet_loss_does_not_leak_across_architectures():
 
 def test_layer_norm_scales_invariants_only():
     """Both THGLab versions normalize the atomic features and leave the vectors."""
-    from enerzyme.models.newtonnet import NewtonNetCore
+    from enerzyme.models.presets.cartesian_vector import newtonnet
 
     torch.manual_seed(3)
     graph = _graph(4, 5, 3, seed=3)
     for variant in ("paper", "repo"):
-        raw = NewtonNetCore(
+        raw = newtonnet(
             dim_embedding=5,
             num_rbf=3,
             num_interactions=1,
@@ -147,7 +147,7 @@ def test_layer_norm_scales_invariants_only():
             variant=variant,
             layer_norm=False,
         )
-        normed = NewtonNetCore(
+        normed = newtonnet(
             dim_embedding=5,
             num_rbf=3,
             num_interactions=1,
@@ -198,16 +198,16 @@ def test_newtonnet_rejects_a_second_cutoff_on_the_basis():
 
 
 def test_newtonnet_rejects_bad_settings():
-    from enerzyme.models.newtonnet import NewtonNetCore
+    from enerzyme.models.presets.cartesian_vector import newtonnet
 
     try:
-        NewtonNetCore(dim_embedding=4, num_rbf=2, variant="schnet")
+        newtonnet(dim_embedding=4, num_rbf=2, variant="schnet")
     except ValueError as exc:
         assert "variant" in str(exc)
     else:
         raise AssertionError("expected ValueError")
     try:
-        NewtonNetCore(dim_embedding=4, num_rbf=2, envelope_p=1)
+        newtonnet(dim_embedding=4, num_rbf=2, envelope_p=1)
     except ValueError as exc:
         assert "envelope_p" in str(exc)
     else:
@@ -215,11 +215,11 @@ def test_newtonnet_rejects_bad_settings():
 
 
 def test_paper_geometry_and_third_law():
-    from enerzyme.models.newtonnet import NewtonNetCore
+    from enerzyme.models.presets.cartesian_vector import newtonnet
 
     torch.manual_seed(0)
     n, f, n_rbf = 5, 8, 4
-    core = NewtonNetCore(
+    core = newtonnet(
         dim_embedding=f, num_rbf=n_rbf, num_interactions=3, cutoff_sr=5.0, variant="paper"
     )
     core.eval()
@@ -278,11 +278,11 @@ def test_paper_geometry_and_third_law():
 
 
 def test_envelope_drops_distant_edges_and_messages_stay_local():
-    from enerzyme.models.newtonnet import NewtonNetCore
+    from enerzyme.models.presets.cartesian_vector import newtonnet
 
     torch.manual_seed(4)
     f, n_rbf = 6, 3
-    core = NewtonNetCore(
+    core = newtonnet(
         dim_embedding=f, num_rbf=n_rbf, num_interactions=2, cutoff_sr=5.0, variant="paper"
     )
     core.eval()
@@ -355,11 +355,11 @@ def test_envelope_drops_distant_edges_and_messages_stay_local():
 
 
 def test_repo_variant_contracts_force_features():
-    from enerzyme.models.newtonnet import NewtonNetCore
+    from enerzyme.models.presets.cartesian_vector import newtonnet
 
     torch.manual_seed(8)
     f, n_rbf = 5, 3
-    core = NewtonNetCore(
+    core = newtonnet(
         dim_embedding=f,
         num_rbf=n_rbf,
         num_interactions=3,
@@ -369,8 +369,8 @@ def test_repo_variant_contracts_force_features():
         layer_norm=True,
     )
     core.eval()
-    assert len(core.blocks) == 1
-    assert len(core.norms) == 3
+    assert core.schedule == [0, 1, 0, 2, 0, 3]
+    assert len(core.blocks) == 4
     graph = _graph(4, f, n_rbf, seed=9)
     out = core.get_output(
         atom_embedding=graph["atom_embedding"],
@@ -386,7 +386,7 @@ def test_repo_variant_contracts_force_features():
     assert torch.isfinite(out["atom_feature"]).all()
 
     torch.manual_seed(8)
-    plain = NewtonNetCore(
+    plain = newtonnet(
         dim_embedding=f, num_rbf=n_rbf, num_interactions=3, cutoff_sr=5.0, variant="repo"
     )
     plain.eval()
@@ -401,7 +401,7 @@ def test_repo_variant_contracts_force_features():
     # Same construction seed, but layer norm changes the scalar state.
     assert not torch.allclose(out["atom_feature"], plain_out["atom_feature"], atol=1e-5)
 
-    one = NewtonNetCore(
+    one = newtonnet(
         dim_embedding=f, num_rbf=n_rbf, num_interactions=1, cutoff_sr=5.0, variant="repo"
     )
     one.eval()
