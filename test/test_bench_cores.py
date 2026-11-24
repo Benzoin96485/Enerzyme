@@ -70,11 +70,19 @@ def test_compare_requires_matching_parameter_counts(tmp_path, before, after):
 
 def test_fixture_retains_shared_architecture_configuration():
     fixture = Path(__file__).parent / "fixtures" / "main_legacy" / "mace_ff04.pt.gz"
-    config, digest = _fixture_configuration(fixture)
+    config, digest, state, _ = _fixture_configuration(fixture)
     assert config["architecture"] == "mace"
     assert len(config["layers"]) > 1
     assert config["build_params"]["cutoff_sr"] > 0
     assert len(digest) == 64
+    assert "interactions.0.linear_up.weight" in state
+
+
+def test_fixture_includes_external_atomic_embeddings():
+    fixture = Path(__file__).parent / "fixtures" / "main_legacy" / "physnet_ff01.pt.gz"
+    _, _, _, features = _fixture_configuration(fixture)
+    assert set(features) == {"Qa_xTB"}
+    assert features["Qa_xTB"].shape == (21,)
 
 
 def test_compare_rejects_different_fixture_configs_at_same_parameter_count(tmp_path):

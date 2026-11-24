@@ -93,6 +93,34 @@ def test_compiled_mace_preserves_scripted_parameter_gradients():
             torch.testing.assert_close(gradient, target)
 
 
+@pytest.mark.parametrize("architecture", ["dimenet", "m3gnet"])
+def test_compiled_triplet_forces_match_parameter_gradients(architecture):
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    model = build(architecture).double()
+    weights = tuple(model.parameters())
+    operators = set()
+
+    def capture(graph, _inputs):
+        operators.update(getattr(node.target, "__name__", "") for node in graph.graph.nodes)
+        return graph.forward
+
+    compiled = torch.compile(model, backend=capture)
+    for sizes in ([5, 4], [2]):
+        batch = make_batch(random_molecules(107, sizes), torch.float64)
+        reference = forward(model, batch, torch.float64, train=True)
+        result = forward(compiled, batch, torch.float64, train=True)
+        for key in ("E", "Fa"):
+            torch.testing.assert_close(result[key], reference[key])
+        def gradients(out):
+            return torch.autograd.grad(out["E"].square().sum() + out["Fa"].square().sum(),
+                                       weights, allow_unused=True)
+        for gradient, target in zip(gradients(result), gradients(reference)):
+            torch.testing.assert_close(gradient, target)
+    assert "linear" in operators
+
+
 def _batch(distance):
     return {
         "Ra": torch.tensor([[0., 0., 0.], [distance, .1, -.2], [2.7, -.4, .3]],

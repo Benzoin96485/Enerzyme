@@ -46,6 +46,22 @@ def test_euler_singularity_mask_stays_bool_and_includes_pole():
     assert float(beta[1].abs()) < 1e-4
 
 
+def test_euler_derivatives_at_degenerate_directions():
+    from enerzyme.models.e2former.wigner_otf import init_edge_rot_euler_angles
+
+    vec = torch.tensor(
+        [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -1.0, 0.0], [0.2, 0.3, 0.4]],
+        dtype=torch.float64,
+        requires_grad=True,
+    )
+    angles = init_edge_rot_euler_angles(vec, training=False)
+    gradient = torch.autograd.grad(sum(angles).sum(), vec, create_graph=True)[0]
+    hessian_product = torch.autograd.grad(gradient.sum(), vec)[0]
+    for value in (gradient, hessian_product):
+        assert torch.isfinite(value).all()
+        torch.testing.assert_close(value[:3], torch.zeros_like(value[:3]))
+
+
 def test_euler_acos_clamps_float32_overshoot():
     """float32 normalize can yield |y| > 1; acos must stay finite."""
     from enerzyme.models.e2former.wigner_otf import init_edge_rot_euler_angles

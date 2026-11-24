@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import torch
 import torch.nn.functional as F
 from numpy.testing import assert_allclose
@@ -18,6 +19,7 @@ from enerzyme.models.reann.density import (
     default_n_orbit,
     embedded_atom_density,
     squared_cosine_window,
+    validate_species,
 )
 
 
@@ -66,6 +68,21 @@ def test_activation_formulas_match_the_paper_and_the_repository():
     assert_allclose(tanh(features).detach().numpy(), expected_tanh.numpy())
     expected_swish = 1.2 * features * torch.sigmoid(0.4 * features)
     assert_allclose(swish(features).detach().numpy(), expected_swish.numpy())
+
+
+def test_compiled_orbital_species_bounds():
+    def check(species):
+        validate_species(species, 8, "Za")
+        return species + 1
+
+    compiled = torch.compile(check, backend="eager", fullgraph=True)
+    for species in (torch.tensor([0, 1, 8]), torch.empty(0, dtype=torch.long)):
+        torch.testing.assert_close(compiled(species), check(species))
+    for species in (torch.tensor([-1]), torch.tensor([9])):
+        with pytest.raises(ValueError, match="Za must lie in"):
+            check(species)
+        with pytest.raises(RuntimeError, match="Za must lie in"):
+            compiled(species)
 
 
 def test_orbit_width_and_cartesian_channel_order():

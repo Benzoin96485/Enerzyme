@@ -77,6 +77,16 @@ def cartesian_angular(vectors: Tensor, window: Tensor, lmax: int) -> Tensor:
     return torch.cat([part.reshape(n_edges, -1) for part in powers.values()], dim=1).transpose(0, 1)
 
 
+def validate_species(species: Tensor, maximum: int, field: str) -> None:
+    message = f"{field} must lie in 0..{maximum}"
+    if torch.compiler.is_compiling():
+        torch._assert_async(((species >= 0) & (species <= maximum)).all(), message)
+    elif species.numel():
+        low, high = torch.aminmax(species)
+        if bool((low < 0) | (high > maximum)):
+            raise ValueError(f"{message}, got {int(low)}..{int(high)}")
+
+
 def pair_gaussian_orbitals(
     idx_i: Tensor,
     idx_j: Tensor,
@@ -87,6 +97,8 @@ def pair_gaussian_orbitals(
     inta: Tensor,
     lmax: int,
     cutoff: float,
+    *,
+    species_checked: bool = False,
 ) -> tuple[Tensor, Tensor]:
     """Geometric orbitals ``[E, n_angular, nwave]`` and the squared-cosine window.
 
@@ -120,11 +132,8 @@ def pair_gaussian_orbitals(
             f"rs and inta must share nwave, got {tuple(rs.shape)} and {tuple(inta.shape)}"
         )
     neighbor = species.reshape(-1).long().index_select(0, idx_j.long())
-    if neighbor.numel() and (int(neighbor.min()) < 0 or int(neighbor.max()) >= rs.shape[0]):
-        raise ValueError(
-            f"neighbor atomic numbers must lie in 0..{rs.shape[0] - 1}, "
-            f"got {int(neighbor.min())}..{int(neighbor.max())}"
-        )
+    if not species_checked:
+        validate_species(neighbor, rs.shape[0] - 1, "neighbor atomic numbers")
     dtype = vij.dtype
     centers = rs.index_select(0, neighbor).to(dtype=dtype)
     exponents = inta.index_select(0, neighbor).to(dtype=dtype)
