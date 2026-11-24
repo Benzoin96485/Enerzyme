@@ -2,6 +2,7 @@ import math
 from typing import Optional, Tuple
 import torch
 from torch.nn import Module, Linear, init
+from torch.utils.checkpoint import checkpoint
 from ..mp.block import BlockState
 from ..mp.graph import GraphContext
 from ..mp.ops import scatter_sum
@@ -364,7 +365,16 @@ class InteractionModule(Module):
         """One SpookyNet module: ``x`` is updated in place; ``aux["y"]`` is its output contribution."""
         x = self.residual_pre(state.scalar)
         pij, dij = edge_orbitals(ctx, self.use_irreps)
-        l = self.local_interaction(x, ctx.rbf, pij, dij, ctx.receiver, ctx.sender)
+        if (torch.compiler.is_compiling() and x.is_cuda and not self.training
+                and not torch._C._are_functorch_transforms_active()):
+            # Rebuild private edge features during the force pullback. The
+            # returned energy can be differentiated again using the same inputs.
+            l = checkpoint(
+                self.local_interaction, x, ctx.rbf, pij, dij, ctx.receiver, ctx.sender,
+                use_reentrant=False, preserve_rng_state=False,
+            )
+        else:
+            l = self.local_interaction(x, ctx.rbf, pij, dij, ctx.receiver, ctx.sender)
         if self.use_efa:
             Ra = ctx.inputs.get("Ra")
             if Ra is None:
