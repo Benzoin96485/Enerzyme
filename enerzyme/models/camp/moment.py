@@ -175,6 +175,12 @@ class CAMPEmbed(Embed):
 
     def _species_index(self, atomic_numbers: Tensor) -> Tensor:
         species = atomic_numbers.long()
+        if torch.compiler.is_compiling():
+            torch._assert_async(((species >= 0) & (species <= self.max_Za)).all(),
+                                "atomic numbers exceed the CAMP species table")
+            index = self.index_of_z[species]
+            torch._assert_async((index >= 0).all(), "atomic numbers are outside the CAMP species table")
+            return index
         if species.numel() and (
             int(species.min()) < 0 or int(species.max()) > self.max_Za
         ):
@@ -213,7 +219,7 @@ class CAMPEmbed(Embed):
                 f"got {tuple(Dij_sr.shape)}, {tuple(vij_sr.shape)}, "
                 f"{tuple(receivers.shape)}, {tuple(senders.shape)}"
             )
-        if n_edges and vij_sr.shape[-1] != 3:
+        if vij_sr.shape[-1] != 3 and n_edges:
             raise ValueError(f"vij_sr must be [E, 3], got {tuple(vij_sr.shape)}")
         species = self._species_index(Za)
         dtype = atom_embedding.dtype
@@ -225,7 +231,10 @@ class CAMPEmbed(Embed):
             zi = species.new_zeros(0)
             zj = species.new_zeros(0)
         else:
-            if (
+            if torch.compiler.is_compiling():
+                valid = (receivers >= 0) & (receivers < n_atoms) & (senders >= 0) & (senders < n_atoms)
+                torch._assert_async(valid.all(), "neighbor indices exceed the atom count")
+            elif (
                 int(receivers.min()) < 0
                 or int(senders.min()) < 0
                 or int(receivers.max()) >= n_atoms

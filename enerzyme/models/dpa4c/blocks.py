@@ -99,7 +99,12 @@ class DPA4CBlock(Block):
         nodes = atom_embedding.shape[0]
         center = idx_i_sr.long()
         neighbor = idx_j_sr.long()
-        if center.numel():
+        if torch.compiler.is_compiling():
+            torch._assert_async(((center >= 0) & (neighbor >= 0)).all(), "edge indices must be non-negative")
+            torch._assert_async(((center < nodes) & (neighbor < nodes)).all(),
+                                "edge indices must address rows of atom_embedding")
+            torch._assert_async((center != neighbor).all(), "DPA4C edges must not contain self-loops")
+        elif center.numel():
             # Transfer the validation results together, so valid GPU graphs
             # incur a single synchronization regardless of their edge count.
             i_min, i_max = torch.aminmax(center)

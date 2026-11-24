@@ -94,7 +94,7 @@ class CACEEmbed(Embed):
                 "distance, vectors, receivers, and senders must share the edge count, "
                 f"got {distance.shape[0]}, {vectors.shape[0]}, {n_edges}, {senders.shape[0]}"
             )
-        if n_edges and vectors.shape[-1] != 3:
+        if vectors.shape[-1] != 3 and n_edges:
             raise ValueError(f"vectors must be [E, 3], got {tuple(vectors.shape)}")
         receiver = (
             self.receiver_proj(atom_embedding)
