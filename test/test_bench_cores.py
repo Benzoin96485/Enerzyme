@@ -39,3 +39,29 @@ def test_compare_checks_each_measurement(tmp_path):
     new.write_text(json.dumps({"schnet": entry}))
     failures = compare(old, new, 0.03)
     assert [row[:3] for row in failures] == [("schnet", "mol_batch", "train_ms")]
+
+
+def test_compare_distinguishes_native_and_reference_compilation(tmp_path):
+    old, new = tmp_path / "before.json", tmp_path / "after.json"
+    record = dict(_timings(), compile=True)
+    old.write_text(json.dumps({"schnet": record}))
+    record["compile_reference"] = True
+    new.write_text(json.dumps({"schnet": record}))
+    with pytest.raises(ValueError, match="compile_reference"):
+        compare(old, new, 0.03)
+    old.write_text(new.read_text())
+    assert compare(old, new, 0.03) == []
+
+
+@pytest.mark.parametrize("before, after", [(17, 18), (17, None), (None, 17)])
+def test_compare_requires_matching_parameter_counts(tmp_path, before, after):
+    paths = []
+    for label, params in (("before", before), ("after", after)):
+        path = tmp_path / f"{label}.json"
+        record = _timings()
+        if params is not None:
+            record["params"] = params
+        path.write_text(json.dumps({"schnet": record}))
+        paths.append(path)
+    with pytest.raises(ValueError, match="params"):
+        compare(*paths, 0.03)

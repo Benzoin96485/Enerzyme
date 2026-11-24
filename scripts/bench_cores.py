@@ -5,10 +5,12 @@ do not leak between models. Results are written as JSON; compare two runs with
 ``--compare``.
 
     PYTHONPATH=. python scripts/bench_cores.py --out bench.json [--only a,b] [--compile]
+    PYTHONPATH=. python scripts/bench_cores.py --out normalized.json --compile-reference
     python scripts/bench_cores.py --compare base.json new.json [--threshold 0.03]
 """
 import argparse
 import json
+import importlib.util
 import math
 import os
 import resource
@@ -17,6 +19,9 @@ import subprocess
 import tempfile
 import sys
 import time
+from functools import lru_cache
+from pathlib import Path
+from types import MethodType
 
 # ``small`` and ``tiny`` are for Cores whose default systems exceed the memory
 # of the machine; their keys differ so ``--compare`` never mixes sets.
@@ -55,8 +60,42 @@ def _batch(name, sizes, dtype, cutoff):
     return batch
 
 
+def _load_reference_module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@lru_cache(maxsize=None)
+def _reference_forward(gather_nd):
+    import torch
+
+    root = Path(__file__).resolve().parents[1] / "enerzyme" / "models"
+    forces = _load_reference_module(
+        "enerzyme.models.layers._benchmark_compiled_grad", root / "layers" / "compiled_grad.py"
+    )
+    table = _load_reference_module("enerzyme.models._benchmark_table", root / "functional.py")
+    torch.compiler.substitute_in_graph(gather_nd)(table.gather_nd)
+    return forces.forward_with_coordinate_gradients
+
+
+def compile_reference_model(model):
+    """Compile the same functional force and tensor table gather on both checkouts.
+
+    Each checkout retains its model, layer classes, parameters and eager path.
+    Both compiler representations come from this benchmark driver's tree.
+    """
+    import torch
+    from enerzyme.models.functional import gather_nd
+
+    model.forward = MethodType(_reference_forward(gather_nd), model)
+    return torch.compile(model, fullgraph=True)
+
+
 def _worker(arch, reps, threads, use_compile, systems="default", precision="float32",
-            device_name="auto", model_tree=None):
+            device_name="auto", model_tree=None, compile_reference=False):
     import torch
     from core_harness import build, forward
 
@@ -80,10 +119,13 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
     graph_options = None
     if arch == "allscaip":
         graph_options = getattr(getattr(model, "embed", None), "graph_params", model)
-    if use_compile:
+    if compile_reference:
+        model = compile_reference_model(model)
+    elif use_compile:
         model = torch.compile(model)
     result = {"params": sum(p.numel() for p in model.parameters()), "device": device.type,
-              "precision": precision, "compile": use_compile}
+              "precision": precision, "compile": use_compile or compile_reference,
+              "compile_reference": compile_reference}
     if device.type == "cuda":
         result["device_name"] = torch.cuda.get_device_name(device)
 
@@ -138,7 +180,7 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
 
 
 def run_all(archs, out_path, reps, threads, use_compile, timeout, systems="default",
-            precision="float32", device_name="auto", model_tree=None):
+            precision="float32", device_name="auto", model_tree=None, compile_reference=False):
     results = {}
     if os.path.exists(out_path):
         with open(out_path) as f:
@@ -148,7 +190,11 @@ def run_all(archs, out_path, reps, threads, use_compile, timeout, systems="defau
     for arch in archs:
         cmd = [sys.executable, os.path.join(here, "bench_cores.py"), "--worker", arch,
                "--reps", str(reps), "--threads", str(threads)]
-        cmd += (["--compile"] if use_compile else []) + ["--systems", systems]
+        if compile_reference:
+            cmd.append("--compile-reference")
+        elif use_compile:
+            cmd.append("--compile")
+        cmd += ["--systems", systems]
         cmd += ["--dtype", precision, "--device", device_name]
         if model_tree:
             cmd += ["--model-tree", model_tree]
@@ -195,7 +241,8 @@ def compare(base_path, new_path, threshold):
         current = new.get(arch, {})
         if "error" in old or "error" in current:
             raise ValueError(f"{arch}: incomplete benchmark: {old.get('error') or current.get('error')}")
-        for field, default in (("device", None), ("device_name", None), ("precision", "float32"), ("compile", False)):
+        for field, default in (("params", None), ("device", None), ("device_name", None), ("precision", "float32"),
+                               ("compile", False), ("compile_reference", False)):
             if old.get(field, default) != current.get(field, default):
                 raise ValueError(f"{arch}: different {field} in the two runs")
         measured = systems.intersection(old)
@@ -230,7 +277,10 @@ def main():
     parser.add_argument("--reps", type=int, default=5)
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=1800)
-    parser.add_argument("--compile", action="store_true")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--compile", action="store_true", help="compile the selected checkout directly")
+    modes.add_argument("--compile-reference", action="store_true",
+                       help="use the same full-graph force derivative and tensor table gather for both checkouts")
     parser.add_argument("--dtype", choices=("float32", "float64"), default="float32")
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--model-tree", help="load Enerzyme from this checkout using the same benchmark driver")
@@ -243,7 +293,7 @@ def main():
         parser.error("--reps, --threads and --timeout must be positive")
     if args.worker:
         print("BENCH " + json.dumps(_worker(args.worker, args.reps, args.threads, args.compile, args.systems,
-                                             args.dtype, args.device, args.model_tree)),
+                                             args.dtype, args.device, args.model_tree, args.compile_reference)),
               flush=True)
         return
     if args.compare:
@@ -253,7 +303,7 @@ def main():
 
     archs = args.only.split(",") if args.only else ARCHITECTURES
     ok = run_all(archs, args.out, args.reps, args.threads, args.compile, args.timeout, args.systems,
-                 args.dtype, args.device, args.model_tree)
+                 args.dtype, args.device, args.model_tree, args.compile_reference)
     sys.exit(0 if ok else 1)
 
 
