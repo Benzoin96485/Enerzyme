@@ -21,6 +21,7 @@ from ..mp.head import Head
 
 from typing import List, Optional, Sequence, Union
 
+import torch
 from torch import Tensor
 from torch.nn import Module
 
@@ -265,3 +266,46 @@ class ChargeFeatureHead(Head):
     def forward(self, state, ctx, taps, inputs):
         node = state.scalar if self.norm is None else self.norm(state.scalar)
         return {"atom_feature": node, "atom_feature_charge": state.aux["charge"]}
+
+
+@torch.compiler.disable
+def independent_magnetic_readout(core):
+    """Recognize the standard moment head whose output is independent of the force loss."""
+    from ..layers.gradient import ForceLayer
+    from ..layers.readout import AbsoluteLinearReadout, SimpleReadout
+    from ..layers.reduce import EnergyReduceLayer
+    from ..mp.nn.mlp import DenseLayer
+
+    stages = core.post_sequence
+    if tuple(type(layer) for layer in stages) != (
+        AbsoluteLinearReadout, SimpleReadout, EnergyReduceLayer, ForceLayer
+    ):
+        return None
+    moment, energy, _, _ = stages
+    if (moment._output_fields != {"Ma"} or energy._output_fields != {"Ea"}
+            or type(moment.head) is not DenseLayer or moment.head.activation_fn is not None):
+        return None
+    for layer in stages:
+        if layer.test_only or layer.test_exclude or layer.eval_only or layer.train_only:
+            return None
+        if any(field != mapped for field, mapped in layer._name_mapping.items()):
+            return None
+    if any("forward" in vars(module) for module in stages.modules()):
+        return None
+    return moment
+
+
+@torch.compiler.disable(recursive=False)
+def train_with_magnetic_readout(core, inputs, edges, topology, post_pairs):
+    from ..layers.compiled_grad import forward_with_coordinate_gradients, has_module_hooks, native_forces
+
+    if has_module_hooks(core.post_sequence):
+        return native_forces(core, inputs)
+    moment = independent_magnetic_readout(core)
+    if moment is None:
+        return forward_with_coordinate_gradients(core, inputs, edges, topology, post_pairs)
+    # AOTAutograd materializes zero gradients for unused outputs of a joint
+    # graph. Keep magnetic parameters out of the force VJP and expose Ma so
+    # a magnetic loss can still differentiate both the head and atom features.
+    fields = forward_with_coordinate_gradients(core, inputs, edges, topology, post_pairs, skip_post=(0,))
+    return moment(fields)

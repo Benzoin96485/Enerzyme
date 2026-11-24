@@ -408,3 +408,84 @@ def test_layer_stack_energy_forces_magmom_and_wrong_basis():
         assert "basis_cutoff" in str(exc)
     else:
         raise AssertionError("a bond basis at the wrong cutoff must be rejected")
+
+
+def test_compiled_energy_force_and_moment_parameter_participation():
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(21)
+    model = build("chgnet").double()
+    batch = make_batch(random_molecules(107, [5, 4]), torch.float64)
+    compiled = torch.compile(model, backend="aot_eager")
+
+    def gradients(runner, include_moment):
+        out = forward(runner, batch, torch.float64, train=True)
+        loss = out["E"].square().sum() + out["Fa"].square().sum()
+        if include_moment:
+            loss = loss + out["Ma"].square().sum()
+        derivatives = torch.autograd.grad(loss, (*model.parameters(), out["Ra"]), allow_unused=True)
+        return out, derivatives
+
+    for include_moment in (False, True):
+        expected, expected_gradients = gradients(model, include_moment)
+        observed, actual_gradients = gradients(compiled, include_moment)
+        assert expected.keys() == observed.keys()
+        for key, value in expected.items():
+            torch.testing.assert_close(observed[key], value)
+        for actual, reference in zip(actual_gradients, expected_gradients):
+            torch.testing.assert_close(actual, reference)
+
+    # A hook can consume magnetic predictions before computing the energy.
+    # Register after tracing to exercise ordinary calls on an existing runner.
+    def add_moment_to_features(module, args):
+        fields, = args
+        return ({**fields, "atom_feature": fields["atom_feature"] + fields["Ma"][:, None]},)
+
+    handle = model.post_sequence[1].register_forward_pre_hook(add_moment_to_features)
+    try:
+        expected, expected_gradients = gradients(model, False)
+        observed, actual_gradients = gradients(compiled, False)
+        torch.testing.assert_close(observed["Fa"], expected["Fa"])
+        for actual, reference in zip(actual_gradients, expected_gradients):
+            torch.testing.assert_close(actual, reference)
+    finally:
+        handle.remove()
+    expected, expected_gradients = gradients(model, False)
+    observed, actual_gradients = gradients(compiled, False)
+    torch.testing.assert_close(observed["Fa"], expected["Fa"])
+    for actual, reference in zip(actual_gradients, expected_gradients):
+        torch.testing.assert_close(actual, reference)
+
+
+def test_compiled_magnetic_readout_preserves_pyg_output():
+    from torch_geometric.data import Data
+    from scripts.core_harness import build, make_batch, random_molecules
+
+    fields = make_batch(random_molecules(107, [5, 4]), torch.float64)
+    fields["batch"] = fields.pop("batch_seg")
+    fields["Ra"].requires_grad_()
+    model = build("chgnet").double()
+    compiled = torch.compile(model, backend="aot_eager")
+    expected = model(Data(**fields))
+    graph = Data(**fields)
+    actual = compiled(graph)
+    assert actual is graph
+    assert set(actual.keys()) == set(expected.keys())
+    for key in ("Ma", "E", "Fa", "atom_feature_charge"):
+        torch.testing.assert_close(actual[key], expected[key])
+    params = tuple(model.post_sequence[0].parameters())
+    assert all(value is None for value in torch.autograd.grad(actual.Fa.square().sum(), params, allow_unused=True))
+
+
+def test_independent_magnetic_readout_checks_custom_fields_and_modes():
+    from enerzyme.models.chgnet.stages import independent_magnetic_readout
+    from scripts.core_harness import build
+
+    core = build("chgnet")
+    moment, energy, _, _ = core.post_sequence
+    assert independent_magnetic_readout(core) is moment
+    moment.test_only = True
+    assert independent_magnetic_readout(core) is None
+    moment.test_only = False
+    energy.reset_field_name(atom_feature="Ma")
+    assert independent_magnetic_readout(core) is None

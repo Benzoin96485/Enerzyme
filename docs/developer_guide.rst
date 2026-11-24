@@ -313,6 +313,15 @@ The second command prepares the batch's discrete neighbors before compiling
 the graph that returns energy and forces for the loss. On CHGNet this leaves
 the magnetic-moment head's gradient absent during energy/force fitting.
 
+With CHGNet's standard stack, ordinary compiled training also places the
+magnetic readout in a separate differentiable graph. An energy/force loss
+leaves its weight and bias gradients absent. Adding a magnetic loss trains
+both through the same atom features. Readout hooks use native derivatives
+so changes to their inputs and outputs take effect on the next call.
+On PyTorch 2.13, a loss on magnetic moments alone can still give explicit
+zero gradients to unused parameters in the shared feature graph. Use eager
+training if the optimizer must skip those parameters for a magnetic-only step.
+
 :code:`GraphContext` caches geometry for the duration of one forward pass.
 Each block returns a :code:`BlockState` carrying node, edge or auxiliary
 features. The head can consume the final state or request intermediate
