@@ -1142,5 +1142,148 @@
     }
    }
   }
+ },
+ "visnet_independent_vector_training": {
+  "base": "96b255c",
+  "candidate": "c0ce98f",
+  "shared_vjp": "f080325",
+  "torch": "2.13.0+cu126",
+  "device": "CPU",
+  "procedure": "Same weights, same coordinates and inputs within each run. The ordinary compiled model returns its full mapping. Each loss checks every returned tensor, all weight derivatives including unused parameters, and its coordinate gradient against eager in float64 at atol=1e-10 and rtol=1e-8. Each reported participation difference has an absent eager gradient and an all-zero compiled gradient. The AOT direct backend verifies the original zero values individually. The production Inductor cases record the absent side and count of nonzero elements for each mismatch.",
+  "model": "Two layers, hidden width 8, two attention heads, lmax 2, initialization seed 42, coordinate seed 107, 3+2 atoms. Before/after denotes the placement of the optional equivariant dipole readout immediately after the core or after force evaluation. custom_before/after uses a user-defined BaseFFLayer combining a learned scalar times position and a Cartesian projection. In energy, a custom layer adds the squared Cartesian vector norm to atomic energies before reduction and force evaluation.",
+  "implementation": "The scalar/force graph returns the final scalar messages, normalized vectors, residual inputs, indices and directions. A second compiled graph performs the terminal vector projection and normalization. A third executes the optional tensorial readout. The existing joint differentiable graph runs when a custom layer comes before Force or the vector branch contributes to energy. Layers after Force execute in their original order. Only independent built-in dipole/polarizability readouts can cross Force. All graphs receive differentiable inputs.",
+  "jobs": {"split_toy_and_real": "login AOT", "small_split_inductor": 6319556, "small_joint_inductor": 6319575, "optional_readout_independent_graph": 6319579, "custom_head_joint_and_split": 6319617, "prototype_full_preset": 6319626, "prototype_aot_checks": 6319627, "production_full_preset": 6319670, "production_inductor": 6319667, "original_aot_masks": 6319672},
+  "losses": {"energy_forces": "sum(E^2)+sum(Fa^2)", "combined_vector": "energy_forces plus vector_only", "vector_only": "sum(sin(V)+V^2) and squared l=2 channels when present", "combined_dipole": "energy_forces plus dipole_only", "dipole_only": "sum(cos(M2))"},
+  "minimal_model": [{"split": false, "auxiliary": false, "max_abs": 0.0, "same_unused": false, "vector_grads": [false, false]}, {"split": false, "auxiliary": true, "max_abs": 0.0, "same_unused": true, "vector_grads": [false, false]}, {"split": true, "auxiliary": false, "max_abs": 0.0, "same_unused": true, "vector_grads": [true, true]}, {"split": true, "auxiliary": true, "max_abs": 0.0, "same_unused": true, "vector_grads": [false, false]}],
+  "cases": {
+   "default": {
+    "parameter_tensors": 52,
+    "joint_graphs": [{"operations": 389, "linear": 24}],
+    "split_graphs": [{"operations": 367, "linear": 23}, {"operations": 28, "linear": 1}],
+    "split_force_plan": [],
+    "parameter_groups": {
+     "last_s_proj": ["blocks.1.module.s_proj.weight", "blocks.1.module.s_proj.bias"],
+     "scalar_energy_readout": ["post_sequence.0.head.0.weight", "post_sequence.0.head.0.bias", "post_sequence.0.head.1.weight", "post_sequence.0.head.1.bias"],
+     "final_scalar_norm": ["head.out_norm.weight", "head.out_norm.bias"]
+    },
+    "losses": {
+     "energy_forces": {"joint_zero_for_unused": ["last_s_proj"], "split_zero_for_unused": [], "coordinate_max_abs": [4.440892098500626e-16, 4.440892098500626e-16], "split_s_proj_max_abs": [null, null]},
+     "combined_vector": {"joint_zero_for_unused": [], "split_zero_for_unused": [], "coordinate_max_abs": [8.881784197001252e-16, 8.881784197001252e-16], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]},
+     "vector_only": {"joint_zero_for_unused": ["final_scalar_norm", "scalar_energy_readout"], "split_zero_for_unused": ["final_scalar_norm", "scalar_energy_readout"], "coordinate_max_abs": [8.326672684688674e-17, 8.326672684688674e-17], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]}
+    }
+   },
+   "before": {
+    "parameter_tensors": 57,
+    "joint_graphs": [{"operations": 419, "linear": 27}],
+    "split_graphs": [{"operations": 367, "linear": 23}, {"operations": 28, "linear": 1}, {"operations": 29, "linear": 3}],
+    "split_force_plan": [0],
+    "parameter_groups": {
+     "dipole_readout": ["post_sequence.0.outnet.0.mix_vectors.weight", "post_sequence.0.outnet.0.scalar_net.0.weight", "post_sequence.0.outnet.0.scalar_net.0.bias", "post_sequence.0.outnet.0.scalar_net.1.weight", "post_sequence.0.outnet.0.scalar_net.1.bias"],
+     "last_s_proj": ["blocks.1.module.s_proj.weight", "blocks.1.module.s_proj.bias"],
+     "scalar_energy_readout": ["post_sequence.1.head.0.weight", "post_sequence.1.head.0.bias", "post_sequence.1.head.1.weight", "post_sequence.1.head.1.bias"],
+     "final_scalar_norm": ["head.out_norm.weight", "head.out_norm.bias"]
+    },
+    "losses": {
+     "energy_forces": {"joint_zero_for_unused": ["dipole_readout", "last_s_proj"], "split_zero_for_unused": [], "coordinate_max_abs": [2.498001805406602e-16, 2.498001805406602e-16], "split_s_proj_max_abs": [null, null]},
+     "combined_vector": {"joint_zero_for_unused": ["dipole_readout"], "split_zero_for_unused": [], "coordinate_max_abs": [5.273559366969494e-16, 5.273559366969494e-16], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]},
+     "vector_only": {"joint_zero_for_unused": ["dipole_readout", "final_scalar_norm", "scalar_energy_readout"], "split_zero_for_unused": ["final_scalar_norm", "scalar_energy_readout"], "coordinate_max_abs": [8.326672684688674e-17, 8.326672684688674e-17], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]},
+     "combined_dipole": {"joint_zero_for_unused": [], "split_zero_for_unused": [], "coordinate_max_abs": [8.881784197001252e-16, 8.881784197001252e-16], "split_s_proj_max_abs": [0.016849758290993798, 0.6479938722307717]},
+     "dipole_only": {"joint_zero_for_unused": ["scalar_energy_readout"], "split_zero_for_unused": ["scalar_energy_readout"], "coordinate_max_abs": [2.220446049250313e-15, 2.220446049250313e-15], "split_s_proj_max_abs": [0.016849758290993798, 0.6479938722307717]}
+    }
+   },
+   "after": {
+    "parameter_tensors": 57,
+    "joint_graphs": [{"operations": 418, "linear": 27}],
+    "split_graphs": [{"operations": 367, "linear": 23}, {"operations": 28, "linear": 1}, {"operations": 29, "linear": 3}],
+    "split_force_plan": [3],
+    "parameter_groups": {
+     "dipole_readout": ["post_sequence.3.outnet.0.mix_vectors.weight", "post_sequence.3.outnet.0.scalar_net.0.weight", "post_sequence.3.outnet.0.scalar_net.0.bias", "post_sequence.3.outnet.0.scalar_net.1.weight", "post_sequence.3.outnet.0.scalar_net.1.bias"],
+     "last_s_proj": ["blocks.1.module.s_proj.weight", "blocks.1.module.s_proj.bias"],
+     "scalar_energy_readout": ["post_sequence.0.head.0.weight", "post_sequence.0.head.0.bias", "post_sequence.0.head.1.weight", "post_sequence.0.head.1.bias"],
+     "final_scalar_norm": ["head.out_norm.weight", "head.out_norm.bias"]
+    },
+    "losses": {
+     "energy_forces": {"joint_zero_for_unused": ["dipole_readout", "last_s_proj"], "split_zero_for_unused": [], "coordinate_max_abs": [4.440892098500626e-16, 4.440892098500626e-16], "split_s_proj_max_abs": [null, null]},
+     "combined_vector": {"joint_zero_for_unused": ["dipole_readout"], "split_zero_for_unused": [], "coordinate_max_abs": [8.881784197001252e-16, 8.881784197001252e-16], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]},
+     "vector_only": {"joint_zero_for_unused": ["dipole_readout", "final_scalar_norm", "scalar_energy_readout"], "split_zero_for_unused": ["final_scalar_norm", "scalar_energy_readout"], "coordinate_max_abs": [8.326672684688674e-17, 8.326672684688674e-17], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]},
+     "combined_dipole": {"joint_zero_for_unused": [], "split_zero_for_unused": [], "coordinate_max_abs": [8.881784197001252e-16, 8.881784197001252e-16], "split_s_proj_max_abs": [0.002323864816146262, 0.1990817020413274]},
+     "dipole_only": {"joint_zero_for_unused": ["scalar_energy_readout"], "split_zero_for_unused": ["scalar_energy_readout"], "coordinate_max_abs": [4.440892098500626e-16, 4.440892098500626e-16], "split_s_proj_max_abs": [0.002323864816146262, 0.1990817020413274]}
+    }
+   },
+   "custom_before": {
+    "parameter_tensors": 55,
+    "joint_graphs": [{"operations": 397, "linear": 26}],
+    "split_graphs": [{"operations": 397, "linear": 26}],
+    "split_force_plan": null,
+    "parameter_groups": {
+     "dipole_readout": ["post_sequence.0.gate.weight", "post_sequence.0.gate.bias", "post_sequence.0.vector.weight"],
+     "last_s_proj": ["blocks.1.module.s_proj.weight", "blocks.1.module.s_proj.bias"],
+     "scalar_energy_readout": ["post_sequence.1.head.0.weight", "post_sequence.1.head.0.bias", "post_sequence.1.head.1.weight", "post_sequence.1.head.1.bias"],
+     "final_scalar_norm": ["head.out_norm.weight", "head.out_norm.bias"]
+    },
+    "losses": {
+     "energy_forces": {"joint_zero_for_unused": ["dipole_readout", "last_s_proj"], "split_zero_for_unused": ["dipole_readout", "last_s_proj"], "coordinate_max_abs": [4.440892098500626e-16, 4.440892098500626e-16], "split_s_proj_max_abs": [0.0, 0.0]},
+     "combined_vector": {"joint_zero_for_unused": ["dipole_readout"], "split_zero_for_unused": ["dipole_readout"], "coordinate_max_abs": [8.881784197001252e-16, 8.881784197001252e-16], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]},
+     "vector_only": {"joint_zero_for_unused": ["dipole_readout", "final_scalar_norm", "scalar_energy_readout"], "split_zero_for_unused": ["dipole_readout", "final_scalar_norm", "scalar_energy_readout"], "coordinate_max_abs": [8.326672684688674e-17, 8.326672684688674e-17], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]},
+     "combined_dipole": {"joint_zero_for_unused": [], "split_zero_for_unused": [], "coordinate_max_abs": [4.440892098500626e-16, 4.440892098500626e-16], "split_s_proj_max_abs": [0.003709349961297923, 0.002332075307337249]},
+     "dipole_only": {"joint_zero_for_unused": ["scalar_energy_readout"], "split_zero_for_unused": ["scalar_energy_readout"], "coordinate_max_abs": [8.881784197001252e-16, 8.881784197001252e-16], "split_s_proj_max_abs": [0.003709349961297923, 0.002332075307337249]}
+    }
+   },
+   "custom_after": {
+    "parameter_tensors": 55,
+    "joint_graphs": [{"operations": 396, "linear": 26}],
+    "split_graphs": [{"operations": 367, "linear": 23}, {"operations": 28, "linear": 1}, {"operations": 7, "linear": 2}],
+    "split_force_plan": [3],
+    "parameter_groups": {
+     "dipole_readout": ["post_sequence.3.gate.weight", "post_sequence.3.gate.bias", "post_sequence.3.vector.weight"],
+     "last_s_proj": ["blocks.1.module.s_proj.weight", "blocks.1.module.s_proj.bias"],
+     "scalar_energy_readout": ["post_sequence.0.head.0.weight", "post_sequence.0.head.0.bias", "post_sequence.0.head.1.weight", "post_sequence.0.head.1.bias"],
+     "final_scalar_norm": ["head.out_norm.weight", "head.out_norm.bias"]
+    },
+    "losses": {
+     "energy_forces": {"joint_zero_for_unused": ["dipole_readout", "last_s_proj"], "split_zero_for_unused": [], "coordinate_max_abs": [4.440892098500626e-16, 4.440892098500626e-16], "split_s_proj_max_abs": [null, null]},
+     "combined_vector": {"joint_zero_for_unused": ["dipole_readout"], "split_zero_for_unused": [], "coordinate_max_abs": [8.881784197001252e-16, 8.881784197001252e-16], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]},
+     "vector_only": {"joint_zero_for_unused": ["dipole_readout", "final_scalar_norm", "scalar_energy_readout"], "split_zero_for_unused": ["final_scalar_norm", "scalar_energy_readout"], "coordinate_max_abs": [8.326672684688674e-17, 8.326672684688674e-17], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]},
+     "combined_dipole": {"joint_zero_for_unused": [], "split_zero_for_unused": [], "coordinate_max_abs": [4.440892098500626e-16, 4.440892098500626e-16], "split_s_proj_max_abs": [0.003709349961297923, 0.002332075307337249]},
+     "dipole_only": {"joint_zero_for_unused": ["scalar_energy_readout"], "split_zero_for_unused": ["scalar_energy_readout"], "coordinate_max_abs": [8.881784197001252e-16, 8.881784197001252e-16], "split_s_proj_max_abs": [0.003709349961297923, 0.002332075307337249]}
+    }
+   },
+   "energy": {
+    "parameter_tensors": 52,
+    "joint_graphs": [{"operations": 393, "linear": 24}],
+    "split_graphs": [{"operations": 393, "linear": 24}],
+    "split_force_plan": null,
+    "parameter_groups": {
+     "scalar_energy_readout": ["post_sequence.0.head.0.weight", "post_sequence.0.head.0.bias", "post_sequence.0.head.1.weight", "post_sequence.0.head.1.bias"],
+     "final_scalar_norm": ["head.out_norm.weight", "head.out_norm.bias"]
+    },
+    "losses": {
+     "energy_forces": {"joint_zero_for_unused": [], "split_zero_for_unused": [], "coordinate_max_abs": [7.771561172376096e-16, 7.771561172376096e-16], "split_s_proj_max_abs": [0.00831124233194078, 0.11816999584811577]},
+     "combined_vector": {"joint_zero_for_unused": [], "split_zero_for_unused": [], "coordinate_max_abs": [8.881784197001252e-16, 8.881784197001252e-16], "split_s_proj_max_abs": [0.025301317991801048, 0.08298443595515781]},
+     "vector_only": {"joint_zero_for_unused": ["final_scalar_norm", "scalar_energy_readout"], "split_zero_for_unused": ["final_scalar_norm", "scalar_energy_readout"], "coordinate_max_abs": [8.326672684688674e-17, 8.326672684688674e-17], "split_s_proj_max_abs": [0.02741644041775971, 0.11795255926341508]}
+    }
+   }
+  },
+  "additional_controls": {"pyg_data": {"backend": "aot_eager", "rows": {"energy_forces": {"unused_differences": [], "coordinate_max_abs": 0.0}, "combined_vector": {"unused_differences": [], "coordinate_max_abs": 0.0}, "vector_only": {"unused_differences": ["post_sequence.0.head.0.weight", "post_sequence.0.head.0.bias", "post_sequence.0.head.1.weight", "post_sequence.0.head.1.bias", "head.out_norm.weight", "head.out_norm.bias"], "coordinate_max_abs": 0.0}}}, "lmax1_node_learned_rms": {"backend": "aot_eager", "rows": {"energy_forces": {"unused_differences": [], "coordinate_max_abs": 0.0}, "combined_vector": {"unused_differences": [], "coordinate_max_abs": 8.881784197001252e-16}, "vector_only": {"unused_differences": ["post_sequence.0.head.0.weight", "post_sequence.0.head.0.bias", "post_sequence.0.head.1.weight", "post_sequence.0.head.1.bias", "blocks.1.module.t_src_proj.weight", "blocks.1.module.t_trg_proj.weight", "head.out_norm.weight", "head.out_norm.bias"], "coordinate_max_abs": 1.1657341758564144e-15}}}},
+  "full_preset": {"float32": {"graphs": [{"operations": 1053, "learned_operators": ["embedding", "index_add_", "linear"]}, {"operations": 28, "learned_operators": ["index_add_", "linear"]}], "atol": 0.0007, "rtol": 0.001, "outside_tolerance": [], "changed_gradient_participation": {}, "parameter_gradients_compared": 197, "outputs": {"E": {"max_abs": 4.76837158203125e-07, "relative_l2": 1.8709067433316148e-07}, "Fa": {"max_abs": 4.172325134277344e-07, "relative_l2": 7.067484275449687e-07}}}, "float64": {"graphs": [{"operations": 1053, "learned_operators": ["embedding", "index_add_", "linear"]}, {"operations": 28, "learned_operators": ["index_add_", "linear"]}], "atol": 1e-10, "rtol": 1e-08, "outside_tolerance": [], "changed_gradient_participation": {}, "parameter_gradients_compared": 197, "outputs": {"E": {"max_abs": 4.440892098500626e-16, "relative_l2": 1.5584658963207794e-16}, "Fa": {"max_abs": 7.216449660063518e-16, "relative_l2": 1.2703778169832185e-15}}}},
+  "eligibility": {"full_module_count": 159, "checked_module_count": 22, "plan_median_us": 67.61588699494799},
+  "exploratory_custom_before": "The prototype moved the pure test dipole declared as a custom layer and matched its values. Production keeps arbitrary custom layers before Force in the original joint graph to preserve side effects and ordering.",
+  "runtime_hooks": {
+   "revision": "bdb0567",
+   "job_ids": [6319738, 6319756, 6319782],
+   "procedure": "Warm ordinary training, install a scalar-readout input hook, add an output hook, remove both, replace the input hook, attach a descendant linear hook, then restore. The corrected run also attaches both full backward hook types to that linear layer. The custom-before and after configurations additionally attach a hook to their probe output. Each step compares every returned tensor plus every eager-active coordinate and weight gradient. A separate Inductor run records actual callback order against eager. An active input, final-update or readout hook runs native force derivatives. The ordinary unhooked computation resumes after removal.",
+   "eligibility": {"full_module_count": 159, "checked_module_count": 37, "eligibility_median_us": 84.74722970277071},
+   "default": {"earlier_aot_failures": {"both": {"E_max_abs": 1.0665675299920645, "Fa_max_abs": 0.057872026456890366, "mismatched_active_gradients": 46}}, "new_inductor_phases": ["warm", "installed_pre", "both", "removed", "replacement_pre", "descendant_forward", "descendant_backward", "restored"], "new_max_Fa_error": 5.551115123125783e-17, "order_matches_each_phase": true, "active_gradients_and_returned_tensors_match_each_phase": true},
+   "custom_before": {"earlier_aot_failures": {"installed_pre": {"E_max_abs": 1.4347629582027142, "Fa_max_abs": 0.2124767995166424, "mismatched_active_gradients": 46}, "both": {"E_max_abs": 2.5013304881947787, "Fa_max_abs": 0.264334611971757, "mismatched_active_gradients": 46}, "replacement_pre": {"E_max_abs": 2.847586717378762, "Fa_max_abs": 0.3679873497043195, "mismatched_active_gradients": 46}, "descendant_forward": {"E_max_abs": 0.4888604712469907, "Fa_max_abs": 0.15024103926509264, "mismatched_active_gradients": 46}, "custom_forward": {"E_max_abs": 0.0, "Fa_max_abs": 0.0, "mismatched_active_gradients": 0}}, "new_inductor_phases": ["warm", "installed_pre", "both", "removed", "replacement_pre", "descendant_forward", "descendant_backward", "custom_forward", "restored"], "new_max_Fa_error": 5.551115123125783e-17, "order_matches_each_phase": true, "active_gradients_and_returned_tensors_match_each_phase": true},
+   "after": {"earlier_aot_failures": {"both": {"E_max_abs": 1.0665675299920645, "Fa_max_abs": 0.057872026456890366, "mismatched_active_gradients": 46}}, "new_inductor_phases": ["warm", "installed_pre", "both", "removed", "replacement_pre", "descendant_forward", "descendant_backward", "custom_forward", "restored"], "new_max_Fa_error": 5.551115123125783e-17, "order_matches_each_phase": true, "active_gradients_and_returned_tensors_match_each_phase": true}
+  },
+  "isolated_atoms": {
+   "revision": "b86f4b5",
+   "job_ids": [6319786, 6319787],
+   "procedure": "Single isolated atom in AOT with each loss. Counts include coordinates and parameters. With include_self disabled and no selected neighbors, retain the joint graph so empty intermediates do not send gradients to disconnected weights. The original coordinate None/zero discrepancy remains. With self pairs enabled the candidate keeps the split.",
+   "no_self": {"energy_forces": [1, 1], "combined_vector": [1, 1], "vector_only": [10, 10]},
+   "self": {"energy_forces": [5, 3], "combined_vector": [3, 3], "vector_only": [9, 9]}
+  },
+  "scope": "CPU Inductor and AOT. Fullgraph retains the original joint path. Vector-only and dipole-only unused scalar-head gradient differences are recorded in the original column. GPU observations belong to the V100 validation archive."
  }
 }
