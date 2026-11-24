@@ -227,10 +227,14 @@ add :code:`--match-rng` to use matching random draws. For presets using the
 optional e3nn FX kernels, pass :code:`--e3nn-codegen fx`.
 Use :code:`--mode inference` to compare the reported energy and forces and
 differentiate the returned energy twice with respect to the coordinates.
+On PyTorch versions with :code:`donated_buffer`, the two additional gradient
+calls request reusable saved tensors with
+:code:`torch._functorch.config.patch(donated_buffer=False)`.
 
 .. code-block:: shell
 
    PYTHONPATH=. python scripts/check_compiled_forces.py mattersim --dtype float64
+   PYTHONPATH=. python scripts/check_compiled_forces.py chgnet --dtype float64 --prepared-energy-forces
 
 The per-preset CPU results are in
 :code:`test/fixtures/validation/compiled_forces_cpu.json`. Each entry identifies
@@ -240,6 +244,9 @@ The report keeps the original sweep and subsequent checks with corrected
 models or matched dropout masks. An auxiliary weight with an explicit zero
 gradient can receive an optimizer update even when the corresponding eager
 gradient is absent.
+The second command prepares the batch's discrete neighbors before compiling
+the graph that returns energy and forces for the loss. On CHGNet this leaves
+the magnetic-moment head's gradient absent during energy/force fitting.
 
 :code:`GraphContext` caches geometry for the duration of one forward pass.
 Each block returns a :code:`BlockState` carrying node, edge or auxiliary

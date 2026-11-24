@@ -3005,6 +3005,32 @@
         "dpa3-float32": {"graphs": [{"operations": 302, "learned_operators": ["embedding", "index_add_", "linear", "matmul"]}], "gradients_compared": 32, "energy": {"max_abs": 0.0, "relative_l2": 0.0}, "forces": {"max_abs": 1.4901161193847656e-08, "relative_l2": 8.013962305403779e-08}, "largest_parameter_relative_l2": [3.055106506554888e-07, "blocks.0.module.angle_to_edge.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"},
         "dpa3-float64": {"graphs": [{"operations": 302, "learned_operators": ["embedding", "index_add_", "linear", "matmul"]}], "gradients_compared": 32, "energy": {"max_abs": 0.0, "relative_l2": 0.0}, "forces": {"max_abs": 5.551115123125783e-17, "relative_l2": 2.979969135431394e-16}, "largest_parameter_relative_l2": [6.033876553717554e-16, "blocks.0.module.angle_to_edge.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"}
       }
+    },
+    "prepared_energy_force_loss": {
+      "candidate": "2fa0e3d",
+      "job": "6318340",
+      "dtype": "float64",
+      "method": "For each batch, compute _prepare_radius_graph and _post_pair_indices outside the compiled graph. Pass those tensors into forward_with_coordinate_gradients in a fullgraph=True function returning only E and Fa; capture dynamic shapes and scalar outputs. Backpropagate E.square().sum() + Fa.square().sum() and compare with the ordinary eager model with all outputs.",
+      "cases": {
+        "chgnet": {"graphs": [{"operations": 346, "learned_operators": ["embedding", "index_add_", "linear"]}, {"operations": 346, "learned_operators": ["embedding", "index_add_", "linear"]}], "gradients_compared": 127, "energy": {"max_abs": 4.440892098500626e-16, "relative_l2": 5.733648142859284e-16}, "forces": {"max_abs": 6.106226635438361e-16, "relative_l2": 1.265399065030885e-15}, "largest_parameter_relative_l2": [3.2280751732161972e-15, "pre_sequence.3.bessel_weights"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"},
+        "quinnet": {"graphs": [{"operations": 924, "learned_operators": ["embedding", "index_add_", "linear"]}], "gradients_compared": 182, "energy": {"max_abs": 3.3306690738754696e-16, "relative_l2": 4.95401114142518e-16}, "forces": {"max_abs": 4.996003610813204e-16, "relative_l2": 7.4801588586018855e-16}, "largest_parameter_relative_l2": [4.756910445399868e-15, "blocks.3.module.ratio"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"},
+        "visnet_lsrm": {"graphs": [{"operations": 1153, "learned_operators": ["embedding", "index_add_", "linear"]}], "gradients_compared": 182, "energy": {"max_abs": 2.220446049250313e-16, "relative_l2": 1.2563682630467714e-15}, "forces": {"max_abs": 2.0539125955565396e-15, "relative_l2": 2.3352350324152517e-15}, "largest_parameter_relative_l2": [1.3851939757056017e-13, "blocks.4.module.k_proj.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"}
+      },
+      "cli_confirmation": {
+        "model_revision": "b6796ea",
+        "job": "6318459",
+        "command": "scripts/check_compiled_forces.py MODEL --dtype float64 --prepared-energy-forces",
+        "cases": {"chgnet": {"graphs": [{"operations": 346, "learned_operators": ["embedding", "index_add_", "linear"]}, {"operations": 346, "learned_operators": ["embedding", "index_add_", "linear"]}], "gradients_compared": 127, "energy": {"max_abs": 5.551115123125783e-16, "relative_l2": 7.252554973371929e-16}, "forces": {"max_abs": 6.106226635438361e-16, "relative_l2": 1.265399065030885e-15}, "largest_parameter_relative_l2": [3.1527784580934528e-15, "blocks.1.bond.message.gate_norm.weight"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"}, "quinnet": {"graphs": [{"operations": 929, "learned_operators": ["embedding", "index_add_", "linear"]}], "gradients_compared": 182, "energy": {"max_abs": 7.771561172376096e-16, "relative_l2": 1.0464039154316695e-15}, "forces": {"max_abs": 7.771561172376096e-16, "relative_l2": 1.0492577988682812e-15}, "largest_parameter_relative_l2": [7.835580269802777e-15, "blocks.1.module.ratio"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"}, "visnet_lsrm": {"graphs": [{"operations": 1153, "learned_operators": ["embedding", "index_add_", "linear"]}], "gradients_compared": 182, "energy": {"max_abs": 1.1657341758564144e-15, "relative_l2": 6.427949954377786e-15}, "forces": {"max_abs": 2.0539125955565396e-15, "relative_l2": 2.3712731283780284e-15}, "largest_parameter_relative_l2": [1.3913611929301606e-13, "blocks.4.module.k_proj.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass"}}
+      }
+    },
+    "facto": {
+      "candidate": "2354ed0",
+      "job": "6318427",
+      "method": "Keep each tensor residual and the incoming atom sum separate until the final two-term reduction in the CPU compiled block.",
+      "cases": {
+        "facto-float32": {"graphs": [{"operations": 1197, "learned_operators": ["index_add_", "linear"]}], "gradients_compared": 188, "energy": {"max_abs": 0.0, "relative_l2": 0.0}, "forces": {"max_abs": 5.960464477539063e-08, "relative_l2": 2.356090687471951e-08}, "largest_parameter_relative_l2": [0.22429889950254195, "blocks.4.feedback.to_residual.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass", "maximum_abs_across_parameter_tensors": [1.9073486328125e-06, "post_sequence.1._a3"], "maximum_abs_of_largest_relative_error_tensor": 3.725290298461914e-09},
+        "facto-float64": {"graphs": [{"operations": 1197, "learned_operators": ["index_add_", "linear"]}], "gradients_compared": 188, "energy": {"max_abs": 1.1102230246251565e-16, "relative_l2": 1.6576257852897198e-16}, "forces": {"max_abs": 1.1102230246251565e-16, "relative_l2": 5.580248986109914e-17}, "largest_parameter_relative_l2": [0.7468686560843187, "blocks.4.feedback.to_residual.bias"], "outside_tolerance": {}, "changed_gradient_participation": {}, "status": "pass", "maximum_abs_across_parameter_tensors": [3.552713678800501e-15, "post_sequence.1._a3"], "maximum_abs_of_largest_relative_error_tensor": 1.3877787807814457e-17}
+      }
     }
   }
 }

@@ -19,6 +19,36 @@ import torch
 from core_harness import build, forward, make_batch, random_molecules
 
 
+class PreparedEnergyForces(torch.nn.Module):
+    """Return only the loss inputs from the compiled, differentiable part of the preset."""
+
+    def __init__(self, model, backend, device):
+        super().__init__()
+        from enerzyme.models.layers.compiled_grad import forward_with_coordinate_gradients
+
+        if getattr(model, "_scripted_force_kernels", False) or (device.type == "cpu" and (
+            getattr(model, "_native_cpu_inductor_forces", False)
+            or getattr(model, "_separate_cpu_force_reductions", False)
+        )):
+            raise ValueError("This preset requires its specialized force-training entry point")
+        self.model = model
+
+        def select(inputs, edges, topology, post_pairs):
+            out = forward_with_coordinate_gradients(model, inputs, edges, topology, post_pairs)
+            return {"E": out["E"], "Fa": out["Fa"]}
+
+        self.compiled = torch.compile(select, backend=backend, fullgraph=True)
+
+    def forward(self, inputs):
+        from torch._dynamo import config
+        from enerzyme.models.layers.compiled_grad import _post_pair_indices, _prepare_radius_graph
+
+        edges, topology = _prepare_radius_graph(self.model, inputs)
+        post_pairs = _post_pair_indices(self.model, inputs)
+        with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+            return self.compiled(inputs, edges, topology, post_pairs)
+
+
 def step(model, runner, batch, dtype, mode="training"):
     torch.manual_seed(22)
     np.random.seed(22)
@@ -27,9 +57,14 @@ def step(model, runner, batch, dtype, mode="training"):
     out = forward(runner, batch, dtype, train=mode == "training")
     values = {key: out[key].detach().clone() for key in ("E", "Fa")}
     if mode == "inference":
-        for key in ("energy_coordinate_gradient", "repeated_energy_coordinate_gradient"):
-            gradient = torch.autograd.grad(out["E"].sum(), out["Ra"], retain_graph=True, allow_unused=True)[0]
-            values[key] = gradient.detach().clone() if gradient is not None else None
+        from torch._functorch import config
+
+        # These two additional backwards belong to the caller after the
+        # ordinary inference call returns. Both need the saved tensors.
+        with config.patch(donated_buffer=False) if hasattr(config, "donated_buffer") else nullcontext():
+            for key in ("energy_coordinate_gradient", "repeated_energy_coordinate_gradient"):
+                gradient = torch.autograd.grad(out["E"].sum(), out["Ra"], retain_graph=True, allow_unused=True)[0]
+                values[key] = gradient.detach().clone() if gradient is not None else None
         return values
     (out["E"].square().sum() + out["Fa"].square().sum()).backward()
     values.update({name: p.grad.detach().clone() if p.grad is not None else None
@@ -37,7 +72,8 @@ def step(model, runner, batch, dtype, mode="training"):
     return values
 
 
-def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", match_rng=False, mode="training"):
+def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", match_rng=False,
+          mode="training", prepared_energy_forces=False):
     from torch._dynamo.backends.registry import lookup_backend
     from enerzyme.models.ff import get_ff_core
 
@@ -64,7 +100,9 @@ def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", ma
 
     from torch._inductor import config
     with config.patch(fallback_random=True) if match_rng else nullcontext():
-        actual = step(model, torch.compile(model, backend=lower), batch, dtype, mode)
+        runner = (PreparedEnergyForces(model, lower, device) if prepared_energy_forces
+                  else torch.compile(model, backend=lower))
+        actual = step(model, runner, batch, dtype, mode)
     errors, changed_participation, failed = {}, {}, []
     for name, reference in expected.items():
         value = actual[name]
@@ -88,7 +126,8 @@ def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", ma
     return {"architecture": architecture, "torch": str(torch.__version__), "device": str(device),
             "dtype": str(dtype), "atol": atol, "rtol": rtol, "graphs": graphs,
             "e3nn_codegen": e3nn_codegen, "matched_rng": match_rng,
-            "mode": mode, "parameter_gradients_compared": len(errors) - 2 if mode == "training" else 0,
+            "mode": mode, "prepared_energy_forces": prepared_energy_forces,
+            "parameter_gradients_compared": len(errors) - 2 if mode == "training" else 0,
             "changed_gradient_participation": changed_participation,
             "outside_tolerance": failed, "errors": errors}
 
@@ -100,6 +139,8 @@ def main():
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--mode", choices=("training", "inference"), default="training",
                         help="Check force-loss weight gradients or repeated derivatives of the inference energy.")
+    parser.add_argument("--prepared-energy-forces", action="store_true",
+                        help="Prepare discrete neighbors before tracing a training graph returning only E and Fa.")
     parser.add_argument("--atol", type=float)
     parser.add_argument("--rtol", type=float)
     parser.add_argument("--e3nn-codegen", choices=("default", "fx"), default="default",
@@ -107,11 +148,14 @@ def main():
     parser.add_argument("--match-rng", action="store_true",
                         help="Use native random draws in Inductor to compare identical dropout masks.")
     args = parser.parse_args()
+    if args.prepared_energy_forces and args.mode != "training":
+        parser.error("--prepared-energy-forces requires --mode training")
     double = args.dtype == "float64"
     atol = args.atol if args.atol is not None else (1e-10 if double else 7e-4)
     rtol = args.rtol if args.rtol is not None else (1e-8 if double else 1e-3)
     report = check(args.architecture, getattr(torch, args.dtype), atol, rtol, torch.device(args.device),
-                   e3nn_codegen=args.e3nn_codegen, match_rng=args.match_rng, mode=args.mode)
+                   e3nn_codegen=args.e3nn_codegen, match_rng=args.match_rng, mode=args.mode,
+                   prepared_energy_forces=args.prepared_energy_forces)
     print(json.dumps(report, indent=2, allow_nan=False))
     return int(bool(report["outside_tolerance"] or report["changed_gradient_participation"]))
 
