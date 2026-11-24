@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-import torch_geometric
+from ..mp.ops import segment_softmax
 import copy
 
 from ..mp.nn.activation import SmoothLeakyReLU
@@ -295,7 +295,7 @@ class SO2EquivariantGraphAttention(torch.nn.Module):
             x_0_alpha = self.alpha_norm(x_0_alpha)
             x_0_alpha = self.alpha_act(x_0_alpha)
             alpha = torch.einsum('bik, ik -> bi', x_0_alpha, self.alpha_dot)
-        alpha = torch_geometric.utils.softmax(alpha, edge_index[1]) 
+        alpha = segment_softmax(alpha, edge_index[1], x.embedding.shape[0], eps=1e-16, detach_max=True)
         alpha = alpha.reshape(alpha.shape[0], 1, self.num_heads, 1)
         if self.alpha_dropout is not None:
             alpha = self.alpha_dropout(alpha)

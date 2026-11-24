@@ -113,7 +113,7 @@ class SO2Block(torch.nn.Module):
 
         x_edge_0 = self.act(self.fc1_dist0(x_edge))
 
-        x_0 = x.embedding[:, 0 : mappingReduced.m_size[0]].contiguous()
+        x_0 = x.embedding[:, 0 : mappingReduced.order_sizes[0]].contiguous()
         x_0 = x_0.view(num_edges, -1)
 
         x_0 = self.fc1_m0(x_0)
@@ -121,18 +121,18 @@ class SO2Block(torch.nn.Module):
         x_0 = self.fc2_m0(x_0)
         x_0 = x_0.view(num_edges, -1, x.num_channels)
 
-        x.embedding[:, 0 : mappingReduced.m_size[0]] = x_0
+        x.embedding[:, 0 : mappingReduced.order_sizes[0]] = x_0
 
-        offset = mappingReduced.m_size[0]
+        offset = mappingReduced.order_sizes[0]
         for m in range(1, max(self.mmax_list) + 1):
             x_m = x.embedding[
-                :, offset : offset + 2 * mappingReduced.m_size[m]
+                :, offset : offset + 2 * mappingReduced.order_sizes[m]
             ].contiguous()
             x_m = x_m.view(num_edges, 2, -1)
             x_m = self.so2_conv[m - 1](x_m, x_edge)
             x_m = x_m.view(num_edges, -1, x.num_channels)
-            x.embedding[:, offset : offset + 2 * mappingReduced.m_size[m]] = x_m
-            offset = offset + 2 * mappingReduced.m_size[m]
+            x.embedding[:, offset : offset + 2 * mappingReduced.order_sizes[m]] = x_m
+            offset = offset + 2 * mappingReduced.order_sizes[m]
 
         x._l_primary(mappingReduced)
         return x

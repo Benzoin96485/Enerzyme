@@ -35,7 +35,7 @@ class CoefficientMapping:
         self.m_harmonic = torch.tensor([], device=self.device).long()
         self.m_complex = torch.tensor([], device=self.device).long()
 
-        self.res_size = torch.zeros([self.num_resolutions], device=self.device).long()
+        resolution_sizes = []
         offset = 0
         for i in range(self.num_resolutions):
             for lval in range(self.lmax_list[i] + 1):
@@ -48,14 +48,17 @@ class CoefficientMapping:
                 self.l_harmonic = torch.cat(
                     [self.l_harmonic, m.fill_(lval).long()], dim=0
                 )
-            self.res_size[i] = len(self.l_harmonic) - offset
+            resolution_sizes.append(len(self.l_harmonic) - offset)
             offset = len(self.l_harmonic)
+
+        self.resolution_sizes = tuple(resolution_sizes)
+        self.res_size = torch.tensor(self.resolution_sizes, dtype=torch.long, device=self.device)
 
         num_coefficients = len(self.l_harmonic)
         self.to_m = torch.zeros(
             [num_coefficients, num_coefficients], device=self.device
         )
-        self.m_size = torch.zeros([max(self.mmax_list) + 1], device=self.device).long()
+        order_sizes = []
 
         offset = 0
         for m in range(max(self.mmax_list) + 1):
@@ -64,12 +67,14 @@ class CoefficientMapping:
             for idx_out, idx_in in enumerate(idx_r):
                 self.to_m[idx_out + offset, idx_in] = 1.0
             offset = offset + len(idx_r)
-            self.m_size[m] = int(len(idx_r))
+            order_sizes.append(len(idx_r))
 
             for idx_out, idx_in in enumerate(idx_i):
                 self.to_m[idx_out + offset, idx_in] = 1.0
             offset = offset + len(idx_i)
 
+        self.order_sizes = tuple(order_sizes)
+        self.m_size = torch.tensor(self.order_sizes, dtype=torch.long, device=self.device)
         self.to_m = self.to_m.detach()
 
         self._lmax_cache = None

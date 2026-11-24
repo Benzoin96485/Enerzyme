@@ -9,6 +9,12 @@ from ..equivariant.rotation.so3_rotation import DegreeRotation
 from ..head import Head
 
 
+def _full_mapping(lmax, mapping):
+    if mapping.mmax_list == [lmax]:
+        return mapping
+    return CoefficientMapping([lmax], [lmax], torch.device("cpu"))
+
+
 def _seed(node, projection, lmax):
     scalar = projection(node)
     x = scalar.new_zeros(node.shape[0], (lmax + 1) ** 2, scalar.shape[-1])
@@ -44,6 +50,7 @@ class ChannelEmbed(Embed):
         self.mmax = mmax
         self.degree = degree
         self.mapping = mapping if mapping is not None else CoefficientMapping([lmax], [mmax], torch.device("cpu"))
+        self.rotation_mapping = _full_mapping(lmax, self.mapping)
 
     def forward(self, inputs, ctx):
         node = inputs["atom_embedding"]
@@ -51,7 +58,8 @@ class ChannelEmbed(Embed):
         edge = torch.stack((ctx.sender, ctx.receiver))
         frame = inputs.get("edge_rot_mat")
         matrices = ctx.edge_rotation(self.lmax, "jd", edge_sign=-1, frame=frame)
-        rotation = [DegreeRotation(matrices, self.lmax, apply_rotate_inv_rescale=self.degree is not None)]
+        rotation = [DegreeRotation(matrices, self.lmax, apply_rotate_inv_rescale=self.degree is not None,
+                                   mapping=self.rotation_mapping.to(node.device))]
         mapping = self.mapping.to(node.device)
         x = SO3_Embedding(ctx.num_nodes, [self.lmax], self.sphere_proj.out_features, node.device, node.dtype)
         x.embedding[:, 0, :] = self.sphere_proj(node)
@@ -123,6 +131,7 @@ class SmoothChannelEmbed(Embed):
         self.degree = degree
         self.lmax = lmax
         self.mapping = mapping
+        self.rotation_mapping = _full_mapping(lmax, mapping)
 
     def forward(self, inputs, ctx):
         node = inputs["atom_embedding"]
@@ -135,7 +144,7 @@ class SmoothChannelEmbed(Embed):
         if ctx.num_edges:
             vec = ctx.vec.to(node.device)
             matrices = ctx.edge_rotation(self.lmax, "jd", frame=inputs.get("edge_rot_mat"))
-            rotation = [DegreeRotation(matrices, self.lmax)]
+            rotation = [DegreeRotation(matrices, self.lmax, mapping=self.rotation_mapping.to(node.device))]
             distance = torch.linalg.vector_norm(vec, dim=-1)
             radial = torch.cat((ctx.rbf.to(node.device), self.source(z[src]), self.target(z[dst])), dim=1)
             x = x + self.degree(radial, distance, edge, rotation, ctx.num_nodes)

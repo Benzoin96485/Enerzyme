@@ -125,7 +125,7 @@ class SO3_Embedding(torch.nn.Module):
 
         offset = 0
         for i in range(self.num_resolutions):
-            num_coefficients = mappingReduced.res_size[i]
+            num_coefficients = mappingReduced.resolution_sizes[i]
             embedding_i = self.embedding[:, offset : offset + num_coefficients]
             embedding_rotate = torch.cat(
                 [
@@ -148,7 +148,7 @@ class SO3_Embedding(torch.nn.Module):
     def _grid_act(self, SO3_grid, act, mappingReduced) -> None:
         offset = 0
         for i in range(self.num_resolutions):
-            num_coefficients = mappingReduced.res_size[i]
+            num_coefficients = mappingReduced.resolution_sizes[i]
             x_res = self.embedding[:, offset : offset + num_coefficients].contiguous()
             grid_i = SO3_grid[self.lmax_list[i]][self.mmax_list[i]]
             x_grid = act(grid_i.to_grid(x_res))

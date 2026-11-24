@@ -36,11 +36,15 @@ class DegreeRotation:
         self.mapping = CoefficientMapping([self.lmax], [self.lmax], self.device)
 
     def rotate(self, embedding: torch.Tensor, out_lmax: int, out_mmax: int) -> torch.Tensor:
+        if out_lmax == out_mmax == self.lmax:
+            return torch.bmm(self.wigner, embedding)
         out_mask = self.mapping.coefficient_idx(out_lmax, out_mmax)
         wigner = self.wigner[:, out_mask, :]
         return torch.bmm(wigner, embedding)
 
     def rotate_inv(self, embedding: torch.Tensor, in_lmax: int, in_mmax: int) -> torch.Tensor:
+        if in_lmax == in_mmax == self.lmax:
+            return torch.bmm(self.wigner_inv, embedding)
         in_mask = self.mapping.coefficient_idx(in_lmax, in_mmax)
         wigner_inv = self.wigner_inv[:, :, in_mask]
         if self.apply_rotate_inv_rescale and in_mmax < in_lmax:
