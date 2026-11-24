@@ -205,6 +205,14 @@ Adding an internal architecture
    symmetries and checkpoint parity. Record the preset in the
    :doc:`/user_guide/models/architecture_catalog`.
 
+The shared :code:`edge_rotation` function defaults to the recursive Clebsch–Gordan
+backend. It had the shortest median time for the forward pass and coordinate
+gradient at 64 and 1,024 edges, for every tested degree from 1 to 4 in both
+precisions on a Xeon Gold 6130 and a Tesla V100. The benchmark supplies the
+same Cartesian frame to all backends. Existing presets select their upstream
+frame convention explicitly. The measurements in :code:`test/fixtures/bench_rotations.json`
+can be reproduced with :code:`scripts/bench_rotations.py`.
+
 :code:`GraphContext` caches geometry for the duration of one forward pass.
 Each block returns a :code:`BlockState` carrying node, edge or auxiliary
 features. The head can consume the final state or request intermediate
