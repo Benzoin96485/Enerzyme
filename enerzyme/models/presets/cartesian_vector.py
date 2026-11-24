@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional, Union
+
 from torch import nn
 
 from ..mp.block import FnBlock
@@ -21,7 +23,7 @@ def painn(
     propagate_vectors: bool = True,
     use_vector_scalar_product: bool = True,
     epsilon: float = 1e-8,
-    ) -> ComposableCore:
+) -> ComposableCore:
     if num_interactions < 1:
         raise ValueError(f"num_interactions must be >= 1, got {num_interactions}")
     if dim_embedding < 1:
@@ -52,7 +54,7 @@ def newtonnet(
     layer_norm: bool = False,
     shared_interactions: bool = False,
     displacement_init_gain: float = 1e-3,
-    ) -> ComposableCore:
+) -> ComposableCore:
     if int(num_interactions) < 1:
         raise ValueError(f"num_interactions must be >= 1, got {num_interactions}")
     if int(dim_embedding) < 1:
@@ -133,7 +135,7 @@ def et(
     neighbor_embedding: bool = True,
     vector_cutoff: bool = True,
     include_self: bool = True,
-    ) -> ComposableCore:
+) -> ComposableCore:
     from ..et.interaction import EquivariantMultiHeadAttention, normalize_distance_influence
     from ..mp.message.vector import AngularFeatureHead
 
@@ -161,7 +163,7 @@ def quinnet(
     include_self: bool = True,
     activation: object = "silu",
     attn_activation: object = "silu",
-    ) -> ComposableCore:
+) -> ComposableCore:
     from ..et.interaction import normalize_distance_influence
     from ..mp.message.vector import AngularFeatureHead
     from ..quinnet.interaction import QuinNetInteraction
@@ -222,7 +224,7 @@ def visnet(
     include_self: bool = True,
     activation: object = "silu",
     attn_activation: object = "silu",
-    ) -> ComposableCore:
+) -> ComposableCore:
     from ..visnet.interaction import ViSInteraction
 
     embed, layers, head = _vis_parts(
@@ -251,7 +253,7 @@ def freecg(
     num_groups: int = 8,
     shuffle_scale: float = 1.5,
     attention_enhancer: object = "linear",
-    ) -> ComposableCore:
+) -> ComposableCore:
     from ..freecg.interaction import FreeCGInteraction, normalize_attention_enhancer
 
     if int(lmax) != 2:
@@ -303,7 +305,7 @@ def visnet_lsrm(
     kmeans_random_state: int = 0,
     dropout: float = 0.0,
     trainable_rbf_lr: bool = True,
-    ) -> ComposableCore:
+) -> ComposableCore:
     from ..mp.message.vector import edge_attention_step, build_attention_stack
     from ..visnet.interaction import ViSInteraction, _xavier_linear
     from ..visnet.lsr import (
@@ -338,4 +340,174 @@ def visnet_lsrm(
         architecture="visnet_lsrm", lmax=lmax, angular_dim=embed.angular_dim, num_heads=num_heads,
         num_layers=num_layers, dim_embedding=dim_embedding, dim_feature_out=2*dim_embedding,
         feature_irreps=f"{2*dim_embedding}x0e", vector_feature_layout="cartesian_n3f",
+    )
+
+
+def leftnet(
+    dim_embedding: int = 128,
+    num_rbf: int = 32,
+    cutoff_sr: float = 5.0,
+    num_layers: int = 4,
+    fte_scalarization: str = "l2",
+    eps: float = 1e-10,
+) -> ComposableCore:
+    from ..mp.message.frame import CartesianMessage, FrameBlock, FrameEmbed, FrameTransition
+
+    if int(dim_embedding) < 4:
+        raise ValueError(f"dim_embedding must be >= 4, got {dim_embedding}")
+    if int(num_rbf) < 1:
+        raise ValueError(f"num_rbf must be >= 1, got {num_rbf}")
+    if int(num_layers) < 1:
+        raise ValueError(f"num_layers must be >= 1, got {num_layers}")
+    if float(cutoff_sr) <= 0.0:
+        raise ValueError(f"cutoff_sr must be positive, got {cutoff_sr}")
+    if fte_scalarization not in {"l2", "frame"}:
+        raise ValueError(
+            f"fte_scalarization must be 'l2' or 'frame', got {fte_scalarization!r}"
+        )
+
+    embed = FrameEmbed(dim_embedding, num_rbf, cutoff_sr, fte_scalarization, eps)
+    messages = [CartesianMessage(dim_embedding, num_rbf) for _ in range(num_layers)]
+    blocks = [FrameBlock(message, FrameTransition(dim_embedding, fte_scalarization)) for message in messages]
+    return ComposableCore(
+        embed, blocks, FeatureHead(equi_field="atom_vector_feature"), GraphRequires(),
+        positional_fields=_VECTOR_INPUTS + ("Ra", "batch_seg", "cutoff_values_sr"),
+        architecture="leftnet", fte_scalarization=fte_scalarization, num_layers=num_layers,
+        **vector_metadata(dim_embedding),
+    )
+
+
+def alphanet(
+    dim_embedding: int = 128,
+    num_rbf: int = 96,
+    cutoff_sr: float = 5.0,
+    num_layers: int = 3,
+    head: int = 16,
+    main_chi1: int = 24,
+    mp_chi1: int = 24,
+    chi2: int = 6,
+    hidden_channels_chi: int = 96,
+    has_dropout_flag: bool = True,
+    has_norm_before_flag: bool = True,
+    has_norm_after_flag: bool = False,
+    reduce_mode: str = "sum",
+    fte_scalarization: str = "l2",
+    eps: float = 1e-10,
+) -> ComposableCore:
+    import torch
+    from ..mp.message.frame import AlphaNetMessage, FrameBlock, FrameEmbed, FrameTransition, QuantumHead
+
+    hidden = int(dim_embedding)
+    layers = int(num_layers)
+    head = int(head)
+    main_chi1 = int(main_chi1)
+    mp_chi1 = int(mp_chi1)
+    chi2 = int(chi2)
+    hidden_chi = int(hidden_channels_chi)
+    if hidden < 4 or hidden % 2:
+        raise ValueError(
+            "dim_embedding must be even and >= 4 so the rotary embedding "
+            f"can split it in half, got {dim_embedding}"
+        )
+    if int(num_rbf) < 1:
+        raise ValueError(f"num_rbf must be >= 1, got {num_rbf}")
+    if layers < 1:
+        raise ValueError(f"num_layers must be >= 1, got {num_layers}")
+    if float(cutoff_sr) <= 0.0:
+        raise ValueError(f"cutoff_sr must be positive, got {cutoff_sr}")
+    if head < 1 or hidden // head < 1:
+        raise ValueError(
+            f"head must be in 1..dim_embedding, got head={head}, dim_embedding={hidden}"
+        )
+    if hidden_chi < 2 or hidden_chi % head:
+        raise ValueError(
+            "hidden_channels_chi must be >= 2 and divisible by head, "
+            f"got {hidden_chi} and head {head}"
+        )
+    if min(main_chi1, mp_chi1, chi2) < 1:
+        raise ValueError(
+            "main_chi1, mp_chi1, and chi2 must be >= 1, "
+            f"got {(main_chi1, mp_chi1, chi2)}"
+        )
+    if reduce_mode not in {"sum", "mean"}:
+        raise ValueError(f"reduce_mode must be 'sum' or 'mean', got {reduce_mode!r}")
+    if fte_scalarization not in {"l1", "l2"}:
+        raise ValueError(
+            "fte_scalarization must be 'l1' or 'l2', got "
+            f"{fte_scalarization!r}. The default 'l2' is rotationally "
+            "equivariant. 'l1' matches the released AlphaNet transition "
+            "and is not."
+        )
+
+    embed = FrameEmbed(hidden, num_rbf, cutoff_sr, fte_scalarization, eps, quantum=True)
+    messages = [AlphaNetMessage(hidden, num_rbf, hidden_chi, head, mp_chi1, chi2, dropout=has_dropout_flag,
+                                norm_before=has_norm_before_flag, norm_after=has_norm_after_flag, reduce=reduce_mode)
+                for _ in range(layers)]
+    blocks = [FrameBlock(message, FrameTransition(hidden, fte_scalarization), i, eps)
+              for i, message in enumerate(messages)]
+    embed.kernel1 = nn.Parameter(torch.randn(hidden, main_chi1 * 2))
+    embed.kernels_real = nn.Parameter(torch.randn(layers, hidden, main_chi1, main_chi1))
+    embed.kernels_imag = nn.Parameter(torch.randn(layers, hidden, main_chi1, main_chi1))
+    return ComposableCore(
+        embed, blocks, QuantumHead(hidden, main_chi1), GraphRequires(),
+        positional_fields=_VECTOR_INPUTS + ("Ra", "batch_seg", "cutoff_values_sr"),
+        architecture="alphanet", fte_scalarization=fte_scalarization, num_layers=layers,
+        main_chi1=main_chi1, muon_head_names=(), **vector_metadata(hidden),
+    )
+
+
+def geodite(
+    dim_embedding: int = 192,
+    num_rbf: int = 12,
+    max_Za: int = 100,
+    num_layers: int = 4,
+    lmax: int = 2,
+    num_heads: int = 8,
+    attn_dropout: float = 0.2,
+    edge_updates: Union[bool, str] = "linw_mlpa_ln",
+    evec_dim: Optional[int] = None,
+    emlp_dim: Optional[int] = None,
+    edge_norm: str = "",
+    epsilon: float = 1e-6,
+) -> ComposableCore:
+    from ..geodite.interaction import (
+        EquivariantCoupling, GeoditeBlock, GeoditeEmbed, GeoditeHead, InteractionBlock, parse_edge_updates,
+    )
+
+    if int(num_layers) < 1:
+        raise ValueError(f"num_layers must be >= 1, got {num_layers}")
+    if int(dim_embedding) < 1:
+        raise ValueError(f"dim_embedding must be >= 1, got {dim_embedding}")
+    if int(num_rbf) < 1:
+        raise ValueError(f"num_rbf must be >= 1, got {num_rbf}")
+    if int(lmax) < 1 or int(lmax) > 4:
+        raise ValueError(f"lmax must be in 1..4, got {lmax}")
+    if int(num_heads) < 1 or int(dim_embedding) % int(num_heads) != 0:
+        raise ValueError(
+            f"dim_embedding {dim_embedding} must be divisible by num_heads {num_heads}"
+        )
+    if not 0.0 <= float(attn_dropout) <= 1.0:
+        raise ValueError(f"attn_dropout must be in [0, 1], got {attn_dropout}")
+    if float(epsilon) <= 0:
+        raise ValueError(f"epsilon must be positive, got {epsilon}")
+
+    embed = GeoditeEmbed(dim_embedding, num_rbf, max_Za, lmax)
+    edge_spec = parse_edge_updates(edge_updates)
+    messages = [
+        InteractionBlock(
+            channels=dim_embedding, num_rbf=num_rbf, lmax=lmax, num_heads=num_heads, dropout=attn_dropout,
+            epsilon=epsilon, edge_spec=edge_spec, update_edges=edge_updates is not False and i < num_layers - 1,
+            evec_dim=dim_embedding if evec_dim is None else evec_dim,
+            emlp_dim=dim_embedding if emlp_dim is None else emlp_dim, edge_norm=edge_norm,
+        )
+        for i in range(num_layers)
+    ]
+    blocks = [GeoditeBlock(message, EquivariantCoupling(dim_embedding)) for message in messages]
+    return ComposableCore(
+        embed, blocks, GeoditeHead(), GraphRequires(distances=False, optional_cutoff_values=False),
+        positional_fields=("atom_embedding", "rbf", "idx_i_sr", "idx_j_sr", "vij_sr", "Za"),
+        architecture="geodite", dim_embedding=dim_embedding, dim_feature_out=dim_embedding,
+        num_layers=num_layers, num_output_blocks=num_layers, feature_irreps=f"{dim_embedding}x0e",
+        steerable_layout="geodite_polynomial", emits_isolated_atom_feature=True, lmax=lmax,
+        attn_dropout=attn_dropout, angular_dim=embed.angular_dim,
     )

@@ -44,7 +44,7 @@ class LatentForceCosineLoss:
 
     def __call__(self, output: Dict[str, Tensor], target: Dict[str, Tensor]) -> Tensor:
         if "latent_force" not in output:
-            raise KeyError("latent_force_cosine expects output['latent_force'] from NewtonNetCore")
+            raise KeyError("latent_force_cosine expects output['latent_force'] from the NewtonNet preset")
         if "Fa" not in target:
             raise KeyError("latent_force_cosine expects reference forces target['Fa']")
         return self.weight * latent_force_cosine(

@@ -15,8 +15,6 @@ HYPER_PARAM_KEYS = {
 }
 MODEL_HEAD_NAMES = {
     "ComposableCore": {"head"},
-    "AlphaNetCore": set(),
-    "LEFTNetCore": set(),
     "BOTNetCore": set(),
 }
 
@@ -250,7 +248,7 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
             raise TypeError(f"Muon optimizer is not supported for {core_name}.")
         
         # get the param groups
-        head_names = MODEL_HEAD_NAMES[core_name]
+        head_names = getattr(model, "muon_head_names", MODEL_HEAD_NAMES[core_name])
         hidden_weights = []
         hidden_gains_biases = []
         nonhidden_params = []

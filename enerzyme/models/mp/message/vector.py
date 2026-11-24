@@ -149,7 +149,7 @@ class AngularFeatureHead(Head):
     def forward(self, state, ctx, taps, inputs):
         scalar = self.out_norm(state.scalar)
         vector = state.equi if self.vec_out_norm is None else self.vec_out_norm(state.equi)
-        out = {"atom_feature": scalar, "atom_vector_feature": vector[:, :3].contiguous()}
+        out = {"atom_feature": scalar, "atom_vector_feature": vector if self.lmax == 1 else vector[:, :3].contiguous()}
         if self.lmax == 2:
             out["atom_l2_feature"] = vector[:, 3:].contiguous()
         return out

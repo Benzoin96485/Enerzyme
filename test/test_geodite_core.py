@@ -46,7 +46,7 @@ def test_registration_defaults_and_yaml():
 
     for name in ("geodite", "Geodite"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "GeoditeCore"
+        assert core_cls.__name__ == "geodite"
         assert build_params["dim_embedding"] == 192
         assert build_params["num_rbf"] == 12
         assert build_params["cutoff_sr"] == 6.0
@@ -72,13 +72,13 @@ def test_registration_defaults_and_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "GeoditeCore"
+    assert model.architecture == "geodite"
     assert model.dim_embedding == 16
     assert model.num_layers == 2
     assert model.lmax == 2
     assert model.feature_irreps == "16x0e"
-    assert model.interactions[0].update_edges is True
-    assert model.interactions[-1].update_edges is False
+    assert model.blocks[0].message.update_edges is True
+    assert model.blocks[-1].message.update_edges is False
     names = [type(layer).__name__ for layer in list(model.pre_sequence) + list(model.post_sequence)]
     assert "RadialWindowLayer" in names
     assert "IsolatedAtomResidualLayer" in names
@@ -96,9 +96,9 @@ def test_registration_defaults_and_yaml():
     assert zbl.envelope_p == 5
 
     try:
-        from enerzyme.models.geodite import GeoditeCore
+        from enerzyme.models.presets.cartesian_vector import geodite
 
-        GeoditeCore(dim_embedding=16, num_heads=5)
+        geodite(dim_embedding=16, num_heads=5)
     except ValueError as exc:
         assert "divisible" in str(exc)
     else:
@@ -106,10 +106,10 @@ def test_registration_defaults_and_yaml():
 
 
 def test_published_width_forward():
-    from enerzyme.models.geodite import GeoditeCore
+    from enerzyme.models.presets.cartesian_vector import geodite
 
     torch.manual_seed(1)
-    core = GeoditeCore().eval()
+    core = geodite().eval()
     assert core.dim_embedding == 192
     assert core.num_layers == 4
     assert core.lmax == 2
@@ -134,10 +134,10 @@ def test_published_width_forward():
 
 
 def test_molecules_do_not_exchange_messages():
-    from enerzyme.models.geodite import GeoditeCore
+    from enerzyme.models.presets.cartesian_vector import geodite
 
     torch.manual_seed(2)
-    core = GeoditeCore(
+    core = geodite(
         dim_embedding=16, num_rbf=4, max_Za=10, num_layers=2, num_heads=4, attn_dropout=0.0
     ).eval()
     table = torch.randn(11, 16)

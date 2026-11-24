@@ -1,6 +1,6 @@
 """ViSNet-LSRM Core (Li et al., ICLR 2024).
 
-Short-range message passing is :class:`~enerzyme.models.visnet.core.ViSNetCore`.
+Short-range message passing is :func:`~enerzyme.models.presets.cartesian_vector.visnet`.
 The long-range branch is the released serial ViSNet-LSRM block: after the
 short stack, fragment states are mean-pooled from that state and atoms attend
 to fragments inside ``cutoff_lr``. The two branches are normalized separately

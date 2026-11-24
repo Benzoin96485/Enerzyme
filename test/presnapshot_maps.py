@@ -67,6 +67,26 @@ KEY_MAPS["visnet_lsrm"] = [
     (r"^(out_norm_long|vec_out_norm_long)\.", r"head.\1."),
 ]
 
+KEY_MAPS["leftnet"] = [
+    (r"^(radial|lse|embed_norm)\.", r"embed.\1."),
+    (r"^messages\.(\d+)\.", r"blocks.\1.message."),
+    (r"^transitions\.(\d+)\.", r"blocks.\1.transition."),
+]
+
+KEY_MAPS["alphanet"] = [
+    (r"^(radial|lse|embed_norm)\.", r"embed.\1."),
+    (r"^messages\.(\d+)\.", r"blocks.\1.message."),
+    (r"^transitions\.(\d+)\.", r"blocks.\1.transition."),
+    (r"^(kernel1|kernels_real|kernels_imag)$", r"embed.\1"),
+    (r"^quantum_mix\.", r"head.quantum_mix."),
+]
+
+KEY_MAPS["geodite"] = [
+    (r"^(node_init|edge_init)\.", r"embed.\1."),
+    (r"^interactions\.(\d+)\.", r"blocks.\1.message."),
+    (r"^couplings\.(\d+)\.", r"blocks.\1.coupling."),
+]
+
 
 def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:
     out = {}
