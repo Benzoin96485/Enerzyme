@@ -213,6 +213,11 @@ same Cartesian frame to all backends. Existing presets select their upstream
 frame convention explicitly. The measurements in :code:`test/fixtures/bench_rotations.json`
 can be reproduced with :code:`scripts/bench_rotations.py`.
 
+The paired GPU measurements in :code:`test/fixtures/bench_gpu/` cover the
+three acceptance systems in both precisions. Run
+:code:`python scripts/report_eager_gates.py` to summarize the archived ratios
+against Phase 0 and the main checkpoints, including missing comparisons.
+
 To check force training with the installed Inductor backend, run the following
 from the checkout. The report compares the energy, forces, and every parameter
 gradient for identical initial weights and coordinates. It records captured

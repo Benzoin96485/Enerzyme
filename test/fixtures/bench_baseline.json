@@ -3,6 +3,7 @@
   "commit": "1aa0f8b (pre-refactor devel)",
   "cpu": "Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz",
   "eager": true,
+  "eager_acceptance_summary": "bench_gpu/eager_acceptance.md",
   "gpu_acceptance_files": [
    "bench_gpu/baseline_eager_float32.json",
    "bench_gpu/baseline_eager_float64.json",
