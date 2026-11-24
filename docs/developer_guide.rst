@@ -231,6 +231,13 @@ On PyTorch versions with :code:`donated_buffer`, the two additional gradient
 calls request reusable saved tensors with
 :code:`torch._functorch.config.patch(donated_buffer=False)`.
 
+On CPU, ordinary Inductor compiles the CACE and GRACE force calculations with
+scalar C++ kernels. This preserves their coordinate and parameter derivatives
+on PyTorch 2.13, where the vectorized kernels can terminate the process. The
+Nequix FX force-training graph uses the same setting. The model restores the
+compiler settings before returning. An explicit conflicting backend override
+uses native derivatives for that call.
+
 .. code-block:: shell
 
    PYTHONPATH=. python scripts/check_compiled_forces.py mattersim --dtype float64

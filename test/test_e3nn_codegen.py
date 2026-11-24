@@ -48,9 +48,10 @@ def test_fx_codegen_preserves_checkpoint_derivatives_and_captures_contractions(a
     ("equflash_v2", torch.float64),
     ("equiformer", torch.float32),
     ("equiformer", torch.float64),
+    ("nequix", torch.float32),
     ("nequix", torch.float64),
 ])
-def test_fx_cpu_force_training_uses_native_derivatives(architecture, dtype):
+def test_fx_cpu_force_training_matches_scripted_derivatives(architecture, dtype):
     torch.compiler.reset()
     try:
         torch.manual_seed(142)
@@ -63,9 +64,15 @@ def test_fx_cpu_force_training_uses_native_derivatives(architecture, dtype):
         actual = forward(torch.compile(model), batch, dtype, train=True)
         for output in (expected, actual):
             (output["E"].square().sum() + output["Fa"].square().sum()).backward()
+        from torch._functorch import config as autograd_config
+        from torch._inductor import config
+
+        compiled_expected = (architecture == "nequix" and hasattr(config.cpp, "simdlen")
+                             and hasattr(autograd_config, "force_non_lazy_backward_lowering"))
         for key in ("E", "Fa"):
             torch.testing.assert_close(actual[key], expected[key])
-            assert type(actual[key].grad_fn).__name__ != "CompiledFunctionBackward"
+            compiled = type(actual[key].grad_fn).__name__ == "CompiledFunctionBackward"
+            assert compiled == compiled_expected
         for (name, weight), ref_weight in zip(model.named_parameters(), reference.parameters()):
             torch.testing.assert_close(weight.grad, ref_weight.grad, msg=name)
     finally:

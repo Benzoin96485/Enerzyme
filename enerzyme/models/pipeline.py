@@ -58,9 +58,11 @@ def build_model(
         from .mace.compile import prepare_edge_tensor_products
 
         prepare_edge_tensor_products(core)
-    elif getattr(core, "architecture", None) in ("equflashv2", "equiformer", "nequix"):
+    elif getattr(core, "architecture", None) == "nequix":
+        core._cpu_force_training_option = "cpp.simdlen"
+    elif getattr(core, "architecture", None) in ("equflashv2", "equiformer"):
         # PyTorch 2.13 CPU kernels miscompute Equiformer forces and can abort
-        # in EquFlashV2 or Nequix force-loss backward.
+        # in the EquFlashV2 force-loss backward.
         core._native_cpu_inductor_forces = True
     return core
 
