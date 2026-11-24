@@ -1,10 +1,10 @@
 {
   "cpu": {
-    "revision": "5a994c4",
-    "job": "6319102",
+    "revision": "b19d3c5",
+    "job": "6319242",
     "test_files_and_shards": 170,
     "results": {
-      "passed": 1601,
+      "passed": 1609,
       "skipped": 61,
       "errors": 0,
       "failures": 0
@@ -51,10 +51,10 @@
   },
   "notes": "The runs use the recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run.",
   "wheel": {
-    "revision": "5a994c4",
-    "job": "6318933",
+    "revision": "b19d3c5",
+    "job": "6319260",
     "filename": "enerzyme-0.6.0-py3-none-any.whl",
-    "sha256": "85ebb17b60e358804c8dda28025131373b7ecde4bfa156f28f2e0b6bcca1576d",
+    "sha256": "a35610d72ecddeb17ae6308723990837eee7a37a952666f51ede72d1f0e2c7b6",
     "results": {
       "passed": 58,
       "skipped": 0,
