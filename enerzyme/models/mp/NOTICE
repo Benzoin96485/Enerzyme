@@ -11,9 +11,9 @@ The cgmatrix.npz contraction coefficients in equivariant/data/ are shared
 with the So3krates-torch implementation (MIT).
 https://github.com/TCPUniLU/So3krates-torch
 
-The shared spherical normalization and gate implementations in nn/ and
-equivariant/ follow EquiformerV2 (MIT) and the vendored EquiformerV3
-reference. The Cartesian gated blocks in nn/gate.py follow SchNetPack
+The shared spherical normalization, gate and S2 grid activation implementations
+in nn/ and equivariant/ follow EquiformerV2 (MIT) and the vendored
+EquiformerV3 reference. The Cartesian gated blocks in nn/gate.py follow SchNetPack
 2.0.4 (MIT).
 https://github.com/atomicarchitects/equiformer_v2
 https://github.com/atomistic-machine-learning/schnetpack
