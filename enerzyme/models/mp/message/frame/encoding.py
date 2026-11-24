@@ -12,6 +12,8 @@ import math
 
 import torch
 from torch import Tensor, nn
+from torch.nn import functional as F
+from torch.utils.checkpoint import checkpoint
 
 from .geometry import reduce_nodes, scalarize
 
@@ -103,9 +105,23 @@ class LocalSubstructure(nn.Module):
         self.hidden = hidden
         init_linears(self.lin)
 
+    def _mix_three_axes(self, axes: Tensor) -> Tensor:
+        # Expose the 3-input, 1-output affine maps to the compiler so it can
+        # fuse activation and reduction over the hidden channels per edge.
+        first, last = self.lin[0], self.lin[2]
+        x, y, z = axes.unbind(-1)
+        w_x, w_y, w_z = first.weight.unbind(-1)
+        hidden = x.unsqueeze(-1) * w_x + y.unsqueeze(-1) * w_y + z.unsqueeze(-1) * w_z + first.bias
+        return (F.silu(hidden) * last.weight[0]).sum(-1) + last.bias[0]
+
     def _endpoint(self, environment: Tensor, frame: Tensor, nodes: Tensor) -> Tensor:
         projected = scalarize(environment[nodes], frame)
-        mixed = self.lin(projected.transpose(1, 2)).squeeze(-1)
+        axes = projected.transpose(1, 2)
+        if (torch.compiler.is_compiling() and axes.is_cuda and not self.training
+                and not torch._C._are_functorch_transforms_active()):
+            mixed = checkpoint(self._mix_three_axes, axes, use_reentrant=False, preserve_rng_state=False)
+        else:
+            mixed = self.lin(axes).squeeze(-1)
         return (mixed + projected[:, 0, :]) / self.scale
 
     def forward(
