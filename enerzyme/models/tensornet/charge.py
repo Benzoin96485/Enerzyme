@@ -13,7 +13,7 @@ from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module, SiLU
 
 from ..layers.electrostatics import neutral_charge_equilibration
-from .ops import decompose_tensor, frobenius_squared
+from ..mp.equivariant.cartesian import decompose_tensor, frobenius_squared
 
 
 class TensorChargeHead(Module):
