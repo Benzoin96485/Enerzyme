@@ -1,6 +1,6 @@
 """TensorNet channel-last Cartesian algebra."""
 
-from ..layers.self_pairs import unit_direction as unit_vectors
+from ..mp.ops.self_pairs import unit_direction as unit_vectors
 from ..mp.equivariant.cartesian import (
     identity_tensor,
     decompose_tensor,

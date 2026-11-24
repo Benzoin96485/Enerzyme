@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from ..layers.self_pairs import insert_missing_self_pairs, unit_direction
+from ..mp.ops.self_pairs import insert_missing_self_pairs, unit_direction
 from ..mp.basis.envelope import cosine_transition
 from ..mp.block import Block, BlockState
 from ..mp.core import Embed

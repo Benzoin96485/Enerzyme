@@ -4,7 +4,7 @@ from torch import nn
 
 from ...layers.atom_embedding import RandomAtomEmbedding
 from ..basis.angular import angular_dim, polynomial_spherical_harmonics
-from ...layers.self_pairs import insert_missing_self_pairs, unit_direction
+from ..ops.self_pairs import insert_missing_self_pairs, unit_direction
 from ..basis.envelope import cosine_transition
 from ..block import Block, BlockState
 from ..core import Embed
