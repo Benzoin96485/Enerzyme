@@ -9,6 +9,22 @@ from torch_geometric.data import Data
 from .gradient import ForceLayer
 
 
+@torch.compiler.assume_constant_result
+def compiling_fullgraph() -> bool:
+    """Keep strict traces in the joint energy/force transform.
+
+    Dynamo supplies fullgraph mode on its translator, with no public
+    torch.compiler predicate. Read it at trace time only. Other tracing
+    contexts continue to use the self-contained functional VJP.
+    """
+    from torch._dynamo.symbolic_convert import InstructionTranslator
+
+    try:
+        return InstructionTranslator.current_tx().one_graph
+    except AttributeError:
+        return True
+
+
 def forward_with_coordinate_gradients(core, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """Functional coordinate VJPs make force fitting a single compiled backward.
 
