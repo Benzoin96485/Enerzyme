@@ -321,6 +321,4 @@ def train_with_magnetic_readout(core, inputs, edges, topology, post_pairs):
     # graph. Keep magnetic parameters out of the force VJP and expose Ma so
     # a magnetic loss can still differentiate both the head and atom features.
     fields = forward_with_coordinate_gradients(core, inputs, edges, topology, post_pairs, skip_post=(0,))
-    if fields["atom_feature_charge"].device.type == "cpu":
-        return _cpu_magnetic_readout(moment, fields)
-    return moment(fields)
+    return _cpu_magnetic_readout(moment, fields)
