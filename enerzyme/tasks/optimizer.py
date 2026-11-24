@@ -15,7 +15,6 @@ HYPER_PARAM_KEYS = {
 }
 MODEL_HEAD_NAMES = {
     "ComposableCore": {"head"},
-    "BOTNetCore": set(),
 }
 
 

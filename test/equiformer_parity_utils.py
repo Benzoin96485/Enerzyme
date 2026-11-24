@@ -207,7 +207,7 @@ def build_enerzyme_parts(
     output_mode: str = "direct",
     dtype: torch.dtype = torch.float64,
 ):
-    from enerzyme.models.equiformer.core import EquiformerCore
+    from enerzyme.models.presets.irreps import equiformer
     from enerzyme.models.equiformer.embedding import EquiformerNodeEmbedding
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
@@ -221,7 +221,7 @@ def build_enerzyme_parts(
         cuton=0.0,
         trainable=False,
     )
-    core = EquiformerCore(
+    core = equiformer(
         num_rbf=hp["num_rbf"],
         irreps_node_embedding=hp["irreps_node_embedding"],
         irreps_feature=hp["irreps_feature"],
@@ -290,11 +290,13 @@ def copy_official_weights_to_enerzyme(
         rbf.means.copy_(official.rbf.means)
         rbf.betas.copy_(official.rbf.betas)
 
-    _load_matched(core.edge_deg_embed, official.edge_deg_embed, "edge_deg_embed")
-    _load_matched(core.blocks, official.blocks, "blocks")
-    _load_matched(core.norm, official.norm, "norm")
-    if hasattr(core, "head") and core.head is not None:
-        _load_matched(core.head, official.head, "head")
+    _load_matched(core.embed.degree, official.edge_deg_embed, "edge_deg_embed")
+    assert len(core.blocks) == len(official.blocks)
+    for index, (block, reference) in enumerate(zip(core.blocks, official.blocks)):
+        _load_matched(block.module, reference, f"blocks.{index}")
+    _load_matched(core.head.norm, official.norm, "norm")
+    if core.head.readout is not None:
+        _load_matched(core.head.readout, official.head, "head")
 
 
 @torch.no_grad()
@@ -383,7 +385,7 @@ def enerzyme_atomic_energy(
 
     node_attr = torch.ones_like(node_features.narrow(1, 0, 1))
     if core.use_attn_head:
-        ea = core.head(
+        ea = core.head.readout(
             node_input=node_features,
             node_attr=node_attr,
             edge_src=edge_src,
@@ -393,7 +395,7 @@ def enerzyme_atomic_energy(
             batch=batch,
         )
     else:
-        ea = core.head(node_features)
+        ea = core.head.readout(node_features)
     ea = ea.view(-1)
     e_sum = scatter(ea, batch, dim=0, reduce="sum")
     e_graph = e_sum / (avg_num_nodes ** 0.5)
@@ -462,3 +464,12 @@ def build_linear_rs_energy_head(
         LinearRS(ir, ir_out, rescale=_RESCALE),
     )
     return head.to(dtype=dtype).eval()
+
+
+def encode_irreps(core, **inputs):
+    """Return the normalized representation before the direct property head."""
+    ctx = core.context(inputs)
+    state = core.embed(inputs, ctx)
+    for block in core.blocks:
+        state = block(state, ctx)
+    return core.head.features(state)

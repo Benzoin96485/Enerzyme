@@ -67,7 +67,7 @@ def test_equiformer_build_and_forward_shapes(equiformer_model):
 
 
 def test_equiformer_core_feature_mode_direct():
-    from enerzyme.models.equiformer.core import EquiformerCore
+    from enerzyme.models.presets.irreps import equiformer
     from enerzyme.models.equiformer.embedding import EquiformerNodeEmbedding
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
@@ -77,7 +77,7 @@ def test_equiformer_core_feature_mode_direct():
     feat = "32x0e"
     embed = EquiformerNodeEmbedding(max_Za=16, irreps_node_embedding=irreps)
     rbf_layer = ExpNormalSmearing(num_rbf=8, cutoff_sr=5.0)
-    core = EquiformerCore(
+    core = equiformer(
         num_rbf=8,
         irreps_node_embedding=irreps,
         irreps_feature=feat,

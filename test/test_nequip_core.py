@@ -94,7 +94,7 @@ def test_nequip_registration_and_yaml_build():
 
     for name in ("nequip", "NequIP"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "NequIPCore"
+        assert core_cls.__name__ == "nequip"
         assert build_params["num_rbf"] == 8
         assert layers[1]["params"]["flavor"] == "nequip"
         assert layers[1]["name"] == "BesselRBF"
@@ -116,7 +116,7 @@ def test_nequip_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=4, num_rbf=3, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "NequIPCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.num_layers == 2
     assert model.dim_feature_out == 4
     assert model.feature_irreps == "4x0e"
@@ -126,7 +126,8 @@ def test_nequip_registration_and_yaml_build():
 
 
 def test_preset_sets_depth_and_explicit_args_win():
-    from enerzyme.models.nequip.core import NequIPCore, _resolve
+    from enerzyme.models.nequip.defaults import _resolve
+    from enerzyme.models.presets.irreps import nequip
 
     paper = _resolve("paper", {})
     assert paper["radial_mlp_depth"] == 2
@@ -137,7 +138,7 @@ def test_preset_sets_depth_and_explicit_args_win():
     assert small["parity"] is False
     assert small["num_features"] == 4
 
-    core = NequIPCore(
+    core = nequip(
         dim_embedding=4,
         num_rbf=3,
         preset="S",
@@ -147,7 +148,7 @@ def test_preset_sets_depth_and_explicit_args_win():
     assert core.num_layers == 2
     assert core.l_max == 1
     assert core.parity is False
-    assert len(core.convs) == 2
+    assert len(core.blocks) == 2
 
 
 def test_conv_is_rotation_and_inversion_equivariant():
@@ -195,11 +196,11 @@ def test_conv_is_rotation_and_inversion_equivariant():
 
 
 def test_core_scalars_are_invariant_and_molecules_stay_separate():
-    from enerzyme.models.nequip import NequIPCore
+    from enerzyme.models.presets.irreps import nequip
 
     torch.manual_seed(1)
     width, n_rbf = 4, 3
-    core = NequIPCore(
+    core = nequip(
         dim_embedding=width,
         num_rbf=n_rbf,
         num_layers=2,
@@ -270,7 +271,7 @@ def test_core_scalars_are_invariant_and_molecules_stay_separate():
 
 
 def test_isolated_atom_is_zero_until_self_connection_includes_the_first_layer():
-    from enerzyme.models.nequip import NequIPCore
+    from enerzyme.models.presets.irreps import nequip
 
     torch.manual_seed(2)
     kwargs = dict(
@@ -281,7 +282,7 @@ def test_isolated_atom_is_zero_until_self_connection_includes_the_first_layer():
         num_features=4,
         radial_mlp_width=8,
     )
-    plain = NequIPCore(**kwargs)
+    plain = nequip(**kwargs)
     plain.eval()
     embedding = torch.randn(1, 4)
     empty = dict(
@@ -296,7 +297,7 @@ def test_isolated_atom_is_zero_until_self_connection_includes_the_first_layer():
     assert torch.count_nonzero(alone) == 0
 
     torch.manual_seed(2)
-    with_first = NequIPCore(**kwargs, sc_first=True)
+    with_first = nequip(**kwargs, sc_first=True)
     with_first.eval()
     shifted = with_first.get_output(**empty)["atom_feature"]
     assert torch.isfinite(shifted).all()
@@ -311,7 +312,7 @@ def test_isolated_atom_is_zero_until_self_connection_includes_the_first_layer():
         vij_sr=graph["vij_sr"],
     )["atom_feature"]
     torch.manual_seed(2)
-    no_sc = NequIPCore(**kwargs, use_sc=False)
+    no_sc = nequip(**kwargs, use_sc=False)
     no_sc.eval()
     ablated = no_sc.get_output(
         atom_embedding=graph["atom_embedding"],

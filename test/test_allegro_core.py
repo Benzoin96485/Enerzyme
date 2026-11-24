@@ -34,7 +34,7 @@ def _rotation(seed: int = 0, proper: bool = True) -> torch.Tensor:
 
 
 def _core(**overrides):
-    from enerzyme.models.allegro import AllegroCore
+    from enerzyme.models.presets.irreps import allegro
 
     params = dict(
         dim_edge=4,
@@ -50,7 +50,7 @@ def _core(**overrides):
         latent_mlp_width=4,
     )
     params.update(overrides)
-    return AllegroCore(**params)
+    return allegro(**params)
 
 
 def test_pair_embedding_mixes_center_neighbor_and_radius():
@@ -178,7 +178,7 @@ def test_registration_preset_and_yaml_build():
 
     for name in ("allegro", "Allegro"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "AllegroCore"
+        assert core_cls.__name__ == "allegro"
         assert build_params["num_rbf"] == 8
         assert layers[1]["params"]["flavor"] == "nequip"
         assert layers[2]["name"] == "PairChemicalRadial"

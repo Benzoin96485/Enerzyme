@@ -6,6 +6,7 @@ import torch
 from e3nn import o3
 
 from equiformer_parity_utils import (
+    encode_irreps,
     assert_close,
     build_enerzyme_parts,
     build_official_md17,
@@ -59,7 +60,7 @@ def test_direct_energy_and_force_parity():
         feats_ref = official_node_features_after_norm(
             official, za, pos_det, batch, edge_src_d, edge_dst_d, edge_vec_d
         )
-        feats_ours = core.encode_irreps(
+        feats_ours = encode_irreps(core,
             vij_sr=ez_d["vij_sr"],
             idx_i_sr=ez_d["idx_i_sr"],
             idx_j_sr=ez_d["idx_j_sr"],
@@ -104,7 +105,7 @@ def test_direct_energy_and_force_parity():
     )
     rbf_vals = rbf.get_rbf(ez["Dij_sr"])
     atom_emb = embed.get_atom_embedding(za)
-    feats = core.encode_irreps(
+    feats = encode_irreps(core,
         vij_sr=ez["vij_sr"],
         idx_i_sr=ez["idx_i_sr"],
         idx_j_sr=ez["idx_j_sr"],

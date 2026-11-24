@@ -158,7 +158,7 @@ def test_nequix_registration_and_yaml_build():
     from enerzyme.models.layers.readout import SimpleReadout
 
     core_cls, build_params, layers = get_ff_core("nequix")
-    assert core_cls.__name__ == "NequixCore"
+    assert core_cls.__name__ == "nequix"
     assert build_params["cutoff_fn"] == "nequip"
     assert build_params["dim_embedding"] == 89
     assert layers[1]["params"]["flavor"] == "equflash"
@@ -176,7 +176,7 @@ def test_nequix_registration_and_yaml_build():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "NequixCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.num_layers == 2
@@ -275,10 +275,10 @@ def conv_sh(conv, vij: torch.Tensor) -> torch.Tensor:
 
 
 def test_core_scalar_output_is_rotation_invariant_and_isolated_atom_is_finite():
-    from enerzyme.models.nequix import NequixCore
+    from enerzyme.models.presets.irreps import nequix
 
     torch.manual_seed(2)
-    core = NequixCore(
+    core = nequix(
         dim_embedding=3,
         num_rbf=4,
         num_layers=2,

@@ -37,7 +37,7 @@ def _rotation(seed: int = 0) -> torch.Tensor:
 
 
 def _small_core(**overrides):
-    from enerzyme.models.eqnorm import EqnormCore
+    from enerzyme.models.presets.irreps import eqnorm
 
     params = dict(
         dim_embedding=3,
@@ -54,7 +54,7 @@ def _small_core(**overrides):
         message_envelope=False,
     )
     params.update(overrides)
-    return EqnormCore(**params)
+    return eqnorm(**params)
 
 
 def test_registration_and_yaml_build():
@@ -64,7 +64,7 @@ def test_registration_and_yaml_build():
     from enerzyme.models.layers.atom_embedding import OneHotAtomEmbedding
 
     core_cls, build_params, layers = get_ff_core("eqnorm")
-    assert core_cls.__name__ == "EqnormCore"
+    assert core_cls.__name__ == "eqnorm"
     assert build_params["cutoff_fn"] == "nequip"
     assert build_params["cutoff_sr"] == 6.0
     assert layers[1]["params"]["flavor"] == "equflash"
@@ -83,7 +83,7 @@ def test_registration_and_yaml_build():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "EqnormCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.readout_hidden_width == 4
@@ -130,17 +130,17 @@ def test_scalar_branch_does_not_update_the_tensor_state():
     idx_i, idx_j = _edges(3)
     vij = torch.randn(idx_i.numel(), 3)
     radial = torch.rand(idx_i.numel(), 4)
-    edge_sh = core.sph(vij)
-    base = core.species_linear(embedding)
-    tensor, delta = core.layers[0](base, idx_i, idx_j, radial, edge_sh, None)
+    edge_sh = core.embed.sph(vij)
+    base = core.embed.projection(embedding)
+    tensor, delta = core.blocks[0].module(base, idx_i, idx_j, radial, edge_sh, None)
     expected = base + F.silu(delta)
     got = core.get_output(embedding, radial, idx_i, idx_j, vij)["atom_feature"]
     assert torch.allclose(got, expected, atol=1e-5, rtol=1e-5)
 
-    tensor_again, delta_again = core.layers[0](base, idx_i, idx_j, radial, edge_sh, None)
+    tensor_again, delta_again = core.blocks[0].module(base, idx_i, idx_j, radial, edge_sh, None)
     with torch.no_grad():
-        core.layers[0].scalar_conv.linear_2.weight.add_(1.0)
-    tensor_changed, delta_changed = core.layers[0](base, idx_i, idx_j, radial, edge_sh, None)
+        core.blocks[0].module.scalar_conv.linear_2.weight.add_(1.0)
+    tensor_changed, delta_changed = core.blocks[0].module(base, idx_i, idx_j, radial, edge_sh, None)
     assert torch.allclose(tensor_again, tensor_changed, atol=1e-5, rtol=1e-5)
     assert not torch.allclose(delta_again, delta_changed, atol=1e-4)
 
@@ -365,10 +365,10 @@ def test_scalar_stack_matches_upstream_e3nn():
         avg_num_neighbors=2.5,
     )
     core = _small_core(num_layers=2)
-    core.species_linear.load_state_dict(reference.embedding.linear.state_dict())
+    core.embed.projection.load_state_dict(reference.embedding.linear.state_dict())
     for index in range(2):
-        core.layers[index].tensor_conv.load_state_dict(reference.layers[4 * index].state_dict())
-        core.layers[index].scalar_conv.load_state_dict(reference.layers[4 * index + 2].state_dict())
+        core.blocks[index].module.tensor_conv.load_state_dict(reference.layers[4 * index].state_dict())
+        core.blocks[index].module.scalar_conv.load_state_dict(reference.layers[4 * index + 2].state_dict())
 
     indices = torch.tensor([0, 2, 1])
     pos = torch.tensor([[0.0, 0.0, 0.0], [0.8, 0.1, 0.0], [0.2, 0.9, 0.3]])
@@ -395,5 +395,5 @@ def test_scalar_stack_matches_upstream_e3nn():
 def test_feature_layout_is_flat_even_scalars():
     core = _small_core()
     assert o3.Irreps(core.feature_irreps) == o3.Irreps("4x0e")
-    assert core.layers[0].irreps_tensor == o3.Irreps("4x0e+2x1o")
-    assert core.layers[0].gate.irreps_in[0].mul == 4 + 2
+    assert core.blocks[0].module.irreps_tensor == o3.Irreps("4x0e+2x1o")
+    assert core.blocks[0].module.gate.irreps_in[0].mul == 4 + 2

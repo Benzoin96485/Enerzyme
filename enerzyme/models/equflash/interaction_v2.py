@@ -12,12 +12,12 @@ from typing import Dict, List, Optional, Sequence
 
 import torch
 import torch.nn.functional as F
+from ..mp.message.irreps import irreps_convolution
 from e3nn import o3
 from torch import Tensor, nn
 
 from ..mp.nn.radial_mlp import RadialMLP
 from ..mp.equivariant.e3nn.rms_norm import EquivariantRMSNormSH
-from ..mp.ops import scatter_sum
 from .irreps import scale_irreps
 
 
@@ -173,11 +173,7 @@ class ChannelwiseConv(nn.Module):
         rbf: Tensor,
         edge_sh: Tensor,
     ) -> Tensor:
-        if idx_i.numel() == 0:
-            return features.new_zeros(features.shape[0], self.irreps_out.dim)
-        weight = self.radial(rbf)
-        message = self.tp(features[idx_j], edge_sh, weight)
-        aggregated = scatter_sum(message, idx_i, features.shape[0])
+        aggregated = irreps_convolution(self.tp, self.radial, features, idx_j, idx_i, edge_sh, rbf)
         return aggregated / self.denominator
 
 
