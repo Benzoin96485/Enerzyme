@@ -328,6 +328,8 @@ The default compiler otherwise drops part of the derivative. Normal
 :code:`torch.compile(model)` applies the setting for this call. Explicit
 full-graph CPU Inductor training requires the compiler option
 :code:`{"cpp.max_horizontal_fusion_size": 1}`.
+CPU Inductor force inference uses native derivatives because the generated
+backward can terminate the process when the energy is differentiated again.
 
 **DPA4** (:code:`architecture: dpa4`) implements the EMFA SO(2) descriptor of Li et al. (2026, arXiv:2606.02419) under :code:`enerzyme/models/dpa4/` (:code:`interaction.py`, :code:`so2.py`). Shared SO(3) helpers (C³ envelope, Apache e3x Lebedev tables / :code:`S2LebedevProjector`, packed indexing, :code:`FocusSO2Linear`, focus gated activation, degree RMSNorm, Bessel×C³ RBF, quaternion edge frames + shared e3nn/:code:`Jd` Wigner-D via :code:`A R Aᵀ` into DPA4's Cartesian basis; flat :code:`SO3Grid` / Lebedev behind :code:`S2GridProjector`) live in :code:`enerzyme/models/mp/equivariant/`. The Core owns the radial cache, geometric/environment seed, m-truncated interactions, and Lebedev-grid equivariant FFN. It emits :code:`atom_feature` / :code:`atom_sphere_feature`, so the standard :code:`SimpleReadout` + :code:`EnergyReduce` + :code:`Force` stack applies. Example: :code:`enerzyme/config/dpa4_layers_example.yaml`. Tests: :code:`test/test_dpa4_core.py`, :code:`test/test_dpa4_parity_ops.py`. Enerzymette only needs :code:`architecture: dpa4` plus a resolved :code:`config.yaml`.
 

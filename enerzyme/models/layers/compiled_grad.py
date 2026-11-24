@@ -41,10 +41,12 @@ def _cpu_backend_may_use_inductor() -> bool:
     return name not in ("eager", "aot_eager")
 
 
-def uses_cpu_inductor_force_training(core, inputs):
+def uses_cpu_inductor_forces(core, inputs, *, include_eval=False):
     for stages in (core.pre_sequence, core.post_sequence):
         for layer in stages:
-            if type(layer) is not ForceLayer or not layer.training or layer.eval_only:
+            if type(layer) is not ForceLayer:
+                continue
+            if (layer.training and layer.eval_only) or (not layer.training and (not include_eval or layer.train_only)):
                 continue
             if (layer.test_only and not core.test_mode) or (layer.test_exclude and core.test_mode):
                 continue
@@ -55,8 +57,8 @@ def uses_cpu_inductor_force_training(core, inputs):
 
 
 @torch.compiler.disable
-def native_cpu_force_training(core, inputs):
-    # Force-loss double backward in the affected CPU kernels can abort the process.
+def native_cpu_forces(core, inputs):
+    # Differentiating the affected CPU kernels can abort the process.
     return core._run_layers(inputs)
 
 
@@ -81,7 +83,7 @@ def compiled_training_with_separate_reductions(core, inputs):
 
     if not (hasattr(config.cpp, "max_horizontal_fusion_size")
             and hasattr(autograd_config, "force_non_lazy_backward_lowering")):
-        return native_cpu_force_training(core, inputs)
+        return native_cpu_forces(core, inputs)
     # RepFlow reduces contributions from both endpoints of an edge. CPU
     # horizontal fusion can drop one term in the force or its weight gradient.
     # AOT normally defers the weight backward until after this scope exits.

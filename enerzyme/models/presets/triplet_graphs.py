@@ -200,6 +200,7 @@ def dpa3(
         positional_fields=("atom_embedding", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         architecture="dpa3",
         _separate_cpu_force_reductions=True,
+        _native_cpu_inductor_force_inference=True,
         dim_embedding=dim_embedding,
         dim_feature_out=dim_feature_out,
         feature_irreps=feature_irreps,

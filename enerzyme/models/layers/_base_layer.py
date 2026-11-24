@@ -141,20 +141,23 @@ class BaseFFCore(BaseFFModule):
         if torch.compiler.is_compiling():
             from .compiled_grad import (
                 compiled_training, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
-                uses_cpu_inductor_force_training, native_cpu_force_training,
+                uses_cpu_inductor_forces, native_cpu_forces,
                 compiled_training_with_separate_reductions, cpu_horizontal_fusion_option,
             )
 
             # A graph break inside a VJP discards the whole energy trace. In
             # normal inference the ordinary stack can compile on both sides
             # of a break and autograd can differentiate the compiled pieces.
-            if (self.training and getattr(self, "_native_cpu_inductor_forces", False)
-                    and uses_cpu_inductor_force_training(self, net_input)):
+            native = (getattr(self, "_native_cpu_inductor_forces", False) if self.training else
+                      getattr(self, "_native_cpu_inductor_force_inference", False))
+            if native and uses_cpu_inductor_forces(self, net_input, include_eval=not self.training):
                 torch._assert(not compiling_fullgraph(),
-                              "Fullgraph CPU force training requires an eager backend for this model")
-                return native_cpu_force_training(self, net_input)
+                              "Fullgraph CPU force training requires an eager backend for this model"
+                              if self.training else "Fullgraph CPU force inference requires an eager backend "
+                              "for reusable energy derivatives in this model")
+                return native_cpu_forces(self, net_input)
             if (self.training and getattr(self, "_separate_cpu_force_reductions", False)
-                    and uses_cpu_inductor_force_training(self, net_input)):
+                    and uses_cpu_inductor_forces(self, net_input)):
                 fusion = cpu_horizontal_fusion_option()
                 if compiling_fullgraph():
                     torch._assert(fusion == 1, "Fullgraph DPA3 CPU force training requires "
@@ -162,7 +165,7 @@ class BaseFFCore(BaseFFModule):
                 elif fusion is None or fusion == 1:
                     return compiled_training_with_separate_reductions(self, net_input)
                 else:
-                    return native_cpu_force_training(self, net_input)
+                    return native_cpu_forces(self, net_input)
             if compiling_fullgraph():
                 return forward_with_coordinate_gradients(self, net_input)
             if self.training:

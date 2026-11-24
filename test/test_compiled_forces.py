@@ -252,6 +252,30 @@ def test_cpu_compiler_keeps_force_gradients(architecture):
         torch.testing.assert_close(value, target, rtol=1e-9, atol=1e-12)
 
 
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_dpa3_cpu_inference_keeps_reusable_coordinate_gradients(monkeypatch, dtype):
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    model = build("dpa3").to(dtype)
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), dtype)
+
+    def differentiate(runner):
+        out = forward(runner, batch, dtype, train=False)
+        first = torch.autograd.grad(out["E"].sum(), out["Ra"], retain_graph=True)[0]
+        second = torch.autograd.grad(out["E"].sum(), out["Ra"])[0]
+        return out["E"], out["Fa"], first, second
+
+    def unexpected_lowering(*args, **kwargs):
+        pytest.fail("DPA3 CPU force inference entered the unsafe compiled backward")
+
+    expected = differentiate(model)
+    monkeypatch.setattr(torch._inductor, "compile", unexpected_lowering)
+    actual = differentiate(torch.compile(model))
+    for value, target in zip(actual, expected):
+        torch.testing.assert_close(value, target, rtol=0, atol=0)
+
+
 def _batch(distance):
     return {
         "Ra": torch.tensor([[0., 0., 0.], [distance, .1, -.2], [2.7, -.4, .3]],
