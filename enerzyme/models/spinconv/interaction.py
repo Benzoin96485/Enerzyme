@@ -193,24 +193,13 @@ class SpinConvolution(Module):
         """
         if grid.shape[0] == 0:
             return grid.new_zeros((0, self.mid_channels))
-        if torch.compiler.is_compiling() and grid.device.type == "cpu":
-            # Inductor's grouped Conv1d backward can corrupt the force on CPU.
-            # Contract each longitude window with the same grouped filters.
-            hidden = grid.reshape(grid.shape[0], self.groups, -1, self.n_long)
-            longitude = torch.arange(self.n_long, device=grid.device)
-            offsets = (longitude[:, None] + longitude - self.n_long // 2) % self.n_long
-            weights = self.conv.weight.reshape(
-                self.groups, self.mid_channels // self.groups, -1, self.n_long
-            )
-            convolved = torch.einsum("egcsk,gock->egos", hidden[..., offsets], weights)
-            convolved = convolved.flatten(1, 2) + self.conv.bias[None, :, None]
-            return self.norm(self.act(convolved).mean(dim=-1))
-
         hidden = grid.reshape(grid.shape[0], self.hidden_channels * self.n_lat, self.n_long)
-        hidden = self.act(self.conv(hidden))
-        hidden = self.pool(hidden[:, :, : self.n_long])
-        hidden = hidden.reshape(grid.shape[0], self.mid_channels)
-        return self.norm(hidden)
+        hidden = self.act(self.conv(hidden))[:, :, : self.n_long]
+        if torch.compiler.is_compiling() and grid.device.type == "cpu":
+            # Inductor miscompiles AvgPool1d derivatives on the cropped CPU
+            # convolution. Each window spans the complete longitude.
+            return self.norm(hidden.mean(dim=-1))
+        return self.norm(self.pool(hidden).reshape(grid.shape[0], self.mid_channels))
 
     def forward(
         self,
