@@ -52,11 +52,12 @@ class ChargeConservationLayer(BaseFFLayer):
         raw_Q = scatter_sum(Qa, batch_seg, size)
         if Q is None: #assume desired total charge zero if not given
             Q = torch.zeros_like(N_per_batch)
-        #return scaled charges (such that they have the desired total charge)
-        return {
-            "Qa": Qa + ((Q.view(view_shape) - raw_Q) / N_per_batch.view(view_shape).clamp_min(1))[batch_seg],
-            "Q": raw_Q
-        }
+        correction = (Q.view(view_shape) - raw_Q) / N_per_batch.view(view_shape).clamp_min(1)
+        # One structure has one correction for every atom. Broadcast directly so
+        # its backward is a sum rather than an indexed atomic add to a scalar.
+        if size != 1:
+            correction = correction[batch_seg]
+        return {"Qa": Qa + correction, "Q": raw_Q}
 
 
 class VelocityConservationLayer(BaseFFLayer):
