@@ -308,8 +308,9 @@ def visnet_lsrm(
 ) -> ComposableCore:
     from ..mp.message.vector import edge_attention_step, build_attention_stack
     from ..visnet.interaction import ViSInteraction, _xavier_linear
+    from ..mp.nonlocal_ import FragmentLR
     from ..visnet.lsr import (
-        FragmentBipartiteBlock, FragmentEdges, FragmentFusionHead, fragment_step,
+        FragmentEdges, FragmentFusionHead, fragment_step,
         normalize_center, normalize_fragment_mode,
     )
 
@@ -330,7 +331,7 @@ def visnet_lsrm(
     graph = FragmentEdges(num_rbf, dim_embedding, cutoff_lr, trainable_rbf_lr, mode, center_name,
                           min_nodes_per_group, kmeans_random_state, long_layers > 0)
     blocks = [FnBlock(layer, edge_attention_step) for layer in layers] + [graph]
-    blocks.extend(FnBlock(FragmentBipartiteBlock(dim_embedding, num_heads, dropout), fragment_step)
+    blocks.extend(FnBlock(FragmentLR(dim_embedding, num_heads, dropout), fragment_step)
                   for _ in range(long_layers))
     head = FragmentFusionHead(head, dim_embedding)
     _xavier_linear(graph.long_rbf_proj)

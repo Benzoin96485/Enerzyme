@@ -370,3 +370,9 @@ class VariancePreservingMLP(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return self.net(x)
+
+
+def xavier_linear(layer: torch.nn.Linear) -> None:
+    torch.nn.init.xavier_uniform_(layer.weight)
+    if layer.bias is not None:
+        layer.bias.data.fill_(0)

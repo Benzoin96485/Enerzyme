@@ -9,7 +9,7 @@ from ..mp.ops import scatter_sum
 from ..mp.nn.activation import ACTIVATION_KEY_TYPE
 from ..layers.electron_embedding import ResidualMLP
 from ..mp.nn.mlp import ResidualStack as _ResidualStack
-from ..mp.nn.attention import Attention
+from ..mp.nonlocal_ import Performer
 from ..mp.nonlocal_ import EFABlock
 
 
@@ -186,7 +186,7 @@ class NonlocalInteraction(Module):
         self.resblock_v = ResidualMLP(
             dim_embedding, num_residual_v, activation_fn, zero_init=True
         )
-        self.attention = Attention(dim_embedding, dim_embedding)
+        self.attention = Performer(dim_embedding, dim_embedding)
 
     def forward(
         self,

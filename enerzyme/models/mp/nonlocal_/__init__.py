@@ -1,18 +1,8 @@
-"""Euclidean Fast Attention (Frank et al., Nat. Mach. Intell. / arXiv:2412.08541).
+"""Long-range attention for entire molecules and atom-fragment graphs."""
 
-Architecture-agnostic nonlocal plug-in for Enerzyme Cores:
-
-* **SpookyNet** — optional replacement for geometry-free ``NonlocalInteraction``
-  via ``use_efa=True``.
-* **So3krates / SO3LR** — optional layers via ``era_use_in_iterations``;
-  architectures ``efa`` / ``so3lr_efa``.
-* **Other Cores** — call :class:`EFABlock` or :func:`apply_efa_if_configured`
-  on invariant ``[N, F]`` features with absolute ``Ra`` and ``batch_seg``.
-
-Lebedev grids are the shared e3x Apache-2.0 tables under
-``enerzyme.models.mp.equivariant.data`` (re-exported here; see ``NOTICE``).
-"""
-
+from .performer import Performer
+from .fragment import FragmentLR
+from .global_attention import GlobalAttention
 from .attention import EuclideanFastAttention
 from .block import EFABlock, parse_era_iterations
 from .hook import apply_efa_if_configured, build_efa_blocks, efa_input_fields
@@ -31,6 +21,9 @@ from .rope import (
 )
 
 __all__ = [
+    "Performer",
+    "FragmentLR",
+    "GlobalAttention",
     "EuclideanFastAttention",
     "EFABlock",
     "LEBEDEV_FREQUENCY_LOOKUP",
