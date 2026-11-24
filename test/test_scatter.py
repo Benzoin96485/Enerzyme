@@ -1,51 +1,31 @@
-# test_scatter_sum_equivalence.py
+"""Production scatter sums against torch_scatter on CPU and CUDA."""
+
 import pytest
 import torch
 
-
-def scatter_sum_torch(
-    src: torch.Tensor,
-    index: torch.Tensor,
-    dim: int = -1,
-    dim_size: int | None = None,
-) -> torch.Tensor:
-    """
-    Torch-native replacement for torch_scatter.scatter_sum(src, index, dim, dim_size).
-
-    Notes:
-    - index is interpreted as destination indices along `dim`
-    - index must be broadcastable to src; will be expanded to src shape
-    - output shape equals src shape except along `dim` it becomes dim_size (or inferred)
-    """
-    if index.dtype != torch.long:
-        index = index.long()
-
-    dim = dim % src.dim()
-
-    # Make index broadcastable to src, then expand to src shape.
-    # Common GNN case: src [E, F], index [E] and dim=0.
-    if index.dim() != src.dim():
-        # Insert trailing singleton dims until ranks match.
-        for _ in range(src.dim() - index.dim()):
-            index = index.unsqueeze(-1)
-    index = index.expand_as(src)
-
-    if dim_size is None:
-        if index.numel() == 0:
-            dim_size = 0
-        else:
-            dim_size = int(index.max().item()) + 1
-
-    out_shape = list(src.shape)
-    out_shape[dim] = dim_size
-    out = src.new_zeros(out_shape)
-    return out.scatter_add(dim, index, src)
+from enerzyme.models.mp.ops import scatter_sum
 
 
-# --------------------------- helpers ---------------------------
-
-def _maybe_cuda_device():
-    return "cuda" if torch.cuda.is_available() else "cpu"
+def _assert_sum(actual, reference, src, index, dim):
+    if not src.is_cuda:
+        torch.testing.assert_close(actual, reference, rtol=0, atol=0)
+        return
+    # CUDA atomics can sum the same destination in different orders. Compare
+    # each result to a double-precision reference using the standard forward
+    # error bound for n floating-point additions, gamma_(n-1) * sum(abs(x)).
+    values = src.cpu().double()
+    destinations = index.cpu()
+    while destinations.ndim < values.ndim:
+        destinations = destinations.unsqueeze(-1)
+    destinations = destinations.expand_as(values)
+    zeros = values.new_zeros(actual.shape)
+    exact = zeros.scatter_add(dim, destinations, values)
+    absolute_sum = zeros.scatter_add(dim, destinations, values.abs())
+    count = zeros.scatter_add(dim, destinations, torch.ones_like(values))
+    roundoff = (count - 1).clamp_min(0) * (torch.finfo(src.dtype).eps / 2)
+    bound = absolute_sum * (roundoff / (1 - roundoff))
+    for observed in (actual, reference):
+        assert ((observed.cpu().double() - exact).abs() <= bound).all()
 
 
 def _set_seed(seed: int = 0):
@@ -81,16 +61,15 @@ def test_scatter_sum_basic_equivalence(device):
     index = torch.randint(0, N, (E,), device=device, dtype=torch.long)
 
     out_ref = torch_scatter.scatter_sum(src, index, dim=0, dim_size=N)
-    out_new = scatter_sum_torch(src, index, dim=0, dim_size=N)
+    out_new = scatter_sum(src, index, dim=0, dim_size=N)
 
-    torch.testing.assert_close(out_new, out_ref, rtol=0, atol=0)
+    _assert_sum(out_new, out_ref, src, index, 0)
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
 def test_scatter_sum_rank_broadcast_equivalence(device):
     """
-    torch_scatter allows index rank < src rank.
-    We verify our unsqueeze+expand matches behavior.
+    Per-batch receiver lists share the destination axis across features.
     """
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA not available")
@@ -107,9 +86,9 @@ def test_scatter_sum_rank_broadcast_equivalence(device):
     index = torch.randint(0, N, (B, E), device=device, dtype=torch.long)
 
     out_ref = torch_scatter.scatter_sum(src, index, dim=1, dim_size=N)
-    out_new = scatter_sum_torch(src, index, dim=1, dim_size=N)
+    out_new = torch.stack([scatter_sum(row, ids, N) for row, ids in zip(src, index)])
 
-    torch.testing.assert_close(out_new, out_ref, rtol=0, atol=0)
+    _assert_sum(out_new, out_ref, src, index, 1)
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
@@ -129,9 +108,9 @@ def test_scatter_sum_negative_dim_equivalence(device):
     index = torch.randint(0, N, (B, F), device=device, dtype=torch.long)
 
     out_ref = torch_scatter.scatter_sum(src, index, dim=-1, dim_size=N)
-    out_new = scatter_sum_torch(src, index, dim=-1, dim_size=N)
+    out_new = torch.stack([scatter_sum(row, ids, N, dim=-1) for row, ids in zip(src, index)])
 
-    torch.testing.assert_close(out_new, out_ref, rtol=0, atol=0)
+    _assert_sum(out_new, out_ref, src, index, -1)
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
@@ -155,10 +134,10 @@ def test_scatter_sum_infer_dim_size_equivalence(device):
     index = torch.randint(0, N_true, (E,), device=device, dtype=torch.long)
 
     out_ref = torch_scatter.scatter_sum(src, index, dim=0)  # infer dim_size
-    out_new = scatter_sum_torch(src, index, dim=0, dim_size=None)
+    out_new = scatter_sum(src, index, dim=0, dim_size=None)
 
     assert out_ref.shape == out_new.shape
-    torch.testing.assert_close(out_new, out_ref, rtol=0, atol=0)
+    _assert_sum(out_new, out_ref, src, index, 0)
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
@@ -179,7 +158,7 @@ def test_scatter_sum_empty_input_equivalence(device):
     index = torch.empty(E, device=device, dtype=torch.long)
 
     out_ref = torch_scatter.scatter_sum(src, index, dim=0, dim_size=N)
-    out_new = scatter_sum_torch(src, index, dim=0, dim_size=N)
+    out_new = scatter_sum(src, index, dim=0, dim_size=N)
 
     torch.testing.assert_close(out_new, out_ref, rtol=0, atol=0)
 
@@ -204,7 +183,7 @@ def test_scatter_sum_grad_equivalence(device):
     index = torch.randint(0, N, (E,), device=device, dtype=torch.long)
 
     out_ref = torch_scatter.scatter_sum(src1, index, dim=0, dim_size=N)
-    out_new = scatter_sum_torch(src2, index, dim=0, dim_size=N)
+    out_new = scatter_sum(src2, index, dim=0, dim_size=N)
 
     # Random-ish loss that touches all outputs
     w = torch.randn_like(out_ref)
