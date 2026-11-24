@@ -49,19 +49,20 @@ def insert_missing_self_pairs(
     if not enabled or n_atoms == 0:
         return idx_i, idx_j, vij, dist, rbf, window
     present = torch.zeros(n_atoms, dtype=torch.bool, device=idx_i.device)
-    if idx_i.numel():
-        self_edge = idx_i == idx_j
-        if self_edge.any():
-            present[idx_i[self_edge]] = True
+    present.index_fill_(0, idx_i[idx_i == idx_j], True)
     missing = (~present).nonzero(as_tuple=False).flatten()
-    if missing.numel() == 0:
+    if not torch.compiler.is_compiling() and missing.numel() == 0:
         return idx_i, idx_j, vij, dist, rbf, window
     if radial_basis is None or not callable(getattr(radial_basis, "get_rbf", None)):
-        raise RuntimeError(
+        message = (
             "include_self needs the pre-core radial basis "
             "(a layer that writes rbf and implements get_rbf). "
             "Call build(), or pass a self pair for every atom."
         )
+        if torch.compiler.is_compiling():
+            torch._assert_async(present.all(), message)
+            return idx_i, idx_j, vij, dist, rbf, window
+        raise RuntimeError(message)
     zeros = dist.new_zeros(missing.numel())
     self_rbf = radial_basis.get_rbf(zeros).to(dtype=rbf.dtype)
     if self_rbf.shape[-1] != int(num_rbf):
