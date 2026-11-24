@@ -52,7 +52,7 @@ _add('tece', '.presets.so2:tece', '.tece:DEFAULT_BUILD_PARAMS', '.tece:DEFAULT_L
 _add('allscaip', '.presets.hybrid:allscaip', '.allscaip:DEFAULT_BUILD_PARAMS', '.allscaip:DEFAULT_LAYER_PARAMS', family='hybrid')
 _add('nequip', '.presets.irreps:nequip', '.nequip:DEFAULT_BUILD_PARAMS', '.nequip:DEFAULT_LAYER_PARAMS', family='irreps')
 _add('allegro', '.presets.irreps:allegro', '.allegro:DEFAULT_BUILD_PARAMS', '.allegro:DEFAULT_LAYER_PARAMS', family='irreps')
-_add('xpainn', '.xpainn:XPaiNNWrapper', '.xpainn:DEFAULT_BUILD_PARAMS', '.xpainn:DEFAULT_LAYER_PARAMS', family='wrapper')
+_add('xpainn', '.presets.xpainn:xpainn', '.xpainn:DEFAULT_BUILD_PARAMS', '.xpainn:DEFAULT_LAYER_PARAMS', family='wrapper')
 _add('escn', '.presets.so2:escn', '.escn:DEFAULT_BUILD_PARAMS', '.escn:DEFAULT_LAYER_PARAMS', family='so2')
 _add('esen', '.presets.so2:esen', '.esen.native:DEFAULT_BUILD_PARAMS', '.esen.native:DEFAULT_LAYER_PARAMS', family='so2')
 _add('uma_qs', '.esen:UMAWrapperQS', {}, [], family='wrapper')

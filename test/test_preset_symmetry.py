@@ -41,9 +41,11 @@ def _run(model, sample, positions, order, *, capture_features=True):
     return result
 
 
-@pytest.fixture(scope="module", params=NATIVE_PRESETS)
+@pytest.fixture(scope="module", params=[*NATIVE_PRESETS, "xpainn"])
 def case(request):
     name = request.param
+    if name == "xpainn":
+        pytest.importorskip("xequinet.nn.model")
     torch.manual_seed(83)
     params, layers = default_params(name)
     core = next(layer for layer in layers if layer["name"] == "Core")
@@ -98,7 +100,7 @@ def test_reflection_when_supported(case):
     name, model, _, xyz, _ = case
     parity = getattr(model, "is_parity", getattr(model, "parity", None))
     if not (parity or name in ("schnet", "physnet", "spookynet", "painn", "mace", "mace_polar",
-                               "tensornet", "tensornet2", "camp", "cace", "dpa4c", "spinconv")):
+                               "xpainn", "tensornet", "tensornet2", "camp", "cace", "dpa4c", "spinconv")):
         pytest.skip("preset does not declare inversion symmetry")
     _check_transform(case, -torch.eye(3, dtype=xyz.dtype), 0, torch.arange(len(xyz)))
 
