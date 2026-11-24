@@ -3,6 +3,7 @@ import torch.nn as nn
 import copy
 
 from ..mp.equivariant import SO3_Embedding
+from ..mp.aggregate import Aggregate
 from ..mp.nn.radial_mlp import RadialFunction
 
 
@@ -72,6 +73,7 @@ class EdgeDegreeEmbedding(torch.nn.Module):
         self.edge_channels_list.append(self.m_0_num_coefficients * self.sphere_channels)
         self.rad_func = RadialFunction(self.edge_channels_list)
 
+        self.aggregate = Aggregate(divisor=rescale_factor)
         self.rescale_factor = rescale_factor
 
 
@@ -119,8 +121,9 @@ class EdgeDegreeEmbedding(torch.nn.Module):
         x_edge_embedding._rotate_inv(rotation, self.mappingReduced)
 
         # Compute the sum of the incoming neighboring messages for each target node
-        x_edge_embedding._reduce_edge(edge_index[1], atomic_numbers.shape[0])
-        x_edge_embedding.embedding = x_edge_embedding.embedding / self.rescale_factor
+        x_edge_embedding.set_embedding(self.aggregate.reduce(
+            x_edge_embedding.embedding, edge_index[1], atomic_numbers.shape[0]
+        ))
 
         return x_edge_embedding
 

@@ -23,7 +23,7 @@ from ..mp.block import Block, BlockState
 from ..mp.core import Embed
 from ..mp.head import Head
 from ..mp.nn.field_norm import TensorLayerNorm
-from ..mp.ops import scatter_sum
+from ..mp.aggregate import Aggregate
 from .geometry import angular_dim, geodite_spherical_harmonics
 from ..mp.ops.rejection import vector_rejection
 from .geometry import split_degrees
@@ -162,6 +162,7 @@ class NodeInit(Module):
         self.channels = int(channels)
         self.neighbor_embedding = torch.nn.Embedding(int(max_Za) + 1, self.channels)
         self.radial_proj = Dense(int(num_rbf), self.channels)
+        self.aggregate = Aggregate(mode="density")
         self.density = Dense(int(num_rbf), 1, activation=F.silu)
         self.update = _mlp(
             (2 * self.channels, self.channels, self.channels),
@@ -184,9 +185,7 @@ class NodeInit(Module):
             neighbor = self.neighbor_embedding(atomic_numbers.long())
             radial = self.radial_proj(rbf)
             density = torch.tanh(self.density(rbf).square())
-            pooled = scatter_sum(neighbor[idx_j] * radial, idx_i, number)
-            norm = scatter_sum(density, idx_i, number)
-            message = pooled / (norm + 1)
+            message = self.aggregate.reduce(neighbor[idx_j] * radial, idx_i, number, density)
         return self.update(torch.cat([atom_embedding, message], dim=-1))
 
 
@@ -292,6 +291,7 @@ class InteractionBlock(Module):
         self.key = Dense(self.channels, self.channels)
         self.edge_attention = Dense(self.channels, self.channels, activation=F.silu)
         self.edge_filter = Dense(self.channels, multiplier)
+        self.aggregate = Aggregate(mode="density")
         self.density = Dense(self.num_rbf, 1, activation=F.silu)
 
         if self.update_edges:
@@ -380,12 +380,9 @@ class InteractionBlock(Module):
             + feature_gate.unsqueeze(1) * steerable[idx_j]
         )
         density = torch.tanh(self.density(rbf / self.num_rbf).square())
-        scalar_sum = scatter_sum(scalar_message, idx_i, number)
-        steerable_sum = scatter_sum(steerable_message, idx_i, number)
-        density_sum = scatter_sum(density, idx_i, number)
-        scale = density_sum + 1
-        scalars = scalars + scalar_sum / scale
-        steerable = steerable + steerable_sum / scale.unsqueeze(-1)
+        norm = self.aggregate.normalizer(idx_i, number, scalar_message, density)
+        scalars = scalars + self.aggregate.reduce_with_normalizer(scalar_message, idx_i, number, norm)
+        steerable = steerable + self.aggregate.reduce_with_normalizer(steerable_message, idx_i, number, norm)
         if self.update_edges:
             edges = edges + self._edge_update(steerable, harmonics, edges, idx_i, idx_j)
         return scalars, steerable, edges
