@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from itertools import combinations_with_replacement
+
 import torch
 from torch import nn
 
@@ -46,6 +48,24 @@ class OrbitalEmbed(Embed):
 
     def enable_orbital_messages(self, iterations):
         """EquiREANN uses a separately learned contraction at every iteration."""
+        from ..mp.equivariant.body_order import multinomial
+
+        # Products differing only by an axis permutation transform together and
+        # all subsequent orbital messages are linear in those products. Keep
+        # one representative, scaled by sqrt(multiplicity) before the final norm.
+        representatives, multiplicities, shells = [], [], []
+        for degree in range(self.lmax + 1):
+            offset = (3 ** degree - 1) // 2
+            for axes in combinations_with_replacement(range(3), degree):
+                index = 0
+                for axis in axes:
+                    index = 3 * index + axis
+                representatives.append(offset + index)
+                multiplicities.append(multinomial(axes.count(0), axes.count(1), axes.count(2)))
+                shells.append(degree)
+        self.register_buffer("representatives", torch.tensor(representatives), persistent=False)
+        self.register_buffer("multiplicities", torch.tensor(multiplicities), persistent=False)
+        self.register_buffer("packed_shells", torch.tensor(shells), persistent=False)
         base = torch.empty(self.nwave, self.n_orbit)
         nn.init.xavier_uniform_(base)
         self.hyper = nn.Parameter(
@@ -70,14 +90,24 @@ class OrbitalEmbed(Embed):
         coeff = self.coeff(atom_embedding)
         if ctx.receiver.numel() == 0:
             return BlockState(scalar=atom_embedding.new_zeros(ctx.num_nodes, self.n_orbit), equi=(coeff, species, None))
+        pass_orbitals = self.hyper.ndim == 4
         pair, window = pair_gaussian_orbitals(
             ctx.receiver, ctx.sender, ctx.vec, ctx.dist, species, self.rs, self.inta, self.lmax, self.cutoff_sr,
             species_checked=True,
+            symmetric_channels=(self.representatives, self.multiplicities) if pass_orbitals else None,
         )
         psi = aggregate_weighted_orbitals(pair, coeff, ctx.receiver, ctx.sender, ctx.num_nodes)
-        first = self.hyper[0] if self.hyper.ndim == 4 else self.hyper
-        density = invariant_orbital_density(psi, first, self.l_of_channel, ordered_shells=True)
-        return BlockState(scalar=density, equi=(coeff, species, psi), edge=(pair, window, self.hyper, self.l_of_channel))
+        shell = self.packed_shells if pass_orbitals else self.l_of_channel
+        first = self.hyper[0] if pass_orbitals else self.hyper
+        density = _project_orbitals(psi, first, shell, pass_orbitals)
+        return BlockState(scalar=density, equi=(coeff, species, psi), edge=(pair, window, self.hyper, shell))
+
+
+def _project_orbitals(psi, hyper, shell, packed):
+    if packed:
+        projection = torch.bmm(psi.transpose(0, 1), hyper.to(psi)[shell])
+        return projection.square().sum(0)
+    return invariant_orbital_density(psi, hyper, shell, ordered_shells=True)
 
 
 class OrbitalUpdate(SpeciesMLP):
@@ -97,7 +127,7 @@ class OrbitalUpdate(SpeciesMLP):
             pair = add_neighbor_orbital(pair, psi, ctx.sender, window)
             contraction = hyper[self.orbital_step]
         psi = aggregate_weighted_orbitals(pair, coeff, ctx.receiver, ctx.sender, ctx.num_nodes)
-        density = invariant_orbital_density(psi, contraction, shell, ordered_shells=True)
+        density = _project_orbitals(psi, contraction, shell, self.orbital_step is not None)
         return BlockState(scalar=density, equi=(coeff, species, psi), edge=(pair, window, hyper, shell))
 
 

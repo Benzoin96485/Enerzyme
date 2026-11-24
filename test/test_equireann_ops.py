@@ -31,6 +31,39 @@ def _rotation(seed: int = 0, improper: bool = False) -> torch.Tensor:
     return matrix
 
 
+def test_packed_orbitals_preserve_recursive_density_and_force_loss_gradients():
+    from enerzyme.models.reann.blocks import OrbitalEmbed, _project_orbitals
+
+    torch.manual_seed(560)
+    embed = OrbitalEmbed(4, 3, 5., 3, 2, 5, 0.1)
+    embed.enable_orbital_messages(2)
+    embed.double()
+    receiver = torch.tensor([0, 0, 1, 1, 2, 2])
+    sender = torch.tensor([1, 2, 0, 2, 0, 1])
+    species = torch.tensor([1, 3, 2])
+    vec = torch.randn(6, 3, dtype=torch.float64, requires_grad=True)
+    coeff = torch.randn(3, 2, dtype=torch.float64, requires_grad=True)
+
+    def run(packed):
+        shell = embed.packed_shells if packed else embed.l_of_channel
+        layout = (embed.representatives, embed.multiplicities) if packed else None
+        pair, cutoff = pair_gaussian_orbitals(receiver, sender, vec, vec.norm(dim=1), species,
+                                              embed.rs, embed.inta, 3, 5., symmetric_channels=layout)
+        for i in range(3):
+            psi = aggregate_weighted_orbitals(pair, coeff, receiver, sender, 3)
+            density = _project_orbitals(psi, embed.hyper[i], shell, packed)
+            if i < 2:
+                pair = add_neighbor_orbital(pair, psi, sender, cutoff)
+        force, = torch.autograd.grad(density.sum(), vec, create_graph=True)
+        gradient = torch.autograd.grad(force.square().sum(), (coeff, embed.rs, embed.inta, embed.hyper))
+        return (density, force, *gradient)
+
+    assert embed.representatives.numel() == 20
+    assert embed.multiplicities.sum().item() == 40
+    for a, b in zip(run(True), run(False)):
+        torch.testing.assert_close(a, b, rtol=1e-10, atol=1e-10)
+
+
 def test_neighbor_orbital_is_windowed_and_indexed_by_the_sender():
     pair = torch.ones(2, 4, 1, dtype=torch.float64)
     psi = torch.tensor(

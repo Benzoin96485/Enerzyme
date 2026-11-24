@@ -99,6 +99,7 @@ def pair_gaussian_orbitals(
     cutoff: float,
     *,
     species_checked: bool = False,
+    symmetric_channels: tuple[Tensor, Tensor] | None = None,
 ) -> tuple[Tensor, Tensor]:
     """Geometric orbitals ``[E, n_angular, nwave]`` and the squared-cosine window.
 
@@ -109,7 +110,8 @@ def pair_gaussian_orbitals(
     if int(lmax) < 0:
         raise ValueError(f"lmax must be >= 0, got {lmax}")
     nwave = int(rs.shape[-1])
-    n_angular = angular_channel_count(int(lmax))
+    n_angular = (angular_channel_count(int(lmax)) if symmetric_channels is None
+                 else symmetric_channels[0].numel())
     if idx_i.numel() == 0:
         empty = vij.new_zeros((0, n_angular, nwave))
         return empty, vij.new_zeros((0,))
@@ -140,6 +142,9 @@ def pair_gaussian_orbitals(
     radial = torch.exp(exponents * (distance.to(dtype=dtype).unsqueeze(-1) - centers).square())
     window = squared_cosine_window(distance, cutoff).to(dtype=dtype)
     angular = cartesian_angular(vij.to(dtype=dtype), window, int(lmax))
+    if symmetric_channels is not None:
+        representatives, multiplicities = symmetric_channels
+        angular = angular.index_select(0, representatives) * multiplicities.to(dtype).sqrt()[:, None]
     orbital = angular.transpose(0, 1).unsqueeze(-1) * radial.unsqueeze(1)
     return orbital, window
 
