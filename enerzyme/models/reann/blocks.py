@@ -8,7 +8,13 @@ from torch import nn
 from ..mp.block import BlockState
 from ..mp.core import Embed
 from ..equireann.message import add_neighbor_orbital
-from .density import angular_momentum_index, aggregate_weighted_orbitals, invariant_orbital_density, pair_gaussian_orbitals
+from .density import (
+    aggregate_weighted_orbitals,
+    angular_momentum_index,
+    invariant_orbital_density,
+    pair_gaussian_orbitals,
+    validate_species,
+)
 from .network import SpeciesMLP
 
 
@@ -60,16 +66,13 @@ class OrbitalEmbed(Embed):
             raise ValueError(
                 f"Za has {species.shape[0]} atoms but atom_embedding has {atom_embedding.shape[0]}"
             )
-        if species.numel() and (int(species.min()) < 0 or int(species.max()) > self.max_Za):
-            raise ValueError(
-                f"Za must lie in 0..{self.max_Za}, "
-                f"got {int(species.min())}..{int(species.max())}"
-            )
+        validate_species(species, self.max_Za, "Za")
         coeff = self.coeff(atom_embedding)
         if ctx.receiver.numel() == 0:
             return BlockState(scalar=atom_embedding.new_zeros(ctx.num_nodes, self.n_orbit), equi=(coeff, species, None))
         pair, window = pair_gaussian_orbitals(
             ctx.receiver, ctx.sender, ctx.vec, ctx.dist, species, self.rs, self.inta, self.lmax, self.cutoff_sr,
+            species_checked=True,
         )
         psi = aggregate_weighted_orbitals(pair, coeff, ctx.receiver, ctx.sender, ctx.num_nodes)
         first = self.hyper[0] if self.hyper.ndim == 4 else self.hyper
