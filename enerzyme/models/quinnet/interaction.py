@@ -180,8 +180,10 @@ class QuinNetInteraction(Module):
             self.dst_proj1(normal_sender), self.src_proj1(normal_receiver)
         )
         five_ii = F.silu(self.f_proj3(edge)) * angular_norm_squared(self.src_proj2(normal_receiver))
+        # A contiguous edge projection lowers to one matrix multiply when the
+        # fullgraph compiler does not know the number of selected edges.
         torsion = F.silu(self.f_proj1(edge)) * rejection_inner(
-            self.trg_proj(receiver), self.src_proj(sender), direction
+            self.trg_proj(receiver), self.src_proj(sender.contiguous()), direction
         )
         return five_iii, five_ii, torsion
 
