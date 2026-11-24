@@ -49,6 +49,31 @@ From :code:`enerzyme/models/layers/`:
     :code:`EquiformerV2FeedForwardReadout`) accept :code:`shallow_ensemble_size`
     by widening the last linear layer.
 
+Compiling energy and force predictions
+--------------------------------------
+
+For inference, call ``model.eval()`` and then ``torch.compile(model)``. The
+compiled model evaluates the energy and computes conservative forces through
+the captured operations. A pipeline with data-dependent topology can compile
+in several pieces. The returned energy supports a subsequent
+``out["E"].sum().backward()``.
+
+In PyTorch 2.13, an additional external backward with ``retain_graph=True``
+can reject dynamically shaped Inductor partitions after force evaluation.
+Use the reusable-buffer setting around that extra backward when available.
+
+.. code-block:: python
+
+    from torch._functorch import config
+
+    with config.patch(donated_buffer=False):
+        grad_R, = torch.autograd.grad(out["E"].sum(), out["Ra"], retain_graph=True)
+
+To fit forces, call ``model.train()`` before evaluating the compiled model.
+Enerzyme uses a functional coordinate derivative so that gradients of the
+force loss can reach the model parameters. A fully traceable pipeline also
+supports ``torch.compile(model, fullgraph=True)``.
+
 Typical charge-aware stack
 --------------------------
 

@@ -1,4 +1,4 @@
-"""Evaluate a force-field stack and its coordinate derivatives in one compiler graph."""
+"""Compile force-field inference partitions or joint force-training derivatives."""
 
 from typing import Any, Dict
 
@@ -23,6 +23,23 @@ def compiling_fullgraph() -> bool:
         return InstructionTranslator.current_tx().one_graph
     except AttributeError:
         return True
+
+
+@torch.compiler.disable(recursive=False)
+def retained_inference(core, inputs):
+    """Compile each inference partition with reusable backward activations.
+
+    Force evaluation keeps the energy graph for other response heads and for
+    subsequent gradients requested by the caller. An eagerly lowered dynamic
+    backward can otherwise overwrite its saved tensors on the first use.
+    Only this configuration frame is skipped, so the layers still compile.
+    """
+    from torch._functorch import config
+
+    if hasattr(config, "donated_buffer"):
+        with config.patch(donated_buffer=False):
+            return core._run_layers(inputs)
+    return core._run_layers(inputs)
 
 
 def forward_with_coordinate_gradients(core, inputs: Dict[str, Any]) -> Dict[str, Any]:
