@@ -1777,6 +1777,54 @@
       },
       "legs": [{"side": "base", "exit": 0, "process_started_unix": 1795530820.9862125, "process_finished_unix": 1795530903.9422135, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": [[6.952391006052494, 209.13916015625, 14, 436], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 3.4570693969726562e-06, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "process_started_unix": 1795530903.9537544, "process_finished_unix": 1795531138.5245612, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": [[6.530008977279067, 209.19140625, 12, 451], [9.720203001052141, 434.91748046875, 1, 269]], "bulk_256": [[5.941519048064947, 171.01416015625, 1, 207], [8.958092890679836, 348.68994140625, 1, 277]], "large_2000": [[14.460652833804488, 997.88623046875, 1, 207], [30.10904905386269, 2173.71484375, 1, 274]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.3113021850585938e-06, "force_max_abs": 4.172325134277344e-06, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 63, "reference_active_parameters": 63, "energy_max_abs": 1.9073486328125e-06, "force_max_abs": 4.0531158447265625e-06, "gradient_max_abs": 0.0003662109375}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.337860107421875e-06, "force_max_abs": 6.258487701416016e-06, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 63, "reference_active_parameters": 63, "energy_max_abs": 4.76837158203125e-07, "force_max_abs": 6.0498714447021484e-06, "gradient_max_abs": 0.00030517578125}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 8.374452590942383e-06, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 63, "reference_active_parameters": 63, "energy_max_abs": 3.0517578125e-05, "force_max_abs": 8.158385753631592e-06, "gradient_max_abs": 0.078125}}}}]
     },
+    "newtonnet/float64/c32ede3/pair": {
+      "job": "6320078",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "9b09407efa464e44ec3e75449ca8a866367a88090b17fb08b78a8d5ed27da67b",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795533195,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 3.552713678800501e-15,
+          "Fa_max_abs": 2.3869795029440866e-15
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 5.329070518200751e-15,
+          "Fa_max_abs": 2.220446049250313e-15
+        },
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 2.842170943040401e-14,
+          "Fa_max_abs": 2.4424906541753444e-15
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 1.1102230246251565e-15,
+          "Fa_max_abs": 2.4841240175987878e-15
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 2.842170943040401e-14,
+          "Fa_max_abs": 2.858824288409778e-15
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 1.5543122344752192e-15,
+          "Fa_max_abs": 2.4424906541753444e-15
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "cdeca8ed1eb87c4f4444c64695cbb825499e010a82c7cce5c20cc5746993d298", "cache_had_prior_completed_process": true, "process_started_unix": 1795533195.1723206, "process_finished_unix": 1795533236.2846305, "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725", "reps": 5, "timings": {"mol_batch_32x20": [[9.83365811407566, 401.8408203125, 14, 436], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.1649348980190553e-15, "force_max_abs": 6.994405055138486e-15, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "fb3177208a8aca14287da49501beac7c5e7c3244b1256d6f6ee8dc34990b02b2", "cache_had_prior_completed_process": false, "process_started_unix": 1795533236.2992058, "process_finished_unix": 1795533432.698303, "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725", "reps": 5, "timings": {"mol_batch_32x20": [[8.950929157435894, 401.89306640625, 12, 451], [16.54079300351441, 853.724609375, 1, 269]], "bulk_256": [[7.739295018836856, 320.75, 1, 207], [13.541174121201038, 676.26953125, 1, 277]], "large_2000": [[26.38875599950552, 1978.330078125, 1, 207], [56.73738685436547, 4332.26123046875, 1, 274]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.886579864025407e-15, "force_max_abs": 7.993605777301127e-15, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 63, "reference_active_parameters": 63, "energy_max_abs": 2.6645352591003757e-15, "force_max_abs": 7.105427357601002e-15, "gradient_max_abs": 9.094947017729282e-13}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.7763568394002505e-15, "force_max_abs": 7.549516567451064e-15, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 63, "reference_active_parameters": 63, "energy_max_abs": 4.440892098500626e-15, "force_max_abs": 7.882583474838611e-15, "gradient_max_abs": 1.5916157281026244e-12}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 1.0658141036401503e-14, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 63, "reference_active_parameters": 63, "energy_max_abs": 4.263256414560601e-14, "force_max_abs": 1.1823875212257917e-14, "gradient_max_abs": 1.1641532182693481e-10}}}}]
+    },
     "dpa4c/float32/c32ede3/pair": {
       "job": "6317929",
       "host": "d-7-5-2",
@@ -2011,6 +2059,54 @@
       },
       "legs": [{"side": "base", "exit": 0, "process_started_unix": 1795531142.4389026, "process_finished_unix": 1795531250.9445019, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": [[12.867993908002973, 307.40576171875, 26, 510], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.9073486328125e-06, "force_max_abs": 9.5367431640625e-07, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "process_started_unix": 1795531250.9563498, "process_finished_unix": 1795531714.6408732, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": [[11.32576703093946, 307.4580078125, 23, 551], [22.862819954752922, 1119.76220703125, 1, 596]], "bulk_256": [[10.632677003741264, 217.8525390625, 13, 485], [19.744132878258824, 829.35986328125, 1, 599]], "large_2000": [[29.797042021527886, 1331.73193359375, 0, 0], [75.575842987746, 5357.435546875, 1, 596]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 9.5367431640625e-07, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 102, "reference_active_parameters": 102, "energy_max_abs": 9.5367431640625e-07, "force_max_abs": 1.0728836059570312e-06, "gradient_max_abs": 0.00048828125}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.62939453125e-06, "force_max_abs": 8.568167686462402e-08, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 102, "reference_active_parameters": 102, "energy_max_abs": 7.62939453125e-06, "force_max_abs": 1.862645149230957e-07, "gradient_max_abs": 0.00390625}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 6.103515625e-05, "force_max_abs": 1.341104507446289e-07, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 102, "reference_active_parameters": 102, "energy_max_abs": 0.0, "force_max_abs": 2.8312206268310547e-07, "gradient_max_abs": 0.125}}}}]
     },
+    "et/float64/c32ede3/pair": {
+      "job": "6320078",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "fc3f02fe02c2d7f1f16cc62b234d67fa740e51f1bfe948ef996258bf3aa11fab",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795533434,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 1.4210854715202004e-14,
+          "Fa_max_abs": 1.6653345369377348e-16
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 1.6653345369377348e-16
+        },
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 3.0531133177191805e-16
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 5.329070518200751e-15,
+          "Fa_max_abs": 8.881784197001252e-16
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 2.220446049250313e-16
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 4.440892098500626e-15,
+          "Fa_max_abs": 8.881784197001252e-16
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "process_started_unix": 1795533434.1132274, "process_finished_unix": 1795533563.3996205, "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725", "reps": 5, "timings": {"mol_batch_32x20": [[22.85082102753222, 581.1240234375, 26, 510], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.552713678800501e-15, "force_max_abs": 1.9845236565174673e-15, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "process_started_unix": 1795533563.4104605, "process_finished_unix": 1795534131.0194137, "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725", "reps": 5, "timings": {"mol_batch_32x20": [[21.707937121391296, 580.39453125, 23, 551], [45.813912991434336, 2157.25927734375, 1, 596]], "bulk_256": [[20.605786936357617, 418.05322265625, 13, 485], [38.92316296696663, 1648.71923828125, 1, 599]], "large_2000": [[65.20322617143393, 2640.71630859375, 0, 0], [148.82411807775497, 10740.19384765625, 1, 596]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.440892098500626e-15, "force_max_abs": 2.220446049250313e-15, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 102, "reference_active_parameters": 102, "energy_max_abs": 3.552713678800501e-15, "force_max_abs": 1.6653345369377348e-15, "gradient_max_abs": 1.8189894035458565e-12}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 2.0122792321330962e-16, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 102, "reference_active_parameters": 102, "energy_max_abs": 2.842170943040401e-14, "force_max_abs": 3.3306690738754696e-16, "gradient_max_abs": 1.4551915228366852e-11}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.410605131648481e-13, "force_max_abs": 2.636779683484747e-16, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 102, "reference_active_parameters": 102, "energy_max_abs": 1.1368683772161603e-13, "force_max_abs": 4.579669976578771e-16, "gradient_max_abs": 9.313225746154785e-10}}}}]
+    },
     "freecg/float32/c32ede3/pair": {
       "job": "6319793",
       "host": "d-8-15-2",
@@ -2033,6 +2129,97 @@
         }
       },
       "legs": [{"side": "base", "exit": 0, "process_started_unix": 1795531721.1850047, "process_finished_unix": 1795531812.4359274, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": ["err7", "err7"], "bulk_256": ["err2", "err2"], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": "timeout", "process_started_unix": 1795531812.4475062, "process_finished_unix": 1795533012.5984213, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": ["err7", "err7"], "bulk_256": [[157.2644580155611, 24583.318359375, 18, 1864], [368.3880988974124, 21003.826171875, 1, 1929]], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.7418136596679688e-06, "force_max_abs": 1.3224780559539795e-07, "gradient_max_abs": 0.0}, "train": {"reference_error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 560.25 MiB is free. Including non-PyTorch memory, this process has 31.18 GiB memory in use. Of the allocated memory 28.93 GiB is allocated by PyTorch, and 1.88 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)"}}, "large_2000": {}}}]
+    },
+    "geodite/float32/c32ede3/pair": {
+      "job": "6319793",
+      "host": "d-8-15-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "409c11e46309d3e2114454e2cbda357f25517e28c099ceb940e36035abf89a09",
+      "node_gpu_inventory": ["GPU-4163ef98-d563-542a-eccc-2939797f3efc, Tesla V100-PCIE-32GB", "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65",
+      "allocated_gpu_uuid": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795533022,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 3.0517578125e-05,
+          "Fa_max_abs": 6.103515625e-05
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 3.0517578125e-05,
+          "Fa_max_abs": 6.103515625e-05
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 0.00048828125,
+          "Fa_max_abs": 2.5033950805664062e-06
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 2.288818359375e-05,
+          "Fa_max_abs": 1.6689300537109375e-06
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 1.52587890625e-05,
+          "Fa_max_abs": 1.6689300537109375e-06
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "process_started_unix": 1795533022.8449094, "process_finished_unix": 1795533288.4045072, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": [[29.410066083073616, 1383.65478515625, 13, 827], "err1"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": false, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0007781982421875, "force_max_abs": 0.0049591064453125, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "process_started_unix": 1795533288.4200344, "process_finished_unix": 1795533620.5864468, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": [[26.125326054170728, 2533.75244140625, 13, 884], [60.48472388647497, 3854.84765625, 1, 932]], "bulk_256": [[28.955856105312705, 1528.7666015625, 4, 773], "err3"], "large_2000": [[141.09235699288547, 9431.41943359375, 1, 696], "err3"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": false, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.000774383544921875, "force_max_abs": 0.0049591064453125, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 93, "reference_active_parameters": 93, "energy_max_abs": 0.04686737060546875, "force_max_abs": 0.0859375, "gradient_max_abs": 304.0}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.57763671875e-05, "force_max_abs": 1.6689300537109375e-06, "gradient_max_abs": 0.0}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.00018310546875, "force_max_abs": 2.2649765014648438e-06, "gradient_max_abs": 0.0}}}}]
+    },
+    "dpa3/float32/c32ede3/pair": {
+      "job": "6319793",
+      "host": "d-8-15-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "b8a1d5ded93894cf3ba74d44a9bf88a4b4825d38dc968f3f924be35f58ca5c31",
+      "node_gpu_inventory": ["GPU-4163ef98-d563-542a-eccc-2939797f3efc, Tesla V100-PCIE-32GB", "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65",
+      "allocated_gpu_uuid": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795533627,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 9.5367431640625e-07,
+          "Fa_max_abs": 1.1920928955078125e-07
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 9.5367431640625e-07,
+          "Fa_max_abs": 2.384185791015625e-07
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 6.103515625e-05,
+          "Fa_max_abs": 4.586763679981232e-08
+        },
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 0.000152587890625,
+          "Fa_max_abs": 3.655441105365753e-08
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 7.62939453125e-06,
+          "Fa_max_abs": 3.073364496231079e-08
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 7.62939453125e-06,
+          "Fa_max_abs": 3.166496753692627e-08
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "process_started_unix": 1795533627.9879038, "process_finished_unix": 1795533710.9356244, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": [[7.1514330338686705, 93.15283203125, 28, 291], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 9.5367431640625e-07, "force_max_abs": 4.172325134277344e-07, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "process_started_unix": 1795533710.946954, "process_finished_unix": 1795534003.109621, "cuda_visible_devices": "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65", "reps": 5, "timings": {"mol_batch_32x20": [[2133.7778749875724, 100.04638671875, 26, 1952], [6.896784994751215, 138.14013671875, 1, 330]], "bulk_256": [[12.751064961776137, 223.7158203125, 10, 298], [7.739350898191333, 170.427734375, 1, 335]], "large_2000": [[31.511362874880433, 1241.55224609375, 0, 0], [14.859769959002733, 954.6357421875, 1, 332]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 4.470348358154297e-07, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 32, "reference_active_parameters": 32, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 4.76837158203125e-07, "gradient_max_abs": 0.00048828125}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.52587890625e-05, "force_max_abs": 5.029141902923584e-08, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 32, "reference_active_parameters": 32, "energy_max_abs": 1.52587890625e-05, "force_max_abs": 6.100162863731384e-08, "gradient_max_abs": 0.0078125}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 6.103515625e-05, "force_max_abs": 4.284083843231201e-08, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 32, "reference_active_parameters": 32, "energy_max_abs": 0.000885009765625, "force_max_abs": 8.568167686462402e-08, "gradient_max_abs": 3.5}}}}]
     },
     "spookynet/float32/c32ede3/pair": {
       "job": "6317929",
@@ -4110,6 +4297,39 @@
       "passed": false,
       "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
     },
+    "leftnet/float32/c5d7712/acceptance": {
+      "job": "6319582",
+      "requested_precision": "float32",
+      "architecture": "leftnet",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "allocated_gpu_index": "0",
+      "source": "c5d7712c7110a689a71daa3844ddfc6f95407611",
+      "fixture_sha256": "59d155a9145853757f9a91c5c8c79e8b78ba8a2cec4722eec8261bd4fdbb81ab",
+      "passed": false,
+      "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+    },
+    "leftnet/float64/c5d7712/acceptance": {
+      "job": "6319582",
+      "requested_precision": "float64",
+      "architecture": "leftnet",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "allocated_gpu_index": "0",
+      "source": "c5d7712c7110a689a71daa3844ddfc6f95407611",
+      "fixture_sha256": "59d155a9145853757f9a91c5c8c79e8b78ba8a2cec4722eec8261bd4fdbb81ab",
+      "passed": false,
+      "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+    },
+    "alphanet/float32/c5d7712/acceptance": {
+      "job": "6319582",
+      "requested_precision": "float32",
+      "architecture": "alphanet",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "allocated_gpu_index": "0",
+      "source": "c5d7712c7110a689a71daa3844ddfc6f95407611",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "passed": false,
+      "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+    },
     "leftnet/float32/f12974b/snapshot": {
       "passed": true,
       "energy_backwards_after_force": [{"passed": true, "active_parameters": 74, "reference_active_parameters": 74, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 2.980232238769531e-07, "gradient_max_abs": 3.814697265625e-06}, {"passed": true, "active_parameters": 74, "reference_active_parameters": 74, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 2.980232238769531e-07, "gradient_max_abs": 3.814697265625e-06}],
@@ -4324,6 +4544,50 @@
         }
       },
       "finished": true
+    },
+    "alphanet/float32/c5d7712": {
+      "architecture": "alphanet",
+      "precision": "float32",
+      "source": "c5d7712c7110a689a71daa3844ddfc6f95407611",
+      "job": "6319582",
+      "comparisons": {
+        "bare": {
+          "source": "c5d7712c7110a689a71daa3844ddfc6f95407611",
+          "architecture": "alphanet",
+          "precision": "float32",
+          "scope": "bare",
+          "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+          "job": "6319582",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": false,
+              "energy_backwards_after_force": [{"passed": false, "active_parameters": 122, "reference_active_parameters": 122, "energy_max_abs": 5.7220458984375e-06, "force_max_abs": 0.00090789794921875, "gradient_max_abs": 0.00090789794921875}, {"passed": false, "active_parameters": 122, "reference_active_parameters": 122, "energy_max_abs": 5.7220458984375e-06, "force_max_abs": 0.00090789794921875, "gradient_max_abs": 0.00090789794921875}]
+            },
+            "bulk_256": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            },
+            "large_2000": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          },
+          "passed": false,
+          "finished": true
+        }
+      },
+      "finished": false
     },
     "equireann/float32/bf7725d": {
       "architecture": "equireann",
@@ -5012,6 +5276,2757 @@
       },
       "finished": true,
       "method": "Frozen weights and unmodified training dropout probabilities. Ordinary Inductor uses native random draws under fallback_random=True for this diagnostic. The default run is separately archived."
+    },
+    "alphanet/float32/c5d7712/native_repeats": {
+      "architecture": "alphanet",
+      "precision": "float32",
+      "job": "6319582",
+      "source": "c5d7712c7110a689a71daa3844ddfc6f95407611",
+      "allocated_gpu_index": "0",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "systems": {
+        "mol_batch_32x20": {
+          "numerical": {
+            "passed": false,
+            "active_parameters": 121,
+            "reference_active_parameters": 121,
+            "energy_max_abs": 4.0531158447265625e-06,
+            "force_max_abs": 0.0004921555519104004,
+            "gradient_max_abs": 16.30029296875,
+            "gradient_relative_l2": 0.000164498488412403,
+            "gradient_elements_outside": 55837,
+            "gradient_parameters_outside": {
+              "blocks.0.message.diagonal.2.weight": {
+                "elements": 3,
+                "total": 288,
+                "max_outside_absolute": 0.0012257099151611328,
+                "max_error_over_tolerance": 1.2478534541874915
+              },
+              "blocks.0.message.embed.dir_proj.0.bias": {
+                "elements": 38,
+                "total": 384,
+                "max_outside_absolute": 0.019295692443847656,
+                "max_error_over_tolerance": 13.230360042465641
+              },
+              "blocks.0.message.embed.dir_proj.0.weight": {
+                "elements": 1181,
+                "total": 184320,
+                "max_outside_absolute": 0.0037932395935058594,
+                "max_error_over_tolerance": 4.13607380974803
+              },
+              "blocks.0.message.embed.dir_proj.2.bias": {
+                "elements": 27,
+                "total": 384,
+                "max_outside_absolute": 0.0673065185546875,
+                "max_error_over_tolerance": 12.404060284293076
+              },
+              "blocks.0.message.embed.dir_proj.2.weight": {
+                "elements": 890,
+                "total": 147456,
+                "max_outside_absolute": 0.007763385772705078,
+                "max_error_over_tolerance": 9.526405294895634
+              },
+              "blocks.0.message.embed.norm.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.0018544197082519531,
+                "max_error_over_tolerance": 1.8683611086102476
+              },
+              "blocks.0.message.embed.norm.weight": {
+                "elements": 4,
+                "total": 128,
+                "max_outside_absolute": 0.001487135887145996,
+                "max_error_over_tolerance": 1.644300152372968
+              },
+              "blocks.0.message.embed.rbf_proj.bias": {
+                "elements": 23,
+                "total": 384,
+                "max_outside_absolute": 0.03717041015625,
+                "max_error_over_tolerance": 12.570293359298919
+              },
+              "blocks.0.message.embed.rbf_proj.weight": {
+                "elements": 347,
+                "total": 36864,
+                "max_outside_absolute": 0.00967264175415039,
+                "max_error_over_tolerance": 8.868592930814318
+              },
+              "blocks.0.message.embed.x_proj.0.weight": {
+                "elements": 218,
+                "total": 16384,
+                "max_outside_absolute": 0.005968332290649414,
+                "max_error_over_tolerance": 4.925501323280691
+              },
+              "blocks.0.message.embed.x_proj.2.bias": {
+                "elements": 10,
+                "total": 384,
+                "max_outside_absolute": 0.0043182373046875,
+                "max_error_over_tolerance": 4.122225621108987
+              },
+              "blocks.0.message.embed.x_proj.2.weight": {
+                "elements": 313,
+                "total": 49152,
+                "max_outside_absolute": 0.008953571319580078,
+                "max_error_over_tolerance": 8.384165838164222
+              },
+              "blocks.0.message.fc_mps.weight": {
+                "elements": 7,
+                "total": 576,
+                "max_outside_absolute": 0.08203125,
+                "max_error_over_tolerance": 1.299305213633131
+              },
+              "blocks.0.message.norm_before.bias": {
+                "elements": 17,
+                "total": 152,
+                "max_outside_absolute": 4.58935546875,
+                "max_error_over_tolerance": 36.44403168331993
+              },
+              "blocks.0.message.norm_before.weight": {
+                "elements": 18,
+                "total": 152,
+                "max_outside_absolute": 0.92327880859375,
+                "max_error_over_tolerance": 37.67855773658445
+              },
+              "blocks.0.message.scale.weight": {
+                "elements": 263,
+                "total": 24576,
+                "max_outside_absolute": 0.006458282470703125,
+                "max_error_over_tolerance": 5.03080477919448
+              },
+              "blocks.0.message.scale2.weight": {
+                "elements": 14,
+                "total": 1536,
+                "max_outside_absolute": 0.004039287567138672,
+                "max_error_over_tolerance": 1.0196553709290417
+              },
+              "blocks.0.transition.mix.0.bias": {
+                "elements": 12,
+                "total": 128,
+                "max_outside_absolute": 1.5782470703125,
+                "max_error_over_tolerance": 12.475126438474108
+              },
+              "blocks.0.transition.mix.0.weight": {
+                "elements": 1777,
+                "total": 32768,
+                "max_outside_absolute": 3.740478515625,
+                "max_error_over_tolerance": 1165.1903505465511
+              },
+              "blocks.0.transition.mix.2.bias": {
+                "elements": 28,
+                "total": 384,
+                "max_outside_absolute": 1.806396484375,
+                "max_error_over_tolerance": 115.16967260881908
+              },
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 3572,
+                "total": 49152,
+                "max_outside_absolute": 2.71270751953125,
+                "max_error_over_tolerance": 394.424224372256
+              },
+              "blocks.1.message.embed.dir_proj.0.bias": {
+                "elements": 37,
+                "total": 384,
+                "max_outside_absolute": 0.007584571838378906,
+                "max_error_over_tolerance": 7.267520094475471
+              },
+              "blocks.1.message.embed.dir_proj.0.weight": {
+                "elements": 105,
+                "total": 184320,
+                "max_outside_absolute": 0.0015263557434082031,
+                "max_error_over_tolerance": 1.6861040062273653
+              },
+              "blocks.1.message.embed.dir_proj.2.bias": {
+                "elements": 15,
+                "total": 384,
+                "max_outside_absolute": 0.023591995239257812,
+                "max_error_over_tolerance": 5.220569497428446
+              },
+              "blocks.1.message.embed.dir_proj.2.weight": {
+                "elements": 172,
+                "total": 147456,
+                "max_outside_absolute": 0.004344463348388672,
+                "max_error_over_tolerance": 3.051474772298222
+              },
+              "blocks.1.message.embed.rbf_proj.bias": {
+                "elements": 11,
+                "total": 384,
+                "max_outside_absolute": 0.016718387603759766,
+                "max_error_over_tolerance": 8.103862575354412
+              },
+              "blocks.1.message.embed.rbf_proj.weight": {
+                "elements": 97,
+                "total": 36864,
+                "max_outside_absolute": 0.0030841827392578125,
+                "max_error_over_tolerance": 3.594294260278207
+              },
+              "blocks.1.message.embed.x_proj.0.weight": {
+                "elements": 21,
+                "total": 16384,
+                "max_outside_absolute": 0.002291858196258545,
+                "max_error_over_tolerance": 2.163678184591416
+              },
+              "blocks.1.message.embed.x_proj.2.bias": {
+                "elements": 3,
+                "total": 384,
+                "max_outside_absolute": 0.0026090145111083984,
+                "max_error_over_tolerance": 1.7620114580499096
+              },
+              "blocks.1.message.embed.x_proj.2.weight": {
+                "elements": 85,
+                "total": 49152,
+                "max_outside_absolute": 0.009432077407836914,
+                "max_error_over_tolerance": 6.805321744958846
+              },
+              "blocks.1.message.norm_before.bias": {
+                "elements": 14,
+                "total": 152,
+                "max_outside_absolute": 2.554931640625,
+                "max_error_over_tolerance": 374.76806514792287
+              },
+              "blocks.1.message.norm_before.weight": {
+                "elements": 14,
+                "total": 152,
+                "max_outside_absolute": 0.532135009765625,
+                "max_error_over_tolerance": 241.56397004457813
+              },
+              "blocks.1.message.scale2.weight": {
+                "elements": 17,
+                "total": 1536,
+                "max_outside_absolute": 0.00129660964012146,
+                "max_error_over_tolerance": 1.245917363310219
+              },
+              "blocks.1.transition.mix.0.bias": {
+                "elements": 19,
+                "total": 128,
+                "max_outside_absolute": 0.498291015625,
+                "max_error_over_tolerance": 6.991394211478594
+              },
+              "blocks.1.transition.mix.0.weight": {
+                "elements": 1975,
+                "total": 32768,
+                "max_outside_absolute": 1.705810546875,
+                "max_error_over_tolerance": 213.21527157039841
+              },
+              "blocks.1.transition.mix.2.bias": {
+                "elements": 40,
+                "total": 384,
+                "max_outside_absolute": 0.7138671875,
+                "max_error_over_tolerance": 9.34381981904262
+              },
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 4048,
+                "total": 49152,
+                "max_outside_absolute": 1.1923828125,
+                "max_error_over_tolerance": 191.25284104927238
+              },
+              "blocks.1.transition.vec_proj.weight": {
+                "elements": 2,
+                "total": 32768,
+                "max_outside_absolute": 0.0009265542030334473,
+                "max_error_over_tolerance": 1.2436949983987577
+              },
+              "blocks.2.message.embed.dir_proj.0.bias": {
+                "elements": 2,
+                "total": 384,
+                "max_outside_absolute": 0.0032807588577270508,
+                "max_error_over_tolerance": 3.322726991416496
+              },
+              "blocks.2.message.embed.dir_proj.2.bias": {
+                "elements": 8,
+                "total": 384,
+                "max_outside_absolute": 0.010257244110107422,
+                "max_error_over_tolerance": 8.12604446549168
+              },
+              "blocks.2.message.embed.dir_proj.2.weight": {
+                "elements": 23,
+                "total": 147456,
+                "max_outside_absolute": 0.0012750029563903809,
+                "max_error_over_tolerance": 1.586359141653558
+              },
+              "blocks.2.message.embed.rbf_proj.bias": {
+                "elements": 3,
+                "total": 384,
+                "max_outside_absolute": 0.002195596694946289,
+                "max_error_over_tolerance": 2.521774492617344
+              },
+              "blocks.2.message.embed.rbf_proj.weight": {
+                "elements": 1,
+                "total": 36864,
+                "max_outside_absolute": 0.0010161399841308594,
+                "max_error_over_tolerance": 1.2455678337571998
+              },
+              "blocks.2.message.embed.x_proj.0.weight": {
+                "elements": 3,
+                "total": 16384,
+                "max_outside_absolute": 0.001097351312637329,
+                "max_error_over_tolerance": 1.1419486276386352
+              },
+              "blocks.2.message.embed.x_proj.2.weight": {
+                "elements": 2,
+                "total": 49152,
+                "max_outside_absolute": 0.000825732946395874,
+                "max_error_over_tolerance": 1.102100482916669
+              },
+              "blocks.2.message.norm_before.bias": {
+                "elements": 20,
+                "total": 152,
+                "max_outside_absolute": 1.0093994140625,
+                "max_error_over_tolerance": 9.471839781096532
+              },
+              "blocks.2.message.norm_before.weight": {
+                "elements": 20,
+                "total": 152,
+                "max_outside_absolute": 0.22609710693359375,
+                "max_error_over_tolerance": 9.086773719716419
+              },
+              "blocks.2.transition.mix.0.weight": {
+                "elements": 1,
+                "total": 32768,
+                "max_outside_absolute": 0.00244140625,
+                "max_error_over_tolerance": 1.8354475394678578
+              },
+              "embed.kernel1": {
+                "elements": 612,
+                "total": 6144,
+                "max_outside_absolute": 0.838104248046875,
+                "max_error_over_tolerance": 371.31088364828804
+              },
+              "embed.kernels_imag": {
+                "elements": 18880,
+                "total": 221184,
+                "max_outside_absolute": 0.5449981689453125,
+                "max_error_over_tolerance": 84.98980293086272
+              },
+              "embed.kernels_real": {
+                "elements": 18034,
+                "total": 221184,
+                "max_outside_absolute": 0.4770698547363281,
+                "max_error_over_tolerance": 128.41938966503602
+              },
+              "embed.radial.net.0.bias": {
+                "elements": 12,
+                "total": 128,
+                "max_outside_absolute": 4.06494140625,
+                "max_error_over_tolerance": 36.51499089651422
+              },
+              "embed.radial.net.0.weight": {
+                "elements": 1279,
+                "total": 12288,
+                "max_outside_absolute": 0.7314453125,
+                "max_error_over_tolerance": 324.1183424807677
+              },
+              "embed.radial.net.2.bias": {
+                "elements": 20,
+                "total": 128,
+                "max_outside_absolute": 16.30029296875,
+                "max_error_over_tolerance": 1847.8360535485053
+              },
+              "embed.radial.net.2.weight": {
+                "elements": 1429,
+                "total": 16384,
+                "max_outside_absolute": 2.1063232421875,
+                "max_error_over_tolerance": 326.1089025298773
+              },
+              "pre_sequence.2.bessel_weights": {
+                "elements": 10,
+                "total": 96,
+                "max_outside_absolute": 0.7716064453125,
+                "max_error_over_tolerance": 117.81144365552936
+              },
+              "pre_sequence.3.embedding.weight": {
+                "elements": 40,
+                "total": 12160,
+                "max_outside_absolute": 2.30859375,
+                "max_error_over_tolerance": 185.74698959713274
+              }
+            }
+          },
+          "capture": {
+            "new_graphs": 2,
+            "new_calls": 1192
+          },
+          "error": null
+        },
+        "bulk_256": {
+          "numerical": {
+            "passed": false,
+            "active_parameters": 121,
+            "reference_active_parameters": 121,
+            "energy_max_abs": 0.0,
+            "force_max_abs": 0.00016552209854125977,
+            "gradient_max_abs": 1.375,
+            "gradient_relative_l2": 1.0895798972567219e-05,
+            "gradient_elements_outside": 20709,
+            "gradient_parameters_outside": {
+              "blocks.0.message.embed.dir_proj.0.bias": {
+                "elements": 1,
+                "total": 384,
+                "max_outside_absolute": 0.0007908940315246582,
+                "max_error_over_tolerance": 1.1131909206239086
+              },
+              "blocks.0.message.embed.dir_proj.0.weight": {
+                "elements": 1,
+                "total": 184320,
+                "max_outside_absolute": 0.0007553808391094208,
+                "max_error_over_tolerance": 1.0481012568354569
+              },
+              "blocks.0.message.embed.dir_proj.2.bias": {
+                "elements": 4,
+                "total": 384,
+                "max_outside_absolute": 0.0038237571716308594,
+                "max_error_over_tolerance": 2.6184504983972485
+              },
+              "blocks.0.message.embed.rbf_proj.bias": {
+                "elements": 1,
+                "total": 384,
+                "max_outside_absolute": 0.0021990537643432617,
+                "max_error_over_tolerance": 1.7033369022736697
+              },
+              "blocks.0.message.norm_before.bias": {
+                "elements": 3,
+                "total": 152,
+                "max_outside_absolute": 0.222747802734375,
+                "max_error_over_tolerance": 4.160848281756069
+              },
+              "blocks.0.message.norm_before.weight": {
+                "elements": 2,
+                "total": 152,
+                "max_outside_absolute": 0.044814109802246094,
+                "max_error_over_tolerance": 3.988318202320675
+              },
+              "blocks.0.transition.mix.0.bias": {
+                "elements": 2,
+                "total": 128,
+                "max_outside_absolute": 0.08275604248046875,
+                "max_error_over_tolerance": 1.8679550236188733
+              },
+              "blocks.0.transition.mix.0.weight": {
+                "elements": 430,
+                "total": 32768,
+                "max_outside_absolute": 0.28553009033203125,
+                "max_error_over_tolerance": 126.01012452395801
+              },
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 922,
+                "total": 49152,
+                "max_outside_absolute": 0.2715301513671875,
+                "max_error_over_tolerance": 73.35125720902633
+              },
+              "blocks.1.message.embed.dir_proj.2.bias": {
+                "elements": 1,
+                "total": 384,
+                "max_outside_absolute": 0.0014690756797790527,
+                "max_error_over_tolerance": 1.079890838620959
+              },
+              "blocks.1.transition.mix.0.weight": {
+                "elements": 174,
+                "total": 32768,
+                "max_outside_absolute": 0.17160415649414062,
+                "max_error_over_tolerance": 34.58220568670213
+              },
+              "blocks.1.transition.mix.2.bias": {
+                "elements": 2,
+                "total": 384,
+                "max_outside_absolute": 0.0051555633544921875,
+                "max_error_over_tolerance": 2.0499859845575306
+              },
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 450,
+                "total": 49152,
+                "max_outside_absolute": 0.11875152587890625,
+                "max_error_over_tolerance": 48.310169244670185
+              },
+              "blocks.2.message.norm_before.bias": {
+                "elements": 1,
+                "total": 152,
+                "max_outside_absolute": 0.00730133056640625,
+                "max_error_over_tolerance": 2.5104642024068977
+              },
+              "blocks.2.message.norm_before.weight": {
+                "elements": 1,
+                "total": 152,
+                "max_outside_absolute": 0.001635044813156128,
+                "max_error_over_tolerance": 1.4025812536516313
+              },
+              "embed.kernel1": {
+                "elements": 951,
+                "total": 6144,
+                "max_outside_absolute": 0.13360595703125,
+                "max_error_over_tolerance": 43.31310123183546
+              },
+              "embed.kernels_imag": {
+                "elements": 8057,
+                "total": 221184,
+                "max_outside_absolute": 0.1114654541015625,
+                "max_error_over_tolerance": 52.84918194857694
+              },
+              "embed.kernels_real": {
+                "elements": 8133,
+                "total": 221184,
+                "max_outside_absolute": 0.125213623046875,
+                "max_error_over_tolerance": 18.125078756332712
+              },
+              "embed.radial.net.0.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.26544189453125,
+                "max_error_over_tolerance": 5.151196927806727
+              },
+              "embed.radial.net.0.weight": {
+                "elements": 744,
+                "total": 12288,
+                "max_outside_absolute": 0.0655975341796875,
+                "max_error_over_tolerance": 37.650145701864965
+              },
+              "embed.radial.net.2.bias": {
+                "elements": 2,
+                "total": 128,
+                "max_outside_absolute": 0.514739990234375,
+                "max_error_over_tolerance": 1.1533056360923748
+              },
+              "embed.radial.net.2.weight": {
+                "elements": 815,
+                "total": 16384,
+                "max_outside_absolute": 0.06782054901123047,
+                "max_error_over_tolerance": 26.018432484536373
+              },
+              "pre_sequence.2.bessel_weights": {
+                "elements": 5,
+                "total": 96,
+                "max_outside_absolute": 0.061832427978515625,
+                "max_error_over_tolerance": 7.478257211611303
+              },
+              "pre_sequence.3.embedding.weight": {
+                "elements": 6,
+                "total": 12160,
+                "max_outside_absolute": 0.12799835205078125,
+                "max_error_over_tolerance": 5.55588083550943
+              }
+            }
+          },
+          "capture": {
+            "new_graphs": 1,
+            "new_calls": 660
+          },
+          "error": null
+        },
+        "large_2000": {
+          "numerical": {
+            "passed": false,
+            "active_parameters": 121,
+            "reference_active_parameters": 121,
+            "energy_max_abs": 0.0010986328125,
+            "force_max_abs": 0.0017390251159667969,
+            "gradient_max_abs": 183.1875,
+            "gradient_relative_l2": 1.899250445517251e-05,
+            "gradient_elements_outside": 145096,
+            "gradient_parameters_outside": {
+              "blocks.0.message.diagonal.0.weight": {
+                "elements": 53,
+                "total": 18432,
+                "max_outside_absolute": 0.002772510051727295,
+                "max_error_over_tolerance": 2.293810815441898
+              },
+              "blocks.0.message.diagonal.2.weight": {
+                "elements": 11,
+                "total": 288,
+                "max_outside_absolute": 0.0029218196868896484,
+                "max_error_over_tolerance": 2.842374494028191
+              },
+              "blocks.0.message.embed.dir_proj.0.bias": {
+                "elements": 39,
+                "total": 384,
+                "max_outside_absolute": 0.1628875732421875,
+                "max_error_over_tolerance": 101.92244409580671
+              },
+              "blocks.0.message.embed.dir_proj.0.weight": {
+                "elements": 6893,
+                "total": 184320,
+                "max_outside_absolute": 0.028436660766601562,
+                "max_error_over_tolerance": 30.47421288264541
+              },
+              "blocks.0.message.embed.dir_proj.2.bias": {
+                "elements": 39,
+                "total": 384,
+                "max_outside_absolute": 1.646240234375,
+                "max_error_over_tolerance": 26.22506339799866
+              },
+              "blocks.0.message.embed.dir_proj.2.weight": {
+                "elements": 7895,
+                "total": 147456,
+                "max_outside_absolute": 0.1005706787109375,
+                "max_error_over_tolerance": 37.799372774278865
+              },
+              "blocks.0.message.embed.norm.bias": {
+                "elements": 9,
+                "total": 128,
+                "max_outside_absolute": 0.01077127456665039,
+                "max_error_over_tolerance": 8.511277052137254
+              },
+              "blocks.0.message.embed.norm.weight": {
+                "elements": 8,
+                "total": 128,
+                "max_outside_absolute": 0.016202256083488464,
+                "max_error_over_tolerance": 20.069219375613244
+              },
+              "blocks.0.message.embed.rbf_proj.bias": {
+                "elements": 34,
+                "total": 384,
+                "max_outside_absolute": 0.2508544921875,
+                "max_error_over_tolerance": 145.50044633607956
+              },
+              "blocks.0.message.embed.rbf_proj.weight": {
+                "elements": 2503,
+                "total": 36864,
+                "max_outside_absolute": 0.09212493896484375,
+                "max_error_over_tolerance": 63.27789496957671
+              },
+              "blocks.0.message.embed.x_proj.0.bias": {
+                "elements": 5,
+                "total": 128,
+                "max_outside_absolute": 0.011106491088867188,
+                "max_error_over_tolerance": 2.0667196710519677
+              },
+              "blocks.0.message.embed.x_proj.0.weight": {
+                "elements": 1274,
+                "total": 16384,
+                "max_outside_absolute": 0.026070594787597656,
+                "max_error_over_tolerance": 16.53439121236663
+              },
+              "blocks.0.message.embed.x_proj.2.bias": {
+                "elements": 14,
+                "total": 384,
+                "max_outside_absolute": 0.0420074462890625,
+                "max_error_over_tolerance": 5.19432173183453
+              },
+              "blocks.0.message.embed.x_proj.2.weight": {
+                "elements": 2209,
+                "total": 49152,
+                "max_outside_absolute": 0.0726165771484375,
+                "max_error_over_tolerance": 23.285005175703137
+              },
+              "blocks.0.message.fc_mps.weight": {
+                "elements": 152,
+                "total": 576,
+                "max_outside_absolute": 0.0859375,
+                "max_error_over_tolerance": 21.05755732335049
+              },
+              "blocks.0.message.kernel_imag": {
+                "elements": 18,
+                "total": 612,
+                "max_outside_absolute": 0.002434849739074707,
+                "max_error_over_tolerance": 2.2000913342085204
+              },
+              "blocks.0.message.kernel_real": {
+                "elements": 24,
+                "total": 612,
+                "max_outside_absolute": 0.002835512161254883,
+                "max_error_over_tolerance": 1.3784220559046148
+              },
+              "blocks.0.message.norm_before.bias": {
+                "elements": 4,
+                "total": 152,
+                "max_outside_absolute": 45.064453125,
+                "max_error_over_tolerance": 3.6885343311734293
+              },
+              "blocks.0.message.norm_before.weight": {
+                "elements": 4,
+                "total": 152,
+                "max_outside_absolute": 9.078125,
+                "max_error_over_tolerance": 8.127324803470286
+              },
+              "blocks.0.message.scale.weight": {
+                "elements": 1712,
+                "total": 24576,
+                "max_outside_absolute": 0.029334306716918945,
+                "max_error_over_tolerance": 17.73379702269129
+              },
+              "blocks.0.message.scale2.bias": {
+                "elements": 2,
+                "total": 64,
+                "max_outside_absolute": 0.0035839080810546875,
+                "max_error_over_tolerance": 1.646249572530359
+              },
+              "blocks.0.message.scale2.weight": {
+                "elements": 48,
+                "total": 1536,
+                "max_outside_absolute": 0.01060342788696289,
+                "max_error_over_tolerance": 2.0947432966236024
+              },
+              "blocks.0.transition.mix.0.bias": {
+                "elements": 3,
+                "total": 128,
+                "max_outside_absolute": 7.4404296875,
+                "max_error_over_tolerance": 2.8779482153279665
+              },
+              "blocks.0.transition.mix.0.weight": {
+                "elements": 729,
+                "total": 32768,
+                "max_outside_absolute": 24.1171875,
+                "max_error_over_tolerance": 1364.7391405727835
+              },
+              "blocks.0.transition.mix.2.bias": {
+                "elements": 4,
+                "total": 384,
+                "max_outside_absolute": 3.06005859375,
+                "max_error_over_tolerance": 1.340467778979001
+              },
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 1250,
+                "total": 49152,
+                "max_outside_absolute": 32.1474609375,
+                "max_error_over_tolerance": 375.7705091012809
+              },
+              "blocks.0.transition.vec_proj.weight": {
+                "elements": 241,
+                "total": 32768,
+                "max_outside_absolute": 0.004126548767089844,
+                "max_error_over_tolerance": 3.900740134166959
+              },
+              "blocks.1.message.embed.dir_proj.0.bias": {
+                "elements": 20,
+                "total": 384,
+                "max_outside_absolute": 0.07596206665039062,
+                "max_error_over_tolerance": 10.776009456878608
+              },
+              "blocks.1.message.embed.dir_proj.0.weight": {
+                "elements": 1571,
+                "total": 184320,
+                "max_outside_absolute": 0.010307788848876953,
+                "max_error_over_tolerance": 9.60372486736586
+              },
+              "blocks.1.message.embed.dir_proj.2.bias": {
+                "elements": 27,
+                "total": 384,
+                "max_outside_absolute": 0.363372802734375,
+                "max_error_over_tolerance": 34.37194673368168
+              },
+              "blocks.1.message.embed.dir_proj.2.weight": {
+                "elements": 2832,
+                "total": 147456,
+                "max_outside_absolute": 0.017357587814331055,
+                "max_error_over_tolerance": 13.572954632616705
+              },
+              "blocks.1.message.embed.norm.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.0031431913375854492,
+                "max_error_over_tolerance": 1.2435385586515124
+              },
+              "blocks.1.message.embed.norm.weight": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.002809464931488037,
+                "max_error_over_tolerance": 2.1042337253983336
+              },
+              "blocks.1.message.embed.rbf_proj.bias": {
+                "elements": 16,
+                "total": 384,
+                "max_outside_absolute": 0.2719879150390625,
+                "max_error_over_tolerance": 4.925505402032069
+              },
+              "blocks.1.message.embed.rbf_proj.weight": {
+                "elements": 1033,
+                "total": 36864,
+                "max_outside_absolute": 0.025762557983398438,
+                "max_error_over_tolerance": 12.798451172203078
+              },
+              "blocks.1.message.embed.x_proj.0.bias": {
+                "elements": 2,
+                "total": 128,
+                "max_outside_absolute": 0.003169536590576172,
+                "max_error_over_tolerance": 3.6892219826568273
+              },
+              "blocks.1.message.embed.x_proj.0.weight": {
+                "elements": 612,
+                "total": 16384,
+                "max_outside_absolute": 0.014810562133789062,
+                "max_error_over_tolerance": 8.516613691753466
+              },
+              "blocks.1.message.embed.x_proj.2.bias": {
+                "elements": 11,
+                "total": 384,
+                "max_outside_absolute": 0.014542579650878906,
+                "max_error_over_tolerance": 7.571963814711862
+              },
+              "blocks.1.message.embed.x_proj.2.weight": {
+                "elements": 952,
+                "total": 49152,
+                "max_outside_absolute": 0.028781890869140625,
+                "max_error_over_tolerance": 21.966600811570185
+              },
+              "blocks.1.message.fc_mps.weight": {
+                "elements": 125,
+                "total": 576,
+                "max_outside_absolute": 0.029296875,
+                "max_error_over_tolerance": 22.477522477522477
+              },
+              "blocks.1.message.norm_before.bias": {
+                "elements": 2,
+                "total": 152,
+                "max_outside_absolute": 4.3271484375,
+                "max_error_over_tolerance": 1.332418972966584
+              },
+              "blocks.1.message.norm_before.weight": {
+                "elements": 3,
+                "total": 152,
+                "max_outside_absolute": 0.90350341796875,
+                "max_error_over_tolerance": 1.332766986143599
+              },
+              "blocks.1.message.scale.weight": {
+                "elements": 160,
+                "total": 24576,
+                "max_outside_absolute": 0.003931760787963867,
+                "max_error_over_tolerance": 3.030281782192911
+              },
+              "blocks.1.transition.mix.0.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.4947509765625,
+                "max_error_over_tolerance": 1.0489735413441224
+              },
+              "blocks.1.transition.mix.0.weight": {
+                "elements": 369,
+                "total": 32768,
+                "max_outside_absolute": 23.947265625,
+                "max_error_over_tolerance": 302.4558121963636
+              },
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 740,
+                "total": 49152,
+                "max_outside_absolute": 12.947021484375,
+                "max_error_over_tolerance": 182.89339261463647
+              },
+              "blocks.1.transition.vec_proj.weight": {
+                "elements": 109,
+                "total": 32768,
+                "max_outside_absolute": 0.0034038424491882324,
+                "max_error_over_tolerance": 2.9590798974065042
+              },
+              "blocks.2.message.embed.dir_proj.0.bias": {
+                "elements": 12,
+                "total": 384,
+                "max_outside_absolute": 0.02706003189086914,
+                "max_error_over_tolerance": 18.16912416125248
+              },
+              "blocks.2.message.embed.dir_proj.0.weight": {
+                "elements": 367,
+                "total": 184320,
+                "max_outside_absolute": 0.0054770708084106445,
+                "max_error_over_tolerance": 4.272927713169042
+              },
+              "blocks.2.message.embed.dir_proj.2.bias": {
+                "elements": 9,
+                "total": 384,
+                "max_outside_absolute": 0.1689910888671875,
+                "max_error_over_tolerance": 5.358691246815122
+              },
+              "blocks.2.message.embed.dir_proj.2.weight": {
+                "elements": 1032,
+                "total": 147456,
+                "max_outside_absolute": 0.006477415561676025,
+                "max_error_over_tolerance": 6.326493558172227
+              },
+              "blocks.2.message.embed.norm.weight": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.001487046480178833,
+                "max_error_over_tolerance": 1.5093292713983595
+              },
+              "blocks.2.message.embed.rbf_proj.bias": {
+                "elements": 10,
+                "total": 384,
+                "max_outside_absolute": 0.024225234985351562,
+                "max_error_over_tolerance": 6.562084424539482
+              },
+              "blocks.2.message.embed.rbf_proj.weight": {
+                "elements": 431,
+                "total": 36864,
+                "max_outside_absolute": 0.0103912353515625,
+                "max_error_over_tolerance": 7.108243705813633
+              },
+              "blocks.2.message.embed.x_proj.0.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.001717209815979004,
+                "max_error_over_tolerance": 1.0500994310392888
+              },
+              "blocks.2.message.embed.x_proj.0.weight": {
+                "elements": 241,
+                "total": 16384,
+                "max_outside_absolute": 0.006265401840209961,
+                "max_error_over_tolerance": 3.967057290784348
+              },
+              "blocks.2.message.embed.x_proj.2.bias": {
+                "elements": 1,
+                "total": 384,
+                "max_outside_absolute": 0.0027588605880737305,
+                "max_error_over_tolerance": 3.0608500103346508
+              },
+              "blocks.2.message.embed.x_proj.2.weight": {
+                "elements": 353,
+                "total": 49152,
+                "max_outside_absolute": 0.02130889892578125,
+                "max_error_over_tolerance": 8.130734597636291
+              },
+              "blocks.2.message.fc_mps.weight": {
+                "elements": 263,
+                "total": 576,
+                "max_outside_absolute": 0.078125,
+                "max_error_over_tolerance": 29.697624190064793
+              },
+              "blocks.2.message.scale.weight": {
+                "elements": 3,
+                "total": 24576,
+                "max_outside_absolute": 0.0018379688262939453,
+                "max_error_over_tolerance": 1.4220454258793782
+              },
+              "embed.kernel1": {
+                "elements": 2134,
+                "total": 6144,
+                "max_outside_absolute": 12.205078125,
+                "max_error_over_tolerance": 658.2394511066204
+              },
+              "embed.kernels_imag": {
+                "elements": 50318,
+                "total": 221184,
+                "max_outside_absolute": 8.32366943359375,
+                "max_error_over_tolerance": 3086.4406491712125
+              },
+              "embed.kernels_real": {
+                "elements": 49238,
+                "total": 221184,
+                "max_outside_absolute": 10.7314453125,
+                "max_error_over_tolerance": 1902.3628949135566
+              },
+              "embed.lse.lin.0.bias": {
+                "elements": 14,
+                "total": 32,
+                "max_outside_absolute": 0.013516426086425781,
+                "max_error_over_tolerance": 1.080350110661662
+              },
+              "embed.lse.lin.2.bias": {
+                "elements": 1,
+                "total": 1,
+                "max_outside_absolute": 0.06656265258789062,
+                "max_error_over_tolerance": 1.1269382495061306
+              },
+              "embed.lse.structure.mix.0.weight": {
+                "elements": 2,
+                "total": 16384,
+                "max_outside_absolute": 0.0008908938616514206,
+                "max_error_over_tolerance": 1.2286878695005596
+              },
+              "embed.radial.net.0.bias": {
+                "elements": 4,
+                "total": 128,
+                "max_outside_absolute": 29.5361328125,
+                "max_error_over_tolerance": 7.982228080705592
+              },
+              "embed.radial.net.0.weight": {
+                "elements": 4146,
+                "total": 12288,
+                "max_outside_absolute": 5.54296875,
+                "max_error_over_tolerance": 933.3055763912627
+              },
+              "embed.radial.net.2.bias": {
+                "elements": 7,
+                "total": 128,
+                "max_outside_absolute": 87.0078125,
+                "max_error_over_tolerance": 4.8801680710556266
+              },
+              "embed.radial.net.2.weight": {
+                "elements": 2694,
+                "total": 16384,
+                "max_outside_absolute": 15.15625,
+                "max_error_over_tolerance": 891.0359357571168
+              },
+              "pre_sequence.2.bessel_weights": {
+                "elements": 31,
+                "total": 96,
+                "max_outside_absolute": 8.618896484375,
+                "max_error_over_tolerance": 40.09767516382119
+              },
+              "pre_sequence.3.embedding.weight": {
+                "elements": 19,
+                "total": 12160,
+                "max_outside_absolute": 70.7822265625,
+                "max_error_over_tolerance": 33.866712550774416
+              }
+            }
+          },
+          "capture": {
+            "new_graphs": 1,
+            "new_calls": 657
+          },
+          "error": null
+        }
+      },
+      "finished": true,
+      "method": "Frozen weights and unmodified training dropout probabilities. Ordinary Inductor uses native random draws under fallback_random=True for this diagnostic. The default run is separately archived.",
+      "native_repeats_by_atom_count": {
+        "640": {
+          "passed": false,
+          "active_parameters": 121,
+          "reference_active_parameters": 121,
+          "energy_max_abs": 2.1457672119140625e-06,
+          "force_max_abs": 0.00022268295288085938,
+          "gradient_max_abs": 9.91015625,
+          "gradient_relative_l2": 7.787906770629572e-05,
+          "gradient_elements_outside": 20989,
+          "gradient_parameters_outside": {
+            "blocks.0.message.embed.dir_proj.0.bias": {
+              "elements": 28,
+              "total": 384,
+              "max_outside_absolute": 0.010115623474121094,
+              "max_error_over_tolerance": 7.2312428516656935
+            },
+            "blocks.0.message.embed.dir_proj.0.weight": {
+              "elements": 220,
+              "total": 184320,
+              "max_outside_absolute": 0.002190232276916504,
+              "max_error_over_tolerance": 2.480531386596877
+            },
+            "blocks.0.message.embed.dir_proj.2.bias": {
+              "elements": 16,
+              "total": 384,
+              "max_outside_absolute": 0.01915454864501953,
+              "max_error_over_tolerance": 8.02817892802287
+            },
+            "blocks.0.message.embed.dir_proj.2.weight": {
+              "elements": 205,
+              "total": 147456,
+              "max_outside_absolute": 0.004219532012939453,
+              "max_error_over_tolerance": 4.6772611829417166
+            },
+            "blocks.0.message.embed.rbf_proj.bias": {
+              "elements": 11,
+              "total": 384,
+              "max_outside_absolute": 0.02317047119140625,
+              "max_error_over_tolerance": 5.4804200685325535
+            },
+            "blocks.0.message.embed.rbf_proj.weight": {
+              "elements": 101,
+              "total": 36864,
+              "max_outside_absolute": 0.00491642951965332,
+              "max_error_over_tolerance": 3.9760822172440933
+            },
+            "blocks.0.message.embed.x_proj.0.weight": {
+              "elements": 50,
+              "total": 16384,
+              "max_outside_absolute": 0.0032292604446411133,
+              "max_error_over_tolerance": 2.8875772005349405
+            },
+            "blocks.0.message.embed.x_proj.2.bias": {
+              "elements": 4,
+              "total": 384,
+              "max_outside_absolute": 0.0016281604766845703,
+              "max_error_over_tolerance": 1.6426902999823345
+            },
+            "blocks.0.message.embed.x_proj.2.weight": {
+              "elements": 94,
+              "total": 49152,
+              "max_outside_absolute": 0.004346311092376709,
+              "max_error_over_tolerance": 4.374043243649002
+            },
+            "blocks.0.message.fc_mps.weight": {
+              "elements": 2,
+              "total": 576,
+              "max_outside_absolute": 0.0015869140625,
+              "max_error_over_tolerance": 1.3058239749281795
+            },
+            "blocks.0.message.norm_before.bias": {
+              "elements": 9,
+              "total": 152,
+              "max_outside_absolute": 1.594970703125,
+              "max_error_over_tolerance": 27.265776168001683
+            },
+            "blocks.0.message.norm_before.weight": {
+              "elements": 9,
+              "total": 152,
+              "max_outside_absolute": 0.321380615234375,
+              "max_error_over_tolerance": 28.214012040264105
+            },
+            "blocks.0.message.scale.weight": {
+              "elements": 75,
+              "total": 24576,
+              "max_outside_absolute": 0.003620147705078125,
+              "max_error_over_tolerance": 3.5133508148478834
+            },
+            "blocks.0.transition.mix.0.bias": {
+              "elements": 7,
+              "total": 128,
+              "max_outside_absolute": 0.19500732421875,
+              "max_error_over_tolerance": 4.06720473430269
+            },
+            "blocks.0.transition.mix.0.weight": {
+              "elements": 797,
+              "total": 32768,
+              "max_outside_absolute": 1.127716064453125,
+              "max_error_over_tolerance": 236.97023234792613
+            },
+            "blocks.0.transition.mix.2.bias": {
+              "elements": 14,
+              "total": 384,
+              "max_outside_absolute": 0.5218505859375,
+              "max_error_over_tolerance": 14.127208410761131
+            },
+            "blocks.0.transition.mix.2.weight": {
+              "elements": 1606,
+              "total": 49152,
+              "max_outside_absolute": 1.07464599609375,
+              "max_error_over_tolerance": 242.76200361723934
+            },
+            "blocks.1.message.embed.dir_proj.0.bias": {
+              "elements": 17,
+              "total": 384,
+              "max_outside_absolute": 0.0045318603515625,
+              "max_error_over_tolerance": 4.082926679605112
+            },
+            "blocks.1.message.embed.dir_proj.0.weight": {
+              "elements": 3,
+              "total": 184320,
+              "max_outside_absolute": 0.0007982254028320312,
+              "max_error_over_tolerance": 1.0762407839965233
+            },
+            "blocks.1.message.embed.dir_proj.2.bias": {
+              "elements": 6,
+              "total": 384,
+              "max_outside_absolute": 0.018220901489257812,
+              "max_error_over_tolerance": 2.909723986760234
+            },
+            "blocks.1.message.embed.dir_proj.2.weight": {
+              "elements": 30,
+              "total": 147456,
+              "max_outside_absolute": 0.0021724700927734375,
+              "max_error_over_tolerance": 1.7480511100222975
+            },
+            "blocks.1.message.embed.rbf_proj.bias": {
+              "elements": 4,
+              "total": 384,
+              "max_outside_absolute": 0.0078125,
+              "max_error_over_tolerance": 3.8013291380741396
+            },
+            "blocks.1.message.embed.rbf_proj.weight": {
+              "elements": 16,
+              "total": 36864,
+              "max_outside_absolute": 0.0015642642974853516,
+              "max_error_over_tolerance": 2.150083598645184
+            },
+            "blocks.1.message.embed.x_proj.0.weight": {
+              "elements": 1,
+              "total": 16384,
+              "max_outside_absolute": 0.0008453726768493652,
+              "max_error_over_tolerance": 1.0975591655430157
+            },
+            "blocks.1.message.embed.x_proj.2.bias": {
+              "elements": 1,
+              "total": 384,
+              "max_outside_absolute": 0.002054929733276367,
+              "max_error_over_tolerance": 1.389736120730032
+            },
+            "blocks.1.message.embed.x_proj.2.weight": {
+              "elements": 20,
+              "total": 49152,
+              "max_outside_absolute": 0.0056304931640625,
+              "max_error_over_tolerance": 4.252862019327057
+            },
+            "blocks.1.message.norm_before.bias": {
+              "elements": 7,
+              "total": 152,
+              "max_outside_absolute": 0.73846435546875,
+              "max_error_over_tolerance": 12.500777640348195
+            },
+            "blocks.1.message.norm_before.weight": {
+              "elements": 7,
+              "total": 152,
+              "max_outside_absolute": 0.1538543701171875,
+              "max_error_over_tolerance": 10.815969174612496
+            },
+            "blocks.1.transition.mix.0.bias": {
+              "elements": 6,
+              "total": 128,
+              "max_outside_absolute": 0.121124267578125,
+              "max_error_over_tolerance": 5.169130459509037
+            },
+            "blocks.1.transition.mix.0.weight": {
+              "elements": 707,
+              "total": 32768,
+              "max_outside_absolute": 0.61773681640625,
+              "max_error_over_tolerance": 70.3524198340911
+            },
+            "blocks.1.transition.mix.2.bias": {
+              "elements": 4,
+              "total": 384,
+              "max_outside_absolute": 0.152130126953125,
+              "max_error_over_tolerance": 7.206812311619852
+            },
+            "blocks.1.transition.mix.2.weight": {
+              "elements": 1198,
+              "total": 49152,
+              "max_outside_absolute": 0.3099784851074219,
+              "max_error_over_tolerance": 78.27506723011909
+            },
+            "blocks.2.message.embed.rbf_proj.bias": {
+              "elements": 1,
+              "total": 384,
+              "max_outside_absolute": 0.0012078285217285156,
+              "max_error_over_tolerance": 1.352079247537206
+            },
+            "blocks.2.message.norm_before.bias": {
+              "elements": 2,
+              "total": 152,
+              "max_outside_absolute": 0.21514892578125,
+              "max_error_over_tolerance": 10.715644916420965
+            },
+            "blocks.2.message.norm_before.weight": {
+              "elements": 2,
+              "total": 152,
+              "max_outside_absolute": 0.0482330322265625,
+              "max_error_over_tolerance": 7.459773691200906
+            },
+            "embed.kernel1": {
+              "elements": 323,
+              "total": 6144,
+              "max_outside_absolute": 0.4332427978515625,
+              "max_error_over_tolerance": 158.1357381719033
+            },
+            "embed.kernels_imag": {
+              "elements": 7370,
+              "total": 221184,
+              "max_outside_absolute": 0.3292999267578125,
+              "max_error_over_tolerance": 54.40289978218135
+            },
+            "embed.kernels_real": {
+              "elements": 6549,
+              "total": 221184,
+              "max_outside_absolute": 0.2961912155151367,
+              "max_error_over_tolerance": 72.6805854078109
+            },
+            "embed.radial.net.0.bias": {
+              "elements": 11,
+              "total": 128,
+              "max_outside_absolute": 1.68017578125,
+              "max_error_over_tolerance": 52.122244338911266
+            },
+            "embed.radial.net.0.weight": {
+              "elements": 702,
+              "total": 12288,
+              "max_outside_absolute": 0.36151123046875,
+              "max_error_over_tolerance": 178.52391686226287
+            },
+            "embed.radial.net.2.bias": {
+              "elements": 16,
+              "total": 128,
+              "max_outside_absolute": 5.69580078125,
+              "max_error_over_tolerance": 440.18444928286357
+            },
+            "embed.radial.net.2.weight": {
+              "elements": 707,
+              "total": 16384,
+              "max_outside_absolute": 1.224609375,
+              "max_error_over_tolerance": 165.26595171556895
+            },
+            "pre_sequence.2.bessel_weights": {
+              "elements": 8,
+              "total": 96,
+              "max_outside_absolute": 0.410003662109375,
+              "max_error_over_tolerance": 33.451737299015264
+            },
+            "pre_sequence.3.embedding.weight": {
+              "elements": 23,
+              "total": 12160,
+              "max_outside_absolute": 1.12579345703125,
+              "max_error_over_tolerance": 81.58457775185308
+            }
+          }
+        },
+        "256": {
+          "passed": false,
+          "active_parameters": 121,
+          "reference_active_parameters": 121,
+          "energy_max_abs": 1.52587890625e-05,
+          "force_max_abs": 6.818771362304688e-05,
+          "gradient_max_abs": 0.681640625,
+          "gradient_relative_l2": 5.751270390374372e-06,
+          "gradient_elements_outside": 6756,
+          "gradient_parameters_outside": {
+            "blocks.0.message.embed.dir_proj.2.bias": {
+              "elements": 1,
+              "total": 384,
+              "max_outside_absolute": 0.004015922546386719,
+              "max_error_over_tolerance": 1.8312045960408756
+            },
+            "blocks.0.message.norm_before.bias": {
+              "elements": 1,
+              "total": 152,
+              "max_outside_absolute": 0.06549072265625,
+              "max_error_over_tolerance": 1.6234225529855315
+            },
+            "blocks.0.message.norm_before.weight": {
+              "elements": 1,
+              "total": 152,
+              "max_outside_absolute": 0.013214111328125,
+              "max_error_over_tolerance": 1.510448178622532
+            },
+            "blocks.0.transition.mix.0.weight": {
+              "elements": 211,
+              "total": 32768,
+              "max_outside_absolute": 0.1855621337890625,
+              "max_error_over_tolerance": 53.056714921249146
+            },
+            "blocks.0.transition.mix.2.weight": {
+              "elements": 426,
+              "total": 49152,
+              "max_outside_absolute": 0.15971946716308594,
+              "max_error_over_tolerance": 54.34369975013623
+            },
+            "blocks.1.transition.mix.0.weight": {
+              "elements": 108,
+              "total": 32768,
+              "max_outside_absolute": 0.12559890747070312,
+              "max_error_over_tolerance": 22.973387744204977
+            },
+            "blocks.1.transition.mix.2.bias": {
+              "elements": 4,
+              "total": 384,
+              "max_outside_absolute": 0.0766143798828125,
+              "max_error_over_tolerance": 4.14437977323343
+            },
+            "blocks.1.transition.mix.2.weight": {
+              "elements": 254,
+              "total": 49152,
+              "max_outside_absolute": 0.09819412231445312,
+              "max_error_over_tolerance": 19.338382292672122
+            },
+            "blocks.2.message.norm_before.bias": {
+              "elements": 2,
+              "total": 152,
+              "max_outside_absolute": 0.1082763671875,
+              "max_error_over_tolerance": 5.062164433865458
+            },
+            "blocks.2.message.norm_before.weight": {
+              "elements": 2,
+              "total": 152,
+              "max_outside_absolute": 0.024232864379882812,
+              "max_error_over_tolerance": 2.8239543958258655
+            },
+            "embed.kernel1": {
+              "elements": 448,
+              "total": 6144,
+              "max_outside_absolute": 0.03305244445800781,
+              "max_error_over_tolerance": 16.045355642799123
+            },
+            "embed.kernels_imag": {
+              "elements": 2320,
+              "total": 221184,
+              "max_outside_absolute": 0.027904510498046875,
+              "max_error_over_tolerance": 18.876581964627885
+            },
+            "embed.kernels_real": {
+              "elements": 2267,
+              "total": 221184,
+              "max_outside_absolute": 0.024232864379882812,
+              "max_error_over_tolerance": 7.2846713895809945
+            },
+            "embed.radial.net.0.bias": {
+              "elements": 1,
+              "total": 128,
+              "max_outside_absolute": 0.1583251953125,
+              "max_error_over_tolerance": 3.0630663395932145
+            },
+            "embed.radial.net.0.weight": {
+              "elements": 353,
+              "total": 12288,
+              "max_outside_absolute": 0.020839691162109375,
+              "max_error_over_tolerance": 12.656340409247118
+            },
+            "embed.radial.net.2.bias": {
+              "elements": 1,
+              "total": 128,
+              "max_outside_absolute": 0.2130126953125,
+              "max_error_over_tolerance": 2.493402040253011
+            },
+            "embed.radial.net.2.weight": {
+              "elements": 346,
+              "total": 16384,
+              "max_outside_absolute": 0.03003692626953125,
+              "max_error_over_tolerance": 12.242791744044576
+            },
+            "pre_sequence.2.bessel_weights": {
+              "elements": 4,
+              "total": 96,
+              "max_outside_absolute": 0.031589508056640625,
+              "max_error_over_tolerance": 4.170591626074802
+            },
+            "pre_sequence.3.embedding.weight": {
+              "elements": 6,
+              "total": 12160,
+              "max_outside_absolute": 0.09439849853515625,
+              "max_error_over_tolerance": 3.207490281328802
+            }
+          }
+        },
+        "2000": {
+          "passed": false,
+          "active_parameters": 121,
+          "reference_active_parameters": 121,
+          "energy_max_abs": 0.000244140625,
+          "force_max_abs": 0.0011572837829589844,
+          "gradient_max_abs": 78.90625,
+          "gradient_relative_l2": 8.54626049871127e-06,
+          "gradient_elements_outside": 44967,
+          "gradient_parameters_outside": {
+            "blocks.0.message.diagonal.2.weight": {
+              "elements": 2,
+              "total": 288,
+              "max_outside_absolute": 0.0014451146125793457,
+              "max_error_over_tolerance": 1.5457176649173163
+            },
+            "blocks.0.message.embed.dir_proj.0.bias": {
+              "elements": 15,
+              "total": 384,
+              "max_outside_absolute": 0.05841064453125,
+              "max_error_over_tolerance": 58.43231157772156
+            },
+            "blocks.0.message.embed.dir_proj.0.weight": {
+              "elements": 1357,
+              "total": 184320,
+              "max_outside_absolute": 0.010619163513183594,
+              "max_error_over_tolerance": 10.345690678330032
+            },
+            "blocks.0.message.embed.dir_proj.2.bias": {
+              "elements": 11,
+              "total": 384,
+              "max_outside_absolute": 0.56671142578125,
+              "max_error_over_tolerance": 11.762793535731152
+            },
+            "blocks.0.message.embed.dir_proj.2.weight": {
+              "elements": 1911,
+              "total": 147456,
+              "max_outside_absolute": 0.024211883544921875,
+              "max_error_over_tolerance": 13.828269110886268
+            },
+            "blocks.0.message.embed.norm.bias": {
+              "elements": 3,
+              "total": 128,
+              "max_outside_absolute": 0.0031399428844451904,
+              "max_error_over_tolerance": 4.094659285514659
+            },
+            "blocks.0.message.embed.norm.weight": {
+              "elements": 2,
+              "total": 128,
+              "max_outside_absolute": 0.004231899976730347,
+              "max_error_over_tolerance": 5.214585486338839
+            },
+            "blocks.0.message.embed.rbf_proj.bias": {
+              "elements": 16,
+              "total": 384,
+              "max_outside_absolute": 0.06727981567382812,
+              "max_error_over_tolerance": 59.23933068903483
+            },
+            "blocks.0.message.embed.rbf_proj.weight": {
+              "elements": 705,
+              "total": 36864,
+              "max_outside_absolute": 0.03894805908203125,
+              "max_error_over_tolerance": 16.064568678928875
+            },
+            "blocks.0.message.embed.x_proj.0.bias": {
+              "elements": 1,
+              "total": 128,
+              "max_outside_absolute": 0.0019583702087402344,
+              "max_error_over_tolerance": 1.0131587539346243
+            },
+            "blocks.0.message.embed.x_proj.0.weight": {
+              "elements": 293,
+              "total": 16384,
+              "max_outside_absolute": 0.010462462902069092,
+              "max_error_over_tolerance": 6.730127474628622
+            },
+            "blocks.0.message.embed.x_proj.2.bias": {
+              "elements": 4,
+              "total": 384,
+              "max_outside_absolute": 0.010874271392822266,
+              "max_error_over_tolerance": 4.9432684886911975
+            },
+            "blocks.0.message.embed.x_proj.2.weight": {
+              "elements": 583,
+              "total": 49152,
+              "max_outside_absolute": 0.018156051635742188,
+              "max_error_over_tolerance": 11.47571886276181
+            },
+            "blocks.0.message.fc_mps.weight": {
+              "elements": 102,
+              "total": 576,
+              "max_outside_absolute": 0.03515625,
+              "max_error_over_tolerance": 9.447331128956069
+            },
+            "blocks.0.message.norm_before.bias": {
+              "elements": 2,
+              "total": 152,
+              "max_outside_absolute": 12.37890625,
+              "max_error_over_tolerance": 1.5660117028871703
+            },
+            "blocks.0.message.norm_before.weight": {
+              "elements": 2,
+              "total": 152,
+              "max_outside_absolute": 2.4892578125,
+              "max_error_over_tolerance": 3.4458106121728087
+            },
+            "blocks.0.message.scale.weight": {
+              "elements": 243,
+              "total": 24576,
+              "max_outside_absolute": 0.007907867431640625,
+              "max_error_over_tolerance": 5.663420186334364
+            },
+            "blocks.0.transition.mix.0.bias": {
+              "elements": 2,
+              "total": 128,
+              "max_outside_absolute": 4.26708984375,
+              "max_error_over_tolerance": 1.8260183735184834
+            },
+            "blocks.0.transition.mix.0.weight": {
+              "elements": 310,
+              "total": 32768,
+              "max_outside_absolute": 16.048828125,
+              "max_error_over_tolerance": 1312.8544117461922
+            },
+            "blocks.0.transition.mix.2.bias": {
+              "elements": 2,
+              "total": 384,
+              "max_outside_absolute": 4.060546875,
+              "max_error_over_tolerance": 3.892869140052287
+            },
+            "blocks.0.transition.mix.2.weight": {
+              "elements": 626,
+              "total": 49152,
+              "max_outside_absolute": 12.833984375,
+              "max_error_over_tolerance": 277.2938087408898
+            },
+            "blocks.0.transition.vec_proj.weight": {
+              "elements": 13,
+              "total": 32768,
+              "max_outside_absolute": 0.001744389533996582,
+              "max_error_over_tolerance": 1.6847998841263467
+            },
+            "blocks.1.message.embed.dir_proj.0.bias": {
+              "elements": 8,
+              "total": 384,
+              "max_outside_absolute": 0.022159576416015625,
+              "max_error_over_tolerance": 2.8534604949530857
+            },
+            "blocks.1.message.embed.dir_proj.0.weight": {
+              "elements": 277,
+              "total": 184320,
+              "max_outside_absolute": 0.004540681838989258,
+              "max_error_over_tolerance": 3.3600807584618244
+            },
+            "blocks.1.message.embed.dir_proj.2.bias": {
+              "elements": 17,
+              "total": 384,
+              "max_outside_absolute": 0.14313507080078125,
+              "max_error_over_tolerance": 21.19076420016621
+            },
+            "blocks.1.message.embed.dir_proj.2.weight": {
+              "elements": 591,
+              "total": 147456,
+              "max_outside_absolute": 0.008447408676147461,
+              "max_error_over_tolerance": 5.890751534173178
+            },
+            "blocks.1.message.embed.norm.weight": {
+              "elements": 1,
+              "total": 128,
+              "max_outside_absolute": 0.0017278194427490234,
+              "max_error_over_tolerance": 1.2957794967006124
+            },
+            "blocks.1.message.embed.rbf_proj.bias": {
+              "elements": 10,
+              "total": 384,
+              "max_outside_absolute": 0.035793304443359375,
+              "max_error_over_tolerance": 3.209427284265565
+            },
+            "blocks.1.message.embed.rbf_proj.weight": {
+              "elements": 247,
+              "total": 36864,
+              "max_outside_absolute": 0.010685443878173828,
+              "max_error_over_tolerance": 7.705029658320409
+            },
+            "blocks.1.message.embed.x_proj.0.bias": {
+              "elements": 2,
+              "total": 128,
+              "max_outside_absolute": 0.0018185079097747803,
+              "max_error_over_tolerance": 1.7824731144198467
+            },
+            "blocks.1.message.embed.x_proj.0.weight": {
+              "elements": 179,
+              "total": 16384,
+              "max_outside_absolute": 0.005340695381164551,
+              "max_error_over_tolerance": 4.142616986811837
+            },
+            "blocks.1.message.embed.x_proj.2.bias": {
+              "elements": 2,
+              "total": 384,
+              "max_outside_absolute": 0.0032110214233398438,
+              "max_error_over_tolerance": 4.182185704333134
+            },
+            "blocks.1.message.embed.x_proj.2.weight": {
+              "elements": 189,
+              "total": 49152,
+              "max_outside_absolute": 0.008957624435424805,
+              "max_error_over_tolerance": 10.67486875963088
+            },
+            "blocks.1.message.fc_mps.weight": {
+              "elements": 68,
+              "total": 576,
+              "max_outside_absolute": 0.013671875,
+              "max_error_over_tolerance": 14.763779527559056
+            },
+            "blocks.1.message.norm_before.bias": {
+              "elements": 1,
+              "total": 152,
+              "max_outside_absolute": 5.734375,
+              "max_error_over_tolerance": 4.0155629048836445
+            },
+            "blocks.1.message.norm_before.weight": {
+              "elements": 1,
+              "total": 152,
+              "max_outside_absolute": 1.198272705078125,
+              "max_error_over_tolerance": 4.038710481966224
+            },
+            "blocks.1.message.scale.weight": {
+              "elements": 3,
+              "total": 24576,
+              "max_outside_absolute": 0.0010106563568115234,
+              "max_error_over_tolerance": 1.3770792101224385
+            },
+            "blocks.1.message.scale2.weight": {
+              "elements": 16,
+              "total": 1536,
+              "max_outside_absolute": 0.002465367317199707,
+              "max_error_over_tolerance": 1.0403647748997433
+            },
+            "blocks.1.transition.mix.0.weight": {
+              "elements": 197,
+              "total": 32768,
+              "max_outside_absolute": 7.369384765625,
+              "max_error_over_tolerance": 108.56946899081012
+            },
+            "blocks.1.transition.mix.2.weight": {
+              "elements": 362,
+              "total": 49152,
+              "max_outside_absolute": 6.1884765625,
+              "max_error_over_tolerance": 60.37732586615385
+            },
+            "blocks.1.transition.vec_proj.weight": {
+              "elements": 2,
+              "total": 32768,
+              "max_outside_absolute": 0.001169353723526001,
+              "max_error_over_tolerance": 1.3702580239920734
+            },
+            "blocks.2.message.embed.dir_proj.0.bias": {
+              "elements": 9,
+              "total": 384,
+              "max_outside_absolute": 0.016889572143554688,
+              "max_error_over_tolerance": 7.7739820446092125
+            },
+            "blocks.2.message.embed.dir_proj.0.weight": {
+              "elements": 69,
+              "total": 184320,
+              "max_outside_absolute": 0.002707839012145996,
+              "max_error_over_tolerance": 2.223823585494425
+            },
+            "blocks.2.message.embed.dir_proj.2.bias": {
+              "elements": 3,
+              "total": 384,
+              "max_outside_absolute": 0.031581878662109375,
+              "max_error_over_tolerance": 5.1300732010730234
+            },
+            "blocks.2.message.embed.dir_proj.2.weight": {
+              "elements": 124,
+              "total": 147456,
+              "max_outside_absolute": 0.003328084945678711,
+              "max_error_over_tolerance": 2.8542897660465454
+            },
+            "blocks.2.message.embed.rbf_proj.bias": {
+              "elements": 4,
+              "total": 384,
+              "max_outside_absolute": 0.014553070068359375,
+              "max_error_over_tolerance": 3.3716064971604247
+            },
+            "blocks.2.message.embed.rbf_proj.weight": {
+              "elements": 80,
+              "total": 36864,
+              "max_outside_absolute": 0.0039021968841552734,
+              "max_error_over_tolerance": 4.102328265386432
+            },
+            "blocks.2.message.embed.x_proj.0.weight": {
+              "elements": 30,
+              "total": 16384,
+              "max_outside_absolute": 0.002220451831817627,
+              "max_error_over_tolerance": 1.8679003486128363
+            },
+            "blocks.2.message.embed.x_proj.2.bias": {
+              "elements": 1,
+              "total": 384,
+              "max_outside_absolute": 0.0014030933380126953,
+              "max_error_over_tolerance": 1.5542587640914618
+            },
+            "blocks.2.message.embed.x_proj.2.weight": {
+              "elements": 73,
+              "total": 49152,
+              "max_outside_absolute": 0.006702423095703125,
+              "max_error_over_tolerance": 5.767126023576865
+            },
+            "blocks.2.message.fc_mps.weight": {
+              "elements": 198,
+              "total": 576,
+              "max_outside_absolute": 0.078125,
+              "max_error_over_tolerance": 26.178010471204185
+            },
+            "embed.kernel1": {
+              "elements": 475,
+              "total": 6144,
+              "max_outside_absolute": 3.972412109375,
+              "max_error_over_tolerance": 158.68573552356088
+            },
+            "embed.kernels_imag": {
+              "elements": 16445,
+              "total": 221184,
+              "max_outside_absolute": 2.2225341796875,
+              "max_error_over_tolerance": 485.92761155891264
+            },
+            "embed.kernels_real": {
+              "elements": 16255,
+              "total": 221184,
+              "max_outside_absolute": 2.4793701171875,
+              "max_error_over_tolerance": 367.55648571864265
+            },
+            "embed.radial.net.0.bias": {
+              "elements": 1,
+              "total": 128,
+              "max_outside_absolute": 5.32080078125,
+              "max_error_over_tolerance": 3.6493507424253617
+            },
+            "embed.radial.net.0.weight": {
+              "elements": 1718,
+              "total": 12288,
+              "max_outside_absolute": 2.2181396484375,
+              "max_error_over_tolerance": 969.8853013996262
+            },
+            "embed.radial.net.2.bias": {
+              "elements": 2,
+              "total": 128,
+              "max_outside_absolute": 26.708984375,
+              "max_error_over_tolerance": 2.181918417344399
+            },
+            "embed.radial.net.2.weight": {
+              "elements": 1082,
+              "total": 16384,
+              "max_outside_absolute": 4.83251953125,
+              "max_error_over_tolerance": 268.51453972289124
+            },
+            "pre_sequence.2.bessel_weights": {
+              "elements": 11,
+              "total": 96,
+              "max_outside_absolute": 2.70556640625,
+              "max_error_over_tolerance": 10.374351942982996
+            },
+            "pre_sequence.3.embedding.weight": {
+              "elements": 9,
+              "total": 12160,
+              "max_outside_absolute": 14.1739501953125,
+              "max_error_over_tolerance": 13.479498666155008
+            }
+          }
+        }
+      }
+    },
+    "alphanet/float32/c5d7712": {
+      "architecture": "alphanet",
+      "precision": "float32",
+      "job": "6319582",
+      "source": "c5d7712c7110a689a71daa3844ddfc6f95407611",
+      "allocated_gpu_index": "0",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "systems": {
+        "mol_batch_32x20": {
+          "numerical": {
+            "passed": false,
+            "active_parameters": 121,
+            "reference_active_parameters": 121,
+            "energy_max_abs": 4.0531158447265625e-06,
+            "force_max_abs": 0.0004921555519104004,
+            "gradient_max_abs": 16.30029296875,
+            "gradient_relative_l2": 0.000164498488412403,
+            "gradient_elements_outside": 55837,
+            "gradient_parameters_outside": {
+              "blocks.0.message.diagonal.2.weight": {
+                "elements": 3,
+                "total": 288,
+                "max_outside_absolute": 0.0012257099151611328,
+                "max_error_over_tolerance": 1.2478534541874915
+              },
+              "blocks.0.message.embed.dir_proj.0.bias": {
+                "elements": 38,
+                "total": 384,
+                "max_outside_absolute": 0.019295692443847656,
+                "max_error_over_tolerance": 13.230360042465641
+              },
+              "blocks.0.message.embed.dir_proj.0.weight": {
+                "elements": 1181,
+                "total": 184320,
+                "max_outside_absolute": 0.0037932395935058594,
+                "max_error_over_tolerance": 4.13607380974803
+              },
+              "blocks.0.message.embed.dir_proj.2.bias": {
+                "elements": 27,
+                "total": 384,
+                "max_outside_absolute": 0.0673065185546875,
+                "max_error_over_tolerance": 12.404060284293076
+              },
+              "blocks.0.message.embed.dir_proj.2.weight": {
+                "elements": 890,
+                "total": 147456,
+                "max_outside_absolute": 0.007763385772705078,
+                "max_error_over_tolerance": 9.526405294895634
+              },
+              "blocks.0.message.embed.norm.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.0018544197082519531,
+                "max_error_over_tolerance": 1.8683611086102476
+              },
+              "blocks.0.message.embed.norm.weight": {
+                "elements": 4,
+                "total": 128,
+                "max_outside_absolute": 0.001487135887145996,
+                "max_error_over_tolerance": 1.644300152372968
+              },
+              "blocks.0.message.embed.rbf_proj.bias": {
+                "elements": 23,
+                "total": 384,
+                "max_outside_absolute": 0.03717041015625,
+                "max_error_over_tolerance": 12.570293359298919
+              },
+              "blocks.0.message.embed.rbf_proj.weight": {
+                "elements": 347,
+                "total": 36864,
+                "max_outside_absolute": 0.00967264175415039,
+                "max_error_over_tolerance": 8.868592930814318
+              },
+              "blocks.0.message.embed.x_proj.0.weight": {
+                "elements": 218,
+                "total": 16384,
+                "max_outside_absolute": 0.005968332290649414,
+                "max_error_over_tolerance": 4.925501323280691
+              },
+              "blocks.0.message.embed.x_proj.2.bias": {
+                "elements": 10,
+                "total": 384,
+                "max_outside_absolute": 0.0043182373046875,
+                "max_error_over_tolerance": 4.122225621108987
+              },
+              "blocks.0.message.embed.x_proj.2.weight": {
+                "elements": 313,
+                "total": 49152,
+                "max_outside_absolute": 0.008953571319580078,
+                "max_error_over_tolerance": 8.384165838164222
+              },
+              "blocks.0.message.fc_mps.weight": {
+                "elements": 7,
+                "total": 576,
+                "max_outside_absolute": 0.08203125,
+                "max_error_over_tolerance": 1.299305213633131
+              },
+              "blocks.0.message.norm_before.bias": {
+                "elements": 17,
+                "total": 152,
+                "max_outside_absolute": 4.58935546875,
+                "max_error_over_tolerance": 36.44403168331993
+              },
+              "blocks.0.message.norm_before.weight": {
+                "elements": 18,
+                "total": 152,
+                "max_outside_absolute": 0.92327880859375,
+                "max_error_over_tolerance": 37.67855773658445
+              },
+              "blocks.0.message.scale.weight": {
+                "elements": 263,
+                "total": 24576,
+                "max_outside_absolute": 0.006458282470703125,
+                "max_error_over_tolerance": 5.03080477919448
+              },
+              "blocks.0.message.scale2.weight": {
+                "elements": 14,
+                "total": 1536,
+                "max_outside_absolute": 0.004039287567138672,
+                "max_error_over_tolerance": 1.0196553709290417
+              },
+              "blocks.0.transition.mix.0.bias": {
+                "elements": 12,
+                "total": 128,
+                "max_outside_absolute": 1.5782470703125,
+                "max_error_over_tolerance": 12.475126438474108
+              },
+              "blocks.0.transition.mix.0.weight": {
+                "elements": 1777,
+                "total": 32768,
+                "max_outside_absolute": 3.740478515625,
+                "max_error_over_tolerance": 1165.1903505465511
+              },
+              "blocks.0.transition.mix.2.bias": {
+                "elements": 28,
+                "total": 384,
+                "max_outside_absolute": 1.806396484375,
+                "max_error_over_tolerance": 115.16967260881908
+              },
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 3572,
+                "total": 49152,
+                "max_outside_absolute": 2.71270751953125,
+                "max_error_over_tolerance": 394.424224372256
+              },
+              "blocks.1.message.embed.dir_proj.0.bias": {
+                "elements": 37,
+                "total": 384,
+                "max_outside_absolute": 0.007584571838378906,
+                "max_error_over_tolerance": 7.267520094475471
+              },
+              "blocks.1.message.embed.dir_proj.0.weight": {
+                "elements": 105,
+                "total": 184320,
+                "max_outside_absolute": 0.0015263557434082031,
+                "max_error_over_tolerance": 1.6861040062273653
+              },
+              "blocks.1.message.embed.dir_proj.2.bias": {
+                "elements": 15,
+                "total": 384,
+                "max_outside_absolute": 0.023591995239257812,
+                "max_error_over_tolerance": 5.220569497428446
+              },
+              "blocks.1.message.embed.dir_proj.2.weight": {
+                "elements": 172,
+                "total": 147456,
+                "max_outside_absolute": 0.004344463348388672,
+                "max_error_over_tolerance": 3.051474772298222
+              },
+              "blocks.1.message.embed.rbf_proj.bias": {
+                "elements": 11,
+                "total": 384,
+                "max_outside_absolute": 0.016718387603759766,
+                "max_error_over_tolerance": 8.103862575354412
+              },
+              "blocks.1.message.embed.rbf_proj.weight": {
+                "elements": 97,
+                "total": 36864,
+                "max_outside_absolute": 0.0030841827392578125,
+                "max_error_over_tolerance": 3.594294260278207
+              },
+              "blocks.1.message.embed.x_proj.0.weight": {
+                "elements": 21,
+                "total": 16384,
+                "max_outside_absolute": 0.002291858196258545,
+                "max_error_over_tolerance": 2.163678184591416
+              },
+              "blocks.1.message.embed.x_proj.2.bias": {
+                "elements": 3,
+                "total": 384,
+                "max_outside_absolute": 0.0026090145111083984,
+                "max_error_over_tolerance": 1.7620114580499096
+              },
+              "blocks.1.message.embed.x_proj.2.weight": {
+                "elements": 85,
+                "total": 49152,
+                "max_outside_absolute": 0.009432077407836914,
+                "max_error_over_tolerance": 6.805321744958846
+              },
+              "blocks.1.message.norm_before.bias": {
+                "elements": 14,
+                "total": 152,
+                "max_outside_absolute": 2.554931640625,
+                "max_error_over_tolerance": 374.76806514792287
+              },
+              "blocks.1.message.norm_before.weight": {
+                "elements": 14,
+                "total": 152,
+                "max_outside_absolute": 0.532135009765625,
+                "max_error_over_tolerance": 241.56397004457813
+              },
+              "blocks.1.message.scale2.weight": {
+                "elements": 17,
+                "total": 1536,
+                "max_outside_absolute": 0.00129660964012146,
+                "max_error_over_tolerance": 1.245917363310219
+              },
+              "blocks.1.transition.mix.0.bias": {
+                "elements": 19,
+                "total": 128,
+                "max_outside_absolute": 0.498291015625,
+                "max_error_over_tolerance": 6.991394211478594
+              },
+              "blocks.1.transition.mix.0.weight": {
+                "elements": 1975,
+                "total": 32768,
+                "max_outside_absolute": 1.705810546875,
+                "max_error_over_tolerance": 213.21527157039841
+              },
+              "blocks.1.transition.mix.2.bias": {
+                "elements": 40,
+                "total": 384,
+                "max_outside_absolute": 0.7138671875,
+                "max_error_over_tolerance": 9.34381981904262
+              },
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 4048,
+                "total": 49152,
+                "max_outside_absolute": 1.1923828125,
+                "max_error_over_tolerance": 191.25284104927238
+              },
+              "blocks.1.transition.vec_proj.weight": {
+                "elements": 2,
+                "total": 32768,
+                "max_outside_absolute": 0.0009265542030334473,
+                "max_error_over_tolerance": 1.2436949983987577
+              },
+              "blocks.2.message.embed.dir_proj.0.bias": {
+                "elements": 2,
+                "total": 384,
+                "max_outside_absolute": 0.0032807588577270508,
+                "max_error_over_tolerance": 3.322726991416496
+              },
+              "blocks.2.message.embed.dir_proj.2.bias": {
+                "elements": 8,
+                "total": 384,
+                "max_outside_absolute": 0.010257244110107422,
+                "max_error_over_tolerance": 8.12604446549168
+              },
+              "blocks.2.message.embed.dir_proj.2.weight": {
+                "elements": 23,
+                "total": 147456,
+                "max_outside_absolute": 0.0012750029563903809,
+                "max_error_over_tolerance": 1.586359141653558
+              },
+              "blocks.2.message.embed.rbf_proj.bias": {
+                "elements": 3,
+                "total": 384,
+                "max_outside_absolute": 0.002195596694946289,
+                "max_error_over_tolerance": 2.521774492617344
+              },
+              "blocks.2.message.embed.rbf_proj.weight": {
+                "elements": 1,
+                "total": 36864,
+                "max_outside_absolute": 0.0010161399841308594,
+                "max_error_over_tolerance": 1.2455678337571998
+              },
+              "blocks.2.message.embed.x_proj.0.weight": {
+                "elements": 3,
+                "total": 16384,
+                "max_outside_absolute": 0.001097351312637329,
+                "max_error_over_tolerance": 1.1419486276386352
+              },
+              "blocks.2.message.embed.x_proj.2.weight": {
+                "elements": 2,
+                "total": 49152,
+                "max_outside_absolute": 0.000825732946395874,
+                "max_error_over_tolerance": 1.102100482916669
+              },
+              "blocks.2.message.norm_before.bias": {
+                "elements": 20,
+                "total": 152,
+                "max_outside_absolute": 1.0093994140625,
+                "max_error_over_tolerance": 9.471839781096532
+              },
+              "blocks.2.message.norm_before.weight": {
+                "elements": 20,
+                "total": 152,
+                "max_outside_absolute": 0.22609710693359375,
+                "max_error_over_tolerance": 9.086773719716419
+              },
+              "blocks.2.transition.mix.0.weight": {
+                "elements": 1,
+                "total": 32768,
+                "max_outside_absolute": 0.00244140625,
+                "max_error_over_tolerance": 1.8354475394678578
+              },
+              "embed.kernel1": {
+                "elements": 612,
+                "total": 6144,
+                "max_outside_absolute": 0.838104248046875,
+                "max_error_over_tolerance": 371.31088364828804
+              },
+              "embed.kernels_imag": {
+                "elements": 18880,
+                "total": 221184,
+                "max_outside_absolute": 0.5449981689453125,
+                "max_error_over_tolerance": 84.98980293086272
+              },
+              "embed.kernels_real": {
+                "elements": 18034,
+                "total": 221184,
+                "max_outside_absolute": 0.4770698547363281,
+                "max_error_over_tolerance": 128.41938966503602
+              },
+              "embed.radial.net.0.bias": {
+                "elements": 12,
+                "total": 128,
+                "max_outside_absolute": 4.06494140625,
+                "max_error_over_tolerance": 36.51499089651422
+              },
+              "embed.radial.net.0.weight": {
+                "elements": 1279,
+                "total": 12288,
+                "max_outside_absolute": 0.7314453125,
+                "max_error_over_tolerance": 324.1183424807677
+              },
+              "embed.radial.net.2.bias": {
+                "elements": 20,
+                "total": 128,
+                "max_outside_absolute": 16.30029296875,
+                "max_error_over_tolerance": 1847.8360535485053
+              },
+              "embed.radial.net.2.weight": {
+                "elements": 1429,
+                "total": 16384,
+                "max_outside_absolute": 2.1063232421875,
+                "max_error_over_tolerance": 326.1089025298773
+              },
+              "pre_sequence.2.bessel_weights": {
+                "elements": 10,
+                "total": 96,
+                "max_outside_absolute": 0.7716064453125,
+                "max_error_over_tolerance": 117.81144365552936
+              },
+              "pre_sequence.3.embedding.weight": {
+                "elements": 40,
+                "total": 12160,
+                "max_outside_absolute": 2.30859375,
+                "max_error_over_tolerance": 185.74698959713274
+              }
+            }
+          },
+          "capture": {
+            "new_graphs": 2,
+            "new_calls": 1192
+          },
+          "error": null
+        },
+        "bulk_256": {
+          "numerical": {
+            "passed": false,
+            "active_parameters": 121,
+            "reference_active_parameters": 121,
+            "energy_max_abs": 0.0,
+            "force_max_abs": 0.00016552209854125977,
+            "gradient_max_abs": 1.375,
+            "gradient_relative_l2": 1.0895798972567219e-05,
+            "gradient_elements_outside": 20709,
+            "gradient_parameters_outside": {
+              "blocks.0.message.embed.dir_proj.0.bias": {
+                "elements": 1,
+                "total": 384,
+                "max_outside_absolute": 0.0007908940315246582,
+                "max_error_over_tolerance": 1.1131909206239086
+              },
+              "blocks.0.message.embed.dir_proj.0.weight": {
+                "elements": 1,
+                "total": 184320,
+                "max_outside_absolute": 0.0007553808391094208,
+                "max_error_over_tolerance": 1.0481012568354569
+              },
+              "blocks.0.message.embed.dir_proj.2.bias": {
+                "elements": 4,
+                "total": 384,
+                "max_outside_absolute": 0.0038237571716308594,
+                "max_error_over_tolerance": 2.6184504983972485
+              },
+              "blocks.0.message.embed.rbf_proj.bias": {
+                "elements": 1,
+                "total": 384,
+                "max_outside_absolute": 0.0021990537643432617,
+                "max_error_over_tolerance": 1.7033369022736697
+              },
+              "blocks.0.message.norm_before.bias": {
+                "elements": 3,
+                "total": 152,
+                "max_outside_absolute": 0.222747802734375,
+                "max_error_over_tolerance": 4.160848281756069
+              },
+              "blocks.0.message.norm_before.weight": {
+                "elements": 2,
+                "total": 152,
+                "max_outside_absolute": 0.044814109802246094,
+                "max_error_over_tolerance": 3.988318202320675
+              },
+              "blocks.0.transition.mix.0.bias": {
+                "elements": 2,
+                "total": 128,
+                "max_outside_absolute": 0.08275604248046875,
+                "max_error_over_tolerance": 1.8679550236188733
+              },
+              "blocks.0.transition.mix.0.weight": {
+                "elements": 430,
+                "total": 32768,
+                "max_outside_absolute": 0.28553009033203125,
+                "max_error_over_tolerance": 126.01012452395801
+              },
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 922,
+                "total": 49152,
+                "max_outside_absolute": 0.2715301513671875,
+                "max_error_over_tolerance": 73.35125720902633
+              },
+              "blocks.1.message.embed.dir_proj.2.bias": {
+                "elements": 1,
+                "total": 384,
+                "max_outside_absolute": 0.0014690756797790527,
+                "max_error_over_tolerance": 1.079890838620959
+              },
+              "blocks.1.transition.mix.0.weight": {
+                "elements": 174,
+                "total": 32768,
+                "max_outside_absolute": 0.17160415649414062,
+                "max_error_over_tolerance": 34.58220568670213
+              },
+              "blocks.1.transition.mix.2.bias": {
+                "elements": 2,
+                "total": 384,
+                "max_outside_absolute": 0.0051555633544921875,
+                "max_error_over_tolerance": 2.0499859845575306
+              },
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 450,
+                "total": 49152,
+                "max_outside_absolute": 0.11875152587890625,
+                "max_error_over_tolerance": 48.310169244670185
+              },
+              "blocks.2.message.norm_before.bias": {
+                "elements": 1,
+                "total": 152,
+                "max_outside_absolute": 0.00730133056640625,
+                "max_error_over_tolerance": 2.5104642024068977
+              },
+              "blocks.2.message.norm_before.weight": {
+                "elements": 1,
+                "total": 152,
+                "max_outside_absolute": 0.001635044813156128,
+                "max_error_over_tolerance": 1.4025812536516313
+              },
+              "embed.kernel1": {
+                "elements": 951,
+                "total": 6144,
+                "max_outside_absolute": 0.13360595703125,
+                "max_error_over_tolerance": 43.31310123183546
+              },
+              "embed.kernels_imag": {
+                "elements": 8057,
+                "total": 221184,
+                "max_outside_absolute": 0.1114654541015625,
+                "max_error_over_tolerance": 52.84918194857694
+              },
+              "embed.kernels_real": {
+                "elements": 8133,
+                "total": 221184,
+                "max_outside_absolute": 0.125213623046875,
+                "max_error_over_tolerance": 18.125078756332712
+              },
+              "embed.radial.net.0.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.26544189453125,
+                "max_error_over_tolerance": 5.151196927806727
+              },
+              "embed.radial.net.0.weight": {
+                "elements": 744,
+                "total": 12288,
+                "max_outside_absolute": 0.0655975341796875,
+                "max_error_over_tolerance": 37.650145701864965
+              },
+              "embed.radial.net.2.bias": {
+                "elements": 2,
+                "total": 128,
+                "max_outside_absolute": 0.514739990234375,
+                "max_error_over_tolerance": 1.1533056360923748
+              },
+              "embed.radial.net.2.weight": {
+                "elements": 815,
+                "total": 16384,
+                "max_outside_absolute": 0.06782054901123047,
+                "max_error_over_tolerance": 26.018432484536373
+              },
+              "pre_sequence.2.bessel_weights": {
+                "elements": 5,
+                "total": 96,
+                "max_outside_absolute": 0.061832427978515625,
+                "max_error_over_tolerance": 7.478257211611303
+              },
+              "pre_sequence.3.embedding.weight": {
+                "elements": 6,
+                "total": 12160,
+                "max_outside_absolute": 0.12799835205078125,
+                "max_error_over_tolerance": 5.55588083550943
+              }
+            }
+          },
+          "capture": {
+            "new_graphs": 1,
+            "new_calls": 660
+          },
+          "error": null
+        },
+        "large_2000": {
+          "numerical": {
+            "passed": false,
+            "active_parameters": 121,
+            "reference_active_parameters": 121,
+            "energy_max_abs": 0.0010986328125,
+            "force_max_abs": 0.0017390251159667969,
+            "gradient_max_abs": 183.1875,
+            "gradient_relative_l2": 1.899250445517251e-05,
+            "gradient_elements_outside": 145096,
+            "gradient_parameters_outside": {
+              "blocks.0.message.diagonal.0.weight": {
+                "elements": 53,
+                "total": 18432,
+                "max_outside_absolute": 0.002772510051727295,
+                "max_error_over_tolerance": 2.293810815441898
+              },
+              "blocks.0.message.diagonal.2.weight": {
+                "elements": 11,
+                "total": 288,
+                "max_outside_absolute": 0.0029218196868896484,
+                "max_error_over_tolerance": 2.842374494028191
+              },
+              "blocks.0.message.embed.dir_proj.0.bias": {
+                "elements": 39,
+                "total": 384,
+                "max_outside_absolute": 0.1628875732421875,
+                "max_error_over_tolerance": 101.92244409580671
+              },
+              "blocks.0.message.embed.dir_proj.0.weight": {
+                "elements": 6893,
+                "total": 184320,
+                "max_outside_absolute": 0.028436660766601562,
+                "max_error_over_tolerance": 30.47421288264541
+              },
+              "blocks.0.message.embed.dir_proj.2.bias": {
+                "elements": 39,
+                "total": 384,
+                "max_outside_absolute": 1.646240234375,
+                "max_error_over_tolerance": 26.22506339799866
+              },
+              "blocks.0.message.embed.dir_proj.2.weight": {
+                "elements": 7895,
+                "total": 147456,
+                "max_outside_absolute": 0.1005706787109375,
+                "max_error_over_tolerance": 37.799372774278865
+              },
+              "blocks.0.message.embed.norm.bias": {
+                "elements": 9,
+                "total": 128,
+                "max_outside_absolute": 0.01077127456665039,
+                "max_error_over_tolerance": 8.511277052137254
+              },
+              "blocks.0.message.embed.norm.weight": {
+                "elements": 8,
+                "total": 128,
+                "max_outside_absolute": 0.016202256083488464,
+                "max_error_over_tolerance": 20.069219375613244
+              },
+              "blocks.0.message.embed.rbf_proj.bias": {
+                "elements": 34,
+                "total": 384,
+                "max_outside_absolute": 0.2508544921875,
+                "max_error_over_tolerance": 145.50044633607956
+              },
+              "blocks.0.message.embed.rbf_proj.weight": {
+                "elements": 2503,
+                "total": 36864,
+                "max_outside_absolute": 0.09212493896484375,
+                "max_error_over_tolerance": 63.27789496957671
+              },
+              "blocks.0.message.embed.x_proj.0.bias": {
+                "elements": 5,
+                "total": 128,
+                "max_outside_absolute": 0.011106491088867188,
+                "max_error_over_tolerance": 2.0667196710519677
+              },
+              "blocks.0.message.embed.x_proj.0.weight": {
+                "elements": 1274,
+                "total": 16384,
+                "max_outside_absolute": 0.026070594787597656,
+                "max_error_over_tolerance": 16.53439121236663
+              },
+              "blocks.0.message.embed.x_proj.2.bias": {
+                "elements": 14,
+                "total": 384,
+                "max_outside_absolute": 0.0420074462890625,
+                "max_error_over_tolerance": 5.19432173183453
+              },
+              "blocks.0.message.embed.x_proj.2.weight": {
+                "elements": 2209,
+                "total": 49152,
+                "max_outside_absolute": 0.0726165771484375,
+                "max_error_over_tolerance": 23.285005175703137
+              },
+              "blocks.0.message.fc_mps.weight": {
+                "elements": 152,
+                "total": 576,
+                "max_outside_absolute": 0.0859375,
+                "max_error_over_tolerance": 21.05755732335049
+              },
+              "blocks.0.message.kernel_imag": {
+                "elements": 18,
+                "total": 612,
+                "max_outside_absolute": 0.002434849739074707,
+                "max_error_over_tolerance": 2.2000913342085204
+              },
+              "blocks.0.message.kernel_real": {
+                "elements": 24,
+                "total": 612,
+                "max_outside_absolute": 0.002835512161254883,
+                "max_error_over_tolerance": 1.3784220559046148
+              },
+              "blocks.0.message.norm_before.bias": {
+                "elements": 4,
+                "total": 152,
+                "max_outside_absolute": 45.064453125,
+                "max_error_over_tolerance": 3.6885343311734293
+              },
+              "blocks.0.message.norm_before.weight": {
+                "elements": 4,
+                "total": 152,
+                "max_outside_absolute": 9.078125,
+                "max_error_over_tolerance": 8.127324803470286
+              },
+              "blocks.0.message.scale.weight": {
+                "elements": 1712,
+                "total": 24576,
+                "max_outside_absolute": 0.029334306716918945,
+                "max_error_over_tolerance": 17.73379702269129
+              },
+              "blocks.0.message.scale2.bias": {
+                "elements": 2,
+                "total": 64,
+                "max_outside_absolute": 0.0035839080810546875,
+                "max_error_over_tolerance": 1.646249572530359
+              },
+              "blocks.0.message.scale2.weight": {
+                "elements": 48,
+                "total": 1536,
+                "max_outside_absolute": 0.01060342788696289,
+                "max_error_over_tolerance": 2.0947432966236024
+              },
+              "blocks.0.transition.mix.0.bias": {
+                "elements": 3,
+                "total": 128,
+                "max_outside_absolute": 7.4404296875,
+                "max_error_over_tolerance": 2.8779482153279665
+              },
+              "blocks.0.transition.mix.0.weight": {
+                "elements": 729,
+                "total": 32768,
+                "max_outside_absolute": 24.1171875,
+                "max_error_over_tolerance": 1364.7391405727835
+              },
+              "blocks.0.transition.mix.2.bias": {
+                "elements": 4,
+                "total": 384,
+                "max_outside_absolute": 3.06005859375,
+                "max_error_over_tolerance": 1.340467778979001
+              },
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 1250,
+                "total": 49152,
+                "max_outside_absolute": 32.1474609375,
+                "max_error_over_tolerance": 375.7705091012809
+              },
+              "blocks.0.transition.vec_proj.weight": {
+                "elements": 241,
+                "total": 32768,
+                "max_outside_absolute": 0.004126548767089844,
+                "max_error_over_tolerance": 3.900740134166959
+              },
+              "blocks.1.message.embed.dir_proj.0.bias": {
+                "elements": 20,
+                "total": 384,
+                "max_outside_absolute": 0.07596206665039062,
+                "max_error_over_tolerance": 10.776009456878608
+              },
+              "blocks.1.message.embed.dir_proj.0.weight": {
+                "elements": 1571,
+                "total": 184320,
+                "max_outside_absolute": 0.010307788848876953,
+                "max_error_over_tolerance": 9.60372486736586
+              },
+              "blocks.1.message.embed.dir_proj.2.bias": {
+                "elements": 27,
+                "total": 384,
+                "max_outside_absolute": 0.363372802734375,
+                "max_error_over_tolerance": 34.37194673368168
+              },
+              "blocks.1.message.embed.dir_proj.2.weight": {
+                "elements": 2832,
+                "total": 147456,
+                "max_outside_absolute": 0.017357587814331055,
+                "max_error_over_tolerance": 13.572954632616705
+              },
+              "blocks.1.message.embed.norm.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.0031431913375854492,
+                "max_error_over_tolerance": 1.2435385586515124
+              },
+              "blocks.1.message.embed.norm.weight": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.002809464931488037,
+                "max_error_over_tolerance": 2.1042337253983336
+              },
+              "blocks.1.message.embed.rbf_proj.bias": {
+                "elements": 16,
+                "total": 384,
+                "max_outside_absolute": 0.2719879150390625,
+                "max_error_over_tolerance": 4.925505402032069
+              },
+              "blocks.1.message.embed.rbf_proj.weight": {
+                "elements": 1033,
+                "total": 36864,
+                "max_outside_absolute": 0.025762557983398438,
+                "max_error_over_tolerance": 12.798451172203078
+              },
+              "blocks.1.message.embed.x_proj.0.bias": {
+                "elements": 2,
+                "total": 128,
+                "max_outside_absolute": 0.003169536590576172,
+                "max_error_over_tolerance": 3.6892219826568273
+              },
+              "blocks.1.message.embed.x_proj.0.weight": {
+                "elements": 612,
+                "total": 16384,
+                "max_outside_absolute": 0.014810562133789062,
+                "max_error_over_tolerance": 8.516613691753466
+              },
+              "blocks.1.message.embed.x_proj.2.bias": {
+                "elements": 11,
+                "total": 384,
+                "max_outside_absolute": 0.014542579650878906,
+                "max_error_over_tolerance": 7.571963814711862
+              },
+              "blocks.1.message.embed.x_proj.2.weight": {
+                "elements": 952,
+                "total": 49152,
+                "max_outside_absolute": 0.028781890869140625,
+                "max_error_over_tolerance": 21.966600811570185
+              },
+              "blocks.1.message.fc_mps.weight": {
+                "elements": 125,
+                "total": 576,
+                "max_outside_absolute": 0.029296875,
+                "max_error_over_tolerance": 22.477522477522477
+              },
+              "blocks.1.message.norm_before.bias": {
+                "elements": 2,
+                "total": 152,
+                "max_outside_absolute": 4.3271484375,
+                "max_error_over_tolerance": 1.332418972966584
+              },
+              "blocks.1.message.norm_before.weight": {
+                "elements": 3,
+                "total": 152,
+                "max_outside_absolute": 0.90350341796875,
+                "max_error_over_tolerance": 1.332766986143599
+              },
+              "blocks.1.message.scale.weight": {
+                "elements": 160,
+                "total": 24576,
+                "max_outside_absolute": 0.003931760787963867,
+                "max_error_over_tolerance": 3.030281782192911
+              },
+              "blocks.1.transition.mix.0.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.4947509765625,
+                "max_error_over_tolerance": 1.0489735413441224
+              },
+              "blocks.1.transition.mix.0.weight": {
+                "elements": 369,
+                "total": 32768,
+                "max_outside_absolute": 23.947265625,
+                "max_error_over_tolerance": 302.4558121963636
+              },
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 740,
+                "total": 49152,
+                "max_outside_absolute": 12.947021484375,
+                "max_error_over_tolerance": 182.89339261463647
+              },
+              "blocks.1.transition.vec_proj.weight": {
+                "elements": 109,
+                "total": 32768,
+                "max_outside_absolute": 0.0034038424491882324,
+                "max_error_over_tolerance": 2.9590798974065042
+              },
+              "blocks.2.message.embed.dir_proj.0.bias": {
+                "elements": 12,
+                "total": 384,
+                "max_outside_absolute": 0.02706003189086914,
+                "max_error_over_tolerance": 18.16912416125248
+              },
+              "blocks.2.message.embed.dir_proj.0.weight": {
+                "elements": 367,
+                "total": 184320,
+                "max_outside_absolute": 0.0054770708084106445,
+                "max_error_over_tolerance": 4.272927713169042
+              },
+              "blocks.2.message.embed.dir_proj.2.bias": {
+                "elements": 9,
+                "total": 384,
+                "max_outside_absolute": 0.1689910888671875,
+                "max_error_over_tolerance": 5.358691246815122
+              },
+              "blocks.2.message.embed.dir_proj.2.weight": {
+                "elements": 1032,
+                "total": 147456,
+                "max_outside_absolute": 0.006477415561676025,
+                "max_error_over_tolerance": 6.326493558172227
+              },
+              "blocks.2.message.embed.norm.weight": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.001487046480178833,
+                "max_error_over_tolerance": 1.5093292713983595
+              },
+              "blocks.2.message.embed.rbf_proj.bias": {
+                "elements": 10,
+                "total": 384,
+                "max_outside_absolute": 0.024225234985351562,
+                "max_error_over_tolerance": 6.562084424539482
+              },
+              "blocks.2.message.embed.rbf_proj.weight": {
+                "elements": 431,
+                "total": 36864,
+                "max_outside_absolute": 0.0103912353515625,
+                "max_error_over_tolerance": 7.108243705813633
+              },
+              "blocks.2.message.embed.x_proj.0.bias": {
+                "elements": 1,
+                "total": 128,
+                "max_outside_absolute": 0.001717209815979004,
+                "max_error_over_tolerance": 1.0500994310392888
+              },
+              "blocks.2.message.embed.x_proj.0.weight": {
+                "elements": 241,
+                "total": 16384,
+                "max_outside_absolute": 0.006265401840209961,
+                "max_error_over_tolerance": 3.967057290784348
+              },
+              "blocks.2.message.embed.x_proj.2.bias": {
+                "elements": 1,
+                "total": 384,
+                "max_outside_absolute": 0.0027588605880737305,
+                "max_error_over_tolerance": 3.0608500103346508
+              },
+              "blocks.2.message.embed.x_proj.2.weight": {
+                "elements": 353,
+                "total": 49152,
+                "max_outside_absolute": 0.02130889892578125,
+                "max_error_over_tolerance": 8.130734597636291
+              },
+              "blocks.2.message.fc_mps.weight": {
+                "elements": 263,
+                "total": 576,
+                "max_outside_absolute": 0.078125,
+                "max_error_over_tolerance": 29.697624190064793
+              },
+              "blocks.2.message.scale.weight": {
+                "elements": 3,
+                "total": 24576,
+                "max_outside_absolute": 0.0018379688262939453,
+                "max_error_over_tolerance": 1.4220454258793782
+              },
+              "embed.kernel1": {
+                "elements": 2134,
+                "total": 6144,
+                "max_outside_absolute": 12.205078125,
+                "max_error_over_tolerance": 658.2394511066204
+              },
+              "embed.kernels_imag": {
+                "elements": 50318,
+                "total": 221184,
+                "max_outside_absolute": 8.32366943359375,
+                "max_error_over_tolerance": 3086.4406491712125
+              },
+              "embed.kernels_real": {
+                "elements": 49238,
+                "total": 221184,
+                "max_outside_absolute": 10.7314453125,
+                "max_error_over_tolerance": 1902.3628949135566
+              },
+              "embed.lse.lin.0.bias": {
+                "elements": 14,
+                "total": 32,
+                "max_outside_absolute": 0.013516426086425781,
+                "max_error_over_tolerance": 1.080350110661662
+              },
+              "embed.lse.lin.2.bias": {
+                "elements": 1,
+                "total": 1,
+                "max_outside_absolute": 0.06656265258789062,
+                "max_error_over_tolerance": 1.1269382495061306
+              },
+              "embed.lse.structure.mix.0.weight": {
+                "elements": 2,
+                "total": 16384,
+                "max_outside_absolute": 0.0008908938616514206,
+                "max_error_over_tolerance": 1.2286878695005596
+              },
+              "embed.radial.net.0.bias": {
+                "elements": 4,
+                "total": 128,
+                "max_outside_absolute": 29.5361328125,
+                "max_error_over_tolerance": 7.982228080705592
+              },
+              "embed.radial.net.0.weight": {
+                "elements": 4146,
+                "total": 12288,
+                "max_outside_absolute": 5.54296875,
+                "max_error_over_tolerance": 933.3055763912627
+              },
+              "embed.radial.net.2.bias": {
+                "elements": 7,
+                "total": 128,
+                "max_outside_absolute": 87.0078125,
+                "max_error_over_tolerance": 4.8801680710556266
+              },
+              "embed.radial.net.2.weight": {
+                "elements": 2694,
+                "total": 16384,
+                "max_outside_absolute": 15.15625,
+                "max_error_over_tolerance": 891.0359357571168
+              },
+              "pre_sequence.2.bessel_weights": {
+                "elements": 31,
+                "total": 96,
+                "max_outside_absolute": 8.618896484375,
+                "max_error_over_tolerance": 40.09767516382119
+              },
+              "pre_sequence.3.embedding.weight": {
+                "elements": 19,
+                "total": 12160,
+                "max_outside_absolute": 70.7822265625,
+                "max_error_over_tolerance": 33.866712550774416
+              }
+            }
+          },
+          "capture": {
+            "new_graphs": 1,
+            "new_calls": 657
+          },
+          "error": null
+        }
+      },
+      "finished": true,
+      "method": "Frozen weights and unmodified training dropout probabilities. Ordinary Inductor uses native random draws under fallback_random=True for this diagnostic. The default run is separately archived.",
+      "derived_from": "raw-frozen-matched-rng-alphanet-c5d7712-float32-detail.json"
     }
   },
   "frozen_dpa4_rotation_controls": {
@@ -6027,27 +9042,27 @@
     "err11": "timeout after 120s"
   },
   "assessment": {
-    "attempted_architecture_precision_pairs": 60,
+    "attempted_architecture_precision_pairs": 63,
     "expected_architecture_precision_pairs": 116,
     "expected_mode_system_cells": 696,
-    "selected_frozen_full_architecture_precision_pairs": 35,
-    "current_source_full_architecture_precision_pairs": 35,
+    "selected_frozen_full_architecture_precision_pairs": 39,
+    "current_source_full_architecture_precision_pairs": 39,
     "terminal_partial_frozen_attempts": 4,
-    "selected_partial_cells": 2,
+    "selected_partial_cells": 0,
     "historical_architecture_precision_pairs": 46,
-    "completed_frozen_attempts": 56,
-    "comparable_mode_system_cells": 39,
-    "comparable_metrics": 78,
-    "above_3_percent": 1,
-    "frozen_mode_system_cells": 213,
-    "frozen_candidate_only_cells": 141,
+    "completed_frozen_attempts": 60,
+    "comparable_mode_system_cells": 41,
+    "comparable_metrics": 82,
+    "above_3_percent": 3,
+    "frozen_mode_system_cells": 235,
+    "frozen_candidate_only_cells": 157,
     "frozen_candidate_only_native_training_cells": 19,
     "frozen_candidate_only_direct_cpu_oracle_cells": 1,
     "frozen_candidate_timing_incomplete_baseline_cells": 0,
     "frozen_baseline_only_cells": 0,
-    "frozen_both_unavailable_cells": 20,
-    "frozen_numerical_or_reference_failures": 31,
-    "excesses": [{"model_precision": "alphanet/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.936, "baseline_value": 2673.1318359375, "candidate_value": 3259.520263671875}],
-    "frozen_failed_cells": [{"model_precision": "equflash/float32", "system": "mol_batch_32x20", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflash/float32", "system": "bulk_256", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "e2former/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "e2former_v2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "e2former_lsr/float32", "system": "large_2000", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "painn/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "painn/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "freecg/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": null, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "native reference unavailable: OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 560.25 MiB is free. Including no"}, {"model_precision": "visnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float32", "system": "large_2000", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float32", "system": "large_2000", "mode": "train", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float64", "system": "large_2000", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "mol_batch_32x20", "mode": "infer", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "numerical failure", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "bulk_256", "mode": "infer", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "bulk_256", "mode": "train", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "large_2000", "mode": "infer", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "large_2000", "mode": "train", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}]
+    "frozen_both_unavailable_cells": 22,
+    "frozen_numerical_or_reference_failures": 33,
+    "excesses": [{"model_precision": "alphanet/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.936, "baseline_value": 2673.1318359375, "candidate_value": 3259.520263671875}, {"model_precision": "dpa3/float32", "system": "mol_batch_32x20", "mode": "infer", "metric": "median_ms", "candidate": "c32ede3", "relative_percent": 29737.067, "baseline_value": 7.1514330338686705, "candidate_value": 2133.7778749875724}, {"model_precision": "dpa3/float32", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 7.4, "baseline_value": 93.15283203125, "candidate_value": 100.04638671875}],
+    "frozen_failed_cells": [{"model_precision": "equflash/float32", "system": "mol_batch_32x20", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflash/float32", "system": "bulk_256", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "e2former/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "e2former_v2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "e2former_lsr/float32", "system": "large_2000", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "painn/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "painn/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "freecg/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": null, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "native reference unavailable: OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 560.25 MiB is free. Including no"}, {"model_precision": "geodite/float32", "system": "mol_batch_32x20", "mode": "infer", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "numerical failure", "candidate_status": "numerical failure"}, {"model_precision": "geodite/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "RuntimeError: torch.compile with aot_autograd does not currently support double backward", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float32", "system": "large_2000", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float32", "system": "large_2000", "mode": "train", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet_lsrm/float64", "system": "large_2000", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "mol_batch_32x20", "mode": "infer", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "numerical failure", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "bulk_256", "mode": "infer", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "bulk_256", "mode": "train", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "large_2000", "mode": "infer", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "dpa4/float64", "system": "large_2000", "mode": "train", "candidate": "9aab3db", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}]
   }
 }
