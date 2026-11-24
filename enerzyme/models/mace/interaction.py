@@ -191,7 +191,9 @@ class ResidualElementDependentInteractionBlock(InteractionBlock):
         message = scatter_sum(
             src=mji, index=receiver, dim=0, dim_size=num_nodes
         )  # [n_nodes, irreps]
-        message = self.linear(message) / self.avg_num_neighbors
+        message = self.linear(message)
+        if self.avg_num_neighbors != 1.0:
+            message = message / self.avg_num_neighbors
         return message + sc  # [n_nodes, irreps]
 
 
@@ -258,7 +260,9 @@ class AgnosticNonlinearInteractionBlock(InteractionBlock):
         message = scatter_sum(
             src=mji, index=receiver, dim=0, dim_size=num_nodes
         )  # [n_nodes, irreps]
-        message = self.linear(message) / self.avg_num_neighbors
+        message = self.linear(message)
+        if self.avg_num_neighbors != 1.0:
+            message = message / self.avg_num_neighbors
         message = self.skip_tp(message, node_attrs)
         return message  # [n_nodes, irreps]
 
@@ -325,7 +329,9 @@ class AgnosticResidualNonlinearInteractionBlock(InteractionBlock):
         message = scatter_sum(
             src=mji, index=receiver, dim=0, dim_size=num_nodes
         )  # [n_nodes, irreps]
-        message = self.linear(message) / self.avg_num_neighbors
+        message = self.linear(message)
+        if self.avg_num_neighbors != 1.0:
+            message = message / self.avg_num_neighbors
         message = message + sc
         return message  # [n_nodes, irreps]
 

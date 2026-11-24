@@ -845,7 +845,8 @@ def botnet(
         head = PlacedFeatureHead(layer_irreps, union)
     return ComposableCore(
         SpeciesEmbed(dim_embedding, num_rbf, max_Za, spherical_harmonics), blocks, head,
-        GraphRequires(distances=False, optional_cutoff_values=False, edge_convention="swap", fields=("Za",)),
+        GraphRequires(vectors=False, distances=False, optional_cutoff_values=False, edge_convention="swap",
+                      fields=("Za", "vij_sr")),
         positional_fields=("Za", "vij_sr", "idx_i_sr", "idx_j_sr", "rbf",
                            "atom_embedding", "charge_embedding", "spin_embedding"),
         architecture="botnet", banner=f"BOTNet ({variant}, {num_interactions} interactions)",

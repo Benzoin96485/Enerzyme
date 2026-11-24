@@ -23,21 +23,24 @@ class SpeciesEmbed(FieldEmbed):
         embedding = inputs["atom_embedding"]
         if embedding.ndim != 2 or embedding.shape[-1] != self.width:
             raise ValueError(f"atom_embedding must be [N, dim_embedding={self.width}]")
-        if ctx.receiver.shape != ctx.sender.shape or ctx.vec.shape != (ctx.num_edges, 3):
+        vectors = inputs["vij_sr"].to(embedding)
+        if ctx.receiver.shape != ctx.sender.shape or vectors.shape != (ctx.num_edges, 3):
             raise ValueError("idx_i_sr, idx_j_sr and vij_sr must describe the same edges")
         if ctx.rbf.shape != (ctx.num_edges, self.num_rbf):
             raise ValueError(f"rbf must have one row per edge and width num_rbf={self.num_rbf}")
         z = inputs["Za"].long().view(-1)
         if z.shape[0] != ctx.num_nodes:
             raise ValueError("Za and atom_embedding must have the same number of atoms")
-        if z.numel():
-            low, high = torch.stack(torch.aminmax(z)).tolist()
+        if z.is_cuda or torch.compiler.is_compiling():
+            torch._assert_async(((z >= 0) & (z <= self.max_Za)).all(), f"Za must lie in 0..{self.max_Za}")
+        elif z.numel():
+            low, high = torch.aminmax(z)
             if low < 0 or high > self.max_Za:
                 raise ValueError(f"Za must lie in 0..{self.max_Za}")
         x = super().forward(inputs, ctx).equi
         node_attrs = one_hot_species(z, self.max_Za + 1, x.dtype)
         # The BOTNet interaction uses i as sender but harmonics of R_j - R_i.
-        return BlockState(scalar=node_attrs, equi=x, edge=self.sph(-ctx.vec))
+        return BlockState(scalar=node_attrs, equi=x, edge=self.sph(vectors))
 
 
 def body_ordered_update(interaction, state, ctx):
