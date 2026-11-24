@@ -151,3 +151,13 @@ def gather(src: Tensor, index: Tensor) -> Tensor:
     flat = src.reshape(src.shape[0], -1)
     out = flat.gather(0, index.view(-1, 1).expand(-1, flat.shape[1]))
     return out.view((index.shape[0],) + tuple(src.shape[1:]))
+
+
+def gather_sender(src: Tensor, index: Tensor) -> Tensor:
+    """Gather sender features while keeping the two endpoint gradients independent."""
+    if torch.compiler.is_compiling() and src.device.type == "cpu":
+        # Inductor can fuse a row-wise receiver reduction with the sender
+        # reduction, reading its zero buffer before the indexed writes.
+        columns = src.movedim(0, -1).contiguous()
+        return columns.index_select(-1, index).movedim(-1, 0)
+    return src.index_select(0, index)

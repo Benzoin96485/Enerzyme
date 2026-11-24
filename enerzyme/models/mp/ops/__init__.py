@@ -2,6 +2,7 @@ from .geometry import safe_norm, safe_normalize
 from .scatter import (
     batch_size_from_counts,
     gather,
+    gather_sender,
     scatter_count,
     scatter_max,
     scatter_mean,
@@ -15,6 +16,7 @@ from .softmax import GraphSoftmax, SoftCap, segment_envelope_gated_softmax, segm
 __all__ = [
     "batch_size_from_counts",
     "gather",
+    "gather_sender",
     "safe_norm",
     "safe_normalize",
     "scatter_count",

@@ -40,7 +40,7 @@ from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module, Parameter
 
 from ..et.interaction import normalize_distance_influence
-from ..mp.ops import scatter_sum
+from ..mp.ops import gather_sender, scatter_sum
 from ..mp.ops.rejection import vector_rejection
 from ..mp.equivariant.body_order import angular_inner, angular_norm_squared, rejection_inner
 from ..visnet.interaction import normalize_activation
@@ -172,7 +172,7 @@ class QuinNetInteraction(Module):
         reference names ``edge_index[0]`` ``dst`` and ``edge_index[1]``
         ``src``, so ``dst`` is the sender and ``src`` is the receiver.
         """
-        sender = vector.index_select(0, idx_j)
+        sender = gather_sender(vector, idx_j)
         receiver = vector.index_select(0, idx_i)
         normal_sender = normal_i.index_select(0, idx_j)
         normal_receiver = normal_i.index_select(0, idx_i)
@@ -269,7 +269,7 @@ class QuinNetInteraction(Module):
         gate, coeff = torch.split(
             F.silu(self.s_proj(scalar_message)), self.hidden_channels, dim=-1
         )
-        vector_message = vector.index_select(0, idx_j) * gate.unsqueeze(1)
+        vector_message = gather_sender(vector, idx_j) * gate.unsqueeze(1)
         vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
         aggregated_scalar = scatter_sum(scalar_message, idx_i, node_shape[0])
         aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)

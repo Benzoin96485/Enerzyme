@@ -27,7 +27,7 @@ from torch.nn import LayerNorm, Linear, Module
 
 from ..mp.nn.mlp import xavier_linear as _xavier_linear
 from ..mp.nn.field_norm import VECNORM_TYPES, VecLayerNorm, normalize_vecnorm_type  # noqa: F401
-from ..mp.ops import scatter_sum
+from ..mp.ops import gather_sender, scatter_sum
 from ..mp.equivariant.body_order import rejection_inner
 
 
@@ -84,14 +84,7 @@ class EdgeEmbedding(Module):
         rbf: Tensor,
         scalar: Tensor,
     ) -> Tensor:
-        receiver = scalar.index_select(0, idx_i)
-        if torch.compiler.is_compiling() and scalar.device.type == "cpu":
-            # Different accumulation layouts keep CPU Inductor from fusing the
-            # endpoint gradients into a buffer it reads before its indexed writes.
-            sender = scalar.T.contiguous().index_select(1, idx_j).T
-        else:
-            sender = scalar.index_select(0, idx_j)
-        mixed = receiver + sender
+        mixed = scalar.index_select(0, idx_i) + gather_sender(scalar, idx_j)
         return mixed * self.edge_proj(rbf)
 
 
