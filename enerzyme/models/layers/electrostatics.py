@@ -3,7 +3,7 @@ import math
 import torch
 from torch import Tensor
 from . import BaseFFLayer
-from ..mp.ops import scatter_sum
+from ..mp.ops import batch_size_from_counts, scatter_sum
 from ..mp.basis.envelope import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
@@ -22,7 +22,7 @@ class ChargeConservationLayer(BaseFFLayer):
 
     def get_output(
         self, Za: Tensor, Qa: Tensor, 
-        Q: Optional[Tensor]=None, batch_seg: Optional[Tensor]=None
+        Q: Optional[Tensor]=None, batch_seg: Optional[Tensor]=None, N=None,
     ) -> Dict[Literal["Qa", "Q"], Tensor]:
         '''
         Correct the atomic charge
@@ -46,14 +46,15 @@ class ChargeConservationLayer(BaseFFLayer):
         if batch_seg is None:
             batch_seg = torch.zeros_like(Za, dtype=torch.long)
         #number of atoms per batch (needed for charge scaling)
-        N_per_batch = scatter_sum(torch.ones_like(batch_seg), batch_seg)
+        size = batch_size_from_counts(N)
+        N_per_batch = scatter_sum(torch.ones_like(batch_seg), batch_seg, size)
         view_shape = (-1, ) if Qa.dim() == 1 else (-1, 1)
-        raw_Q = scatter_sum(Qa, batch_seg)
+        raw_Q = scatter_sum(Qa, batch_seg, size)
         if Q is None: #assume desired total charge zero if not given
             Q = torch.zeros_like(N_per_batch)
         #return scaled charges (such that they have the desired total charge)
         return {
-            "Qa": Qa + ((Q.view(view_shape) - raw_Q) / N_per_batch.view(view_shape))[batch_seg], 
+            "Qa": Qa + ((Q.view(view_shape) - raw_Q) / N_per_batch.view(view_shape).clamp_min(1))[batch_seg],
             "Q": raw_Q
         }
 
@@ -549,10 +550,10 @@ class WeightedCoulombEnergyLayer(BaseFFLayer):
 
 class AtomicCharge2DipoleLayer(BaseFFLayer):
     def __init__(self) -> None:
-        super().__init__(input_fields={"Qa", "Ra", "batch_seg"}, output_fields={"M2"})
+        super().__init__(input_fields={"Qa", "Ra", "batch_seg", "N"}, output_fields={"M2"})
 
-    def get_M2(self, Qa: Tensor, Ra: Tensor, batch_seg: Optional[Tensor]=None) -> Tensor:
+    def get_M2(self, Qa: Tensor, Ra: Tensor, batch_seg: Optional[Tensor]=None, N=None) -> Tensor:
         if batch_seg is None:
-            batch_seg = torch.zeros_like(Qa, dtype=torch.long)
+            batch_seg = torch.zeros(Qa.shape[0], dtype=torch.long, device=Qa.device)
         Pa = Qa.unsqueeze(1) * Ra.view((-1, 3, 1) if Qa.dim() > 1 else (-1, 3))
-        return scatter_sum(Pa, batch_seg)
+        return scatter_sum(Pa, batch_seg, batch_size_from_counts(N))

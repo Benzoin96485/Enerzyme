@@ -9,6 +9,20 @@ import torch
 from enerzyme.models.ff import build_model
 
 
+def test_batched_charge_dipole_and_energy_keep_empty_structures_in_fullgraph():
+    from enerzyme.models.layers.electrostatics import AtomicCharge2DipoleLayer, ChargeConservationLayer
+    from enerzyme.models.layers.reduce import EnergyReduceLayer
+
+    layers = torch.nn.Sequential(ChargeConservationLayer(), AtomicCharge2DipoleLayer(), EnergyReduceLayer())
+    data = dict(N=[2, 0], Za=torch.tensor([1, 1]), batch_seg=torch.tensor([0, 0]),
+                Ra=torch.tensor([[1., 0., 0.], [0., 1., 0.]]), Q=torch.tensor([0., 0.]),
+                Qa=torch.tensor([0.3, -0.1]), Ea=torch.tensor([2., 3.]))
+    result = torch.compile(layers, fullgraph=True, backend="eager")(data)
+    torch.testing.assert_close(result["E"], torch.tensor([5., 0.]))
+    torch.testing.assert_close(result["Qa"], torch.tensor([0.2, -0.2]))
+    torch.testing.assert_close(result["M2"], torch.tensor([[0.2, -0.2, 0.], [0., 0., 0.]]))
+
+
 def _schnet(ensemble):
     return build_model(
         "schnet",

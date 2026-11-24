@@ -23,6 +23,14 @@ except ImportError:  # pragma: no cover - optional dependency
 TORCH_SCATTER_MAX_NUMEL = 4 * 2**20
 
 
+def batch_size_from_counts(counts) -> Optional[int]:
+    """Number of structures described by the batch's per-structure atom counts."""
+    if isinstance(counts, (tuple, list)) or getattr(counts, "ndim", 0) > 0:
+        return len(counts)
+    # A scalar can describe the total atom count across a prebatched input.
+    return None
+
+
 def _dim_size(index: Tensor, dim_size: Optional[int]) -> int:
     if dim_size is not None:
         return int(dim_size)

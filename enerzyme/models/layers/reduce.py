@@ -3,12 +3,12 @@ from typing import Dict, List, Set
 import torch
 from torch import Tensor
 from . import BaseFFLayer
-from ..mp.ops import scatter_sum
+from ..mp.ops import batch_size_from_counts, scatter_sum
 
 
 class EnergyReduceLayer(BaseFFLayer):
     def __init__(self) -> None:
-        super().__init__(input_fields={"Ea", "batch_seg", "Za"}, output_fields={"E", "Ea"})
+        super().__init__(input_fields={"Ea", "batch_seg", "Za", "N"}, output_fields={"E", "Ea"})
 
     def get_relevant_input_fields(self, net_input_fields: Set[str]) -> Set[str]:
         relevant_input_fields = set()
@@ -26,7 +26,8 @@ class EnergyReduceLayer(BaseFFLayer):
             batch_seg = relevant_input["batch_seg"]
         else:
             batch_seg = torch.zeros_like(relevant_input["Za"])
-        return {"E": scatter_sum(Ea, batch_seg), "Ea": Ea}
+        size = batch_size_from_counts(relevant_input.get("N"))
+        return {"E": scatter_sum(Ea, batch_seg, size), "Ea": Ea}
 
 
 class EdgeEnergyReduceLayer(BaseFFLayer):
