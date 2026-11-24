@@ -8,6 +8,8 @@ and traceless. The squared Frobenius weight of ``I * Id`` is ``3 I²``.
 
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import Tensor
 
@@ -95,3 +97,24 @@ def tensor_matmul(left: Tensor, right: Tensor) -> Tensor:
 def tensor_anticommutator(left: Tensor, right: Tensor) -> Tensor:
     """``right @ left + left @ right``. O(3) interaction product."""
     return tensor_matmul(right, left) + tensor_matmul(left, right)
+
+
+def packed_l2_to_stf(packed: Tensor) -> Tensor:
+    """Map normalized degree-two coefficients to symmetric traceless matrices.
+
+    The map is an isometry from the Euclidean product on ``R^5`` to the
+    Frobenius product.
+    """
+    inv_sqrt_two = 1.0 / math.sqrt(2.0)
+    inv_sqrt_six = 1.0 / math.sqrt(6.0)
+    q0, q1, q2, q3, q4 = packed.unbind(dim=-1)
+    qxy = q0 * inv_sqrt_two
+    qyz = q1 * inv_sqrt_two
+    qxz = q3 * inv_sqrt_two
+    qxx = -q2 * inv_sqrt_six + q4 * inv_sqrt_two
+    qyy = -q2 * inv_sqrt_six - q4 * inv_sqrt_two
+    qzz = 2.0 * q2 * inv_sqrt_six
+    row0 = torch.stack((qxx, qxy, qxz), dim=-1)
+    row1 = torch.stack((qxy, qyy, qyz), dim=-1)
+    row2 = torch.stack((qxz, qyz, qzz), dim=-1)
+    return torch.stack((row0, row1, row2), dim=-2)

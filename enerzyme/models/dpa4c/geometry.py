@@ -16,6 +16,7 @@ import torch
 from torch import Tensor
 
 from ..mp.basis.angular import spherical_harmonics
+from ..mp.equivariant.cartesian import packed_l2_to_stf
 from ..mp.equivariant.gaunt import DegreeTriple, cached_couplings, coupling_tables, enumerate_degree_triples
 
 
@@ -102,27 +103,6 @@ def invariant_width(channels: int, lmax: int) -> int:
 def cartesian_harmonics(direction: Tensor, lmax: int) -> Tensor:
     """DPA4C solid harmonics with Cartesian degree one and increasing m above it."""
     return spherical_harmonics(direction, lmax=lmax, layout="dpa4c", normalize_input=False)
-
-
-def packed_l2_to_stf(packed: Tensor) -> Tensor:
-    """Map normalized degree-two coefficients to symmetric traceless matrices.
-
-    The map is an isometry from the Euclidean product on ``R^5`` to the
-    Frobenius product.
-    """
-    inv_sqrt_two = 1.0 / math.sqrt(2.0)
-    inv_sqrt_six = 1.0 / math.sqrt(6.0)
-    q0, q1, q2, q3, q4 = packed.unbind(dim=-1)
-    qxy = q0 * inv_sqrt_two
-    qyz = q1 * inv_sqrt_two
-    qxz = q3 * inv_sqrt_two
-    qxx = -q2 * inv_sqrt_six + q4 * inv_sqrt_two
-    qyy = -q2 * inv_sqrt_six - q4 * inv_sqrt_two
-    qzz = 2.0 * q2 * inv_sqrt_six
-    row0 = torch.stack((qxx, qxy, qxz), dim=-1)
-    row1 = torch.stack((qxy, qyy, qyz), dim=-1)
-    row2 = torch.stack((qxz, qyz, qzz), dim=-1)
-    return torch.stack((row0, row1, row2), dim=-2)
 
 
 def probe_entries(

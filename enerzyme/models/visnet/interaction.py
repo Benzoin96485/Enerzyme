@@ -27,7 +27,7 @@ from torch.nn import LayerNorm, Linear, Module
 
 from ..mp.nn.field_norm import VECNORM_TYPES, VecLayerNorm, normalize_vecnorm_type  # noqa: F401
 from ..mp.ops import scatter_sum
-from ..mp.ops.rejection import vector_rejection
+from ..mp.equivariant.body_order import rejection_inner
 
 
 VERTEX_TYPES = ("none", "edge", "node")
@@ -91,17 +91,6 @@ class EdgeEmbedding(Module):
     ) -> Tensor:
         mixed = scalar.index_select(0, idx_i) + scalar.index_select(0, idx_j)
         return mixed * self.edge_proj(rbf)
-
-
-def _rejection_inner(
-    left: Tensor,
-    right: Tensor,
-    direction: Tensor,
-) -> Tensor:
-    """Inner product of the two rejections. Shape ``[E, C]``."""
-    rejected_left = vector_rejection(left, direction)
-    rejected_right = vector_rejection(right, -direction)
-    return (rejected_left * rejected_right).sum(dim=1)
 
 
 class ViSInteraction(Module):
@@ -197,7 +186,7 @@ class ViSInteraction(Module):
     def _receiver_angle(self, receiver: Tensor, direction: Tensor) -> Tensor:
         if self.t_src_proj is None or self.t_trg_proj is None:
             raise RuntimeError("receiver angle requested without t projections")
-        return _rejection_inner(
+        return rejection_inner(
             self.t_trg_proj(receiver),
             self.t_src_proj(receiver),
             direction,
@@ -217,7 +206,7 @@ class ViSInteraction(Module):
             or self.w_trg_proj is None
         ):
             raise RuntimeError("edge residual requested on the last layer")
-        dihedral = _rejection_inner(
+        dihedral = rejection_inner(
             self.w_trg_proj(vector.index_select(0, idx_i)),
             self.w_src_proj(vector.index_select(0, idx_j)),
             direction,
