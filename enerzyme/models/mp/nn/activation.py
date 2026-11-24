@@ -1,7 +1,7 @@
 import math
 from abc import ABC, abstractmethod
 from functools import partial
-from typing import Literal, Dict, Union, Callable
+from typing import Any, Callable, Dict, Literal, Mapping, Optional, Union
 import torch
 import torch.nn.functional as F
 from torch import Tensor
@@ -240,21 +240,34 @@ class Swish(BaseScaledTemperedActivation):
         return self.alpha * x * torch.sigmoid(self.beta * x)
 
 
+def _normalized_activation(f: Callable[[Tensor], Tensor]) -> Module:
+    from e3nn.math import normalize2mom
+    return normalize2mom(f)
+
+
+def _s2_activation(lmax: int, mmax: int, act_name: str = "s2", **options) -> Module:
+    from ..equivariant.s2.activation_v3 import get_activation
+    return get_activation(act_name, lmax, mmax, **options)
+
+
 ACTIVATION_REGISTER = {
     "shifted_softplus": ShiftedSoftplus,
     "swish": Swish,
     "relu_like": ReluLike,
     "tanh_like": TanhLike,
+    "silu": torch.nn.SiLU,
+    "ssp": ShiftedSoftplus,
+    "swiglu": SwiGLU,
+    "normalize2mom": _normalized_activation,
+    "s2": _s2_activation,
 }
-ACTIVATION_KEY_TYPE = Literal["shifted_softplus", "swish", "relu_like", "tanh_like"]
+ACTIVATION_KEY_TYPE = Literal["shifted_softplus", "swish", "relu_like", "tanh_like",
+                              "silu", "ssp", "swiglu", "normalize2mom", "s2"]
 ACTIVATION_PARAM_TYPE = Dict[Literal["dim_feature", "initial_alpha", "initial_beta", "learnable"], Union[int, float, bool]]
 
 
-def get_activation_fn(
-    key: ACTIVATION_KEY_TYPE, 
-    activation_params: ACTIVATION_PARAM_TYPE=dict()
-) -> BaseScaledTemperedActivation:
-    return ACTIVATION_REGISTER[key](**activation_params)
+def get_activation_fn(key: ACTIVATION_KEY_TYPE, activation_params: Optional[Mapping[str, Any]] = None) -> Module:
+    return ACTIVATION_REGISTER[key](**(activation_params or {}))
 
 
 POSITIVE_ACTIVATION_REGISTER = {

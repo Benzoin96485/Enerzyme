@@ -5,7 +5,7 @@ from torch import Tensor
 from torch.nn import Module, init, Sequential, Parameter, Dropout
 import torch.nn.functional as F
 import torch
-from .activation import get_activation_fn, ACTIVATION_PARAM_TYPE, ACTIVATION_KEY_TYPE
+from .activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE, get_activation_fn, shifted_softplus
 from ...init import semi_orthogonal_glorot_weights
 
 
@@ -203,7 +203,7 @@ class _ShiftedSoftplus(Module):
     """``softplus(x) - log(2)``, zero at the origin."""
 
     def forward(self, x: Tensor) -> Tensor:
-        return F.softplus(x) - math.log(2.0)
+        return shifted_softplus(x)
 
 
 def _variance_nonlinearity(name: Optional[str]) -> Optional[type]:

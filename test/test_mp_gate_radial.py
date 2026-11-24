@@ -11,6 +11,20 @@ from enerzyme.models.mp.nn.activation import SwiGLU
 from enerzyme.models.mp.nn.radial_mlp import RadialMLP
 
 
+def test_public_activation_registry_resolves_scalar_and_grid_nonlinearities():
+    from e3nn.math import normalize2mom
+    from enerzyme.models.activation import get_activation_fn
+    from enerzyme.models.mp.equivariant.s2.activation_v3 import S2Activation
+
+    x = torch.linspace(-2, 2, 16, dtype=torch.float64)
+    torch.testing.assert_close(get_activation_fn("silu")(x), F.silu(x))
+    torch.testing.assert_close(get_activation_fn("ssp")(x), F.softplus(x) - torch.log(x.new_tensor(2.)))
+    torch.testing.assert_close(get_activation_fn("normalize2mom", {"f": F.silu})(x), normalize2mom(F.silu)(x))
+    grid = get_activation_fn("s2", {"lmax": 1, "mmax": 1}).double()
+    harmonics = x.reshape(2, 4, 2)
+    torch.testing.assert_close(grid(harmonics), S2Activation(1, 1).double()(harmonics))
+
+
 def test_e3nn_radial_output_and_derivatives():
     kernel = RadialMLP([4, 7, 3], e3nn_style=True).double()
     ref = FullyConnectedNet([4, 7, 3], F.silu).double()
