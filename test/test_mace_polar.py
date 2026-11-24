@@ -388,3 +388,25 @@ def _run(model, positions, atomic_numbers, batch, charge=None, spin=None):
     if spin is not None:
         payload["S"] = spin
     return model(payload)
+
+
+def test_analytic_polar_stack_rotates_dipoles_features_and_forces():
+    from enerzyme.models.ff import build_model
+
+    torch.manual_seed(68)
+    model = build_model("mace_polar", _polar_layers(electrostatics_backend="analytic"), _build(), verbose=0).double()
+    model.eval()
+    xyz = torch.tensor([[0., 0., 0.], [1.12, -.2, .1], [-.15, .93, .32]], dtype=torch.float64)
+    za = torch.tensor([8, 1, 1])
+    batch = torch.zeros(3, dtype=torch.long)
+    ref = _run(model, xyz.clone().requires_grad_(), za, batch)
+    axis = xyz.new_tensor([.37, -.18, .86])
+    R = torch.linalg.matrix_exp(torch.linalg.cross(axis.expand(3, -1), torch.eye(3, dtype=xyz.dtype)))
+    for transform in (R, -R):
+        out = _run(model, (xyz @ transform.T).requires_grad_(), za, batch)
+        for key in ("E", "Qa", "Sa", "E_nonlocal_a", "E_coulomb_a"):
+            torch.testing.assert_close(out[key], ref[key], atol=2e-7, rtol=1e-7)
+        for key in ("dipole", "Fa"):
+            torch.testing.assert_close(out[key], ref[key] @ transform.T, atol=2e-7, rtol=1e-7)
+        transformed = ref["spin_multipole"] @ o3.Irreps("1x0e+1x1o").D_from_matrix(transform).T
+        torch.testing.assert_close(out["spin_multipole"], transformed, atol=2e-7, rtol=1e-7)
