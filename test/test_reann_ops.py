@@ -18,6 +18,7 @@ from enerzyme.models.reann.density import (
     cartesian_angular,
     default_n_orbit,
     embedded_atom_density,
+    invariant_orbital_density,
     squared_cosine_window,
     validate_species,
 )
@@ -103,6 +104,21 @@ def test_orbit_width_and_cartesian_channel_order():
             torch.einsum("ji,ki->jki", released[-1], direction).reshape(-1, vectors.shape[0])
         )
     assert_allclose(angular.numpy(), torch.cat(released, dim=0).numpy())
+
+
+def test_shellwise_density_matches_channel_contraction_and_gradients():
+    generator = torch.Generator().manual_seed(18)
+    angular = angular_momentum_index(3)
+    orbitals = torch.randn(3, angular.numel(), 4, generator=generator, dtype=torch.float64, requires_grad=True)
+    weights = torch.randn(4, 4, 7, generator=generator, dtype=torch.float64, requires_grad=True)
+    gradients = []
+    for ordered in (False, True):
+        out = invariant_orbital_density(orbitals, weights, angular, ordered_shells=ordered)
+        first = torch.autograd.grad(out.square().mean(), (orbitals, weights), create_graph=True)
+        mixed = torch.autograd.grad(first[0].sum(), weights)[0]
+        gradients.append((out, *first, mixed))
+    for reference, actual in zip(*gradients):
+        torch.testing.assert_close(actual, reference, atol=1e-10, rtol=1e-12)
 
 
 def test_density_is_a_coherent_square_of_neighbor_orbitals():

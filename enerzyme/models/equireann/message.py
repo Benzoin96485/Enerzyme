@@ -42,4 +42,4 @@ def add_neighbor_orbital(
             f"idx_j has length {idx_j.shape[0]} but pair has {pair.shape[0]} edges"
         )
     scale = window.reshape(-1).to(dtype=pair.dtype, device=pair.device).unsqueeze(-1).unsqueeze(-1)
-    return pair + psi.index_select(0, idx_j.long()) * scale
+    return torch.addcmul(pair, psi[idx_j.long()], scale)

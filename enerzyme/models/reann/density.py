@@ -79,7 +79,7 @@ def cartesian_angular(vectors: Tensor, window: Tensor, lmax: int) -> Tensor:
 
 def validate_species(species: Tensor, maximum: int, field: str) -> None:
     message = f"{field} must lie in 0..{maximum}"
-    if torch.compiler.is_compiling():
+    if species.is_cuda or torch.compiler.is_compiling():
         torch._assert_async(((species >= 0) & (species <= maximum)).all(), message)
     elif species.numel():
         low, high = torch.aminmax(species)
@@ -174,6 +174,8 @@ def invariant_orbital_density(
     accumulated: Tensor,
     hyper: Tensor,
     l_of_channel: Tensor,
+    *,
+    ordered_shells: bool = False,
 ) -> Tensor:
     """Square of the shell-shared contraction. Shape ``[N, n_orbit]``.
 
@@ -203,6 +205,21 @@ def invariant_orbital_density(
             f"orbitals have {accumulated.shape[1]} angular channels, "
             f"l_of_channel has {int(l_of_channel.numel())}"
         )
+    if ordered_shells:
+        # All 3**degree Cartesian components use exactly the same radial
+        # weights. One GEMM per shell also accumulates their weight gradients
+        # directly, without duplicating the hyper matrix for each component.
+        result = None
+        offset = 0
+        for degree in range(n_shell):
+            width = 3 ** degree
+            block = accumulated.narrow(1, offset, width)
+            projected = block.flatten(0, 1) @ hyper[degree].to(accumulated)
+            density = projected.view(block.shape[0], width, hyper.shape[-1]).square().sum(dim=1)
+            result = density if result is None else result + density
+            offset += width
+        return result
+
     shell = hyper.to(dtype=accumulated.dtype, device=accumulated.device).index_select(
         0, l_of_channel.to(device=accumulated.device)
     )

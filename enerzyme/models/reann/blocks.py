@@ -76,7 +76,7 @@ class OrbitalEmbed(Embed):
         )
         psi = aggregate_weighted_orbitals(pair, coeff, ctx.receiver, ctx.sender, ctx.num_nodes)
         first = self.hyper[0] if self.hyper.ndim == 4 else self.hyper
-        density = invariant_orbital_density(psi, first, self.l_of_channel)
+        density = invariant_orbital_density(psi, first, self.l_of_channel, ordered_shells=True)
         return BlockState(scalar=density, equi=(coeff, species, psi), edge=(pair, window, self.hyper, self.l_of_channel))
 
 
@@ -97,7 +97,7 @@ class OrbitalUpdate(SpeciesMLP):
             pair = add_neighbor_orbital(pair, psi, ctx.sender, window)
             contraction = hyper[self.orbital_step]
         psi = aggregate_weighted_orbitals(pair, coeff, ctx.receiver, ctx.sender, ctx.num_nodes)
-        density = invariant_orbital_density(psi, contraction, shell)
+        density = invariant_orbital_density(psi, contraction, shell, ordered_shells=True)
         return BlockState(scalar=density, equi=(coeff, species, psi), edge=(pair, window, hyper, shell))
 
 
