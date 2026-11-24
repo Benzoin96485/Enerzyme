@@ -160,6 +160,13 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
               "compile_reference": compile_reference, **metadata}
     if device.type == "cuda":
         result["device_name"] = torch.cuda.get_device_name(device)
+    if result["compile"]:
+        from torch._dynamo.utils import counters
+        result["compile_capture"] = {}
+
+    def captured():
+        stats = counters["stats"]
+        return stats["unique_graphs"], stats["calls_captured"]
 
     def sync():
         if device.type == "cuda":
@@ -197,6 +204,8 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
         batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
         entry = result[name] = {}
         for mode in ("infer", "train"):
+            if result["compile"]:
+                before_graphs, before_calls = captured()
             try:
                 entry.update(measure(batch, mode))
             except (RuntimeError, ValueError, TypeError) as exc:
@@ -205,6 +214,12 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
                 model.zero_grad(set_to_none=True)
                 if device.type == "cuda":
                     torch.cuda.empty_cache()
+            if result["compile"]:
+                graphs, calls = captured()
+                # A zero delta can also mean that a previous graph was reused.
+                result["compile_capture"].setdefault(name, {})[mode] = {
+                    "new_graphs": graphs - before_graphs, "new_calls": calls - before_calls,
+                }
             print("BENCH_PROGRESS " + json.dumps(result), flush=True)
     result["rss_mb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
     return result
