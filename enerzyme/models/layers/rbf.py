@@ -57,3 +57,7 @@ class BesselRBFLayer(radial.BesselBasis, BaseRBF):
 
 class ExpNormalSmearing(radial.ExpNormalBasis, _RadialLayer):
     pass
+
+
+class SphericalBesselRBFLayer(radial.SphericalBesselBasis, BaseRBF):
+    pass

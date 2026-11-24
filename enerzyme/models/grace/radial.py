@@ -15,13 +15,13 @@ which that layer leaves as a division by ``r``.
 from __future__ import annotations
 
 import math
-from typing import List
 
 import torch
 from torch import Tensor
 from torch.nn import Linear, Module, Sequential, SiLU, Tanh
 
 from ..mp.basis.envelope import powered_cosine_window
+from ..mp.basis.radial import chebyshev_first
 
 
 def chebyshev_basis(distance: Tensor, n_basis: int, cutoff: float) -> Tensor:
@@ -29,12 +29,7 @@ def chebyshev_basis(distance: Tensor, n_basis: int, cutoff: float) -> Tensor:
     if n_basis < 1:
         raise ValueError(f"n_basis must be >= 1, got {n_basis}")
     argument = 2.0 * (distance / cutoff) - 1.0
-    columns: List[Tensor] = [torch.ones_like(argument)]
-    if n_basis > 1:
-        columns.append(argument)
-    for _ in range(2, n_basis):
-        columns.append(2.0 * argument * columns[-1] - columns[-2])
-    return torch.stack(columns, dim=-1)
+    return chebyshev_first(n_basis - 1, argument, dim=-1)
 
 
 def spherical_bessel_basis(distance: Tensor, n_basis: int, cutoff: float) -> Tensor:

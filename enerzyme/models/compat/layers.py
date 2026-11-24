@@ -4,10 +4,10 @@
 :mod:`enerzyme.models.layers`, so ``main`` model sections build unchanged.
 """
 
-import torch
 from torch import Tensor
 
 from ..layers import BaseFFLayer
+from ..mp.basis.radial import gaussian_expansion, gaussian_grid
 
 
 class GaussianSmearing(BaseFFLayer):
@@ -20,13 +20,11 @@ class GaussianSmearing(BaseFFLayer):
 
     def __init__(self, num_rbf: int, cutoff_sr: float, cuton: float = 0.0) -> None:
         super().__init__(input_fields={"Dij_sr"}, output_fields={"rbf"})
-        offset = torch.linspace(cuton, cutoff_sr, num_rbf)
-        self.coeff = -0.5 / (offset[1] - offset[0]).item() ** 2
+        offset, self.coeff = gaussian_grid(cuton, cutoff_sr, num_rbf, 1.0)
         self.register_buffer("offset", offset)
 
     def get_rbf(self, Dij_sr: Tensor) -> Tensor:
-        dist = Dij_sr.view(-1, 1) - self.offset.view(1, -1)
-        return torch.exp(self.coeff * torch.pow(dist, 2))
+        return gaussian_expansion(Dij_sr, self.offset, self.coeff)
 
 
 LEGACY_LAYERS = {"GaussianSmearing": GaussianSmearing}

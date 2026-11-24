@@ -13,7 +13,8 @@ from torch import Tensor, nn
 from torch.nn import Parameter
 
 from ...functional import softplus_inverse
-from .envelope import C3CutoffEnvelope, CUTOFF_KEY_TYPE, CUTOFF_REGISTER
+from .envelope import C3CutoffEnvelope, CUTOFF_KEY_TYPE, CUTOFF_REGISTER, polynomial_envelope
+from .fourier_bessel import spherical_bessel_expansion, register_bessel_tables
 
 
 class DistanceBasis(nn.Module):
@@ -118,9 +119,38 @@ def spinconv_gaussian_terms(
     return centers, coeff
 
 
-def gaussian_expansion(distance: Tensor, center: Tensor, coeff: Tensor) -> Tensor:
+def gaussian_expansion(distance: Tensor, center: Tensor, coeff: Tensor | float) -> Tensor:
     """``exp(coeff · (r - μ)²)`` for every center."""
     return torch.exp(coeff * (distance.reshape(-1, 1) - center) ** 2)
+
+
+def gaussian_grid(start: float, stop: float, count: int, width: float) -> tuple[Tensor, float]:
+    """SchNet/fairchem offsets and Python-precision coefficient on the native grid."""
+    if count < 2 or width <= 0 or start == stop:
+        raise ValueError("Gaussian smearing requires two distinct centers and a positive width")
+    offset = torch.linspace(start, stop, count)
+    coeff = -0.5 / (width * (offset[1] - offset[0])).item() ** 2
+    return offset, coeff
+
+
+class GaussianSmearing(nn.Module):
+    """Fairchem Gaussian grid, optionally retaining the atom/fragment dimensions."""
+
+    def __init__(
+        self, start: float = -5.0, stop: float = 5.0, num_gaussians: int = 50,
+        basis_width_scalar: float = 1.0, *, preserve_shape: bool = False,
+    ) -> None:
+        super().__init__()
+        self.num_output = num_gaussians
+        self.preserve_shape = preserve_shape
+        offset, self.coeff = gaussian_grid(start, stop, num_gaussians, basis_width_scalar)
+        self.register_buffer("offset", offset)
+
+    def forward(self, distance: Tensor) -> Tensor:
+        values = gaussian_expansion(distance, self.offset, self.coeff)
+        if self.preserve_shape:
+            return values.reshape(*distance.shape, self.num_output)
+        return values
 
 
 def gemnet_oc_gaussian_terms(
@@ -1063,3 +1093,167 @@ class BesselC3RadialBasis(nn.Module):
         if not self.apply_envelope:
             return raw
         return raw * self.envelope(r)
+
+
+class SphericalBesselBasis(DistanceBasis):
+    """M3GNet bond expansion. YAML name: ``SphericalBesselRBF``.
+
+    ``num_rbf`` is the radial count ``max_n``. ``max_l`` is the number of
+    spherical orders ``l = 0 … max_l - 1``. The output width is
+    ``max_l * num_rbf``. ``apply_cutoff_fn`` stays off: a cutoff envelope on
+    this basis is not the M3GNet three-body weight.
+    """
+
+    def __init__(
+        self,
+        num_rbf: int,
+        cutoff_sr: float,
+        max_l: int = 3,
+        cutoff_fn: Optional[str] = None,
+        apply_cutoff_fn: bool = False,
+    ) -> None:
+        if apply_cutoff_fn:
+            raise ValueError(
+                "SphericalBesselRBF does not apply a cutoff envelope. "
+                "M3GNetCore multiplies the three-body term by a polynomial cutoff."
+            )
+        if int(max_l) < 1:
+            raise ValueError(f"max_l must be >= 1, got {max_l}")
+        if int(num_rbf) < 1 or int(num_rbf) > 64:
+            raise ValueError(f"num_rbf must lie in 1..64, got {num_rbf}")
+        if float(cutoff_sr) <= 0:
+            raise ValueError(f"cutoff_sr must be positive, got {cutoff_sr}")
+        super().__init__(
+            int(num_rbf),
+            float(cutoff_sr),
+            cutoff_fn,
+            apply_cutoff_fn=False,
+        )
+        self.max_l = int(max_l)
+        self.flavor = "m3gnet"
+        self.degree = self.max_l * self.num_rbf
+        register_bessel_tables(self, self.max_l, self.num_rbf)
+
+    def _get_rbf(self, Dij: Tensor) -> Tensor:
+        return spherical_bessel_expansion(
+            Dij, self.zeros, self.normalizer, self.cutoff_sr
+        )
+
+
+def chebyshev_first(degree: int, x: Tensor, dim: int = 0) -> Tensor:
+    """``T_0, ..., T_degree`` stacked on the requested axis."""
+    if degree < 0:
+        raise ValueError(f"degree must be >= 0, got {degree}")
+    columns = [torch.ones_like(x)]
+    if degree == 0:
+        return columns[0].unsqueeze(dim)
+    columns.append(x)
+    for _ in range(2, degree + 1):
+        columns.append(2.0 * x * columns[-1] - columns[-2])
+    return torch.stack(columns, dim=dim)
+
+
+class SpeciesPairChebyshev(nn.Module):
+    """``B_u(r, zi, zj) = envelope(r) Σ_β c[zi, zj, u, β] T_β(r / cutoff)``.
+
+    ``zi`` and ``zj`` are compact species indices, not atomic numbers. The
+    caller owns that table so several layers can share one vocabulary.
+    """
+
+    def __init__(
+        self,
+        n_channels: int,
+        n_species: int,
+        degree: int,
+        cutoff: float,
+        envelope_p: int,
+    ) -> None:
+        super().__init__()
+        if int(n_channels) < 1:
+            raise ValueError(f"n_channels must be >= 1, got {n_channels}")
+        if int(n_species) < 1:
+            raise ValueError(f"n_species must be >= 1, got {n_species}")
+        if int(degree) < 0:
+            raise ValueError(f"degree must be >= 0, got {degree}")
+        if float(cutoff) <= 0:
+            raise ValueError(f"cutoff must be positive, got {cutoff}")
+        if int(envelope_p) < 1:
+            raise ValueError(f"envelope_p must be >= 1, got {envelope_p}")
+        self.n_channels = int(n_channels)
+        self.n_species = int(n_species)
+        self.degree = int(degree)
+        self.cutoff = float(cutoff)
+        self.envelope_p = int(envelope_p)
+        self.coeff = nn.Parameter(
+            torch.empty(self.n_species, self.n_species, self.n_channels, self.degree + 1)
+        )
+        bound = (self.degree + 1) ** -0.5
+        nn.init.uniform_(self.coeff, -bound, bound)
+
+    def forward(self, distance: Tensor, zi: Tensor, zj: Tensor) -> Tensor:
+        """Return ``[E, n_channels]``. Distances at or beyond the cutoff are 0."""
+        if distance.shape != zi.shape or distance.shape != zj.shape:
+            raise ValueError(
+                "distance, zi, and zj must share a shape, "
+                f"got {tuple(distance.shape)}, {tuple(zi.shape)}, {tuple(zj.shape)}"
+            )
+        basis = chebyshev_first(self.degree, distance / self.cutoff)
+        window = polynomial_envelope(distance, self.cutoff, self.envelope_p).to(
+            dtype=distance.dtype
+        )
+        # coeff rows: (E, C, degree + 1). basis: (degree + 1, E).
+        pair = self.coeff[zi.long(), zj.long()]
+        return torch.einsum("ecd,de->ec", pair, basis * window)
+
+
+class ChebyshevBasis(DistanceBasis):
+    """First-kind polynomials on r/c (CAMP) or 2r/c−1 (GRACE)."""
+
+    def __init__(self, num_rbf: int, cutoff_sr: float, shifted: bool = False) -> None:
+        if num_rbf < 1 or cutoff_sr <= 0:
+            raise ValueError("Chebyshev expansion needs a positive count and cutoff")
+        super().__init__(num_rbf, cutoff_sr, apply_cutoff_fn=False)
+        self.shifted = shifted
+
+    def _get_rbf(self, distance: Tensor) -> Tensor:
+        argument = distance / self.cutoff_sr
+        if self.shifted:
+            argument = 2.0 * argument - 1.0
+        return chebyshev_first(self.num_rbf - 1, argument, dim=-1)
+
+
+_BASIS_TYPES = {
+    "gaussian": GaussianBasis,
+    "bessel": BesselBasis,
+    "spherical_bessel": SphericalBesselBasis,
+    "chebyshev": ChebyshevBasis,
+    "bernstein": BernsteinBasis,
+    "exp_gaussian": ExponentialGaussianBasis,
+    "exp_bernstein": ExponentialBernsteinBasis,
+    "sinc": SincBasis,
+    "expnormal": ExpNormalBasis,
+}
+
+
+def RadialBasis(
+    kind: str, num_rbf: int, cutoff_sr: float, *, trainable: Optional[bool] = None, **options
+) -> DistanceBasis:
+    """Build a distance-to-feature module with its kind's native cutoff and parameters.
+
+    Bessel frequencies, Gaussian centers, sinc frequencies and exponential
+    shape parameters can be trained. Analytic polynomial and spherical-Bessel
+    tables are fixed. Omitting ``trainable`` preserves each flavor's default.
+    """
+    if kind not in _BASIS_TYPES:
+        raise ValueError(f"unknown radial basis {kind!r}; choices are {tuple(_BASIS_TYPES)}")
+    if trainable is not None and kind in ("bessel", "expnormal"):
+        options["trainable"] = trainable
+    if trainable and kind in ("bernstein", "chebyshev", "spherical_bessel"):
+        raise ValueError(f"{kind} has no trainable shape parameters")
+    basis = _BASIS_TYPES[kind](num_rbf=num_rbf, cutoff_sr=cutoff_sr, **options)
+    if trainable and kind in ("gaussian", "sinc"):
+        name = "center" if kind == "gaussian" else "factor"
+        setattr(basis, name, Parameter(getattr(basis, name)))
+    if trainable is not None and kind in ("exp_gaussian", "exp_bernstein"):
+        basis.requires_grad_(trainable)
+    return basis

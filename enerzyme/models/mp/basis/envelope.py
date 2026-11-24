@@ -234,14 +234,22 @@ class Envelope(torch.nn.Module):
     def __init__(self, kind: str = "cosine", cutoff: float = 5.0, cuton: float = 0.0,
                  exponent: int = 5) -> None:
         super().__init__()
-        if kind != "polynomial_p" and kind not in CUTOFF_REGISTER:
-            raise KeyError(f"unknown envelope {kind!r}; choose from {sorted(CUTOFF_REGISTER)} or 'polynomial_p'")
+        aliases = {"smoothstep": "polynomial", "poly9": "facto"}
+        kind = aliases.get(kind, kind)
+        if kind not in ("c3", "polynomial_p") and kind not in CUTOFF_REGISTER:
+            choices = sorted(set(CUTOFF_REGISTER) | set(aliases) | {"c3", "polynomial_p"})
+            raise KeyError(f"unknown envelope {kind!r}; choose from {choices}")
+        if kind in ("c3", "polynomial_p") and cuton != 0.0:
+            raise ValueError(f"{kind} is defined on [0, cutoff] and requires cuton=0")
+        self.c3 = C3CutoffEnvelope(cutoff, exponent) if kind == "c3" else None
         self.kind = kind
         self.cutoff = float(cutoff)
         self.cuton = float(cuton)
         self.exponent = int(exponent)
 
     def forward(self, distance: Tensor) -> Tensor:
+        if self.c3 is not None:
+            return self.c3(distance)
         if self.kind == "polynomial_p":
             return polynomial_envelope(distance, self.cutoff, self.exponent)
         return CUTOFF_REGISTER[self.kind](distance, cutoff=self.cutoff, cuton=self.cuton)
@@ -378,10 +386,8 @@ class C3CutoffEnvelope(torch.nn.Module):
         u = ((self.rcut - dst) / self.rcut).clamp(min=0.0, max=1.0)
         x = 1.0 - u
         coeffs = self.series_coefficients.to(dtype=x.dtype, device=x.device)
-        series = torch.full(
-            x.shape, float(coeffs[-1].item()), dtype=x.dtype, device=x.device
-        )
-        for coefficient in reversed(coeffs[:-1].tolist()):
+        series = coeffs[-1]
+        for coefficient in coeffs[:-1].unbind()[::-1]:
             series = coefficient + x * series
         return (u**4) * series
 
