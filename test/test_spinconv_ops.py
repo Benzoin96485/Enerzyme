@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import pytest
 import torch
 from numpy.testing import assert_allclose
 
@@ -264,6 +265,28 @@ def test_spin_pool_is_invariant_to_a_longitude_roll():
     assert float((pooled - block.pool_grid(reflected)).detach().abs().max()) > 1e-3
     empty = block.pool_grid(grid[:0])
     assert empty.shape == (0, 16)
+
+
+@pytest.mark.parametrize("longitude", [5, 6])
+def test_compiled_spin_pool_matches_grouped_circular_convolution_derivatives(longitude):
+    from enerzyme.models.spinconv.interaction import SpinConvolution
+
+    torch.manual_seed(17)
+    block = SpinConvolution(4, 8, n_lat=3, n_long=longitude, group_channels=2, cutoff=6.0).double()
+    grid = torch.randn(3, 4, 3, longitude, dtype=torch.float64, requires_grad=True)
+    target = torch.randn(3, 8, dtype=torch.float64)
+    direction = torch.randn_like(grid)
+
+    def values(run):
+        pooled = run(grid)
+        gradient = torch.autograd.grad((pooled * target).sum(), grid, create_graph=True)[0]
+        mixed = torch.autograd.grad((gradient * direction).sum(), (grid, block.conv.weight, block.conv.bias))
+        return (pooled, gradient, *mixed)
+
+    expected = values(block.pool_grid)
+    compiled = torch.compile(block.pool_grid, backend="eager", fullgraph=True)
+    for actual, reference in zip(values(compiled), expected):
+        torch.testing.assert_close(actual, reference, atol=2e-13, rtol=2e-12)
 
 
 def test_pair_scale_starts_near_identity():

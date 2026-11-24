@@ -466,4 +466,4 @@ def test_compiled_spin_force_training_uses_live_pruned_edges_and_preserves_empty
             assert torch.count_nonzero(gain)
         else:
             assert not torch.count_nonzero(actual_forces)
-    assert "conv1d" in calls and "linear" in calls
+    assert "einsum" in calls and "linear" in calls
