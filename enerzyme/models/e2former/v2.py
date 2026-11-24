@@ -1,6 +1,6 @@
 """E2Former-V2 defaults (Huang et al., 2026, arXiv:2601.16622).
 
-Reuses :class:`~enerzyme.models.e2former.core.E2FormerCore` with SO2 / EAAS
+Reuses :func:`~enerzyme.models.presets.so2.e2former` with SO2 / EAAS
 attention (:code:`attn_type: so2-first-order`) and optional Triton sparse
 kernels (:code:`tp_type: QK_alpha+triton`). Without CUDA, kernels fall back to
 PyTorch automatically. CUDA numerical parity vs that fallback is covered by
@@ -13,7 +13,7 @@ Adapted from https://github.com/IQuestLab/UBio-MolFM (MIT).
 
 from __future__ import annotations
 
-from .core import DEFAULT_BUILD_PARAMS as _V1_BUILD
+from .defaults import DEFAULT_BUILD_PARAMS as _V1_BUILD
 
 DEFAULT_BUILD_PARAMS = dict(_V1_BUILD)
 

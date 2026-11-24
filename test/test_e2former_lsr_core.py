@@ -33,7 +33,7 @@ def _random_so3(dtype=torch.float64):
 
 
 def _tiny_lsr_core(**kwargs):
-    from enerzyme.models.e2former import E2FormerLSRCore
+    from enerzyme.models.presets.so2 import e2former_lsr
 
     defaults = dict(
         dim_embedding=16,
@@ -56,7 +56,7 @@ def _tiny_lsr_core(**kwargs):
         min_nodes_per_group=2,
     )
     defaults.update(kwargs)
-    return E2FormerLSRCore(**defaults)
+    return e2former_lsr(**defaults)
 
 
 def _tiny_lsr_layer_params(**core_overrides):
@@ -351,7 +351,7 @@ def test_empty_long_neighbors_still_runs_fuse():
         min_nodes_per_group=100,
     )
     called = []
-    core.final_linear.register_forward_hook(lambda *_a, **_k: called.append(True))
+    core.head.fuse.register_forward_hook(lambda *_a, **_k: called.append(True))
     idx_i, idx_j = _complete_graph_edges(n)
     out = core.get_output(
         atom_embedding=torch.randn(n, 16),
@@ -387,17 +387,14 @@ def test_lsr_fuse_sees_prenorm_short_tower():
     cluster_ids = torch.tensor([0, 0, 1, 1, 2, 2])
 
     with torch.no_grad():
-        short_pre = core.encode_sphere_short(
-            atom_embedding,
-            Za,
-            Ra,
-            rbf,
-            idx_i,
-            idx_j,
-            vij,
-            apply_final_norm=False,
-        )["node_irreps"]
-        short_post = core.norm(short_pre)
+        inputs = dict(atom_embedding=atom_embedding, Za=Za, Ra=Ra, rbf=rbf,
+                      idx_i_sr=idx_i, idx_j_sr=idx_j, vij_sr=vij)
+        context = core.context(inputs)
+        state = core.embed(inputs, context)
+        for block in core.blocks[:core.num_layers]:
+            state = block(state, context)
+        short_pre = state.equi
+        short_post = core.head.norm(short_pre)
     # Ensure the assertion is meaningful (affine RMSNorm moves the features).
     assert not torch.allclose(short_pre, short_post, atol=1e-5, rtol=1e-5)
 
@@ -406,10 +403,10 @@ def test_lsr_fuse_sees_prenorm_short_tower():
     def _capture(_mod, inputs, _out):
         captured["short"] = inputs[0].detach().clone()
 
-    handle = core.norm_fuse_short.register_forward_hook(_capture)
+    handle = core.head.norm_short.register_forward_hook(_capture)
     try:
         with torch.no_grad():
-            core.encode_sphere_lsr(
+            core.get_output(
                 atom_embedding,
                 Za,
                 Ra,
@@ -442,8 +439,8 @@ def test_lsr_no_long_layers_applies_core_norm_once():
     core.eval()
     norm_calls = []
     fuse_calls = []
-    core.norm.register_forward_hook(lambda *_a, **_k: norm_calls.append(True))
-    core.norm_fuse_short.register_forward_hook(
+    core.head.norm.register_forward_hook(lambda *_a, **_k: norm_calls.append(True))
+    core.head.norm_short.register_forward_hook(
         lambda *_a, **_k: fuse_calls.append(True)
     )
     idx_i, idx_j = _complete_graph_edges(n)

@@ -778,3 +778,226 @@ def tece(
         num_channel=num_channel, num_elements=num_elements, target_irreps=target_irreps,
         dim_feature_out=dim_feature_out, feature_irreps=feature_irreps,
     )
+
+
+def e2former(
+    dim_embedding: int,
+    num_rbf: int,
+    max_Za: int = 94,
+    irreps_node_embedding: str = "64x0e+64x1e+64x2e",
+    irreps_head: str = "16x0e+16x1e+16x2e",
+    num_layers: int = 2,
+    num_attn_heads: int = 4,
+    attn_scalar_head: int = 32,
+    ffn_hidden_channels: int = 128,
+    max_neighbors: int = 32,
+    attn_type: str = "first-order",
+    tp_type: str = "QK_alpha",
+    norm_layer: str = "rms_norm_sh",
+    alpha_drop: float = 0.0,
+    proj_drop: float = 0.0,
+    avg_degree: float = _AVG_DEGREE,
+    use_atom_edge_embedding: bool = True,
+    grid_resolution: Optional[int] = None,
+    use_gate_act: bool = False,
+    use_grid_mlp: bool = False,
+    use_sep_s2_act: bool = True,
+    ffn_activation: str = "scaled_silu",
+    **kwargs,
+) -> ComposableCore:
+    """Apply Wigner-6j or SO(2) graph attention on bounded neighbourhoods."""
+    from e3nn import o3
+    from ..e2former.embedding import EdgeDegreeEmbeddingHigherOrder
+    from ..e2former.interaction import TransBlock
+    from ..e2former.stages import NeighborhoodEmbed, neighborhood_attention
+    from ..mp.equivariant import build_so3_grid_table, get_normalization_layer
+
+    irreps_node_embedding = o3.Irreps(irreps_node_embedding)
+    irreps_head = o3.Irreps(irreps_head)
+    if irreps_node_embedding[0][1].l != 0:
+        raise ValueError("irreps_node_embedding must start with 0e")
+    # Equal multiplicity across degrees (E2Former layout)
+    scalar_dim = irreps_node_embedding[0][0]
+    for mul, _ir in irreps_node_embedding:
+        if mul != scalar_dim:
+            raise ValueError(
+                "E2Former requires equal multiplicity across degrees; "
+                f"got {irreps_node_embedding}"
+            )
+    lmax = irreps_node_embedding[-1][1].l
+
+    dim_feature_out = scalar_dim
+    feature_irreps = f"{scalar_dim}x0e"
+
+    sphere_proj = torch.nn.Linear(dim_embedding, scalar_dim)
+    edge_deg_embed = EdgeDegreeEmbeddingHigherOrder(
+        irreps_node_embedding,
+        avg_aggregate_num=avg_degree,
+        number_of_basis=num_rbf,
+        use_atom_edge=use_atom_edge_embedding,
+        max_num_elements=max_Za + 1,
+    )
+    SO3_grid = build_so3_grid_table(
+        lmax,
+        normalization="component",
+        resolution=grid_resolution,
+        rescale_by_mmax=True,
+    )
+    blocks = []
+    for _ in range(num_layers):
+        blocks.append(
+            TransBlock(
+                irreps_node_input=irreps_node_embedding,
+                attn_weight_input_dim=num_rbf,
+                num_attn_heads=num_attn_heads,
+                attn_scalar_head=attn_scalar_head,
+                irreps_head=irreps_head,
+                SO3_grid=SO3_grid,
+                ffn_hidden_channels=ffn_hidden_channels,
+                alpha_drop=alpha_drop,
+                proj_drop=proj_drop,
+                norm_layer=norm_layer,
+                attn_type=attn_type,
+                tp_type=tp_type,
+                use_gate_act=use_gate_act,
+                use_grid_mlp=use_grid_mlp,
+                use_sep_s2_act=use_sep_s2_act,
+                ffn_activation=ffn_activation,
+                atom_type_cnt=max_Za + 1,
+            )
+        )
+    norm = get_normalization_layer(
+        norm_layer, lmax=lmax, num_channels=scalar_dim
+    )
+    use_frames = attn_type == "so2-first-order"
+    paths = getattr(blocks[0].ga.attention_order_module, "l3_sequential", None) if use_frames and blocks else None
+
+    return ComposableCore(
+        NeighborhoodEmbed(sphere_proj, edge_deg_embed, lmax, max_neighbors, use_frames, paths),
+        [FnBlock(block, neighborhood_attention) for block in blocks], SphereHead(norm),
+        GraphRequires(distances=False, optional_cutoff_values=False, fields=("Za", "Ra"), optional_fields=("batch_seg",)),
+        positional_fields=("atom_embedding", "Za", "Ra", "rbf", "idx_i_sr", "idx_j_sr", "vij_sr", "batch_seg"), architecture="e2former",
+        irreps_node_embedding=irreps_node_embedding, irreps_head=irreps_head, lmax=lmax,
+        dim_embedding=dim_embedding, num_rbf=num_rbf, num_layers=num_layers,
+        scalar_dim=scalar_dim, dim_feature_out=dim_feature_out, feature_irreps=feature_irreps,
+        max_neighbors=max_neighbors, attn_type=attn_type, tp_type=tp_type,
+        max_Za=max_Za, SO3_grid=SO3_grid,
+    )
+
+
+def e2former_lsr(
+    dim_embedding: int,
+    num_rbf: int,
+    max_Za: int = 94,
+    irreps_node_embedding: str = "64x0e+64x1e+64x2e",
+    irreps_head: str = "16x0e+16x1e+16x2e",
+    num_layers: int = 4,
+    long_layers: int = 2,
+    num_attn_heads: int = 4,
+    attn_scalar_head: int = 32,
+    ffn_hidden_channels: int = 128,
+    max_neighbors: int = 32,
+    long_max_neighbors: int = 64,
+    attn_type: str = "first-order",
+    tp_type: str = "QK_alpha",
+    norm_layer: str = "rms_norm_sh",
+    alpha_drop: float = 0.0,
+    proj_drop: float = 0.0,
+    avg_degree: float = 15.57930850982666,
+    use_atom_edge_embedding: bool = True,
+    grid_resolution: Optional[int] = None,
+    use_gate_act: bool = False,
+    use_grid_mlp: bool = False,
+    use_sep_s2_act: bool = True,
+    ffn_activation: str = "scaled_silu",
+    cutoff_lr: float = 15.0,
+    fragment_mode: str = "kmeans",
+    min_nodes_per_group: int = 24,
+    kmeans_random_state: int = 0,
+    **kwargs,
+) -> ComposableCore:
+    """Fuse the short-range representation with an atom–fragment attention tower."""
+    from ..e2former.interaction import ClusterTransBlock
+    from ..e2former.stages import FragmentGraph, FragmentHead, fragment_attention
+    from ..mp.basis.radial import GaussianSmearing
+    from ..mp.equivariant import get_normalization_layer
+    from ..mp.equivariant.sph.linear import SO3Linear
+
+    short = e2former(
+        dim_embedding=dim_embedding,
+        num_rbf=num_rbf,
+        max_Za=max_Za,
+        irreps_node_embedding=irreps_node_embedding,
+        irreps_head=irreps_head,
+        num_layers=num_layers,
+        num_attn_heads=num_attn_heads,
+        attn_scalar_head=attn_scalar_head,
+        ffn_hidden_channels=ffn_hidden_channels,
+        max_neighbors=max_neighbors,
+        attn_type=attn_type,
+        tp_type=tp_type,
+        norm_layer=norm_layer,
+        alpha_drop=alpha_drop,
+        proj_drop=proj_drop,
+        avg_degree=avg_degree,
+        use_atom_edge_embedding=use_atom_edge_embedding,
+        grid_resolution=grid_resolution,
+        use_gate_act=use_gate_act,
+        use_grid_mlp=use_grid_mlp,
+        use_sep_s2_act=use_sep_s2_act,
+        ffn_activation=ffn_activation,
+        **kwargs,
+    )
+    long_layers = int(long_layers)
+    long_max_neighbors = int(long_max_neighbors)
+    cutoff_lr = float(cutoff_lr)
+    min_nodes_per_group = max(int(min_nodes_per_group), 1)
+    kmeans_random_state = int(kmeans_random_state)
+
+    rbf_long = GaussianSmearing(0.0, cutoff_lr, num_rbf, preserve_shape=True)
+    cluster_blocks = []
+    for _ in range(long_layers):
+        cluster_blocks.append(
+            ClusterTransBlock(
+                irreps_node_input=short.irreps_node_embedding,
+                attn_weight_input_dim=num_rbf,
+                num_attn_heads=num_attn_heads,
+                attn_scalar_head=attn_scalar_head,
+                irreps_head=short.irreps_head,
+                SO3_grid=short.SO3_grid,
+                ffn_hidden_channels=ffn_hidden_channels,
+                alpha_drop=alpha_drop,
+                proj_drop=proj_drop,
+                norm_layer=norm_layer,
+                attn_type=attn_type,
+                tp_type=tp_type,
+                use_gate_act=use_gate_act,
+                use_grid_mlp=use_grid_mlp,
+                use_sep_s2_act=use_sep_s2_act,
+                ffn_activation=ffn_activation,
+                atom_type_cnt=max_Za + 1,
+            )
+        )
+    norm_fuse_short = get_normalization_layer(
+        norm_layer, lmax=short.lmax, num_channels=short.scalar_dim
+    )
+    norm_fuse_long = get_normalization_layer(
+        norm_layer, lmax=short.lmax, num_channels=short.scalar_dim
+    )
+    final_linear = SO3Linear(
+        2 * short.scalar_dim, short.scalar_dim, lmax=short.lmax
+    )
+    use_frames = attn_type == "so2-first-order" and bool(cluster_blocks)
+    paths = getattr(cluster_blocks[0].ga.attention_order_module, "l3_sequential", None) if use_frames else None
+    prepare = FragmentGraph(rbf_long, cutoff_lr, long_max_neighbors, fragment_mode, min_nodes_per_group,
+                            kmeans_random_state, use_frames, short.lmax, paths)
+    blocks = [*short.blocks, prepare, *(FnBlock(block, fragment_attention) for block in cluster_blocks)]
+    return ComposableCore(
+        short.embed, blocks, FragmentHead(short.head.norm, norm_fuse_short, norm_fuse_long, final_linear, bool(cluster_blocks)),
+        GraphRequires(distances=False, optional_cutoff_values=False, fields=("Za", "Ra"),
+                      optional_fields=("batch_seg", "cluster_ids", "cluster_centers")),
+        positional_fields=(*short.positional_fields, "cluster_ids", "cluster_centers"),
+        architecture="e2former_lsr", dim_feature_out=short.dim_feature_out, feature_irreps=short.feature_irreps,
+        dim_embedding=dim_embedding, scalar_dim=short.scalar_dim, num_layers=num_layers, num_rbf=num_rbf,
+        min_nodes_per_group=min_nodes_per_group, attn_type=attn_type, long_layers=long_layers, lmax=short.lmax,
+    )

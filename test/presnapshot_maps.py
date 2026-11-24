@@ -21,6 +21,12 @@ KEY_MAPS: Dict[str, List[Tuple[str, str]]] = {
         (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
         (r"^feedforwards\.(\d+)\.", r"blocks.\1.feedforward."),
     ],
+    "e2former": [
+        (r"^sphere_proj\.", "embed.projection."),
+        (r"^edge_deg_embed\.", "embed.degree."),
+        (r"^blocks\.(\d+)\.", r"blocks.\1.module."),
+        (r"^norm\.", "head.norm."),
+    ],
     "dpa4": [
         (r"^(radial_basis|envelope|wigner_calc|sphere_proj|radial_feat_mlp|gie|env_embed)\.", r"embed.\1."),
         (r"^blocks\.(\d+)\.", r"blocks.\1.module."),
@@ -242,8 +248,23 @@ def remap_snapshot(arch: str, old_state: Dict[str, torch.Tensor], old_param_name
     legacy = getattr(model, "architecture", None)
     if legacy in KEY_RULES and set(old_state) != set(new_state):
         return dict(convert_state_dict(legacy, old_state)[0])
-    if arch in KEY_MAPS:
-        renamed = _rename(old_state, KEY_MAPS[arch])
+
+    if arch in ("e2former_v2", "e2former_lsr"):
+        rules = list(KEY_MAPS["e2former"])
+        if arch == "e2former_lsr":
+            offset = model.num_layers
+            rules.extend([
+                (r"^rbf_long\.", f"blocks.{offset}.radial."),
+                (r"^norm_fuse_short\.", "head.norm_short."),
+                (r"^norm_fuse_long\.", "head.norm_long."),
+                (r"^final_linear\.", "head.fuse."),
+            ])
+            for index in range(model.long_layers):
+                rules.append((rf"^cluster_blocks\.{index}\.", f"blocks.{offset + 1 + index}.module."))
+    else:
+        rules = KEY_MAPS.get(arch)
+    if rules is not None:
+        renamed = _rename(old_state, rules)
         merged = dict(new_state)
         for key, value in renamed.items():
             if key in merged:
