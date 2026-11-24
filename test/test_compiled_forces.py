@@ -32,6 +32,38 @@ def test_batched_charge_dipole_and_energy_keep_empty_structures_in_fullgraph():
     torch.testing.assert_close(result["M2"], torch.tensor([[0.2, -0.2, 0.], [0., 0., 0.]]))
 
 
+def test_inductor_keeps_d4_coordination_and_charge_derivatives():
+    from enerzyme.models.layers.dispersion.grimme_d4 import GrimmeD4EnergyLayer
+    from scripts.core_harness import make_batch, random_molecules
+
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
+    za, xyz, i, j = (batch[key] for key in ("Za", "Ra", "idx_i", "idx_j"))
+    distance = (xyz[i] - xyz[j]).norm(dim=-1).requires_grad_()
+    charge = torch.zeros_like(za, dtype=xyz.dtype, requires_grad=True)
+    d4 = GrimmeD4EnergyLayer(max_Za=86).float()
+
+    def derivatives(dist, q):
+        def energy(r, charges):
+            per_atom = d4.get_E_disp_a(za, charges, r, i, j)
+            return per_atom.sum(), per_atom
+
+        total, pullback, per_atom = torch.func.vjp(energy, dist, q, has_aux=True)
+        dr, dq = pullback(torch.ones_like(total))
+        return per_atom, dr, dq
+
+    expected = derivatives(distance, charge)
+    actual = torch.compile(derivatives, fullgraph=True)(distance, charge)
+    assert expected[2].abs().max() > 1e-3
+    for output, reference in zip(actual, expected):
+        torch.testing.assert_close(output, reference, atol=2e-7, rtol=2e-5)
+    weights = (d4._s8, d4._a1, d4._a2, d4._scaleq)
+    for output, reference in zip(
+        torch.autograd.grad(actual[1].square().sum(), weights),
+        torch.autograd.grad(expected[1].square().sum(), weights),
+    ):
+        torch.testing.assert_close(output, reference, atol=2e-7, rtol=2e-5)
+
+
 def _schnet(ensemble):
     return build_model(
         "schnet",

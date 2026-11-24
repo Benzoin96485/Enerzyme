@@ -262,7 +262,12 @@ class GrimmeD4EnergyLayer(BaseFFLayer):
             )
             * gweights
         )
-        if zeta.device.type == "cpu":  # indexing is faster on CPUs
+        if zeta.device.type == "cpu" and torch.compiler.is_compiling():
+            # A single indexed read accumulates derivatives from both endpoints.
+            # Inductor's CPU fusion can drop these derivatives when lowering
+            # the two reads separately in a coordinate VJP.
+            zetai, zetaj = zeta[torch.stack((idx_i, idx_j))].unbind(0)
+        elif zeta.device.type == "cpu":  # indexing is faster on CPUs
             zetai = zeta[idx_i]
             zetaj = zeta[idx_j]
         else:  # gathering is faster on GPUs
