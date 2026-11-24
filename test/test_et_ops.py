@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import torch
 import torch.nn.functional as F
 
@@ -202,3 +203,33 @@ def test_insert_self_pairs_uses_the_radial_basis_once():
         assert "get_rbf" in str(exc)
     else:
         raise AssertionError("expected a missing radial basis to fail")
+
+
+@pytest.mark.parametrize("has_basis", [True, False])
+def test_compiled_self_pairs_for_variable_neighbor_lists(has_basis):
+    class Radial:
+        def get_rbf(self, dist):
+            return torch.stack((dist, 1 + dist), dim=-1)
+
+    radial = Radial() if has_basis else None
+    i = torch.tensor([0, 1, 2, 0, 0])
+    j = torch.tensor([0, 1, 2, 1, 0])
+    dist = torch.tensor([0., 0., 0., 1., 0.])
+
+    def select_and_insert(mask):
+        r = dist[mask]
+        return insert_missing_self_pairs(
+            3, i[mask], j[mask], r[:, None].expand(-1, 3), r,
+            torch.stack((r, 1 + r), dim=-1), 1 - r / 2,
+            enabled=True, radial_basis=radial, num_rbf=2,
+        )
+
+    compiled = torch.compile(select_and_insert, backend="eager", fullgraph=True)
+    with torch._dynamo.config.patch(capture_dynamic_output_shape_ops=True):
+        for selected in ([1, 1, 1, 1, 1], [1, 0, 0, 1, 1], [0, 0, 0, 0, 0]):
+            mask = torch.tensor(selected, dtype=torch.bool)
+            if has_basis or mask[:3].all():
+                torch.testing.assert_close(compiled(mask), select_and_insert(mask))
+            else:
+                with pytest.raises(RuntimeError, match="get_rbf"):
+                    compiled(mask)

@@ -85,7 +85,7 @@ class ETNeighborEmbedding(Module):
     ) -> Tensor:
         n_atoms = int(scalar.shape[0])
         keep = idx_i != idx_j
-        if not bool(keep.all()):
+        if torch.compiler.is_compiling() or not bool(keep.all()):
             idx_i = idx_i[keep]
             idx_j = idx_j[keep]
             rbf = rbf[keep]
