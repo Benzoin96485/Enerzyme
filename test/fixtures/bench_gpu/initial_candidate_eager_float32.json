@@ -1,0 +1,1410 @@
+{
+ "_meta": {
+  "coordinates_seed": 11,
+  "device": "Tesla V100-PCIE-32GB",
+  "driver_revision": "6d7254f",
+  "failed_runs": "Each unavailable result retains its exception. Some workers raised before returning partial results.",
+  "initialization": "torch.manual_seed(0); legacy NumPy initialization, where used, was unseeded",
+  "memory": "peak allocated MiB during the same call",
+  "mode": "eager",
+  "model_revision": "6d7254f",
+  "precision": "float32",
+  "python": "3.13.5",
+  "reps": 5,
+  "statistic": "median",
+  "systems": "acceptance",
+  "threads": 2,
+  "timings": "milliseconds; energy and forces for inference; energy-and-force loss backward for training",
+  "torch": "2.13.0+cu126",
+  "warmups": 2
+ },
+ "alignn": {
+  "bulk_256": {
+   "infer_ms": 414.32825685478747,
+   "infer_peak_mb": 18914.28466796875,
+   "train_error": "CUDA out of memory; requested 904.00 MiB"
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 44.00 MiB",
+   "train_error": "CUDA out of memory; requested 44.00 MiB"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 33.139477018266916,
+   "infer_peak_mb": 1294.021484375,
+   "train_ms": 102.56383009254932,
+   "train_peak_mb": 3153.701171875
+  },
+  "params": 153409,
+  "precision": "float32"
+ },
+ "allegro": {
+  "bulk_256": {
+   "infer_ms": 8.267906028777361,
+   "infer_peak_mb": 114.7958984375,
+   "train_ms": 20.91522002592683,
+   "train_peak_mb": 191.232421875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 24.986499920487404,
+   "infer_peak_mb": 641.623046875,
+   "train_ms": 73.28928401693702,
+   "train_peak_mb": 1129.388671875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 8.594853105023503,
+   "infer_peak_mb": 135.09912109375,
+   "train_ms": 23.015138925984502,
+   "train_peak_mb": 227.94921875
+  },
+  "params": 68478,
+  "precision": "float32"
+ },
+ "allscaip": {
+  "bulk_256": {
+   "infer_ms": 51.09046306461096,
+   "infer_peak_mb": 1136.55078125,
+   "train_error": "RuntimeError: derivative for aten::_scaled_dot_product_efficient_attention_backward is not implemented"
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 620.1310050673783,
+   "infer_peak_mb": 18163.41064453125,
+   "train_error": "RuntimeError: derivative for aten::_scaled_dot_product_efficient_attention_backward is not implemented"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 125.74470997788012,
+   "infer_peak_mb": 2495.69287109375,
+   "train_error": "RuntimeError: derivative for aten::_scaled_dot_product_efficient_attention_backward is not implemented"
+  },
+  "params": 1608690,
+  "precision": "float32"
+ },
+ "alphanet": {
+  "bulk_256": {
+   "infer_ms": 23.819274036213756,
+   "infer_peak_mb": 1183.54541015625,
+   "train_ms": 80.01697086729109,
+   "train_peak_mb": 3038.470703125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 98.47397217527032,
+   "infer_peak_mb": 7564.5322265625,
+   "train_ms": 368.85750805959105,
+   "train_peak_mb": 19625.6171875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 26.488735107704997,
+   "infer_peak_mb": 1439.1923828125,
+   "train_ms": 92.35361288301647,
+   "train_peak_mb": 3699.26953125
+  },
+  "params": 2310530,
+  "precision": "float32"
+ },
+ "botnet": {
+  "bulk_256": {
+   "infer_ms": 15.589507995173335,
+   "infer_peak_mb": 71.2890625,
+   "train_ms": 42.52131190150976,
+   "train_peak_mb": 121.08984375
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 17.47090881690383,
+   "infer_peak_mb": 379.091796875,
+   "train_ms": 50.890931161120534,
+   "train_peak_mb": 704.5595703125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 15.525972936302423,
+   "infer_peak_mb": 90.81689453125,
+   "train_ms": 41.93936102092266,
+   "train_peak_mb": 155.6328125
+  },
+  "params": 184270,
+  "precision": "float32"
+ },
+ "cace": {
+  "bulk_256": {
+   "infer_ms": 9.56070818938315,
+   "infer_peak_mb": 228.33251953125,
+   "train_ms": 24.06671899370849,
+   "train_peak_mb": 302.8759765625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 25.977818062528968,
+   "infer_peak_mb": 1440.1103515625,
+   "train_ms": 75.73780696839094,
+   "train_peak_mb": 1950.5361328125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 10.35178592428565,
+   "infer_peak_mb": 323.4365234375,
+   "train_ms": 27.785389916971326,
+   "train_peak_mb": 446.52783203125
+  },
+  "params": 69602,
+  "precision": "float32"
+ },
+ "camp": {
+  "bulk_256": {
+   "infer_ms": 27.59191091172397,
+   "infer_peak_mb": 249.51416015625,
+   "train_ms": 80.76929696835577,
+   "train_peak_mb": 529.6689453125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 35.99381004460156,
+   "infer_peak_mb": 1377.0673828125,
+   "train_ms": 122.4732759874314,
+   "train_peak_mb": 3212.42431640625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 28.441306902095675,
+   "infer_peak_mb": 302.46630859375,
+   "train_ms": 81.27353596501052,
+   "train_peak_mb": 648.228515625
+  },
+  "params": 8127507,
+  "precision": "float32"
+ },
+ "chgnet": {
+  "bulk_256": {
+   "infer_ms": 113.3606240618974,
+   "infer_peak_mb": 271.71044921875,
+   "train_ms": 150.43963002972305,
+   "train_peak_mb": 616.79150390625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 690.3760777786374,
+   "infer_peak_mb": 1678.93994140625,
+   "train_ms": 792.6586710382253,
+   "train_peak_mb": 3920.4541015625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 133.19486379623413,
+   "infer_peak_mb": 442.126953125,
+   "train_ms": 170.79985002055764,
+   "train_peak_mb": 986.09619140625
+  },
+  "params": 402652,
+  "precision": "float32"
+ },
+ "dimenet": {
+  "bulk_256": {
+   "infer_ms": 114.30650693364441,
+   "infer_peak_mb": 7524.35791015625,
+   "train_ms": 359.7111639101058,
+   "train_peak_mb": 13720.1572265625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 3.91 GiB",
+   "train_error": "CUDA out of memory; requested 22.00 MiB"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 78.27458996325731,
+   "infer_peak_mb": 4782.9873046875,
+   "train_ms": 247.1091221086681,
+   "train_peak_mb": 9216.04052734375
+  },
+  "params": 2100070,
+  "precision": "float32"
+ },
+ "dimenet++": {
+  "bulk_256": {
+   "infer_ms": 26.42358816228807,
+   "infer_peak_mb": 1031.794921875,
+   "train_ms": 78.634446952492,
+   "train_peak_mb": 2412.5029296875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 93.84665987454355,
+   "infer_peak_mb": 6064.35888671875,
+   "train_ms": 305.0961869303137,
+   "train_peak_mb": 14707.09423828125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 23.898432031273842,
+   "infer_peak_mb": 866.73388671875,
+   "train_ms": 76.64437708444893,
+   "train_peak_mb": 2304.1611328125
+  },
+  "params": 1885830,
+  "precision": "float32"
+ },
+ "dpa3": {
+  "bulk_256": {
+   "infer_ms": 12.868966907262802,
+   "infer_peak_mb": 220.72265625,
+   "train_ms": 28.690578183159232,
+   "train_peak_mb": 234.80224609375
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 31.829478917643428,
+   "infer_peak_mb": 1237.6728515625,
+   "train_ms": 63.230232102796435,
+   "train_peak_mb": 1328.75
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 12.191228102892637,
+   "infer_peak_mb": 171.4208984375,
+   "train_ms": 28.312487993389368,
+   "train_peak_mb": 185.16650390625
+  },
+  "params": 31377,
+  "precision": "float32"
+ },
+ "dpa4": {
+  "bulk_256": {
+   "infer_ms": 35.30516801401973,
+   "infer_peak_mb": 900.72900390625,
+   "train_ms": 99.59622216410935,
+   "train_peak_mb": 1624.09619140625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 124.1610839497298,
+   "infer_peak_mb": 5764.27685546875,
+   "train_ms": 392.1519957948476,
+   "train_peak_mb": 10282.19189453125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 35.592901054769754,
+   "infer_peak_mb": 1038.392578125,
+   "train_ms": 99.79912894777954,
+   "train_peak_mb": 1792.50830078125
+  },
+  "params": 341235,
+  "precision": "float32"
+ },
+ "dpa4c": {
+  "bulk_256": {
+   "infer_ms": 8.877744898200035,
+   "infer_peak_mb": 50.24658203125,
+   "train_ms": 23.01998296752572,
+   "train_peak_mb": 72.986328125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 9.057658957317472,
+   "infer_peak_mb": 224.51318359375,
+   "train_ms": 23.476788075640798,
+   "train_peak_mb": 374.00390625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 8.93039908260107,
+   "infer_peak_mb": 44.9453125,
+   "train_ms": 22.733790101483464,
+   "train_peak_mb": 66.6318359375
+  },
+  "params": 29617,
+  "precision": "float32"
+ },
+ "e2former": {
+  "bulk_256": {
+   "infer_ms": 51.51287908665836,
+   "infer_peak_mb": 401.5966796875,
+   "train_ms": 135.77929884195328,
+   "train_peak_mb": 764.10107421875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 134.09863994456828,
+   "infer_peak_mb": 2968.5087890625,
+   "train_ms": 362.99864295870066,
+   "train_peak_mb": 5782.41455078125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 91.52595791965723,
+   "infer_peak_mb": 967.4697265625,
+   "train_ms": 235.26930483058095,
+   "train_peak_mb": 1873.609375
+  },
+  "params": 561547,
+  "precision": "float32"
+ },
+ "e2former_lsr": {
+  "bulk_256": {
+   "infer_ms": 233.7281950749457,
+   "infer_peak_mb": 1194.35009765625,
+   "train_ms": 526.2271300889552,
+   "train_peak_mb": 2262.76953125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 1083.5958158131689,
+   "infer_peak_mb": 9015.6416015625,
+   "train_ms": 2168.9841251354665,
+   "train_peak_mb": 17299.70556640625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 659.899075049907,
+   "infer_peak_mb": 2897.85791015625,
+   "train_ms": 1238.3439119439572,
+   "train_peak_mb": 5550.25146484375
+  },
+  "params": 1609695,
+  "precision": "float32"
+ },
+ "e2former_v2": {
+  "error": "TypeError: 'module' object is not callable"
+ },
+ "efa": {
+  "bulk_256": {
+   "infer_ms": 19.127886975184083,
+   "infer_peak_mb": 248.58642578125,
+   "train_ms": 51.5935099683702,
+   "train_peak_mb": 482.06591796875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 38.83815812878311,
+   "infer_peak_mb": 1560.32373046875,
+   "train_ms": 113.71790780685842,
+   "train_peak_mb": 3121.88330078125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 24.380885064601898,
+   "infer_peak_mb": 1620.6865234375,
+   "train_ms": 69.10517299547791,
+   "train_peak_mb": 2295.20654296875
+  },
+  "params": 396829,
+  "precision": "float32"
+ },
+ "eqnorm": {
+  "bulk_256": {
+   "infer_ms": 17.12065003812313,
+   "infer_peak_mb": 52.36279296875,
+   "train_ms": 43.60080906189978,
+   "train_peak_mb": 105.06640625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 17.03968085348606,
+   "infer_peak_mb": 245.70751953125,
+   "train_ms": 44.163641054183245,
+   "train_peak_mb": 581.48681640625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 17.08541391417384,
+   "infer_peak_mb": 45.1826171875,
+   "train_ms": 43.88923989608884,
+   "train_peak_mb": 88.33349609375
+  },
+  "params": 3854,
+  "precision": "float32"
+ },
+ "equflash": {
+  "bulk_256": {
+   "infer_ms": 1201.108002802357,
+   "infer_peak_mb": 17080.53759765625,
+   "train_error": "CUDA out of memory; requested 302.00 MiB"
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 2.80 GiB",
+   "train_error": "CUDA out of memory; requested 2.80 GiB"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 1011.6117580328137,
+   "infer_peak_mb": 14141.57373046875,
+   "train_error": "CUDA out of memory; requested 238.00 MiB"
+  },
+  "params": 28775699,
+  "precision": "float32"
+ },
+ "equflashv2": {
+  "bulk_256": {
+   "infer_ms": 19.19347303919494,
+   "infer_peak_mb": 120.84619140625,
+   "train_ms": 51.36471404694021,
+   "train_peak_mb": 208.1826171875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 21.576430881395936,
+   "infer_peak_mb": 672.3359375,
+   "train_ms": 55.275454884395,
+   "train_peak_mb": 1234.1171875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 19.268399104475975,
+   "infer_peak_mb": 111.236328125,
+   "train_ms": 52.2051858715713,
+   "train_peak_mb": 202.40380859375
+  },
+  "params": 47984,
+  "precision": "float32"
+ },
+ "equiformer": {
+  "bulk_256": {
+   "infer_ms": 56.12828186713159,
+   "infer_peak_mb": 343.6337890625,
+   "train_ms": 152.1694869734347,
+   "train_peak_mb": 639.7724609375
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 104.73518981598318,
+   "infer_peak_mb": 2095.720703125,
+   "train_ms": 305.7138838339597,
+   "train_peak_mb": 3958.55615234375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 54.32318616658449,
+   "infer_peak_mb": 413.4736328125,
+   "train_ms": 150.9853908792138,
+   "train_peak_mb": 776.82568359375
+  },
+  "params": 112912,
+  "precision": "float32"
+ },
+ "equiformer_v2": {
+  "bulk_256": {
+   "infer_ms": 41.105262003839016,
+   "infer_peak_mb": 886.99267578125,
+   "train_ms": 107.94404800981283,
+   "train_peak_mb": 2144.5361328125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 163.33455685526133,
+   "infer_peak_mb": 5609.85986328125,
+   "train_ms": 482.85443196073174,
+   "train_peak_mb": 13882.2529296875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 45.151888160035014,
+   "infer_peak_mb": 1085.3662109375,
+   "train_ms": 122.62342683970928,
+   "train_peak_mb": 2711.20751953125
+  },
+  "params": 960513,
+  "precision": "float32"
+ },
+ "equiformer_v3": {
+  "bulk_256": {
+   "infer_ms": 39.86909193918109,
+   "infer_peak_mb": 1637.34033203125,
+   "train_ms": 113.93534997478127,
+   "train_peak_mb": 2816.4697265625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 197.64598016627133,
+   "infer_peak_mb": 10687.98974609375,
+   "train_ms": 566.1946278996766,
+   "train_peak_mb": 18569.66552734375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 50.56945513933897,
+   "infer_peak_mb": 2186.89208984375,
+   "train_ms": 145.45211801305413,
+   "train_peak_mb": 3842.90673828125
+  },
+  "params": 1895809,
+  "precision": "float32"
+ },
+ "equireann": {
+  "bulk_256": {
+   "infer_ms": 6.959129124879837,
+   "infer_peak_mb": 217.39404296875,
+   "train_ms": 19.70251905731857,
+   "train_peak_mb": 372.55517578125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 16.364952083677053,
+   "infer_peak_mb": 1317.59375,
+   "train_ms": 49.14523288607597,
+   "train_peak_mb": 2364.20703125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 6.838626926764846,
+   "infer_peak_mb": 254.0576171875,
+   "train_ms": 18.463027896359563,
+   "train_peak_mb": 452.248046875
+  },
+  "params": 188492,
+  "precision": "float32"
+ },
+ "escn": {
+  "bulk_256": {
+   "infer_ms": 55.71674508973956,
+   "infer_peak_mb": 1803.3486328125,
+   "train_ms": 167.25506098009646,
+   "train_peak_mb": 4736.55810546875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 270.9757690317929,
+   "infer_peak_mb": 11220.9375,
+   "train_error": "CUDA out of memory; requested 860.00 MiB"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 48.57853287830949,
+   "infer_peak_mb": 1491.501953125,
+   "train_ms": 142.21855904906988,
+   "train_peak_mb": 3951.9072265625
+  },
+  "params": 836161,
+  "precision": "float32"
+ },
+ "esen": {
+  "bulk_256": {
+   "infer_ms": 32.34974201768637,
+   "infer_peak_mb": 386.71337890625,
+   "train_ms": 81.69483998790383,
+   "train_peak_mb": 654.267578125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 106.18813592009246,
+   "infer_peak_mb": 2292.255859375,
+   "train_ms": 277.68453978933394,
+   "train_peak_mb": 3983.34521484375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 31.762957107275724,
+   "infer_peak_mb": 313.63916015625,
+   "train_ms": 80.89048811234534,
+   "train_peak_mb": 540.9775390625
+  },
+  "params": 55845,
+  "precision": "float32"
+ },
+ "et": {
+  "bulk_256": {
+   "infer_ms": 15.037351986393332,
+   "infer_peak_mb": 594.35302734375,
+   "train_ms": 45.09331611916423,
+   "train_peak_mb": 1457.26953125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 55.81282894127071,
+   "infer_peak_mb": 3798.3369140625,
+   "train_ms": 185.82540401257575,
+   "train_peak_mb": 9482.0751953125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 16.55315887182951,
+   "infer_peak_mb": 782.68505859375,
+   "train_ms": 51.62804084829986,
+   "train_peak_mb": 1935.2216796875
+  },
+  "params": 1260417,
+  "precision": "float32"
+ },
+ "facto": {
+  "bulk_256": {
+   "infer_ms": 40.454882895573974,
+   "infer_peak_mb": 433.7236328125,
+   "train_ms": 109.31525193154812,
+   "train_peak_mb": 974.94091796875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 74.54347889870405,
+   "infer_peak_mb": 2502.26611328125,
+   "train_ms": 231.5447039436549,
+   "train_peak_mb": 5984.8896484375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 40.785625111311674,
+   "infer_peak_mb": 456.67724609375,
+   "train_ms": 108.31685201264918,
+   "train_peak_mb": 1004.52392578125
+  },
+  "params": 4537400,
+  "precision": "float32"
+ },
+ "freecg": {
+  "bulk_256": {
+   "infer_ms": 201.29932486452162,
+   "infer_peak_mb": 18191.3330078125,
+   "train_error": "CUDA out of memory; requested 256.00 MiB"
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 368.00 MiB",
+   "train_error": "CUDA out of memory; requested 368.00 MiB"
+  },
+  "mol_batch_32x20": {
+   "infer_error": "CUDA out of memory; requested 2.50 GiB",
+   "train_error": "CUDA out of memory; requested 2.50 GiB"
+  },
+  "params": 18959433,
+  "precision": "float32"
+ },
+ "gemnet": {
+  "bulk_256": {
+   "infer_ms": 48.976847901940346,
+   "infer_peak_mb": 1772.8486328125,
+   "train_ms": 145.86913888342679,
+   "train_peak_mb": 4327.82470703125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 206.2678849324584,
+   "infer_peak_mb": 10460.125,
+   "train_ms": 639.1791980713606,
+   "train_peak_mb": 26013.26513671875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 41.595204966142774,
+   "infer_peak_mb": 1448.19091796875,
+   "train_ms": 127.69714905880392,
+   "train_peak_mb": 3749.25830078125
+  },
+  "params": 1892550,
+  "precision": "float32"
+ },
+ "gemnet-oc": {
+  "bulk_256": {
+   "infer_error": "CUDA out of memory; requested 9.88 GiB",
+   "train_error": "CUDA out of memory; requested 9.88 GiB"
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 44.64 GiB",
+   "train_error": "CUDA out of memory; requested 44.64 GiB"
+  },
+  "mol_batch_32x20": {
+   "infer_error": "CUDA out of memory; requested 9.15 GiB",
+   "train_error": "CUDA out of memory; requested 9.15 GiB"
+  },
+  "params": 28013568,
+  "precision": "float32"
+ },
+ "gemnet-q": {
+  "bulk_256": {
+   "infer_error": "CUDA out of memory; requested 7.02 GiB",
+   "train_error": "CUDA out of memory; requested 7.02 GiB"
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 2.09 GiB",
+   "train_error": "CUDA out of memory; requested 2.09 GiB"
+  },
+  "mol_batch_32x20": {
+   "infer_error": "CUDA out of memory; requested 10.16 GiB",
+   "train_error": "CUDA out of memory; requested 10.16 GiB"
+  },
+  "params": 2158726,
+  "precision": "float32"
+ },
+ "geodite": {
+  "bulk_256": {
+   "infer_ms": 58.59053204767406,
+   "infer_peak_mb": 2728.2177734375,
+   "train_ms": 184.65348705649376,
+   "train_peak_mb": 5114.86328125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 297.6832038257271,
+   "infer_peak_mb": 16878.77001953125,
+   "train_error": "CUDA out of memory; requested 308.00 MiB"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 51.9668769557029,
+   "infer_peak_mb": 2269.43603515625,
+   "train_ms": 160.00461601652205,
+   "train_peak_mb": 4230.24267578125
+  },
+  "params": 3623496,
+  "precision": "float32"
+ },
+ "grace": {
+  "bulk_256": {
+   "infer_ms": 43.34890400059521,
+   "infer_peak_mb": 168.96142578125,
+   "train_ms": 106.45008319988847,
+   "train_peak_mb": 266.642578125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 49.86315406858921,
+   "infer_peak_mb": 995.29638671875,
+   "train_ms": 122.23032489418983,
+   "train_peak_mb": 1678.00732421875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 44.008524157106876,
+   "infer_peak_mb": 177.25439453125,
+   "train_ms": 111.60552897490561,
+   "train_peak_mb": 334.197265625
+  },
+  "params": 212231,
+  "precision": "float32"
+ },
+ "leftnet": {
+  "bulk_256": {
+   "infer_ms": 19.21828999184072,
+   "infer_peak_mb": 1162.8115234375,
+   "train_ms": 66.67671585455537,
+   "train_peak_mb": 2996.69384765625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 86.57288295216858,
+   "infer_peak_mb": 7439.8408203125,
+   "train_ms": 328.6892760079354,
+   "train_peak_mb": 19379.65087890625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 21.9932000618428,
+   "infer_peak_mb": 1406.82763671875,
+   "train_ms": 77.5408057961613,
+   "train_peak_mb": 3633.2705078125
+  },
+  "params": 2057250,
+  "precision": "float32"
+ },
+ "m3gnet": {
+  "bulk_256": {
+   "infer_ms": 14.08706302754581,
+   "infer_peak_mb": 255.6298828125,
+   "train_ms": 43.41267282143235,
+   "train_peak_mb": 686.02001953125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 34.701860044151545,
+   "infer_peak_mb": 1545.40673828125,
+   "train_ms": 102.91017987765372,
+   "train_peak_mb": 4306.18896484375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 14.17620712891221,
+   "infer_peak_mb": 288.154296875,
+   "train_ms": 43.26198413036764,
+   "train_peak_mb": 790.076171875
+  },
+  "params": 280221,
+  "precision": "float32"
+ },
+ "mace": {
+  "bulk_256": {
+   "infer_ms": 17.873578006401658,
+   "infer_peak_mb": 113.07861328125,
+   "train_ms": 47.23932105116546,
+   "train_peak_mb": 197.6103515625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 23.986324900761247,
+   "infer_peak_mb": 637.515625,
+   "train_ms": 69.84498887322843,
+   "train_peak_mb": 1187.08740234375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 17.899919068440795,
+   "infer_peak_mb": 146.4208984375,
+   "train_ms": 47.41356405429542,
+   "train_peak_mb": 256.9365234375
+  },
+  "params": 406654,
+  "precision": "float32"
+ },
+ "mace_polar": {
+  "bulk_256": {
+   "infer_ms": 63.15211788751185,
+   "infer_peak_mb": 653.689453125,
+   "train_ms": 162.8202369902283,
+   "train_peak_mb": 1274.0244140625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 490.00 MiB",
+   "train_error": "CUDA out of memory; requested 490.00 MiB"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 109.91141805425286,
+   "infer_peak_mb": 256.583984375,
+   "train_ms": 214.41092994064093,
+   "train_peak_mb": 501.4365234375
+  },
+  "params": 529183,
+  "precision": "float32"
+ },
+ "mattersim": {
+  "bulk_256": {
+   "infer_ms": 19.31014400906861,
+   "infer_peak_mb": 270.6875,
+   "train_ms": 58.62118303775787,
+   "train_peak_mb": 711.8017578125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 40.32425791956484,
+   "infer_peak_mb": 1639.30615234375,
+   "train_ms": 118.1118090171367,
+   "train_peak_mb": 4467.99755859375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 19.402601988986135,
+   "infer_peak_mb": 306.3984375,
+   "train_ms": 58.86343913152814,
+   "train_peak_mb": 821.123046875
+  },
+  "params": 331741,
+  "precision": "float32"
+ },
+ "nequip": {
+  "bulk_256": {
+   "infer_ms": 20.652585895732045,
+   "infer_peak_mb": 148.8251953125,
+   "train_ms": 54.736093850806355,
+   "train_peak_mb": 293.45703125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 29.732657130807638,
+   "infer_peak_mb": 860.50341796875,
+   "train_ms": 89.2043448984623,
+   "train_peak_mb": 1786.935546875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 20.720286993309855,
+   "infer_peak_mb": 190.1669921875,
+   "train_ms": 54.45229611359537,
+   "train_peak_mb": 374.01220703125
+  },
+  "params": 441534,
+  "precision": "float32"
+ },
+ "nequix": {
+  "bulk_256": {
+   "infer_ms": 10.849762940779328,
+   "infer_peak_mb": 164.77734375,
+   "train_ms": 27.412390103563666,
+   "train_peak_mb": 262.18017578125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 16.381139867007732,
+   "infer_peak_mb": 937.3798828125,
+   "train_ms": 46.47159203886986,
+   "train_peak_mb": 1536.06640625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 10.85572107695043,
+   "infer_peak_mb": 136.72607421875,
+   "train_ms": 27.431203052401543,
+   "train_peak_mb": 216.017578125
+  },
+  "params": 23615,
+  "precision": "float32"
+ },
+ "newtonnet": {
+  "bulk_256": {
+   "infer_ms": 8.647511014714837,
+   "infer_peak_mb": 222.05908203125,
+   "train_ms": 24.766386952251196,
+   "train_peak_mb": 450.0400390625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 21.667129825800657,
+   "infer_peak_mb": 1316.009765625,
+   "train_ms": 66.75565196201205,
+   "train_peak_mb": 2775.77294921875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 8.67211795412004,
+   "infer_peak_mb": 265.7841796875,
+   "train_ms": 24.942156858742237,
+   "train_peak_mb": 546.7158203125
+  },
+  "params": 539264,
+  "precision": "float32"
+ },
+ "painn": {
+  "bulk_256": {
+   "infer_ms": 7.3316029738634825,
+   "infer_peak_mb": 273.44775390625,
+   "train_ms": 18.629088066518307,
+   "train_peak_mb": 419.73291015625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 19.665312953293324,
+   "infer_peak_mb": 1689.60986328125,
+   "train_ms": 56.0513180680573,
+   "train_peak_mb": 2659.75244140625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 7.470595883205533,
+   "infer_peak_mb": 336.21484375,
+   "train_ms": 19.289426039904356,
+   "train_peak_mb": 528.744140625
+  },
+  "params": 588417,
+  "precision": "float32"
+ },
+ "physnet": {
+  "bulk_256": {
+   "infer_ms": 37.55094017833471,
+   "infer_peak_mb": 590.763671875,
+   "train_ms": 78.00713600590825,
+   "train_peak_mb": 998.796875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 145.59257798828185,
+   "infer_peak_mb": 3067.67333984375,
+   "train_ms": 281.7991729825735,
+   "train_peak_mb": 5251.72314453125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 21.202862029895186,
+   "infer_peak_mb": 180.14404296875,
+   "train_ms": 52.08108411170542,
+   "train_peak_mb": 300.83056640625
+  },
+  "params": 1971014,
+  "precision": "float32"
+ },
+ "quinnet": {
+  "bulk_256": {
+   "infer_ms": 94.54215597361326,
+   "infer_peak_mb": 4868.12158203125,
+   "train_ms": 289.15798221714795,
+   "train_peak_mb": 9931.37451171875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 368.00 MiB",
+   "train_error": "CUDA out of memory; requested 368.00 MiB"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 120.70713005959988,
+   "infer_peak_mb": 6236.2119140625,
+   "train_ms": 365.95097510144114,
+   "train_peak_mb": 12709.12158203125
+  },
+  "params": 8772383,
+  "precision": "float32"
+ },
+ "reann": {
+  "bulk_256": {
+   "infer_ms": 4.880678141489625,
+   "infer_peak_mb": 42.1904296875,
+   "train_ms": 12.802551966160536,
+   "train_peak_mb": 63.5751953125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 4.859633976593614,
+   "infer_peak_mb": 188.71875,
+   "train_ms": 13.536441139876842,
+   "train_peak_mb": 336.39208984375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 4.805617965757847,
+   "infer_peak_mb": 57.5244140625,
+   "train_ms": 12.89278781041503,
+   "train_peak_mb": 92.13818359375
+  },
+  "params": 87296,
+  "precision": "float32"
+ },
+ "schnet": {
+  "bulk_256": {
+   "infer_ms": 13.68809281848371,
+   "infer_peak_mb": 123.4599609375,
+   "train_ms": 28.51438382640481,
+   "train_peak_mb": 236.4140625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 39.7962611168623,
+   "infer_peak_mb": 684.85986328125,
+   "train_ms": 75.92472899705172,
+   "train_peak_mb": 1415.65576171875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 13.364392798393965,
+   "infer_peak_mb": 142.88818359375,
+   "train_ms": 28.104942990466952,
+   "train_peak_mb": 279.05810546875
+  },
+  "params": 1027719,
+  "precision": "float32"
+ },
+ "so3krates": {
+  "bulk_256": {
+   "infer_ms": 15.11803106404841,
+   "infer_peak_mb": 204.0458984375,
+   "train_ms": 40.4116481076926,
+   "train_peak_mb": 394.58935546875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 24.796748999506235,
+   "infer_peak_mb": 1227.99951171875,
+   "train_ms": 73.92865302972496,
+   "train_peak_mb": 2478.57763671875
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 15.071423957124352,
+   "infer_peak_mb": 242.474609375,
+   "train_ms": 40.394810028374195,
+   "train_peak_mb": 475.17236328125
+  },
+  "params": 300997,
+  "precision": "float32"
+ },
+ "so3lr": {
+  "bulk_256": {
+   "infer_ms": 25.80745192244649,
+   "infer_peak_mb": 213.57080078125,
+   "train_ms": 72.36644602380693,
+   "train_peak_mb": 414.30322265625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 30.93795501627028,
+   "infer_peak_mb": 1196.2080078125,
+   "train_ms": 90.82194208167493,
+   "train_peak_mb": 2423.4912109375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 25.718238903209567,
+   "infer_peak_mb": 219.46484375,
+   "train_ms": 73.44787498004735,
+   "train_peak_mb": 427.3525390625
+  },
+  "params": 493933,
+  "precision": "float32"
+ },
+ "so3lr_efa": {
+  "bulk_256": {
+   "infer_ms": 30.12783289887011,
+   "infer_peak_mb": 254.7607421875,
+   "train_ms": 86.52510400861502,
+   "train_peak_mb": 496.3916015625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 44.533965177834034,
+   "infer_peak_mb": 1562.66455078125,
+   "train_ms": 130.04771480336785,
+   "train_peak_mb": 3063.32275390625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 33.59450586140156,
+   "infer_peak_mb": 1601.93115234375,
+   "train_ms": 89.7173909470439,
+   "train_peak_mb": 2249.0537109375
+  },
+  "params": 584813,
+  "precision": "float32"
+ },
+ "spinconv": {
+  "bulk_256": {
+   "infer_ms": 420.95914809033275,
+   "infer_peak_mb": 6228.015625,
+   "train_ms": 1479.9900790676475,
+   "train_peak_mb": 13153.9150390625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 1.75 GiB",
+   "train_error": "CUDA out of memory; requested 970.00 MiB"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 396.7837109230459,
+   "infer_peak_mb": 5637.7021484375,
+   "train_ms": 1418.5871060471982,
+   "train_peak_mb": 12393.77490234375
+  },
+  "params": 6791459,
+  "precision": "float32"
+ },
+ "spookynet": {
+  "bulk_256": {
+   "infer_ms": 31.911615980789065,
+   "infer_peak_mb": 181.560546875,
+   "train_ms": 94.72015383653343,
+   "train_peak_mb": 320.11083984375
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 35.02439893782139,
+   "infer_peak_mb": 1087.0146484375,
+   "train_ms": 101.43626388162374,
+   "train_peak_mb": 2025.0849609375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 33.07700203731656,
+   "infer_peak_mb": 269.9658203125,
+   "train_ms": 96.45558893680573,
+   "train_peak_mb": 475.14990234375
+  },
+  "params": 498540,
+  "precision": "float32"
+ },
+ "tace": {
+  "bulk_256": {
+   "infer_ms": 40.661325911059976,
+   "infer_peak_mb": 1096.1015625,
+   "train_ms": 119.10419608466327,
+   "train_peak_mb": 1583.6337890625
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 146.56415185891092,
+   "infer_peak_mb": 6742.50927734375,
+   "train_ms": 496.8668259680271,
+   "train_peak_mb": 9931.80712890625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 41.2314310669899,
+   "infer_peak_mb": 1087.6923828125,
+   "train_ms": 117.04961094073951,
+   "train_peak_mb": 1674.16015625
+  },
+  "params": 8879921,
+  "precision": "float32"
+ },
+ "tece": {
+  "bulk_256": {
+   "infer_ms": 76.15549815818667,
+   "infer_peak_mb": 2120.19970703125,
+   "train_ms": 210.6764609925449,
+   "train_peak_mb": 4072.24658203125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 376.3594070915133,
+   "infer_peak_mb": 13059.408203125,
+   "train_ms": 1054.4067090377212,
+   "train_peak_mb": 25246.89453125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 68.6779438983649,
+   "infer_peak_mb": 1840.96630859375,
+   "train_ms": 184.90856187418103,
+   "train_peak_mb": 3488.3037109375
+  },
+  "params": 7739879,
+  "precision": "float32"
+ },
+ "tensornet": {
+  "bulk_256": {
+   "infer_ms": 17.623323015868664,
+   "infer_peak_mb": 345.03955078125,
+   "train_ms": 48.225275008007884,
+   "train_peak_mb": 755.4716796875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 76.03865396231413,
+   "infer_peak_mb": 2237.810546875,
+   "train_ms": 229.7325769905001,
+   "train_peak_mb": 5024.345703125
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 25.303059024736285,
+   "infer_peak_mb": 506.0205078125,
+   "train_ms": 73.41295597143471,
+   "train_peak_mb": 1119.16015625
+  },
+  "params": 765697,
+  "precision": "float32"
+ },
+ "tensornet2": {
+  "bulk_256": {
+   "infer_ms": 25.73527698405087,
+   "infer_peak_mb": 382.12158203125,
+   "train_ms": 65.52685797214508,
+   "train_peak_mb": 819.01123046875
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 115.47352303750813,
+   "infer_peak_mb": 4115.12060546875,
+   "train_ms": 320.5037300940603,
+   "train_peak_mb": 7925.259765625
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 32.91591606102884,
+   "infer_peak_mb": 545.94677734375,
+   "train_ms": 87.5700970645994,
+   "train_peak_mb": 1195.98291015625
+  },
+  "params": 985953,
+  "precision": "float32"
+ },
+ "visnet": {
+  "bulk_256": {
+   "infer_ms": 101.84352193027735,
+   "infer_peak_mb": 4916.44970703125,
+   "train_ms": 312.9803871270269,
+   "train_peak_mb": 10536.78564453125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_error": "CUDA out of memory; requested 368.00 MiB",
+   "train_error": "CUDA out of memory; requested 368.00 MiB"
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 127.34517501667142,
+   "infer_peak_mb": 6243.65869140625,
+   "train_ms": 393.70308606885374,
+   "train_peak_mb": 13376.69775390625
+  },
+  "params": 9503745,
+  "precision": "float32"
+ },
+ "visnet_lsrm": {
+  "bulk_256": {
+   "infer_ms": 55.76654919423163,
+   "infer_peak_mb": 626.67626953125,
+   "train_ms": 116.94240313954651,
+   "train_peak_mb": 1431.5703125
+  },
+  "compile": false,
+  "device": "cuda",
+  "device_name": "Tesla V100-PCIE-32GB",
+  "large_2000": {
+   "infer_ms": 314.8505771532655,
+   "infer_peak_mb": 4099.53662109375,
+   "train_ms": 472.9643980972469,
+   "train_peak_mb": 9552.880859375
+  },
+  "mol_batch_32x20": {
+   "infer_ms": 256.8699249532074,
+   "infer_peak_mb": 830.162109375,
+   "train_ms": 355.4134890437126,
+   "train_peak_mb": 1917.453125
+  },
+  "params": 2074441,
+  "precision": "float32"
+ }
+}

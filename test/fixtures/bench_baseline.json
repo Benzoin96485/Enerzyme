@@ -3,6 +3,12 @@
   "commit": "1aa0f8b (pre-refactor devel)",
   "cpu": "Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz",
   "eager": true,
+  "gpu_acceptance_files": [
+   "bench_gpu/baseline_eager_float32.json",
+   "bench_gpu/baseline_eager_float64.json",
+   "bench_gpu/initial_candidate_eager_float32.json",
+   "bench_gpu/initial_candidate_eager_float64.json"
+  ],
   "python": "3.13.5",
   "reps": 5,
   "systems": "default unless the entry has *_small (freecg, equflash) or *_tiny (gemnet-q, gemnet-oc) keys",
