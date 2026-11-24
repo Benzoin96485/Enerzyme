@@ -65,15 +65,23 @@ def compare_step(actual, reference, dtype):
         "reference_active_parameters": len(ref_gradients),
     }
     for quantity, pairs in (
-        ("energy", [(fields["E"], ref_fields["E"])]),
-        ("force", [(fields["Fa"], ref_fields["Fa"])]),
-        ("gradient", [(gradients[k], ref_gradients[k]) for k in gradients.keys() & ref_gradients.keys()]),
+        ("energy", [("E", fields["E"], ref_fields["E"])]),
+        ("force", [("Fa", fields["Fa"], ref_fields["Fa"])]),
+        ("gradient", [(k, gradients[k], ref_gradients[k]) for k in sorted(gradients.keys() & ref_gradients.keys())]),
     ):
         atol, rtol = (1e-10, 1e-8) if dtype == torch.float64 else (3e-4, 3e-4)
         if quantity == "gradient" and dtype == torch.float32:
             atol, rtol = 7e-4, 1e-3
         error = 0.0
-        for a, b in pairs:
+        for name, a, b in pairs:
+            if a.shape != b.shape or a.dtype != b.dtype:
+                result["passed"] = False
+                result.setdefault("incompatible_tensors", {})[name] = {
+                    "actual_shape": list(a.shape), "reference_shape": list(b.shape),
+                    "actual_dtype": str(a.dtype), "reference_dtype": str(b.dtype),
+                }
+                error = None
+                continue
             if a.numel():
                 diff = (a - b).abs().max().item()
                 error = max(error, diff) if np.isfinite(diff) and error is not None else None
@@ -146,6 +154,9 @@ def compare_main_runs(paths, reference_paths):
             if gold is not None and trial is not None and not isinstance(gold, str) and not isinstance(trial, str):
                 cross = compare_step(trial, gold, dtype)
             cell["cross_native"] = cross
+            for side, value in (("baseline", gold), ("candidate", trial)):
+                if isinstance(value, str):
+                    cell.setdefault("native_reference_errors", {})[side] = value
             if not any(valid):
                 status = "neither_validated"
             elif cross is None:

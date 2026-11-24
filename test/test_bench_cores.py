@@ -147,6 +147,15 @@ def test_compiled_checkpoint_comparison_requires_cross_branch_weight_gradients(t
     mismatch = cell()
     assert mismatch["status"] == "cross_native_mismatch"
     assert mismatch["cross_native"]["different_gradient_names"] == ["other", "w"]
+    # Equal values must not pass through allclose's broadcasting or dtype conversions.
+    torch.save({("large_2000", "train"): (dict(values, E=torch.ones(1, 1)), {"w": torch.ones(1).double()})}, refs[1])
+    incompatible = cell()["cross_native"]
+    assert not incompatible["passed"]
+    assert set(incompatible["incompatible_tensors"]) == {"E", "w"}
+    torch.save({("large_2000", "train"): "missing external field"}, refs[1])
+    missing = cell()
+    assert missing["status"] == "cross_native_unavailable"
+    assert missing["native_reference_errors"]["candidate"] == "missing external field"
     paths[1].write_text(json.dumps({"schnet": dict(measurement, torch="other")}))
     with pytest.raises(ValueError, match="different torch"):
         cell()
