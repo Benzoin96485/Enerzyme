@@ -1,0 +1,569 @@
+{
+ "model": "CAMP, published water preset",
+ "device": "CPU",
+ "torch": "2.13.0+cu126",
+ "test": "scripts/check_compiled_forces.py camp. Same weights, five- and four-atom structures, seeds 142 and 107. Compare energy and force plus two external energy-coordinate derivatives in evaluation or all force-loss parameter gradients in training. FP32 atol/rtol = 7e-4/1e-3, FP64 = 1e-10/1e-8.",
+ "initial": {
+  "revision": "2354ed0",
+  "job": 6318417,
+  "inference": {
+   "float32": {
+    "fields": {
+     "E": {
+      "max_abs": 0.00014096498489379883,
+      "relative_l2": 0.00015033538964679758
+     },
+     "Fa": {
+      "max_abs": 1.8000719137489796e-08,
+      "relative_l2": 9.067964803346102e-06
+     },
+     "energy_coordinate_gradient": {
+      "max_abs": 1.8000719137489796e-08,
+      "relative_l2": 9.067964803346102e-06
+     },
+     "repeated_energy_coordinate_gradient": {
+      "max_abs": 1.8000719137489796e-08,
+      "relative_l2": 9.067964803346102e-06
+     }
+    },
+    "graphs": 9,
+    "captured_operations": 539,
+    "learned_operations": [
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear"
+    ],
+    "gradients_compared": 0,
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   },
+   "float64": {
+    "fields": {
+     "E": {
+      "max_abs": 0.0001409571060070336,
+      "relative_l2": 0.00015031960713999499
+     },
+     "Fa": {
+      "max_abs": 1.876245174477827e-08,
+      "relative_l2": 8.89484795444634e-06
+     },
+     "energy_coordinate_gradient": {
+      "max_abs": 1.876245174477827e-08,
+      "relative_l2": 8.894847954466332e-06
+     },
+     "repeated_energy_coordinate_gradient": {
+      "max_abs": 1.876245174477827e-08,
+      "relative_l2": 8.894847954466332e-06
+     }
+    },
+    "graphs": 9,
+    "captured_operations": 539,
+    "learned_operations": [
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear"
+    ],
+    "gradients_compared": 0,
+    "outside_tolerance": [
+     "E",
+     "Fa",
+     "energy_coordinate_gradient",
+     "repeated_energy_coordinate_gradient"
+    ],
+    "changed_gradient_participation": {}
+   }
+  }
+ },
+ "production_dispatch": {
+  "inference": "CPU Inductor uses expanded strided scatter indices to sum nonleading axes. The Cartesian moment model retains vectorized kernels.",
+  "training": "CPU Inductor lowers the coordinate VJP and its backward with cpp.simdlen=1, scoped to CAMP. Torch eager and GPU code paths are unchanged."
+ },
+ "diagnostics": {
+  "stage_definition": "layer_0, layer_1 and layer_2 are the three scalar feature slices supplied to the published readout. Each control uses float64.",
+  "controls": {
+   "AOT eager": {
+    "layer_0": 0.0,
+    "layer_1": 0.0,
+    "layer_2": 0.0,
+    "E": 0.0,
+    "Fa": 0.0,
+    "energy_gradient": 0.0,
+    "repeated_energy_gradient": 0.0
+   },
+   "ordinary": {
+    "job": 6318703,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 0.0003180892061403198,
+     "layer_2": 0.00012301050776943013,
+     "E": 0.0001409571060070336,
+     "Fa": 1.876245174477827e-08,
+     "energy_gradient": 1.876245174477827e-08,
+     "repeated_energy_gradient": 1.876245174477827e-08
+    }
+   },
+   "single_op_fusion": {
+    "job": 6318703,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 0.0003180892061403198,
+     "layer_2": 0.00012301050776943013,
+     "E": 0.0001409571060070336,
+     "Fa": 1.8762451744656298e-08,
+     "energy_gradient": 1.8762451744656298e-08,
+     "repeated_energy_gradient": 1.8762451744656298e-08
+    }
+   },
+   "native_feature_and_hyper_contractions": {
+    "job": 6318703,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 5.204170427930421e-18,
+     "layer_2": 2.0599841277224584e-18,
+     "E": 1.1102230246251565e-16,
+     "Fa": 1.3010426069826053e-18,
+     "energy_gradient": 1.3010426069826053e-18,
+     "repeated_energy_gradient": 1.3010426069826053e-18
+    }
+   },
+   "native_feature_dyad": {
+    "job": 6318739,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 6.071532165918825e-18,
+     "layer_2": 1.734723475976807e-18,
+     "E": 1.1102230246251565e-16,
+     "Fa": 1.1926223897340549e-18,
+     "energy_gradient": 1.1926223897340549e-18,
+     "repeated_energy_gradient": 1.1926223897340549e-18
+    }
+   },
+   "native_hyper_moment": {
+    "job": 6318739,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 5.204170427930421e-18,
+     "layer_2": 1.951563910473908e-18,
+     "E": 1.1102230246251565e-16,
+     "Fa": 2.6020852139652106e-18,
+     "energy_gradient": 2.6020852139652106e-18,
+     "repeated_energy_gradient": 2.6020852139652106e-18
+    }
+   },
+   "feature_dyad_explicit_sum": {
+    "job": 6318739,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 0.0006650594844227488,
+     "layer_2": 0.0003096284811413458,
+     "E": 8.721074027251419e-05,
+     "Fa": 1.415427478985206e-06,
+     "energy_gradient": 1.415427478985206e-06,
+     "repeated_energy_gradient": 1.415427478985206e-06
+    }
+   },
+   "hyper_moment_explicit_sum": {
+    "job": 6318739,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 0.0003180892061403198,
+     "layer_2": 0.00012301050776943013,
+     "E": 0.0001409571060070336,
+     "Fa": 1.876245174477827e-08,
+     "energy_gradient": 1.876245174477827e-08,
+     "repeated_energy_gradient": 1.876245174477827e-08
+    }
+   },
+   "scatter_across_leading_edges": {
+    "job": 6318755,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 6.071532165918825e-18,
+     "layer_2": 1.951563910473908e-18,
+     "E": 1.1102230246251565e-16,
+     "Fa": 2.8189256484623115e-18,
+     "energy_gradient": 2.8189256484623115e-18,
+     "repeated_energy_gradient": 2.8189256484623115e-18
+    }
+   },
+   "expanded_scatter_index": {
+    "job": 6318755,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 6.071532165918825e-18,
+     "layer_2": 1.951563910473908e-18,
+     "E": 1.1102230246251565e-16,
+     "Fa": 2.8189256484623115e-18,
+     "energy_gradient": 2.8189256484623115e-18,
+     "repeated_energy_gradient": 2.8189256484623115e-18
+    }
+   },
+   "explicit_bmm_contiguous": {
+    "job": 6318755,
+    "maximum_absolute_error": {
+     "layer_0": 1.0408340855860843e-17,
+     "layer_1": 0.0003180892061403198,
+     "layer_2": 0.00012301050776943013,
+     "E": 0.0001409571060070336,
+     "Fa": 1.876245174477827e-08,
+     "energy_gradient": 1.876245174477827e-08,
+     "repeated_energy_gradient": 1.876245174477827e-08
+    }
+   }
+  },
+  "failures_in_other_controls": {
+   "native_path_mix_and_native_channel_mix": "PyTorch CPU lowering raised _print_PowByNatural not implemented for CppPrinter.",
+   "normal_simd_training_with_corrected_scatter": {
+    "job": 6318786,
+    "float32": "SIGABRT (corrupted double-linked list)",
+    "float64": "SIGSEGV",
+    "independent_float64_pytest_maximum_force_difference": 1.0847222299416748e-05
+   }
+  }
+ },
+ "verified": {
+  "revision": "c440f28",
+  "inference_job": 6318786,
+  "training_job": 6318817,
+  "inference": {
+   "float32": {
+    "fields": {
+     "E": {
+      "max_abs": 5.960464477539063e-08,
+      "relative_l2": 5.84768346667048e-08
+     },
+     "Fa": {
+      "max_abs": 1.5425030142068863e-09,
+      "relative_l2": 6.977251141000162e-07
+     },
+     "energy_coordinate_gradient": {
+      "max_abs": 1.5425030142068863e-09,
+      "relative_l2": 6.977251141000162e-07
+     },
+     "repeated_energy_coordinate_gradient": {
+      "max_abs": 1.5425030142068863e-09,
+      "relative_l2": 6.977251141000162e-07
+     }
+    },
+    "graphs": 9,
+    "captured_operations": 584,
+    "learned_operations": [
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "scatter_add_"
+    ],
+    "gradients_compared": 0,
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   },
+   "float64": {
+    "fields": {
+     "E": {
+      "max_abs": 1.1102230246251565e-16,
+      "relative_l2": 1.0892159156324131e-16
+     },
+     "Fa": {
+      "max_abs": 1.5178830414797062e-18,
+      "relative_l2": 9.290340179222566e-16
+     },
+     "energy_coordinate_gradient": {
+      "max_abs": 2.8189256484623115e-18,
+      "relative_l2": 1.4084676108325977e-15
+     },
+     "repeated_energy_coordinate_gradient": {
+      "max_abs": 2.8189256484623115e-18,
+      "relative_l2": 1.4084676108325977e-15
+     }
+    },
+    "graphs": 9,
+    "captured_operations": 584,
+    "learned_operations": [
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "scatter_add_"
+    ],
+    "gradients_compared": 0,
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   }
+  },
+  "training": {
+   "float32": {
+    "fields": {
+     "E": {
+      "max_abs": 5.960464477539063e-08,
+      "relative_l2": 5.84768346667048e-08
+     },
+     "Fa": {
+      "max_abs": 1.0186340659856796e-09,
+      "relative_l2": 4.971632284320136e-07
+     }
+    },
+    "graphs": 1,
+    "captured_operations": 611,
+    "learned_operations": [
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "scatter_add_"
+    ],
+    "gradients_compared": 140,
+    "largest_weight_gradient_error": {
+     "name": "post_sequence.0.heads.2.2.bias",
+     "max_abs": 1.1920928955078125e-07,
+     "relative_l2": 5.9089991277505347e-08
+    },
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   },
+   "float64": {
+    "fields": {
+     "E": {
+      "max_abs": 1.1102230246251565e-16,
+      "relative_l2": 1.0892159156324131e-16
+     },
+     "Fa": {
+      "max_abs": 2.0735366548785272e-18,
+      "relative_l2": 1.1150725339345603e-15
+     }
+    },
+    "graphs": 1,
+    "captured_operations": 611,
+    "learned_operations": [
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "scatter_add_"
+    ],
+    "gradients_compared": 140,
+    "largest_weight_gradient_error": {
+     "name": "post_sequence.0.heads.0.bias",
+     "max_abs": 1.7763568394002505e-15,
+     "relative_l2": 1.3608555928144526e-16
+    },
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   }
+  }
+ },
+ "related_allscaip": {
+  "model_use": "AllScAIP computes bond orientational order by summing harmonic powers over the final axis (dim=-1).",
+  "complete_model_job": 6318786,
+  "ordinary_inference": {
+   "float32": {
+    "fields": {
+     "E": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "Fa": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "energy_coordinate_gradient": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "repeated_energy_coordinate_gradient": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     }
+    },
+    "graphs": 33,
+    "captured_operations": 1125,
+    "learned_operations": [
+     "einsum",
+     "index_add_",
+     "linear",
+     "mm",
+     "scatter_add_"
+    ],
+    "gradients_compared": 0,
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   },
+   "float64": {
+    "fields": {
+     "E": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "Fa": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "energy_coordinate_gradient": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "repeated_energy_coordinate_gradient": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     }
+    },
+    "graphs": 34,
+    "captured_operations": 1133,
+    "learned_operations": [
+     "einsum",
+     "index_add_",
+     "linear",
+     "mm",
+     "scatter_add_"
+    ],
+    "gradients_compared": 0,
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   }
+  },
+  "complete_training": {
+   "float32": {
+    "fields": {
+     "E": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "Fa": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     }
+    },
+    "graphs": 1,
+    "captured_operations": 1338,
+    "learned_operations": [
+     "einsum",
+     "index_add_",
+     "linear",
+     "mm",
+     "scatter_add_"
+    ],
+    "gradients_compared": 244,
+    "largest_weight_gradient_error": {
+     "name": "pre_sequence.3.element_embedding",
+     "max_abs": 0.0,
+     "relative_l2": null
+    },
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   },
+   "float64": {
+    "fields": {
+     "E": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "Fa": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     }
+    },
+    "graphs": 2,
+    "captured_operations": 2676,
+    "learned_operations": [
+     "einsum",
+     "index_add_",
+     "linear",
+     "mm",
+     "scatter_add_"
+    ],
+    "gradients_compared": 244,
+    "largest_weight_gradient_error": {
+     "name": "pre_sequence.3.element_embedding",
+     "max_abs": 0.0,
+     "relative_l2": null
+    },
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   }
+  },
+  "retained_inference_job": 6318807,
+  "retained_inference": {
+   "float32": {
+    "fields": {
+     "E": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "Fa": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "energy_coordinate_gradient": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "repeated_energy_coordinate_gradient": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     }
+    },
+    "graphs": 33,
+    "captured_operations": 1125,
+    "learned_operations": [
+     "einsum",
+     "index_add_",
+     "linear",
+     "mm",
+     "scatter_add_"
+    ],
+    "gradients_compared": 0,
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   },
+   "float64": {
+    "fields": {
+     "E": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "Fa": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "energy_coordinate_gradient": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     },
+     "repeated_energy_coordinate_gradient": {
+      "max_abs": 0.0,
+      "relative_l2": null
+     }
+    },
+    "graphs": 34,
+    "captured_operations": 1133,
+    "learned_operations": [
+     "einsum",
+     "index_add_",
+     "linear",
+     "mm",
+     "scatter_add_"
+    ],
+    "gradients_compared": 0,
+    "outside_tolerance": [],
+    "changed_gradient_participation": {}
+   }
+  },
+  "feature_reference": "Nine nodes, thirteen neighbors and harmonic degrees 0 through 3 with seeded directions and a partial neighbor mask. Differentiate a nonconstant weighted sum with respect to the directions.",
+  "feature_values_and_gradients": {
+   "torch.float32": {
+    "value_max_abs_error": 8.940696716308594e-08,
+    "value_max_abs": 1.0,
+    "coordinate_gradient_max_abs_error": 1.4901161193847656e-07,
+    "coordinate_gradient_max_abs": 0.25746777653694153
+   },
+   "torch.float64": {
+    "value_max_abs_error": 1.1102230246251565e-16,
+    "value_max_abs": 1.0,
+    "coordinate_gradient_max_abs_error": 8.326672684688674e-17,
+    "coordinate_gradient_max_abs": 0.24333782348409183
+   }
+  }
+ }
+}
