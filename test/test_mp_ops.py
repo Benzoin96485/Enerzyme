@@ -149,6 +149,38 @@ def test_inductor_cpu_single_destination_scalar_sum():
             torch.testing.assert_close(torch.autograd.grad(result, values, probe)[0], probe[index])
 
 
+@pytest.mark.parametrize("dim", [0, 1])
+def test_inductor_cpu_vector_sum_into_single_or_multiple_structures(dim):
+    values = torch.linspace(-1., 1., 256 * 3, dtype=torch.float64).reshape(256, 3).movedim(0, dim)
+    values.requires_grad_(True)
+    edges = values.movedim(dim, 0)
+
+    def reduce(x, index, count):
+        return scatter_sum(x, index, count, dim)
+
+    compiled = torch.compile(reduce, fullgraph=True)
+    for size in (1, 3):
+        index = torch.arange(256) % size
+        expected = torch.stack([edges[index == i].sum(0) for i in range(size)], dim=dim)
+        actual = compiled(values, index, size)
+        torch.testing.assert_close(actual, expected)
+        assert actual.is_contiguous()
+        gradient = torch.autograd.grad(actual.square().sum(), values)[0]
+        reference = torch.autograd.grad(expected.square().sum(), values)[0]
+        torch.testing.assert_close(gradient, reference)
+    empty = compiled(values.narrow(dim, 0, 0), torch.empty(0, dtype=torch.long), 1)
+    torch.testing.assert_close(empty, torch.zeros_like(values.narrow(dim, 0, 1)))
+    assert not empty.requires_grad
+
+
+def test_compiled_singleton_scatter_preserves_out_of_bounds_errors():
+    values = torch.ones(4, 3)
+    invalid = torch.tensor([0, 0, 1, 0])
+    compiled = torch.compile(lambda x, index: scatter_sum(x, index, 1), backend="eager", fullgraph=True)
+    with pytest.raises((IndexError, RuntimeError), match="out of|index"):
+        compiled(values, invalid)
+
+
 @pytest.mark.parametrize("shape, dim", [((33, 32, 3), 1), ((9, 16), -1)])
 def test_inductor_cpu_nonleading_scatter_gradients(shape, dim):
     generator = torch.Generator().manual_seed(107)

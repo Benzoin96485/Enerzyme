@@ -64,17 +64,16 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
         index = index.long()
     if src.device.type != "cuda" and _use_torch_scatter(src) and index.numel():
         return _torch_scatter.scatter_sum(src, index, dim=dim, dim_size=size)
-    # With a single output scalar the CPU Inductor vectorizer collapses an
-    # atomic-add destination to a constant index. Retain a spare slot until
-    # after reduction so the generated kernel keeps its indexed writes.
-    if torch.compiler.is_compiling() and src.device.type == "cpu" and src.ndim == 1:
-        if dim_size is not None:
-            # A supplied out-of-bounds index must not fall in the spare slot.
-            index = index + (index == size)
-        padded = src.new_zeros(size + 1)
-        return padded.index_add_(dim, index, src).narrow(dim, 0, size)
+    # When the destination axis is a singleton, CPU Inductor can collapse
+    # the atomic-add index to a constant, including for vector-valued rows.
+    pad = torch.compiler.is_compiling() and src.device.type == "cpu" and (
+        src.ndim == 1 or statically_known_true(size == 1)
+    )
+    if pad and dim_size is not None:
+        # A supplied out-of-bounds index must not fall in the spare row.
+        index = index + (index == size)
     shape = list(src.shape)
-    shape[dim] = size
+    shape[dim] = size + 1 if pad else size
     out = src.new_zeros(shape)
     if torch.compiler.is_compiling() or index.numel():
         # CPU Inductor can miscompile index_add_ across a nonleading axis in
@@ -85,7 +84,7 @@ def scatter_sum(src: Tensor, index: Tensor, dim_size: Optional[int] = None, dim:
             out.scatter_add_(dim, _broadcast_index(index, src, dim), src)
         else:
             out.index_add_(dim, index, src)
-    return out
+    return out.narrow(dim, 0, size).contiguous() if pad else out
 
 
 def scatter_count(index: Tensor, dim_size: Optional[int] = None, dtype: torch.dtype = torch.float32) -> Tensor:
