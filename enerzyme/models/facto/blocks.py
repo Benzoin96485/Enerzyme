@@ -35,23 +35,26 @@ class FACTOEmbed(Embed):
     def forward(self, inputs, ctx):
         isolated = F.silu(self.linear(self.element_descriptors.to(self.linear.weight)))
         scalars = isolated[inputs["Za"]]
-        active_geometry = self.geometry(ctx.dist, ctx.vec)
-        isolated_geometry = self.geometry(ctx.dist[:0], ctx.vec[:0])
         return BlockState(
-            scalar=scalars, equi=self._zero_moments(scalars), edge=(active_geometry, isolated_geometry),
-            aux={"isolated": isolated, "isolated_equi": self._zero_moments(isolated)},
+            scalar=scalars, equi=self._zero_moments(scalars), edge=self.geometry(ctx.dist, ctx.vec),
+            aux={"isolated": isolated},
         )
 
 
 class FACTOBlock(FACTOInteraction):
     def forward(self, state, ctx):
-        geometry, empty_geometry = state.edge
-        scalars, tensors = super().forward(state.scalar, state.equi, geometry, ctx.receiver, ctx.sender)
-        isolated, isolated_equi = super().forward(
-            state.aux["isolated"], state.aux["isolated_equi"], empty_geometry, ctx.receiver[:0], ctx.sender[:0],
-        )
-        return BlockState(scalar=scalars, equi=tensors, edge=state.edge,
-                          aux={"isolated": isolated, "isolated_equi": isolated_equi})
+        scalars, tensors = super().forward(state.scalar, state.equi, state.edge, ctx.receiver, ctx.sender)
+        # Without neighbors every tensor rank and the aggregated scalar message
+        # stay zero. The remaining affine bias terms give the same increment to
+        # every isolated species. Keep Linear calls for the parameter and AMP dtypes.
+        isolated = state.aux["isolated"]
+        empty_message = isolated.new_zeros(1, self.attention.mix.in_features)
+        intermediate = F.silu(self.attention.mix(empty_message))
+        empty_dots = isolated.new_zeros(1, self.feedback.mix.in_features)
+        delta = self.feedback.mix(empty_dots) * self.feedback.to_gate(intermediate)
+        delta = delta + self.feedback.to_residual(intermediate)
+        isolated = isolated + self.residual_scale * delta
+        return BlockState(scalar=scalars, equi=tensors, edge=state.edge, aux={"isolated": isolated})
 
 
 class FACTOHead(Head):

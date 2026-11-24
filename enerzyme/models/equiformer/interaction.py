@@ -5,7 +5,7 @@
 import math
 import torch
 import torch_geometric
-from ..mp.ops import scatter_sum as scatter
+from ..mp.ops import scatter_sum as scatter, segment_softmax
 from e3nn import o3
 from e3nn.util.jit import compile_mode
 from e3nn.nn.models.v2106.gate_points_message_passing import tp_path_exists
@@ -473,7 +473,7 @@ class GraphAttention(torch.nn.Module):
         # inner product
         alpha = self.alpha_act(alpha)
         alpha = torch.einsum('bik, aik -> bi', alpha, self.alpha_dot)
-        alpha = torch_geometric.utils.softmax(alpha, edge_dst)
+        alpha = segment_softmax(alpha, edge_dst, node_input.shape[0], eps=1e-16, detach_max=True)
         alpha = alpha.unsqueeze(-1)
         if self.alpha_dropout is not None:
             alpha = self.alpha_dropout(alpha)

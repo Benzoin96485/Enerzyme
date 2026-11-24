@@ -231,3 +231,38 @@ def test_attention_triton_qk_matches_qk_alpha_module_on_cuda():
         atol=5e-4,
         rtol=5e-4,
     )
+
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("cuda", marks=pytest.mark.skipif(
+    not _cuda_triton_ready(), reason="CUDA and Triton required",
+))])
+def test_sparse_dispatch_values_and_double_gradients(device, dtype):
+    from enerzyme.models.e2former import triton_sparse as sparse
+
+    generator = torch.Generator(device=device).manual_seed(401)
+    def field(*shape):
+        return torch.randn(*shape, device=device, dtype=dtype, generator=generator).requires_grad_()
+
+    n, k, heads, width = 5, 4, 2, 8
+    indices = torch.randint(n, (n, k), generator=generator, device=device)
+    query = field(n, width, heads).transpose(1, 2)
+    key = field(n, heads, width)
+    gate = field(n, k, heads)
+    value = field(n, width, heads)
+    fields = (query, key, gate, value)
+
+    def evaluate(enabled):
+        weights = sparse.sparse_qk(query, key, indices, gate, 0.25, use_triton=enabled)
+        aggregate = sparse.make_sparse_v_kernel(indices, use_triton=enabled)
+        result = aggregate(value, weights)
+        first = torch.autograd.grad(result.square().sum(), fields, create_graph=True)
+        second = torch.autograd.grad(sum(item.square().mean() for item in first), fields)
+        return (result, *first, *second)
+
+    actual, expected = evaluate(True), evaluate(False)
+    for got, want in zip(actual, expected):
+        torch.testing.assert_close(got, want, rtol=2e-4 if dtype == torch.float32 else 1e-12,
+                                   atol=2e-4 if dtype == torch.float32 else 1e-12)
+    assert callable(sparse.sparse_qk) and callable(sparse.sparse_v_agg)
