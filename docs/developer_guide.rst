@@ -222,7 +222,9 @@ To check force training with the installed Inductor backend, run the following
 from the checkout. The report compares the energy, forces, and every parameter
 gradient for identical initial weights and coordinates. It records captured
 operations, numerical errors, and changes between an absent and a zero gradient.
-The command exits with a nonzero status on a mismatch.
+The command exits with a nonzero status on a mismatch. For dropout comparisons,
+add :code:`--match-rng` to use matching random draws. For presets using the
+optional e3nn FX kernels, pass :code:`--e3nn-codegen fx`.
 
 .. code-block:: shell
 

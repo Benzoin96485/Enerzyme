@@ -11,6 +11,7 @@ import copy
 import json
 import math
 import random
+from contextlib import nullcontext
 
 import numpy as np
 import torch
@@ -31,13 +32,16 @@ def step(model, runner, batch, dtype):
     return values
 
 
-def check(architecture, dtype, atol, rtol, device):
+def check(architecture, dtype, atol, rtol, device, *, e3nn_codegen="default", match_rng=False):
     from torch._dynamo.backends.registry import lookup_backend
+    from enerzyme.models.ff import get_ff_core
 
     torch.manual_seed(142)
     np.random.seed(142)
     random.seed(142)
-    model = build(architecture).float().to(device=device, dtype=dtype)
+    _, defaults, _ = get_ff_core(architecture)
+    model = build(architecture, build_params={**defaults, "e3nn_codegen": e3nn_codegen})
+    model = model.float().to(device=device, dtype=dtype)
     batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
     batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
     weights = copy.deepcopy(model.state_dict())
@@ -53,7 +57,9 @@ def check(architecture, dtype, atol, rtol, device):
         graphs.append({"operations": len(ops), "learned_operators": sorted(set(ops) & learned)})
         return lookup_backend("inductor")(graph, inputs)
 
-    actual = step(model, torch.compile(model, backend=lower), batch, dtype)
+    from torch._inductor import config
+    with config.patch(fallback_random=True) if match_rng else nullcontext():
+        actual = step(model, torch.compile(model, backend=lower), batch, dtype)
     errors, changed_participation, failed = {}, {}, []
     for name, reference in expected.items():
         value = actual[name]
@@ -76,6 +82,7 @@ def check(architecture, dtype, atol, rtol, device):
             failed.append(name)
     return {"architecture": architecture, "torch": str(torch.__version__), "device": str(device),
             "dtype": str(dtype), "atol": atol, "rtol": rtol, "graphs": graphs,
+            "e3nn_codegen": e3nn_codegen, "matched_rng": match_rng,
             "parameter_gradients_compared": len(errors) - 2, "changed_gradient_participation": changed_participation,
             "outside_tolerance": failed, "errors": errors}
 
@@ -87,11 +94,16 @@ def main():
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--atol", type=float)
     parser.add_argument("--rtol", type=float)
+    parser.add_argument("--e3nn-codegen", choices=("default", "fx"), default="default",
+                        help="Build the preset with the selected e3nn code generator.")
+    parser.add_argument("--match-rng", action="store_true",
+                        help="Use native random draws in Inductor to compare identical dropout masks.")
     args = parser.parse_args()
     double = args.dtype == "float64"
     atol = args.atol if args.atol is not None else (1e-10 if double else 7e-4)
     rtol = args.rtol if args.rtol is not None else (1e-8 if double else 1e-3)
-    report = check(args.architecture, getattr(torch, args.dtype), atol, rtol, torch.device(args.device))
+    report = check(args.architecture, getattr(torch, args.dtype), atol, rtol, torch.device(args.device),
+                   e3nn_codegen=args.e3nn_codegen, match_rng=args.match_rng)
     print(json.dumps(report, indent=2, allow_nan=False))
     return int(bool(report["outside_tolerance"] or report["changed_gradient_participation"]))
 
