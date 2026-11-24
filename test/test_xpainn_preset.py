@@ -9,7 +9,8 @@ from enerzyme.models.presets import default_params
 
 
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
-def test_xpainn_upstream_energy_forces_and_force_loss(dtype):
+@pytest.mark.parametrize("compiled", [False, True], ids=["eager", "fullgraph"])
+def test_xpainn_upstream_energy_forces_and_force_loss(dtype, compiled):
     upstream = pytest.importorskip("xequinet.nn.model")
     from xequinet.utils.config import NetConfig
 
@@ -28,7 +29,9 @@ def test_xpainn_upstream_energy_forces_and_force_loss(dtype):
         i, j = torch.where((batch[:, None] == batch) & ~torch.eye(5, dtype=torch.bool))
         pos = torch.randn(5, 3, requires_grad=True)
         e, f = expected(Data(at_no=z, pos=pos, batch=batch, edge_index=torch.stack((i, j))))
-        out = actual(dict(Za=z, Ra=pos, batch_seg=batch, idx_i=i, idx_j=j))
+        runner = torch.compile(actual, backend="eager", fullgraph=True) if compiled else actual
+        with torch._dynamo.config.patch(capture_dynamic_output_shape_ops=True):
+            out = runner(dict(Za=z, Ra=pos, batch_seg=batch, idx_i=i, idx_j=j, N=[3, 2]))
         torch.testing.assert_close(out["E"], e.squeeze(-1))
         torch.testing.assert_close(out["Fa"], f)
         def loss(en, fo):

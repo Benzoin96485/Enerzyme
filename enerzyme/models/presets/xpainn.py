@@ -1,5 +1,6 @@
 """Compose XequiNet's optional xPaiNN embedding, message/update pairs and property head."""
 
+from threading import RLock
 from typing import Union
 
 import torch
@@ -10,6 +11,10 @@ from ..mp.block import BlockState
 from ..mp.core import ComposableCore, Embed
 from ..mp.graph import GraphRequires
 from ..mp.head import Head
+from ..mp.ops import batch_size_from_counts, scatter_sum
+
+
+_construction_lock = RLock()
 
 
 class XPaiNNEmbed(Embed):
@@ -43,7 +48,7 @@ class XPaiNNBlock(nn.Module):
 
 
 class XPaiNNHead(Head):
-    input_fields = ("Ra", "Za", "batch_seg")
+    input_fields = ("Ra", "Za", "batch_seg", "N")
     output_fields = ("E", "Fa")
 
     def __init__(self, output):
@@ -51,9 +56,30 @@ class XPaiNNHead(Head):
         self.output = output
 
     def forward(self, state, ctx, taps, inputs):
+        if inputs.get("_atomic_readout", False):
+            return {"Ea": self.output.out_mlp(state.scalar).squeeze(-1)}
         data = Data(pos=inputs["Ra"], at_no=inputs["Za"], batch=ctx.batch, edge_index=state.edge[-1])
         energy, forces = self.output(data, state.scalar, state.equi)
         return {"E": energy.squeeze(-1), "Fa": forces}
+
+
+class XPaiNNCore(ComposableCore):
+    def get_output(self, Ra, Za, batch_seg, idx_i, idx_j, offsets=None, N=None, **fields):
+        evaluate = super().get_output
+        inputs = dict(Za=Za, batch_seg=batch_seg, idx_i=idx_i, idx_j=idx_j, offsets=offsets, N=N, **fields)
+        if not torch.compiler.is_compiling() or not self.gradient_output:
+            return evaluate(Ra=Ra, **inputs)
+
+        # XequiNet differentiates the sum of atomic energies, before batched
+        # reduction. A functional VJP keeps this force loss differentiable in AOT.
+        def atomic_energy(positions):
+            return evaluate(Ra=positions, _atomic_readout=True, **inputs)["Ea"]
+
+        energies, pullback = torch.func.vjp(atomic_energy, Ra)
+        forces = -pullback(torch.ones_like(energies))[0]
+        if batch_seg is None:
+            return {"E": energies.sum().reshape(1), "Fa": forces}
+        return {"E": scatter_sum(energies, batch_seg, batch_size_from_counts(N)), "Fa": forces}
 
 
 def xpainn(
@@ -63,6 +89,7 @@ def xpainn(
     output_dim: int, node_average: Union[bool, float], default_dtype: str,
 ) -> ComposableCore:
     try:
+        import e3nn
         from xequinet.nn.model import XPaiNN
         from xequinet.utils.config import NetConfig
     except ImportError as exc:
@@ -75,11 +102,20 @@ def xpainn(
         action_blocks=action_blocks, activation=activation, norm_type=norm_type, output_mode=output_mode,
         output_dim=output_dim, node_average=node_average, default_dtype=default_dtype,
     )
-    external = XPaiNN(config)
-    return ComposableCore(
+    # Keep e3nn's generated tensor products as FX modules that Dynamo can trace.
+    # This construction setting is global in e3nn, so restore it even on failure.
+    with _construction_lock:
+        previous = e3nn.get_optimization_defaults()["jit_script_fx"]
+        try:
+            e3nn.set_optimization_defaults(jit_script_fx=False)
+            external = XPaiNN(config)
+        finally:
+            e3nn.set_optimization_defaults(jit_script_fx=previous)
+    return XPaiNNCore(
         XPaiNNEmbed(external.embed),
         [XPaiNNBlock(message, update) for message, update in zip(external.message, external.update)],
         XPaiNNHead(external.out),
         GraphRequires(edge_set="lr", vectors=False, distances=False, rbf=False, optional_cutoff_values=False),
         node_field="Za", positional_fields=("Ra", "Za", "batch_seg", "idx_i", "idx_j"), architecture="xpainn",
+        gradient_output=output_mode == "grad",
     )
