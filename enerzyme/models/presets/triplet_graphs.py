@@ -8,7 +8,7 @@ from torch import nn
 
 from ..mp.block import FnBlock
 from ..mp.core import ComposableCore
-from ..mp.graph import GraphRequires
+from ..mp.graph import GraphRequires, QuadrupletRequest, ReverseEdgeRequest, TripletRequest
 from ..mp.head import FeatureHead
 from ..mp.message.triplet_graph import GemNetBlock, GemNetHead
 
@@ -193,7 +193,9 @@ def dpa3(
         embed,
         blocks,
         head,
-        GraphRequires(rbf=False, optional_cutoff_values=False),
+        GraphRequires(rbf=False, optional_cutoff_values=False, topology=(
+            TripletRequest("receiver", edge_cutoff=e_rcut, cutoff=a_rcut, strict=True, include_self=True),
+        ) if update_angle else ()),
         builder=build_stack,
         positional_fields=("atom_embedding", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         architecture="dpa3",
@@ -321,7 +323,9 @@ def alignn(
         embed,
         blocks,
         head,
-        GraphRequires(optional_cutoff_values=False),
+        GraphRequires(optional_cutoff_values=False, topology=(
+            TripletRequest("line_graph", exclude_backtracking=not backtracking),
+        ) if alignn_layers else ()),
         builder=build_stack,
         positional_fields=("atom_embedding", "rbf", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         architecture="alignn",
@@ -494,7 +498,8 @@ def chgnet(
         embed,
         blocks,
         head,
-        GraphRequires(optional_cutoff_values=False, fields=("rbf_bg",)),
+        GraphRequires(optional_cutoff_values=False, fields=("rbf_bg",),
+                      topology=(TripletRequest("receiver", cutoff=bond_cutoff),)),
         builder=build_stack,
         positional_fields=("atom_embedding", "rbf", "rbf_bg", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         architecture="chgnet",
@@ -803,11 +808,14 @@ def gemnet(
     )
     blocks = [GemNetBlock(interaction) for interaction in interactions]
     head = GemNetHead(readouts, output_mode, include_nodes=False)
+    topology = (ReverseEdgeRequest(emb_cutoff), TripletRequest("receiver", edge_cutoff=emb_cutoff))
+    if not triplets_only:
+        topology += (QuadrupletRequest(emb_cutoff, int_cutoff),)
     return ComposableCore(
         embed,
         blocks,
         head,
-        GraphRequires(optional_cutoff_values=False),
+        GraphRequires(optional_cutoff_values=False, topology=topology),
         builder=build_stack,
         positional_fields=("atom_embedding", "rbf", "Dij_sr", "vij_sr", "idx_i_sr", "idx_j_sr"),
         architecture="gemnet" if triplets_only else "gemnet-q",

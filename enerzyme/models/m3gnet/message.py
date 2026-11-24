@@ -37,7 +37,7 @@ class MaterialEmbed(Embed):
             raise ValueError("Dij_sr, rbf, idx_i_sr, and idx_j_sr must share the edge count")
         if ctx.vec.shape != (ctx.num_edges, 3):
             raise ValueError(f"vij_sr must be (E, 3), got {tuple(ctx.vec.shape)}")
-        first, second = ctx.receiver_pairs(self.threebody_cutoff)
+        first, second = ctx.triplets("receiver", cutoff=self.threebody_cutoff)
         angle = bond_angle(ctx.vec, first, second)
         joint = joint_zonal_basis(ctx.rbf, angle, second, self.max_l, self.num_rbf)
         envelope = polynomial_envelope(ctx.dist, self.threebody_cutoff, self.envelope_exponent)

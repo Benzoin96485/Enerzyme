@@ -117,3 +117,51 @@ def test_receiver_rank_is_stable_knn():
     key = torch.tensor([0.5, 0.2, 0.1, 0.5, 0.1, 9.0, 0.3])
     rank = receiver_rank(receiver, key, 3)
     assert rank.tolist() == [2, 1, 0, 3, 0, 0, 1]
+
+
+def test_declared_topology_prepares_once_and_reuses_receiver_csr(monkeypatch):
+    from enerzyme.models.mp import graph
+    from enerzyme.models.mp.graph import QuadrupletRequest, ReverseEdgeRequest, TripletRequest
+
+    receiver, sender, vec, dist, n = _graph(n_nodes=4, cutoff=10)
+    vec.requires_grad_()
+    inputs = {"idx_i_sr": receiver, "idx_j_sr": sender, "vij_sr": vec, "Dij_sr": dist}
+    calls = []
+    original = graph.receiver_csr
+
+    def counted(receiver, num_nodes):
+        calls.append(receiver)
+        return original(receiver, num_nodes)
+
+    monkeypatch.setattr(graph, "receiver_csr", counted)
+    req = GraphRequires(rbf=False, topology=(
+        ReverseEdgeRequest(10), TripletRequest("receiver", edge_cutoff=10), QuadrupletRequest(10, 10)))
+    ctx = GraphContext.from_inputs(inputs, req, n)
+    sub = ctx.within(10)
+    pairs = sub.triplets("receiver")
+    quads = sub.quadruplets(sub)
+    assert sub.triplets("receiver") is pairs
+    assert sub.quadruplets() is quads
+    assert len(calls) == 1
+    actual = set(zip(quads.atom_c.tolist(), quads.atom_a.tolist(), quads.atom_b.tolist(), quads.atom_d.tolist()))
+    from itertools import permutations
+    assert actual == set(permutations(range(n), 4))
+    assert quads.edge_ca.numel() == len(actual)
+    grad, = torch.autograd.grad(quads.dihedral.sum(), vec)
+    assert torch.isfinite(grad).all() and grad.abs().sum() > 0
+
+
+def test_periodic_line_graph_backtracking_and_duplicate_reverse_edges():
+    r = torch.tensor([0, 1, 0, 1])
+    s = torch.tensor([1, 0, 1, 0])
+    x = torch.tensor([[1., 0., 0.], [-1., 0., 0.], [2., 0., 0.], [-2., 0., 0.]])
+    graph = GraphContext(r, s, 2, vec=x)
+    assert graph.triplets("path", exclude_backtracking=True).first.numel() == 0
+    first, second = graph.triplets("line_graph", exclude_backtracking=True)
+    assert first.numel() == 4
+    assert ((x[first] + x[second]).norm(dim=1) > 0).all()
+    # The same bond image has been listed twice in both directions.
+    dup = GraphContext(r, s, 2, vec=x[[0, 1, 0, 1]])
+    reverse = dup.reverse_edge(distinct=True)
+    assert torch.equal(reverse[reverse], torch.arange(4))
+    assert torch.equal(reverse, torch.tensor([1, 0, 3, 2]))

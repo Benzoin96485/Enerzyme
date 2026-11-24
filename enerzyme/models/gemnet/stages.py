@@ -27,7 +27,7 @@ from torch.nn import Module
 
 from ..layers import BaseAtomEmbedding, BaseRBF
 from .basis import joint_zonal, real_spherical_harmonics, y_lm0
-from .geometry import quadruplet_graph, reverse_edge_index, split_cutoff_edges, triplet_graph
+from ..mp.quadruplets import angle_between
 
 
 class GemNetEmbed(Embed):
@@ -68,29 +68,19 @@ class GemNetEmbed(Embed):
         self.mlp_cbf4 = mlp_cbf4
         self.mlp_sbf4 = mlp_sbf4
 
-    def _quad_basis(
-        self,
-        dist: Tensor,
-        vij: Tensor,
-        idx_i: Tensor,
-        idx_j: Tensor,
-        emb_index: Tensor,
-        int_index: Tensor,
-        num_nodes: int,
-        rbf_emb: Tensor,
-    ) -> Dict[str, Tensor]:
+    def _quad_basis(self, embedding, interaction, rbf_emb) -> Dict[str, Tensor]:
         assert self.quad_cbf_radial is not None
         assert self.quad_sbf_radial is not None
         assert self.mlp_rbf4 is not None
         assert self.mlp_cbf4 is not None
         assert self.mlp_sbf4 is not None
-        quads = quadruplet_graph(idx_i, idx_j, dist, vij, emb_index, int_index, num_nodes)
-        sbf_radial = self.quad_sbf_radial(dist[emb_index])
+        quads = embedding.quadruplets(interaction)
+        sbf_radial = self.quad_sbf_radial(embedding.dist)
         if quads.edge_ca.numel() == 0:
             cbf = rbf_emb.new_empty(0, self.mlp_cbf4.linear.out_features)
             angular = rbf_emb.new_empty(0, self.quad_sbf_radial.angular_dim)
         else:
-            radial_ab = self.quad_cbf_radial(dist[int_index])[quads.int_local]
+            radial_ab = self.quad_cbf_radial(interaction.dist)[quads.int_local]
             joint = joint_zonal(radial_ab, y_lm0(quads.angle_abd, self.num_spherical))
             cbf = self.mlp_cbf4(joint)
             angular = real_spherical_harmonics(quads.angle_cab, quads.dihedral, self.num_spherical)
@@ -105,21 +95,16 @@ class GemNetEmbed(Embed):
 
     def forward(self, inputs, ctx):
         check_gemnet_edges(ctx, self.num_rbf)
-        num_nodes = int(inputs["atom_embedding"].shape[0])
-        emb_index, int_index = split_cutoff_edges(
-            ctx.dist,
-            self.emb_cutoff,
-            self.int_cutoff,
-            triplets_only=self.triplets_only,
-        )
-        idx_i = ctx.receiver[emb_index]
-        idx_j = ctx.sender[emb_index]
-        vij = ctx.vec[emb_index]
-        rbf_emb = ctx.rbf[emb_index]
-        swap = reverse_edge_index(idx_i, idx_j, vij, num_nodes)
-        trips = triplet_graph(idx_i, idx_j, vij, num_nodes)
-        angular3 = y_lm0(trips.angle, self.num_spherical)
-        radial_w3 = self.mlp_cbf3(self.triplet_radial(ctx.dist[emb_index]))
+        embedding = ctx.within(self.emb_cutoff)
+        idx_i, idx_j = embedding.receiver, embedding.sender
+        rbf_emb = embedding.rbf
+        swap = embedding.reverse_edge()
+        edge, other = embedding.triplets("receiver")
+        distinct = idx_j[edge] != idx_j[other]
+        edge, other = edge[distinct], other[distinct]
+        angles = angle_between(embedding.vec[edge], embedding.vec[other])
+        angular3 = y_lm0(angles, self.num_spherical)
+        radial_w3 = self.mlp_cbf3(self.triplet_radial(embedding.dist))
         rbf3 = self.mlp_rbf3(rbf_emb)
         rbf_h = self.mlp_rbf_h(rbf_emb)
         rbf_out = self.mlp_rbf_out(rbf_emb)
@@ -128,10 +113,8 @@ class GemNetEmbed(Embed):
         m = self.edge_emb(h, rbf_emb, idx_i, idx_j)
         quad: Dict[str, Tensor] = {}
         if not self.triplets_only:
-            quad = self._quad_basis(
-                ctx.dist, ctx.vec, ctx.receiver, ctx.sender, emb_index, int_index, num_nodes, rbf_emb
-            )
-        args = (rbf3, rbf_h, radial_w3, angular3, trips.idx_edge, trips.idx_other, swap, idx_i, idx_j)
+            quad = self._quad_basis(embedding, ctx.within(self.int_cutoff), rbf_emb)
+        args = (rbf3, rbf_h, radial_w3, angular3, edge, other, swap, idx_i, idx_j)
         ctx.cache["gemnet_interaction"] = args, quad
         ctx.cache["gemnet_readout"] = rbf_out, idx_i
         return BlockState(scalar=h, edge=m)

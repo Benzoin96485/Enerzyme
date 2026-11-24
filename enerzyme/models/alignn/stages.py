@@ -29,7 +29,7 @@ from ..mp.basis.envelope import polynomial_envelope
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.geometry import RangeSeparationLayer
 from ..layers.rbf import BaseRBF, GaussianRBFLayer
-from .geometry import directed_line_graph, line_graph_cosine
+from .geometry import line_graph_cosine
 
 
 def _norm_name(value: Optional[str]) -> Optional[str]:
@@ -80,21 +80,9 @@ class ALIGNNEmbed(Embed):
             bond = bond * envelope.unsqueeze(-1)
         return atom, bond
 
-    def _angles(
-        self,
-        vij: Tensor,
-        idx_i: Tensor,
-        idx_j: Tensor,
-        n_atoms: int,
-    ) -> tuple[Tensor, Tensor, Tensor]:
-        src_edge, dst_edge = directed_line_graph(
-            idx_i,
-            idx_j,
-            n_atoms,
-            backtracking=self.backtracking,
-            vij=vij,
-        )
-        cosine = line_graph_cosine(vij, src_edge, dst_edge)
+    def _angles(self, ctx):
+        src_edge, dst_edge = ctx.triplets("line_graph", exclude_backtracking=not self.backtracking)
+        cosine = line_graph_cosine(ctx.vec, src_edge, dst_edge)
         expanded = torch.exp(self.angle_coeff * (cosine.unsqueeze(-1) - self.angle_centers) ** 2)
         return src_edge, dst_edge, self.angle_mlp(expanded)
 
@@ -126,7 +114,7 @@ class ALIGNNEmbed(Embed):
         atom, bond = self._embed(inputs["atom_embedding"], ctx.rbf, ctx.dist)
         angle = None
         if self.alignn_layers:
-            source, target, angle = self._angles(ctx.vec, ctx.receiver, ctx.sender, ctx.num_nodes)
+            source, target, angle = self._angles(ctx)
             ctx.cache["line_graph"] = source, target, self.update_order
         return BlockState(scalar=atom, equi=angle, edge=bond)
 

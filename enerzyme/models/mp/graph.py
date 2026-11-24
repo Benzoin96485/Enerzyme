@@ -6,9 +6,8 @@ Edge convention: ``receiver`` is the atom being updated (Enerzyme ``idx_i``),
 ``edge_convention="swap"`` flips the roles for Cores fitted with the opposite
 orientation (main-branch MACE), so blocks never see the difference.
 
-Derived quantities (unit vectors, spherical harmonics, reverse edges, triplets,
-CSR offsets, rotation frames) are computed on first use and cached for the rest
-of the forward pass, so every block shares one copy.
+The Core builds declared topology, harmonics and rotations on entry. All blocks
+share those results and can cache additional quantities for this forward pass.
 """
 
 from __future__ import annotations
@@ -25,6 +24,66 @@ EDGE_CONVENTIONS = ("receiver_i", "swap")
 # A true reverse edge has displacement -v, so the residual is identically zero;
 # anything larger is a different periodic image and must not be paired.
 _OPPOSITE_TOL = 1e-4
+
+
+@dataclass(frozen=True)
+class TripletRequest:
+    """A path, receiver or line graph; indices refer to the selected edge list."""
+
+    kind: str
+    edge_cutoff: Optional[float] = None
+    cutoff: Optional[float] = None
+    include_self: bool = False
+    strict: bool = False
+    exclude_backtracking: bool = False
+
+    def prepare(self, ctx):
+        return ctx.within(self.edge_cutoff).triplets(
+            self.kind, cutoff=self.cutoff, include_self=self.include_self, strict=self.strict,
+            exclude_backtracking=self.exclude_backtracking)
+
+
+@dataclass(frozen=True)
+class QuadrupletRequest:
+    edge_cutoff: float
+    interaction_cutoff: float
+    images: bool = False
+
+    def prepare(self, ctx):
+        return ctx.within(self.edge_cutoff).quadruplets(ctx.within(self.interaction_cutoff), images=self.images)
+
+
+@dataclass(frozen=True)
+class ReverseEdgeRequest:
+    edge_cutoff: Optional[float] = None
+
+    def prepare(self, ctx):
+        return ctx.within(self.edge_cutoff).reverse_edge()
+
+
+@dataclass(frozen=True)
+class HarmonicsRequest:
+    lmax: int
+    edge_sign: float = 1.0
+    normalization: str = "component"
+    normalize: bool = True
+    layout: str = "e3nn"
+
+    def prepare(self, ctx):
+        return ctx.spherical_harmonics(self.lmax, self.normalization, self.normalize, self.layout, self.edge_sign)
+
+
+@dataclass(frozen=True)
+class RotationRequest:
+    lmax: int
+    backend: Any = "cg"
+    mmax: Optional[int] = None
+    edge_sign: int = 1
+    frame_field: Optional[str] = None
+
+    def prepare(self, ctx):
+        frame = ctx.inputs.get(self.frame_field) if self.frame_field else None
+        return ctx.edge_rotation(self.lmax, self.backend, mmax=self.mmax, edge_sign=self.edge_sign, frame=frame)
 
 
 @dataclass(frozen=True)
@@ -49,6 +108,11 @@ class GraphRequires:
     fields: Tuple[str, ...] = ()
     optional_fields: Tuple[str, ...] = ()
     path_triplets: bool = False
+    topology: tuple[TripletRequest | QuadrupletRequest | ReverseEdgeRequest, ...] = ()
+    csr: bool = False
+    unit: bool = False
+    harmonics: Tuple[HarmonicsRequest, ...] = ()
+    rotations: Tuple[RotationRequest, ...] = ()
 
     def __post_init__(self) -> None:
         if self.edge_set not in EDGE_SETS:
@@ -92,6 +156,11 @@ class GraphRequires:
             self,
             vectors=self.vectors or other.vectors,
             path_triplets=self.path_triplets or other.path_triplets,
+            csr=self.csr or other.csr,
+            unit=self.unit or other.unit,
+            harmonics=tuple(dict.fromkeys(self.harmonics + other.harmonics)),
+            rotations=tuple(dict.fromkeys(self.rotations + other.rotations)),
+            topology=tuple(dict.fromkeys(self.topology + other.topology)),
             distances=self.distances or other.distances,
             rbf=self.rbf or other.rbf,
             cutoff_values=self.cutoff_values or other.cutoff_values,
@@ -131,6 +200,7 @@ def receiver_pairs(
     num_nodes: int,
     edge_subset: Optional[Tensor] = None,
     include_self: bool = False,
+    *, csr: Optional[ReceiverCSR] = None,
 ) -> EdgePairs:
     """Ordered pairs of edges that share a receiver (angle at the receiver).
 
@@ -146,7 +216,7 @@ def receiver_pairs(
     if n_kept == 0:
         return EdgePairs(empty, empty)
     device = receiver.device
-    counts, offsets, perm = receiver_csr(centers, num_nodes)
+    counts, offsets, perm = receiver_csr(centers, num_nodes) if csr is None else csr
     degree = counts[centers] if include_self else counts[centers] - 1
     total = int(degree.sum().item())
     if total == 0:
@@ -166,7 +236,8 @@ def receiver_pairs(
     return EdgePairs(kept[src_local], kept[dst_local])
 
 
-def cross_receiver_pairs(query_receiver: Tensor, key_receiver: Tensor, num_nodes: int) -> EdgePairs:
+def cross_receiver_pairs(query_receiver: Tensor, key_receiver: Tensor, num_nodes: int, *,
+                         csr: Optional[ReceiverCSR] = None) -> EdgePairs:
     """Pair each query edge with every key edge that arrives at the same receiver.
 
     ``first`` indexes the query list in edge order, ``second`` indexes the key
@@ -176,7 +247,7 @@ def cross_receiver_pairs(query_receiver: Tensor, key_receiver: Tensor, num_nodes
     empty = query_receiver.new_empty(0)
     if query_receiver.numel() == 0 or key_receiver.numel() == 0 or int(num_nodes) == 0:
         return EdgePairs(empty, empty)
-    counts, offsets, perm = receiver_csr(key_receiver, num_nodes)
+    counts, offsets, perm = receiver_csr(key_receiver, num_nodes) if csr is None else csr
     degree = counts[query_receiver]
     total = int(degree.sum().item())
     if total == 0:
@@ -203,7 +274,8 @@ def receiver_rank(receiver: Tensor, key: Tensor, num_nodes: int) -> Tensor:
     return rank
 
 
-def path_pairs(receiver: Tensor, sender: Tensor, num_nodes: int, order: str = "outgoing") -> EdgePairs:
+def path_pairs(receiver: Tensor, sender: Tensor, num_nodes: int, order: str = "outgoing",
+               *, csr: Optional[ReceiverCSR] = None) -> EdgePairs:
     """Head-to-tail pairs ``(k→j, j→i)``: ``first`` arrives at ``j``, ``second`` leaves it.
 
     ``order="outgoing"`` enumerates by the outgoing edge in edge order (DimeNet);
@@ -215,7 +287,7 @@ def path_pairs(receiver: Tensor, sender: Tensor, num_nodes: int, order: str = "o
     if num_edges == 0:
         return EdgePairs(empty, empty)
     device = receiver.device
-    in_counts, in_offsets, in_perm = receiver_csr(receiver, num_nodes)
+    in_counts, in_offsets, in_perm = receiver_csr(receiver, num_nodes) if csr is None else csr
     if order == "outgoing":
         n_trip = in_counts[sender]
         total = int(n_trip.sum().item())
@@ -242,7 +314,9 @@ def path_pairs(receiver: Tensor, sender: Tensor, num_nodes: int, order: str = "o
     return EdgePairs(in_perm[in_offsets[pair_atom] + in_local], out_perm[out_offsets[pair_atom] + out_local])
 
 
-def reverse_edge_index(receiver: Tensor, sender: Tensor, vec: Tensor, num_nodes: int) -> Tensor:
+def reverse_edge_index(receiver: Tensor, sender: Tensor, vec: Tensor, num_nodes: int, *,
+                       atol: float = _OPPOSITE_TOL, rtol: float = 0.0, metric: str = "l2",
+                       distinct: bool = False) -> Tensor:
     """Index of the edge ``(sender, receiver, -vec)`` for every edge, periodic images included.
 
     The match is a neighbor-list identity, so it runs on a detached copy of
@@ -259,30 +333,56 @@ def reverse_edge_index(receiver: Tensor, sender: Tensor, vec: Tensor, num_nodes:
         raise ValueError("edge index must be non-negative")
     if vec.ndim != 2 or vec.shape[0] != num_edges or vec.shape[-1] != 3:
         raise ValueError(f"vec must have shape ({num_edges}, 3), got {tuple(vec.shape)}")
+    if metric not in ("l2", "max"):
+        raise ValueError(f"unknown displacement metric {metric!r}")
     disp = vec.detach()
+    ids = torch.arange(num_edges, device=receiver.device)
     key = receiver * num_nodes + sender
     rev = sender * num_nodes + receiver
     order = torch.argsort(key, stable=True)
     sorted_key = key[order]
     start = torch.searchsorted(sorted_key, rev, right=False)
     end = torch.searchsorted(sorted_key, rev, right=True)
-    if torch.any(end == start):
+    count = end - start
+    if torch.any(count == 0):
         raise ValueError("reverse edges need both directions of every edge in the neighbor list")
-    width = int((end - start).max().item())
+    width = int(count.max().item())
     if width == 1:
         chosen = order[start]
     else:
-        device = receiver.device
-        offsets = torch.arange(width, device=device)
-        pos = start[:, None] + offsets
-        valid = offsets[None, :] < (end - start)[:, None]
-        cand = order[pos.clamp(max=num_edges - 1)]
-        mismatch = (disp[cand] + disp[:, None, :]).square().sum(dim=-1)
-        mismatch = mismatch.masked_fill(~valid, float("inf"))
-        best = mismatch.argmin(dim=1)
-        chosen = cand[torch.arange(num_edges, device=device), best]
-    residual = (disp[chosen] + disp).square().sum(dim=-1).sqrt()
-    if not torch.isfinite(residual).all() or bool((residual > _OPPOSITE_TOL).any()):
+        offsets = torch.arange(width, device=receiver.device)
+        cand = order[(start[:, None] + offsets).clamp(max=num_edges - 1)]
+        gaps = disp[cand] + disp[:, None]
+        cost = gaps.abs().amax(-1) if metric == "max" else torch.linalg.vector_norm(gaps, dim=-1)
+        valid = offsets < count[:, None]
+        if distinct:
+            valid = valid & (cand != ids[:, None])
+        cost = cost.masked_fill(~valid, float("inf"))
+        chosen = cand[ids, cost.argmin(dim=1)]
+        if not torch.equal(chosen[chosen], ids):
+            # Identical copies of an image can share the same nearest reverse.
+            # Greedy one-to-one tie breaking follows cost, then input edge order.
+            limit = atol
+            if rtol:
+                scales = disp.abs().amax(-1).clamp_min(1)
+                limit = atol + rtol * torch.maximum(scales[:, None], scales[cand])
+            rows, slots = torch.where((cost <= limit) & (ids[:, None] <= cand))
+            partners = cand[rows, slots].tolist()
+            costs = cost[rows, slots].tolist()
+            matching = [-1] * num_edges
+            for _, first, second in sorted(zip(costs, rows.tolist(), partners)):
+                if matching[first] == matching[second] == -1:
+                    matching[first], matching[second] = second, first
+            if -1 in matching:
+                raise ValueError("could not match every edge to a distinct reverse edge")
+            chosen = receiver.new_tensor(matching)
+    gap = disp[chosen] + disp
+    residual = gap.abs().amax(-1) if metric == "max" else torch.linalg.vector_norm(gap, dim=-1)
+    limit = atol
+    if rtol:
+        limit = atol + rtol * torch.maximum(disp.abs(), disp[chosen].abs()).amax(-1).clamp_min(1)
+    if (not torch.isfinite(residual).all() or bool((residual > limit).any()) or
+            (distinct and bool((chosen == ids).any()))):
         raise ValueError(
             "could not match every edge to the opposite displacement; each directed edge "
             "(receiver, sender, v) needs (sender, receiver, -v) in the neighbor list"
@@ -290,7 +390,7 @@ def reverse_edge_index(receiver: Tensor, sender: Tensor, vec: Tensor, num_nodes:
     return chosen
 
 
-@dataclass
+@dataclass(frozen=True, eq=False)
 class GraphContext:
     """Edges and cached derived quantities for one forward pass."""
 
@@ -332,6 +432,12 @@ class GraphContext:
             cutoff_values=cutoff_values, batch=inputs.get("batch_seg"), inputs=inputs,
         )
 
+        if requires.csr:
+            ctx.csr()
+        if requires.unit:
+            ctx.unit()
+        for request in requires.topology + requires.harmonics + requires.rotations:
+            request.prepare(ctx)
         if requires.path_triplets:
             ctx.path_pairs(exclude_backtracking=True)
         return ctx
@@ -375,12 +481,84 @@ class GraphContext:
         return self.cached(key, lambda: edge_rotation(
             self.vec if edge_sign == 1 else -self.vec, lmax, backend, frame=frame, mmax=mmax))
 
-    def csr(self) -> ReceiverCSR:
-        return self.cached("csr", lambda: receiver_csr(self.receiver, self.num_nodes))
+    def csr(self, indices=None) -> ReceiverCSR:
+        if indices is None:
+            return self.cached("csr", lambda: receiver_csr(self.receiver, self.num_nodes))
+        return self.cached(("csr", indices), lambda: receiver_csr(self.receiver[indices], self.num_nodes))
 
-    def reverse_edge(self) -> Tensor:
-        return self.cached("reverse_edge", lambda: reverse_edge_index(
-            self.receiver, self.sender, self.vec, self.num_nodes))
+    def edge_indices(self, cutoff, strict=False):
+        def select():
+            length = self.edge_length()
+            return torch.where(length < cutoff if strict else length <= cutoff)[0]
+        return self.cached(("edge_indices", cutoff, strict), select)
+
+    def subset(self, indices: Tensor) -> "GraphContext":
+        """A graph indexed locally in the order given by edge indices or a mask."""
+        def select():
+            fields = (self.sender, self.vec, self.dist, self.rbf, self.cutoff_values)
+            if any(t is not None and (not t.ndim or t.shape[0] != self.num_edges) for t in fields):
+                raise ValueError("receiver, sender, vectors, distances and radial features must describe the same edges")
+            graph = GraphContext(
+                self.receiver[indices], self.sender[indices], self.num_nodes,
+                vec=self.vec[indices] if self.vec is not None else None,
+                dist=self.dist[indices] if self.dist is not None else None,
+                rbf=self.rbf[indices] if self.rbf is not None else None,
+                cutoff_values=self.cutoff_values[indices] if self.cutoff_values is not None else None,
+                batch=self.batch, inputs=self.inputs)
+            if ("csr", indices) in self.cache:
+                graph.cache["csr"] = self.cache[("csr", indices)]
+            return graph
+        return self.cached(("subset", indices), select)
+
+    def within(self, cutoff: Optional[float]) -> "GraphContext":
+        """Edges strictly inside the cutoff, retaining input edge order."""
+        if cutoff is None:
+            return self
+        return self.cached(("within", cutoff), lambda: self.subset(self.edge_indices(cutoff, strict=True)))
+
+    def closest_indices(self, cutoff, max_neighbors):
+        """Indices of the nearest incoming edges strictly inside the cutoff."""
+        if max_neighbors < 1 or cutoff <= 0:
+            raise ValueError("max_neighbors and cutoff must be positive")
+
+        def select():
+            indices = self.edge_indices(cutoff, strict=True)
+            if indices.numel() and int(self.csr(indices).counts.max()) > max_neighbors:
+                rank = self.cached("distance_rank", lambda: receiver_rank(
+                    self.receiver, self.edge_length(), self.num_nodes))
+                return indices[rank[indices] < max_neighbors]
+            return indices
+        return self.cached(("closest", cutoff, max_neighbors), select)
+
+    def closest(self, cutoff, max_neighbors):
+        return self.subset(self.closest_indices(cutoff, max_neighbors))
+
+    def cross_pairs(self, other):
+        """For each edge of this graph, enumerate all of the other graph's incoming edges."""
+        return self.cached(("cross_pairs", other), lambda: cross_receiver_pairs(
+            self.receiver, other.receiver, self.num_nodes, csr=other.csr()))
+
+    def triplets(self, kind, *, cutoff=None, include_self=False, strict=False, exclude_backtracking=False):
+        """Ordered edge pairs in receiver, directed path, or DGL line-graph order."""
+        if kind == "receiver":
+            return self.receiver_pairs(cutoff, include_self, strict)
+        if kind in ("path", "line_graph"):
+            return self.path_pairs("atom" if kind == "line_graph" else "outgoing", exclude_backtracking)
+        raise ValueError(f"unknown triplet kind {kind!r}")
+
+    def quadruplets(self, interaction=None, *, images=False):
+        """Dihedrals with both outer edges in this graph and a central interaction edge."""
+        from .quadruplets import dihedral_quadruplets
+
+        if interaction is None:
+            interaction = self
+        return self.cached(("quadruplets", interaction, images),
+                           lambda: dihedral_quadruplets(self, interaction, images))
+
+    def reverse_edge(self, *, atol=_OPPOSITE_TOL, rtol=0.0, metric="l2", distinct=False) -> Tensor:
+        return self.cached(("reverse_edge", atol, rtol, metric, distinct), lambda: reverse_edge_index(
+            self.receiver, self.sender, self.vec, self.num_nodes,
+            atol=atol, rtol=rtol, metric=metric, distinct=distinct))
 
     def receiver_pairs(self, cutoff: Optional[float] = None, include_self: bool = False,
                        strict: bool = False) -> EdgePairs:
@@ -389,20 +567,21 @@ class GraphContext:
         ``strict`` uses ``dist < cutoff`` instead of ``dist <= cutoff``.
         """
         def build() -> EdgePairs:
-            subset = None
-            if cutoff is not None:
-                length = self.edge_length()
-                inside = length < float(cutoff) if strict else length <= float(cutoff)
-                subset = torch.where(inside)[0]
-            return receiver_pairs(self.receiver, self.num_nodes, subset, include_self)
+            subset = None if cutoff is None else self.edge_indices(cutoff, strict)
+            csr = self.csr(subset)
+            return receiver_pairs(self.receiver, self.num_nodes, subset, include_self, csr=csr)
 
         return self.cached(("receiver_pairs", cutoff, include_self, strict), build)
 
     def path_pairs(self, order: str = "outgoing", exclude_backtracking: bool = False) -> EdgePairs:
         def build():
-            incoming, outgoing = path_pairs(self.receiver, self.sender, self.num_nodes, order)
+            incoming, outgoing = path_pairs(self.receiver, self.sender, self.num_nodes, order, csr=self.csr())
             if exclude_backtracking:
                 keep = self.sender[incoming] != self.receiver[outgoing]
+                if order == "atom":
+                    # DGL line graphs allow a return to a different periodic image.
+                    gap = (self.vec[incoming] + self.vec[outgoing]).abs().amax(dim=-1)
+                    keep = keep | (gap > _OPPOSITE_TOL)
                 return EdgePairs(incoming[keep], outgoing[keep])
             return EdgePairs(incoming, outgoing)
 

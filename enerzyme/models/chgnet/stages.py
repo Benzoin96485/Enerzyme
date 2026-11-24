@@ -27,7 +27,8 @@ from torch.nn import Module
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.geometry import RangeSeparationLayer
 from ..layers.rbf import BaseRBF, BesselRBFLayer
-from .geometry import bond_graph, directed_bond_angle, undirected_bond_index
+from ..m3gnet.geometry import ThreeBodyPairs
+from .geometry import directed_bond_angle, undirected_bonds
 
 
 HiddenSpec = Union[int, Sequence[int], None]
@@ -89,6 +90,7 @@ class CHGNetEmbed(Embed):
         vij_sr: Tensor,
         idx_i_sr: Tensor,
         idx_j_sr: Tensor,
+        ctx,
     ):
         if atom_embedding.ndim != 2 or atom_embedding.shape[-1] != self.dim_embedding:
             raise ValueError(
@@ -109,9 +111,10 @@ class CHGNetEmbed(Embed):
                 raise ValueError(
                     f"{name} must be (E, {self.num_rbf}), got {tuple(basis.shape)} " f"for {n_edges} edges"
                 )
-        n_atoms = int(atom_embedding.shape[0])
-        bonds = undirected_bond_index(idx_i_sr, idx_j_sr, vij_sr)
-        angles = bond_graph(idx_i_sr, Dij_sr, n_atoms, self.bond_cutoff)
+        bonds = undirected_bonds(ctx)
+        first, second = ctx.triplets("receiver", cutoff=self.bond_cutoff)
+        keep = Dij_sr[second] < self.bond_cutoff
+        angles = ThreeBodyPairs(first[keep], second[keep])
         if bonds.representative.numel() == 0:
             bond = self.bond_embed(rbf.new_zeros(0, self.num_rbf))
             atom_weight = self.atom_weight(rbf.new_zeros(0, self.num_rbf))
@@ -144,6 +147,7 @@ class CHGNetEmbed(Embed):
             ctx.vec,
             ctx.receiver,
             ctx.sender,
+            ctx,
         )
         ctx.cache["atom_graph"] = atom_weight, directed
         if angle.shape[0]:

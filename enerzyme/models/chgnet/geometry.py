@@ -15,6 +15,7 @@ from typing import NamedTuple
 import torch
 from torch import Tensor
 
+from ..mp.graph import GraphContext
 from ..m3gnet.geometry import ThreeBodyPairs, receiver_triplets
 
 
@@ -54,49 +55,22 @@ def undirected_bond_index(
             "idx_i, idx_j, and vij must describe the same directed edges, "
             f"got {tuple(idx_i.shape)}, {tuple(idx_j.shape)}, {tuple(vij.shape)}"
         )
-    centers = idx_i.detach().to(dtype=torch.long).cpu().tolist()
-    neighbors = idx_j.detach().to(dtype=torch.long).cpu().tolist()
-    vectors = vij.detach().cpu()
-    grouped: dict[tuple[int, int], list[int]] = {}
-    for edge, (center, neighbor) in enumerate(zip(centers, neighbors)):
-        grouped.setdefault((center, neighbor), []).append(edge)
+    n_nodes = int(torch.maximum(idx_i.max(), idx_j.max()).item()) + 1
+    return undirected_bonds(GraphContext(idx_i, idx_j, n_nodes, vec=vij), atol)
 
-    directed = [-1] * n_edges
-    representative: list[int] = []
-    used = [False] * n_edges
-    tolerance = float(atol)
-    candidates: list[tuple[float, int, int]] = []
-    for edge, (center, neighbor) in enumerate(zip(centers, neighbors)):
-        for reverse in grouped.get((neighbor, center), ()):
-            if reverse <= edge:
-                continue
-            gap = vectors[edge] + vectors[reverse]
-            cost = float(gap.abs().max())
-            scale = torch.maximum(vectors[edge].abs(), vectors[reverse].abs()).max()
-            limit = tolerance + 1e-5 * float(scale.clamp(min=1.0))
-            if cost <= limit:
-                candidates.append((cost, edge, reverse))
-    for _cost, edge, reverse in sorted(candidates):
-        if used[edge] or used[reverse]:
-            continue
-        bond = len(representative)
-        directed[edge] = bond
-        directed[reverse] = bond
-        used[edge] = True
-        used[reverse] = True
-        representative.append(edge)
-    if any(not flag for flag in used):
-        missing = next(edge for edge, flag in enumerate(used) if not flag)
-        center, neighbor = centers[missing], neighbors[missing]
-        raise ValueError(
-            "CHGNet needs both directions of every bond, including the "
-            f"opposite periodic image. Edge {missing} ({center} -> {neighbor}) "
-            "has no reverse."
-        )
-    return UndirectedBonds(
-        torch.tensor(directed, dtype=torch.long, device=idx_i.device),
-        torch.tensor(representative, dtype=torch.long, device=idx_i.device),
-    )
+
+def undirected_bonds(ctx, atol=_PAIR_ATOL):
+    """Index the matched bonds in discrepancy order, breaking ties by input order."""
+    reverse = ctx.reverse_edge(atol=atol, rtol=1e-5, metric="max", distinct=True)
+    ids = torch.arange(ctx.num_edges, device=reverse.device)
+    first = ids[ids < reverse]
+    mismatch = (ctx.vec[first] + ctx.vec[reverse[first]]).detach().abs().amax(-1)
+    representative = first[torch.argsort(mismatch, stable=True)]
+    bonds = torch.arange(representative.numel(), device=ids.device)
+    directed = torch.empty_like(ids)
+    directed[representative] = bonds
+    directed[reverse[representative]] = bonds
+    return UndirectedBonds(directed, representative)
 
 
 def bond_graph(

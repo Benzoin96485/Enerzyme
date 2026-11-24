@@ -231,9 +231,9 @@ def bilinear_sphere_index(
 
 
 @torch.no_grad()
-def sphere_projection(vij, receiver, sender, distance, cutoff, num_nodes, n_lat, n_long):
+def sphere_projection(vij, receiver, sender, distance, cutoff, num_nodes, n_lat, n_long, *, pairs=None):
     """Graph-dependent interpolation indices and fixed-coordinate weights for all spin blocks."""
-    source, query = source_neighbor_pairs(receiver, sender, num_nodes)
+    source, query = source_neighbor_pairs(receiver, sender, num_nodes) if pairs is None else pairs
     if source.numel() == 0:
         return source.new_empty(4, 0), vij.new_empty(4, 0), source
     frames = edge_spin_frames(vij, receiver, distance, cutoff, num_nodes)

@@ -22,7 +22,7 @@ from torch import Tensor, nn
 
 from ..mp.basis.envelope import exponential_switch, polynomial_transition
 from ..layers import BaseAtomEmbedding, RangeSeparationLayer
-from .geometry import AnglePairs, angle_pairs
+from .geometry import AnglePairs
 
 
 class DPA3Embed(Embed):
@@ -115,11 +115,9 @@ class DPA3Embed(Embed):
             )
         self._check_edges(ctx.dist, ctx.vec, ctx.receiver, ctx.sender, num_nodes)
 
-        keep = ctx.dist < self.e_rcut
-        dist = ctx.dist[keep]
-        vij = ctx.vec[keep]
-        idx_i = ctx.receiver[keep]
-        idx_j = ctx.sender[keep]
+        edges = ctx.within(self.e_rcut)
+        dist, vij = edges.dist, edges.vec
+        idx_i, idx_j = edges.receiver, edges.sender
         edge_switch = self._switch(dist, self.e_rcut, self.e_rcut_smth)
         angle_switch = self._switch(dist, self.a_rcut, self.a_rcut_smth)
         denom = (dist + self.env_protection).clamp(min=1e-12)
@@ -131,7 +129,8 @@ class DPA3Embed(Embed):
             edge = self.act(self.edge_embed(radial))
 
         if self.update_angle:
-            pairs = angle_pairs(idx_i, dist, num_nodes, self.a_rcut)
+            first, second = edges.triplets("receiver", cutoff=self.a_rcut, include_self=True, strict=True)
+            pairs = AnglePairs(first, second, idx_i[first])
             angle = self._embed_angles(pairs, vij, dist)
         else:
             pairs = AnglePairs(idx_i.new_empty(0), idx_i.new_empty(0), idx_i.new_empty(0))

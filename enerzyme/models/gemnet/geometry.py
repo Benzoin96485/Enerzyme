@@ -18,6 +18,7 @@ import torch
 from torch import Tensor
 
 from ..mp.graph import (  # noqa: F401
+    GraphContext,
     cross_receiver_pairs,
     receiver_csr,
     receiver_pairs,
@@ -26,10 +27,8 @@ from ..mp.graph import (  # noqa: F401
 )
 
 
-_INV_SQRT_EPS = 1e-12
-# A true reverse edge has displacement -v, so the residual is identically zero.
-# Anything larger is a different periodic image and must not be paired.
-_OPPOSITE_TOL = 1e-4
+from ..mp.graph import _OPPOSITE_TOL
+from ..mp.quadruplets import QuadrupletGraph, angle_between
 
 
 class TripletGraph(NamedTuple):
@@ -38,21 +37,6 @@ class TripletGraph(NamedTuple):
     idx_edge: Tensor
     idx_other: Tensor
     angle: Tensor
-
-
-class QuadrupletGraph(NamedTuple):
-    """Quadruplets ``c → a − b ← d`` on one neighbor list."""
-
-    edge_ca: Tensor
-    edge_db: Tensor
-    int_local: Tensor
-    angle_cab: Tensor
-    angle_abd: Tensor
-    dihedral: Tensor
-    atom_c: Tensor
-    atom_a: Tensor
-    atom_b: Tensor
-    atom_d: Tensor
 
 
 def split_cutoff_edges(
@@ -72,22 +56,6 @@ def split_cutoff_edges(
         return emb, emb
     inter = torch.where(dist < int_cutoff)[0]
     return emb, inter
-
-
-def angle_between(left: Tensor, right: Tensor) -> Tensor:
-    """Unsigned angle in ``[0, π]`` between row vectors."""
-    if left.numel() == 0:
-        return left.new_zeros(0)
-    sine = torch.linalg.cross(left, right, dim=-1).norm(dim=-1)
-    sine = torch.maximum(sine, sine.new_tensor(1e-9))
-    cosine = (left * right).sum(dim=-1)
-    return torch.atan2(sine, cosine)
-
-
-def _reject(vec: Tensor, normal: Tensor) -> Tensor:
-    denom = (normal * normal).sum(dim=-1, keepdim=True).clamp(min=_INV_SQRT_EPS)
-    coef = (vec * normal).sum(dim=-1, keepdim=True) / denom
-    return vec - coef * normal
 
 
 def triplet_graph(
@@ -116,96 +84,10 @@ def triplet_graph(
     return TripletGraph(idx_edge, idx_other, angle)
 
 
-def _distinct_image(atom_a: Tensor, vec_a: Tensor, atom_b: Tensor, vec_b: Tensor) -> Tensor:
-    """True when the two neighbor images are not the same atom in the same cell."""
-    gap = (vec_a - vec_b).detach().square().sum(dim=-1).sqrt()
-    return (atom_a != atom_b) | (gap > _OPPOSITE_TOL)
-
-
-def quadruplet_graph(
-    idx_i: Tensor,
-    idx_j: Tensor,
-    dist: Tensor,
-    vij: Tensor,
-    emb_index: Tensor,
-    int_index: Tensor,
-    num_nodes: int,
-    images: bool = False,
-) -> QuadrupletGraph:
-    """Build ``c → a − b ← d`` quadruplets.
-
-    ``edge_ca`` and ``edge_db`` index the embedding-edge subset. ``int_local``
-    indexes ``int_index``. ``images=False`` drops any repeated atom index.
-    ``images=True`` keeps a second periodic image of the same atom when the
-    displacements differ. GemNet-Q uses the default. GemNet-OC uses ``True``.
-    """
-    empty_l = idx_i.new_empty(0)
-    empty_f = vij.new_zeros(0)
-    blank = QuadrupletGraph(
-        empty_l, empty_l, empty_l, empty_f, empty_f, empty_f,
-        empty_l, empty_l, empty_l, empty_l,
-    )
-    if emb_index.numel() == 0 or int_index.numel() == 0:
-        return blank
-
-    idx_i_emb = idx_i[emb_index]
-    idx_j_emb = idx_j[emb_index]
-    counts, offsets, perm = receiver_csr(idx_i_emb, num_nodes)
-    a_node = idx_i[int_index]
-    b_node = idx_j[int_index]
-    n_a = counts[a_node]
-    n_b = counts[b_node]
-    n_quad = n_a * n_b
-    total = int(n_quad.sum().item())
-    if total == 0:
-        return blank
-
-    device = idx_i.device
-    int_local = torch.repeat_interleave(torch.arange(int_index.numel(), device=device), n_quad)
-    prefix = torch.cumsum(n_quad, dim=0) - n_quad
-    slot = torch.arange(total, device=device) - torch.repeat_interleave(prefix, n_quad)
-    n_b_rep = torch.repeat_interleave(n_b, n_quad)
-    c_local = torch.div(slot, n_b_rep, rounding_mode="floor")
-    d_local = slot - c_local * n_b_rep
-    a_rep = torch.repeat_interleave(a_node, n_quad)
-    b_rep = torch.repeat_interleave(b_node, n_quad)
-    edge_ca = perm[offsets[a_rep] + c_local]
-    edge_db = perm[offsets[b_rep] + d_local]
-    atom_c = idx_j_emb[edge_ca]
-    atom_d = idx_j_emb[edge_db]
-    if images:
-        vij_emb = vij[emb_index]
-        vij_ab = vij[int_index][int_local]
-        vij_ca = vij_emb[edge_ca]
-        vij_db = vij_emb[edge_db]
-        keep = (
-            _distinct_image(atom_c, vij_ca, b_rep, vij_ab)
-            & _distinct_image(a_rep, -vij_ab, atom_d, vij_db)
-            & _distinct_image(atom_c, vij_ca, atom_d, vij_ab + vij_db)
-        )
-    else:
-        keep = (atom_c != b_rep) & (a_rep != atom_d) & (atom_c != atom_d)
-    edge_ca = edge_ca[keep]
-    edge_db = edge_db[keep]
-    int_local = int_local[keep]
-    atom_c = atom_c[keep]
-    atom_a = a_rep[keep]
-    atom_b = b_rep[keep]
-    atom_d = atom_d[keep]
-    if edge_ca.numel() == 0:
-        return blank
-
-    vij_emb = vij[emb_index]
-    vij_ab = vij[int_index[int_local]]
-    vij_ca = vij_emb[edge_ca]
-    vij_db = vij_emb[edge_db]
-    angle_cab = angle_between(vij_ca, vij_ab)
-    angle_abd = angle_between(-vij_ab, vij_db)
-    dihedral = angle_between(_reject(vij_ca, vij_ab), _reject(vij_db, -vij_ab))
-    return QuadrupletGraph(
-        edge_ca, edge_db, int_local, angle_cab, angle_abd, dihedral,
-        atom_c, atom_a, atom_b, atom_d,
-    )
+def quadruplet_graph(idx_i, idx_j, dist, vij, emb_index, int_index, num_nodes, images=False) -> QuadrupletGraph:
+    """Dihedral indices and angles for embedding and interaction edge selections."""
+    ctx = GraphContext(idx_i, idx_j, num_nodes, vec=vij, dist=dist)
+    return ctx.subset(emb_index).quadruplets(ctx.subset(int_index), images=images)
 
 
 class MixedTriplets(NamedTuple):
@@ -249,13 +131,9 @@ def cap_incoming_mask(
     local_i = idx_i[within]
     if int(local_i.min()) < 0 or int(local_i.max()) >= int(num_nodes):
         raise ValueError("receiver index is outside num_nodes")
-    local_d = distance[within]
-    counts = torch.bincount(local_i, minlength=int(num_nodes))
-    if int(counts.max().item()) <= int(max_neighbors):
-        return within
-    chosen = receiver_rank(local_i, local_d, int(num_nodes)) < int(max_neighbors)
-    mask = torch.zeros(idx_i.shape[0], dtype=torch.bool, device=idx_i.device)
-    mask[torch.where(within)[0][chosen]] = True
+    graph = GraphContext(idx_i, None, num_nodes, dist=distance)
+    mask = torch.zeros_like(within)
+    mask[graph.closest_indices(cutoff, max_neighbors)] = True
     return mask
 
 
@@ -334,19 +212,20 @@ def mixed_triplets(
     is the edge itself, or the same periodic image stored twice, and is
     dropped. A different image of the same atom is kept.
     """
-    empty = out_i.new_empty(0)
-    blank = MixedTriplets(empty, empty, out_v.new_zeros(0))
-    if out_i.numel() == 0 or in_i.numel() == 0 or int(num_nodes) == 0:
-        return blank
-    idx_edge, idx_other = cross_receiver_pairs(out_i, in_i, num_nodes)
-    if idx_edge.numel() == 0:
-        return blank
-    same = in_j[idx_other] == out_j[idx_edge]
+    query = GraphContext(out_i, out_j, num_nodes, vec=out_v)
+    keys = GraphContext(in_i, in_j, num_nodes, vec=in_v)
+    return mixed_graph_triplets(query, keys)
+
+
+def mixed_graph_triplets(query, keys) -> MixedTriplets:
+    """Filter cross-graph receiver pairs by sender image and compute their angles."""
+    idx_edge, idx_other = query.cross_pairs(keys)
+    same = keys.sender[idx_other] == query.sender[idx_edge]
     if bool(same.any()):
-        residual = (in_v[idx_other] - out_v[idx_edge]).detach().square().sum(dim=-1).sqrt()
+        residual = (keys.vec[idx_other] - query.vec[idx_edge]).detach().norm(dim=-1)
         same = same & (residual <= _OPPOSITE_TOL)
     keep = ~same
     idx_edge = idx_edge[keep]
     idx_other = idx_other[keep]
-    angle = angle_between(out_v[idx_edge], in_v[idx_other])
+    angle = angle_between(query.vec[idx_edge], keys.vec[idx_other])
     return MixedTriplets(idx_edge, idx_other, angle)
