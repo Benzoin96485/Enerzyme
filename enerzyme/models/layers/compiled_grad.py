@@ -30,6 +30,7 @@ def compiling_fullgraph() -> bool:
 @torch.compiler.assume_constant_result
 def _cpu_backend_may_use_inductor() -> bool:
     """Custom backends may delegate to Inductor. Eager backends do no kernel lowering."""
+    from torch._dynamo.backends.registry import lookup_backend
     from torch._dynamo.symbolic_convert import InstructionTranslator
 
     try:
@@ -37,8 +38,8 @@ def _cpu_backend_may_use_inductor() -> bool:
     except AttributeError:
         return True
     backend = getattr(wrapper, "_torchdynamo_orig_backend", wrapper)
-    name = getattr(backend, "compiler_name", getattr(backend, "__name__", None))
-    return name not in ("eager", "aot_eager")
+    compiler = getattr(backend, "compiler_fn", backend)
+    return all(compiler is not lookup_backend(name) for name in ("eager", "aot_eager"))
 
 
 def uses_cpu_inductor_forces(core, inputs, *, include_eval=False):
@@ -213,8 +214,8 @@ def _scripted_force_training(core, inputs):
 
 
 @torch.compiler.disable(recursive=False)
-def retained_inference(core, inputs):
-    """Compile each inference partition with reusable backward activations.
+def retained_inference(core, inputs, *, joint=False):
+    """Compile inference with reusable backward activations.
 
     Force evaluation keeps the energy graph for other response heads and for
     subsequent gradients requested by the caller. An eagerly lowered dynamic
@@ -224,8 +225,9 @@ def retained_inference(core, inputs):
     from contextlib import nullcontext
     from torch._functorch import config
 
+    run = partial(compiled_coordinate_vjp, core) if joint else core._run_layers
     if not hasattr(config, "donated_buffer"):
-        return core._run_layers(inputs)
+        return run(inputs)
 
     # The Inductor FX cache key on PyTorch 2.13 omits AOTAutograd's donated
     # input indices. A cached single-use backward can overwrite buffers even
@@ -238,7 +240,7 @@ def retained_inference(core, inputs):
     else:
         cache_scope = nullcontext()
     with config.patch(donated_buffer=False), cache_scope:
-        return core._run_layers(inputs)
+        return run(inputs)
 
 
 def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, topology=None,

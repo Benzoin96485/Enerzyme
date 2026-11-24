@@ -271,7 +271,12 @@ def test_dpa3_cpu_inference_keeps_reusable_coordinate_gradients(monkeypatch, dty
 
     expected = differentiate(model)
     monkeypatch.setattr(torch._inductor, "compile", unexpected_lowering)
-    actual = differentiate(torch.compile(model))
+    # A custom compiler can delegate to Inductor under any Python name.
+    def eager(graph, inputs):
+        return torch._inductor.compile(graph, inputs)
+
+    backend = eager if dtype == torch.float64 else "inductor"
+    actual = differentiate(torch.compile(model, backend=backend))
     for value, target in zip(actual, expected):
         torch.testing.assert_close(value, target, rtol=0, atol=0)
 

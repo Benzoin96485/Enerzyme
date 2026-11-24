@@ -168,10 +168,11 @@ class BaseFFCore(BaseFFModule):
                     return native_cpu_forces(self, net_input)
             if compiling_fullgraph():
                 return forward_with_coordinate_gradients(self, net_input)
-            if self.training or (getattr(self, "_joint_cpu_force_inference", False)
-                                 and uses_cpu_inductor_forces(self, net_input, include_eval=True)):
+            if self.training:
                 return compiled_coordinate_vjp(self, net_input)
-            return retained_inference(self, net_input)
+            joint = (getattr(self, "_joint_cpu_force_inference", False)
+                     and uses_cpu_inductor_forces(self, net_input, include_eval=True))
+            return retained_inference(self, net_input, joint=joint)
         return self._run_layers(net_input)
 
     def _run_layers(self, net_input):
