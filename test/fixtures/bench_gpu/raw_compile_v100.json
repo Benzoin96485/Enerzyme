@@ -677,6 +677,8 @@
     "nequip/float64": "5a994c4",
     "allegro/float32": "5a994c4",
     "allegro/float64": "5a994c4",
+    "dpa4/float32": "9aab3db",
+    "dpa4/float64": "9aab3db",
     "e2former_lsr/float32": "aadb4bd",
     "e2former_lsr/float64": "aadb4bd"
   },
@@ -689,6 +691,8 @@
       "fixture_sha256": "5e05a04015053aba14911156a32ddca45ba80841aa3b56f2acacfe2f231b06be",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": true,
       "matches_current_source": true,
       "attempt_started_unix": 1795522427,
@@ -735,6 +739,8 @@
       "fixture_sha256": "ec0fb0b8f18d6eaef1ff024bf23fd7c439df954f7e76ba7e0d2c0314a3acd21b",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": true,
       "matches_current_source": true,
       "attempt_started_unix": 1795524536,
@@ -781,6 +787,8 @@
       "fixture_sha256": "ec0fb0b8f18d6eaef1ff024bf23fd7c439df954f7e76ba7e0d2c0314a3acd21b",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": true,
       "matches_current_source": true,
       "attempt_started_unix": 1795525143,
@@ -827,6 +835,8 @@
       "fixture_sha256": "5e05a04015053aba14911156a32ddca45ba80841aa3b56f2acacfe2f231b06be",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": true,
       "matches_current_source": true,
       "attempt_started_unix": 1795525789,
@@ -873,6 +883,8 @@
       "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "0",
+      "cuda_visible_devices": "GPU-2c6a0c04-8630-be10-f0e0-b467c595f452",
+      "allocated_gpu_uuid": "GPU-2c6a0c04-8630-be10-f0e0-b467c595f452",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795522961,
@@ -919,6 +931,8 @@
       "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795523610,
@@ -965,6 +979,8 @@
       "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "0",
+      "cuda_visible_devices": "GPU-2c6a0c04-8630-be10-f0e0-b467c595f452",
+      "allocated_gpu_uuid": "GPU-2c6a0c04-8630-be10-f0e0-b467c595f452",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795524055,
@@ -1006,6 +1022,8 @@
       "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "0",
+      "cuda_visible_devices": "GPU-2c6a0c04-8630-be10-f0e0-b467c595f452",
+      "allocated_gpu_uuid": "GPU-2c6a0c04-8630-be10-f0e0-b467c595f452",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795525301,
@@ -1040,6 +1058,148 @@
       },
       "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "d02641ffcbab74ee3edb23045c2fe33210bffb781d2c2e3c0c0f1f6ad27b6c71", "cache_had_prior_completed_process": true, "reps": 5, "timings": {"mol_batch_32x20": [[44.61555206216872, 2673.1318359375, 20, 530], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err5", "err5"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.0658141036401503e-14, "force_max_abs": 7.531752999057062e-13, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "4c5a19c10c726e3269780c516b1fbd2f80dc51245da65dacfcd78b0e5be48e01", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[36.06473887339234, 1655.9462890625, 12, 1063], [99.43639393895864, 7346.3759765625, 1, 596]], "bulk_256": [[31.03170613758266, 1346.603515625, 1, 529], [83.35413201712072, 5961.43115234375, 1, 660]], "large_2000": [[155.4498840123415, 8434.40966796875, 1, 529], "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 1.212807632100521e-12, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 121, "reference_active_parameters": 121, "energy_max_abs": 0.0039674429885359075, "force_max_abs": 0.8819251396220318, "gradient_max_abs": 5971.1769946781715}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 1.1668443988810395e-13, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 121, "reference_active_parameters": 121, "energy_max_abs": 0.0003417621720700481, "force_max_abs": 0.03980913352662396, "gradient_max_abs": 579.2284868999977}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 9.094947017729282e-13, "force_max_abs": 4.065636716177323e-12, "gradient_max_abs": 0.0}}}}]
     },
+    "visnet/float32/aadb4bd/pair": {
+      "job": "6318565",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "dc10a4693f7850e8ced5c2b8270c640425bc7d5d7bf7799bf5db4bc688e5e54d",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795526323,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 8.940696716308594e-08
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 3.814697265625e-06,
+          "Fa_max_abs": 7.152557373046875e-07
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 4.57763671875e-05,
+          "Fa_max_abs": 7.473863661289215e-08
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 2.86102294921875e-06,
+          "Fa_max_abs": 8.642673492431641e-07
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "fc0ec97bd7a5249a80a6d0c96371eb9448f5c90b37532121e532dd89be95f3b8", "cache_had_prior_completed_process": true, "reps": 5, "timings": {"mol_batch_32x20": [[90.55734216235578, 4929.826171875, 27, 940], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.9073486328125e-06, "force_max_abs": 1.0728836059570312e-06, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "cbe7b2238123fe2c694003e0b82ad195ab4455684661f4cb3c8911c24cb4c136", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[58.15822212025523, 3575.4873046875, 23, 1001], [149.04219307936728, 7065.330078125, 1, 1133]], "bulk_256": [[43.935082852840424, 2640.96142578125, 13, 1039], [114.08968106843531, 5375.02685546875, 1, 1154]], "large_2000": [[232.31097008101642, 17293.99267578125, 0, 0], "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.9073486328125e-06, "force_max_abs": 1.430511474609375e-06, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 199, "reference_active_parameters": 197, "energy_max_abs": 2.86102294921875e-06, "force_max_abs": 1.430511474609375e-06, "gradient_max_abs": 0.0029296875, "different_gradient_names": ["blocks.8.module.s_proj.bias", "blocks.8.module.s_proj.weight"]}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 8.940696716308594e-08, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 199, "reference_active_parameters": 197, "energy_max_abs": 0.0, "force_max_abs": 1.6391277313232422e-07, "gradient_max_abs": 0.0078125, "different_gradient_names": ["blocks.8.module.s_proj.bias", "blocks.8.module.s_proj.weight"]}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0003662109375, "force_max_abs": 1.1920928955078125e-07, "gradient_max_abs": 0.0}}}}],
+      "cross_eager_cpu_baseline": {
+        "source": {
+          "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+          "torch": "2.13.0+cu126",
+          "device": "cpu",
+          "job": "6319570",
+          "fixture_sha256": "dc10a4693f7850e8ced5c2b8270c640425bc7d5d7bf7799bf5db4bc688e5e54d",
+          "errors": {},
+          "systems": {
+            "large_2000": {
+              "atoms": 2000,
+              "edges": 83828
+            }
+          },
+          "requested_systems": ["large_2000"],
+          "requested_modes": ["infer"],
+          "complete": true
+        },
+        "candidate": "aadb4bd",
+        "gpu_job": "6318565",
+        "measurements": {
+          "large_2000/infer": {
+            "passed": true,
+            "E_max_abs": 0.001953125,
+            "Fa_max_abs": 3.129243850708008e-07
+          }
+        }
+      }
+    },
+    "visnet/float64/aadb4bd/pair": {
+      "job": "6318185",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "dc10a4693f7850e8ced5c2b8270c640425bc7d5d7bf7799bf5db4bc688e5e54d",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "0",
+      "cuda_visible_devices": "GPU-2c6a0c04-8630-be10-f0e0-b467c595f452",
+      "allocated_gpu_uuid": "GPU-2c6a0c04-8630-be10-f0e0-b467c595f452",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795527017,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 1.7694179454963432e-16
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 5.329070518200751e-15,
+          "Fa_max_abs": 1.0824674490095276e-15
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 2.220446049250313e-16
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 8.881784197001252e-15,
+          "Fa_max_abs": 1.3322676295501878e-15
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "1d41348453ac642de4cd5c22df95fb5b491ebeda7f3ab6277f148b7a80990222", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[185.06765202619135, 9914.14794921875, 27, 940], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 5.329070518200751e-15, "force_max_abs": 1.887379141862766e-15, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "8e26bfcf262debddc52daa37ffd5dbabcb9054e650a7b647f919bb2b655b53eb", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[103.62878208979964, 7188.51513671875, 23, 1001], [277.55853394046426, 14245.3603515625, 1, 1133]], "bulk_256": [[82.60217099450529, 5252.6005859375, 13, 1039], [218.73731911182404, 10715.18994140625, 1, 1154]], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 1.9984014443252818e-15, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 199, "reference_active_parameters": 197, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 1.887379141862766e-15, "gradient_max_abs": 7.275957614183426e-12, "different_gradient_names": ["blocks.8.module.s_proj.bias", "blocks.8.module.s_proj.weight"]}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 2.220446049250313e-16, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 199, "reference_active_parameters": 197, "energy_max_abs": 5.684341886080802e-14, "force_max_abs": 3.3306690738754696e-16, "gradient_max_abs": 4.3655745685100555e-11, "different_gradient_names": ["blocks.8.module.s_proj.bias", "blocks.8.module.s_proj.weight"]}}, "large_2000": {}}}]
+    },
+    "quinnet/float32/aadb4bd/pair": {
+      "job": "6318565",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "07a02b4c04bea4bb56ad87b7bfdbc5f1d07ebb00700af10fc18703d377bbf289",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795527118,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 3.814697265625e-06,
+          "Fa_max_abs": 5.960464477539063e-08
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 1.2516975402832031e-06,
+          "Fa_max_abs": 5.960464477539062e-07
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 3.814697265625e-06,
+          "Fa_max_abs": 7.450580596923828e-08
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 9.5367431640625e-07,
+          "Fa_max_abs": 7.748603820800781e-07
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "dfe8f963ce450bba089fd24afda03f2fb7b731fe805496c31010ce85a4f20e91", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[109.08462293446064, 7180.974609375, 26, 795], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.1920928955078125e-06, "force_max_abs": 1.9371509552001953e-06, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "0fc888cc93f163fc6ff558f33e2d1bb103f82fd80a90ac561dcd1677de087e1c", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[106.86958697624505, 7195.3544921875, 23, 882], [228.2403539866209, 9569.04541015625, 1, 978]], "bulk_256": [[84.52074811793864, 4265.8681640625, 13, 896], [179.18947897851467, 7377.615234375, 1, 1011]], "large_2000": [[497.55183001980186, 27853.30712890625, 0, 0], "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 2.1457672119140625e-06, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 184, "reference_active_parameters": 182, "energy_max_abs": 1.5497207641601562e-06, "force_max_abs": 1.7583370208740234e-06, "gradient_max_abs": 0.00048828125, "different_gradient_names": ["blocks.4.module.s_proj.bias", "blocks.4.module.s_proj.weight"]}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.1444091796875e-05, "force_max_abs": 7.450580596923828e-08, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 184, "reference_active_parameters": 182, "energy_max_abs": 3.814697265625e-06, "force_max_abs": 1.7881393432617188e-07, "gradient_max_abs": 0.00390625, "different_gradient_names": ["blocks.4.module.s_proj.bias", "blocks.4.module.s_proj.weight"]}}, "large_2000": {"infer": {"reference_error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 308.25 MiB is free. Including non-PyTorch memory, this process has 31.43 GiB memory in use. Of the allocated memory 28.50 GiB is allocated by PyTorch, and 2.55 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)"}}}}]
+    },
     "equireann/float32/bf7725d/pair": {
       "job": "6318510",
       "host": "d-7-5-2",
@@ -1047,6 +1207,8 @@
       "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": true,
       "matches_current_source": true,
       "attempt_started_unix": 1795523043,
@@ -1093,6 +1255,8 @@
       "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": true,
       "matches_current_source": true,
       "attempt_started_unix": 1795523260,
@@ -2032,6 +2196,8 @@
       "fixture_sha256": "59d155a9145853757f9a91c5c8c79e8b78ba8a2cec4722eec8261bd4fdbb81ab",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795521054,
@@ -2053,6 +2219,8 @@
       "fixture_sha256": "59d155a9145853757f9a91c5c8c79e8b78ba8a2cec4722eec8261bd4fdbb81ab",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795521191,
@@ -2074,6 +2242,8 @@
       "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795521334,
@@ -2095,6 +2265,8 @@
       "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795520702,
@@ -2116,6 +2288,8 @@
       "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795521553,
@@ -2137,6 +2311,8 @@
       "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795520939,
@@ -2158,6 +2334,8 @@
       "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
       "selected_candidate": false,
       "matches_current_source": false,
       "attempt_started_unix": 1795522785,
@@ -2174,6 +2352,47 @@
     }
   },
   "frozen_partial_attempts": {
+    "visnet/float32/aadb4bd/pair_14-visnet-float32_6318510_1795526016": {
+      "job": "6318510",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "dc10a4693f7850e8ced5c2b8270c640425bc7d5d7bf7799bf5db4bc688e5e54d",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "cuda_visible_devices": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "allocated_gpu_uuid": "GPU-590cd023-ff31-c1a2-8267-e0afba042725",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795526016,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 3.0517578125e-05,
+          "Fa_max_abs": 9.313225746154785e-08
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 1.9073486328125e-06,
+          "Fa_max_abs": 7.152557373046875e-07
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 1.52587890625e-05,
+          "Fa_max_abs": 7.450580596923828e-08
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 2.86102294921875e-06,
+          "Fa_max_abs": 7.152557373046875e-07
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "fc0ec97bd7a5249a80a6d0c96371eb9448f5c90b37532121e532dd89be95f3b8", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[91.4472509175539, 4930.322265625, 27, 940], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.814697265625e-06, "force_max_abs": 1.430511474609375e-06, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": "timeout", "cache_configuration_sha256": "cbe7b2238123fe2c694003e0b82ad195ab4455684661f4cb3c8911c24cb4c136", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[59.531728038564324, 3575.9833984375, 23, 1001], "err10"], "bulk_256": ["err10", "err10"], "large_2000": ["err10", "err10"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.814697265625e-06, "force_max_abs": 1.1920928955078125e-06, "gradient_max_abs": 0.0}}}, "missing_mode_checkpoints": ["bulk_256/infer", "bulk_256/train", "large_2000/infer", "large_2000/train", "mol_batch_32x20/train"]}],
+      "reason": "allocation deadline before all legs completed",
+      "kind": "pair",
+      "complete_cells": ["mol_batch_32x20/infer"]
+    },
     "spinconv/float32/c32ede3/pair_98-spinconv-float32_6317929_1795521903": {
       "job": "6317929",
       "host": "d-7-5-2",
@@ -2886,6 +3105,17 @@
       "passed": false,
       "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
     },
+    "alphanet/float64/9b460bf/acceptance": {
+      "job": "6318185",
+      "requested_precision": "float64",
+      "architecture": "alphanet",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "allocated_gpu_index": "0",
+      "source": "9b460bff9c3537ab74949ffad0da3411559125c7",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "passed": false,
+      "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+    },
     "equireann/float32/bf7725d/acceptance": {
       "job": "6318510",
       "requested_precision": "float32",
@@ -3255,9 +3485,191 @@
         }
       },
       "finished": true
+    },
+    "spookynet/float32/610ad2d": {
+      "architecture": "spookynet",
+      "precision": "float32",
+      "source": "610ad2db7b4bc3cc70d3078fb33c7e34a3150920",
+      "job": "6318185",
+      "comparisons": {
+        "bare": {
+          "source": "610ad2db7b4bc3cc70d3078fb33c7e34a3150920",
+          "architecture": "spookynet",
+          "precision": "float32",
+          "scope": "bare",
+          "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 2.384185791015625e-07, "force_max_abs": 1.0728836059570312e-06, "gradient_max_abs": 1.52587890625e-05}, {"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 2.384185791015625e-07, "force_max_abs": 1.0728836059570312e-06, "gradient_max_abs": 1.52587890625e-05}]
+            },
+            "bulk_256": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            },
+            "large_2000": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          },
+          "passed": false,
+          "finished": true
+        },
+        "caller_scoped": {
+          "source": "610ad2db7b4bc3cc70d3078fb33c7e34a3150920",
+          "architecture": "spookynet",
+          "precision": "float32",
+          "scope": "caller_scoped",
+          "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 2.384185791015625e-07, "force_max_abs": 1.0728836059570312e-06, "gradient_max_abs": 1.52587890625e-05}, {"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 2.384185791015625e-07, "force_max_abs": 1.0728836059570312e-06, "gradient_max_abs": 1.52587890625e-05}]
+            },
+            "bulk_256": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 0.0, "force_max_abs": 7.450580596923828e-09, "gradient_max_abs": 1.9073486328125e-06}, {"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 0.0, "force_max_abs": 7.450580596923828e-09, "gradient_max_abs": 1.9073486328125e-06}]
+            },
+            "large_2000": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 5.7220458984375e-06, "force_max_abs": 1.1175870895385742e-08, "gradient_max_abs": 3.0517578125e-05}, {"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 5.7220458984375e-06, "force_max_abs": 1.1175870895385742e-08, "gradient_max_abs": 3.0517578125e-05}]
+            }
+          },
+          "passed": true,
+          "finished": true
+        }
+      },
+      "finished": true
+    },
+    "spookynet/float32/c32ede3": {
+      "architecture": "spookynet",
+      "precision": "float32",
+      "source": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+      "job": "6318185",
+      "comparisons": {
+        "bare": {
+          "source": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+          "architecture": "spookynet",
+          "precision": "float32",
+          "scope": "bare",
+          "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 2.384185791015625e-07, "force_max_abs": 1.0728836059570312e-06, "gradient_max_abs": 1.52587890625e-05}, {"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 2.384185791015625e-07, "force_max_abs": 1.0728836059570312e-06, "gradient_max_abs": 1.52587890625e-05}]
+            },
+            "bulk_256": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            },
+            "large_2000": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          },
+          "passed": false,
+          "finished": true
+        },
+        "caller_scoped": {
+          "source": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+          "architecture": "spookynet",
+          "precision": "float32",
+          "scope": "caller_scoped",
+          "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 3.5762786865234375e-07, "force_max_abs": 9.5367431640625e-07, "gradient_max_abs": 1.52587890625e-05}, {"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 3.5762786865234375e-07, "force_max_abs": 9.5367431640625e-07, "gradient_max_abs": 1.52587890625e-05}]
+            },
+            "bulk_256": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 4.76837158203125e-07, "force_max_abs": 7.450580596923828e-09, "gradient_max_abs": 1.9073486328125e-06}, {"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 4.76837158203125e-07, "force_max_abs": 7.450580596923828e-09, "gradient_max_abs": 1.9073486328125e-06}]
+            },
+            "large_2000": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 9.5367431640625e-06, "force_max_abs": 7.450580596923828e-09, "gradient_max_abs": 3.0517578125e-05}, {"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 9.5367431640625e-06, "force_max_abs": 7.450580596923828e-09, "gradient_max_abs": 3.0517578125e-05}]
+            }
+          },
+          "passed": true,
+          "finished": true
+        }
+      },
+      "finished": true
     }
   },
-  "frozen_matched_dropout_controls": {},
+  "frozen_matched_dropout_controls": {
+    "alphanet/float64/9b460bf": {
+      "architecture": "alphanet",
+      "precision": "float64",
+      "job": "6318185",
+      "source": "9b460bff9c3537ab74949ffad0da3411559125c7",
+      "allocated_gpu_index": "0",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "systems": {
+        "mol_batch_32x20": {
+          "numerical": {
+            "passed": false,
+            "active_parameters": 121,
+            "reference_active_parameters": 121,
+            "energy_max_abs": 8.881784197001252e-15,
+            "force_max_abs": 1.4770407119613083e-12,
+            "gradient_max_abs": 4.20986907556653e-08
+          },
+          "capture": {
+            "new_graphs": 2,
+            "new_calls": 1192
+          },
+          "error": null
+        },
+        "bulk_256": {
+          "numerical": {
+            "passed": true,
+            "active_parameters": 121,
+            "reference_active_parameters": 121,
+            "energy_max_abs": 0.0,
+            "force_max_abs": 2.5490720645393594e-13,
+            "gradient_max_abs": 1.3988028513267636e-09
+          },
+          "capture": {
+            "new_graphs": 1,
+            "new_calls": 660
+          },
+          "error": null
+        }
+      },
+      "finished": true,
+      "method": "Frozen weights and unmodified training dropout probabilities. Ordinary Inductor uses native random draws under fallback_random=True for this diagnostic. The default run is separately archived."
+    }
+  },
+  "frozen_compiled_cpu_oracles": {},
   "frozen_precision_controls": {
     "equflash/1aa0f8b/base_native_gpu_repeat": {
       "architecture": "equflash",
@@ -3987,29 +4399,30 @@
     "err6": "InternalTorchDynamoError: NotImplementedError:",
     "err7": "CUDA out of memory",
     "err8": "self._call_impl(*args, **kwargs)",
-    "err9": "/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl"
+    "err9": "/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl",
+    "err10": "timeout after 131s"
   },
   "assessment": {
-    "attempted_architecture_precision_pairs": 46,
+    "attempted_architecture_precision_pairs": 49,
     "expected_architecture_precision_pairs": 116,
     "expected_mode_system_cells": 696,
-    "selected_frozen_full_architecture_precision_pairs": 20,
-    "current_source_full_architecture_precision_pairs": 20,
-    "terminal_partial_frozen_attempts": 1,
+    "selected_frozen_full_architecture_precision_pairs": 23,
+    "current_source_full_architecture_precision_pairs": 23,
+    "terminal_partial_frozen_attempts": 2,
     "selected_partial_cells": 0,
     "historical_architecture_precision_pairs": 46,
-    "completed_frozen_attempts": 37,
-    "comparable_mode_system_cells": 29,
-    "comparable_metrics": 58,
+    "completed_frozen_attempts": 40,
+    "comparable_mode_system_cells": 32,
+    "comparable_metrics": 64,
     "above_3_percent": 3,
-    "frozen_mode_system_cells": 121,
-    "frozen_candidate_only_cells": 95,
+    "frozen_mode_system_cells": 139,
+    "frozen_candidate_only_cells": 99,
     "frozen_candidate_only_native_training_cells": 15,
     "frozen_candidate_timing_incomplete_baseline_cells": 0,
     "frozen_baseline_only_cells": 0,
-    "frozen_both_unavailable_cells": 9,
-    "frozen_numerical_or_reference_failures": 6,
+    "frozen_both_unavailable_cells": 13,
+    "frozen_numerical_or_reference_failures": 13,
     "excesses": [{"model_precision": "spookynet/float32", "system": "bulk_256", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 20.203, "baseline_value": 73.45556640625, "candidate_value": 88.2958984375}, {"model_precision": "spookynet/float64", "system": "bulk_256", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.015, "baseline_value": 131.10009765625, "candidate_value": 158.650390625}, {"model_precision": "alphanet/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.936, "baseline_value": 2673.1318359375, "candidate_value": 3259.520263671875}],
-    "frozen_failed_cells": [{"model_precision": "equflash/float32", "system": "mol_batch_32x20", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflash/float32", "system": "bulk_256", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "e2former/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "e2former_v2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}]
+    "frozen_failed_cells": [{"model_precision": "equflash/float32", "system": "mol_batch_32x20", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflash/float32", "system": "bulk_256", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "e2former/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "e2former_v2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "visnet/float64", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "mol_batch_32x20", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "bulk_256", "mode": "train", "candidate": "aadb4bd", "cross_eager": true, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "quinnet/float32", "system": "large_2000", "mode": "infer", "candidate": "aadb4bd", "cross_eager": null, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "native reference unavailable: OutOfMemoryError: CUDA out of memory. Tried to allocate 368.00 MiB. GPU 0 has a total capacity of 31.73 GiB of which 308.25 MiB is free. Including non"}]
   }
 }
