@@ -671,6 +671,8 @@
     "quinnet/float64": "aadb4bd",
     "visnet_lsrm/float32": "aadb4bd",
     "visnet_lsrm/float64": "aadb4bd",
+    "equireann/float32": "bf7725d",
+    "equireann/float64": "bf7725d",
     "nequip/float32": "5a994c4",
     "nequip/float64": "5a994c4",
     "allegro/float32": "5a994c4",
@@ -726,6 +728,277 @@
       },
       "legs": [{"side": "new", "exit": 0, "cache_configuration_sha256": "acd0c498d507ef2578fc9bd346ff0269f542e4f7e20c21648f609010c1f0155d", "cache_had_prior_completed_process": false, "reps": 17, "timings": {"mol_batch_32x20": [[5.24943508207798, 210.68359375, 11, 424], [7.267719134688377, 384.71875, 1, 281]], "bulk_256": [[5.233195144683123, 178.85302734375, 1, 184], [6.787439808249474, 315.54541015625, 1, 298]], "large_2000": [[16.158956103026867, 1062.171875, 1, 184], [34.039085963740945, 1953.26318359375, 1, 295]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 9.992007221626409e-16, "force_max_abs": 1.096345236817342e-15, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 17, "reference_active_parameters": 17, "energy_max_abs": 9.992007221626409e-16, "force_max_abs": 1.4432899320127035e-15, "gradient_max_abs": 9.947598300641403e-14}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.7763568394002505e-15, "force_max_abs": 5.551115123125783e-16, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 17, "reference_active_parameters": 17, "energy_max_abs": 2.6645352591003757e-15, "force_max_abs": 9.71445146547012e-16, "gradient_max_abs": 1.1368683772161603e-13}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.552713678800501e-15, "force_max_abs": 5.412337245047638e-16, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 17, "reference_active_parameters": 17, "energy_max_abs": 5.684341886080802e-14, "force_max_abs": 1.0547118733938987e-15, "gradient_max_abs": 1.546140993013978e-11}}}}, {"side": "base", "exit": 0, "cache_configuration_sha256": "006fa11cbc2a57b263c8fe95eb4476972016ade5495819947e5eb43302cc8ac7", "cache_had_prior_completed_process": false, "reps": 17, "timings": {"mol_batch_32x20": ["err6", "err6"], "bulk_256": ["err6", "err6"], "large_2000": [[31.93625807762146, 1401.9072265625, 0, 0], [104.49694702401757, 2329.49072265625, 0, 0]]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 5.273559366969494e-16, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 17, "reference_active_parameters": 17, "energy_max_abs": 0.0, "force_max_abs": 5.273559366969494e-16, "gradient_max_abs": 1.8189894035458565e-12}}}}, {"side": "base", "exit": 0, "cache_configuration_sha256": "006fa11cbc2a57b263c8fe95eb4476972016ade5495819947e5eb43302cc8ac7", "cache_had_prior_completed_process": true, "reps": 17, "timings": {"mol_batch_32x20": ["err6", "err6"], "bulk_256": ["err6", "err6"], "large_2000": [[31.82175289839506, 1401.9072265625, 0, 0], [104.4732159934938, 2329.49072265625, 0, 0]]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.552713678800501e-15, "force_max_abs": 4.787836793695988e-16, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 17, "reference_active_parameters": 17, "energy_max_abs": 2.1316282072803006e-14, "force_max_abs": 6.106226635438361e-16, "gradient_max_abs": 7.275957614183426e-12}}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "acd0c498d507ef2578fc9bd346ff0269f542e4f7e20c21648f609010c1f0155d", "cache_had_prior_completed_process": true, "reps": 17, "timings": {"mol_batch_32x20": [[5.689969984814525, 210.68359375, 11, 424], [7.5855141039937735, 384.71826171875, 1, 281]], "bulk_256": [[5.1406980492174625, 179.09326171875, 1, 184], [7.026995997875929, 315.78564453125, 1, 298]], "large_2000": [[16.182668041437864, 1062.171875, 1, 184], [34.83245917595923, 1953.36962890625, 1, 295]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 9.992007221626409e-16, "force_max_abs": 1.27675647831893e-15, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 17, "reference_active_parameters": 17, "energy_max_abs": 8.881784197001252e-16, "force_max_abs": 1.1102230246251565e-15, "gradient_max_abs": 7.105427357601002e-14}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.6645352591003757e-15, "force_max_abs": 5.551115123125783e-16, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 17, "reference_active_parameters": 17, "energy_max_abs": 1.7763568394002505e-15, "force_max_abs": 1.1171619185290638e-15, "gradient_max_abs": 1.3642420526593924e-12}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.552713678800501e-15, "force_max_abs": 4.718447854656915e-16, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 17, "reference_active_parameters": 17, "energy_max_abs": 1.0658141036401503e-14, "force_max_abs": 1.1379786002407855e-15, "gradient_max_abs": 5.229594535194337e-12}}}}]
     },
+    "nequip/float32/5a994c4/pair": {
+      "job": "6318510",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "ec0fb0b8f18d6eaef1ff024bf23fd7c439df954f7e76ba7e0d2c0314a3acd21b",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795524536,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 9.685754776000977e-08
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 9.12696123123169e-08,
+          "Fa_max_abs": 1.2293457984924316e-07
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 1.9073486328125e-06,
+          "Fa_max_abs": 1.0803341865539551e-07
+        },
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 9.5367431640625e-07,
+          "Fa_max_abs": 1.341104507446289e-07
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 1.1920928955078125e-07,
+          "Fa_max_abs": 1.1734664440155029e-07
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 1.3317912817001343e-07,
+          "Fa_max_abs": 1.1362135410308838e-07
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "0d45f90e7ba9ac8bacde91e8c5b4688275c129b985e00cb9cbfc159b2e991fc7", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": ["err2", "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "43501a740743428c409e9cec24bf94a46140b8e727e798dbbd6c480a83def40c", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[8.140977937728167, 182.88671875, 12, 1456], [15.205302042886615, 377.50341796875, 1, 783]], "bulk_256": [[8.391221053898335, 138.189453125, 1, 759], [13.143471907824278, 292.224609375, 1, 846]], "large_2000": [[19.938810961320996, 798.359375, 1, 759], [47.69304487854242, 1789.2646484375, 1, 843]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.7508864402770996e-07, "force_max_abs": 2.7939677238464355e-07, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 23, "reference_active_parameters": 23, "energy_max_abs": 2.2351741790771484e-07, "force_max_abs": 2.8312206268310547e-07, "gradient_max_abs": 1.9073486328125e-05}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 1.1734664440155029e-07, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 23, "reference_active_parameters": 23, "energy_max_abs": 2.980232238769531e-07, "force_max_abs": 3.241002559661865e-07, "gradient_max_abs": 7.62939453125e-06}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.76837158203125e-07, "force_max_abs": 1.2759119272232056e-07, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 23, "reference_active_parameters": 23, "energy_max_abs": 4.291534423828125e-06, "force_max_abs": 3.7997961044311523e-07, "gradient_max_abs": 0.00048828125}}}}]
+    },
+    "spookynet/float32/610ad2d/pair": {
+      "job": "6318185",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "0",
+      "selected_candidate": false,
+      "matches_current_source": false,
+      "attempt_started_unix": 1795522961,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 7.62939453125e-06,
+          "Fa_max_abs": 1.1175870895385742e-08
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 4.76837158203125e-07,
+          "Fa_max_abs": 2.384185791015625e-07
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 4.76837158203125e-07,
+          "Fa_max_abs": 2.384185791015625e-07
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 7.450580596923828e-09
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 2.384185791015625e-07,
+          "Fa_max_abs": 1.0244548320770264e-08
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 5.7220458984375e-06,
+          "Fa_max_abs": 9.313225746154785e-09
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "3057ce04f7a75a6c96fcf8fe88e56244743adf99b9b657b679243d85c96c1fd5", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": ["err3", "err3"], "bulk_256": [[30.028517125174403, 73.45556640625, 10, 302], "err1"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 4.470348358154297e-08, "gradient_max_abs": 0.0}}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "c3811dce7eca779b51ff327b285864b5518454ad1a3a049e362fe99b0e092150", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[24.572576861828566, 116.54931640625, 15, 1134], [31.27039992250502, 303.373046875, 1, 1333]], "bulk_256": [[25.1449360512197, 72.47802734375, 1, 422], [32.40015101619065, 182.6943359375, 1, 1260]], "large_2000": [[28.690003091469407, 378.58837890625, 1, 422], [31.45266999490559, 1136.8720703125, 1, 1257]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.384185791015625e-07, "force_max_abs": 1.0728836059570312e-06, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 435, "reference_active_parameters": 435, "energy_max_abs": 7.152557373046875e-07, "force_max_abs": 1.1920928955078125e-06, "gradient_max_abs": 0.0008544921875}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 7.450580596923828e-09, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 435, "reference_active_parameters": 435, "energy_max_abs": 1.1920928955078125e-06, "force_max_abs": 5.21540641784668e-08, "gradient_max_abs": 7.62939453125e-05}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.9073486328125e-06, "force_max_abs": 1.1175870895385742e-08, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 435, "reference_active_parameters": 435, "energy_max_abs": 1.71661376953125e-05, "force_max_abs": 7.078051567077637e-08, "gradient_max_abs": 0.009765625}}}}]
+    },
+    "spookynet/float64/610ad2d/pair": {
+      "job": "6318510",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "selected_candidate": false,
+      "matches_current_source": false,
+      "attempt_started_unix": 1795523610,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 8.881784197001252e-16,
+          "Fa_max_abs": 4.440892098500626e-16
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 8.881784197001252e-16,
+          "Fa_max_abs": 8.881784197001252e-16
+        },
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 3.552713678800501e-15,
+          "Fa_max_abs": 2.0816681711721685e-17
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 3.552713678800501e-15,
+          "Fa_max_abs": 2.0816681711721685e-17
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 0.0,
+          "Fa_max_abs": 2.0816681711721685e-17
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 8.881784197001252e-16,
+          "Fa_max_abs": 1.3877787807814457e-17
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "aeac206136e39c5b034c36798a8125853909b95c1e52f96c40bdd06841c249a5", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": ["err3", "err3"], "bulk_256": [[29.9705620855093, 131.10009765625, 10, 302], "err1"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.440892098500626e-16, "force_max_abs": 4.618701254788249e-17, "gradient_max_abs": 0.0}}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "f22c89371a84915898a1a6652ff714addb73aa84e2c756586336b6c6200f95f1", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[27.862761169672012, 213.0625, 15, 1134], [29.0052960626781, 589.93603515625, 1, 1333]], "bulk_256": [[27.869192184880376, 126.3759765625, 1, 422], [29.70528812147677, 347.095703125, 1, 1260]], "large_2000": [[34.4444380607456, 737.12744140625, 1, 422], [50.1534529030323, 2249.39453125, 1, 1257]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.440892098500626e-16, "force_max_abs": 1.3322676295501878e-15, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 435, "reference_active_parameters": 435, "energy_max_abs": 8.881784197001252e-16, "force_max_abs": 1.3322676295501878e-15, "gradient_max_abs": 4.547473508864641e-13}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 1.3877787807814457e-17, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 435, "reference_active_parameters": 435, "energy_max_abs": 2.220446049250313e-15, "force_max_abs": 5.551115123125783e-17, "gradient_max_abs": 1.7053025658242404e-13}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 1.734723475976807e-17, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 435, "reference_active_parameters": 435, "energy_max_abs": 4.263256414560601e-14, "force_max_abs": 5.551115123125783e-17, "gradient_max_abs": 2.1827872842550278e-11}}}}]
+    },
+    "alphanet/float64/98e0bac/pair": {
+      "job": "6318185",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "0",
+      "selected_candidate": false,
+      "matches_current_source": false,
+      "attempt_started_unix": 1795524055,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 1.5916157281026244e-12,
+          "Fa_max_abs": 2.4726887204451486e-12
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 2.842170943040401e-14,
+          "Fa_max_abs": 1.4166445794216997e-13
+        },
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 7.105427357601002e-15,
+          "Fa_max_abs": 1.0311751452718454e-12
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 2.842170943040401e-14,
+          "Fa_max_abs": 6.861178292183467e-14
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 7.105427357601002e-15,
+          "Fa_max_abs": 6.235012506294879e-13
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "d02641ffcbab74ee3edb23045c2fe33210bffb781d2c2e3c0c0f1f6ad27b6c71", "cache_had_prior_completed_process": true, "reps": 5, "timings": {"mol_batch_32x20": [[44.83228293247521, 2673.1318359375, 20, 530], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err5", "err5"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 9.756639940405876e-13, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "3175df10810599bc17280fbee7f841a50ee744357c08091f521f33266f03bb12", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[36.344917956739664, 1654.80224609375, 12, 1063], [98.833599826321, 7345.23193359375, 1, 596]], "bulk_256": [[31.115882098674774, 1345.65283203125, 1, 529], [83.06098007597029, 5960.48046875, 1, 660]], "large_2000": ["err5", "err5"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.4210854715202004e-14, "force_max_abs": 1.241673430740775e-12, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 121, "reference_active_parameters": 121, "energy_max_abs": 0.003967442988528802, "force_max_abs": 0.8819251396218183, "gradient_max_abs": 5971.176994685449}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.842170943040401e-14, "force_max_abs": 1.5654144647214707e-13, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 121, "reference_active_parameters": 121, "energy_max_abs": 0.0003417621722690001, "force_max_abs": 0.039809133526665264, "gradient_max_abs": 579.2284869000723}}, "large_2000": {}}}]
+    },
+    "equireann/float32/bf7725d/pair": {
+      "job": "6318510",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795523043,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 5.960464477539063e-08,
+          "Fa_max_abs": 2.9802322387695312e-08
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 4.76837158203125e-06,
+          "Fa_max_abs": 1.955777406692505e-08
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 5.960464477539063e-08,
+          "Fa_max_abs": 2.9802322387695312e-08
+        },
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 1.430511474609375e-06,
+          "Fa_max_abs": 1.909211277961731e-08
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 4.76837158203125e-07,
+          "Fa_max_abs": 1.6763806343078613e-08
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 5.960464477539062e-07,
+          "Fa_max_abs": 1.9907020032405853e-08
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "50d21fb7c598ab4ef9902120c93855164b33a334ec2d798b4fdbd402dc85d818", "cache_had_prior_completed_process": true, "reps": 5, "timings": {"mol_batch_32x20": [[5.943578900769353, 147.59521484375, 19, 200], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 5.960464477539063e-08, "force_max_abs": 2.9802322387695312e-08, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "d5bbbe13c7de2472d354d27bb0110d23debc44247a41755c8db7d61faf099efa", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[4.703633952885866, 122.6240234375, 12, 402], [7.480243919417262, 363.0458984375, 1, 292]], "bulk_256": [[4.70124906860292, 82.05322265625, 1, 184], [7.437908090651035, 283.89208984375, 1, 299]], "large_2000": [[7.313000038266182, 461.95703125, 1, 184], [18.919742899015546, 1755.3046875, 1, 296]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 3.725290298461914e-08, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 39, "reference_active_parameters": 39, "energy_max_abs": 1.7881393432617188e-07, "force_max_abs": 4.470348358154297e-08, "gradient_max_abs": 1.52587890625e-05}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 1.6763806343078613e-08, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 39, "reference_active_parameters": 39, "energy_max_abs": 3.5762786865234375e-07, "force_max_abs": 2.60770320892334e-08, "gradient_max_abs": 0.0001220703125}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.384185791015625e-06, "force_max_abs": 2.0489096641540527e-08, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 39, "reference_active_parameters": 39, "energy_max_abs": 4.291534423828125e-06, "force_max_abs": 2.7008354663848877e-08, "gradient_max_abs": 0.009765625}}}}]
+    },
+    "equireann/float64/bf7725d/pair": {
+      "job": "6318510",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795523260,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 1.6653345369377348e-16,
+          "Fa_max_abs": 8.326672684688674e-17
+        },
+        "large_2000/infer": {
+          "passed": true,
+          "E_max_abs": 1.7763568394002505e-15,
+          "Fa_max_abs": 3.8163916471489756e-17
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 1.1102230246251565e-16,
+          "Fa_max_abs": 5.551115123125783e-17
+        },
+        "large_2000/train": {
+          "passed": true,
+          "E_max_abs": 8.881784197001252e-15,
+          "Fa_max_abs": 4.163336342344337e-17
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 2.220446049250313e-16,
+          "Fa_max_abs": 3.469446951953614e-17
+        },
+        "bulk_256/train": {
+          "passed": true,
+          "E_max_abs": 1.7763568394002505e-15,
+          "Fa_max_abs": 3.903127820947816e-17
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "a329764ac3ca59be839507d9657b09a326ef3f05e63a11819820e779872d7148", "cache_had_prior_completed_process": true, "reps": 5, "timings": {"mol_batch_32x20": [[7.334629073739052, 280.85986328125, 19, 200], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.220446049250313e-16, "force_max_abs": 5.551115123125783e-17, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "a8b523ddd97f4e94831c3c69b6e51c444f8ce90d666ca2ea30f5a746260285fe", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[6.019560154527426, 223.2314453125, 12, 402], [10.660146130248904, 714.15185546875, 1, 292]], "bulk_256": [[4.734017886221409, 148.01611328125, 1, 184], [8.861674927175045, 532.279296875, 1, 299]], "large_2000": [[12.935639126226306, 898.1572265625, 1, 184], [35.326709039509296, 3462.357421875, 1, 296]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.7755575615628914e-16, "force_max_abs": 1.1102230246251565e-16, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 39, "reference_active_parameters": 39, "energy_max_abs": 2.220446049250313e-16, "force_max_abs": 1.3877787807814457e-16, "gradient_max_abs": 1.4210854715202004e-14}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 2.949029909160572e-17, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 39, "reference_active_parameters": 39, "energy_max_abs": 0.0, "force_max_abs": 4.85722573273506e-17, "gradient_max_abs": 1.1368683772161603e-13}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 9.769962616701378e-15, "force_max_abs": 3.8163916471489756e-17, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 39, "reference_active_parameters": 39, "energy_max_abs": 1.2434497875801753e-14, "force_max_abs": 5.2909066017292616e-17, "gradient_max_abs": 2.546585164964199e-11}}}}]
+    },
     "alphanet/float64/c32ede3/abba": {
       "job": "6317929",
       "host": "d-7-5-2",
@@ -755,7 +1028,7 @@
       "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
       "allocated_gpu_index": "0",
       "selected_candidate": true,
-      "matches_current_source": true,
+      "matches_current_source": false,
       "attempt_started_unix": 1795516053,
       "systems": ["mol_batch_32x20"],
       "modes": ["infer"],
@@ -1744,6 +2017,27 @@
         }
       },
       "legs": [{"side": "new", "exit": 0, "cache_configuration_sha256": "617a59372b0dfa82d39985b8e8848e0623bbd110b7502ebe68056b563895f5a5", "cache_had_prior_completed_process": false, "reps": 17, "timings": {"mol_batch_32x20": [[5.732860881835222, 223.2314453125, 12, 402]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.220446049250313e-16, "force_max_abs": 1.1102230246251565e-16, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "cache_configuration_sha256": "a329764ac3ca59be839507d9657b09a326ef3f05e63a11819820e779872d7148", "cache_had_prior_completed_process": false, "reps": 17, "timings": {"mol_batch_32x20": [[7.516728946939111, 280.85986328125, 19, 200]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.220446049250313e-16, "force_max_abs": 8.326672684688674e-17, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "cache_configuration_sha256": "a329764ac3ca59be839507d9657b09a326ef3f05e63a11819820e779872d7148", "cache_had_prior_completed_process": true, "reps": 17, "timings": {"mol_batch_32x20": [[7.525126915425062, 280.85986328125, 19, 200]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.3877787807814457e-16, "force_max_abs": 1.1102230246251565e-16, "gradient_max_abs": 0.0}}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "617a59372b0dfa82d39985b8e8848e0623bbd110b7502ebe68056b563895f5a5", "cache_had_prior_completed_process": true, "reps": 17, "timings": {"mol_batch_32x20": [[6.355060962960124, 223.2314453125, 12, 402]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.6653345369377348e-16, "force_max_abs": 8.326672684688674e-17, "gradient_max_abs": 0.0}}}}]
+    },
+    "alphanet/float64/fc563a7/abba": {
+      "job": "6318510",
+      "host": "d-7-5-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "node_gpu_inventory": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452, Tesla V100-PCIE-32GB", "GPU-590cd023-ff31-c1a2-8267-e0afba042725, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "1",
+      "selected_candidate": false,
+      "matches_current_source": false,
+      "attempt_started_unix": 1795522785,
+      "systems": ["mol_batch_32x20"],
+      "modes": ["infer"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 5.773159728050814e-15,
+          "Fa_max_abs": 7.225331444260519e-13
+        }
+      },
+      "legs": [{"side": "new", "exit": 0, "cache_configuration_sha256": "acde08692ef6cffca17cab4f6a09444c3003e08deca32159b104e46a350d4d80", "cache_had_prior_completed_process": false, "reps": 17, "timings": {"mol_batch_32x20": [[36.47218598052859, 1654.80224609375, 12, 1063]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 1.1231016117108084e-12, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "cache_configuration_sha256": "d02641ffcbab74ee3edb23045c2fe33210bffb781d2c2e3c0c0f1f6ad27b6c71", "cache_had_prior_completed_process": true, "reps": 17, "timings": {"mol_batch_32x20": [[44.4013278465718, 2673.1318359375, 20, 530]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 8.881784197001252e-15, "force_max_abs": 9.08162434143378e-13, "gradient_max_abs": 0.0}}}}, {"side": "base", "exit": 0, "cache_configuration_sha256": "d02641ffcbab74ee3edb23045c2fe33210bffb781d2c2e3c0c0f1f6ad27b6c71", "cache_had_prior_completed_process": true, "reps": 17, "timings": {"mol_batch_32x20": [[44.073740020394325, 2673.1318359375, 20, 530]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.0658141036401503e-14, "force_max_abs": 8.602007994795713e-13, "gradient_max_abs": 0.0}}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "acde08692ef6cffca17cab4f6a09444c3003e08deca32159b104e46a350d4d80", "cache_had_prior_completed_process": true, "reps": 17, "timings": {"mol_batch_32x20": [[36.75909200683236, 1654.80224609375, 12, 1063]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 9.583445148564351e-13, "gradient_max_abs": 0.0}}}}]
     }
   },
   "frozen_partial_attempts": {
@@ -2415,6 +2709,72 @@
     }
   },
   "frozen_retained_energy_checks": {
+    "spookynet/float32/610ad2d/acceptance": {
+      "job": "6318185",
+      "requested_precision": "float32",
+      "architecture": "spookynet",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "allocated_gpu_index": "0",
+      "source": "610ad2db7b4bc3cc70d3078fb33c7e34a3150920",
+      "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
+      "passed": false,
+      "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+    },
+    "spookynet/float32/610ad2d/snapshot": {
+      "job": "6318510",
+      "requested_precision": "float32",
+      "architecture": "spookynet",
+      "systems": ["snapshot"],
+      "allocated_gpu_index": "1",
+      "source": "610ad2db7b4bc3cc70d3078fb33c7e34a3150920",
+      "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
+      "passed": true,
+      "energy_backwards_after_force": [{"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 0.0, "force_max_abs": 3.3527612686157227e-08, "gradient_max_abs": 4.76837158203125e-07}, {"passed": true, "active_parameters": 434, "reference_active_parameters": 434, "energy_max_abs": 0.0, "force_max_abs": 3.3527612686157227e-08, "gradient_max_abs": 4.76837158203125e-07}]
+    },
+    "spookynet/float64/610ad2d/acceptance": {
+      "job": "6318510",
+      "requested_precision": "float64",
+      "architecture": "spookynet",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "allocated_gpu_index": "1",
+      "source": "610ad2db7b4bc3cc70d3078fb33c7e34a3150920",
+      "fixture_sha256": "8dfdf1cb5e9f692f6ad6dacbde117ef79268790fefb6b7cf2d59fc63c3bf20b8",
+      "passed": false,
+      "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+    },
+    "alphanet/float64/98e0bac/acceptance": {
+      "job": "6318185",
+      "requested_precision": "float64",
+      "architecture": "alphanet",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "allocated_gpu_index": "0",
+      "source": "98e0bace76580669934c679b8cdc2953622441b1",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "passed": false,
+      "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+    },
+    "equireann/float32/bf7725d/acceptance": {
+      "job": "6318510",
+      "requested_precision": "float32",
+      "architecture": "equireann",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "allocated_gpu_index": "1",
+      "source": "bf7725d9130abd20df21231ca5df083b65a13a80",
+      "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+      "passed": false,
+      "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+    },
+    "equireann/float64/bf7725d/acceptance": {
+      "job": "6318510",
+      "requested_precision": "float64",
+      "architecture": "equireann",
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "allocated_gpu_index": "1",
+      "source": "bf7725d9130abd20df21231ca5df083b65a13a80",
+      "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+      "passed": false,
+      "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+    },
     "leftnet/float32/f12974b/snapshot": {
       "passed": true,
       "energy_backwards_after_force": [{"passed": true, "active_parameters": 74, "reference_active_parameters": 74, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 2.980232238769531e-07, "gradient_max_abs": 3.814697265625e-06}, {"passed": true, "active_parameters": 74, "reference_active_parameters": 74, "energy_max_abs": 1.430511474609375e-06, "force_max_abs": 2.980232238769531e-07, "gradient_max_abs": 3.814697265625e-06}],
@@ -2474,8 +2834,297 @@
       "allocated_gpu_index": "1",
       "source": "f12974b8dfa346c5d84c886ad76397b32a51cfb1",
       "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45"
+    },
+    "alphanet/float64/fc563a7/snapshot": {
+      "job": "6318185",
+      "requested_precision": "float64",
+      "architecture": "alphanet",
+      "allocated_gpu_index": "0",
+      "source": "fc563a767fc46008b048f4340828ae0b42c7d114",
+      "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+      "passed": true,
+      "energy_backwards_after_force": [{"passed": true, "active_parameters": 122, "reference_active_parameters": 122, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 1.8451906669270102e-13, "gradient_max_abs": 1.8451906669270102e-13}, {"passed": true, "active_parameters": 122, "reference_active_parameters": 122, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 1.8451906669270102e-13, "gradient_max_abs": 1.8474111129762605e-13}]
     }
   },
+  "frozen_caller_retention_controls": {
+    "equireann/float32/bf7725d": {
+      "architecture": "equireann",
+      "precision": "float32",
+      "source": "bf7725d9130abd20df21231ca5df083b65a13a80",
+      "job": "6318185",
+      "comparisons": {
+        "bare": {
+          "source": "bf7725d9130abd20df21231ca5df083b65a13a80",
+          "architecture": "equireann",
+          "precision": "float32",
+          "scope": "bare",
+          "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 8.940696716308594e-08, "force_max_abs": 2.9802322387695312e-08, "gradient_max_abs": 1.52587890625e-05}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 8.940696716308594e-08, "force_max_abs": 2.9802322387695312e-08, "gradient_max_abs": 1.52587890625e-05}]
+            },
+            "bulk_256": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            },
+            "large_2000": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          },
+          "passed": false,
+          "finished": true
+        },
+        "caller_scoped": {
+          "source": "bf7725d9130abd20df21231ca5df083b65a13a80",
+          "architecture": "equireann",
+          "precision": "float32",
+          "scope": "caller_scoped",
+          "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 2.9802322387695312e-08, "gradient_max_abs": 1.52587890625e-05}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 2.9802322387695312e-08, "gradient_max_abs": 1.52587890625e-05}]
+            },
+            "bulk_256": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.384185791015625e-07, "force_max_abs": 2.561137080192566e-08, "gradient_max_abs": 1.52587890625e-05}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.384185791015625e-07, "force_max_abs": 2.561137080192566e-08, "gradient_max_abs": 1.52587890625e-05}]
+            },
+            "large_2000": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.384185791015625e-06, "force_max_abs": 1.955777406692505e-08, "gradient_max_abs": 6.103515625e-05}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.384185791015625e-06, "force_max_abs": 1.955777406692505e-08, "gradient_max_abs": 6.103515625e-05}]
+            }
+          },
+          "passed": true,
+          "finished": true
+        }
+      },
+      "finished": true
+    },
+    "equireann/float64/bf7725d": {
+      "architecture": "equireann",
+      "precision": "float64",
+      "source": "bf7725d9130abd20df21231ca5df083b65a13a80",
+      "job": "6318185",
+      "comparisons": {
+        "bare": {
+          "source": "bf7725d9130abd20df21231ca5df083b65a13a80",
+          "architecture": "equireann",
+          "precision": "float64",
+          "scope": "bare",
+          "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.5265566588595902e-16, "force_max_abs": 5.551115123125783e-17, "gradient_max_abs": 1.4210854715202004e-14}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.5265566588595902e-16, "force_max_abs": 5.551115123125783e-17, "gradient_max_abs": 1.4210854715202004e-14}]
+            },
+            "bulk_256": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            },
+            "large_2000": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          },
+          "passed": false,
+          "finished": true
+        },
+        "caller_scoped": {
+          "source": "bf7725d9130abd20df21231ca5df083b65a13a80",
+          "architecture": "equireann",
+          "precision": "float64",
+          "scope": "caller_scoped",
+          "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1102230246251565e-16, "force_max_abs": 8.326672684688674e-17, "gradient_max_abs": 1.4210854715202004e-14}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1102230246251565e-16, "force_max_abs": 8.326672684688674e-17, "gradient_max_abs": 2.842170943040401e-14}]
+            },
+            "bulk_256": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.3322676295501878e-15, "force_max_abs": 3.469446951953614e-17, "gradient_max_abs": 2.842170943040401e-14}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.3322676295501878e-15, "force_max_abs": 3.469446951953614e-17, "gradient_max_abs": 2.842170943040401e-14}]
+            },
+            "large_2000": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 9.769962616701378e-15, "force_max_abs": 3.642919299551295e-17, "gradient_max_abs": 1.1368683772161603e-13}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 9.769962616701378e-15, "force_max_abs": 3.642919299551295e-17, "gradient_max_abs": 1.1368683772161603e-13}]
+            }
+          },
+          "passed": true,
+          "finished": true
+        }
+      },
+      "finished": true
+    },
+    "equireann/float32/c32ede3": {
+      "architecture": "equireann",
+      "precision": "float32",
+      "source": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+      "job": "6318185",
+      "comparisons": {
+        "bare": {
+          "source": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+          "architecture": "equireann",
+          "precision": "float32",
+          "scope": "bare",
+          "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 4.470348358154297e-08, "gradient_max_abs": 7.62939453125e-06}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 4.470348358154297e-08, "gradient_max_abs": 7.62939453125e-06}]
+            },
+            "bulk_256": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            },
+            "large_2000": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          },
+          "passed": false,
+          "finished": true
+        },
+        "caller_scoped": {
+          "source": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+          "architecture": "equireann",
+          "precision": "float32",
+          "scope": "caller_scoped",
+          "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 2.9802322387695312e-08, "gradient_max_abs": 7.62939453125e-06}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 2.9802322387695312e-08, "gradient_max_abs": 7.62939453125e-06}]
+            },
+            "bulk_256": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 2.9802322387695312e-08, "gradient_max_abs": 1.52587890625e-05}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.1920928955078125e-07, "force_max_abs": 2.9802322387695312e-08, "gradient_max_abs": 1.52587890625e-05}]
+            },
+            "large_2000": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.384185791015625e-06, "force_max_abs": 2.421438694000244e-08, "gradient_max_abs": 0.0001220703125}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.384185791015625e-06, "force_max_abs": 2.421438694000244e-08, "gradient_max_abs": 7.62939453125e-05}]
+            }
+          },
+          "passed": true,
+          "finished": true
+        }
+      },
+      "finished": true
+    },
+    "equireann/float64/c32ede3": {
+      "architecture": "equireann",
+      "precision": "float64",
+      "source": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+      "job": "6318185",
+      "comparisons": {
+        "bare": {
+          "source": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+          "architecture": "equireann",
+          "precision": "float64",
+          "scope": "bare",
+          "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.220446049250313e-16, "force_max_abs": 1.1102230246251565e-16, "gradient_max_abs": 2.842170943040401e-14}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.220446049250313e-16, "force_max_abs": 1.1102230246251565e-16, "gradient_max_abs": 2.842170943040401e-14}]
+            },
+            "bulk_256": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            },
+            "large_2000": {
+              "passed": false,
+              "reference_error": null,
+              "compiled_error": {
+                "stage": "caller_backward_1_retain",
+                "type": "RuntimeError",
+                "message": "This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          },
+          "passed": false,
+          "finished": true
+        },
+        "caller_scoped": {
+          "source": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+          "architecture": "equireann",
+          "precision": "float64",
+          "scope": "caller_scoped",
+          "fixture_sha256": "4313f2175083b16232a923ee7f2c7093dff29d691164d2ee7b4c76de077c3f45",
+          "job": "6318185",
+          "allocated_gpu_index": "0",
+          "systems": {
+            "mol_batch_32x20": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.6653345369377348e-16, "force_max_abs": 1.6653345369377348e-16, "gradient_max_abs": 2.842170943040401e-14}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 1.6653345369377348e-16, "force_max_abs": 1.6653345369377348e-16, "gradient_max_abs": 2.842170943040401e-14}]
+            },
+            "bulk_256": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 8.881784197001252e-16, "force_max_abs": 5.724587470723463e-17, "gradient_max_abs": 2.842170943040401e-14}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 8.881784197001252e-16, "force_max_abs": 5.724587470723463e-17, "gradient_max_abs": 2.842170943040401e-14}]
+            },
+            "large_2000": {
+              "passed": true,
+              "energy_backwards_after_force": [{"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.6645352591003757e-15, "force_max_abs": 4.163336342344337e-17, "gradient_max_abs": 1.8474111129762605e-13}, {"passed": true, "active_parameters": 40, "reference_active_parameters": 40, "energy_max_abs": 2.6645352591003757e-15, "force_max_abs": 4.163336342344337e-17, "gradient_max_abs": 1.8474111129762605e-13}]
+            }
+          },
+          "passed": true,
+          "finished": true
+        }
+      },
+      "finished": true
+    }
+  },
+  "frozen_matched_dropout_controls": {},
   "frozen_precision_controls": {
     "equflash/1aa0f8b/base_native_gpu_repeat": {
       "architecture": "equflash",
@@ -3211,22 +3860,23 @@
     "attempted_architecture_precision_pairs": 46,
     "expected_architecture_precision_pairs": 116,
     "expected_mode_system_cells": 696,
-    "selected_frozen_full_architecture_precision_pairs": 18,
-    "current_source_full_architecture_precision_pairs": 15,
+    "selected_frozen_full_architecture_precision_pairs": 20,
+    "current_source_full_architecture_precision_pairs": 18,
     "terminal_partial_frozen_attempts": 1,
     "selected_partial_cells": 0,
     "historical_architecture_precision_pairs": 46,
-    "completed_frozen_attempts": 27,
+    "completed_frozen_attempts": 34,
     "comparable_mode_system_cells": 29,
     "comparable_metrics": 58,
-    "above_3_percent": 4,
-    "frozen_mode_system_cells": 110,
-    "frozen_candidate_only_cells": 85,
-    "frozen_candidate_only_native_training_cells": 23,
+    "above_3_percent": 3,
+    "frozen_mode_system_cells": 121,
+    "frozen_candidate_only_cells": 95,
+    "frozen_candidate_only_native_training_cells": 20,
     "frozen_candidate_timing_incomplete_baseline_cells": 0,
     "frozen_baseline_only_cells": 0,
     "frozen_both_unavailable_cells": 9,
     "frozen_numerical_or_reference_failures": 6,
-    "excesses": [{"model_precision": "spookynet/float32", "system": "bulk_256", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 20.203}, {"model_precision": "spookynet/float64", "system": "bulk_256", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.015}, {"model_precision": "alphanet/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.936}, {"model_precision": "equireann/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 18.777}]
+    "excesses": [{"model_precision": "spookynet/float32", "system": "bulk_256", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 20.203, "baseline_value": 73.45556640625, "candidate_value": 88.2958984375}, {"model_precision": "spookynet/float64", "system": "bulk_256", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.015, "baseline_value": 131.10009765625, "candidate_value": 158.650390625}, {"model_precision": "alphanet/float64", "system": "mol_batch_32x20", "mode": "infer", "metric": "peak_allocated_MiB", "candidate": "c32ede3", "relative_percent": 21.936, "baseline_value": 2673.1318359375, "candidate_value": 3259.520263671875}],
+    "frozen_failed_cells": [{"model_precision": "equflash/float32", "system": "mol_batch_32x20", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflash/float32", "system": "bulk_256", "mode": "infer", "candidate": "c32ede3", "cross_eager": false, "baseline_status": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "bulk_256", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "equflashv2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "InternalTorchDynamoError: NotImplementedError:", "candidate_status": "numerical failure"}, {"model_precision": "e2former/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}, {"model_precision": "e2former_v2/float32", "system": "large_2000", "mode": "train", "candidate": "c32ede3", "cross_eager": true, "baseline_status": "TorchRuntimeError: RuntimeError when making fake tensor call", "candidate_status": "numerical failure"}]
   }
 }
