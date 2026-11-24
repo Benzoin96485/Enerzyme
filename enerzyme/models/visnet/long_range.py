@@ -65,6 +65,11 @@ def normalize_fragment_mode(value: object) -> str:
     return key
 
 
+def _fragment_direction(delta: Tensor, distance: Tensor) -> Tensor:
+    unit = delta / distance.clamp_min(1e-12).unsqueeze(-1)
+    return torch.where((distance < 1e-8).unsqueeze(-1), torch.zeros_like(unit), unit)
+
+
 def bipartite_radius_edges(
     atom_pos: Tensor,
     cluster_pos: Tensor,
@@ -107,10 +112,7 @@ def bipartite_radius_edges(
         local_atom, local_fragment = torch.where(within)
         chosen = dist[local_atom, local_fragment]
         vec = delta[local_atom, local_fragment]
-        direction = vec / chosen.clamp_min(1e-12).unsqueeze(-1)
-        direction = torch.where(
-            (chosen < 1e-8).unsqueeze(-1), torch.zeros_like(direction), direction
-        )
+        direction = _fragment_direction(vec, chosen)
         idx_atom.append(atoms[local_atom])
         idx_fragment.append(fragments[local_fragment])
         distances.append(chosen)
@@ -180,3 +182,51 @@ def resolve_long_range_fragments(
         weights = Za.reshape(-1)
     centers = weighted_fragment_centers(Ra, flat_ids, weights)
     return flat_ids, centers, cluster_batch
+
+
+@torch.library.custom_op("enerzyme::lsrm_fragment_indices", mutates_args=())
+def _fragment_indices(
+    positions: Tensor, batch: Tensor, mode: str, center: str,
+    numbers: Optional[Tensor], labels: Optional[Tensor],
+    min_nodes: int, seed: int, cutoff: float,
+) -> Tuple[Tensor, Tensor]:
+    """Discrete clustering and radius selection, independent of the force pullback."""
+    ids, centers, cluster_batch = resolve_long_range_fragments(
+        positions, batch, mode, center, numbers, labels, min_nodes, seed
+    )
+    atoms, fragments, _, _ = bipartite_radius_edges(
+        positions, centers, batch, cluster_batch, cutoff
+    )
+    return ids, torch.stack((atoms, fragments))
+
+
+@_fragment_indices.register_fake
+def _fragment_index_shapes(positions, batch, mode, center, numbers, labels, min_nodes, seed, cutoff):
+    n_edges = torch.library.get_ctx().new_dynamic_size()
+    return torch.empty_like(batch), batch.new_empty((2, n_edges))
+
+
+def fragment_geometry(
+    positions: Tensor, batch: Tensor, mode: str, center: str,
+    numbers: Optional[Tensor], labels: Optional[Tensor],
+    min_nodes: int, seed: int, cutoff: float,
+) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    """Return the discrete indices and their differentiable distances and directions."""
+    if torch.compiler.is_compiling():
+        ids, edges = _fragment_indices(
+            positions.detach(), batch, mode, center, numbers, labels, min_nodes, seed, cutoff
+        )
+        atoms, fragments = edges.unbind(0)
+        weights = numbers if center == "atomic_number" else None
+        centers = weighted_fragment_centers(positions, ids, weights)
+        delta = centers[fragments] - positions[atoms]
+        distance = torch.linalg.vector_norm(delta, dim=-1)
+        direction = _fragment_direction(delta, distance)
+    else:
+        ids, centers, cluster_batch = resolve_long_range_fragments(
+            positions, batch, mode, center, numbers, labels, min_nodes, seed
+        )
+        atoms, fragments, distance, direction = bipartite_radius_edges(
+            positions, centers, batch, cluster_batch, cutoff
+        )
+    return ids, atoms, fragments, distance, direction

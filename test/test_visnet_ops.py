@@ -90,6 +90,31 @@ def test_vector_norm_is_channel_scale_and_rotates():
         raise AssertionError("expected a bad angular width to fail")
 
 
+def test_compiled_vector_norm_preserves_zero_field_force_derivatives():
+    torch.manual_seed(29)
+    field = torch.randn(4, 8, 5, dtype=torch.double)
+    probe = torch.randn_like(field)
+    for kind in ("rms", "max_min"):
+        norm = VecLayerNorm(5, trainable=True, norm_type=kind).double()
+        compiled = torch.compile(norm, backend="eager", fullgraph=True)
+        for only_degree_two in (False, True):
+            x = field.clone()
+            if only_degree_two:
+                x[:, :3].zero_()
+            else:
+                x.zero_()
+            x.requires_grad_()
+            def derivatives(layer):
+                output = layer(x)
+                # Connect all-zero reference fields to x with exact zero derivatives.
+                loss = (output * probe).sum() + 0 * x.square().sum()
+                gradient, = torch.autograd.grad(loss, x, create_graph=True)
+                hessian, = torch.autograd.grad((gradient * probe).sum(), x)
+                return output, gradient, hessian
+
+            torch.testing.assert_close(derivatives(compiled), derivatives(norm))
+
+
 def test_edge_embedding_is_sum_of_endpoints():
     torch.manual_seed(1)
     block = EdgeEmbedding(3, 4)

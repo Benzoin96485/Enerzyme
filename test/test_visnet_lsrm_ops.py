@@ -7,6 +7,7 @@ import torch
 from enerzyme.models.visnet.long_range import (
     FragmentBipartiteBlock,
     bipartite_radius_edges,
+    fragment_geometry,
     resolve_long_range_fragments,
 )
 
@@ -190,3 +191,30 @@ def test_precomputed_requires_labels_and_unknown_mode_fails():
         assert "cluster_ids" in str(exc)
     else:
         raise AssertionError("expected missing cluster_ids to fail")
+
+
+def test_compiled_fragment_geometry_preserves_indices_and_center_force_derivatives():
+    positions = torch.tensor([
+        [0., 0., 0.], [0.3, 0.1, -0.2], [1., 0., 0.], [1.3, 0.2, 0.],
+        [0., 0.1, 0.1], [0.4, 0.2, 0.], [1., 0.1, 0.], [1.3, 0.1, -0.1],
+    ], dtype=torch.double, requires_grad=True)
+    batch = torch.tensor([0, 0, 0, 0, 2, 2, 2, 2])
+    numbers = torch.tensor([1, 6, 6, 8, 1, 8, 6, 7])
+    labels = torch.tensor([7, 7, 3, 3, 3, 3, 8, 8])
+
+    def geometry(x, mode):
+        return fragment_geometry(x, batch, mode, "atomic_number", numbers, labels, 24, 7, 0.9)
+
+    def evaluate(fn, mode):
+        result = fn(positions, mode)
+        # An anisotropic probe checks displacement directions as well as distances.
+        projection = result[4] @ positions.new_tensor([0.1, -0.2, 0.3])
+        loss = (result[3].square() + projection).sum()
+        gradient, = torch.autograd.grad(loss, positions, create_graph=True)
+        hessian, = torch.autograd.grad(gradient.square().sum(), positions)
+        return (*result, gradient, hessian)
+
+    with torch._dynamo.config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+        compiled = torch.compile(geometry, backend="eager", fullgraph=True)
+        for mode in ("precomputed", "kmeans"):
+            torch.testing.assert_close(evaluate(compiled, mode), evaluate(geometry, mode))

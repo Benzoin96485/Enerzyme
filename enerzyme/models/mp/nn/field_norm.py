@@ -54,25 +54,34 @@ class VecLayerNorm(nn.Module):
         return vec
 
     def rms_norm(self, vec: Tensor) -> Tensor:
-        dist = torch.linalg.vector_norm(vec, dim=1)
-        if bool((dist == 0).all()):
-            return torch.zeros_like(vec)
-        dist = dist.clamp(min=self.eps)
-        dist = torch.sqrt(torch.mean(dist.square(), dim=-1))
-        return vec / F.relu(dist).unsqueeze(-1).unsqueeze(-1)
+        return self._field_norm(vec, rms=True)
 
     def max_min_norm(self, vec: Tensor) -> Tensor:
+        return self._field_norm(vec, rms=False)
+
+    def _field_norm(self, vec: Tensor, rms: bool) -> Tensor:
+        if torch.compiler.is_compiling():
+            # The all-zero reference field has zero first and second derivatives.
+            # Keep the inactive norm away from its singularity during force fitting.
+            all_zero = (vec == 0).all()
+            vec = torch.where(all_zero, torch.ones_like(vec), vec)
         dist = torch.linalg.vector_norm(vec, dim=1, keepdim=True)
-        if bool((dist == 0).all()):
+        if not torch.compiler.is_compiling() and bool((dist == 0).all()):
             return torch.zeros_like(vec)
         dist = dist.clamp(min=self.eps)
-        direct = vec / dist
-        max_val, _ = torch.max(dist, dim=-1)
-        min_val, _ = torch.min(dist, dim=-1)
-        delta = (max_val - min_val).reshape(-1)
-        delta = torch.where(delta == 0, torch.ones_like(delta), delta)
-        dist = (dist - min_val.reshape(-1, 1, 1)) / delta.reshape(-1, 1, 1)
-        return F.relu(dist) * direct
+        if rms:
+            scale = torch.sqrt(torch.mean(dist.square(), dim=-1, keepdim=True))
+            result = vec / F.relu(scale)
+        else:
+            direction = vec / dist
+            maximum = torch.max(dist, dim=-1, keepdim=True).values
+            minimum = torch.min(dist, dim=-1, keepdim=True).values
+            span = maximum - minimum
+            span = torch.where(span == 0, torch.ones_like(span), span)
+            result = F.relu((dist - minimum) / span) * direction
+        if torch.compiler.is_compiling():
+            return torch.where(all_zero, torch.zeros_like(vec), result)
+        return result
 
     def forward(self, vec: Tensor) -> Tensor:
         if vec.shape[1] == 3:
