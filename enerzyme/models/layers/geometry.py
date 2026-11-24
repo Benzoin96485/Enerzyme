@@ -72,7 +72,9 @@ class RangeSeparationLayer(BaseFFLayer):
     def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor, vij_lr: Optional[Tensor]=None) -> Dict[
         Literal["Dij_sr", "idx_i_sr", "idx_j_sr", "vij_sr", "cutoff_values_sr"], Tensor
     ]:
-        cutmask = Dij_lr < self.cutoff_sr
+        return self._select_edges(Dij_lr < self.cutoff_sr, Dij_lr, idx_i_lr, idx_j_lr, vij_lr)
+
+    def _select_edges(self, cutmask, Dij_lr, idx_i_lr, idx_j_lr, vij_lr):
         relevant_output = {
             "Dij_sr": Dij_lr[cutmask],
             "idx_i_sr": idx_i_lr[cutmask],
