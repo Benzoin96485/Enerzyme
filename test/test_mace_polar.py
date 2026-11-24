@@ -32,7 +32,7 @@ def _rotation(seed: int = 0) -> torch.Tensor:
 
 
 def _tiny_core(**overrides):
-    from enerzyme.models.mace.core import MACECore
+    from enerzyme.models.presets.irreps import mace
 
     params = dict(
         max_Za=10,
@@ -49,7 +49,7 @@ def _tiny_core(**overrides):
         output_mode="layers",
     )
     params.update(overrides)
-    return MACECore(**params)
+    return mace(**params)
 
 
 def _forward_inputs(n, seed=0):
@@ -295,7 +295,7 @@ def test_mace_polar_dipole_forces_match_finite_difference():
 
 
 def test_example_yaml_names_match_the_defaults():
-    from enerzyme.models.mace.core import DEFAULT_LAYER_PARAMS
+    from enerzyme.models.mace.defaults import DEFAULT_LAYER_PARAMS
     from enerzyme.models.mace.polar import DEFAULT_LAYER_PARAMS_POLAR
 
     mace = yaml.safe_load((ROOT / "enerzyme/config/mace_layers_example.yaml").read_text())

@@ -350,11 +350,11 @@ def test_build_model_so3lr_efa_smoke():
 
 
 def test_spookynet_use_efa_smoke():
-    from enerzyme.models.spookynet.core import SpookyNetCore
+    from enerzyme.models.presets.scalar import spookynet
 
     torch.manual_seed(0)
     F = 16
-    core = SpookyNetCore(
+    core = spookynet(
         dim_embedding=F,
         num_rbf=8,
         num_modules=1,
@@ -408,7 +408,7 @@ def test_spookynet_default_checkpoint_layout_matches_pre_efa():
         ResidualMLP,
         ResidualStack,
     )
-    from enerzyme.models.spookynet.core import SpookyNetCore
+    from enerzyme.models.presets.scalar import spookynet
     from enerzyme.models.ff import build_model
 
     class PreEFAInteractionModule(Module):
@@ -483,10 +483,10 @@ def test_spookynet_default_checkpoint_layout_matches_pre_efa():
         activation_fn="swish",
         use_irreps=True,
     )
-    core = SpookyNetCore(**core_kwargs)  # default use_efa=False
+    core = spookynet(**core_kwargs)  # default use_efa=False
     assert all("efa" not in k.lower() for k in core.state_dict())
     assert any("nonlocal_interaction" in k for k in core.state_dict())
-    SpookyNetCore(**core_kwargs).load_state_dict(core.state_dict(), strict=True)
+    spookynet(**core_kwargs).load_state_dict(core.state_dict(), strict=True)
 
     model = build_model("spookynet", verbose=0)
     assert all("efa" not in k.lower() for k in model.state_dict())

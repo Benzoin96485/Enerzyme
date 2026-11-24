@@ -328,8 +328,8 @@ class BOTNetCore(BaseFFCore):
                 node_feats=node_feats,
                 edge_attrs=edge_attrs,
                 edge_feats=edge_feats,
-                idx_i_sr=idx_i_sr,
-                idx_j_sr=idx_j_sr,
+                sender=idx_i_sr,
+                receiver=idx_j_sr,
             )
             if not isinstance(node_feats, Tensor):
                 raise TypeError(

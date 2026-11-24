@@ -1,8 +1,9 @@
 """Map pre-refactor snapshot state_dicts onto rebuilt Cores.
 
 ``KEY_MAPS[arch]`` is a list of ``(regex, replacement)`` pairs applied in order
-to every old key. An architecture without an entry first tries an identical key
-set, then pairs parameters positionally (both sides in ``named_parameters``
+to every old key. The legacy architectures (SchNet, PhysNet, SpookyNet, MACE)
+go through the ``main``-branch checkpoint converter. Any other architecture
+without an entry first tries an identical key set, then pairs parameters positionally (both sides in ``named_parameters``
 order, shapes must agree). Buffers are copied by name when present on both
 sides; a buffer only the new model has must be a deterministic constant.
 """
@@ -30,6 +31,11 @@ def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dic
 def remap_snapshot(arch: str, old_state: Dict[str, torch.Tensor], old_param_names: List[str],
                    model: torch.nn.Module) -> Dict[str, torch.Tensor]:
     new_state = model.state_dict()
+    from enerzyme.models.compat.main_branch import KEY_RULES, convert_state_dict
+
+    legacy = getattr(model, "architecture", None)
+    if legacy in KEY_RULES and set(old_state) != set(new_state):
+        return dict(convert_state_dict(legacy, old_state)[0])
     if arch in KEY_MAPS:
         renamed = _rename(old_state, KEY_MAPS[arch])
         merged = dict(new_state)

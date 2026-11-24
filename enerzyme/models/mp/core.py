@@ -15,6 +15,7 @@ from torch import Tensor, nn
 from ..layers import BaseFFCore
 from .block import BlockState
 from .graph import GraphContext, GraphRequires
+from .head import FeatureHead, Head, ReadoutHead  # noqa: F401
 
 
 class Embed(nn.Module):
@@ -26,88 +27,42 @@ class Embed(nn.Module):
         raise NotImplementedError
 
 
-class Head(nn.Module):
-    """Maps the final state (and optional per-block taps) to the Core's output fields."""
-
-    input_fields: Tuple[str, ...] = ()
-    output_fields: Tuple[str, ...] = ("atom_feature",)
-    needs_taps: bool = False
-
-    def forward(self, state: BlockState, ctx: GraphContext, taps: Optional[List[BlockState]],
-                inputs: Dict[str, Any]) -> Dict[str, Tensor]:  # pragma: no cover
-        raise NotImplementedError
-
-
 class FieldEmbed(Embed):
-    """``BlockState(scalar=inputs[field])``, optionally with a zero Cartesian vector state."""
+    """Initial state from a node input field.
 
-    def __init__(self, field: str = "atom_embedding", width: Optional[int] = None,
-                 vector_channels: Optional[int] = None) -> None:
+    ``add_fields`` are summed onto ``field`` when present (charge / spin
+    embeddings). ``slot="equi"`` stores the result as the equivariant state,
+    for Cores whose node features are irreps from the start.
+    ``vector_channels`` adds a zero Cartesian vector state ``(N, 3, C)``.
+    """
+
+    def __init__(self, field: str = "atom_embedding", add_fields: Sequence[str] = (),
+                 width: Optional[int] = None, vector_channels: Optional[int] = None,
+                 slot: str = "scalar") -> None:
         super().__init__()
+        if slot not in ("scalar", "equi"):
+            raise ValueError(f"slot must be 'scalar' or 'equi', got {slot!r}")
         self.field = field
+        self.add_fields = tuple(add_fields)
         self.width = None if width is None else int(width)
         self.vector_channels = None if vector_channels is None else int(vector_channels)
-        self.input_fields = (field,)
+        self.slot = slot
+        self.input_fields = (field,) + self.add_fields
 
     def forward(self, inputs: Dict[str, Any], ctx: GraphContext) -> BlockState:
         x = inputs[self.field]
+        for name in self.add_fields:
+            extra = inputs.get(name)
+            if extra is not None:
+                x = x + extra
         if self.width is not None and x.shape[-1] != self.width:
             raise ValueError(f"{self.field} width {x.shape[-1]} != {self.width}")
+        if self.slot == "equi":
+            return BlockState(equi=x)
         equi = None
         if self.vector_channels is not None:
             equi = x.new_zeros(x.shape[0], 3, self.vector_channels)
         return BlockState(scalar=x, equi=equi)
-
-
-OUTPUT_MODES = ("feature", "layers", "concat", "sum")
-
-
-class FeatureHead(Head):
-    """Expose node features for the readout layers.
-
-    ``output_mode``:
-
-    * ``"feature"``: final ``state.scalar`` as ``atom_feature``
-    * ``"layers"``: per-block scalars stacked on a new last axis ``(N, F, B)``
-    * ``"concat"``: per-block scalars concatenated on the feature axis
-    * ``"sum"``: sum of per-block scalars
-
-    ``include_embedding`` adds the embedded state as the first tap.
-    ``equi_field`` also emits ``state.equi`` (e.g. ``atom_vector_feature``).
-    """
-
-    def __init__(self, output_mode: str = "feature", scalar_field: str = "atom_feature",
-                 equi_field: Optional[str] = None, include_embedding: bool = False) -> None:
-        super().__init__()
-        if output_mode not in OUTPUT_MODES:
-            raise ValueError(f"output_mode must be one of {OUTPUT_MODES}, got {output_mode!r}")
-        self.output_mode = output_mode
-        self.scalar_field = scalar_field
-        self.equi_field = equi_field
-        self.include_embedding = bool(include_embedding)
-        self.output_fields = tuple(f for f in (scalar_field, equi_field) if f)
-        self.needs_taps = output_mode != "feature"
-
-    def forward(self, state: BlockState, ctx: GraphContext, taps: Optional[List[BlockState]],
-                inputs: Dict[str, Any]) -> Dict[str, Tensor]:
-        if self.output_mode == "feature":
-            feature = state.scalar
-        else:
-            chosen = taps if self.include_embedding else taps[1:]
-            scalars = [tap.scalar for tap in chosen]
-            if self.output_mode == "layers":
-                feature = torch.stack(scalars, dim=-1)
-            elif self.output_mode == "concat":
-                feature = torch.cat(scalars, dim=-1)
-            else:
-                feature = torch.stack(scalars, dim=0).sum(dim=0)
-        out = {self.scalar_field: feature}
-        if self.equi_field:
-            out[self.equi_field] = state.equi
-        return out
-
-    def extra_repr(self) -> str:
-        return f"output_mode={self.output_mode}"
 
 
 def radius_stack_builder(core: BaseFFCore, built_layers: List[nn.Module]) -> None:

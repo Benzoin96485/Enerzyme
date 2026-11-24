@@ -13,7 +13,7 @@ def _rand_graph_indices(num_nodes: int, num_edges: int, device=None):
 
 
 def test_physnet_output_mode_feature_atom_feature_shape():
-    from enerzyme.models.physnet.core import PhysNetCore
+    from enerzyme.models.presets.scalar import physnet
 
     torch.manual_seed(0)
     N = 7
@@ -22,7 +22,7 @@ def test_physnet_output_mode_feature_atom_feature_shape():
     num_rbf = 8
     num_blocks = 3
 
-    core = PhysNetCore(
+    core = physnet(
         dim_embedding=dim_embedding,
         num_rbf=num_rbf,
         num_blocks=num_blocks,
@@ -43,7 +43,7 @@ def test_physnet_output_mode_feature_atom_feature_shape():
 
 
 def test_schnet_output_mode_feature_atom_feature_shape():
-    from enerzyme.models.schnet.core import SchNetCore
+    from enerzyme.models.presets.scalar import schnet
 
     torch.manual_seed(0)
     N = 9
@@ -57,7 +57,7 @@ def test_schnet_output_mode_feature_atom_feature_shape():
     rbf = torch.randn(num_edges, num_rbf)
     atom_embedding = torch.randn(N, hidden_channels)
 
-    core = SchNetCore(
+    core = schnet(
         hidden_channels=hidden_channels,
         dim_embedding=dim_embedding,
         num_interactions=2,
@@ -73,7 +73,7 @@ def test_schnet_output_mode_feature_atom_feature_shape():
 
 
 def test_spookynet_output_mode_feature_atom_feature_shape():
-    from enerzyme.models.spookynet.core import SpookyNetCore
+    from enerzyme.models.presets.scalar import spookynet
 
     torch.manual_seed(0)
     N = 11
@@ -88,7 +88,7 @@ def test_spookynet_output_mode_feature_atom_feature_shape():
     atom_embedding = torch.randn(N, dim_embedding)
     batch_seg = torch.zeros(N, dtype=torch.long)
 
-    core = SpookyNetCore(
+    core = spookynet(
         dim_embedding=dim_embedding,
         num_rbf=num_rbf,
         num_modules=2,
@@ -124,10 +124,7 @@ def test_spookynet_output_mode_feature_atom_feature_shape():
 
 
 def test_mace_output_mode_feature_atom_feature_shape():
-    try:
-        from enerzyme.models.mace.core import MACECore
-    except Exception as e:
-        pytest.skip(f"MACECore not importable: {e}")
+    from enerzyme.models.presets.irreps import mace
 
     torch.manual_seed(0)
     N = 8
@@ -143,7 +140,7 @@ def test_mace_output_mode_feature_atom_feature_shape():
     Za = torch.randint(1, max_Za + 1, (N,), dtype=torch.long)
     atom_embedding = torch.randn(N, dim_embedding)
 
-    core = MACECore(
+    core = mace(
         max_Za=max_Za,
         max_ell=max_ell,
         dim_embedding=dim_embedding,

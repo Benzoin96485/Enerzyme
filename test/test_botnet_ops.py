@@ -83,8 +83,8 @@ def test_message_is_written_on_idx_j_and_matches_the_interaction_block():
         node_feats=embedding,
         edge_attrs=core.spherical_harmonics(vij),
         edge_feats=rbf,
-        idx_i_sr=idx_i,
-        idx_j_sr=idx_j,
+        sender=idx_i,
+        receiver=idx_j,
     )
     assert torch.allclose(block, out[:, :, 0])
 

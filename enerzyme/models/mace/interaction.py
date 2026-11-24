@@ -10,6 +10,8 @@ from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Activation
 from e3nn.o3 import Irreps, TensorProduct, FullyConnectedTensorProduct
 from e3nn.util.jit import compile_mode
+from ..mp.block import BlockState
+from ..mp.graph import GraphContext
 from ..mp.ops import scatter_sum
 from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions, reshape_irreps, U_matrix_real, linear_out_irreps
 
@@ -336,8 +338,8 @@ class InteractionBlock(ABC, Module):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tuple[Tensor, Tensor]:
         ...
 
@@ -391,11 +393,9 @@ class ResidualElementDependentInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tensor:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         sc = self.skip_tp(node_feats, node_attrs)
         node_feats = self.linear_up(node_feats)
@@ -461,11 +461,9 @@ class AgnosticNonlinearInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tensor:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         tp_weights = self.conv_tp_weights(edge_feats)
         node_feats = self.linear_up(node_feats)
@@ -529,11 +527,9 @@ class AgnosticResidualNonlinearInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tensor:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         sc = self.skip_tp(node_feats, node_attrs)
         node_feats = self.linear_up(node_feats)
@@ -603,11 +599,9 @@ class RealAgnosticInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         node_feats = self.linear_up(node_feats)
         tp_weights = self.conv_tp_weights(edge_feats)
@@ -679,11 +673,9 @@ class RealAgnosticResidualInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         sc = self.skip_tp(node_feats, node_attrs)
         node_feats = self.linear_up(node_feats) # Linear map of node features
@@ -768,11 +760,9 @@ class RealAgnosticAttResidualInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         sc = self.skip_linear(node_feats)
         node_feats_up = self.linear_up(node_feats)
@@ -835,3 +825,34 @@ INTERACTION_CLASSES = {
     "RealAgnosticResidualInteractionBlock": RealAgnosticResidualInteractionBlock,
     "RealAgnosticAttResidualInteractionBlock": RealAgnosticAttResidualInteractionBlock,
 }
+
+def element_one_hot(ctx: GraphContext, num_elements: int, dtype: torch.dtype) -> Tensor:
+    """One-hot species ``(N, num_elements)`` from ``Za``, cached per forward."""
+    return ctx.cached(("element_one_hot", int(num_elements), dtype),
+                      lambda: F.one_hot(ctx.inputs["Za"], num_classes=int(num_elements)).to(dtype))
+
+
+class MACEBlock(Module):
+    """One MACE layer: equivariant convolution, then the symmetric-contraction product.
+
+    Node features live in ``state.equi`` (e3nn flat irreps). Edge attributes are
+    the component-normalized e3nn harmonics of ``R_receiver - R_sender``.
+    """
+
+    def __init__(self, interaction: InteractionBlock, product: EquivariantProductBasisBlock,
+                 num_elements: int, max_ell: int) -> None:
+        super().__init__()
+        self.interaction = interaction
+        self.product = product
+        self.num_elements = int(num_elements)
+        self.max_ell = int(max_ell)
+
+    def forward(self, state: BlockState, ctx: GraphContext) -> BlockState:
+        node_feats = state.equi
+        node_attrs = element_one_hot(ctx, self.num_elements, node_feats.dtype)
+        edge_attrs = ctx.spherical_harmonics(self.max_ell, "component", True, layout="e3nn", edge_sign=-1.0)
+        node_feats, sc = self.interaction(
+            node_attrs=node_attrs, node_feats=node_feats, edge_attrs=edge_attrs,
+            edge_feats=ctx.rbf, sender=ctx.sender, receiver=ctx.receiver,
+        )
+        return state._replace(equi=self.product(node_feats=node_feats, sc=sc, node_attrs=node_attrs))

@@ -223,6 +223,33 @@ CUTOFF_KEY_TYPE = Literal[
 ]
 
 
+class Envelope(torch.nn.Module):
+    """Radial window ``f(d)`` as a module, shape-preserving.
+
+    ``kind`` is a :data:`CUTOFF_REGISTER` transition evaluated on
+    ``[cuton, cutoff]`` (``"cosine"``, ``"polynomial"``, ``"bump"``, ...), or
+    ``"polynomial_p"`` for :func:`polynomial_envelope` with ``exponent``.
+    """
+
+    def __init__(self, kind: str = "cosine", cutoff: float = 5.0, cuton: float = 0.0,
+                 exponent: int = 5) -> None:
+        super().__init__()
+        if kind != "polynomial_p" and kind not in CUTOFF_REGISTER:
+            raise KeyError(f"unknown envelope {kind!r}; choose from {sorted(CUTOFF_REGISTER)} or 'polynomial_p'")
+        self.kind = kind
+        self.cutoff = float(cutoff)
+        self.cuton = float(cuton)
+        self.exponent = int(exponent)
+
+    def forward(self, distance: Tensor) -> Tensor:
+        if self.kind == "polynomial_p":
+            return polynomial_envelope(distance, self.cutoff, self.exponent)
+        return CUTOFF_REGISTER[self.kind](distance, cutoff=self.cutoff, cuton=self.cuton)
+
+    def extra_repr(self) -> str:
+        return f"kind={self.kind}, cutoff={self.cutoff}, cuton={self.cuton}"
+
+
 def polynomial_envelope(distance: Tensor, cutoff, exponent: int) -> Tensor:
     """``1 + a x^p + b x^{p+1} + c x^{p+2}`` on ``x = r / cutoff < 1``, else 0.
 
