@@ -24,7 +24,7 @@ from ..layers.fragments import (
 
 # Historical private name. The count now lives in layers.fragments.
 _num_clusters_for_graph = num_clusters_for_graph
-from .graph import map_neighbor_list, pad_neighbor_list, select_closest_neighbors
+from .graph import map_neighbor_list, packed_neighbors
 
 __all__ = [
     "build_atom_fragment_topk",
@@ -143,17 +143,11 @@ def build_atom_fragment_topk(
     dist = torch.cat(dist_list)
     vec = torch.cat(vec_list)
 
-    src, dst, dist, vec = select_closest_neighbors(
-        src, dst, dist, max_neighbors, num_atoms, vec
-    )
-    neighbor_list, present, index_mapping = pad_neighbor_list(
-        src, dst, max_neighbors, num_atoms
-    )
+    selected, index_mapping, safe, present = packed_neighbors(src, dst, dist, max_neighbors, num_atoms)
     attn_mask = (~present).unsqueeze(-1)
-    edge_vec = map_neighbor_list(vec, index_mapping, max_neighbors, num_atoms)
-    edge_dis = map_neighbor_list(dist, index_mapping, max_neighbors, num_atoms)
-    edge_dis = edge_dis.masked_fill(~present, 0.0)
-    safe = neighbor_list.clamp(min=0)
+    edge_vec = map_neighbor_list(vec[selected], index_mapping, max_neighbors, num_atoms)
+    edge_dis = map_neighbor_list(dist[selected], index_mapping, max_neighbors, num_atoms)
+
     return {
         "f_sparse_idx_expnode": safe,
         "f_sparse_idx_node": safe,

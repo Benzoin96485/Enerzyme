@@ -9,7 +9,7 @@ import torch
 from e3nn import o3
 from torch import Tensor, nn
 
-from ..mp.basis.angular import spherical_harmonic_degree
+from ..mp.basis.angular import spherical_harmonics
 from ..mp.nn.radial_mlp import RadialProfile
 
 
@@ -85,14 +85,10 @@ class EdgeDegreeEmbeddingHigherOrder(nn.Module):
         else:
             edge_dis_embed = edge_scalars
 
+        harmonics = spherical_harmonics(edge_vec, lmax=max(self.degrees), layout="e3nn", normalization="norm")
         node_features = []
         for idx, degree in enumerate(self.degrees):
-            lx = spherical_harmonic_degree(
-                l=degree,
-                x=edge_vec,
-                normalize=True,
-                normalization="norm",
-            )
+            lx = harmonics[..., degree**2 : (degree + 1)**2]
             edge_fea = self.gbf_projs[idx](edge_dis_embed)
             edge_fea = torch.where(attn_mask, 0, edge_fea)
             lx_embed = torch.einsum("mnd,mnh->mdh", lx, edge_fea)
