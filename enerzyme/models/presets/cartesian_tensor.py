@@ -290,7 +290,7 @@ def grace(
     return ComposableCore(
         GRACEEmbed(dim_embedding, avg_n_neigh, max_l), built, GRACEDensityHead(density),
         GraphRequires(rbf=False, optional_cutoff_values=False, harmonics=(HarmonicsRequest(max_l),)),
-        is_grace_core=True, num_blocks=1,
+        is_grace_core=True, num_blocks=1, _native_cpu_inductor_forces=True,
         preset=preset, max_Za=max_Za, dim_embedding=dim_embedding,
         cutoff_sr=cutoff_sr, basis_type=basis_type, n_rad_base=n_rad_base,
         cutoff_order=cutoff_order, radial_hidden=radial_hidden, radial_activation=radial_activation,

@@ -18,7 +18,7 @@ def isolate_compiler_cache():
     torch.compiler.reset()
 
 
-@pytest.mark.parametrize("architecture", ["equiformer_v3", "camp", "cace"])
+@pytest.mark.parametrize("architecture", ["equiformer_v3", "camp", "cace", "grace"])
 def test_cpu_compiled_force_training_uses_native_gradients(monkeypatch, architecture):
     from torch._dynamo.exc import TorchRuntimeError
 
