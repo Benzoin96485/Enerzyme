@@ -243,7 +243,12 @@ class RepFlowBlock(nn.Module):
         num_edges: int,
     ) -> Tensor:
         assert self.edge_from_angle is not None
-        weight = angle_switch[edge_ij] * angle_switch[edge_ik]
+        if torch.compiler.is_compiling() and angle_switch.device.type == "cpu":
+            # Accumulate both legs of the angular switch in a single indexed
+            # backward. Separate reads can lose a contribution in CPU fusion.
+            weight = angle_switch[torch.stack((edge_ij, edge_ik))].prod(0)
+        else:
+            weight = angle_switch[edge_ij] * angle_switch[edge_ik]
         reduced = scatter_sum(hidden * weight.unsqueeze(-1), edge_ij, num_edges)
         reduced = reduced / self.angular_scale
         if not self.smooth_edge_update:
