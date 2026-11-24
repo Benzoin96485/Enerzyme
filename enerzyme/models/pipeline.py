@@ -48,6 +48,14 @@ def build_model(
     e3nn_codegen = build_params.get("e3nn_codegen", "default")
     if e3nn_codegen == "default":
         with construction_lock:
+            if architecture.casefold() in ("nequip", "allegro"):
+                import e3nn
+                if e3nn.get_optimization_defaults()["jit_script_fx"]:
+                    from .mp.equivariant.e3nn.dispatch import install_generated_kernels
+
+                    with traceable_e3nn_kernels():
+                        core = _build_layers(Core, layer_params, build_params, verbose)
+                    return install_generated_kernels(core)
             return _build_layers(Core, layer_params, build_params, verbose)
     if e3nn_codegen != "fx":
         raise ValueError("e3nn_codegen must be 'default' or 'fx'")
