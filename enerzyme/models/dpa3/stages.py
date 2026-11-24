@@ -18,6 +18,7 @@ from ..mp.core import Embed
 import math
 from typing import List
 
+import torch
 from torch import Tensor, nn
 
 from ..mp.basis.envelope import exponential_switch, polynomial_transition
@@ -100,6 +101,11 @@ class DPA3Embed(Embed):
                 "Dij_sr, vij_sr, idx_i_sr, and idx_j_sr must describe the same edges "
                 f"(got {tuple(dist.shape)}, {tuple(vij.shape)}, {tuple(idx_i.shape)}, {tuple(idx_j.shape)})"
             )
+        if torch.compiler.is_compiling():
+            torch._assert_async(((idx_i >= 0) & (idx_j >= 0)).all(), "edge indices must be non-negative")
+            torch._assert_async(((idx_i < num_nodes) & (idx_j < num_nodes)).all(),
+                                "edge index is outside the atom embedding")
+            return
         if idx_i.numel() == 0:
             return
         if int(idx_i.min()) < 0 or int(idx_j.min()) < 0:
