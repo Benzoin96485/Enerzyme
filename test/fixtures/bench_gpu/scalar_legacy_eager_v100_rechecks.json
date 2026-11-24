@@ -503,5 +503,70 @@
         }
       }
     }
+  },
+  "rejected_experiments": {
+    "6317857": {
+      "baseline": "b05ea1a",
+      "candidate": "baaea1b",
+      "weights": "identical main checkpoints and external atomic features",
+      "repetitions": 17,
+      "cases": {
+        "mace_ff04-float32": {
+          "precision": "float32",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[22.080038, 60.155866, 205.361328, 319.390137], [22.998651, 60.998591, 190.319824, 313.641602], [23.457684, 62.631685, 190.319824, 313.641602], [21.751712, 57.930589, 205.361328, 319.390137]],
+            "delta_percent": [-5.6496, -4.4842, 7.9033, 1.8328]
+          },
+          "bulk_256": {
+            "samples": [[22.728148, 60.30431, 134.931641, 202.489258], [23.795304, 61.452513, 124.427246, 191.349609], [23.980709, 62.985314, 124.427246, 191.349609], [22.025714, 57.41643, 134.931641, 202.489258]],
+            "delta_percent": [-6.3257, -5.3979, 8.4422, 5.8216]
+          },
+          "large_2000": {
+            "samples": [[25.645832, 75.029345, 792.14209, 1251.104492], [35.547325, 93.601303, 700.421875, 1153.990723], [35.921059, 93.446136, 700.421875, 1153.990723], [25.015535, 72.783469, 792.14209, 1251.104492]],
+            "delta_percent": [-29.1136, -20.9758, 13.095, 8.4155]
+          }
+        },
+        "mace_ff04-float64": {
+          "precision": "float64",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[23.450595, 62.331293, 398.792969, 628.540527], [25.857089, 63.213246, 367.3125, 618.247559], [23.820624, 56.980312, 367.3125, 618.247559], [21.400643, 57.538491, 398.792969, 628.540527]],
+            "delta_percent": [-9.7156, -0.2694, 8.5705, 1.6649]
+          },
+          "bulk_256": {
+            "samples": [[23.619481, 61.937249, 250.797852, 381.973633], [24.141442, 63.304563, 228.858398, 357.793945], [21.606637, 58.995868, 228.858398, 357.793945], [24.153015, 64.944202, 250.797852, 381.973633]],
+            "delta_percent": [4.4251, 3.7457, 9.5865, 6.758]
+          },
+          "large_2000": {
+            "samples": [[40.906371, 123.704875, 1557.183105, 2465.59375], [57.201525, 152.379034, 1370.980957, 2267.163574], [55.376818, 150.722491, 1370.980957, 2267.163574], [40.674853, 123.659041, 1557.183105, 2465.59375]],
+            "delta_percent": [-27.5338, -18.3891, 13.5817, 8.7524]
+          }
+        }
+      },
+      "trained_checkpoint_gradient_parity": {
+        "loss": "sum(E^2) + sum(F^2), CPU, checkpoint training batch",
+        "columns": ["precision", "energy_max_absolute_error", "force_max_absolute_error", "active_parameter_gradients", "parameter_gradient_max_absolute_error"],
+        "results": [["torch.float32", 2.9802322387695312e-08, 4.470348358154297e-08, 60, 2.384185791015625e-07], ["torch.float64", 5.551115123125783e-17, 8.326672684688674e-17, 60, 4.440892098500626e-16]]
+      },
+      "gpu_profile": {
+        "configuration": "One profiled periodic fp64 training iteration including energy, forces and loss backward, after three warmups.",
+        "columns": ["operator", "calls", "total_device_ms"],
+        "revisions": {
+          "b05ea1a": [["MACE_LEGACY_Contraction", 3, 2.9139], ["MACE_LEGACY_ForceLayer", 1, 23.1147], ["aten::mm", 241, 8.8654], ["aten::bmm", 90, 4.1702], ["aten::copy_", 321, 1.5096]],
+          "3e65250": [["MACE_LEGACY_Contraction", 3, 2.8744], ["MACE_LEGACY_ForceLayer", 1, 24.3928], ["aten::mm", 241, 9.6826], ["aten::bmm", 90, 4.5804], ["aten::copy_", 319, 1.5956]],
+          "baaea1b": [["MACE_LEGACY_Contraction", 3, 1.9542], ["MACE_LEGACY_ForceLayer", 1, 21.7036], ["aten::mm", 217, 5.8307], ["aten::bmm", 96, 5.2766], ["aten::copy_", 310, 1.3119]]
+        }
+      },
+      "disposition": "Rejected. GPU peak memory exceeds the 3 percent allowance, and fp64 bulk train and inference time also exceed it. The accepted implementation is 72b2738 (6317837)."
+    }
   }
 }
