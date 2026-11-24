@@ -148,3 +148,16 @@ def test_flat_rms_matches_block_reductions_and_gradients(variant):
         torch.autograd.grad(expected, variables, probe),
     ):
         torch.testing.assert_close(actual_grad, ref_grad, rtol=5e-8, atol=5e-8)
+
+
+@pytest.mark.parametrize("mode", ["inside", "outside", "floor"])
+def test_zero_norm_gradient(mode):
+    eps = 0.25
+    x = torch.zeros(2, 4, 3, dtype=torch.float64, requires_grad=True)
+    layer = EquivariantNorm(
+        1, 3, kind="rms", scope="global", eps=eps, eps_mode=mode, affine=False
+    )
+    response = torch.randn_like(x)
+    grad, = torch.autograd.grad(layer(x), x, response)
+    expected = response / (eps if mode == "outside" else eps**0.5)
+    torch.testing.assert_close(grad, expected)

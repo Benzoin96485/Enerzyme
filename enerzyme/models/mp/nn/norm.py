@@ -11,7 +11,11 @@ def inverse_rms(moment: Tensor, eps: float, eps_mode: str = "inside") -> Tensor:
     if eps_mode == "inside":
         return torch.rsqrt(moment + eps)
     if eps_mode == "outside":
-        return (moment.sqrt() + eps).reciprocal()
+        # The composed norm has a finite derivative at a zero input. Keep
+        # sqrt's infinite derivative at zero out of its backward pass.
+        zero = moment == 0
+        root = moment.masked_fill(zero, 1).sqrt().masked_fill(zero, 0)
+        return (root + eps).reciprocal()
     if eps_mode == "floor":
         return torch.rsqrt(moment.clamp_min(eps))
     raise ValueError(f"unknown eps_mode {eps_mode!r}")
