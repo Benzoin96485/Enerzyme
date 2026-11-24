@@ -238,5 +238,184 @@
     "changed_gradient_participation": {}
    }
   }
+ },
+ "additional_training_controls": {
+  "job": 6318833,
+  "precision": "float64",
+  "reference": "Identical model parameters, FP32 degree statistics and two-molecule force-loss check as the original training controls.",
+  "controls": {
+   "native_degree_norm": {
+    "method": "Use the original degree normalization outside Dynamo while tracing the CPU force VJP.",
+    "energy": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "forces": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "gradient_count": 60,
+    "largest_gradient_error": {
+     "name": "pre_sequence.2.embedding.weight",
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "outside_tolerance": [],
+    "changed_gradient_participation": {},
+    "graphs": 2,
+    "captured_operations": 2,
+    "learned_operations": []
+   },
+   "scalar_cpu": {
+    "method": "Set CPU cpp.simdlen=1 while lowering both forward and backward.",
+    "energy": {
+     "max_abs": 6.615955072675206e-08,
+     "relative_l2": 8.140551107270262e-09
+    },
+    "forces": {
+     "max_abs": 5.088858029411725e-09,
+     "relative_l2": 3.8130508607447436e-08
+    },
+    "gradient_count": 60,
+    "largest_gradient_error": {
+     "name": "embed.sphere_proj.weight",
+     "max_abs": 8.083585811391458e-06,
+     "relative_l2": 5.3073203423174004e-08
+    },
+    "outside_tolerance": [
+     "Fa",
+     "pre_sequence.2.embedding.weight",
+     "post_sequence.0.head.weight",
+     "embed.radial_basis.freqs",
+     "embed.sphere_proj.weight",
+     "embed.sphere_proj.bias",
+     "embed.radial_feat_mlp.net.0.weight",
+     "embed.radial_feat_mlp.net.2.weight",
+     "embed.env_embed.output_proj.weight",
+     "blocks.0.module.post_so2_norm.bias",
+     "blocks.0.module.so2_conv.post_mix.weight",
+     "blocks.0.module.ffns.0.so3_linear_2.weight",
+     "blocks.1.module.post_so2_norm.bias",
+     "blocks.1.module.so2_conv.post_mix.weight",
+     "blocks.1.module.ffns.0.so3_linear_2.weight",
+     "head.norm.scale",
+     "head.norm.bias"
+    ],
+    "changed_gradient_participation": {},
+    "graphs": 1,
+    "captured_operations": 1171,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "unroll_short_reductions": {
+    "method": "Expand static reductions with fewer than 64 elements.",
+    "energy": {
+     "max_abs": 6.615955072675206e-08,
+     "relative_l2": 8.140551107270262e-09
+    },
+    "forces": {
+     "max_abs": 6.381205286398739e-10,
+     "relative_l2": 5.2331708619832906e-09
+    },
+    "gradient_count": 60,
+    "largest_gradient_error": {
+     "name": "blocks.0.module.post_so2_norm.bias",
+     "max_abs": 1.52587890625e-05,
+     "relative_l2": 6.007544555014459e-08
+    },
+    "outside_tolerance": [
+     "Fa",
+     "pre_sequence.2.embedding.weight",
+     "post_sequence.0.head.weight",
+     "embed.radial_basis.freqs",
+     "embed.sphere_proj.weight",
+     "embed.sphere_proj.bias",
+     "embed.radial_feat_mlp.net.0.weight",
+     "embed.radial_feat_mlp.net.2.weight",
+     "embed.env_embed.output_proj.weight",
+     "blocks.0.module.post_so2_norm.bias",
+     "blocks.0.module.so2_conv.post_mix.weight",
+     "blocks.0.module.ffns.0.so3_linear_2.weight",
+     "blocks.1.module.post_so2_norm.bias",
+     "blocks.1.module.so2_conv.post_mix.weight",
+     "blocks.1.module.ffns.0.so3_linear_2.weight",
+     "head.norm.scale",
+     "head.norm.bias"
+    ],
+    "changed_gradient_participation": {},
+    "graphs": 1,
+    "captured_operations": 1171,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "scalar_cpu_single_operation_fusion": {
+    "method": "Set cpp.simdlen=1 and max_fusion_size=1.",
+    "energy": {
+     "max_abs": 6.615955072675206e-08,
+     "relative_l2": 8.140551107270262e-09
+    },
+    "forces": {
+     "max_abs": 5.088858029411725e-09,
+     "relative_l2": 3.8130508607447436e-08
+    },
+    "gradient_count": 60,
+    "largest_gradient_error": {
+     "name": "embed.sphere_proj.weight",
+     "max_abs": 8.083585811391458e-06,
+     "relative_l2": 5.3073203423174004e-08
+    },
+    "outside_tolerance": [
+     "Fa",
+     "pre_sequence.2.embedding.weight",
+     "post_sequence.0.head.weight",
+     "embed.radial_basis.freqs",
+     "embed.sphere_proj.weight",
+     "embed.sphere_proj.bias",
+     "embed.radial_feat_mlp.net.0.weight",
+     "embed.radial_feat_mlp.net.2.weight",
+     "embed.env_embed.output_proj.weight",
+     "blocks.0.module.post_so2_norm.bias",
+     "blocks.0.module.so2_conv.post_mix.weight",
+     "blocks.0.module.ffns.0.so3_linear_2.weight",
+     "blocks.1.module.post_so2_norm.bias",
+     "blocks.1.module.so2_conv.post_mix.weight",
+     "blocks.1.module.ffns.0.so3_linear_2.weight",
+     "head.norm.scale",
+     "head.norm.bias"
+    ],
+    "changed_gradient_participation": {},
+    "graphs": 1,
+    "captured_operations": 1171,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   }
+  },
+  "segmented_forward": {
+   "method": "Apply the same native degree normalization, compile the ordinary forward in segments, and ask the energy for a differentiable force (create_graph=True).",
+   "outcome": "PyTorch AOTAutograd fails while computing the first force. Its backward tries to restride a leaf tensor via copy_ while higher derivatives are enabled.",
+   "error": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation."
+  },
+  "production_training": "The published FP32 accumulations remain in the compiled VJP. Native degree normalization matches all 60 parameter gradients, but the VJP loses all learned operators. The CPU code-generation controls retain learned contractions and reductions, with errors above the stated FP64 tolerances."
  }
 }
