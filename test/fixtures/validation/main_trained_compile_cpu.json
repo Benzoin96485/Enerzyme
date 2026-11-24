@@ -1,0 +1,2264 @@
+{
+  "scope": "Ordinary torch.compile on four trained checkpoints from test/fixtures/main_legacy. These CPU checks use one timed repetition to verify behavior and gradients. Phase 0 has its own snapshot matrix.",
+  "model_revisions": {
+    "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+    "new": "13f1b0b920d54ef3500b1d588b5881b32fe6da59"
+  },
+  "comparison_code_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+  "molecular_job": "6319574",
+  "cpu_model": "Intel(R) Xeon(R) Platinum 8260 CPU @ 2.40GHz",
+  "method": "Each side ran on the same CPU allocation, in a separate process, using one model/precision-specific compilation cache. The training step differentiates sum(E squared) + sum(Fa squared) with respect to the model weights. Cross-source gradients were compared under their original trained parameter names. The molecular cases reused the per-side caches generated in calibration. The periodic and large cases started with empty caches.",
+  "candidate_force_routes": {
+    "schnet_default": {
+      "scripted_force_kernels": false,
+      "force_layer_hooks": false,
+      "native_cpu_force_training": false,
+      "native_cpu_force_inference": false
+    },
+    "physnet_ff01": {
+      "scripted_force_kernels": false,
+      "force_layer_hooks": false,
+      "native_cpu_force_training": false,
+      "native_cpu_force_inference": false
+    },
+    "spookynet_ff02": {
+      "scripted_force_kernels": false,
+      "force_layer_hooks": false,
+      "native_cpu_force_training": false,
+      "native_cpu_force_inference": false
+    },
+    "mace_ff04": {
+      "scripted_force_kernels": true,
+      "force_layer_hooks": false,
+      "native_cpu_force_training": false,
+      "native_cpu_force_inference": false
+    }
+  },
+  "training_dispatch": "The MACE FF04 checkpoint builds scripted e3nn force kernels. Its ordinary compiled training call dispatches to native forces. SchNet, PhysNet and SpookyNet select the compiled coordinate VJP. Graph counters and returned autograd functions describe the observations in each process.",
+  "molecular_32x20": [
+    {
+      "device": "cpu",
+      "torch": "2.13.0+cu126",
+      "precision": "float32",
+      "compile": true,
+      "reps": 1,
+      "threads": 2,
+      "snapshot": "schnet_default.pt.gz",
+      "snapshot_sha256": "e0ec083cfe71c322d4758fe5ae65c8aa20f692ea2a2fc4ea7a6d11870c04ab10",
+      "fixture_kind": "main_trained",
+      "config_sha256": "832ecba15c2957b1a5d8af950c29a71cb6b873c02b7dc372b709670bfa872317",
+      "checkpoint_state": "model_state_dict",
+      "tiled_atom_features": [],
+      "requested_systems": [
+        "mol_batch_32x20"
+      ],
+      "modes": [
+        "infer",
+        "train"
+      ],
+      "params": 681679,
+      "architecture": "schnet",
+      "comparisons": {
+        "mol_batch_32x20": {
+          "infer": {
+            "baseline": {
+              "ms": 26.273395167663693,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 1.9073486328125e-06,
+                "force_max_abs": 4.172325134277344e-07,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 19,
+                "new_calls": 201
+              }
+            },
+            "candidate": {
+              "ms": 21.410745102912188,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 1.9073486328125e-06,
+                "force_max_abs": 4.76837158203125e-07,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 11,
+                "new_calls": 202
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 2.384185791015625e-06,
+              "force_max_abs": 3.8743019104003906e-07,
+              "gradient_max_abs": 0.0
+            },
+            "delta_percent": {
+              "ms": -18.507886147642893
+            },
+            "status": "both_validated"
+          },
+          "train": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "RuntimeError: torch.compile with aot_autograd does not currently support double backward",
+              "capture": {
+                "new_graphs": 0,
+                "new_calls": 0
+              }
+            },
+            "candidate": {
+              "ms": 40.41307000443339,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 30,
+                "reference_active_parameters": 30,
+                "energy_max_abs": 1.9073486328125e-06,
+                "force_max_abs": 4.76837158203125e-07,
+                "gradient_max_abs": 0.0029296875,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "CompiledFunctionBackward"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 1,
+                "new_calls": 260
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 30,
+              "reference_active_parameters": 30,
+              "energy_max_abs": 2.384185791015625e-06,
+              "force_max_abs": 3.8743019104003906e-07,
+              "gradient_max_abs": 0.00048828125
+            },
+            "status": "candidate_only_validated"
+          }
+        }
+      },
+      "counts": {
+        "both_validated": 1,
+        "candidate_only_validated": 1
+      },
+      "source": {
+        "baseline": {
+          "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795527886445866328,
+          "finished_unix_ns": 1795527906572483075
+        },
+        "candidate": {
+          "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795527909874803856,
+          "finished_unix_ns": 1795527947787497905
+        }
+      },
+      "measurement_order": [
+        "baseline",
+        "candidate"
+      ],
+      "exit_codes": {
+        "base": 0,
+        "new": 0
+      }
+    },
+    {
+      "device": "cpu",
+      "torch": "2.13.0+cu126",
+      "precision": "float64",
+      "compile": true,
+      "reps": 1,
+      "threads": 2,
+      "snapshot": "schnet_default.pt.gz",
+      "snapshot_sha256": "e0ec083cfe71c322d4758fe5ae65c8aa20f692ea2a2fc4ea7a6d11870c04ab10",
+      "fixture_kind": "main_trained",
+      "config_sha256": "832ecba15c2957b1a5d8af950c29a71cb6b873c02b7dc372b709670bfa872317",
+      "checkpoint_state": "model_state_dict",
+      "tiled_atom_features": [],
+      "requested_systems": [
+        "mol_batch_32x20"
+      ],
+      "modes": [
+        "infer",
+        "train"
+      ],
+      "params": 681679,
+      "architecture": "schnet",
+      "comparisons": {
+        "mol_batch_32x20": {
+          "infer": {
+            "baseline": {
+              "ms": 33.345682080835104,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 4.440892098500626e-15,
+                "force_max_abs": 7.216449660063518e-16,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 19,
+                "new_calls": 201
+              }
+            },
+            "candidate": {
+              "ms": 29.71253707073629,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 3.552713678800501e-15,
+                "force_max_abs": 8.881784197001252e-16,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 11,
+                "new_calls": 202
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 2.6645352591003757e-15,
+              "force_max_abs": 5.551115123125783e-16,
+              "gradient_max_abs": 0.0
+            },
+            "delta_percent": {
+              "ms": -10.895398694474167
+            },
+            "status": "both_validated"
+          },
+          "train": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "RuntimeError: torch.compile with aot_autograd does not currently support double backward",
+              "capture": {
+                "new_graphs": 0,
+                "new_calls": 0
+              }
+            },
+            "candidate": {
+              "ms": 58.85693384334445,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 30,
+                "reference_active_parameters": 30,
+                "energy_max_abs": 3.552713678800501e-15,
+                "force_max_abs": 8.881784197001252e-16,
+                "gradient_max_abs": 4.547473508864641e-12,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "CompiledFunctionBackward"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 1,
+                "new_calls": 260
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 30,
+              "reference_active_parameters": 30,
+              "energy_max_abs": 2.6645352591003757e-15,
+              "force_max_abs": 5.551115123125783e-16,
+              "gradient_max_abs": 9.094947017729282e-13
+            },
+            "status": "candidate_only_validated"
+          }
+        }
+      },
+      "counts": {
+        "both_validated": 1,
+        "candidate_only_validated": 1
+      },
+      "source": {
+        "baseline": {
+          "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795527951354891706,
+          "finished_unix_ns": 1795527971208605021
+        },
+        "candidate": {
+          "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795527974607630741,
+          "finished_unix_ns": 1795528011416885333
+        }
+      },
+      "measurement_order": [
+        "baseline",
+        "candidate"
+      ],
+      "exit_codes": {
+        "base": 0,
+        "new": 0
+      }
+    },
+    {
+      "device": "cpu",
+      "torch": "2.13.0+cu126",
+      "precision": "float32",
+      "compile": true,
+      "reps": 1,
+      "threads": 2,
+      "snapshot": "physnet_ff01.pt.gz",
+      "snapshot_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+      "fixture_kind": "main_trained",
+      "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+      "checkpoint_state": "model_state_dict",
+      "tiled_atom_features": [
+        "Qa_xTB"
+      ],
+      "requested_systems": [
+        "mol_batch_32x20"
+      ],
+      "modes": [
+        "infer",
+        "train"
+      ],
+      "params": 9509,
+      "architecture": "physnet",
+      "comparisons": {
+        "mol_batch_32x20": {
+          "infer": {
+            "baseline": {
+              "ms": 17.523963004350662,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 2.1827872842550278e-11,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 18,
+                "new_calls": 359
+              }
+            },
+            "candidate": {
+              "ms": 19.39933397807181,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 2.000888343900442e-11,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 11,
+                "new_calls": 351
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 0.0,
+              "force_max_abs": 9.094947017729282e-12,
+              "gradient_max_abs": 0.0
+            },
+            "delta_percent": {
+              "ms": 10.701751500248836
+            },
+            "status": "both_validated"
+          },
+          "train": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "RuntimeError: torch.compile with aot_autograd does not currently support double backward",
+              "capture": {
+                "new_graphs": 1,
+                "new_calls": 145
+              }
+            },
+            "candidate": {
+              "ms": 22.125724935904145,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 68,
+                "reference_active_parameters": 68,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 2.000888343900442e-11,
+                "gradient_max_abs": 3.814697265625e-06,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "CompiledFunctionBackward"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 1,
+                "new_calls": 296
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 68,
+              "reference_active_parameters": 68,
+              "energy_max_abs": 0.0,
+              "force_max_abs": 9.094947017729282e-12,
+              "gradient_max_abs": 2.384185791015625e-07
+            },
+            "status": "candidate_only_validated"
+          }
+        }
+      },
+      "counts": {
+        "both_validated": 1,
+        "candidate_only_validated": 1
+      },
+      "source": {
+        "baseline": {
+          "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528014993490073,
+          "finished_unix_ns": 1795528044457571162
+        },
+        "candidate": {
+          "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528047711664888,
+          "finished_unix_ns": 1795528096212770809
+        }
+      },
+      "measurement_order": [
+        "baseline",
+        "candidate"
+      ],
+      "exit_codes": {
+        "base": 0,
+        "new": 0
+      }
+    },
+    {
+      "device": "cpu",
+      "torch": "2.13.0+cu126",
+      "precision": "float64",
+      "compile": true,
+      "reps": 1,
+      "threads": 2,
+      "snapshot": "physnet_ff01.pt.gz",
+      "snapshot_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+      "fixture_kind": "main_trained",
+      "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+      "checkpoint_state": "model_state_dict",
+      "tiled_atom_features": [
+        "Qa_xTB"
+      ],
+      "requested_systems": [
+        "mol_batch_32x20"
+      ],
+      "modes": [
+        "infer",
+        "train"
+      ],
+      "params": 9509,
+      "architecture": "physnet",
+      "comparisons": {
+        "mol_batch_32x20": {
+          "infer": {
+            "baseline": {
+              "ms": 31.486599938943982,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 2.371692252312041e-20,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 18,
+                "new_calls": 371
+              }
+            },
+            "candidate": {
+              "ms": 24.270195979624987,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 2.371692252312041e-20,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 11,
+                "new_calls": 369
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 0.0,
+              "force_max_abs": 1.3552527156068805e-20,
+              "gradient_max_abs": 0.0
+            },
+            "delta_percent": {
+              "ms": -22.91896861938858
+            },
+            "status": "both_validated"
+          },
+          "train": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "RuntimeError: torch.compile with aot_autograd does not currently support double backward",
+              "capture": {
+                "new_graphs": 1,
+                "new_calls": 145
+              }
+            },
+            "candidate": {
+              "ms": 46.145456843078136,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 68,
+                "reference_active_parameters": 68,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 2.371692252312041e-20,
+                "gradient_max_abs": 1.7763568394002505e-15,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "CompiledFunctionBackward"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 1,
+                "new_calls": 296
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 68,
+              "reference_active_parameters": 68,
+              "energy_max_abs": 0.0,
+              "force_max_abs": 1.3552527156068805e-20,
+              "gradient_max_abs": 4.440892098500626e-16
+            },
+            "status": "candidate_only_validated"
+          }
+        }
+      },
+      "counts": {
+        "both_validated": 1,
+        "candidate_only_validated": 1
+      },
+      "source": {
+        "baseline": {
+          "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528100026054009,
+          "finished_unix_ns": 1795528131052325962
+        },
+        "candidate": {
+          "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528134395298352,
+          "finished_unix_ns": 1795528181414311398
+        }
+      },
+      "measurement_order": [
+        "baseline",
+        "candidate"
+      ],
+      "exit_codes": {
+        "base": 0,
+        "new": 0
+      }
+    },
+    {
+      "device": "cpu",
+      "torch": "2.13.0+cu126",
+      "precision": "float32",
+      "compile": true,
+      "reps": 1,
+      "threads": 2,
+      "snapshot": "spookynet_ff02.pt.gz",
+      "snapshot_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+      "fixture_kind": "main_trained",
+      "config_sha256": "d345661a5b40ea8dcf53990985e0daec06e46949ad9c99023faef167f035d583",
+      "checkpoint_state": "model_state_dict",
+      "tiled_atom_features": [
+        "Qa_xTB"
+      ],
+      "requested_systems": [
+        "mol_batch_32x20"
+      ],
+      "modes": [
+        "infer",
+        "train"
+      ],
+      "params": 26167,
+      "architecture": "spookynet",
+      "comparisons": {
+        "mol_batch_32x20": {
+          "infer": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch)",
+              "capture": {
+                "new_graphs": 7,
+                "new_calls": 39
+              }
+            },
+            "candidate": {
+              "ms": 47.65308485366404,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 7.450580596923828e-09,
+                "force_max_abs": 1.6298145055770874e-09,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 15,
+                "new_calls": 1288
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 7.450580596923828e-09,
+              "force_max_abs": 6.984919309616089e-10,
+              "gradient_max_abs": 0.0
+            },
+            "status": "candidate_only_validated"
+          },
+          "train": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch)",
+              "capture": {
+                "new_graphs": 3,
+                "new_calls": 23
+              }
+            },
+            "candidate": {
+              "ms": 77.2551130503416,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 304,
+                "reference_active_parameters": 304,
+                "energy_max_abs": 7.450580596923828e-09,
+                "force_max_abs": 1.6298145055770874e-09,
+                "gradient_max_abs": 7.62939453125e-06,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "CompiledFunctionBackward"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 1,
+                "new_calls": 858
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 304,
+              "reference_active_parameters": 304,
+              "energy_max_abs": 7.450580596923828e-09,
+              "force_max_abs": 6.984919309616089e-10,
+              "gradient_max_abs": 3.814697265625e-06
+            },
+            "status": "candidate_only_validated"
+          }
+        }
+      },
+      "counts": {
+        "candidate_only_validated": 2
+      },
+      "source": {
+        "baseline": {
+          "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528184979644597,
+          "finished_unix_ns": 1795528199471693642
+        },
+        "candidate": {
+          "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528202672912827,
+          "finished_unix_ns": 1795528316832608710
+        }
+      },
+      "measurement_order": [
+        "baseline",
+        "candidate"
+      ],
+      "exit_codes": {
+        "base": 0,
+        "new": 0
+      }
+    },
+    {
+      "device": "cpu",
+      "torch": "2.13.0+cu126",
+      "precision": "float64",
+      "compile": true,
+      "reps": 1,
+      "threads": 2,
+      "snapshot": "spookynet_ff02.pt.gz",
+      "snapshot_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+      "fixture_kind": "main_trained",
+      "config_sha256": "d345661a5b40ea8dcf53990985e0daec06e46949ad9c99023faef167f035d583",
+      "checkpoint_state": "model_state_dict",
+      "tiled_atom_features": [
+        "Qa_xTB"
+      ],
+      "requested_systems": [
+        "mol_batch_32x20"
+      ],
+      "modes": [
+        "infer",
+        "train"
+      ],
+      "params": 26167,
+      "architecture": "spookynet",
+      "comparisons": {
+        "mol_batch_32x20": {
+          "infer": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch)",
+              "capture": {
+                "new_graphs": 7,
+                "new_calls": 39
+              }
+            },
+            "candidate": {
+              "ms": 60.75412989594042,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 1.3877787807814457e-17,
+                "force_max_abs": 1.734723475976807e-18,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 15,
+                "new_calls": 1288
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 1.3877787807814457e-17,
+              "force_max_abs": 2.168404344971009e-18,
+              "gradient_max_abs": 0.0
+            },
+            "status": "candidate_only_validated"
+          },
+          "train": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch)",
+              "capture": {
+                "new_graphs": 3,
+                "new_calls": 23
+              }
+            },
+            "candidate": {
+              "ms": 122.11380014196038,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 304,
+                "reference_active_parameters": 304,
+                "energy_max_abs": 1.3877787807814457e-17,
+                "force_max_abs": 1.734723475976807e-18,
+                "gradient_max_abs": 2.1316282072803006e-14,
+                "output_grad_functions": {
+                  "E": "CompiledFunctionBackward",
+                  "Fa": "CompiledFunctionBackward"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 1,
+                "new_calls": 858
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 304,
+              "reference_active_parameters": 304,
+              "energy_max_abs": 1.3877787807814457e-17,
+              "force_max_abs": 2.168404344971009e-18,
+              "gradient_max_abs": 7.105427357601002e-15
+            },
+            "status": "candidate_only_validated"
+          }
+        }
+      },
+      "counts": {
+        "candidate_only_validated": 2
+      },
+      "source": {
+        "baseline": {
+          "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528321349516972,
+          "finished_unix_ns": 1795528335916841075
+        },
+        "candidate": {
+          "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528339186343136,
+          "finished_unix_ns": 1795528454471268370
+        }
+      },
+      "measurement_order": [
+        "baseline",
+        "candidate"
+      ],
+      "exit_codes": {
+        "base": 0,
+        "new": 0
+      }
+    },
+    {
+      "device": "cpu",
+      "torch": "2.13.0+cu126",
+      "precision": "float32",
+      "compile": true,
+      "reps": 1,
+      "threads": 2,
+      "snapshot": "mace_ff04.pt.gz",
+      "snapshot_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+      "fixture_kind": "main_trained",
+      "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+      "checkpoint_state": "model_state_dict",
+      "tiled_atom_features": [],
+      "requested_systems": [
+        "mol_batch_32x20"
+      ],
+      "modes": [
+        "infer",
+        "train"
+      ],
+      "params": 217748,
+      "architecture": "mace",
+      "comparisons": {
+        "mol_batch_32x20": {
+          "infer": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch)",
+              "capture": {
+                "new_graphs": 7,
+                "new_calls": 32
+              }
+            },
+            "candidate": {
+              "ms": 352.1553729660809,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 4.76837158203125e-07,
+                "force_max_abs": 5.960464477539062e-07,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 29,
+                "new_calls": 328
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 5.960464477539063e-08,
+              "force_max_abs": 2.384185791015625e-07,
+              "gradient_max_abs": 0.0
+            },
+            "status": "candidate_only_validated"
+          },
+          "train": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch)",
+              "capture": {
+                "new_graphs": 3,
+                "new_calls": 16
+              }
+            },
+            "candidate": {
+              "ms": 836.402609013021,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 60,
+                "reference_active_parameters": 60,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 0.0,
+                "gradient_max_abs": 1.1920928955078125e-07,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NegBackward0"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 0,
+                "new_calls": 0
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 60,
+              "reference_active_parameters": 60,
+              "energy_max_abs": 5.960464477539063e-08,
+              "force_max_abs": 1.7881393432617188e-07,
+              "gradient_max_abs": 1.1444091796875e-05
+            },
+            "status": "candidate_only_validated"
+          }
+        }
+      },
+      "counts": {
+        "candidate_only_validated": 2
+      },
+      "source": {
+        "baseline": {
+          "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528458970113210,
+          "finished_unix_ns": 1795528476955623290
+        },
+        "candidate": {
+          "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528480252553092,
+          "finished_unix_ns": 1795528510456449927
+        }
+      },
+      "measurement_order": [
+        "baseline",
+        "candidate"
+      ],
+      "exit_codes": {
+        "base": 0,
+        "new": 0
+      }
+    },
+    {
+      "device": "cpu",
+      "torch": "2.13.0+cu126",
+      "precision": "float64",
+      "compile": true,
+      "reps": 1,
+      "threads": 2,
+      "snapshot": "mace_ff04.pt.gz",
+      "snapshot_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+      "fixture_kind": "main_trained",
+      "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+      "checkpoint_state": "model_state_dict",
+      "tiled_atom_features": [],
+      "requested_systems": [
+        "mol_batch_32x20"
+      ],
+      "modes": [
+        "infer",
+        "train"
+      ],
+      "params": 217748,
+      "architecture": "mace",
+      "comparisons": {
+        "mol_batch_32x20": {
+          "infer": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch)",
+              "capture": {
+                "new_graphs": 7,
+                "new_calls": 41
+              }
+            },
+            "candidate": {
+              "ms": 648.0323700234294,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 4.440892098500626e-16,
+                "force_max_abs": 5.551115123125783e-16,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NoneType"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 29,
+                "new_calls": 336
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 1.1102230246251565e-16,
+              "force_max_abs": 3.3306690738754696e-16,
+              "gradient_max_abs": 0.0
+            },
+            "status": "candidate_only_validated"
+          },
+          "train": {
+            "baseline": {
+              "ms": null,
+              "peak_MiB": null,
+              "numerical": null,
+              "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch)",
+              "capture": {
+                "new_graphs": 3,
+                "new_calls": 25
+              }
+            },
+            "candidate": {
+              "ms": 1525.9065970312804,
+              "peak_MiB": null,
+              "numerical": {
+                "passed": true,
+                "active_parameters": 60,
+                "reference_active_parameters": 60,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 0.0,
+                "gradient_max_abs": 0.0,
+                "output_grad_functions": {
+                  "E": "ScatterAddBackward0",
+                  "Fa": "NegBackward0"
+                }
+              },
+              "error": null,
+              "capture": {
+                "new_graphs": 0,
+                "new_calls": 0
+              }
+            },
+            "cross_native": {
+              "passed": true,
+              "active_parameters": 60,
+              "reference_active_parameters": 60,
+              "energy_max_abs": 1.1102230246251565e-16,
+              "force_max_abs": 4.440892098500626e-16,
+              "gradient_max_abs": 2.1316282072803006e-14
+            },
+            "status": "candidate_only_validated"
+          }
+        }
+      },
+      "counts": {
+        "candidate_only_validated": 2
+      },
+      "source": {
+        "baseline": {
+          "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528513971930922,
+          "finished_unix_ns": 1795528533280197182
+        },
+        "candidate": {
+          "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+          "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+          "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+          "torch": "2.13.0+cu126",
+          "slurm_job_id": "6319574",
+          "node": "d-4-15-4",
+          "started_unix_ns": 1795528536512645514,
+          "finished_unix_ns": 1795528570498148633
+        }
+      },
+      "measurement_order": [
+        "baseline",
+        "candidate"
+      ],
+      "exit_codes": {
+        "base": 0,
+        "new": 0
+      }
+    }
+  ],
+  "molecular_mode_counts": {
+    "both_validated": 4,
+    "candidate_only_validated": 12
+  },
+  "pending": [],
+  "periodic_confirmation_job": "6319455",
+  "periodic_confirmation": {
+    "device": "cpu",
+    "torch": "2.13.0+cu126",
+    "precision": "float64",
+    "compile": true,
+    "reps": 1,
+    "threads": 2,
+    "snapshot": "physnet_ff01.pt.gz",
+    "snapshot_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+    "fixture_kind": "main_trained",
+    "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+    "checkpoint_state": "model_state_dict",
+    "tiled_atom_features": [
+      "Qa_xTB"
+    ],
+    "requested_systems": [
+      "bulk_256"
+    ],
+    "modes": [
+      "infer",
+      "train"
+    ],
+    "params": 9509,
+    "architecture": "physnet",
+    "comparisons": {
+      "bulk_256": {
+        "infer": {
+          "baseline": {
+            "ms": null,
+            "peak_MiB": null,
+            "numerical": null,
+            "error": "InductorError: AssertionError: ",
+            "capture": {
+              "new_graphs": 17,
+              "new_calls": 227
+            }
+          },
+          "candidate": {
+            "ms": 70.62225602567196,
+            "peak_MiB": null,
+            "numerical": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 8.881784197001252e-16,
+              "force_max_abs": 4.055170234979963e-20,
+              "gradient_max_abs": 0.0,
+              "output_grad_functions": {
+                "E": "ScatterAddBackward0",
+                "Fa": "NoneType"
+              }
+            },
+            "error": null,
+            "capture": {
+              "new_graphs": 11,
+              "new_calls": 363
+            }
+          },
+          "cross_native": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 0.0,
+            "force_max_abs": 3.134021904840911e-20,
+            "gradient_max_abs": 0.0
+          },
+          "status": "candidate_only_validated"
+        },
+        "train": {
+          "baseline": {
+            "ms": null,
+            "peak_MiB": null,
+            "numerical": null,
+            "error": "InductorError: AssertionError: ",
+            "capture": {
+              "new_graphs": 1,
+              "new_calls": 145
+            }
+          },
+          "candidate": {
+            "ms": null,
+            "peak_MiB": null,
+            "numerical": null,
+            "error": "InductorError: AssertionError: \n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch). For even more developer context, set TORCH_LOGS=\"+dynamo\"\n",
+            "capture": {
+              "new_graphs": 0,
+              "new_calls": 298
+            }
+          },
+          "cross_native": {
+            "passed": true,
+            "active_parameters": 68,
+            "reference_active_parameters": 68,
+            "energy_max_abs": 0.0,
+            "force_max_abs": 3.134021904840911e-20,
+            "gradient_max_abs": 7.105427357601002e-15
+          },
+          "status": "neither_validated"
+        }
+      }
+    },
+    "counts": {
+      "candidate_only_validated": 1,
+      "neither_validated": 1
+    },
+    "source": {
+      "baseline": {
+        "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+        "driver_revision": "d5b78187fd0c49310213e2bf7658dd9749e62eff",
+        "driver_sha256": "8ec484831345ec09197a6728c0116fb6b472972b5ca44c6fb6b66d728ceed19c",
+        "torch": "2.13.0+cu126",
+        "slurm_job_id": "6319455",
+        "node": "d-4-15-4",
+        "started_unix_ns": 1795527565774307176,
+        "finished_unix_ns": 1795527622785664555
+      },
+      "candidate": {
+        "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+        "driver_revision": "d5b78187fd0c49310213e2bf7658dd9749e62eff",
+        "driver_sha256": "8ec484831345ec09197a6728c0116fb6b472972b5ca44c6fb6b66d728ceed19c",
+        "torch": "2.13.0+cu126",
+        "slurm_job_id": "6319455",
+        "node": "d-4-15-4",
+        "started_unix_ns": 1795527626150456381,
+        "finished_unix_ns": 1795527713598549754
+      }
+    },
+    "measurement_order": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  "large_confirmation_job": "6319565",
+  "large_confirmation": {
+    "device": "cpu",
+    "torch": "2.13.0+cu126",
+    "precision": "float32",
+    "compile": true,
+    "reps": 1,
+    "threads": 2,
+    "snapshot": "physnet_ff01.pt.gz",
+    "snapshot_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+    "fixture_kind": "main_trained",
+    "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+    "checkpoint_state": "model_state_dict",
+    "tiled_atom_features": [
+      "Qa_xTB"
+    ],
+    "requested_systems": [
+      "large_2000"
+    ],
+    "modes": [
+      "infer",
+      "train"
+    ],
+    "params": 9509,
+    "architecture": "physnet",
+    "comparisons": {
+      "large_2000": {
+        "infer": {
+          "baseline": {
+            "ms": null,
+            "peak_MiB": null,
+            "numerical": null,
+            "error": "InductorError: AssertionError: ",
+            "capture": {
+              "new_graphs": 17,
+              "new_calls": 214
+            }
+          },
+          "candidate": {
+            "ms": 234.32695493102074,
+            "peak_MiB": null,
+            "numerical": {
+              "passed": true,
+              "active_parameters": 0,
+              "reference_active_parameters": 0,
+              "energy_max_abs": 0.0,
+              "force_max_abs": 1.716671249596402e-11,
+              "gradient_max_abs": 0.0,
+              "output_grad_functions": {
+                "E": "ScatterAddBackward0",
+                "Fa": "NoneType"
+              }
+            },
+            "error": null,
+            "capture": {
+              "new_graphs": 11,
+              "new_calls": 350
+            }
+          },
+          "cross_native": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 0.0,
+            "force_max_abs": 1.7053025658242404e-11,
+            "gradient_max_abs": 0.0
+          },
+          "status": "candidate_only_validated"
+        },
+        "train": {
+          "baseline": {
+            "ms": null,
+            "peak_MiB": null,
+            "numerical": null,
+            "error": "InductorError: AssertionError: ",
+            "capture": {
+              "new_graphs": 1,
+              "new_calls": 145
+            }
+          },
+          "candidate": {
+            "ms": null,
+            "peak_MiB": null,
+            "numerical": null,
+            "error": "InductorError: AssertionError: \n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch). For even more developer context, set TORCH_LOGS=\"+dynamo\"\n",
+            "capture": {
+              "new_graphs": 0,
+              "new_calls": 295
+            }
+          },
+          "cross_native": {
+            "passed": true,
+            "active_parameters": 68,
+            "reference_active_parameters": 68,
+            "energy_max_abs": 0.0,
+            "force_max_abs": 1.8189894035458565e-11,
+            "gradient_max_abs": 0.000244140625
+          },
+          "status": "neither_validated"
+        }
+      }
+    },
+    "counts": {
+      "candidate_only_validated": 1,
+      "neither_validated": 1
+    },
+    "source": {
+      "baseline": {
+        "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "torch": "2.13.0+cu126",
+        "slurm_job_id": "6319565",
+        "node": "d-4-15-4",
+        "started_unix_ns": 1795527725147997886,
+        "finished_unix_ns": 1795527783512097351
+      },
+      "candidate": {
+        "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "torch": "2.13.0+cu126",
+        "slurm_job_id": "6319565",
+        "node": "d-4-15-4",
+        "started_unix_ns": 1795527786864858506,
+        "finished_unix_ns": 1795527875014470549
+      }
+    },
+    "measurement_order": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  "single_structure_scatter_followup": {
+    "job": "6319666",
+    "candidate": "f710134",
+    "baseline": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+    "reason": "In PyTorch 2.13.0+cu126, CPU Inductor CppVecKernel.store asserted index.is_vec while generating the original [1, 3] atomic-add destination in trained PhysNet force fitting. The first system in each precision was the original standalone failing input: periodic 256 for float64 and nonperiodic 2000 for float32. The correction preserves a spare destination during lowering.",
+    "baseline_order_observation": "In the float64 follow-up, the original main failed on periodic 256 first. The later 32x20 inference reported donated buffers, whereas the independent process starting with 32x20 validated that inference. Each row records its ordered systems and error separately.",
+    "rows": [
+      {
+        "device": "cpu",
+        "torch": "2.13.0+cu126",
+        "precision": "float64",
+        "compile": true,
+        "reps": 1,
+        "threads": 2,
+        "snapshot": "physnet_ff01.pt.gz",
+        "snapshot_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+        "fixture_kind": "main_trained",
+        "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+        "checkpoint_state": "model_state_dict",
+        "tiled_atom_features": [
+          "Qa_xTB"
+        ],
+        "requested_systems": [
+          "bulk_256",
+          "mol_batch_32x20",
+          "large_2000"
+        ],
+        "modes": [
+          "infer",
+          "train"
+        ],
+        "params": 9509,
+        "architecture": "physnet",
+        "comparisons": {
+          "bulk_256": {
+            "infer": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "InductorError: AssertionError: ",
+                "capture": {
+                  "new_graphs": 17,
+                  "new_calls": 227
+                }
+              },
+              "candidate": {
+                "ms": 74.99924302101135,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 0,
+                  "reference_active_parameters": 0,
+                  "energy_max_abs": 8.881784197001252e-16,
+                  "force_max_abs": 4.097521882342678e-20,
+                  "gradient_max_abs": 0.0,
+                  "output_grad_functions": {
+                    "E": "ScatterAddBackward0",
+                    "Fa": "NoneType"
+                  }
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 11,
+                  "new_calls": 365
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 3.134021904840911e-20,
+                "gradient_max_abs": 0.0
+              },
+              "status": "candidate_only_validated"
+            },
+            "train": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "InductorError: AssertionError: ",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 145
+                }
+              },
+              "candidate": {
+                "ms": 107.41337900981307,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 68,
+                  "reference_active_parameters": 68,
+                  "energy_max_abs": 8.881784197001252e-16,
+                  "force_max_abs": 3.801060350803673e-20,
+                  "gradient_max_abs": 9.094947017729282e-13,
+                  "output_grad_functions": {
+                    "E": "CompiledFunctionBackward",
+                    "Fa": "CompiledFunctionBackward"
+                  },
+                  "native_gradient_linf": 1930.9638780767314,
+                  "original_parameter_at_native_gradient_linf": "output_block.0.output.weight",
+                  "relative_gradient_linf": 4.710055491451235e-16
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 306
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 68,
+                "reference_active_parameters": 68,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 3.134021904840911e-20,
+                "gradient_max_abs": 7.105427357601002e-15
+              },
+              "status": "candidate_only_validated"
+            }
+          },
+          "mol_batch_32x20": {
+            "infer": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 147
+                }
+              },
+              "candidate": {
+                "ms": 23.076755926012993,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 0,
+                  "reference_active_parameters": 0,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 0.0,
+                  "gradient_max_abs": 0.0,
+                  "output_grad_functions": {
+                    "E": "ScatterAddBackward0",
+                    "Fa": "NoneType"
+                  }
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 138
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.3552527156068805e-20,
+                "gradient_max_abs": 0.0
+              },
+              "status": "candidate_only_validated"
+            },
+            "train": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 147
+                }
+              },
+              "candidate": {
+                "ms": 47.58724197745323,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 68,
+                  "reference_active_parameters": 68,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 2.371692252312041e-20,
+                  "gradient_max_abs": 2.220446049250313e-15,
+                  "output_grad_functions": {
+                    "E": "CompiledFunctionBackward",
+                    "Fa": "CompiledFunctionBackward"
+                  },
+                  "native_gradient_linf": 347.27457672862045,
+                  "original_parameter_at_native_gradient_linf": "output_block.1.output.weight",
+                  "relative_gradient_linf": 6.3939205402458595e-18
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 301
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 68,
+                "reference_active_parameters": 68,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.3552527156068805e-20,
+                "gradient_max_abs": 4.440892098500626e-16
+              },
+              "status": "candidate_only_validated"
+            }
+          },
+          "large_2000": {
+            "infer": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 147
+                }
+              },
+              "candidate": {
+                "ms": 380.25375991128385,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 0,
+                  "reference_active_parameters": 0,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 2.371692252312041e-20,
+                  "gradient_max_abs": 0.0,
+                  "output_grad_functions": {
+                    "E": "ScatterAddBackward0",
+                    "Fa": "NoneType"
+                  }
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 138
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 2.795208725939191e-20,
+                "gradient_max_abs": 0.0
+              },
+              "status": "candidate_only_validated"
+            },
+            "train": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 147
+                }
+              },
+              "candidate": {
+                "ms": 597.3837568890303,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 68,
+                  "reference_active_parameters": 68,
+                  "energy_max_abs": 7.105427357601002e-14,
+                  "force_max_abs": 4.2351647362715017e-20,
+                  "gradient_max_abs": 7.566995918750763e-10,
+                  "output_grad_functions": {
+                    "E": "CompiledFunctionBackward",
+                    "Fa": "CompiledFunctionBackward"
+                  },
+                  "native_gradient_linf": 107659.62947363417,
+                  "original_parameter_at_native_gradient_linf": "output_block.1.output.weight",
+                  "relative_gradient_linf": 7.028628981677779e-15
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 304
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 68,
+                "reference_active_parameters": 68,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 2.795208725939191e-20,
+                "gradient_max_abs": 4.547473508864641e-13
+              },
+              "status": "candidate_only_validated"
+            }
+          }
+        },
+        "counts": {
+          "candidate_only_validated": 6
+        },
+        "source": {
+          "baseline": {
+            "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "torch": "2.13.0+cu126",
+            "slurm_job_id": "6319666",
+            "node": "d-4-15-4",
+            "started_unix_ns": 1795528922814535385,
+            "finished_unix_ns": 1795529027398257414
+          },
+          "candidate": {
+            "model_revision": "f710134c978786d095fdde4ce3910c440129c54f",
+            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "torch": "2.13.0+cu126",
+            "slurm_job_id": "6319666",
+            "node": "d-4-15-4",
+            "started_unix_ns": 1795528581213884590,
+            "finished_unix_ns": 1795528918867940703
+          }
+        },
+        "measurement_order": [
+          "candidate",
+          "baseline"
+        ]
+      },
+      {
+        "device": "cpu",
+        "torch": "2.13.0+cu126",
+        "precision": "float32",
+        "compile": true,
+        "reps": 1,
+        "threads": 2,
+        "snapshot": "physnet_ff01.pt.gz",
+        "snapshot_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+        "fixture_kind": "main_trained",
+        "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+        "checkpoint_state": "model_state_dict",
+        "tiled_atom_features": [
+          "Qa_xTB"
+        ],
+        "requested_systems": [
+          "large_2000",
+          "mol_batch_32x20",
+          "bulk_256"
+        ],
+        "modes": [
+          "infer",
+          "train"
+        ],
+        "params": 9509,
+        "architecture": "physnet",
+        "comparisons": {
+          "large_2000": {
+            "infer": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "InductorError: AssertionError: ",
+                "capture": {
+                  "new_graphs": 17,
+                  "new_calls": 214
+                }
+              },
+              "candidate": {
+                "ms": 232.28003014810383,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 0,
+                  "reference_active_parameters": 0,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 1.8189894035458565e-11,
+                  "gradient_max_abs": 0.0,
+                  "output_grad_functions": {
+                    "E": "ScatterAddBackward0",
+                    "Fa": "NoneType"
+                  }
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 11,
+                  "new_calls": 352
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.77351466845721e-11,
+                "gradient_max_abs": 0.0
+              },
+              "status": "candidate_only_validated"
+            },
+            "train": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "InductorError: AssertionError: ",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 145
+                }
+              },
+              "candidate": {
+                "ms": 348.16818684339523,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 68,
+                  "reference_active_parameters": 68,
+                  "energy_max_abs": 1.9073486328125e-05,
+                  "force_max_abs": 1.8189894035458565e-11,
+                  "gradient_max_abs": 0.046875,
+                  "output_grad_functions": {
+                    "E": "CompiledFunctionBackward",
+                    "Fa": "CompiledFunctionBackward"
+                  },
+                  "native_gradient_linf": 107659.609375,
+                  "original_parameter_at_native_gradient_linf": "output_block.1.output.weight",
+                  "relative_gradient_linf": 4.35400056456874e-07
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 303
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 68,
+                "reference_active_parameters": 68,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.7962520360015333e-11,
+                "gradient_max_abs": 0.000244140625
+              },
+              "status": "candidate_only_validated"
+            }
+          },
+          "mol_batch_32x20": {
+            "infer": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 147
+                }
+              },
+              "candidate": {
+                "ms": 17.616348108276725,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 0,
+                  "reference_active_parameters": 0,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 0.0,
+                  "gradient_max_abs": 0.0,
+                  "output_grad_functions": {
+                    "E": "ScatterAddBackward0",
+                    "Fa": "NoneType"
+                  }
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 138
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 9.094947017729282e-12,
+                "gradient_max_abs": 0.0
+              },
+              "status": "candidate_only_validated"
+            },
+            "train": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 147
+                }
+              },
+              "candidate": {
+                "ms": 21.55904215760529,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 68,
+                  "reference_active_parameters": 68,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 2.000888343900442e-11,
+                  "gradient_max_abs": 3.814697265625e-06,
+                  "output_grad_functions": {
+                    "E": "CompiledFunctionBackward",
+                    "Fa": "CompiledFunctionBackward"
+                  },
+                  "native_gradient_linf": 347.2745056152344,
+                  "original_parameter_at_native_gradient_linf": "output_block.1.output.weight",
+                  "relative_gradient_linf": 1.0984674094825506e-08
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 301
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 68,
+                "reference_active_parameters": 68,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 9.094947017729282e-12,
+                "gradient_max_abs": 2.384185791015625e-07
+              },
+              "status": "candidate_only_validated"
+            }
+          },
+          "bulk_256": {
+            "infer": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 147
+                }
+              },
+              "candidate": {
+                "ms": 50.23412709124386,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 0,
+                  "reference_active_parameters": 0,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 6.59383658785373e-12,
+                  "gradient_max_abs": 0.0,
+                  "output_grad_functions": {
+                    "E": "ScatterAddBackward0",
+                    "Fa": "NoneType"
+                  }
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 138
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 0,
+                "reference_active_parameters": 0,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.8417267710901797e-11,
+                "gradient_max_abs": 0.0
+              },
+              "status": "candidate_only_validated"
+            },
+            "train": {
+              "baseline": {
+                "ms": null,
+                "peak_MiB": null,
+                "numerical": null,
+                "error": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 147
+                }
+              },
+              "candidate": {
+                "ms": 74.93805000558496,
+                "peak_MiB": null,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 68,
+                  "reference_active_parameters": 68,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 1.9554136088117957e-11,
+                  "gradient_max_abs": 0.0001220703125,
+                  "output_grad_functions": {
+                    "E": "CompiledFunctionBackward",
+                    "Fa": "CompiledFunctionBackward"
+                  },
+                  "native_gradient_linf": 1930.9632568359375,
+                  "original_parameter_at_native_gradient_linf": "output_block.0.output.weight",
+                  "relative_gradient_linf": 6.321731502028864e-08
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 1,
+                  "new_calls": 307
+                }
+              },
+              "cross_native": {
+                "passed": true,
+                "active_parameters": 68,
+                "reference_active_parameters": 68,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.5688783605583012e-11,
+                "gradient_max_abs": 3.814697265625e-06
+              },
+              "status": "candidate_only_validated"
+            }
+          }
+        },
+        "counts": {
+          "candidate_only_validated": 6
+        },
+        "source": {
+          "baseline": {
+            "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "torch": "2.13.0+cu126",
+            "slurm_job_id": "6319666",
+            "node": "d-4-15-4",
+            "started_unix_ns": 1795529326895061457,
+            "finished_unix_ns": 1795529427124769884
+          },
+          "candidate": {
+            "model_revision": "f710134c978786d095fdde4ce3910c440129c54f",
+            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "torch": "2.13.0+cu126",
+            "slurm_job_id": "6319666",
+            "node": "d-4-15-4",
+            "started_unix_ns": 1795529032946174083,
+            "finished_unix_ns": 1795529323097804762
+          }
+        },
+        "measurement_order": [
+          "candidate",
+          "baseline"
+        ]
+      }
+    ],
+    "mode_counts": {
+      "candidate_only_validated": 12
+    },
+    "component_tests": {
+      "test_file": "test/test_mp_ops.py",
+      "implementation_revision": "f710134",
+      "test_source_sha256": "a5b5f622ed1065a9951aca0c1ed93b448cf91c5a174cce9eb1175cbf016dd877",
+      "test_revision": "d8a3c5d27c8db152e9eb9316859339a6cb1527a9",
+      "pre_fix_control": {
+        "model_revision": "13f1b0b920d54ef3500b1d588b5881b32fe6da59",
+        "cpu_threads": 2,
+        "atoms": 16384,
+        "dtype": "float64",
+        "leading_axis_with_atom_contiguous_storage": "InductorError in CppVecKernel.store: index.is_vec",
+        "nonleading_axis": "passed"
+      },
+      "passed": 33,
+      "coverage": "CPU Inductor single and multiple destinations on leading and nonleading axes, forward values, input gradients, contiguous outputs, independent empty outputs, invalid indices, and the existing shared operations suite."
+    }
+  },
+  "cold_molecular_calibration": {
+    "job": "6319407",
+    "driver_content_revision": "f05890ac840b162f89e587e29a7477822c9cd59a67e2d3e77bbaee94b76b0026",
+    "driver_files_sha256": {
+      "bench_cores.py": "12c3e142448217c291c602eb7b9c46461b30005fd6d3d87f93be69b555fc6394",
+      "bench_frozen_compile.py": "92165edeaa2b8909b41b595cb32569c895780c5b00ecc8f9b8c1a802b681dcb2",
+      "core_harness.py": "1c8c285e631dccc6df25357056be7c0f8743556e47fb05605119ca7fddea2bff"
+    },
+    "raw_driver_location": ".refactor/bench/6319407-main-trained-compile-cpu/driver",
+    "model_revisions": {
+      "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+      "new": "13f1b0b920d54ef3500b1d588b5881b32fe6da59"
+    },
+    "order": [
+      "baseline",
+      "candidate"
+    ],
+    "mode_counts": {
+      "both_validated": 4,
+      "candidate_only_validated": 12
+    },
+    "torch": [
+      "2.13.0+cu126"
+    ],
+    "pending": []
+  },
+  "existing_gpu_archive_audit": {
+    "json_files_examined": 1092,
+    "matched_trained_fixture_sha256": {
+      "spookynet_ff02.pt.gz": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+      "physnet_ff01.pt.gz": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+      "schnet_default.pt.gz": "e0ec083cfe71c322d4758fe5ae65c8aa20f692ea2a2fc4ea7a6d11870c04ab10",
+      "mace_ff04.pt.gz": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973"
+    },
+    "eager_cuda_matches": 104,
+    "ordinary_compiled_cuda_matches": 0
+  },
+  "allclose_tolerances": {
+    "float64": {
+      "energy_force_and_gradient": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      }
+    },
+    "float32": {
+      "energy_and_force": {
+        "atol": 0.0003,
+        "rtol": 0.0003
+      },
+      "gradient": {
+        "atol": 0.0007,
+        "rtol": 0.001
+      }
+    }
+  }
+}
