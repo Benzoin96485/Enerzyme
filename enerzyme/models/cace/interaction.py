@@ -58,6 +58,12 @@ def parse_messages(spec: MessageSpec) -> FrozenSet[str]:
     return frozenset(kinds)
 
 
+def _angular_shells(shells: Tensor, width: int) -> Tensor:
+    """Map each angular coefficient to its shell without reading device scalars."""
+    counts = shells[:, 1] - shells[:, 0]
+    shell_ids = torch.arange(shells.shape[0], device=shells.device)
+    return torch.repeat_interleave(shell_ids, counts, output_size=width)
+
 
 class RadialChannelMix(nn.Module):
     """Per-shell map from raw radial channels to the mixed radial basis."""
@@ -87,6 +93,10 @@ class RadialChannelMix(nn.Module):
                 f"raw density must be [N, {self.n_raw}, angular, {self.n_channels}], "
                 f"got {tuple(raw.shape)}"
             )
+        if torch.compiler.is_compiling():
+            shell = _angular_shells(self.shells, raw.shape[2])
+            weight = self.weight.index_select(0, shell)
+            return torch.einsum("irkc,kroc->iokc", raw, weight)
         mixed = raw.new_zeros(raw.shape[0], self.n_radial, raw.shape[2], self.n_channels)
         for shell, (start, end) in enumerate(self.shells.tolist()):
             group = raw[:, :, start:end, :]
@@ -191,6 +201,9 @@ class MessagePassing(nn.Module):
             )
 
     def _scale_shells(self, density: Tensor, coefficient: Tensor) -> Tensor:
+        if torch.compiler.is_compiling():
+            shell = _angular_shells(self.shells, density.shape[2])
+            return density * coefficient.index_select(0, shell).transpose(0, 1)
         scaled = torch.empty_like(density)
         for shell, (start, end) in enumerate(self.shells.tolist()):
             scaled[:, :, start:end, :] = (
@@ -213,15 +226,21 @@ class MessagePassing(nn.Module):
         updated = mixed.new_zeros(mixed.shape)
         if "a" in self.kinds and senders.numel():
             sender = mixed.index_select(0, senders)
-            filtered = torch.empty_like(sender)
-            for shell, (start, end) in enumerate(self.shells.tolist()):
-                decay = torch.exp(
-                    -distance[:, None, None] * self.inv_r0[shell]
-                )
-                decay = decay * self.prefactor[shell] * window[:, None, None]
-                filtered[:, :, start:end, :] = (
-                    sender[:, :, start:end, :] * decay[:, :, None, :]
-                )
+            if torch.compiler.is_compiling():
+                shell = _angular_shells(self.shells, sender.shape[2])
+                decay = torch.exp(-distance[:, None, None, None] * self.inv_r0)
+                decay = decay * self.prefactor * window[:, None, None, None]
+                filtered = sender * decay.index_select(1, shell).transpose(1, 2)
+            else:
+                filtered = torch.empty_like(sender)
+                for shell, (start, end) in enumerate(self.shells.tolist()):
+                    decay = torch.exp(
+                        -distance[:, None, None] * self.inv_r0[shell]
+                    )
+                    decay = decay * self.prefactor[shell] * window[:, None, None]
+                    filtered[:, :, start:end, :] = (
+                        sender[:, :, start:end, :] * decay[:, :, None, :]
+                    )
             updated = updated + scatter_sum(filtered, receivers, n_atoms)
         if "b" in self.kinds and senders.numel():
             weight = self.gate.angular_weight(invariant).index_select(0, senders)
