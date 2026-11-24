@@ -140,7 +140,7 @@ class BaseFFCore(BaseFFModule):
     def forward(self, net_input):
         if torch.compiler.is_compiling():
             from .compiled_grad import (
-                compiled_training, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
+                compiled_coordinate_vjp, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
                 uses_cpu_inductor_forces, native_cpu_forces,
                 compiled_training_with_separate_reductions, cpu_horizontal_fusion_option,
             )
@@ -168,8 +168,9 @@ class BaseFFCore(BaseFFModule):
                     return native_cpu_forces(self, net_input)
             if compiling_fullgraph():
                 return forward_with_coordinate_gradients(self, net_input)
-            if self.training:
-                return compiled_training(self, net_input)
+            if self.training or (getattr(self, "_joint_cpu_force_inference", False)
+                                 and uses_cpu_inductor_forces(self, net_input, include_eval=True)):
+                return compiled_coordinate_vjp(self, net_input)
             return retained_inference(self, net_input)
         return self._run_layers(net_input)
 

@@ -276,6 +276,26 @@ def test_dpa3_cpu_inference_keeps_reusable_coordinate_gradients(monkeypatch, dty
         torch.testing.assert_close(value, target, rtol=0, atol=0)
 
 
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_et_cpu_inference_matches_force_and_repeated_energy_derivatives(dtype):
+    from torch._functorch import config
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    model = build("et").float().to(dtype)
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
+    expected = forward(model, batch, dtype)
+    result = forward(torch.compile(model), batch, dtype)
+    torch.testing.assert_close(result["E"], expected["E"])
+    torch.testing.assert_close(result["Fa"], expected["Fa"])
+    assert not result["Fa"].requires_grad
+    scope = config.patch(donated_buffer=False) if hasattr(config, "donated_buffer") else nullcontext()
+    with scope:
+        for retain in (True, False):
+            grad, = torch.autograd.grad(result["E"].sum(), result["Ra"], retain_graph=retain)
+            torch.testing.assert_close(grad, -expected["Fa"])
+
+
 def _batch(distance):
     return {
         "Ra": torch.tensor([[0., 0., 0.], [distance, .1, -.2], [2.7, -.4, .3]],

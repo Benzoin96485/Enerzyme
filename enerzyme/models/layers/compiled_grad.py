@@ -90,7 +90,7 @@ def compiled_training_with_separate_reductions(core, inputs):
     with config.patch({"cpp.max_horizontal_fusion_size": 1}), autograd_config.patch(
         force_non_lazy_backward_lowering=True
     ):
-        return compiled_training(core, inputs)
+        return compiled_coordinate_vjp(core, inputs)
 
 
 @torch.compiler.disable
@@ -194,7 +194,7 @@ def _post_pair_indices(core, inputs):
 
 
 @torch.compiler.disable(recursive=False)
-def compiled_training(core, inputs):
+def compiled_coordinate_vjp(core, inputs):
     """Keep differentiable distances inside the VJP and discrete sizes outside it."""
     from torch._dynamo import config
 
