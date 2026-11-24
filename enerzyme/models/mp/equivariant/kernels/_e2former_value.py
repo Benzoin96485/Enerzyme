@@ -5,13 +5,11 @@
 # Problem setting:
 # Shapes:
 
-from time import perf_counter
 import torch
 import triton
 import triton.language as tl
 import torch, triton
 
-_SAFE_TUNED_KEYS = set()
 
 
 
@@ -172,150 +170,6 @@ def _bwd_value_n_kernel(
 
         k += 1
 
-class VAgg_BwdFn(torch.autograd.Function):
-    """
-    """
-
-    @staticmethod
-    def forward(ctx, go, v, a, idx):
-        
-        go = go.contiguous().to(torch.float32)
-        v  = v.contiguous()
-        a  = a.contiguous()
-        if idx.dtype != torch.int32:
-            idx = idx.to(torch.int32)
-        idx = idx.contiguous()
-
-        N2, H, C = v.shape
-        N,Kdim = idx.shape[:2]
-
-        dA = torch.empty((N, Kdim, H), dtype=torch.float32, device=v.device)
-        s_vn, s_vh, s_vc = v.stride()
-        s_in, s_ik       = idx.stride()
-        s_gn, s_gh, s_gc = go.stride()
-        s_an, s_ak, s_ah = dA.stride()
-
-        grid_alpha = lambda meta: (N, triton.cdiv(H, meta['BLOCK_H']), triton.cdiv(Kdim, meta['BLOCK_K']))
-        _bwd_alpha_n_kernel[grid_alpha](
-            v, idx, go, dA,
-            N, H, C, Kdim,
-            s_vn, s_vh, s_vc,
-            s_in, s_ik,
-            s_gn, s_gh, s_gc,
-            s_an, s_ak, s_ah,
-        )
-
-        dV = torch.zeros_like(v, dtype=torch.float32)
-        s_an0, s_ak0, s_ah0 = a.stride()
-        s_vn0, s_vh0, s_vc0 = dV.stride()
-
-        grid_value = lambda meta: (N, triton.cdiv(H, meta['BLOCK_H']), triton.cdiv(C, meta['BLOCK_C']))
-        _bwd_value_n_kernel[grid_value](
-            A=a, IDX=idx, GO=go, dV=dV,
-            N=N, H=H, C=C, Kdim=Kdim,
-            s_an=s_an0, s_ak=s_ak0, s_ah=s_ah0,
-            s_in=s_in,  s_ik=s_ik,
-            s_gn=s_gn,  s_gh=s_gh,  s_gc=s_gc,
-            s_vn=s_vn0, s_vh=s_vh0, s_vc=s_vc0,
-        )
-
-        
-        ctx.save_for_backward(go, v, a, idx)
-        ctx.shape = (N, H, C, Kdim)
-        return dV.to(v.dtype), dA.to(a.dtype)
-
-    @staticmethod
-    def backward(ctx, gg_dV, gg_dA):
-        """
-
-        dV[m,h,c] = Σ_{n,k: idx[n,k]=m} a[n,k,h] * go[n,h,c]
-          ⇒ ∂L/∂go[n,h,c]  ⊃ Σ_k a[n,k,h] * gg_dV[idx[n,k],h,c]
-          ⇒ ∂L/∂a[n,k,h]   ⊃ Σ_c go[n,h,c] * gg_dV[idx[n,k],h,c]
-
-        dA[n,k,h] = Σ_c v[idx[n,k],h,c] * go[n,h,c]
-          ⇒ ∂L/∂go[n,h,c]  ⊃ Σ_k gg_dA[n,k,h] * v[idx[n,k],h,c]
-          ⇒ ∂L/∂v[m,h,c]   ⊃ Σ_{n,k: idx[n,k]=m} gg_dA[n,k,h] * go[n,h,c]
-        """
-        go, v, a, idx = ctx.saved_tensors
-        N, H, C, Kdim = ctx.shape
-
-        gg_dV = (torch.zeros_like(v,  dtype=torch.float32) if gg_dV is None
-                 else gg_dV.contiguous().to(torch.float32))
-        gg_dA = (torch.zeros((N, Kdim, H), device=v.device, dtype=torch.float32) if gg_dA is None
-                 else gg_dA.contiguous().to(torch.float32))
-        go_f  = go.contiguous().to(torch.float32)
-        v_f   = v.contiguous().to(torch.float32)
-        a_f   = a.contiguous().to(torch.float32)
-        idx_i = idx.to(torch.int32, copy=False).contiguous()
-
-        
-        grad_go_v = torch.empty_like(go_f, dtype=torch.float32)
-        
-        
-        
-        
-        
-        s_vn, s_vh, s_vc = gg_dV.stride()
-        s_in, s_ik       = idx_i.stride()
-        s_an, s_ak, s_ah = a_f.stride()
-        s_on, s_oh, s_oc = go_f.stride()
-        grid = lambda meta: (N, triton.cdiv(H, meta['BLOCK_H']), triton.cdiv(C, meta['BLOCK_C']))
-        _fwd_n_kernel[grid](
-            gg_dV, idx_i, a_f, grad_go_v,
-            N, H, C, Kdim,
-            s_vn, s_vh, s_vc,
-            s_in, s_ik,
-            s_an, s_ak, s_ah,
-            s_on, s_oh, s_oc,
-            OUT_DTYPE=tl.float32,
-        )
-
-        grad_go_a = torch.empty_like(go_f, dtype=torch.float32)
-        s_vn2, s_vh2, s_vc2 = v_f.stride()
-        s_an2, s_ak2, s_ah2 = gg_dA.stride()
-        _fwd_n_kernel[grid](
-            v_f, idx_i, gg_dA, grad_go_a,
-            N, H, C, Kdim,
-            s_vn2, s_vh2, s_vc2,
-            s_in,  s_ik,
-            s_an2, s_ak2, s_ah2,
-            s_on,  s_oh, s_oc,
-            OUT_DTYPE=tl.float32,
-        )
-        d_go = (grad_go_v + grad_go_a).to(go.dtype)
-
-        
-        d_a = torch.empty_like(gg_dA, dtype=torch.float32)
-        s_vn3, s_vh3, s_vc3 = gg_dV.stride()
-        s_gn3, s_gh3, s_gc3 = go_f.stride()
-        s_an3, s_ak3, s_ah3 = d_a.stride()
-        grid_alpha = lambda meta: (N, triton.cdiv(H, meta['BLOCK_H']), triton.cdiv(Kdim, meta['BLOCK_K']))
-        _bwd_alpha_n_kernel[grid_alpha](
-            gg_dV, idx_i, go_f, d_a,
-            N, H, C, Kdim,
-            s_vn3, s_vh3, s_vc3,
-            s_in,  s_ik,
-            s_gn3, s_gh3, s_gc3,
-            s_an3, s_ak3, s_ah3,
-        )
-        d_a = d_a.to(a.dtype)
-
-        d_v = torch.zeros_like(v_f, dtype=torch.float32)
-        s_an4, s_ak4, s_ah4 = gg_dA.stride()
-        s_vn4, s_vh4, s_vc4 = d_v.stride()
-        grid_value = lambda meta: (N, triton.cdiv(H, meta['BLOCK_H']), triton.cdiv(C, meta['BLOCK_C']))
-        _bwd_value_n_kernel[grid_value](
-            A=gg_dA, IDX=idx_i, GO=go_f, dV=d_v,
-            N=N, H=H, C=C, Kdim=Kdim,
-            s_an=s_an4, s_ak=s_ak4, s_ah=s_ah4,
-            s_in=s_in,  s_ik=s_ik,
-            s_gn=go_f.stride()[0], s_gh=go_f.stride()[1], s_gc=go_f.stride()[2],
-            s_vn=s_vn4, s_vh=s_vh4, s_vc=s_vc4,
-        )
-        d_v = d_v.to(v.dtype)
-
-        return d_go, d_v, d_a, None
-
 # ----------------- Autograd wrapper -----------------
 class SparseVAgg_N_Tiled_Fn(torch.autograd.Function):
     @staticmethod
@@ -352,7 +206,7 @@ class SparseVAgg_N_Tiled_Fn(torch.autograd.Function):
             s_on, s_oh, s_oc,
             OUT_DTYPE=OUT_DTYPE,
         )
-        ctx.save_for_backward(v, a, idx)
+        ctx.save_for_backward(value, alpha, idx)
         ctx.shape = (N, H, C, Kdim)
         return out
 
@@ -363,11 +217,13 @@ class SparseVAgg_N_Tiled_Fn(torch.autograd.Function):
         go = grad_out.contiguous().to(torch.float32)
 
     
-        need_graph = torch.is_grad_enabled()
-
-        if need_graph:
-            
-            dV, dA = VAgg_BwdFn.apply(go, v, a, idx)
+        if torch.is_grad_enabled():
+            neighbors = idx.long()
+            samples = go.unsqueeze(1) * a.float().unsqueeze(-1)
+            dV = torch.zeros_like(v, dtype=torch.float32).index_add(
+                0, neighbors.flatten(), samples.flatten(0, 1)
+            )
+            dA = (go.unsqueeze(1) * v[neighbors].float()).sum(dim=-1)
         else:
             # dAlpha
             dA = torch.empty((N, Kdim, H), dtype=torch.float32, device=v.device)

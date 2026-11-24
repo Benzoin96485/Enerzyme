@@ -4,11 +4,9 @@
 # -*- coding: utf-8 -*-
 
 
-from time import perf_counter
 import torch
 import triton
 import triton.language as tl
-_SAFE_TUNED_KEYS = set()
 
 # -----------------------
 
@@ -258,25 +256,32 @@ class SparseQK_N_Tiled_Fn(torch.autograd.Function):
             OUT_DTYPE=out_dtype,
         )
 
-        ctx.save_for_backward(q, k, idx, g,dot)
+        ctx.save_for_backward(query, key, idx, gate, dot)
         ctx.scale = scale
         return out
 
     @staticmethod
     def backward(ctx, grad_out):
-        q, k, idx, g,dot = ctx.saved_tensors
+        q, k, idx, g, dot = ctx.saved_tensors
         scale = ctx.scale
         N, H, D = q.shape
         Kdim = idx.shape[1]
         device = q.device
 
-        
-        need_graph = torch.is_grad_enabled()
-        if need_graph:
-            
-            dQ, dK, _, dgate, _ = BackwardAsFunction_Fn.apply(grad_out,q,k,idx , g, scale,dot)
+        if torch.is_grad_enabled():
+            # Keep the VJP differentiable for force training. In particular
+            # dots must retain the original query/key dependencies.
+            neighbors = idx.long()
+            keys = k[neighbors].float()
+            queries = q.float().unsqueeze(1)
+            upstream = grad_out.float()
+            weight = (upstream * g.float() * scale).unsqueeze(-1)
+            dQ = (weight * keys).sum(dim=1)
+            dK = torch.zeros_like(k, dtype=torch.float32).index_add(
+                0, neighbors.flatten(), (weight * queries).flatten(0, 1)
+            )
+            dgate = upstream * (queries * keys).sum(dim=-1) * scale
         else:
-            
             alpha = (g * grad_out * scale).to(torch.float32)
             dQ = torch.empty_like(q, dtype=torch.float32)
             dK = torch.zeros_like(k, dtype=torch.float32)
@@ -306,202 +311,9 @@ class SparseQK_N_Tiled_Fn(torch.autograd.Function):
                 s_an, s_ak, s_ah,
                 s_kn0, s_kh0, s_kd0,
             )
-            qk = torch.empty((N, Kdim, H), device=q.device, dtype=torch.float32)
-            _dot_only_n_tiled[(N,)](
-                q, k, idx, qk,
-                N, H, Kdim, D,
-                *q.stride(), *k.stride(), *idx.stride(), *qk.stride(),
-            )
-            dgate  = (qk * grad_out.to(torch.float32) * scale).to(g.dtype)
+            dgate = dot * grad_out.float() * scale
 
-        return dQ.to(q.dtype), dK.to(k.dtype), None, dgate, None
-
-
-
-
-@triton.autotune(configs=AUTOTUNE_CFGS, key=['H','Kdim','D'])
-@triton.jit
-def _dot_only_n_tiled(
-    Q, K, IDX, DOT,
-    N, H, Kdim, D,
-    s_qn, s_qh, s_qd,
-    s_kn, s_kh, s_kd,
-    s_in, s_ik,
-    s_dn, s_dk, s_dh,
-    BLOCK_H: tl.constexpr,
-    BLOCK_K: tl.constexpr,
-    BLOCK_D: tl.constexpr,
-):
-    pid_n = tl.program_id(0)
-    if pid_n >= N: 
-        return
-
-    k0 = 0
-    while k0 < Kdim:
-        k_offs = k0 + tl.arange(0, BLOCK_K)
-        k_mask = k_offs < Kdim
-        idx_ptr  = IDX + pid_n*s_in + k_offs*s_ik
-        idx_vals = tl.load(idx_ptr, mask=k_mask, other=0).to(tl.int32)
-        h0 = 0
-        while h0 < H:
-            h_offs = h0 + tl.arange(0, BLOCK_H)
-            h_mask = h_offs < H
-            acc = tl.zeros((BLOCK_K, BLOCK_H), dtype=tl.float32)
-            d0 = 0
-            while d0 < D:
-                d_offs = d0 + tl.arange(0, BLOCK_D)
-                d_mask = d_offs < D
-                q_ptr  = Q + pid_n*s_qn + h_offs[:,None]*s_qh + d_offs[None,:]*s_qd
-                q_tile = tl.load(q_ptr, mask=h_mask[:,None] & d_mask[None,:], other=0.).to(tl.float32)
-                k_base = idx_vals[:,None,None]*s_kn + h_offs[None,:,None]*s_kh + d_offs[None,None]*s_kd
-                k_ptr  = K + k_base
-                kmask  = k_mask[:,None,None] & h_mask[None,:,None] & d_mask[None,None,:]
-                k_tile = tl.load(k_ptr, mask=kmask, other=0.).to(tl.float32)
-                acc += tl.sum(k_tile * q_tile[None,:,:], axis=2)
-                d0  += BLOCK_D
-            dot_ptr = DOT + pid_n*s_dn + k_offs[:,None]*s_dk + h_offs[None,:]*s_dh
-            tl.store(dot_ptr, acc, mask=k_mask[:,None] & h_mask[None,:])
-            h0 += BLOCK_H
-        k0 += BLOCK_K
-
-
-class BackwardAsFunction_Fn(torch.autograd.Function):
-    """
-        inputs:  (idx[N,K], k[N,H,D], q[N,H,D], tmp_out[N,K,H], g[N,K,H], scale)
-        outputs: (tmp_Q[N,H,D], tmp_K[N,H,D], None, tmp_gate[N,K,H], None)
-    """
-    @staticmethod
-    def forward(ctx, tmp_out,q,k,idx,  g, scale: float,dot):
-        assert idx.is_cuda and k.is_cuda and q.is_cuda and tmp_out.is_cuda and g.is_cuda
-        idx = idx.to(torch.int32, copy=False)
-        N, H, D = q.shape
-        Kdim    = idx.shape[1]
-
-        w = (tmp_out.to(torch.float32) * g.to(torch.float32) * float(scale))  # [N,K,H]
-
-        
-        tmp_Q = torch.empty_like(q, dtype=torch.float32)
-        _bwdq_n_tiled[(N,)](
-            k, idx, w, tmp_Q,
-            N, H, Kdim, D,
-            *k.stride(), *idx.stride(), *w.stride(), *tmp_Q.stride(),
-        )
-
-        
-        tmp_K = torch.zeros_like(k, dtype=torch.float32)
-        _bwdk_n_tiled[(N,)](
-            q, idx, w, tmp_K,
-            N, H, Kdim, D,
-            *q.stride(), *idx.stride(), *w.stride(), *tmp_K.stride(),
-        )
-
-        qk = dot
-        tmp_gate = (tmp_out.to(torch.float32) * qk * float(scale))
-
-        
-        ctx.save_for_backward(tmp_out,q,k, idx,  g, qk)
-        ctx.scale = float(scale)
-        return tmp_Q.to(q.dtype), tmp_K.to(k.dtype), None, tmp_gate.to(tmp_out.dtype), None
-
-    @staticmethod
-    def backward(ctx, gg_tmp_Q, gg_tmp_K, _, gg_tmp_gate, __):
-        """
-          gg_tmp_Q:    [N,H,D]
-          gg_tmp_K:    [N,H,D]
-          gg_tmp_gate: [N,K,H]
-          (d_idx=None, d_k2, d_q2, d_tmp_out2, d_g2, d_scale=None)
-        """
-        tmp_out,q,k,  idx,  g, qk = ctx.saved_tensors
-        scale = ctx.scale
-        N, H, D = q.shape
-        Kdim    = idx.shape[1]
-
-        
-        ggQ = gg_tmp_Q.to(torch.float32) if gg_tmp_Q is not None else torch.zeros_like(q, dtype=torch.float32)
-        ggK = gg_tmp_K.to(torch.float32) if gg_tmp_K is not None else torch.zeros_like(k, dtype=torch.float32)
-        ggG = gg_tmp_gate.to(torch.float32) if gg_tmp_gate is not None else torch.zeros((N, Kdim, H), device=q.device, dtype=torch.float32)
-
-        # ------------------------------
-        
-        # ------------------------------
-        dw = torch.empty((N, Kdim, H), device=q.device, dtype=torch.float32)
-
-        _dot_only_n_tiled[(N,)](
-            ggQ.contiguous(), k, idx, dw,
-            N, H, Kdim, D,
-            *ggQ.stride(), *k.stride(), *idx.stride(), *dw.stride(),
-        )
-        
-        tmp = torch.empty_like(dw)
-        _dot_only_n_tiled[(N,)](
-            q, ggK.contiguous(), idx, tmp,
-            N, H, Kdim, D,
-            *q.stride(), *ggK.stride(), *idx.stride(), *tmp.stride(),
-        )
-        dw.add_(tmp)
-
-        # ------------------------------
-        
-        # ------------------------------
-        beta = (tmp_out.to(torch.float32) * ggG * float(scale))  # [N,K,H]
-
-        # ------------------------------
-        
-        
-        
-        # ------------------------------
-        
-        w = (tmp_out.to(torch.float32) * g.to(torch.float32) * float(scale))
-
-        d_q2_a = torch.empty_like(q, dtype=torch.float32)
-        _bwdq_n_tiled[(N,)](
-            ggK.contiguous(), idx, w, d_q2_a,      # alpha = w, K = ggK
-            N, H, Kdim, D,
-            *ggK.stride(), *idx.stride(), *w.stride(), *d_q2_a.stride(),
-        )
-        d_q2_b = torch.empty_like(q, dtype=torch.float32)
-        _bwdq_n_tiled[(N,)](
-            k, idx, beta, d_q2_b,                 # alpha = beta, K = k
-            N, H, Kdim, D,
-            *k.stride(), *idx.stride(), *beta.stride(), *d_q2_b.stride(),
-        )
-        d_q2 = d_q2_a + d_q2_b
-
-        # ------------------------------
-        
-        
-        
-        # ------------------------------
-        d_k2 = torch.zeros_like(k, dtype=torch.float32)
-        _bwdk_n_tiled[(N,)](
-            ggQ.contiguous(), idx, w, d_k2,       # alpha = w, Q = ggQ
-            N, H, Kdim, D,
-            *ggQ.stride(), *idx.stride(), *w.stride(), *d_k2.stride(),
-        )
-        _bwdk_n_tiled[(N,)](
-            q, idx, beta, d_k2,                   # alpha = beta, Q = q
-            N, H, Kdim, D,
-            *q.stride(), *idx.stride(), *beta.stride(), *d_k2.stride(),
-        )
-
-        # ------------------------------
-        
-        
-        
-        # ------------------------------
-        d_tmp_out2 = dw * (g.to(torch.float32) * float(scale)) + (ggG * qk.to(torch.float32) * float(scale))
-        d_g2       = dw * (tmp_out.to(torch.float32) * float(scale))
-
-        
-        d_k2  = d_k2.to(k.dtype)
-        d_q2  = d_q2.to(q.dtype)
-        d_tmp_out2 = d_tmp_out2.to(tmp_out.dtype)
-        d_g2  = d_g2.to(g.dtype)
-
-        
-        return d_tmp_out2, d_q2, d_k2,None,  d_g2, None,None
-
-
+        return dQ.to(q.dtype), dK.to(k.dtype), None, dgate.to(g.dtype), None
 
 
 def sparse_qk_triton_n_tiled(query, key, idx, gate, scale=0.1):
