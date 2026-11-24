@@ -267,7 +267,9 @@ If a forward hook rescales a force or replaces its input energy, its changes
 also affect the force-loss gradients. Ordinary compiled training invokes the
 original :code:`ForceLayer` whenever that layer has hooks. Use ordinary
 :code:`torch.compile(model)` when installing such hooks, including hooks added
-after the first call.
+after the first call. When a forward hook changes a layer inside the ordinary
+energy/force training graph, the next call uses the current hooks. This also
+applies when removing a hook from a running model.
 
 On CPU, ordinary Inductor compiles the CACE and GRACE force calculations with
 scalar C++ kernels. This preserves their coordinate and parameter derivatives

@@ -245,7 +245,12 @@ def compiled_coordinate_vjp(core, inputs):
         # the coordinates. Its joint VJP would materialize a zero derivative.
         return native_forces(core, inputs)
     post_pairs = _post_pair_indices(core, inputs)
-    with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+    options = {"capture_dynamic_output_shape_ops": True, "capture_scalar_outputs": True}
+    if hasattr(config, "skip_nnmodule_hook_guards"):
+        # A cached joint VJP must be retraced when callbacks change the
+        # energy or its inputs, including after the first compiled call.
+        options["skip_nnmodule_hook_guards"] = False
+    with config.patch(options):
         if core.training and getattr(core, "architecture", None) == "chgnet":
             coordinates = inputs.get("Ra")
             if isinstance(coordinates, Tensor) and coordinates.device.type == "cpu":

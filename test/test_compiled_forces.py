@@ -53,6 +53,48 @@ def test_compiled_force_layer_keeps_hooks_added_after_first_call():
     torch.testing.assert_close(values(runner), original)
 
 
+
+def test_compiled_energy_reduction_uses_current_forward_hooks():
+    from torch._dynamo import config
+    from enerzyme.models.layers.reduce import EnergyReduceLayer
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    core = build("schnet").double()
+    runner = torch.compile(core, backend="aot_eager")
+    reduce, = (layer for layer in core.post_sequence if type(layer) is EnergyReduceLayer)
+    batch = make_batch(random_molecules(107, [5, 4]), torch.float64)
+
+    def values(target):
+        out = forward(target, batch, torch.float64, train=True)
+        loss = out["E"].square().sum() + out["Fa"].square().sum()
+        grads = torch.autograd.grad(loss, tuple(core.parameters()), allow_unused=True)
+        return out["E"], out["Fa"], grads
+
+    def scale_atoms(module, args):
+        fields, = args
+        return ({**fields, "Ea": 1.5 * fields["Ea"]},)
+
+    def scale_total(module, args, fields):
+        return {**fields, "E": 2 * fields["E"]}
+
+    def check():
+        torch.testing.assert_close(values(runner), values(core))
+
+    initial_setting = getattr(config, "skip_nnmodule_hook_guards", None)
+    check()
+    pre = reduce.register_forward_pre_hook(scale_atoms)
+    try:
+        check()
+        with reduce.register_forward_hook(scale_total):
+            check()
+            pre.remove()
+            check()
+    finally:
+        pre.remove()
+    check()
+    assert getattr(config, "skip_nnmodule_hook_guards", None) == initial_setting
+
 @pytest.mark.parametrize("architecture", ["cace", "grace", "equiformer_v3"])
 def test_conflicting_cpu_kernel_option_uses_native_gradients(monkeypatch, architecture):
     from torch._dynamo.exc import TorchRuntimeError
