@@ -216,11 +216,13 @@ class SO2EquivariantGraphAttention(torch.nn.Module):
         x,
         atomic_numbers,
         edge_distance,
-        edge_index
+        edge_index,
+        rotation=None,
     ):
         
         # Compute edge scalar features (invariant to rotations)
         # Uses atomic numbers and edge distance as inputs
+        rotation = self.SO3_rotation if rotation is None else rotation
         if self.use_atom_edge_embedding:
             source_element = atomic_numbers[edge_index[0]]  # Source atom atomic number
             target_element = atomic_numbers[edge_index[1]]  # Target atom atomic number
@@ -254,7 +256,7 @@ class SO2EquivariantGraphAttention(torch.nn.Module):
             x_message.embedding = x_message.embedding * x_edge_weight
 
         # Rotate the irreps to align with the edge
-        x_message._rotate(self.SO3_rotation, self.lmax_list, self.mmax_list)
+        x_message._rotate(rotation, self.lmax_list, self.mmax_list)
 
         # First SO(2)-convolution
         if self.use_s2_act_attn:
@@ -306,7 +308,7 @@ class SO2EquivariantGraphAttention(torch.nn.Module):
         x_message.embedding = attn
 
         # Rotate back the irreps
-        x_message._rotate_inv(self.SO3_rotation, self.mappingReduced)
+        x_message._rotate_inv(rotation, self.mappingReduced)
 
         # Compute the sum of the incoming neighboring messages for each target node
         x_message._reduce_edge(edge_index[1], len(x.embedding))
@@ -569,7 +571,8 @@ class TransBlockV2(torch.nn.Module):
         atomic_numbers,
         edge_distance,
         edge_index,
-        batch           # for GraphDropPath
+        batch,          # for GraphDropPath
+        rotation=None,
     ):
 
         output_embedding = x
@@ -579,7 +582,7 @@ class TransBlockV2(torch.nn.Module):
         output_embedding = self.ga(output_embedding, 
             atomic_numbers,
             edge_distance,
-            edge_index)
+            edge_index, rotation=rotation)
         
         if self.drop_path is not None:
             output_embedding.embedding = self.drop_path(output_embedding.embedding, batch)

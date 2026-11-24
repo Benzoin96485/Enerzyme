@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import math
 
+from typing import NamedTuple
+
 import torch
 
 from .wigner_jd import (
@@ -136,6 +138,17 @@ class CoefficientMappingModule(torch.nn.Module):
         return f"{self.__class__.__name__}(lmax={self.lmax}, mmax={self.mmax})"
 
 
+class EdgeRotation(NamedTuple):
+    wigner: torch.Tensor
+    wigner_inv: torch.Tensor
+
+    def rotate(self, inputs):
+        return torch.bmm(self.wigner, inputs)
+
+    def rotate_inv(self, inputs):
+        return torch.bmm(self.wigner_inv, inputs)
+
+
 class SO3RotationFused(torch.nn.Module):
     """EquiformerV3 SO(3) rotation with fused m-primary permute."""
 
@@ -162,7 +175,7 @@ class SO3RotationFused(torch.nn.Module):
         self.register_buffer("wigner_index_to_m_array", wigner_index_to_m_array)
         self.register_buffer("wigner_inv_rescale", wigner_inv_rescale)
 
-    def set_wigner(self, rot_mat3x3):
+    def for_edges(self, rot_mat3x3):
         wigner = self._rotation_to_wigner_matrix(rot_mat3x3, 0, self.lmax)
         index = self.wigner_index_to_m_array.to(
             device=wigner.device, dtype=wigner.dtype
@@ -175,8 +188,10 @@ class SO3RotationFused(torch.nn.Module):
         wigner_inv = wigner_inv * rescale
         if torch.is_autocast_enabled():
             wigner_inv = wigner_inv.to(torch.float16)
-        self.wigner = wigner
-        self.wigner_inv = wigner_inv
+        return EdgeRotation(wigner, wigner_inv)
+
+    def set_wigner(self, rot_mat3x3):
+        self.wigner, self.wigner_inv = self.for_edges(rot_mat3x3)
 
     def rotate(self, inputs):
         return torch.bmm(self.wigner, inputs)

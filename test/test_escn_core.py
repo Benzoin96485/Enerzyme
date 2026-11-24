@@ -25,7 +25,7 @@ def _random_so3(dtype=torch.float64):
 
 
 def test_escn_core_atom_feature_shape():
-    from enerzyme.models.escn import eSCNCore
+    from enerzyme.models.presets.so2 import escn
 
     torch.manual_seed(0)
     N = 6
@@ -33,7 +33,7 @@ def test_escn_core_atom_feature_shape():
     dim_embedding = 16
     num_rbf = 8
     lmax = 2
-    core = eSCNCore(
+    core = escn(
         dim_embedding=dim_embedding,
         num_rbf=num_rbf,
         sphere_channels=sphere_channels,
@@ -65,10 +65,10 @@ def test_escn_core_atom_feature_shape():
 
 
 def test_escn_simple_readout_resolves_feature_irreps():
-    from enerzyme.models.escn import eSCNCore
+    from enerzyme.models.presets.so2 import escn
     from enerzyme.models.layers import SimpleReadout
 
-    core = eSCNCore(
+    core = escn(
         dim_embedding=16,
         num_rbf=8,
         sphere_channels=16,

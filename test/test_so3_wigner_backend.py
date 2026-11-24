@@ -77,7 +77,7 @@ def test_wigner_d_rejects_l_above_jd_max():
 
 
 def test_dpa4_lmax3_forward_and_geometry_grad():
-    from enerzyme.models.dpa4 import DPA4Core
+    from enerzyme.models.presets.so2 import dpa4
 
     torch.manual_seed(4)
     n = 4
@@ -85,7 +85,7 @@ def test_dpa4_lmax3_forward_and_geometry_grad():
     idx_i = torch.tensor([p[0] for p in pairs])
     idx_j = torch.tensor([p[1] for p in pairs])
     positions = torch.randn(n, 3, requires_grad=True)
-    core = DPA4Core(
+    core = dpa4(
         dim_embedding=8,
         channels=8,
         lmax=3,
