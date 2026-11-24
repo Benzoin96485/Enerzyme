@@ -17,6 +17,7 @@ import io
 import json
 import math
 import os
+import random
 import resource
 import statistics
 import subprocess
@@ -113,6 +114,7 @@ def compile_reference_model(model):
 
 def _worker(arch, reps, threads, use_compile, systems="default", precision="float32",
             device_name="auto", model_tree=None, compile_reference=False, fixture=None):
+    import numpy as np
     import torch
     from core_harness import build, forward
 
@@ -124,6 +126,8 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
     from enerzyme.models.ff import get_ff_core
 
     torch.set_num_threads(threads)
+    random.seed(0)
+    np.random.seed(0)
     torch.manual_seed(0)
     if device_name == "auto":
         device_name = "cuda" if torch.cuda.is_available() else "cpu"
