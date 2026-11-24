@@ -5,7 +5,7 @@ from .rbf import (
     BaseRBF, 
     ExponentialGaussianRBFLayer, ExponentialBernsteinRBFLayer,
     GaussianRBFLayer, BernsteinRBFLayer, SincRBFLayer, BesselRBFLayer,
-    ExpNormalSmearing,
+    ExpNormalSmearing, SphericalBesselRBFLayer,
 )
 from .atom_embedding import (
     BaseAtomEmbedding,
@@ -59,7 +59,6 @@ from ..cace.readout import CACEEnergyReadout
 from ..camp.readout import CAMPEnergyReadout
 from ..mp.equivariant.s2.sample_readout import SphereSampleReadout
 from .charge_spin_embedding import ChargeSpinEmbeddingLayer
-from ..m3gnet.basis import SphericalBesselRBFLayer
 from ..mace.readout import MACEEnergyReadout
 from ..botnet.readout import BOTNetEnergyReadout
 from ..mace.polar import PolarFieldLayer

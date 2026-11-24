@@ -15,23 +15,10 @@ from typing import List, Optional, Sequence, Union
 import torch
 from torch import Tensor, nn
 
-from ..mp.basis.envelope import polynomial_envelope
+from ..mp.basis.radial import SpeciesPairChebyshev, chebyshev_first
 
 
 HiddenSpec = Union[int, Sequence[int], None]
-
-
-def chebyshev_first(degree: int, x: Tensor) -> Tensor:
-    """``T_0, ..., T_degree`` stacked on a leading axis. Shape ``(degree + 1, *x.shape)``."""
-    if degree < 0:
-        raise ValueError(f"degree must be >= 0, got {degree}")
-    columns = [torch.ones_like(x)]
-    if degree == 0:
-        return columns[0].unsqueeze(0)
-    columns.append(x)
-    for _ in range(2, degree + 1):
-        columns.append(2.0 * x * columns[-1] - columns[-2])
-    return torch.stack(columns, dim=0)
 
 
 def resolve_hidden_layers(spec: HiddenSpec, width: int) -> List[int]:
@@ -59,59 +46,6 @@ def silu_mlp(in_features: int, hidden: Sequence[int], out_features: int) -> nn.S
         raise ValueError("MLP needs at least one linear map")
     layers.pop()
     return nn.Sequential(*layers)
-
-
-class SpeciesPairChebyshev(nn.Module):
-    """``B_u(r, zi, zj) = envelope(r) Σ_β c[zi, zj, u, β] T_β(r / cutoff)``.
-
-    ``zi`` and ``zj`` are compact species indices, not atomic numbers. The
-    caller owns that table so several layers can share one vocabulary.
-    """
-
-    def __init__(
-        self,
-        n_channels: int,
-        n_species: int,
-        degree: int,
-        cutoff: float,
-        envelope_p: int,
-    ) -> None:
-        super().__init__()
-        if int(n_channels) < 1:
-            raise ValueError(f"n_channels must be >= 1, got {n_channels}")
-        if int(n_species) < 1:
-            raise ValueError(f"n_species must be >= 1, got {n_species}")
-        if int(degree) < 0:
-            raise ValueError(f"degree must be >= 0, got {degree}")
-        if float(cutoff) <= 0:
-            raise ValueError(f"cutoff must be positive, got {cutoff}")
-        if int(envelope_p) < 1:
-            raise ValueError(f"envelope_p must be >= 1, got {envelope_p}")
-        self.n_channels = int(n_channels)
-        self.n_species = int(n_species)
-        self.degree = int(degree)
-        self.cutoff = float(cutoff)
-        self.envelope_p = int(envelope_p)
-        self.coeff = nn.Parameter(
-            torch.empty(self.n_species, self.n_species, self.n_channels, self.degree + 1)
-        )
-        bound = (self.degree + 1) ** -0.5
-        nn.init.uniform_(self.coeff, -bound, bound)
-
-    def forward(self, distance: Tensor, zi: Tensor, zj: Tensor) -> Tensor:
-        """Return ``[E, n_channels]``. Distances at or beyond the cutoff are 0."""
-        if distance.shape != zi.shape or distance.shape != zj.shape:
-            raise ValueError(
-                "distance, zi, and zj must share a shape, "
-                f"got {tuple(distance.shape)}, {tuple(zi.shape)}, {tuple(zj.shape)}"
-            )
-        basis = chebyshev_first(self.degree, distance / self.cutoff)
-        window = polynomial_envelope(distance, self.cutoff, self.envelope_p).to(
-            dtype=distance.dtype
-        )
-        # coeff rows: (E, C, degree + 1). basis: (degree + 1, E).
-        pair = self.coeff[zi.long(), zj.long()]
-        return torch.einsum("ecd,de->ec", pair, basis * window)
 
 
 def species_lookup(max_Za: int, atomic_numbers: Optional[Sequence[int]]) -> tuple:

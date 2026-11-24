@@ -14,15 +14,7 @@ import math
 
 import torch
 from torch import Tensor
-from torch.nn import Module
-
-from ..mp.basis.envelope import polynomial_envelope
-from ..dimenet.basis import (
-    real_sph_harm_l0,
-    spherical_bessel_normalizer,
-    spherical_bessel_zeros,
-    spherical_jn,
-)
+from ..mp.basis.fourier_bessel import SphericalBesselRadial, real_sph_harm_l0
 
 
 def legendre_outer(angle_cab: Tensor, dihedral: Tensor, num_spherical: int) -> Tensor:
@@ -109,67 +101,6 @@ def real_spherical_harmonics(theta: Tensor, phi: Tensor, num_spherical: int) -> 
             out[:, degree * degree + degree + order] = base * torch.cos(order * phi)
             out[:, degree * degree + degree - order] = base * torch.sin(order * phi)
     return out
-
-
-class SphericalBesselRadial(Module):
-    """Enveloped spherical Bessel radial factor ``(E, L, N)`` or ``(E, L², N)``.
-
-    ``repeat_m`` repeats degree ``l`` across the ``2l+1`` real harmonics so the
-    radial tensor lines up with :func:`real_spherical_harmonics`.
-    """
-
-    def __init__(
-        self,
-        num_spherical: int,
-        num_radial: int,
-        cutoff: float,
-        envelope_exponent: int = 5,
-        repeat_m: bool = False,
-    ) -> None:
-        super().__init__()
-        if num_spherical < 1:
-            raise ValueError("num_spherical must be >= 1")
-        if num_radial < 1 or num_radial > 64:
-            raise ValueError("num_radial must lie in 1..64")
-        if cutoff <= 0:
-            raise ValueError(f"cutoff must be positive, got {cutoff}")
-        self.num_spherical = int(num_spherical)
-        self.num_radial = int(num_radial)
-        self.cutoff = float(cutoff)
-        self.envelope_exponent = int(envelope_exponent)
-        self.repeat_m = bool(repeat_m)
-        self.norm_const = self.cutoff ** -1.5
-        zeros = spherical_bessel_zeros(self.num_spherical, self.num_radial)
-        normalizer = spherical_bessel_normalizer(zeros)
-        self.register_buffer("zeros", torch.tensor(zeros, dtype=torch.float64))
-        self.register_buffer("normalizer", torch.tensor(normalizer, dtype=torch.float64))
-        if self.repeat_m:
-            repeats = torch.arange(self.num_spherical, dtype=torch.long) * 2 + 1
-            self.register_buffer("degree_repeats", repeats)
-
-    @property
-    def angular_dim(self) -> int:
-        if self.repeat_m:
-            return self.num_spherical * self.num_spherical
-        return self.num_spherical
-
-    def forward(self, dist: Tensor) -> Tensor:
-        if dist.numel() == 0:
-            return dist.new_empty(0, self.angular_dim, self.num_radial)
-        scaled = dist / self.cutoff
-        env = polynomial_envelope(dist, self.cutoff, self.envelope_exponent)
-        zeros = self.zeros.to(dtype=dist.dtype, device=dist.device)
-        normalizer = self.normalizer.to(dtype=dist.dtype, device=dist.device)
-        radial = dist.new_empty(dist.shape[0], self.num_spherical, self.num_radial)
-        scaled_col = scaled.unsqueeze(-1)
-        for ell in range(self.num_spherical):
-            arg = zeros[ell].unsqueeze(0) * scaled_col
-            radial[:, ell, :] = spherical_jn(ell, arg) * normalizer[ell].unsqueeze(0)
-        radial = radial * (env * self.norm_const).unsqueeze(-1).unsqueeze(-1)
-        if not self.repeat_m:
-            return radial
-        repeats = self.degree_repeats.to(device=dist.device)
-        return torch.repeat_interleave(radial, repeats, dim=1)
 
 
 def joint_zonal(radial: Tensor, angular: Tensor) -> Tensor:

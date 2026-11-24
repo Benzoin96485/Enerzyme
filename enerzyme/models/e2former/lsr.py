@@ -14,6 +14,7 @@ import torch
 from torch import Tensor
 from torch.nn import ModuleList
 
+from ..mp.basis.radial import GaussianSmearing
 from ..mp.equivariant import get_normalization_layer
 from ..mp.equivariant.sph.linear import SO3Linear
 from .cluster import (
@@ -49,21 +50,6 @@ for _layer in DEFAULT_LAYER_PARAMS:
             "cutoff_lr": 15.0,
         }
         break
-
-
-class _LongRangeGaussianRBF(torch.nn.Module):
-    """Gaussian RBF on atom–fragment distances (inside Core; not the SR layer)."""
-
-    def __init__(self, num_rbf: int, cutoff: float) -> None:
-        super().__init__()
-        offset = torch.linspace(0.0, float(cutoff), num_rbf)
-        self.coeff = -0.5 / (offset[1] - offset[0]).item() ** 2
-        self.register_buffer("offset", offset)
-
-    def forward(self, dist: Tensor) -> Tensor:
-        # dist: [N, K] → [N, K, num_rbf]
-        d = dist.unsqueeze(-1) - self.offset.view(1, 1, -1)
-        return torch.exp(self.coeff * torch.pow(d, 2))
 
 
 class E2FormerLSRCore(E2FormerCore):
@@ -147,7 +133,7 @@ class E2FormerLSRCore(E2FormerCore):
         self.min_nodes_per_group = max(int(min_nodes_per_group), 1)
         self.kmeans_random_state = int(kmeans_random_state)
 
-        self.rbf_long = _LongRangeGaussianRBF(num_rbf, self.cutoff_lr)
+        self.rbf_long = GaussianSmearing(0.0, self.cutoff_lr, num_rbf, preserve_shape=True)
         self.cluster_blocks = ModuleList()
         for _ in range(self.long_layers):
             self.cluster_blocks.append(
