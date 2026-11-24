@@ -16,7 +16,9 @@ import gc
 import hashlib
 import json
 import math
+import os
 import random
+import socket
 import statistics
 import subprocess
 import sys
@@ -94,7 +96,7 @@ def compare_main_runs(paths, reference_paths):
     arch = next(iter(raw[0]))
     base, candidate = (result[arch] for result in raw)
     fields = ("fixture_kind", "snapshot", "snapshot_sha256", "config_sha256", "checkpoint_state", "torch",
-              "tiled_atom_features", "compile", "device", "device_name", "precision", "params",
+              "tiled_atom_features", "compile", "device", "device_name", "device_uuid", "precision", "params",
               "reps", "threads", "requested_systems", "modes")
     if base.get("fixture_kind") != "main_trained" or not base.get("config_sha256") or not base.get("snapshot_sha256"):
         raise ValueError("expected a trained main checkpoint with configuration and fixture hashes")
@@ -106,15 +108,20 @@ def compare_main_runs(paths, reference_paths):
             raise ValueError(f"cannot compare different {field}")
     if not base.get("compile") or not base.get("torch"):
         raise ValueError("expected ordinary compiled measurements with a PyTorch version")
+    if base.get("device") == "cuda" and not base.get("device_uuid"):
+        raise ValueError("a paired GPU comparison requires a physical device UUID")
 
     refs = [torch.load(path, map_location="cpu", weights_only=True) if path.is_file() else {}
             for path in reference_paths]
     result = {key: value for key, value in base.items() if key in fields}
     result.update(architecture=arch, comparisons={}, counts={})
     result["source"] = {
-        name: {key: row.get(key) for key in ("model_revision", "driver_revision", "driver_sha256", "torch")}
+        name: {key: row.get(key) for key in ("model_revision", "driver_revision", "driver_sha256", "torch",
+                                             "slurm_job_id", "node", "started_unix_ns", "finished_unix_ns")}
         for name, row in (("baseline", base), ("candidate", candidate))
     }
+    if all(side["started_unix_ns"] is not None for side in result["source"].values()):
+        result["measurement_order"] = sorted(result["source"], key=lambda side: result["source"][side]["started_unix_ns"])
     if base.get("driver_sha256") != candidate.get("driver_sha256"):
         raise ValueError("cannot compare different benchmark drivers")
     dtype = getattr(torch, base["precision"])
@@ -159,6 +166,7 @@ def compare_main_runs(paths, reference_paths):
 
 
 def run(args):
+    started = time.time_ns()
     sys.path.insert(0, str(args.model_tree.resolve()))
     from enerzyme.models.ff import get_ff_core
 
@@ -183,7 +191,9 @@ def run(args):
         provenance = {"fixture_kind": "main_trained", "config_sha256": digest,
                       "checkpoint_state": "model_state_dict", "tiled_atom_features": sorted(atom_features),
                       "model_revision": revision(args.model_tree), "driver_revision": revision(driver_path.parent),
-                      "driver_sha256": hashlib.sha256(driver_path.read_bytes()).hexdigest()}
+                      "driver_sha256": hashlib.sha256(driver_path.read_bytes()).hexdigest(),
+                      "slurm_job_id": os.environ.get("SLURM_JOB_ID"), "node": socket.gethostname(),
+                      "started_unix_ns": started}
     else:
         payload = torch.load(source, map_location="cpu", weights_only=False)
         arch = payload["architecture"]
@@ -228,6 +238,8 @@ def run(args):
     }
     if device.type == "cuda":
         result["device_name"] = torch.cuda.get_device_name(device)
+        if main_fixture:
+            result["device_uuid"] = str(torch.cuda.get_device_properties(device).uuid)
     write()
     try:
         model, initial_state, original_names = load_model()
@@ -352,6 +364,8 @@ def run(args):
             )
         del batch
     result["finished"] = True
+    if main_fixture:
+        result["finished_unix_ns"] = time.time_ns()
     write()
 
 

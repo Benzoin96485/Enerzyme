@@ -123,7 +123,8 @@ def test_compiled_checkpoint_comparison_requires_cross_branch_weight_gradients(t
 
     measurement = {
         "fixture_kind": "main_trained", "snapshot": "fixture.pt.gz", "snapshot_sha256": "fixture",
-        "config_sha256": "config", "compile": True, "torch": "2.13", "precision": "float32", "device": "cuda", "params": 1,
+        "config_sha256": "config", "compile": True, "torch": "2.13", "precision": "float32",
+        "device": "cuda", "device_uuid": "test-card", "params": 1,
         "requested_systems": ["large_2000"], "modes": ["train"], "reps": 5,
         "large_2000": {"train_ms": 10.0, "train_peak_mb": 64.0},
         "numerical": {"large_2000": {"train": {"passed": True}}},
@@ -148,6 +149,9 @@ def test_compiled_checkpoint_comparison_requires_cross_branch_weight_gradients(t
     assert mismatch["cross_native"]["different_gradient_names"] == ["other", "w"]
     paths[1].write_text(json.dumps({"schnet": dict(measurement, torch="other")}))
     with pytest.raises(ValueError, match="different torch"):
+        cell()
+    paths[1].write_text(json.dumps({"schnet": dict(measurement, device_uuid="second-card")}))
+    with pytest.raises(ValueError, match="different device_uuid"):
         cell()
 
 
