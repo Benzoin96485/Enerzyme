@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from core_harness import build, forward, make_batch, random_molecules
 
 
-NATIVE_PRESETS = [name for name in available_architectures() if get_architecture(name).family != "wrapper"]
+COMPOSABLE_PRESETS = [name for name in available_architectures() if get_architecture(name).family != "wrapper"]
 
 
 def _run(model, sample, positions, order, *, capture_features=True):
@@ -41,7 +41,7 @@ def _run(model, sample, positions, order, *, capture_features=True):
     return result
 
 
-@pytest.fixture(scope="module", params=[*NATIVE_PRESETS, "xpainn"])
+@pytest.fixture(scope="module", params=COMPOSABLE_PRESETS)
 def case(request):
     name = request.param
     if name == "xpainn":

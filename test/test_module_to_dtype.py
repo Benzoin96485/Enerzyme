@@ -292,7 +292,9 @@ def test_task_entrypoints_do_not_chain_module_type_dtype(relpath: str):
 
 
 @pytest.mark.parametrize("name", [n for n in available_architectures() if get_architecture(n).family != "wrapper"])
-def test_native_preset_to_preserves_buffer_types(name):
+def test_composable_preset_to_preserves_buffer_types(name):
+    if name == "xpainn":
+        pytest.importorskip("xequinet.nn.model")
     params, layers = default_params(name)
     model = build_model(name, layers, params, verbose=0)
     original = {k: v.dtype for k, v in model.named_buffers()}
