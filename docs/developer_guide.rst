@@ -213,6 +213,17 @@ same Cartesian frame to all backends. Existing presets select their upstream
 frame convention explicitly. The measurements in :code:`test/fixtures/bench_rotations.json`
 can be reproduced with :code:`scripts/bench_rotations.py`.
 
+To check force training with the installed Inductor backend, run the following
+from the checkout. The report compares the energy, forces, and every parameter
+gradient for identical initial weights and coordinates. It records captured
+operations, numerical errors, and changes between an absent and a zero gradient.
+The command exits with a nonzero status on a mismatch.
+
+.. code-block:: shell
+
+   PYTHONPATH=. python scripts/check_compiled_forces.py mattersim --dtype float64
+
+
 :code:`GraphContext` caches geometry for the duration of one forward pass.
 Each block returns a :code:`BlockState` carrying node, edge or auxiliary
 features. The head can consume the final state or request intermediate
