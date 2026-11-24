@@ -176,3 +176,20 @@ def test_compiled_local_frame_input_validation():
         compiled(batch, i, j, vec, dist + 1.)
     with pytest.raises(RuntimeError, match="cover every neighbor index"):
         compiled(batch, i + 2, j, vec, dist)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA-only local-frame fusion")
+def test_compiled_local_frame_projection_honors_nested_hook():
+    layer = LocalSubstructure(8, False, True, "source_target").cuda().double().eval()
+    environment = torch.randn(4, 3, 8, device="cuda", dtype=torch.float64, requires_grad=True)
+    frame = torch.eye(3, device="cuda", dtype=torch.float64).expand(3, -1, -1)
+    nodes = torch.tensor([2, 0, 3], device="cuda")
+    inputs = (environment, *layer.lin.parameters())
+    with layer.lin[1].register_forward_hook(lambda _, args, y: y * 1.7):
+        expected = layer._endpoint(environment, frame, nodes)
+        actual = torch.compile(layer._endpoint, backend="eager", fullgraph=True)(environment, frame, nodes)
+        torch.testing.assert_close(actual, expected)
+        actual_grads = torch.autograd.grad(actual.square().sum(), inputs)
+        expected_grads = torch.autograd.grad(expected.square().sum(), inputs)
+        for actual_grad, expected_grad in zip(actual_grads, expected_grads):
+            torch.testing.assert_close(actual_grad, expected_grad)
