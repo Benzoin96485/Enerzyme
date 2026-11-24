@@ -128,6 +128,19 @@ KEY_MAPS["mattersim"] = KEY_MAPS["m3gnet"] + [
 ]
 
 
+for _name in ("so3krates", "so3lr", "efa", "so3lr_efa"):
+    KEY_MAPS[_name] = [
+        (r"^layers\.", "blocks."),
+        (r"^efa_blocks\.(\d+)\.", r"blocks.\1.nonlocal_update."),
+    ]
+
+
+KEY_MAPS["allscaip"] = [
+    (r"^input_block\.", "embed.input_block."),
+    (r"^graph_blocks\.", "blocks."),
+]
+
+
 def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:
     out = {}
     for key, value in state.items():

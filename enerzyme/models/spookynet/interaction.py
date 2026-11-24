@@ -10,7 +10,7 @@ from ..mp.nn.activation import ACTIVATION_KEY_TYPE
 from ..layers.electron_embedding import ResidualMLP
 from ..mp.nn.mlp import ResidualStack as _ResidualStack
 from ..mp.nn.attention import Attention
-from ..efa import EFABlock
+from ..mp.nonlocal_ import EFABlock
 
 
 def ResidualStack(

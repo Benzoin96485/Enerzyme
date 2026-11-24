@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, Hashable, NamedTuple, Optional, Set, Tup
 import torch
 from torch import Tensor
 
-EDGE_SETS = ("sr", "lr")
+EDGE_SETS = ("sr", "lr", "internal")
 EDGE_CONVENTIONS = ("receiver_i", "swap")
 
 # A true reverse edge has displacement -v, so the residual is identically zero;
@@ -31,7 +31,8 @@ _OPPOSITE_TOL = 1e-4
 class GraphRequires:
     """Inputs a Core reads and derived graph quantities its blocks use.
 
-    ``edge_set`` picks the neighbor list: ``"sr"`` reads ``idx_i_sr`` /
+    ``edge_set="internal"`` lets an embedding construct its own graph from node fields.
+    Otherwise ``edge_set`` picks the neighbor list: ``"sr"`` reads ``idx_i_sr`` /
     ``idx_j_sr`` / ``vij_sr`` / ``Dij_sr``; ``"lr"`` reads the full list the
     Core's own :class:`DistanceLayer` produces (``idx_i`` / ``idx_j`` /
     ``vij_lr`` / ``Dij_lr``). ``fields`` names extra raw inputs (``Za``,
@@ -57,6 +58,8 @@ class GraphRequires:
 
     @property
     def edge_fields(self) -> Dict[str, str]:
+        if self.edge_set == "internal":
+            return {}
         if self.edge_set == "sr":
             names = dict(receiver="idx_i_sr", sender="idx_j_sr", vec="vij_sr", dist="Dij_sr",
                          cutoff_values="cutoff_values_sr")
@@ -66,6 +69,8 @@ class GraphRequires:
         return names
 
     def input_fields(self) -> Set[str]:
+        if self.edge_set == "internal":
+            return set(self.fields) | set(self.optional_fields)
         names = self.edge_fields
         out = {names["receiver"], names["sender"]}
         if self.vectors:
@@ -289,8 +294,8 @@ def reverse_edge_index(receiver: Tensor, sender: Tensor, vec: Tensor, num_nodes:
 class GraphContext:
     """Edges and cached derived quantities for one forward pass."""
 
-    receiver: Tensor
-    sender: Tensor
+    receiver: Optional[Tensor]
+    sender: Optional[Tensor]
     num_nodes: int
     vec: Optional[Tensor] = None
     dist: Optional[Tensor] = None
@@ -303,6 +308,8 @@ class GraphContext:
     @classmethod
     def from_inputs(cls, inputs: Dict[str, Any], requires: GraphRequires, num_nodes: int,
                     dtype: Optional[torch.dtype] = None) -> "GraphContext":
+        if requires.edge_set == "internal":
+            return cls(None, None, num_nodes, inputs=inputs, batch=inputs.get("batch_seg"))
         names = requires.edge_fields
         receiver = inputs[names["receiver"]].long()
         sender = inputs[names["sender"]].long()
@@ -331,7 +338,7 @@ class GraphContext:
 
     @property
     def num_edges(self) -> int:
-        return int(self.receiver.numel())
+        return 0 if self.receiver is None else int(self.receiver.numel())
 
     def cached(self, key: Hashable, fn: Callable[[], Any]) -> Any:
         if key not in self.cache:

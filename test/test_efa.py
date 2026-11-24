@@ -169,11 +169,11 @@ def test_build_efa_blocks_rejects_out_of_range_iterations():
 
 
 def test_so3krates_rejects_out_of_range_era_iterations():
-    from enerzyme.models.so3krates import So3kratesCore
+    from enerzyme.models.presets.hybrid import so3krates
     import pytest
 
     with pytest.raises(ValueError, match="era_use_in_iterations"):
-        So3kratesCore(
+        so3krates(
             dim_embedding=12,
             num_rbf=8,
             degrees=[1, 2, 3],
@@ -191,11 +191,11 @@ def test_so3krates_rejects_out_of_range_era_iterations():
 
 
 def test_so3krates_with_efa_get_output():
-    from enerzyme.models.so3krates import So3kratesCore
+    from enerzyme.models.presets.hybrid import so3krates
 
     torch.manual_seed(0)
     N, F = 5, 12
-    core = So3kratesCore(
+    core = so3krates(
         dim_embedding=F,
         num_rbf=8,
         degrees=[1, 2, 3],

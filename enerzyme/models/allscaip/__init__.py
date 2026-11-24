@@ -1,4 +1,4 @@
-from .core import AllScAIPCore, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 from .equivariant_input import EquivariantInputBlock, scalarize_irreps
 from .graph_preprocess import (
     AllScAIPGraphHParams,
@@ -14,7 +14,6 @@ from .types import GraphAttentionData
 __all__ = [
     "EquivariantInputBlock",
     "scalarize_irreps",
-    "AllScAIPCore",
     "AllScAIPGraphHParams",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",

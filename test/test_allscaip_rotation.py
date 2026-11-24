@@ -22,7 +22,8 @@ from numpy.testing import assert_allclose
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from enerzyme.models.allscaip.core import AllScAIPCore
+from enerzyme.models.mp.core import ComposableCore
+from enerzyme.models.presets.hybrid import allscaip
 
 
 def _random_so3(device: torch.device, dtype: torch.dtype) -> torch.Tensor:
@@ -34,7 +35,7 @@ def _random_so3(device: torch.device, dtype: torch.dtype) -> torch.Tensor:
     return q
 
 
-def _make_invariant_limit_core(**kwargs) -> AllScAIPCore:
+def _make_invariant_limit_core(**kwargs) -> ComposableCore:
     """Small core with rotation-invariant angular features (l=0 only, no freq mask)."""
     defaults = dict(
         dim_embedding=64,
@@ -51,7 +52,7 @@ def _make_invariant_limit_core(**kwargs) -> AllScAIPCore:
         attn_num_freq=16,
     )
     defaults.update(kwargs)
-    return AllScAIPCore(**defaults)
+    return allscaip(**defaults)
 
 
 def _make_higher_l_core(
@@ -60,7 +61,7 @@ def _make_higher_l_core(
     node_direction_expansion_size: int = 3,
     use_freq_mask: bool = True,
     **kwargs: object,
-) -> AllScAIPCore:
+) -> ComposableCore:
     """Core with l>0 spherical-harmonic edge/node channels (lmax = size - 1)."""
     defaults = dict(
         dim_embedding=64,
@@ -77,7 +78,7 @@ def _make_higher_l_core(
         attn_num_freq=16,
     )
     defaults.update(kwargs)
-    return AllScAIPCore(**defaults)
+    return allscaip(**defaults)
 
 
 def _print_rotation_invariance_deviation(
@@ -286,7 +287,7 @@ def test_allscaip_equivariant_mode_l_gt_0_rotation_invariant():
     N = 20
     hidden = 64
 
-    core = AllScAIPCore(
+    core = allscaip(
         dim_embedding=hidden,
         num_layers=2,
         atten_num_heads=4,
@@ -304,7 +305,7 @@ def test_allscaip_equivariant_mode_l_gt_0_rotation_invariant():
         attn_num_freq=16,
     ).to(device=device, dtype=dtype)
     core.eval()
-    assert core._use_freq_mask_resolved is False
+    assert core.embed.graph_params.use_freq_mask is False
 
     Ra = torch.randn(N, 3, device=device, dtype=dtype) * 2.0
     Za = torch.randint(1, 10, (N,), device=device)
