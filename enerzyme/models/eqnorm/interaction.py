@@ -26,7 +26,8 @@ import torch
 import torch.nn.functional as F
 from ..mp.message.irreps import weighted_messages
 from e3nn import o3
-from e3nn.nn import FullyConnectedNet, Gate
+from ..mp.nn.radial_mlp import e3nn_radial_mlp
+from e3nn.nn import Gate
 from torch import Tensor, nn
 
 from ..mp.ops import scatter_sum
@@ -136,7 +137,7 @@ class EqnormConv(nn.Module):
             internal_weights=False,
         )
         hidden = [int(invariant_neurons)] * int(invariant_layers)
-        self.fc = FullyConnectedNet(
+        self.fc = e3nn_radial_mlp(
             [int(num_rbf), *hidden, self.tp.weight_numel],
             F.silu,
         )

@@ -16,7 +16,7 @@ from ..mp.basis.envelope import cosine_transition
 from ..mp.block import Block, BlockState
 from ..mp.core import FieldEmbed
 from ..mp.ops import scatter_sum
-from ..layers.gated_equivariant import cartesian_dense
+from ..mp.nn.gate import cartesian_dense
 
 
 class PaiNNInteraction(Module):

@@ -27,7 +27,7 @@ from torch.nn import LayerNorm, Linear, Module
 
 from ..mp.nn.field_norm import VECNORM_TYPES, VecLayerNorm, normalize_vecnorm_type  # noqa: F401
 from ..mp.ops import scatter_sum
-from ..layers.rejection import vector_rejection
+from ..mp.ops.rejection import vector_rejection
 
 
 VERTEX_TYPES = ("none", "edge", "node")

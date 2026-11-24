@@ -13,6 +13,8 @@ path (``Irreps.num_irreps``). With ``mul(Y) = 1`` that is exactly the e3nn
 
 from __future__ import annotations
 
+from ..mp.nn.radial_mlp import NequixRadialMLP
+
 import math
 from typing import List, Optional, Sequence, Tuple
 
@@ -143,49 +145,6 @@ class NequixGate(nn.Module):
         if len(parts) == 1:
             return parts[0]
         return torch.cat(parts, dim=-1)
-
-
-class _BiasFreeLinear(nn.Module):
-    """``y = x W`` with ``W_ij ~ N(0, init_scale / fan_in)``."""
-
-    def __init__(self, in_size: int, out_size: int, init_scale: float) -> None:
-        super().__init__()
-        if in_size < 1 or out_size < 1:
-            raise ValueError(f"linear size must be positive, got {in_size} -> {out_size}")
-        scale = math.sqrt(float(init_scale) / float(in_size))
-        self.weights = nn.Parameter(torch.randn(in_size, out_size) * scale)
-
-    def forward(self, features: Tensor) -> Tensor:
-        return features @ self.weights
-
-
-class NequixRadialMLP(nn.Module):
-    """Bias-free SiLU MLP. Hidden layers use ``init_scale``; the last does not."""
-
-    def __init__(self, sizes: Sequence[int], init_scale: float = 4.0) -> None:
-        super().__init__()
-        widths = [int(size) for size in sizes]
-        if len(widths) < 2:
-            raise ValueError(f"radial MLP needs at least two widths, got {widths}")
-        self.layers = nn.ModuleList(
-            [
-                _BiasFreeLinear(
-                    widths[i],
-                    widths[i + 1],
-                    init_scale if i < len(widths) - 2 else 1.0,
-                )
-                for i in range(len(widths) - 1)
-            ]
-        )
-
-    def forward(self, radial: Tensor) -> Tensor:
-        hidden = radial
-        last = len(self.layers) - 1
-        for index, layer in enumerate(self.layers):
-            hidden = layer(hidden)
-            if index < last:
-                hidden = F.silu(hidden)
-        return hidden
 
 
 def pre_gate_irreps(irreps_out: o3.Irreps) -> o3.Irreps:

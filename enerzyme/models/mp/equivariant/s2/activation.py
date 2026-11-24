@@ -6,45 +6,18 @@ import torch
 import torch.nn as nn
 
 
-class GateActivation(torch.nn.Module):
-    def __init__(self, lmax, mmax, num_channels):
-        super().__init__()
+from ..s2grid import SphericalGate, activate_grid
 
-        self.lmax = lmax
-        self.mmax = mmax
+
+class GateActivation(SphericalGate):
+    """EquiformerV2's gate takes the scalar gates first."""
+
+    def __init__(self, lmax, mmax, num_channels):
+        super().__init__(lmax, mmax)
         self.num_channels = num_channels
 
-        num_components = 0
-        for l in range(1, self.lmax + 1):
-            num_m_components = min((2 * l + 1), (2 * self.mmax + 1))
-            num_components = num_components + num_m_components
-        expand_index = torch.zeros([num_components]).long()
-        start_idx = 0
-        for l in range(1, self.lmax + 1):
-            length = min((2 * l + 1), (2 * self.mmax + 1))
-            expand_index[start_idx : (start_idx + length)] = l - 1
-            start_idx = start_idx + length
-        self.register_buffer("expand_index", expand_index)
-
-        self.scalar_act = torch.nn.SiLU()
-        self.gate_act = torch.nn.Sigmoid()
-
     def forward(self, gating_scalars, input_tensors):
-        gating_scalars = self.gate_act(gating_scalars)
-        gating_scalars = gating_scalars.reshape(
-            gating_scalars.shape[0], self.lmax, self.num_channels
-        )
-        gating_scalars = torch.index_select(
-            gating_scalars, dim=1, index=self.expand_index
-        )
-
-        input_tensors_scalars = input_tensors.narrow(1, 0, 1)
-        input_tensors_scalars = self.scalar_act(input_tensors_scalars)
-
-        input_tensors_vectors = input_tensors.narrow(1, 1, input_tensors.shape[1] - 1)
-        input_tensors_vectors = input_tensors_vectors * gating_scalars
-
-        return torch.cat((input_tensors_scalars, input_tensors_vectors), dim=1)
+        return self.gate(input_tensors, gating_scalars)
 
 
 class S2Activation(torch.nn.Module):
@@ -58,7 +31,7 @@ class S2Activation(torch.nn.Module):
 
     def forward(self, inputs, SO3_grid):
         grid = SO3_grid[self.lmax][self.mmax]
-        return grid.from_grid(self.act(grid.to_grid(inputs)))
+        return activate_grid(inputs, grid, self.act)
 
 
 class SeparableS2Activation(torch.nn.Module):

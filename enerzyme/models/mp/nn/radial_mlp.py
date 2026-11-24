@@ -16,6 +16,17 @@ import torch.nn as nn
 from torch.nn import init
 
 
+def e3nn_radial_mlp(widths: Sequence[int], act=torch.nn.functional.silu) -> nn.Sequential:
+    """Native biasless, fan-in-scaled layers with e3nn's normalized activation.
+
+    Returning the native sequence keeps layer names and JIT compilation compatible
+    with checkpoints from MACE, EquFlash, and EQNorm.
+    """
+    from e3nn.nn import FullyConnectedNet
+
+    return FullyConnectedNet(list(widths), act)
+
+
 class RadialMLP(nn.Module):
     """Construct a radial function from a list of channel widths."""
 
@@ -25,9 +36,18 @@ class RadialMLP(nn.Module):
         use_layer_norm: bool = True,
         use_offset: bool = False,
         bias: bool = True,
+        *,
+        e3nn_style: bool = False,
+        activation=torch.nn.functional.silu,
     ) -> None:
         super().__init__()
         channels_list = list(channels_list)
+        if e3nn_style:
+            if use_offset:
+                raise ValueError("e3nn radial networks require a bias-free output")
+            self.net = e3nn_radial_mlp(channels_list, activation)
+            self.offset = None
+            return
         modules: List[nn.Module] = []
         input_channels = channels_list[0]
         for i in range(1, len(channels_list)):
@@ -152,3 +172,46 @@ class RadialFunctionExpand(RadialMLP):
                 outputs = outputs.view(outputs.shape[0], (self.lmax + 1), -1)
             outputs = torch.index_select(outputs, dim=1, index=self.expand_index)
         return outputs
+
+
+class _BiasFreeLinear(nn.Module):
+    """``y = x W`` with ``W_ij ~ N(0, init_scale / fan_in)``."""
+
+    def __init__(self, in_size: int, out_size: int, init_scale: float) -> None:
+        super().__init__()
+        if in_size < 1 or out_size < 1:
+            raise ValueError(f"linear size must be positive, got {in_size} -> {out_size}")
+        scale = math.sqrt(float(init_scale) / float(in_size))
+        self.weights = nn.Parameter(torch.randn(in_size, out_size) * scale)
+
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        return features @ self.weights
+
+
+class NequixRadialMLP(nn.Module):
+    """Bias-free SiLU MLP. Hidden layers use ``init_scale``; the last does not."""
+
+    def __init__(self, sizes: Sequence[int], init_scale: float = 4.0) -> None:
+        super().__init__()
+        widths = [int(size) for size in sizes]
+        if len(widths) < 2:
+            raise ValueError(f"radial MLP needs at least two widths, got {widths}")
+        self.layers = nn.ModuleList(
+            [
+                _BiasFreeLinear(
+                    widths[i],
+                    widths[i + 1],
+                    init_scale if i < len(widths) - 2 else 1.0,
+                )
+                for i in range(len(widths) - 1)
+            ]
+        )
+
+    def forward(self, radial: torch.Tensor) -> torch.Tensor:
+        hidden = radial
+        last = len(self.layers) - 1
+        for index, layer in enumerate(self.layers):
+            hidden = layer(hidden)
+            if index < last:
+                hidden = torch.nn.functional.silu(hidden)
+        return hidden
