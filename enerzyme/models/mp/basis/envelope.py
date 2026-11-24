@@ -38,15 +38,15 @@ def scale(cutoff_fn: Callable[[Tensor, Tensor, Tensor], Tensor]):
 def polynomial_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     """
     Polynomial cutoff function that goes from f(x) = 1 to f(x) = 0 in the interval
-    from x = 0 to x = 1 with sufficiently many smooth derivatives [1]. 
-    For x >= 1, f(x) = 0. 
-    For x <= 0, f(x) = 1. 
+    from x = 0 to x = 1 with sufficiently many smooth derivatives [1].
+    For x >= 1, f(x) = 0.
+    For x <= 0, f(x) = 1.
 
     Params:
     -----
 
     x: Only 0<=x<=1 should be used as input.
-    
+
     References:
     -----
     [1] Texturing & Modeling: A Procedural Approach; Morgan Kaufmann: 2003.
@@ -61,14 +61,14 @@ def polynomial_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
 def bump_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
     """
     Smooth cutoff function that goes from f(x) = 1 to f(x) = 0 in the interval
-    from x = 0 to x = cutoff [1]. 
-    For x >= cutoff, f(x) = 0. 
+    from x = 0 to x = cutoff [1].
+    For x >= cutoff, f(x) = 0.
 
     Params:
     -----
 
     x: Only 0<=x<=1 should be used as input.
-    
+
     References:
     -----
     [1] Nat. Commun., 2021, 12, 7273.

@@ -132,10 +132,10 @@ class ShiftedSoftplus(BaseScaledTemperedActivation):
         """
         super().__init__(dim_feature, initial_alpha, initial_beta, learnable)
         self.log2 = math.log(2.0)
-    
+
     def simple_activation_fn(self, x: Tensor) -> Tensor:
         return F.softplus(x) - self.log2
-    
+
     def activation_fn(self, x: Tensor) -> Tensor:
         return self.alpha * torch.where(
             self.beta != 0,
