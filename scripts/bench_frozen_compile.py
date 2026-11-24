@@ -60,7 +60,7 @@ def compare_step(actual, reference, dtype):
         ("force", [(fields["Fa"], ref_fields["Fa"])]),
         ("gradient", [(gradients[k], ref_gradients[k]) for k in gradients.keys() & ref_gradients.keys()]),
     ):
-        atol, rtol = (1e-8, 1e-7) if dtype == torch.float64 else (3e-4, 3e-4)
+        atol, rtol = (1e-10, 1e-8) if dtype == torch.float64 else (3e-4, 3e-4)
         if quantity == "gradient" and dtype == torch.float32:
             atol, rtol = 7e-4, 1e-3
         error = 0.0
@@ -109,6 +109,7 @@ def run(args):
 
     result = {
         "device": device.type,
+        "torch": str(torch.__version__),
         "precision": args.precision,
         "compile": True,
         "reps": args.reps,
