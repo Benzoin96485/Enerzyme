@@ -215,6 +215,24 @@ def _degree_scale(normalization: str, degree: int) -> float:
     raise ValueError(f"unsupported harmonic normalization {normalization!r}")
 
 
+def spherical_harmonic_degree(l: int, x: Tensor, normalize: bool, normalization: str = "integral") -> Tensor:
+    """One e3nn degree in Cartesian order, with no module construction during forward."""
+    from e3nn.o3._spherical_harmonics import _spherical_harmonics
+
+    if not 0 <= l <= 11:
+        raise ValueError(f"e3nn spherical harmonics require 0 <= l <= 11, got {l}")
+    if normalize:
+        x = torch.nn.functional.normalize(x, dim=-1)
+    sh = _spherical_harmonics(l, x[..., 0], x[..., 1], x[..., 2])[..., l * l : (l + 1) ** 2]
+    if normalization == "norm":
+        return sh / math.sqrt(2 * l + 1)
+    if normalization == "integral":
+        return sh / math.sqrt(4 * math.pi)
+    if normalization == "component":
+        return sh
+    raise ValueError(f"unknown e3nn normalization {normalization!r}")
+
+
 def spherical_harmonics(
     vecs: Tensor, degrees: Sequence[int] | int | None = None, *,
     lmax: Optional[int] = None, layout: SHLayout = "so3krates",

@@ -57,6 +57,7 @@ class Activation(torch.nn.Module):
         self.irreps_in = irreps_in
         self.irreps_out = o3.Irreps(irreps_out)
         self.acts = torch.nn.ModuleList(acts)
+        self.channel_widths = tuple(mul * ir.dim for mul, ir in irreps_in)
         assert len(self.irreps_in) == len(self.acts)
         
 
@@ -76,12 +77,10 @@ class Activation(torch.nn.Module):
         
         output = []
         index = 0
-        for (mul, ir), act in zip(self.irreps_in, self.acts):
-            if act is not None:
-                output.append(act(features.narrow(dim, index, mul)))
-            else:
-                output.append(features.narrow(dim, index, mul * ir.dim))
-            index += mul * ir.dim
+        for width, act in zip(self.channel_widths, self.acts):
+            part = features.narrow(dim, index, width)
+            output.append(part if act is None else act(part))
+            index += width
 
         if len(output) > 1:
             return torch.cat(output, dim=dim)
@@ -117,6 +116,9 @@ class Gate(torch.nn.Module):
         self.irreps_gated = irreps_gated
         self._irreps_in = (irreps_scalars + irreps_gates + irreps_gated).simplify()
         
+        self.scalar_width = irreps_scalars.dim
+        self.gate_width = irreps_gates.dim
+        self.input_width = self._irreps_in.dim
         self.act_scalars = Activation(irreps_scalars, act_scalars)
         irreps_scalars = self.act_scalars.irreps_out
 
@@ -134,9 +136,9 @@ class Gate(torch.nn.Module):
 
 
     def forward(self, features):
-        scalars_dim = self.irreps_scalars.dim
-        gates_dim = self.irreps_gates.dim
-        input_dim = self.irreps_in.dim
+        scalars_dim = self.scalar_width
+        gates_dim = self.gate_width
+        input_dim = self.input_width
         scalars = features.narrow(-1, 0, scalars_dim)
         gates = features.narrow(-1, scalars_dim, gates_dim)
         gated = features.narrow(-1, (scalars_dim + gates_dim), 

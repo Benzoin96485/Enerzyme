@@ -36,3 +36,20 @@ def test_polynomial_layout_accepts_batched_vectors_and_omits_unrequested_degrees
     torch.testing.assert_close(full[..., 1:4], v)
     partial = spherical_harmonics(v, [3, 1], layout="polynomial", normalize_input=False)
     torch.testing.assert_close(partial, torch.cat((full[..., 9:16], v), dim=-1))
+
+
+@pytest.mark.parametrize("normalization", ["integral", "component", "norm"])
+@pytest.mark.parametrize("normalize", [False, True])
+def test_single_degree_matches_e3nn_and_cartesian_gradient(normalization, normalize):
+    from enerzyme.models.mp.basis.angular import spherical_harmonic_degree
+
+    vectors = torch.randn(2, 3, 3, generator=torch.Generator().manual_seed(11), dtype=torch.float64,
+                          requires_grad=True)
+    for degree in (1, 2, 4, 6):
+        expected = o3.spherical_harmonics(degree, vectors, normalize=normalize, normalization=normalization)
+        actual = spherical_harmonic_degree(degree, vectors, normalize=normalize, normalization=normalization)
+        torch.testing.assert_close(actual, expected, rtol=1e-12, atol=1e-12)
+        probe = torch.arange(actual.numel(), dtype=vectors.dtype).reshape_as(actual)
+        got, = torch.autograd.grad((actual * probe).sum(), vectors)
+        ref, = torch.autograd.grad((expected * probe).sum(), vectors)
+        torch.testing.assert_close(got, ref, rtol=1e-12, atol=1e-12)

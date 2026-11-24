@@ -9,6 +9,7 @@ import torch
 from e3nn import o3
 from torch import Tensor, nn
 
+from ..mp.basis.angular import spherical_harmonic_degree
 from ..mp.nn.radial_mlp import RadialProfile
 
 
@@ -30,6 +31,7 @@ class EdgeDegreeEmbeddingHigherOrder(nn.Module):
     ) -> None:
         super().__init__()
         self.irreps_node_embedding = o3.Irreps(irreps_node_embedding)
+        self.degrees = tuple(ir.l for _, ir in self.irreps_node_embedding)
         if self.irreps_node_embedding[0][1].l != 0:
             raise ValueError("node embedding must include a 0e irrep first")
         self.number_of_basis = number_of_basis
@@ -84,9 +86,9 @@ class EdgeDegreeEmbeddingHigherOrder(nn.Module):
             edge_dis_embed = edge_scalars
 
         node_features = []
-        for idx, (_mul, ir) in enumerate(self.irreps_node_embedding):
-            lx = o3.spherical_harmonics(
-                l=ir.l,
+        for idx, degree in enumerate(self.degrees):
+            lx = spherical_harmonic_degree(
+                l=degree,
                 x=edge_vec,
                 normalize=True,
                 normalization="norm",

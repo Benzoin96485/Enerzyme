@@ -23,6 +23,7 @@ from e3nn.util.jit import compile_mode
 from opt_einsum_fx import optimize_einsums_full
 from torch import fx
 
+from ..mp.basis.angular import spherical_harmonic_degree
 from ..mp.equivariant.cg import wigner_3j, wigner_6j
 from ..mp.equivariant.sph.linear import SO3Linear as SO3_Linear_e2former
 from .tensor_product import Simple_TensorProduct_oTchannel, _sum_tensors, slices_basis
@@ -763,23 +764,23 @@ def get_tp_e3nnsh_diff():
 
     print(
         Y_sq
-        / (e3nn.o3.spherical_harmonics(2, Y, normalize=False, normalization="integral"))
+        / (spherical_harmonic_degree(2, Y, normalize=False, normalization="integral"))
     )  # 1.29441716
     print(
         Y_tr
-        / (e3nn.o3.spherical_harmonics(3, Y, normalize=False, normalization="integral"))
+        / (spherical_harmonic_degree(3, Y, normalize=False, normalization="integral"))
     )  # 0.84739512
     print(
         Y_4
-        / (e3nn.o3.spherical_harmonics(4, Y, normalize=False, normalization="integral"))
+        / (spherical_harmonic_degree(4, Y, normalize=False, normalization="integral"))
     )  # 0.56493002
     print(
         Y_5
-        / (e3nn.o3.spherical_harmonics(5, Y, normalize=False, normalization="integral"))
+        / (spherical_harmonic_degree(5, Y, normalize=False, normalization="integral"))
     )  # 0.38087577
     print(
         Y_6
-        / (e3nn.o3.spherical_harmonics(6, Y, normalize=False, normalization="integral"))
+        / (spherical_harmonic_degree(6, Y, normalize=False, normalization="integral"))
     )  # 0.25875416
 
 
@@ -937,7 +938,7 @@ class E2TensorProductArbitraryOrder_woequal(torch.nn.Module):
                 else:
                     Y_powers.append(
                         self.coeffs[i]
-                        * e3nn.o3.spherical_harmonics(
+                        * spherical_harmonic_degree(
                             i, pos, normalize=False, normalization="integral"
                         ).unsqueeze(-1)
                     )
@@ -953,7 +954,7 @@ class E2TensorProductArbitraryOrder_woequal(torch.nn.Module):
                 else:
                     exp_Y_powers.append(
                         self.coeffs[i]
-                        * e3nn.o3.spherical_harmonics(
+                        * spherical_harmonic_degree(
                             i, exp_pos, normalize=False, normalization="integral"
                         ).unsqueeze(-1)
                     )
@@ -1003,7 +1004,7 @@ class E2TensorProductArbitraryOrder_woequal(torch.nn.Module):
 
         delta_pos = pos.unsqueeze(dim=1) - exp_pos.unsqueeze(dim=0)
         delta_pos_order_l = (
-            e3nn.o3.spherical_harmonics(
+            spherical_harmonic_degree(
                 self.order, delta_pos, normalize=False, normalization="integral"
             )
             * self.coeffs[self.order]
@@ -1149,7 +1150,7 @@ class E2TensorProduct_FirstOrder(torch.nn.Module):
                 else:
                     Y_powers.append(
                         self.coeffs[i]
-                        * e3nn.o3.spherical_harmonics(
+                        * spherical_harmonic_degree(
                             i, pos, normalize=False, normalization="integral"
                         ).unsqueeze(-1)
                     )
@@ -1165,7 +1166,7 @@ class E2TensorProduct_FirstOrder(torch.nn.Module):
                 else:
                     exp_Y_powers.append(
                         self.coeffs[i]
-                        * e3nn.o3.spherical_harmonics(
+                        * spherical_harmonic_degree(
                             i, exp_pos, normalize=False, normalization="integral"
                         ).unsqueeze(-1)
                     )
@@ -1229,7 +1230,7 @@ class E2TensorProduct_FirstOrder(torch.nn.Module):
 
         delta_pos = pos.unsqueeze(dim=1) - exp_pos.unsqueeze(dim=0)
         delta_pos_order_l = (
-            e3nn.o3.spherical_harmonics(
+            spherical_harmonic_degree(
                 self.order, delta_pos, normalize=False, normalization="integral"
             )
             * self.coeffs[self.order]
@@ -1422,7 +1423,7 @@ class E2TensorProductArbitraryOrder(torch.nn.Module):
                 else:
                     Y_powers.append(
                         self.coeffs[i]
-                        * e3nn.o3.spherical_harmonics(
+                        * spherical_harmonic_degree(
                             i, pos, normalize=False, normalization="integral"
                         ).unsqueeze(-1)
                     )
@@ -1438,7 +1439,7 @@ class E2TensorProductArbitraryOrder(torch.nn.Module):
                 else:
                     exp_Y_powers.append(
                         self.coeffs[i]
-                        * e3nn.o3.spherical_harmonics(
+                        * spherical_harmonic_degree(
                             i, exp_pos, normalize=False, normalization="integral"
                         ).unsqueeze(-1)
                     )
@@ -1507,7 +1508,7 @@ class E2TensorProductArbitraryOrder(torch.nn.Module):
 
         delta_pos = pos.unsqueeze(dim=1) - exp_pos.unsqueeze(dim=0)
         delta_pos_order_l = (
-            e3nn.o3.spherical_harmonics(
+            spherical_harmonic_degree(
                 self.order, delta_pos, normalize=False, normalization="integral"
             )
             * self.coeffs[self.order]
