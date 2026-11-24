@@ -8,6 +8,7 @@ from torch.nn import Identity, SiLU
 
 from ..allscaip.equivariant_input import EquivariantInputBlock
 from ..allscaip.graph_blocks import GraphAttentionBlock, InputBlock
+from ..allscaip.radius_graph import prepare_biknn
 from ..allscaip.graph_preprocess import AllScAIPGraphHParams, _default_freequency_list, build_graph_attention_data
 from ..mp.basis.angular import RealSphericalHarmonics
 from ..mp.basis.envelope import CUTOFF_REGISTER, CUTOFF_KEY_TYPE
@@ -45,8 +46,8 @@ class SphericalAttentionEmbed(Embed):
             pos = inputs.get("Ra")
             if pos is None:
                 raise ValueError("Ra is required when era_use_in_iterations is set")
-            aux["positions"] = pos.to(scalar.dtype)
             aux["num_graphs"] = batch_size_from_counts(inputs.get("N"))
+            aux["positions"] = pos.to(scalar.dtype)
             aux["batch"] = ctx.batch if ctx.batch is not None else ctx.receiver.new_zeros(ctx.num_nodes)
         return BlockState(scalar=scalar, equi=sphere, aux=aux)
 
@@ -178,6 +179,11 @@ class NeighborEmbed(Embed):
         self.input_block = input_block
         self.graph_params = graph_params
 
+    topology_fields = ("Ra", "batch_seg", "cell")
+
+    def prepare_force_topology(self, Ra, batch_seg, cell):
+        return prepare_biknn(Ra, batch_seg, cell, self.graph_params)
+
     def forward(self, inputs, ctx):
         node = inputs["atom_embedding"]
         for field in ("charge_embedding", "spin_embedding"):
@@ -185,7 +191,7 @@ class NeighborEmbed(Embed):
                 node = node + inputs[field]
         graph = build_graph_attention_data(
             inputs["Ra"], inputs["Za"], ctx.batch, hparams=self.graph_params,
-            cell=inputs.get("cell"),
+            cell=inputs.get("cell"), prepared=inputs.get("_prepared_topology"),
         )
         return BlockState(edge=self.input_block(graph, node), aux={"graph": graph})
 

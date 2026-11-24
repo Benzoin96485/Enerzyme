@@ -5,7 +5,8 @@ Ported from fairchem `radius_graph_v2.py` (MIT), open-boundary and batched-molec
 from __future__ import annotations
 
 import warnings
-from typing import Sequence
+from itertools import accumulate
+from typing import NamedTuple, Sequence
 
 import torch
 
@@ -18,38 +19,31 @@ from .radius_utils import (
 )
 
 
-def build_radius_graph(
-    pos: torch.Tensor,
-    cell: torch.Tensor,
-    image_id: torch.Tensor,
-    cutoff: float,
-    start_index: int,
-    device: torch.device,
-    k: int = 30,
-    soft: bool = False,
-    sigmoid_scale: float = 0.2,
-    lse_scale: float = 0.1,
-    use_low_mem: bool = False,
-    delta: int = 20,
-    compute_dist_pairwise: bool = True,
-) -> tuple[
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor | None,
-]:
-    """One system: return edge list, ranks, displacements, envelope, optional pairwise distances."""
+class NeighborSlots(NamedTuple):
+    src: torch.Tensor
+    dst: torch.Tensor
+    image: torch.Tensor
+    src_rank: torch.Tensor
+    dst_rank: torch.Tensor
+
+
+class PreparedBiKNN(NamedTuple):
+    sizes: tuple[int, ...]
+    images: tuple[torch.Tensor, ...]
+    slots: tuple[NeighborSlots, ...]
+    pad_size: int
+
+
+def _radius_geometry(pos, cell, image_id, cutoff, k, soft, sigmoid_scale, lse_scale,
+                     use_low_mem, delta, compute_dist_pairwise):
     N = pos.size(0)
     M = image_id.size(0)
     src_pos = pos[:, None, :] + torch.mm(image_id, cell)[None, :, :]
     disp = src_pos[None, :, :, :] - pos[:, None, None, :]
     dist = safe_norm(disp, dim=-1)
-    dist_T = dist.transpose(0, 1).contiguous()
     dist_pairwise = dist.min(dim=2)[0] if compute_dist_pairwise else None
 
+    dist_T = dist.transpose(0, 1).contiguous()
     if soft:
         if use_low_mem:
             src_ranks = soft_rank_low_mem(dist.view(N, N * M), k, sigmoid_scale, delta).view(
@@ -74,6 +68,12 @@ def build_radius_graph(
         env = torch.amax(env, dim=0)
     env = env.masked_fill(dist == 0.0, 0.0)
 
+    return disp, env, dist_pairwise
+
+
+def _neighbor_slots(env):
+    N, _, M = env.shape
+    device = env.device
     index = torch.arange(N, device=device)[:, None]
     ranks = torch.arange(M * N, device=device, dtype=torch.long)[None, :]
     index1_rank = torch.full((N, N, M), -1, device=device, dtype=torch.long)
@@ -86,6 +86,38 @@ def build_radius_graph(
     index1, index2, index3 = torch.where(mask)
     index1_rank = index1_rank[index1, index2, index3]
     index2_rank = index2_rank[index1, index2, index3]
+    return NeighborSlots(index1, index2, index3, index1_rank, index2_rank)
+
+
+def build_radius_graph(
+    pos: torch.Tensor,
+    cell: torch.Tensor,
+    image_id: torch.Tensor,
+    cutoff: float,
+    start_index: int,
+    device: torch.device,
+    k: int = 30,
+    soft: bool = False,
+    sigmoid_scale: float = 0.2,
+    lse_scale: float = 0.1,
+    use_low_mem: bool = False,
+    delta: int = 20,
+    compute_dist_pairwise: bool = True,
+    slots: NeighborSlots | None = None,
+) -> tuple[
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor | None,
+]:
+    """One system: return edge list, ranks, displacements, envelope, optional pairwise distances."""
+    disp, env, dist_pairwise = _radius_geometry(
+        pos, cell, image_id, cutoff, k, soft, sigmoid_scale, lse_scale, use_low_mem, delta, compute_dist_pairwise,
+    )
+    index1, index2, index3, index1_rank, index2_rank = slots if slots is not None else _neighbor_slots(env)
     disp = disp[index1, index2, index3]
     env = env[index1, index2, index3]
     index1 = index1 + start_index
@@ -109,6 +141,7 @@ def batched_radius_graph(
     cutoff: float,
     device: torch.device,
     compute_dist_pairwise: bool = True,
+    prepared: PreparedBiKNN | None = None,
 ) -> tuple[
     torch.Tensor | None,
     torch.Tensor,
@@ -151,8 +184,9 @@ def batched_radius_graph(
             knn_lse_scale,
             knn_use_low_mem,
             compute_dist_pairwise=compute_dist_pairwise,
+            slots=None if prepared is None else prepared.slots[g],
         )
-        for pos, cell, image_id, start_idx in zip(pos_list, cell_list, image_id_list, starts)
+        for g, (pos, cell, image_id, start_idx) in enumerate(zip(pos_list, cell_list, image_id_list, starts))
     ]
     index1 = torch.cat([r[0] for r in results])
     index2 = torch.cat([r[1] for r in results])
@@ -168,7 +202,9 @@ def batched_radius_graph(
         dist_pairwise = None
 
     pad_size = knn_pad_size
-    if pad_size is None:
+    if prepared is not None:
+        pad_size = prepared.pad_size
+    elif pad_size is None:
         pad_size = int(max(index1_rank.max().item(), index2_rank.max().item())) + 1
     elif (index1_rank >= pad_size).any() or (index2_rank >= pad_size).any():
         warnings.warn(
@@ -224,56 +260,18 @@ def batched_radius_graph(
     )
 
 
-def biknn_radius_graph_from_batch(
-    Ra: torch.Tensor,
-    batch_seg: torch.Tensor,
-    cutoff: float,
-    knn_k: int,
-    knn_soft: bool = False,
-    knn_sigmoid_scale: float = 0.2,
-    knn_lse_scale: float = 0.1,
-    knn_use_low_mem: bool = False,
-    knn_pad_size: int | None = None,
-    max_atoms: int | None = None,
-    compute_dist_pairwise: bool = True,
-    cell: torch.Tensor | None = None,
-    pbc: bool = False,
-) -> tuple[
-    torch.Tensor | None,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor,
-]:
-    """
-    Build fairchem-layout padded neighbor tensors from Enerzyme ``Ra`` / ``batch_seg``.
-
-    When ``pbc`` is False (default), uses a single image (0,0,0) per system; ``cell`` is ignored.
-    When ``pbc`` is True, ``cell`` must be ``(num_graphs, 3, 3)`` and image lists are built
-    from cutoff and cell geometry (fairchem-style).
-    """
+def _batch_images(Ra, batch_seg, cutoff, cell, pbc):
     device = Ra.device
     dtype = Ra.dtype
     num_graphs = int(batch_seg.max().item()) + 1
-    natoms = torch.tensor(
-        [(batch_seg == g).sum().item() for g in range(num_graphs)],
-        dtype=torch.long,
-        device=device,
-    )
-    pos_list = list(torch.split(Ra, natoms.tolist(), dim=0))
-
+    natoms = torch.bincount(batch_seg.long(), minlength=num_graphs)
     if not pbc:
         identity = torch.zeros((1, 3), device=device, dtype=dtype)
         image_id_list = [identity] * num_graphs
-        eye = torch.eye(3, device=device, dtype=dtype)
-        cell_list = [eye] * num_graphs
     else:
         if cell is None:
             raise ValueError("pbc=True requires cell of shape (num_graphs, 3, 3)")
         image_id_list = []
-        cell_list = []
         for g in range(num_graphs):
             c = cell[g]
             cross_a2a3 = torch.cross(c[1], c[2], dim=-1)
@@ -292,10 +290,86 @@ def biknn_radius_graph_from_batch(
                 torch.arange(-rep_a3, rep_a3 + 1, device=device, dtype=dtype),
             )
             image_id_list.append(grid)
-            cell_list.append(c)
 
-    start_tensor = torch.cat([torch.zeros(1, dtype=torch.long, device=device), natoms.cumsum(0)[:-1]])
+    return tuple(natoms.tolist()), tuple(image_id_list)
 
+
+def _cells(Ra, cell, pbc, count):
+    if pbc:
+        return list(cell.unbind(0))
+    return [torch.eye(3, device=Ra.device, dtype=Ra.dtype)] * count
+
+
+def prepare_biknn(Ra, batch_seg, cell, hp):
+    """Select discrete images, neighbor ranks and padding for this minibatch."""
+    if hp.preprocess_on_cpu and Ra.device.type == "cuda":
+        Ra, batch_seg = Ra.cpu(), batch_seg.cpu()
+        if cell is not None:
+            cell = cell.cpu()
+    if Ra.dtype in (torch.float16, torch.bfloat16):
+        Ra = Ra.float()
+    sizes, images = _batch_images(Ra, batch_seg, hp.max_radius, cell, hp.pbc)
+    cells = _cells(Ra, cell, hp.pbc, len(sizes))
+    slots = []
+    for pos, lattice, offsets in zip(Ra.split(sizes), cells, images):
+        _, env, _ = _radius_geometry(
+            pos, lattice, offsets, hp.max_radius, hp.knn_k, hp.knn_soft,
+            hp.knn_sigmoid_scale, hp.knn_lse_scale, hp.knn_use_low_mem, 20, False,
+        )
+        slots.append(_neighbor_slots(env))
+    pad_size = hp.knn_pad_size
+    if pad_size is None:
+        pad_size = int(torch.cat([rank for s in slots for rank in (s.src_rank, s.dst_rank)]).max()) + 1
+    else:
+        trimmed = []
+        for table in slots:
+            keep = (table.src_rank < pad_size) & (table.dst_rank < pad_size)
+            if not keep.all():
+                warnings.warn("knn_pad_size smaller than neighbor rank; trimming excess neighbors.", stacklevel=2)
+            trimmed.append(NeighborSlots(*(value[keep] for value in table)))
+        slots = trimmed
+    return PreparedBiKNN(sizes, tuple(image.long() for image in images), tuple(slots), pad_size)
+
+
+def biknn_radius_graph_from_batch(
+    Ra: torch.Tensor,
+    batch_seg: torch.Tensor,
+    cutoff: float,
+    knn_k: int,
+    knn_soft: bool = False,
+    knn_sigmoid_scale: float = 0.2,
+    knn_lse_scale: float = 0.1,
+    knn_use_low_mem: bool = False,
+    knn_pad_size: int | None = None,
+    max_atoms: int | None = None,
+    compute_dist_pairwise: bool = True,
+    cell: torch.Tensor | None = None,
+    pbc: bool = False,
+    prepared: PreparedBiKNN | None = None,
+) -> tuple[
+    torch.Tensor | None,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+]:
+    """
+    Build fairchem-layout padded neighbor tensors from Enerzyme ``Ra`` / ``batch_seg``.
+
+    When ``pbc`` is False (default), uses a single image (0,0,0) per system; ``cell`` is ignored.
+    When ``pbc`` is True, ``cell`` must be ``(num_graphs, 3, 3)`` and image lists are built
+    from cutoff and cell geometry (fairchem-style).
+    """
+    if prepared is None:
+        sizes, image_id_list = _batch_images(Ra, batch_seg, cutoff, cell, pbc)
+    else:
+        sizes = prepared.sizes
+        image_id_list = tuple(image.to(Ra) for image in prepared.images)
+    pos_list = Ra.split(sizes)
+    cell_list = _cells(Ra, cell, pbc, len(sizes))
+    starts = tuple(accumulate(sizes, initial=0))[:-1]
     num_atoms_total = Ra.shape[0]
     return batched_radius_graph(
         pos_list,
@@ -303,7 +377,7 @@ def biknn_radius_graph_from_batch(
         image_id_list,
         num_atoms_total,
         max_atoms,
-        start_tensor,
+        starts,
         knn_k,
         knn_soft,
         knn_sigmoid_scale,
@@ -311,6 +385,7 @@ def biknn_radius_graph_from_batch(
         knn_use_low_mem,
         knn_pad_size,
         cutoff,
-        device,
+        Ra.device,
         compute_dist_pairwise=compute_dist_pairwise,
+        prepared=prepared,
     )

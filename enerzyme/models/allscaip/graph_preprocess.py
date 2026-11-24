@@ -16,7 +16,7 @@ from torch import Tensor
 
 from ..mp.ops import safe_normalize, scatter_sum
 from .radius_utils import envelope_fn
-from .radius_graph import biknn_radius_graph_from_batch
+from .radius_graph import PreparedBiKNN, biknn_radius_graph_from_batch
 from .smearing import GaussianSmearing, LinearSigmoidSmearing, SigmoidSmearing, SiLUSmearing
 from .types import GraphAttentionData
 
@@ -97,7 +97,7 @@ def get_node_direction_expansion_neighbor(
         z=direction_vec[:, :, 2],
     )
     sh_index = torch.arange(lmax + 1, device=edge_sh.device)
-    sh_index = torch.repeat_interleave(sh_index, 2 * sh_index + 1)
+    sh_index = torch.repeat_interleave(sh_index, 2 * sh_index + 1, output_size=(lmax + 1) ** 2)
     edge_sh = edge_sh / torch.clamp(torch.sqrt(2 * sh_index + 1), min=1e-6).unsqueeze(0).unsqueeze(0)
     masked_sh = edge_sh * neighbor_mask
     neighbor_count = neighbor_mask.sum(dim=1)
@@ -149,8 +149,12 @@ def get_node_attention_mask(
         dtype=dtype,
     )
     x = dist_pairwise.unsqueeze(-1) * omega.view(1, 1, -1)
-    sincx = torch.empty_like(x)
     small = x.abs() < 1e-4
+    if torch.compiler.is_compiling():
+        x2 = x.square()
+        denom = torch.where(small, 1.0, x)
+        return torch.where(small, 1 - x2 / 6 + x2.square() / 120, torch.sin(x) / denom), base_mask, valid_mask
+    sincx = torch.empty_like(x)
     x_small = x[small]
     x2 = x_small * x_small
     sincx[small] = 1 - x2 / 6 + (x2 * x2) / 120
@@ -276,6 +280,7 @@ def build_graph_attention_data(
     charge: Tensor | None = None,
     spin: Tensor | None = None,
     cell: Tensor | None = None,
+    prepared: PreparedBiKNN | None = None,
 ) -> GraphAttentionData:
     """
     Build ``GraphAttentionData`` from Enerzyme fields (positions, species, batch).
@@ -302,7 +307,7 @@ def build_graph_attention_data(
         Ra = Ra.float()
     Za = Za.to(device=work_device)
     batch_seg = batch_seg.to(device=work_device)
-    num_graphs = int(batch_seg.max().item()) + 1
+    num_graphs = len(prepared.sizes) if prepared is not None else int(batch_seg.max().item()) + 1
     num_nodes = Za.shape[0]
 
     head_dim = hp.hidden_size // hp.atten_num_heads
@@ -336,6 +341,7 @@ def build_graph_attention_data(
         compute_dist_pairwise=need_dist_pairwise,
         cell=cell,
         pbc=hp.pbc,
+        prepared=prepared,
     )
 
     edge_direction = safe_normalize(disp, dim=-1)

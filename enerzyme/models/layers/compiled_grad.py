@@ -78,6 +78,16 @@ def _prepare_radius_graph(core, inputs):
         fields = {k: inputs.get(distance._name_mapping[k]) for k in distance._input_fields}
         geometry = distance.get_output(**fields)
         edges = torch.where(geometry["Dij"] < ranges.cutoff_sr)[0]
+        embed = getattr(core, "embed", None)
+        if getattr(embed, "prepare_force_topology", None) is not None:
+            names = [core._name_mapping.get(k, k) for k in embed.topology_fields]
+            if isinstance(inputs, Data):
+                names = ["batch" if k == "batch_seg" else name for k, name in zip(embed.topology_fields, names)]
+            changed = any(layer._forward_hooks or layer._forward_pre_hooks or
+                          any(layer._name_mapping[k] in names for k in layer._output_fields)
+                          for layer in core.pre_sequence)
+            if not changed and not embed._forward_pre_hooks:
+                return edges, embed.prepare_force_topology(*(inputs.get(name) for name in names))
         return edges, _topology_indices(core, ranges, fields, geometry, edges)
 
 

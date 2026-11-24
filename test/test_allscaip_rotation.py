@@ -346,3 +346,35 @@ def test_allscaip_double_precision_periodic_graph_uses_cell():
     second = core.get_output(**dict(inputs, Ra=moved))["atom_feature"]
     torch.testing.assert_close(first, second)
     assert torch.isfinite(torch.autograd.grad(first.square().sum(), positions)[0]).all()
+
+
+def test_prepared_biknn_preserves_periodic_cell_and_coordinate_derivatives():
+    from enerzyme.models.allscaip.graph_preprocess import AllScAIPGraphHParams
+    from enerzyme.models.allscaip.radius_graph import biknn_radius_graph_from_batch, prepare_biknn
+
+    pos = torch.tensor([[.2, .1, .0], [2.8, .3, .1], [.4, .6, .2], [2.6, .3, .2]],
+                       dtype=torch.float64, requires_grad=True)
+    cells = (3 * torch.eye(3, dtype=torch.float64)).repeat(2, 1, 1).requires_grad_()
+    batch = torch.tensor([0, 0, 1, 1])
+    for soft, padding in ((False, None), (True, 2)):
+        hp = AllScAIPGraphHParams(max_radius=1.8, knn_k=3, knn_pad_size=padding, knn_soft=soft, pbc=True)
+        with torch.no_grad():
+            topology = prepare_biknn(pos, batch, cells, hp)
+        for first, second in zip(topology.images, topology.slots):
+            assert first.dtype == torch.int64
+            assert all(table.dtype == torch.int64 for table in second)
+
+        def evaluate(prepared):
+            fields = biknn_radius_graph_from_batch(
+                pos, batch, hp.max_radius, hp.knn_k, knn_soft=soft, knn_pad_size=padding,
+                cell=cells, pbc=True, prepared=prepared,
+            )
+            distances, vectors, src_env, dst_env = fields[:4]
+            loss = distances.square().sum() + vectors.square().sum()
+            loss = loss + src_env[src_env.isfinite()].square().sum() + dst_env[dst_env.isfinite()].square().sum()
+            dpos, dcell = torch.autograd.grad(loss, (pos, cells), create_graph=True)
+            second = torch.autograd.grad(dpos.square().sum() + dcell.square().sum(), (pos, cells))
+            return *fields, dpos, dcell, *second
+
+        for result, reference in zip(evaluate(topology), evaluate(None)):
+            torch.testing.assert_close(result, reference)
