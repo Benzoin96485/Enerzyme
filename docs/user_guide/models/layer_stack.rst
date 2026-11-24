@@ -205,6 +205,11 @@ EquFlashV2
 
 With :code:`architecture: equflashv2`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, prefactor ``2/cutoff``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: xplor` and :code:`cuton` supplies the same radial window as EquFlash. The Core returns flat :code:`atom_feature`. Energy uses :code:`SimpleReadout` (two bias-free linears when ``activate_hidden: false`` and ``use_bias: false``) → :code:`AtomicAffine` (``order: scale_then_shift``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/equflashv2_layers_example.yaml`.
 
+For bilinear gates spanning multiple non-scalar degrees, set ``copy_major: true``
+in both Core mappings ``nonlinear_kwargs`` and ``ff_nonlinear_kwargs``.
+Each factor then follows its declared e3nn irrep order under rotation and
+reflection. Existing configurations retain their original gate layout.
+
 Nequix
 ------
 

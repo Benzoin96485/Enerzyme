@@ -246,7 +246,7 @@ class BiLinearGate(nn.Module):
     ones, so the product contains both a gated linear term and a bilinear term.
     """
 
-    def __init__(self, irreps) -> None:
+    def __init__(self, irreps, *, copy_major=False) -> None:
         super().__init__()
         irreps = o3.Irreps(irreps).simplify()
         for _, ir in irreps:
@@ -254,6 +254,7 @@ class BiLinearGate(nn.Module):
                 raise NotImplementedError("BiLinearGate does not support 0o features")
         if len(irreps) == 0 or irreps[0].ir != o3.Irrep("0e"):
             raise ValueError(f"BiLinearGate expects a leading 0e block, got {irreps}")
+        self.copy_major = bool(copy_major)
         self.scalar = o3.Irreps([irreps[0]])
         self.higher = o3.Irreps(list(irreps)[1:]).simplify()
         self.dim_act = self.scalar.dim
@@ -292,19 +293,24 @@ class BiLinearGate(nn.Module):
             return act
         weights = F.silu(features[:, :gate_dim])
         rest = features[:, gate_dim + self.dim_act :]
-        first_parts = []
-        second_parts = []
-        offset = 0
-        batch = features.shape[0]
-        for mul, dim in self._higher_layout:
-            width = 2 * mul * dim
-            block = rest[:, offset : offset + width].reshape(batch, 2 * mul, dim)
-            first_parts.append(block[:, :mul].reshape(batch, mul * dim))
-            second_parts.append(block[:, mul:].reshape(batch, mul * dim))
-            offset += width
-        left = torch.cat(first_parts, dim=-1)
-        ones = features.new_ones(batch, self.dim_act)
-        right = torch.cat([ones, torch.cat(second_parts, dim=-1)], dim=-1)
+        if self.copy_major:
+            # irreps_in contains higher + higher in this order.
+            left, right = rest.split(self.higher.dim, dim=-1)
+        else:
+            first_parts = []
+            second_parts = []
+            offset = 0
+            batch = features.shape[0]
+            for mul, dim in self._higher_layout:
+                width = 2 * mul * dim
+                block = rest[:, offset : offset + width].reshape(batch, 2 * mul, dim)
+                first_parts.append(block[:, :mul].reshape(batch, mul * dim))
+                second_parts.append(block[:, mul:].reshape(batch, mul * dim))
+                offset += width
+            left = torch.cat(first_parts, dim=-1)
+            right = torch.cat(second_parts, dim=-1)
+        ones = features.new_ones(features.shape[0], self.dim_act)
+        right = torch.cat((ones, right), dim=-1)
         mixed = self.tp(left, right, weights)
         return torch.cat([act, mixed], dim=-1)
 
@@ -363,7 +369,7 @@ def make_nonlinear(kind: str, irreps, scale: float = 1.0, kwargs: Optional[dict]
     if kind == "gate":
         return ScalarGate(target)
     if kind == "bilinear_gate":
-        return BiLinearGate(target)
+        return BiLinearGate(target, copy_major=kwargs.get("copy_major", False))
     if kind == "symmetric_contraction":
         return SymmetricContraction(
             target, contraction_degree=int(kwargs.get("contraction_degree", 3))

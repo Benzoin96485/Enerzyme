@@ -235,6 +235,7 @@ class PolarFieldLayer(BaseFFLayer):
         energy_offset: float = 0.02,
         feature_offset: float = 0.1,
         field_feature_norms: Optional[List[float]] = None,
+        electrostatics_backend: str = "displaced",
     ) -> None:
         super().__init__(
             output_fields={
@@ -246,6 +247,9 @@ class PolarFieldLayer(BaseFFLayer):
                 "spin_multipole",
             }
         )
+        if electrostatics_backend not in ("displaced", "analytic"):
+            raise ValueError(f"unknown electrostatics_backend {electrostatics_backend!r}")
+        self.electrostatics_backend = electrostatics_backend
         self.max_Za = int(max_Za)
         self.node_irreps, self.num_output_blocks = feature_spec(
             built_layers, feature_irreps, num_output_blocks
@@ -318,6 +322,11 @@ class PolarFieldLayer(BaseFFLayer):
                     f"field_feature_norms has length {norms.numel()}, "
                     f"expected {self.potential_irreps.dim}."
                 )
+        if electrostatics_backend == "analytic":
+            for sl, (mul, ir) in zip(self.potential_irreps.slices(), self.potential_irreps):
+                scales = norms[sl].reshape(mul, ir.dim)
+                if not torch.equal(scales, scales[:, :1].expand_as(scales)):
+                    raise ValueError("an equivariant field scale must be constant within each irrep")
         self.register_buffer("field_feature_norms", norms)
 
     def _graph_total(
@@ -368,8 +377,9 @@ class PolarFieldLayer(BaseFFLayer):
         return updated
 
     def _spin_potential(self, density: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
-        up = self.potential(density[:, 0, :], positions, batch)
-        down = self.potential(density[:, 1, :], positions, batch)
+        project = self.potential.analytic_features if self.electrostatics_backend == "analytic" else self.potential
+        up = project(density[:, 0, :], positions, batch)
+        down = project(density[:, 1, :], positions, batch)
         return torch.cat((up, down), dim=-1) / self.field_feature_norms.to(dtype=up.dtype)
 
     def _dipole(self, total_density: Tensor, positions: Tensor, batch: Tensor, n_graphs: int) -> Tensor:
@@ -377,7 +387,9 @@ class PolarFieldLayer(BaseFFLayer):
         dipole = scatter_sum(moment, batch, n_graphs)
         if total_density.shape[-1] > 1:
             angular = scatter_sum(total_density[:, 1:4], batch, n_graphs)
-            dipole = dipole + angular[:, [2, 0, 1]]
+            if self.electrostatics_backend == "displaced":
+                angular = angular[:, [2, 0, 1]]
+            dipole = dipole + angular
         return dipole
 
     def get_output(
@@ -447,7 +459,8 @@ class PolarFieldLayer(BaseFFLayer):
         else:
             nonlocal_energy = Ra.new_zeros(n_atoms)
         total_density = density.sum(dim=1)
-        coulomb = self.coulomb.atomic_energy(total_density, Ra, batch_seg)
+        energy = self.coulomb.analytic_energy if self.electrostatics_backend == "analytic" else self.coulomb.atomic_energy
+        coulomb = energy(total_density, Ra, batch_seg)
         return {
             "E_nonlocal_a": nonlocal_energy,
             "E_coulomb_a": coulomb,

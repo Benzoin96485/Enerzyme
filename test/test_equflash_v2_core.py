@@ -372,3 +372,18 @@ def test_nequip_interaction_honors_after_nonlinear():
     identity = NequIPInteractionBlock(**common, after_nonlinear="identity")
     assert isinstance(linear.project, o3.Linear)
     assert isinstance(identity.project, nn.Identity)
+
+
+def test_copy_major_bilinear_gate_preserves_wigner_action_across_degrees():
+    from e3nn import o3
+    from enerzyme.models.equflash.interaction_v2 import BiLinearGate
+
+    torch.manual_seed(73)
+    gate = BiLinearGate("3x0e+3x1o+3x2e", copy_major=True).double()
+    x = torch.randn(4, gate.irreps_in.dim, dtype=torch.float64)
+    axis = x.new_tensor([0.29, -0.69, 0.17])
+    R = torch.linalg.matrix_exp(torch.linalg.cross(axis.expand(3, -1), torch.eye(3, dtype=x.dtype)))
+    for transform in (R, -R):
+        rotated = x @ gate.irreps_in.D_from_matrix(transform).T
+        expected = gate(x) @ gate.irreps_out.D_from_matrix(transform).T
+        torch.testing.assert_close(gate(rotated), expected, atol=3e-6, rtol=3e-6)
