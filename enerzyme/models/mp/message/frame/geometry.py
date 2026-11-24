@@ -53,32 +53,36 @@ def neighbor_mean(pos: Tensor, idx_i: Tensor, idx_j: Tensor) -> tuple[Tensor, Te
     return mean, count
 
 
+def _require(condition: Tensor, message: str) -> None:
+    if torch.compiler.is_compiling():
+        torch._assert_async(condition, message)
+    elif not bool(condition):
+        raise ValueError(message)
+
+
 def require_same_graph(batch: Tensor | None, idx_i: Tensor, idx_j: Tensor) -> None:
     """Reject an edge that joins atoms from two molecules."""
-    if batch is None or idx_i.numel() == 0:
+    if batch is None or (not torch.compiler.is_compiling() and idx_i.numel() == 0):
         return
     if batch.ndim != 1:
         raise ValueError("batch_seg must be a 1D graph id per atom")
-    highest = int(max(int(idx_i.max()), int(idx_j.max())))
-    if int(batch.shape[0]) <= highest:
-        raise ValueError(
-            "batch_seg must list one graph id per atom and cover every neighbor index"
-        )
-    if torch.any(batch[idx_i] != batch[idx_j]):
-        raise ValueError("neighbor edges must stay inside one molecule")
+    _require(
+        ((idx_i < batch.shape[0]) & (idx_j < batch.shape[0])).all(),
+        "batch_seg must list one graph id per atom and cover every neighbor index",
+    )
+    _require((batch[idx_i] == batch[idx_j]).all(), "neighbor edges must stay inside one molecule")
 
 
 def require_matching_distance(vij: Tensor, dij: Tensor, tol: float = 1e-4) -> None:
     """``Dij`` is the Euclidean length of ``vij``, including a periodic image."""
-    if vij.numel() == 0:
+    if not torch.compiler.is_compiling() and vij.numel() == 0:
         return
     actual = torch.linalg.vector_norm(vij, dim=-1)
     given = dij.reshape(-1).to(dtype=actual.dtype)
     if given.shape != actual.shape:
         raise ValueError("Dij_sr and vij_sr must describe the same edges")
     scale = actual.detach().clamp_min(1.0)
-    if torch.any((given - actual).abs() > tol * scale):
-        raise ValueError("Dij_sr must be the Euclidean norm of vij_sr")
+    _require(~torch.any((given - actual).abs() > tol * scale), "Dij_sr must be the Euclidean norm of vij_sr")
 
 
 def subtract_graph_mean(pos: Tensor, batch: Tensor | None) -> Tensor:
@@ -94,9 +98,8 @@ def subtract_graph_mean(pos: Tensor, batch: Tensor | None) -> Tensor:
         return pos
     if batch is None:
         batch = torch.zeros(n_atoms, dtype=torch.long, device=pos.device)
-    n_graph = int(batch.max().item()) + 1
-    total = scatter_sum(pos, batch, n_graph)
-    count = scatter_sum(pos.new_ones(n_atoms), batch, n_graph).clamp_min(1)
+    total = scatter_sum(pos, batch)
+    count = scatter_sum(pos.new_ones(n_atoms), batch, total.shape[0]).clamp_min(1)
     return pos - (total / count.unsqueeze(-1))[batch]
 
 

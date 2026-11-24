@@ -14,6 +14,8 @@ from enerzyme.models.mp.message.frame.geometry import (
     leftnet_edge_frame,
     leftnet_node_frame,
     neighbor_mean,
+    require_matching_distance,
+    require_same_graph,
     scalarize,
     subtract_graph_mean,
 )
@@ -156,3 +158,21 @@ def test_alphanet_bond_axis_uses_the_vector_length():
     assert torch.allclose(length, torch.ones_like(length), atol=1e-8)
     with pytest.raises(ValueError, match="Dij_sr"):
         alphanet_edge_frame(pos, vij, dij * 2, idx_i, idx_j, 1e-10)
+
+
+def test_compiled_local_frame_input_validation():
+    pos, i, j, vec, dist = _triangle()
+    def validate(batch, i, j, vec, dist):
+        require_same_graph(batch, i, j)
+        require_matching_distance(vec, dist)
+        return dist + 1
+
+    compiled = torch.compile(validate, backend="eager", fullgraph=True)
+    batch = torch.zeros(pos.shape[0], dtype=torch.long)
+    torch.testing.assert_close(compiled(batch, i, j, vec, dist), dist + 1)
+    with pytest.raises(RuntimeError, match="one molecule"):
+        compiled(torch.tensor([0, 1, 0]), i, j, vec, dist)
+    with pytest.raises(RuntimeError, match="Euclidean norm"):
+        compiled(batch, i, j, vec, dist + 1.)
+    with pytest.raises(RuntimeError, match="cover every neighbor index"):
+        compiled(batch, i + 2, j, vec, dist)
