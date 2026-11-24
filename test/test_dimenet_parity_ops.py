@@ -318,11 +318,11 @@ def test_core_get_output_matches_paper_angle_features():
         idx_j_sr=idx_j,
     )["atom_feature"]
     idx_kj, idx_ji, _, _, _ = triplet_indices(idx_i, idx_j, z.numel())
-    sbf = core.sbf(dist, triplet_angles(vij, idx_kj, idx_ji), idx_kj)
-    messages = core.emb_block(atom, rbf, idx_i, idx_j)
-    features = [core.atom_readouts[0](messages, rbf, idx_i, z.numel())]
-    for block, atom_readout in zip(core.interactions, core.atom_readouts[1:]):
-        messages = block(messages, rbf, sbf, idx_kj, idx_ji)
+    sbf = core.embed.basis(dist, triplet_angles(vij, idx_kj, idx_ji), idx_kj)
+    messages = core.embed.embedding(atom, rbf, idx_i, idx_j)
+    features = [core.head.readouts[0](messages, rbf, idx_i, z.numel())]
+    for block, atom_readout in zip(core.blocks, core.head.readouts[1:]):
+        messages = block.interaction(messages, rbf, sbf, idx_kj, idx_ji)
         features.append(atom_readout(messages, rbf, idx_i, z.numel()))
     expected = torch.stack(features, dim=-1)
     assert_close(out, expected, atol=1e-12, rtol=1e-12, err_msg="core get_output")

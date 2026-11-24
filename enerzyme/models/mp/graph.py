@@ -47,6 +47,7 @@ class GraphRequires:
     edge_convention: str = "receiver_i"
     fields: Tuple[str, ...] = ()
     optional_fields: Tuple[str, ...] = ()
+    path_triplets: bool = False
 
     def __post_init__(self) -> None:
         if self.edge_set not in EDGE_SETS:
@@ -85,6 +86,7 @@ class GraphRequires:
         return replace(
             self,
             vectors=self.vectors or other.vectors,
+            path_triplets=self.path_triplets or other.path_triplets,
             distances=self.distances or other.distances,
             rbf=self.rbf or other.rbf,
             cutoff_values=self.cutoff_values or other.cutoff_values,
@@ -318,10 +320,14 @@ class GraphContext:
         if requires.edge_convention == "swap":
             receiver, sender = sender, receiver
             vec = -vec if vec is not None else None
-        return cls(
+        ctx = cls(
             receiver=receiver, sender=sender, num_nodes=int(num_nodes), vec=vec, dist=dist, rbf=rbf,
             cutoff_values=cutoff_values, batch=inputs.get("batch_seg"), inputs=inputs,
         )
+
+        if requires.path_triplets:
+            ctx.path_pairs(exclude_backtracking=True)
+        return ctx
 
     @property
     def num_edges(self) -> int:
@@ -375,9 +381,15 @@ class GraphContext:
 
         return self.cached(("receiver_pairs", cutoff, include_self, strict), build)
 
-    def path_pairs(self, order: str = "outgoing") -> EdgePairs:
-        return self.cached(("path_pairs", order), lambda: path_pairs(
-            self.receiver, self.sender, self.num_nodes, order))
+    def path_pairs(self, order: str = "outgoing", exclude_backtracking: bool = False) -> EdgePairs:
+        def build():
+            incoming, outgoing = path_pairs(self.receiver, self.sender, self.num_nodes, order)
+            if exclude_backtracking:
+                keep = self.sender[incoming] != self.receiver[outgoing]
+                return EdgePairs(incoming[keep], outgoing[keep])
+            return EdgePairs(incoming, outgoing)
+
+        return self.cached(("path_pairs", order, exclude_backtracking), build)
 
     def num_graphs(self) -> int:
         if self.batch is None or self.batch.numel() == 0:

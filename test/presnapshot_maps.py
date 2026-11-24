@@ -28,6 +28,14 @@ KEY_MAPS["newtonnet"] = [
 ]
 
 
+KEY_MAPS["dimenet"] = KEY_MAPS["dimenet++"] = [
+    (r"^sbf\.", "embed.basis."),
+    (r"^emb_block\.", "embed.embedding."),
+    (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
+    (r"^atom_readouts\.", "head.readouts."),
+]
+
+
 def _rename(state: Dict[str, torch.Tensor], rules: List[Tuple[str, str]]) -> Dict[str, torch.Tensor]:
     out = {}
     for key, value in state.items():

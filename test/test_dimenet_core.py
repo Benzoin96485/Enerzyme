@@ -23,7 +23,7 @@ def _complete_graph_edges(num_nodes: int):
 
 
 def _tiny_core(**kwargs):
-    from enerzyme.models.dimenet import DimeNetCore
+    from enerzyme.models.presets.triplet import dimenet
 
     params = dict(
         dim_embedding=8,
@@ -37,7 +37,7 @@ def _tiny_core(**kwargs):
         envelope_exponent=5,
     )
     params.update(kwargs)
-    return DimeNetCore(**params)
+    return dimenet(**params)
 
 
 def _core_inputs(n=4, dim_embedding=8, num_rbf=4, requires_grad=False):
@@ -60,7 +60,7 @@ def test_dimenet_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, _, _ = get_ff_core("dimenet")
-    assert core_cls.__name__ == "DimeNetCore"
+    assert core_cls.__name__ == "dimenet"
     with EXAMPLE.open() as stream:
         ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
     layers = []
@@ -84,7 +84,7 @@ def test_dimenet_registration_and_yaml_build():
     model = build_model(
         ff["architecture"], layer_params=layers, build_params=bp, verbose=0
     )
-    assert model.__class__.__name__ == "DimeNetCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.num_output_blocks == 3
     assert model.dim_feature_out == 8
 

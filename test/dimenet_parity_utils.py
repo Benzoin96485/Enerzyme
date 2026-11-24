@@ -120,10 +120,10 @@ def copy_pyg_dimenet_into_enerzyme(
 ) -> None:
     rbf_layer.bessel_weights.data.copy_(pyg.rbf.freq)
     atom_embedding.embedding.weight.data.copy_(pyg.emb.emb.weight)
-    copy_embedding_block(core.emb_block, pyg.emb)
-    for dst, src in zip(core.interactions, pyg.interaction_blocks):
-        copy_interaction(dst, src)
-    for dst, src in zip(core.atom_readouts, pyg.output_blocks):
+    copy_embedding_block(core.embed.embedding, pyg.emb)
+    for dst, src in zip(core.blocks, pyg.interaction_blocks):
+        copy_interaction(dst.interaction, src)
+    for dst, src in zip(core.head.readouts, pyg.output_blocks):
         copy_linear_to_dense(dst.dense_rbf, src.lin_rbf)
     for dst, src in zip(readout.heads, pyg.output_blocks):
         copy_output_head(dst, src)
@@ -229,13 +229,13 @@ def make_tiny_pyg_dimenet(dtype: torch.dtype = torch.float64) -> Module:
 
 
 def make_tiny_enerzyme_stack(dtype: torch.dtype = torch.float64):
-    from enerzyme.models.dimenet.core import DimeNetCore
+    from enerzyme.models.presets.triplet import dimenet
     from enerzyme.models.layers.atom_embedding import RandomAtomEmbedding
     from enerzyme.models.layers.rbf import BesselRBFLayer
     from enerzyme.models.layers.readout import HierachicalReadout
 
     hp = PARITY_HPARAMS
-    core = DimeNetCore(
+    core = dimenet(
         dim_embedding=hp["hidden_channels"],
         num_rbf=hp["num_radial"],
         cutoff_sr=hp["cutoff"],
@@ -289,7 +289,7 @@ def enerzyme_energy(
     """DimeNet energy from Core internals + shared HierarchicalReadout.
 
     ``angle_at='i'`` matches PyG original DimeNet; ``'j'`` is the paper
-    convention used by :meth:`DimeNetCore.get_output`.
+    convention used by :meth:`dimenet.get_output`.
     """
     num_nodes = z.size(0)
     vij = pos[idx_j] - pos[idx_i]
@@ -304,11 +304,11 @@ def enerzyme_energy(
     else:
         raise ValueError(f"angle_at must be 'i' or 'j', got {angle_at!r}")
     rbf = rbf_layer.get_rbf(dist)
-    sbf = core.sbf(dist, angle, idx_kj)
-    messages = core.emb_block(atom_embedding.get_embedding(z), rbf, idx_i, idx_j)
-    features = [core.atom_readouts[0](messages, rbf, idx_i, num_nodes)]
-    for block, atom_readout in zip(core.interactions, core.atom_readouts[1:]):
-        messages = block(messages, rbf, sbf, idx_kj, idx_ji)
+    sbf = core.embed.basis(dist, angle, idx_kj)
+    messages = core.embed.embedding(atom_embedding.get_embedding(z), rbf, idx_i, idx_j)
+    features = [core.head.readouts[0](messages, rbf, idx_i, num_nodes)]
+    for block, atom_readout in zip(core.blocks, core.head.readouts[1:]):
+        messages = block.interaction(messages, rbf, sbf, idx_kj, idx_ji)
         features.append(atom_readout(messages, rbf, idx_i, num_nodes))
     atom_feature = torch.stack(features, dim=-1)
     return readout.get_output(atom_feature)["Ea"].sum()
