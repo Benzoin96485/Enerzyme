@@ -21,7 +21,7 @@ Open boundaries only: a ``pbc`` tensor with any true entry raises
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, NamedTuple, Optional
 
 import torch
 from e3nn import o3
@@ -29,7 +29,8 @@ from torch import Tensor, nn
 
 from ..mp.ops import scatter_sum
 from ..layers._base_layer import BaseFFLayer
-from ..layers.gto_electrostatics import GaussianMultipoleEnergy, GaussianPotentialFeatures
+from ..layers.atom_embedding import one_hot_species
+from ..layers.gto_electrostatics import GaussianMultipoleEnergy, GaussianPotentialFeatures, PairIndices, _pair_index
 from .blocks import (
     GatedIrrepsMLP,
     InvariantChannelDot,
@@ -212,7 +213,45 @@ class NonlocalEnergyHead(nn.Module):
         return self.mlp(torch.cat([density_invariants, potential_invariants], dim=-1)).squeeze(-1)
 
 
+class _PolarPairs(NamedTuple):
+    """Open-boundary pair indices for the Coulomb energy and Gaussian projections."""
+
+    batch: Tensor
+    n_graphs: int
+    energy: PairIndices
+    potential: PairIndices
+
+
 class PolarFieldLayer(BaseFFLayer):
+    _force_pair_fields = ("Ra", "batch_seg", "pbc")
+
+    def _prepare_force_pairs(self, Ra: Tensor, batch_seg: Optional[Tensor], pbc: Optional[Tensor]) -> _PolarPairs:
+        """Reuse integer pairs across field updates while differentiating positions in the VJP."""
+        self._check_boundary(pbc)
+        batch = self._batch(Ra, batch_seg)
+        n_graphs = int(batch.max()) + 1 if batch.numel() else 0
+        displaced = self.electrostatics_backend == "displaced"
+        energy_images = 4 if displaced and self.density_max_l else 1
+        potential_images = 4 if displaced and (self.density_max_l or self.field_max_l) else 1
+        energy = _pair_index(batch, energy_images)
+        potential = energy if potential_images == energy_images else _pair_index(batch, potential_images)
+        return _PolarPairs(batch, n_graphs, energy, potential)
+
+    @staticmethod
+    def _batch(positions: Tensor, batch: Optional[Tensor]) -> Tensor:
+        if batch is None:
+            return torch.zeros(positions.shape[0], dtype=torch.long, device=positions.device)
+        return batch.to(dtype=torch.long, device=positions.device)
+
+    @staticmethod
+    def _check_boundary(pbc: Optional[Tensor]) -> None:
+        if pbc is not None and torch.as_tensor(pbc).bool().any():
+            raise NotImplementedError(
+                "MACE-POLAR-1 periodic evaluation is not implemented. "
+                "Open-boundary molecules omit pbc. Periodic k-space needs "
+                "graph_electrostatics (https://github.com/WillBaldwin0/graph_electrostatics)."
+            )
+
     def __init__(
         self,
         max_Za: int,
@@ -238,6 +277,7 @@ class PolarFieldLayer(BaseFFLayer):
         electrostatics_backend: str = "displaced",
     ) -> None:
         super().__init__(
+            input_fields={"atom_feature", "Za", "Ra", "batch_seg", "Q", "S", "pbc"},
             output_fields={
                 "E_nonlocal_a",
                 "E_coulomb_a",
@@ -378,10 +418,12 @@ class PolarFieldLayer(BaseFFLayer):
         updated[:, 1, 0] = density[:, 1, 0] + weights[:, 1] * (target_down - predicted[:, 1])
         return updated
 
-    def _spin_potential(self, density: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
+    def _spin_potential(self, density: Tensor, positions: Tensor, batch: Tensor,
+                        pairs: Optional[PairIndices] = None) -> Tensor:
         project = self.potential.analytic_features if self.electrostatics_backend == "analytic" else self.potential
-        up = project(density[:, 0, :], positions, batch)
-        down = project(density[:, 1, :], positions, batch)
+        extra = {} if pairs is None else {"pairs": pairs}
+        up = project(density[:, 0, :], positions, batch, **extra)
+        down = project(density[:, 1, :], positions, batch, **extra)
         return torch.cat((up, down), dim=-1) / self.field_feature_norms.to(dtype=up.dtype)
 
     def _dipole(self, total_density: Tensor, positions: Tensor, batch: Tensor, n_graphs: int) -> Tensor:
@@ -403,18 +445,14 @@ class PolarFieldLayer(BaseFFLayer):
         Q: Optional[Tensor] = None,
         S: Optional[Tensor] = None,
         pbc: Optional[Tensor] = None,
+        _pair_indices: Optional[_PolarPairs] = None,
     ) -> Dict[str, Tensor]:
-        if pbc is not None and torch.as_tensor(pbc).bool().any():
-            raise NotImplementedError(
-                "MACE-POLAR-1 periodic evaluation is not implemented. "
-                "Open-boundary molecules omit pbc. Periodic k-space needs "
-                "graph_electrostatics (https://github.com/WillBaldwin0/graph_electrostatics)."
-            )
-        n_atoms = int(Ra.shape[0])
-        if batch_seg is None:
-            batch_seg = torch.zeros(n_atoms, dtype=torch.long, device=Ra.device)
+        if _pair_indices is None:
+            self._check_boundary(pbc)
+            batch_seg = self._batch(Ra, batch_seg)
         else:
-            batch_seg = batch_seg.to(dtype=torch.long, device=Ra.device)
+            batch_seg = _pair_indices.batch
+        n_atoms = int(Ra.shape[0])
         if n_atoms == 0:
             empty = Ra.new_zeros(0)
             return {
@@ -425,7 +463,9 @@ class PolarFieldLayer(BaseFFLayer):
                 "dipole": Ra.new_zeros(0, 3),
                 "spin_multipole": Ra.new_zeros(0, 2, self.nlm),
             }
-        n_graphs = int(batch_seg.max().item()) + 1
+        n_graphs = int(batch_seg.max().item()) + 1 if _pair_indices is None else _pair_indices.n_graphs
+        potential_pairs = None if _pair_indices is None else _pair_indices.potential
+        energy_pairs = None if _pair_indices is None else _pair_indices.energy
         charge = self._graph_total(Q, batch_seg, n_graphs, Ra.dtype)
         spin = self._graph_total(S, batch_seg, n_graphs, Ra.dtype)
         layers = stack_node_features(atom_feature, self.num_output_blocks)
@@ -438,10 +478,12 @@ class PolarFieldLayer(BaseFFLayer):
         raw = self.sources(layers).view(n_atoms, 2, self.nlm)
         initial_fukui = self.fukui(layers[:, :, -1])
         density = self._equilibrate(raw, initial_fukui, charge, spin, batch_seg)
-        one_hot = torch.nn.functional.one_hot(Za.long(), num_classes=self.max_Za + 1)
-        one_hot = one_hot.to(dtype=layers.dtype)
+        if torch.compiler.is_compiling():
+            one_hot = one_hot_species(Za.long(), self.max_Za + 1, layers.dtype)
+        else:
+            one_hot = torch.nn.functional.one_hot(Za.long(), num_classes=self.max_Za + 1).to(layers.dtype)
         for update in self.updates:
-            potential = self._spin_potential(density, Ra, batch_seg)
+            potential = self._spin_potential(density, Ra, batch_seg, potential_pairs)
             correction = update(
                 mixed,
                 one_hot,
@@ -451,7 +493,7 @@ class PolarFieldLayer(BaseFFLayer):
             delta = correction[:, : self.spin_width].view(n_atoms, 2, self.nlm)
             next_fukui = correction[:, self.spin_width :]
             density = self._equilibrate(density + delta, next_fukui, charge, spin, batch_seg)
-        final_potential = self._spin_potential(density, Ra, batch_seg)
+        final_potential = self._spin_potential(density, Ra, batch_seg, potential_pairs)
         if self.add_nonlocal_energy:
             nonlocal_energy = self.nonlocal_head(
                 layers[:, :, -1],
@@ -462,7 +504,8 @@ class PolarFieldLayer(BaseFFLayer):
             nonlocal_energy = Ra.new_zeros(n_atoms)
         total_density = density.sum(dim=1)
         energy = self.coulomb.analytic_energy if self.electrostatics_backend == "analytic" else self.coulomb.atomic_energy
-        coulomb = energy(total_density, Ra, batch_seg)
+        coulomb = (energy(total_density, Ra, batch_seg) if energy_pairs is None
+                   else energy(total_density, Ra, batch_seg, pairs=energy_pairs))
         return {
             "E_nonlocal_a": nonlocal_energy,
             "E_coulomb_a": coulomb,

@@ -410,3 +410,67 @@ def test_analytic_polar_stack_rotates_dipoles_features_and_forces():
             torch.testing.assert_close(out[key], ref[key] @ transform.T, atol=2e-7, rtol=1e-7)
         transformed = ref["spin_multipole"] @ o3.Irreps("1x0e+1x1o").D_from_matrix(transform).T
         torch.testing.assert_close(out["spin_multipole"], transformed, atol=2e-7, rtol=1e-7)
+
+
+def test_prepared_polar_pairs_respect_field_mappings_and_boundaries():
+    import pytest
+    from enerzyme.models.ff import build_model
+    from enerzyme.models.layers.compiled_grad import _post_pair_indices
+    from enerzyme.models.layers.gto_electrostatics import _pair_index
+    from enerzyme.models.mace.polar import PolarFieldLayer
+
+    model = build_model("mace_polar", _polar_layers(density_max_l=0, field_max_l=1), _build(), verbose=0)
+    index, polar = next((i, layer) for i, layer in enumerate(model.post_sequence) if isinstance(layer, PolarFieldLayer))
+    polar.reset_field_name(Ra="polar_positions", batch_seg="polar_batch", pbc="polar_pbc")
+    coordinates = torch.randn(4, 3)
+    batch = torch.tensor([1, 0, 1, 0])
+    inputs = dict(polar_positions=coordinates, polar_batch=batch, polar_pbc=torch.zeros(2, 3, dtype=torch.bool))
+
+    cached = _post_pair_indices(model, inputs)[index]
+    assert cached.n_graphs == 2
+    torch.testing.assert_close(cached.batch, batch)
+    from torch_geometric.data import Data
+
+    pyg = Data(polar_positions=coordinates, batch=batch, polar_pbc=inputs["polar_pbc"])
+    torch.testing.assert_close(_post_pair_indices(model, pyg)[index], cached)
+    for actual, expected in zip((cached.energy, cached.potential), (_pair_index(batch, 1), _pair_index(batch, 4))):
+        torch.testing.assert_close(actual, expected)
+    with pytest.raises(NotImplementedError, match="periodic"):
+        _post_pair_indices(model, {**inputs, "polar_pbc": torch.ones(2, 3, dtype=torch.bool)})
+
+    # An earlier layer may produce the batch membership under this custom name.
+    producer = model.post_sequence[0]
+    output = next(iter(producer._output_fields))
+    producer.reset_field_name(**{output: "polar_batch"})
+    assert index not in _post_pair_indices(model, inputs)
+
+
+def test_normal_compiled_polar_force_training_captures_the_molecular_interactions():
+    from enerzyme.models.ff import build_model
+    from scripts.core_harness import forward, make_batch, random_molecules
+
+    torch.compiler.reset()
+    try:
+        torch.manual_seed(59)
+        layers = _polar_layers(electrostatics_backend="analytic")
+        reference = build_model("mace_polar", layers, _build(), verbose=0).double()
+        model = build_model("mace-polar-1", layers, {**_build(), "e3nn_codegen": "fx"}, verbose=0).double()
+        model.load_state_dict(reference.state_dict(), strict=True)
+        batch = make_batch(random_molecules(23, [3, 2]), torch.float64)
+        operations = set()
+
+        def capture(graph, _):
+            operations.update(getattr(node.target, "__name__", "") for node in graph.graph.nodes)
+            return graph.forward
+
+        expected = forward(reference, batch, torch.float64, train=True)
+        actual = forward(torch.compile(model, backend=capture), batch, torch.float64, train=True)
+        assert "erf" in operations and "einsum" in operations
+        for key in ("E", "Fa", "Qa", "Sa", "dipole", "spin_multipole"):
+            torch.testing.assert_close(actual[key], expected[key])
+        for outputs in (expected, actual):
+            (outputs["E"].square().sum() + outputs["Fa"].square().sum()).backward()
+        for (name, p), q in zip(model.named_parameters(), reference.parameters()):
+            torch.testing.assert_close(p.grad, q.grad, msg=name)
+    finally:
+        torch.compiler.reset()

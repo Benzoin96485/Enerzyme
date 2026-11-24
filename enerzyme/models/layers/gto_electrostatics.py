@@ -144,13 +144,18 @@ def _overlap_tables(
     return overlap, index, feature_dim
 
 
-def _pair_index(batch: Tensor, n_images: int) -> Tuple[Tensor, Tensor]:
+PairIndices = Tuple[Tensor, Tensor]
+
+
+def _pair_index(batch: Tensor, n_images: int, pairs: Optional[PairIndices] = None) -> PairIndices:
     """Directed pairs of images whose original atoms differ and share a graph.
 
     ``n_images=1`` is the complete graph without self-pairs. ``n_images=4`` is
     the displaced-charge graph: the four images of one atom do not interact,
     and that self-energy is added separately.
     """
+    if pairs is not None:
+        return pairs
     device = batch.device
     empty = torch.empty(0, dtype=torch.long, device=device)
     n_atoms = int(batch.shape[0])
@@ -255,13 +260,13 @@ def _gaussian_moments(t: Tensor):
     return moments
 
 
-def _analytic_field(multipoles: Tensor, positions: Tensor, batch: Tensor, widths: Tensor):
+def _analytic_field(multipoles: Tensor, positions: Tensor, batch: Tensor, widths: Tensor, pairs: Optional[PairIndices] = None):
     """Potential and Cartesian gradient of Gaussian charges and xyz dipoles.
 
     For receiver minus source displacement x, the source dipole acts as
     -p·∇_x on erf(a|x|)/|x|. A receiver dipole acts as +p·∇_x.
     """
-    sender, receiver = _pair_index(batch, 1)
+    sender, receiver = _pair_index(batch, 1, pairs)
     r = positions[receiver] - positions[sender]
     a = 0.5 / widths.to(positions).reshape(1, -1)
     t = r.square().sum(-1, keepdim=True) * a.square()
@@ -348,10 +353,10 @@ class GaussianMultipoleEnergy(nn.Module):
         self.register_buffer("shift_y", torch.tensor([0.0, self.offset, 0.0]))
         self.register_buffer("shift_z", torch.tensor([0.0, 0.0, self.offset]))
 
-    def analytic_energy(self, multipoles: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
+    def analytic_energy(self, multipoles: Tensor, positions: Tensor, batch: Tensor, pairs: Optional[PairIndices] = None) -> Tensor:
         """Evaluate the isotropic kernel directly on native (q, x, y, z) coefficients."""
         widths = positions.new_tensor([self.sigma])
-        receiver, value, gradient = _analytic_field(multipoles, positions, batch, widths)
+        receiver, value, gradient = _analytic_field(multipoles, positions, batch, widths, pairs)
         pair = multipoles[receiver, 0] * value[:, 0]
         if self.max_l == 1:
             pair = pair + (multipoles[receiver, 1:4] * gradient[:, 0]).sum(-1)
@@ -360,23 +365,23 @@ class GaussianMultipoleEnergy(nn.Module):
             node = node + 0.5 * (multipoles * self.self_overlap(multipoles)).sum(dim=-1)
         return node * self.energy_scale
 
-    def atomic_energy(self, multipoles: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
+    def atomic_energy(self, multipoles: Tensor, positions: Tensor, batch: Tensor, pairs: Optional[PairIndices] = None) -> Tensor:
         if multipoles.ndim != 2:
             raise ValueError(f"multipoles must be rank 2, got {tuple(multipoles.shape)}")
         if self.max_l == 0:
-            node = self._monopole_energy(multipoles[:, 0], positions, batch)
+            node = self._monopole_energy(multipoles[:, 0], positions, batch, pairs)
         else:
-            node = self._dipole_energy(multipoles, positions, batch)
+            node = self._dipole_energy(multipoles, positions, batch, pairs)
         if self.include_self:
             field = self.self_overlap(multipoles)
             node = node + 0.5 * (multipoles * field).sum(dim=-1)
         return node * self.energy_scale
 
-    def _monopole_energy(self, charges: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
-        sender, receiver = _pair_index(batch, 1)
+    def _monopole_energy(self, charges: Tensor, positions: Tensor, batch: Tensor, pairs: Optional[PairIndices] = None) -> Tensor:
+        sender, receiver = _pair_index(batch, 1, pairs)
         return _pair_node_energy(charges, positions, sender, receiver, self.sigma)
 
-    def _dipole_energy(self, multipoles: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
+    def _dipole_energy(self, multipoles: Tensor, positions: Tensor, batch: Tensor, pairs: Optional[PairIndices] = None) -> Tensor:
         if multipoles.shape[-1] < 4:
             raise ValueError(
                 f"l = 1 multipoles need 4 components (q, y, z, x), got {multipoles.shape[-1]}"
@@ -387,7 +392,7 @@ class GaussianMultipoleEnergy(nn.Module):
         charges[2::4] = multipoles[:, 1] / self.offset
         charges[3::4] = multipoles[:, 2] / self.offset
         charges[0::4] = multipoles[:, 0] - (charges[1::4] + charges[2::4] + charges[3::4])
-        sender, receiver = _pair_index(batch, 4)
+        sender, receiver = _pair_index(batch, 4, pairs)
         node = _pair_node_energy(charges, extended, sender, receiver, self.sigma)
         return node.view(-1, 4).sum(dim=-1)
 
@@ -451,9 +456,9 @@ class GaussianPotentialFeatures(nn.Module):
         self.register_buffer("shift_y", torch.tensor([0.0, self.offset, 0.0]))
         self.register_buffer("shift_z", torch.tensor([0.0, 0.0, self.offset]))
 
-    def analytic_features(self, multipoles: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
+    def analytic_features(self, multipoles: Tensor, positions: Tensor, batch: Tensor, pairs: Optional[PairIndices] = None) -> Tensor:
         """Isotropic projected fields, in native e3nn (xyz) vector order."""
-        receiver, value, gradient = _analytic_field(multipoles, positions, batch, self.total_width)
+        receiver, value, gradient = _analytic_field(multipoles, positions, batch, self.total_width, pairs)
         packed = self.l0_factors.to(value) * value
         if self.projection_max_l == 1:
             # The stored factor converts finite potential differences. Its
@@ -466,23 +471,23 @@ class GaussianPotentialFeatures(nn.Module):
             features = features + self.self_overlap(multipoles)
         return features
 
-    def forward(self, multipoles: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
+    def forward(self, multipoles: Tensor, positions: Tensor, batch: Tensor, pairs: Optional[PairIndices] = None) -> Tensor:
         if self.density_max_l == 0 and self.projection_max_l == 0:
-            features = self._monopole_on_monopole(multipoles, positions, batch)
+            features = self._monopole_on_monopole(multipoles, positions, batch, pairs)
         else:
             source = multipoles
             if self.density_max_l == 0:
                 source = multipoles.new_zeros(multipoles.shape[0], 4)
                 source[:, 0] = multipoles[:, 0]
-            features = self._dipole_projection(source, positions, batch)
+            features = self._dipole_projection(source, positions, batch, pairs)
             if self.projection_max_l == 0:
                 features = features[:, : self.num_radial]
         if self.include_self:
             features = features + self.self_overlap(multipoles)
         return features
 
-    def _monopole_on_monopole(self, multipoles: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
-        sender, receiver = _pair_index(batch, 1)
+    def _monopole_on_monopole(self, multipoles: Tensor, positions: Tensor, batch: Tensor, pairs: Optional[PairIndices] = None) -> Tensor:
+        sender, receiver = _pair_index(batch, 1, pairs)
         scalars = _scalar_projection(
             multipoles[:, 0],
             positions,
@@ -492,7 +497,7 @@ class GaussianPotentialFeatures(nn.Module):
         )
         return self.l0_factors.to(dtype=scalars.dtype) * scalars
 
-    def _dipole_projection(self, multipoles: Tensor, positions: Tensor, batch: Tensor) -> Tensor:
+    def _dipole_projection(self, multipoles: Tensor, positions: Tensor, batch: Tensor, pairs: Optional[PairIndices] = None) -> Tensor:
         if multipoles.shape[-1] < 4:
             raise ValueError(
                 f"l = 1 multipoles need 4 components (q, y, z, x), got {multipoles.shape[-1]}"
@@ -503,7 +508,7 @@ class GaussianPotentialFeatures(nn.Module):
         charges[2::4] = multipoles[:, 1] / self.offset
         charges[3::4] = multipoles[:, 2] / self.offset
         charges[0::4] = multipoles[:, 0] - (charges[1::4] + charges[2::4] + charges[3::4])
-        sender, receiver = _pair_index(batch, 4)
+        sender, receiver = _pair_index(batch, 4, pairs)
         scalars = _scalar_projection(
             charges,
             extended,

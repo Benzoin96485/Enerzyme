@@ -130,23 +130,25 @@ def _topology_indices(core, ranges, fields, geometry, edges):
 @torch.compiler.disable
 def _post_pair_indices(core, inputs):
     """Prepare discrete all-pairs membership before differentiating the distances."""
-    from .electrostatics import WeightedCoulombEnergyLayer, intramolecular_pair_indices
-
     prepared = {}
-    if not any(type(layer) is WeightedCoulombEnergyLayer for layer in core.post_sequence):
+    if not any("_force_pair_fields" in type(layer).__dict__ for layer in core.post_sequence):
         return prepared
     preceding = [*core.pre_sequence, core]
     for i, layer in enumerate(core.post_sequence):
-        if (type(layer) is WeightedCoulombEnergyLayer and layer.pairs == "all_to_all"
-                and layer.cutoff is None and not layer.eval_only and not layer._forward_hooks
-                and not layer._forward_pre_hooks):
-            pos = layer._name_mapping["Ra"]
-            batch = "batch" if isinstance(inputs, Data) else layer._name_mapping["batch_seg"]
-            # Respect stacks which replace the coordinate or membership fields.
-            changed = any(step._name_mapping[k] in (pos, batch)
-                          for step in preceding for k in step._output_fields)
-            if not changed and inputs.get(pos) is not None:
-                prepared[i] = intramolecular_pair_indices(inputs[pos], inputs.get(batch))
+        fields = type(layer).__dict__.get("_force_pair_fields")
+        active = not ((layer.eval_only and layer.training) or (layer.train_only and not layer.training)
+                      or (layer.test_only and not core.test_mode) or (layer.test_exclude and core.test_mode))
+        if fields and active and not layer._forward_hooks and not layer._forward_pre_hooks:
+            names = {key: ("batch" if key == "batch_seg" and isinstance(inputs, Data) else layer._name_mapping[key])
+                     for key in fields}
+            # Hooks and earlier layers can change the coordinates, membership or boundary flags.
+            changed = any(step._forward_hooks or step._forward_pre_hooks
+                          or any(step._name_mapping[k] in names.values() for k in step._output_fields)
+                          for step in preceding)
+            if not changed and inputs.get(names["Ra"]) is not None:
+                pairs = layer._prepare_force_pairs(**{key: inputs.get(name) for key, name in names.items()})
+                if pairs is not None:
+                    prepared[i] = pairs
         preceding.append(layer)
     return prepared
 

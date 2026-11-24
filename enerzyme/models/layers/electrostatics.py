@@ -473,6 +473,13 @@ class WeightedCoulombEnergyLayer(BaseFFLayer):
     ``EnergyReduce`` adds the atomic term because the field is ``E_coul_a``.
     """
 
+    _force_pair_fields = ("Ra", "batch_seg")
+
+    def _prepare_force_pairs(self, Ra, batch_seg):
+        if self.pairs == "all_to_all" and self.cutoff is None:
+            return intramolecular_pair_indices(Ra, batch_seg)
+        return None
+
     def __init__(
         self,
         layer_weights: Optional[List[float]] = None,
