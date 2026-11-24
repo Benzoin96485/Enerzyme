@@ -4,12 +4,18 @@ Run the same script, snapshot, precision and systems on both checkouts. The
 first compiled warmup is compared with eager energy, force and every active
 weight derivative before subsequent timed repetitions. Progress is persisted
 after each mode so later compiler timeouts and device OOMs retain earlier data.
+
+Use --main-fixture in place of --snapshot to run a trained main-branch
+checkpoint. Save --eager-grad-out on each checkout, then compare the runs
+with --compare-main BASE.json CANDIDATE.json --reference-grads BASE.pt
+CANDIDATE.pt --out comparison.json.
 """
 
 import argparse
 import gc
 import hashlib
 import json
+import math
 import random
 import statistics
 import sys
@@ -19,7 +25,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from bench_cores import SYSTEM_SETS, _batch
+from bench_cores import SYSTEM_SETS, _add_fixture_features, _batch, _build_fixture_model, _fixture_configuration
 from core_harness import build, forward
 
 
@@ -79,19 +85,98 @@ def compare_step(actual, reference, dtype):
     return result
 
 
+def compare_main_runs(paths, reference_paths):
+    """Classify each compiled mode and require same-weight native numerical parity."""
+    raw = [json.loads(path.read_text()) for path in paths]
+    if len(raw[0]) != 1 or raw[0].keys() != raw[1].keys():
+        raise ValueError("expected both files to contain the same single architecture")
+    arch = next(iter(raw[0]))
+    base, candidate = (result[arch] for result in raw)
+    fields = ("fixture_kind", "snapshot", "snapshot_sha256", "config_sha256", "checkpoint_state",
+              "tiled_atom_features", "compile", "device", "device_name", "precision", "params",
+              "reps", "threads", "requested_systems", "modes")
+    if base.get("fixture_kind") != "main_trained" or not base.get("config_sha256") or not base.get("snapshot_sha256"):
+        raise ValueError("expected a trained main checkpoint with configuration and fixture hashes")
+    for field in fields:
+        if field == "params" and (field not in base or field not in candidate):
+            # Construction may fail before a model can report its parameter count.
+            continue
+        if base.get(field) != candidate.get(field):
+            raise ValueError(f"cannot compare different {field}")
+    if not base.get("compile"):
+        raise ValueError("expected ordinary compiled measurements")
+
+    refs = [torch.load(path, map_location="cpu", weights_only=True) if path.is_file() else {}
+            for path in reference_paths]
+    result = {key: value for key, value in base.items() if key in fields}
+    result.update(architecture=arch, comparisons={}, counts={})
+    dtype = getattr(torch, base["precision"])
+    for system in base["requested_systems"]:
+        result["comparisons"][system] = modes = {}
+        for mode in base["modes"]:
+            cell = modes[mode] = {}
+            valid = []
+            for side, run in (("baseline", base), ("candidate", candidate)):
+                measurements = run.get(system, {})
+                timing = measurements.get(mode + "_ms")
+                peak = measurements.get(mode + "_peak_mb")
+                numeric = run.get("numerical", {}).get(system, {}).get(mode)
+                error = measurements.get(mode + "_error") or run.get("worker_error")
+                cell[side] = {"ms": timing, "peak_MiB": peak, "numerical": numeric, "error": error,
+                              "capture": run.get("compile_capture", {}).get(system, {}).get(mode)}
+                valid.append(bool(numeric and numeric.get("passed") and timing is not None
+                                  and math.isfinite(timing) and timing > 0 and
+                                  (run["device"] != "cuda" or (peak is not None and math.isfinite(peak) and peak > 0))))
+            gold, trial = (saved.get((system, mode)) for saved in refs)
+            cross = None
+            if gold is not None and trial is not None and not isinstance(gold, str) and not isinstance(trial, str):
+                cross = compare_step(trial, gold, dtype)
+            cell["cross_native"] = cross
+            if not any(valid):
+                status = "neither_validated"
+            elif cross is None:
+                status = "cross_native_unavailable"
+            elif not cross["passed"]:
+                status = "cross_native_mismatch"
+            elif all(valid):
+                status = "both_validated"
+                cell["delta_percent"] = {
+                    key: 100 * (cell["candidate"][key] / cell["baseline"][key] - 1)
+                    for key in ("ms", "peak_MiB") if cell["baseline"][key] is not None
+                }
+            else:
+                status = "baseline_only_validated" if valid[0] else "candidate_only_validated"
+            cell["status"] = status
+            result["counts"][status] = result["counts"].get(status, 0) + 1
+    return result
+
+
 def run(args):
     sys.path.insert(0, str(args.model_tree.resolve()))
     from enerzyme.models.ff import get_ff_core
 
     torch.set_num_threads(args.threads)
     dtype, device = getattr(torch, args.precision), torch.device(args.device)
-    payload = torch.load(args.snapshot, map_location="cpu", weights_only=False)
-    arch = payload["architecture"]
-    _, params, _ = get_ff_core(arch)
+    main_fixture = getattr(args, "main_fixture", None)
+    source = main_fixture or args.snapshot
+    atom_features = {}
+    if main_fixture:
+        config, digest, weights, atom_features = _fixture_configuration(source)
+        arch, params = config["architecture"], config["build_params"]
+        provenance = {"fixture_kind": "main_trained", "config_sha256": digest,
+                      "checkpoint_state": "model_state_dict", "tiled_atom_features": sorted(atom_features)}
+    else:
+        payload = torch.load(source, map_location="cpu", weights_only=False)
+        arch = payload["architecture"]
+        _, params, _ = get_ff_core(arch)
+        provenance = {"snapshot_revision": payload["commit"]}
     cutoff = max(float(params.get("cutoff_sr") or 0), float(params.get("cutoff_lr") or 0), 6.0)
 
     def load_model():
         seed_run()
+        if main_fixture:
+            model, state, names = _build_fixture_model(config, weights, dtype)
+            return model.to(device=device), state, names
         model = build(arch).float()
         state = payload["state_dict"]
         if model.state_dict().keys() != state.keys():
@@ -100,7 +185,7 @@ def run(args):
 
             state = remap_snapshot(arch, state, payload["param_names"], model)
         model.load_state_dict(state, strict=True)
-        return model.to(device=device, dtype=dtype), state
+        return model.to(device=device, dtype=dtype), state, {}
 
     def write():
         temp = args.out.with_suffix(".tmp")
@@ -114,9 +199,9 @@ def run(args):
         "compile": True,
         "reps": args.reps,
         "threads": args.threads,
-        "snapshot": args.snapshot.name,
-        "snapshot_revision": payload["commit"],
-        "snapshot_sha256": hashlib.sha256(args.snapshot.read_bytes()).hexdigest(),
+        "snapshot": source.name,
+        "snapshot_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        **provenance,
         "compile_capture": {},
         "numerical": {},
         "requested_systems": args.systems,
@@ -125,10 +210,17 @@ def run(args):
     if device.type == "cuda":
         result["device_name"] = torch.cuda.get_device_name(device)
     write()
-    model, initial_state = load_model()
+    try:
+        model, initial_state, original_names = load_model()
+    except Exception as exc:
+        result["worker_error"] = f"{type(exc).__name__}: {exc}"[:2500]
+        write()
+        raise
     result["params"] = sum(p.numel() for p in model.parameters())
+    write()
     host_batches = {
-        name: _batch(name, SYSTEM_SETS["acceptance"][name], dtype, cutoff) for name in args.systems
+        name: _add_fixture_features(_batch(name, SYSTEM_SETS["acceptance"][name], dtype, cutoff), atom_features, dtype)
+        for name in args.systems
     }
 
     def device_batch(name):
@@ -165,9 +257,18 @@ def run(args):
         torch.save(
             {key: value[0] for key, value in references.items() if not isinstance(value, str)}, args.eager_out
         )
+    if getattr(args, "eager_grad_out", None) is not None:
+        saved = {}
+        for key, value in references.items():
+            if isinstance(value, str):
+                saved[key] = value
+            else:
+                fields, grads = value
+                saved[key] = (fields, {original_names.get(name, name): v for name, v in grads.items()})
+        torch.save(saved, args.eager_grad_out)
     del model, initial_state
     clean()
-    model, initial_state = load_model()
+    model, initial_state, _ = load_model()
     runner = torch.compile(model)
     from torch._dynamo.utils import counters
 
@@ -197,6 +298,10 @@ def run(args):
                             if isinstance(ref, str)
                             else compare_step(snapshot_step(model, out, mode == "train"), ref, dtype)
                         )
+                        if main_fixture:
+                            proof["output_grad_functions"] = {
+                                key: type(out[key].grad_fn).__name__ for key in ("E", "Fa")
+                            }
                         result["numerical"][name][mode] = proof
                     if mode == "train":
                         model.zero_grad(set_to_none=True)
@@ -233,9 +338,15 @@ def run(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model-tree", type=Path, required=True)
-    parser.add_argument("--snapshot", type=Path, required=True)
-    parser.add_argument("--precision", choices=("float32", "float64"), required=True)
+    parser.add_argument("--model-tree", type=Path)
+    sources = parser.add_mutually_exclusive_group(required=True)
+    sources.add_argument("--snapshot", type=Path, help="use a Phase 0 pre-refactor snapshot")
+    sources.add_argument("--main-fixture", type=Path, help="use the layers, trained weights and external features from a main checkpoint fixture")
+    sources.add_argument("--compare-main", nargs=2, type=Path, metavar=("BASE", "CANDIDATE"),
+                         help="compare two measured main-checkpoint JSON files")
+    parser.add_argument("--reference-grads", nargs=2, type=Path, metavar=("BASE", "CANDIDATE"),
+                        help="native reference files saved by each run with --eager-grad-out")
+    parser.add_argument("--precision", choices=("float32", "float64"))
     parser.add_argument(
         "--systems", nargs="+", choices=SYSTEM_SETS["acceptance"], default=list(SYSTEM_SETS["acceptance"])
     )
@@ -245,7 +356,16 @@ if __name__ == "__main__":
     parser.add_argument("--threads", type=int, default=2)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--eager-out", type=Path, help="save native E and Fa for cross-checkout comparison")
+    parser.add_argument("--eager-grad-out", type=Path, help="save native E, Fa and active gradients; main fixture parameters use their original names")
     args = parser.parse_args()
     if min(args.reps, args.threads) < 1:
         parser.error("repetitions and threads must be positive")
-    run(args)
+    if args.compare_main:
+        if not args.reference_grads:
+            parser.error("--compare-main requires the two --reference-grads paths")
+        comparison = compare_main_runs(args.compare_main, args.reference_grads)
+        args.out.write_text(json.dumps(comparison, indent=2, allow_nan=False) + "\n")
+    else:
+        if args.model_tree is None or args.precision is None:
+            parser.error("measurement requires --model-tree and --precision")
+        run(args)

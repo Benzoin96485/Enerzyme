@@ -85,6 +85,38 @@ def _fixture_configuration(path):
     return config, hashlib.sha256(encoded).hexdigest(), payload["checkpoint"]["model_state_dict"], atom_features
 
 
+def _build_fixture_model(config, state, dtype):
+    """Strictly load a trained main checkpoint and retain its original parameter names."""
+    from core_harness import build
+
+    arch = config["architecture"]
+    model = build(arch, layer_params=config["layers"], build_params=config["build_params"]).to(dtype=dtype)
+    if model.state_dict().keys() == state.keys():
+        native_names = {name: name for name, _ in model.named_parameters()}
+    else:
+        from enerzyme.models.compat.main_branch import convert_state_dict, old_parameter_order
+
+        converted, key_map = convert_state_dict(arch, state)
+        order = old_parameter_order(state, key_map, [name for name, _ in model.named_parameters()])
+        native_names = {new: old for old, new in order}
+        if native_names.keys() != dict(model.named_parameters()).keys():
+            raise ValueError(f"checkpoint cannot identify every original {arch} parameter")
+        state = converted
+    model.load_state_dict(state, strict=True)
+    return model, state, native_names
+
+
+def _add_fixture_features(batch, atom_features, dtype):
+    """Tile the fixture's external atomic inputs identically on both source checkouts."""
+    import torch
+
+    for field, values in atom_features.items():
+        if field not in batch:
+            indices = torch.arange(batch["Za"].shape[0]) % values.shape[0]
+            batch[field] = values[indices].to(dtype=dtype)
+    return batch
+
+
 def _load_reference_module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -150,12 +182,7 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
         if config["architecture"] != arch.lower():
             raise ValueError(f"Fixture builds {config['architecture']!r}, worker requested {arch!r}")
         build_params = config["build_params"]
-        model = build(arch, layer_params=config["layers"], build_params=build_params)
-        model = model.to(dtype=dtype)
-        if model.state_dict().keys() != state.keys():
-            from enerzyme.models.compat.main_branch import convert_state_dict
-            state, _ = convert_state_dict(arch, state)
-        model.load_state_dict(state, strict=True)
+        model, _, _ = _build_fixture_model(config, state, dtype)
         metadata = {"fixture": Path(fixture).name, "config_sha256": digest,
                     "fixture_sha256": hashlib.sha256(Path(fixture).read_bytes()).hexdigest(),
                     "tiled_atom_features": sorted(atom_features)}
@@ -216,12 +243,7 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
         if graph_options is not None:
             graph_options.pbc = name == "bulk_256"
         batch = _batch(name, sizes, dtype, cutoff)
-        # These timing inputs use the fixture's external atomic features (e.g.
-        # xTB charges), repeated in the same order for both model versions.
-        for field, values in atom_features.items():
-            if field not in batch:
-                indices = torch.arange(batch["Za"].shape[0]) % values.shape[0]
-                batch[field] = values[indices].to(dtype=dtype)
+        _add_fixture_features(batch, atom_features, dtype)
         batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
         entry = result[name] = {}
         for mode in ("infer", "train"):
