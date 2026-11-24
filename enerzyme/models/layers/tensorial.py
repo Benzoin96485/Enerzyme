@@ -27,7 +27,7 @@ from torch.nn import Module
 
 from ..mp.ops import scatter_sum
 from . import BaseFFLayer
-from .gated_equivariant import build_gated_equivariant_mlp
+from ..mp.nn.gate import build_gated_equivariant_mlp
 
 
 def resolve_cartesian_feature_dim(

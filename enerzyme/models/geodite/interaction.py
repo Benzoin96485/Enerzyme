@@ -25,7 +25,7 @@ from ..mp.head import Head
 from ..mp.nn.field_norm import TensorLayerNorm
 from ..mp.ops import scatter_sum
 from .geometry import angular_dim, geodite_spherical_harmonics
-from ..layers.rejection import vector_rejection
+from ..mp.ops.rejection import vector_rejection
 from .geometry import split_degrees
 
 

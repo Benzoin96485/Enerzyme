@@ -7,7 +7,8 @@ from torch.nn import Module, ModuleList, Parameter, ParameterList
 import torch.nn.functional as F
 from opt_einsum_fx import optimize_einsums_full
 from e3nn import o3
-from e3nn.nn import FullyConnectedNet, Activation
+from ..mp.nn.radial_mlp import e3nn_radial_mlp
+from e3nn.nn import Activation
 from e3nn.o3 import Irreps, TensorProduct, FullyConnectedTensorProduct
 from e3nn.util.jit import compile_mode
 from ..mp.block import BlockState
@@ -437,7 +438,7 @@ class AgnosticNonlinearInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
             F.silu,
         )
@@ -503,7 +504,7 @@ class AgnosticResidualNonlinearInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
             F.silu,
         )
@@ -575,7 +576,7 @@ class RealAgnosticInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
             F.silu,
         )
@@ -649,7 +650,7 @@ class RealAgnosticResidualInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
             F.silu,
         )
@@ -734,7 +735,7 @@ class RealAgnosticAttResidualInteractionBlock(InteractionBlock):
             self.edge_feats_irreps.num_irreps
             + 2 * self.node_feats_down_irreps.num_irreps
         )
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + 3 * [256] + [self.conv_tp.weight_numel],
             F.silu,
         )

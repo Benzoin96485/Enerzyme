@@ -7,7 +7,9 @@ and related nonlinearities from Liao et al. (2026).
 import torch
 import copy
 from .grid import SO3Grid
-from ...nn.activation import SmoothLeakyReLU
+from ...nn.activation import SmoothLeakyReLU, SwiGLU as ChannelSwiGLU
+from ...nn.activation import swiglu as swiglu_torch  # noqa: F401
+from ..s2grid import SphericalGate, activate_grid
 
 
 def check_activation_name(act_name):
@@ -109,67 +111,11 @@ def prepare_activation_forward_param(act_name, inputs, scalars):
     return output_dict
 
 
-class GateActivation(torch.nn.Module):
-    def __init__(self, lmax, mmax, use_m_primary=False):
-        super().__init__()
-
-        self.lmax = lmax
-        self.mmax = mmax
-        self.use_m_primary = use_m_primary
-
-        # compute `expand_index` based on `lmax` and `mmax`
-        num_components = 0
-        for l in range(1, self.lmax + 1):
-            num_m_components = min((2 * l + 1), (2 * self.mmax + 1))
-            num_components = num_components + num_m_components
-        if not self.use_m_primary:
-            expand_index = torch.zeros([num_components]).long()
-            start_idx = 0
-            for l in range(1, self.lmax + 1):
-                length = min((2 * l + 1), (2 * self.mmax + 1))
-                expand_index[start_idx : (start_idx + length)] = (l - 1)
-                start_idx = start_idx + length
-        elif self.use_m_primary:
-            expand_index = []
-            for m in range(self.mmax + 1):
-                if m == 0:
-                    l_index = torch.arange(self.lmax)       # We do not have L = 0
-                else:
-                    l_index = torch.arange((m - 1), self.lmax)
-                expand_index.append(l_index)
-                if m > 0:
-                    expand_index.append(l_index)            # +- m
-            expand_index = torch.cat(expand_index, dim=0)
-            expand_index = expand_index.long()
-        self.register_buffer('expand_index', expand_index)
-
-        self.scalar_act = torch.nn.SiLU()
-        self.gate_act   = torch.nn.Sigmoid()
-
+class GateActivation(SphericalGate):
+    """EquiformerV3's gate takes features first and supports m-major order."""
 
     def forward(self, inputs, scalars):
-        '''
-            `inputs`: shape  [N, (lmax + 1) ** 2, num_channels]
-            `scalars`: shape [N, lmax * num_channels]
-        '''
-        gate_scalars = self.gate_act(scalars)
-        gate_scalars = gate_scalars.reshape(gate_scalars.shape[0], self.lmax, -1)
-        gate_scalars = torch.index_select(gate_scalars, dim=1, index=self.expand_index)
-
-        # L = 0
-        input_scalars = inputs.narrow(1, 0, 1)
-        input_scalars = self.scalar_act(input_scalars)
-        # L > 0
-        input_vectors = inputs.narrow(1, 1, inputs.shape[1] - 1)
-        input_vectors = input_vectors * gate_scalars
-
-        output_tensors = torch.cat((input_scalars, input_vectors), dim=1)
-
-        return output_tensors
-
-
-    def extra_repr(self):
-        return 'lmax={}, mmax={}, use_m_primary={}'.format(self.lmax, self.mmax, self.use_m_primary)
+        return self.gate(inputs, scalars)
 
 
 class S2Activation(torch.nn.Module):
@@ -182,10 +128,8 @@ class S2Activation(torch.nn.Module):
         
 
     def forward(self, inputs):
-        x_grid = self.so3_grid.to_grid(inputs)
-        x_grid = self.act(x_grid)
-        outputs = self.so3_grid.from_grid(x_grid)
-        return outputs
+        return activate_grid(inputs, self.so3_grid, self.act)
+
 
 
 class SeparableS2Activation(S2Activation):
@@ -204,33 +148,13 @@ class SeparableS2Activation(S2Activation):
         return outputs
 
 
-def swiglu_torch(gate, up_states):
-    gate = torch.nn.functional.silu(gate)
-    outputs = gate * up_states
-    return outputs
-
-
-class SwiGLU(torch.nn.Module):
-    '''
-        1.  The module only contains the activation.
-        2.  The number of output channels is the half of that of input channels.
-    '''
-    def __init__(self, backend='torch'):
-        super(SwiGLU, self).__init__()
-        assert backend in ['torch']
+class SwiGLU(ChannelSwiGLU):
+    def __init__(self, backend="torch"):
+        if backend != "torch":
+            raise ValueError(f"unsupported SwiGLU backend {backend!r}")
+        super().__init__(gate_first=True)
         self.backend = backend
-        self.func = swiglu_torch
 
-
-    def forward(self, inputs):
-        x_1, x_2 = torch.chunk(inputs, chunks=2, dim=-1)
-        outputs = self.func(x_1, x_2)
-        return outputs
-
-
-    def extra_repr(self):
-        return 'backend={}'.format(self.backend)
-    
 
 class LinearSwiGLU(torch.nn.Module):
     def __init__(self, in_channels, out_channels, bias=True, backend='torch'):

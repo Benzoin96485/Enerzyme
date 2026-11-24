@@ -67,18 +67,24 @@ def get_scaled_activation(name: str) -> Module:
     raise ValueError(f"Unknown scaled activation={name!r}; expected 'sigmoid' or 'silu'")
 
 
-class SwiGLU(Module):
-    """SwiGLU over the last dim: ``value * silu(gate)`` (DPA4 / SeZM order).
+def swiglu(gate: Tensor, value: Tensor) -> Tensor:
+    return F.silu(gate) * value
 
-    Distinct from :class:`~enerzyme.models.mp.equivariant.s2.activation_v3.SwiGLU`, which
-    applies ``silu`` to the first half (EquiformerV3 convention).
-    """
+
+class SwiGLU(Module):
+    """Gate either the first (EquiformerV3) or second (DPA4) channel half."""
+
+    def __init__(self, gate_first: bool = False) -> None:
+        super().__init__()
+        self.gate_first = gate_first
 
     def forward(self, x: Tensor) -> Tensor:
         if x.shape[-1] % 2:
             raise ValueError("SwiGLU requires an even last dimension")
-        value, gate = x.chunk(2, dim=-1)
-        return value * F.silu(gate)
+        first, second = x.chunk(2, dim=-1)
+        if self.gate_first:
+            return swiglu(first, second)
+        return swiglu(second, first)
 
 
 class BaseScaledTemperedActivation(ABC, Module):

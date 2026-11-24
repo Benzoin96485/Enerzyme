@@ -41,7 +41,7 @@ from torch.nn import LayerNorm, Linear, Module, Parameter
 
 from ..et.interaction import normalize_distance_influence
 from ..mp.ops import scatter_sum
-from ..layers.rejection import vector_rejection
+from ..mp.ops.rejection import vector_rejection
 from ..visnet.interaction import normalize_activation
 
 

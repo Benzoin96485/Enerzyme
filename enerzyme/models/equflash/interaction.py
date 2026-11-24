@@ -18,7 +18,8 @@ from typing import List, Sequence
 
 import torch
 from e3nn import o3
-from e3nn.nn import FullyConnectedNet, Gate
+from ..mp.nn.radial_mlp import e3nn_radial_mlp
+from e3nn.nn import Gate
 from torch import Tensor, nn
 
 from ..mp.nn.activation import resolve_scalar_activation
@@ -122,7 +123,7 @@ class EquFlashConvolution(nn.Module):
         hidden = [int(width) for width in radial_hidden]
         if any(width < 1 for width in hidden):
             raise ValueError(f"radial hidden widths must be positive, got {hidden}")
-        self.weight_nn = FullyConnectedNet(
+        self.weight_nn = e3nn_radial_mlp(
             [num_rbf, *hidden, self.tp.weight_numel],
             act=resolve_activation(act_radial),
         )
