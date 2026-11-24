@@ -6,6 +6,7 @@ import torch
 from torch import Tensor
 from torch_geometric.data import Data
 
+from .geometry import DistanceLayer, RangeSeparationLayer
 from .gradient import ForceLayer
 
 
@@ -25,13 +26,34 @@ def compiling_fullgraph() -> bool:
         return True
 
 
+@torch.compiler.disable
+def _short_range_edges(core, inputs):
+    """Choose discrete neighbors once, before tracing the differentiable geometry."""
+    if len(core.pre_sequence) < 2:
+        return None
+    distance, ranges = core.pre_sequence[0], core.pre_sequence[1]
+    if type(distance) is not DistanceLayer or type(ranges) is not RangeSeparationLayer:
+        return None
+    for layer in (distance, ranges):
+        if (layer.train_only or layer.eval_only or layer.test_only or layer.test_exclude
+                or layer._forward_hooks or layer._forward_pre_hooks):
+            return None
+    if distance._name_mapping["Dij"] != ranges._name_mapping["Dij_lr"]:
+        return None
+    with torch.no_grad():
+        fields = {k: inputs.get(distance._name_mapping[k]) for k in distance._input_fields}
+        distances = distance.get_output(**fields)["Dij"]
+        return torch.where(distances < ranges.cutoff_sr)[0]
+
+
 @torch.compiler.disable(recursive=False)
 def compiled_training(core, inputs):
-    """Trace the energy VJP through data-dependent neighbor-list lengths."""
-    from torch._dynamo import config
-
-    with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
-        return forward_with_coordinate_gradients(core, inputs)
+    """Keep differentiable distances inside the VJP and discrete sizes outside it."""
+    edges = _short_range_edges(core, inputs)
+    # The TorchScript optimizing executor detaches closed-over e3nn weights
+    # inside a functional coordinate VJP. Keep their parameter gradients live.
+    with torch.jit.optimized_execution(False):
+        return forward_with_coordinate_gradients(core, inputs, edges)
 
 
 @torch.compiler.disable(recursive=False)
@@ -63,7 +85,7 @@ def retained_inference(core, inputs):
         return core._run_layers(inputs)
 
 
-def forward_with_coordinate_gradients(core, inputs: Dict[str, Any]) -> Dict[str, Any]:
+def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None) -> Dict[str, Any]:
     """Functional coordinate VJPs make force fitting a single compiled backward.
 
     The prefix ending at each Force layer returns energy and tensor-valued
@@ -75,6 +97,15 @@ def forward_with_coordinate_gradients(core, inputs: Dict[str, Any]) -> Dict[str,
                     (layer.test_exclude and core.test_mode))
 
     stages = [layer for layer in core.pre_sequence if active(layer)]
+    if edges is not None:
+        ranges = stages[1]
+
+        def select_neighbors(state):
+            fields = {k: state.get(ranges._name_mapping[k]) for k in ranges._input_fields}
+            selected = ranges._select_edges(edges, **fields)
+            return {**state, **{ranges._name_mapping[k]: v for k, v in selected.items()}}
+
+        stages[1] = select_neighbors
     stages.append(core._forward)
     stages.extend(layer for layer in core.post_sequence if active(layer))
 
