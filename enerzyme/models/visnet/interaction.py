@@ -245,6 +245,11 @@ class ViSInteraction(Module):
         """
         return vector_gate * out_scale.unsqueeze(1) + aggregated_vector
 
+    def _vector_message(self, scalar_message: Tensor, vector_n: Tensor, idx_j: Tensor, direction: Tensor) -> Tensor:
+        gate, coeff = torch.split(F.silu(self.s_proj(scalar_message)), self.hidden_channels, dim=-1)
+        vector_message = vector_n.index_select(0, idx_j) * gate.unsqueeze(1)
+        return vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
+
     def forward(
         self,
         scalar: Tensor,
@@ -255,6 +260,19 @@ class ViSInteraction(Module):
         window: Tensor,
         direction: Tensor,
     ) -> tuple[Tensor, Tensor, Optional[Tensor]]:
+        return self._update(scalar, vector, edge, idx_i, idx_j, window, direction, defer_vector=False)
+
+    def _update(
+        self,
+        scalar: Tensor,
+        vector: Tensor,
+        edge: Tensor,
+        idx_i: Tensor,
+        idx_j: Tensor,
+        window: Tensor,
+        direction: Tensor,
+        *, defer_vector: bool,
+    ):
         n_atoms = int(scalar.shape[0])
         if idx_i.shape != idx_j.shape or idx_i.ndim != 1:
             raise ValueError(
@@ -305,12 +323,11 @@ class ViSInteraction(Module):
         scalar_message = (value_j * attention.unsqueeze(-1)).reshape(
             n_edges, self.hidden_channels
         )
-        gate, coeff = torch.split(F.silu(self.s_proj(scalar_message)), self.hidden_channels, dim=-1)
-        vector_message = vector_n.index_select(0, idx_j) * gate.unsqueeze(1)
-        vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
-
+        if not defer_vector:
+            vector_message = self._vector_message(scalar_message, vector_n, idx_j, direction)
         aggregated_scalar = scatter_sum(scalar_message, idx_i, n_atoms)
-        aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
+        if not defer_vector:
+            aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
         mixed = self.o_proj(aggregated_scalar)
         if self.vertex_type == "node":
             angle = self._receiver_angle(vector_n, idx_i, direction)
@@ -324,6 +341,8 @@ class ViSInteraction(Module):
                 mixed, self.hidden_channels, dim=-1
             )
             delta_scalar = vector_dot * out_dot + out_bias
+        if defer_vector:
+            return delta_scalar, (scalar_message, vector_n, vec3, out_scale)
         delta_vector = self._vector_residual(vec3, out_scale, aggregated_vector)
         delta_edge = None
         if not self.last_layer:

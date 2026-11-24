@@ -387,6 +387,15 @@ auxiliary parameters contribute to the loss. AdamW skips a parameter whose
 gradient is :code:`None` and applies weight decay to a parameter with an
 explicit zero gradient.
 
+For the standard ViSNet force-training stack, :code:`torch.compile(model)`
+returns the full output dictionary and computes the final vector update in a
+separate differentiable graph. An energy/force loss leaves
+:code:`blocks[-1].module.s_proj` unused. Supervising Cartesian vectors, the
+degree-two features or a dipole head differentiates this projection. Custom
+layers before force evaluation and hooks on the affected layers retain the
+joint execution path. When training exclusively on vectors, AOTAutograd can
+still assign zeros to unused scalar readout weights.
+
 The following CPU example uses the same model, weights, two structures and
 squared loss as the recorded checks. Run it from the repository checkout.
 Keep the dynamic-shape and scalar capture settings active when executing the

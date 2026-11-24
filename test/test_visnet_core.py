@@ -455,12 +455,11 @@ def test_stack_energy_force_dipole_and_image():
     assert torch.allclose(alone["Fa"], torch.zeros_like(alone["Fa"]), atol=1e-8)
 
 
-def test_fullgraph_energy_force_loss_keeps_unused_vector_weights_out_of_adamw():
-    from torch._dynamo import config
+def _force_fixture(dipole=False, lmax=1):
     from enerzyme.models.ff import build_model
 
     torch.manual_seed(53)
-    layers = _tiny_layers()
+    layers = _tiny_layers(dipole=dipole, lmax=lmax)
     layers[3]["params"].update(vertex_type="none", vecnorm_type="none")
     model = build_model(
         "visnet", layer_params=layers,
@@ -471,6 +470,13 @@ def test_fullgraph_energy_force_loss_keeps_unused_vector_weights_out_of_adamw():
     batch = dict(Ra=torch.tensor([[0., 0., 0.], [1.2, 0., 0.], [0., 0.9, 0.]], requires_grad=True),
                  Za=torch.tensor([1, 6, 8]), N=[3], batch_seg=torch.zeros(3, dtype=torch.long),
                  idx_i=receiver, idx_j=sender)
+    return model, batch
+
+
+def test_fullgraph_energy_force_loss_keeps_unused_vector_weights_out_of_adamw():
+    from torch._dynamo import config
+
+    model, batch = _force_fixture()
     weights = model.blocks[-1].module.s_proj.weight
     before = weights.detach().clone()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.01, weight_decay=0.1)
@@ -486,3 +492,124 @@ def test_fullgraph_energy_force_loss_keeps_unused_vector_weights_out_of_adamw():
     assert weights.grad is None
     optimizer.step()
     torch.testing.assert_close(weights, before, atol=0, rtol=0)
+
+def test_compiled_force_and_vector_supervision_preserve_terminal_gradients():
+    from torch._dynamo.backends.registry import lookup_backend
+
+    torch.compiler.reset()
+    model, batch = _force_fixture(dipole=True, lmax=2)
+    model.double()
+    batch["Ra"] = batch["Ra"].detach().double().requires_grad_()
+    params = dict(model.named_parameters())
+    dense_layers_per_graph = []
+
+    def capture(graph, example):
+        dense_layers_per_graph.append(sum(node.target is torch.nn.functional.linear for node in graph.graph.nodes))
+        return lookup_backend("aot_eager")(graph, example)
+
+    compiled = torch.compile(model, backend=capture)
+
+    def step(runner, target):
+        result = runner(batch)
+        loss = result["E"].square().sum() + result["Fa"].square().sum()
+        vector_loss = result["atom_vector_feature"].square().sum() + result["atom_l2_feature"].square().sum()
+        if target == "vector":
+            loss = vector_loss
+        elif target == "forces_and_vector":
+            loss = loss + vector_loss
+        elif target == "forces_and_dipole":
+            loss = loss + result["M2"].square().sum()
+        gradients = torch.autograd.grad(loss, [batch["Ra"], *params.values()], allow_unused=True)
+        return result, dict(zip(["Ra", *params], gradients))
+
+    for target in ("forces", "forces_and_vector", "forces_and_dipole", "vector"):
+        expected, reference = step(model, target)
+        actual, gradients = step(compiled, target)
+        assert expected.keys() == actual.keys()
+        for name, value in expected.items():
+            if isinstance(value, torch.Tensor):
+                torch.testing.assert_close(actual[name], value, atol=1e-10, rtol=1e-8)
+        for name, value in reference.items():
+            observed = gradients[name]
+            if target == "vector" and value is None and observed is not None:
+                # The shared prefix still returns energy and scalar fields when a
+                # caller uses only raw vectors. AOT supplies zeros to these scalar heads.
+                assert name.startswith(("head.out_norm.", "post_sequence.0.head."))
+                assert torch.count_nonzero(observed) == 0
+            elif value is None:
+                assert observed is None, name
+            else:
+                torch.testing.assert_close(observed, value, atol=1e-10, rtol=1e-8)
+        terminal = [gradients["blocks.1.module.s_proj." + p] for p in ("weight", "bias")]
+        if target == "forces":
+            assert all(grad is None for grad in terminal)
+        else:
+            assert all(grad is not None and torch.count_nonzero(grad) for grad in terminal)
+    assert 1 in dense_layers_per_graph and max(dense_layers_per_graph) > 1
+
+
+def test_compiled_vector_partition_respects_custom_layers_hooks_modes_and_fields():
+    from torch_geometric.data import Data
+    from enerzyme.models.layers._base_layer import BaseFFLayer
+    from enerzyme.models.visnet.compiled import _deferred_layers
+
+    class VectorEnergy(BaseFFLayer):
+        def __init__(self, **flags):
+            super().__init__(input_fields={"atom_vector_feature", "Ea"}, output_fields={"Ea"}, **flags)
+
+        def get_Ea(self, atom_vector_feature, Ea):
+            return Ea + atom_vector_feature.square().sum(dim=(1, 2))
+
+    model, batch = _force_fixture()
+    assert _deferred_layers(model, batch) == ()
+    collision = torch.tensor(17)
+    assert _deferred_layers(model, {**batch, "_visnet_idx_j": collision}) is None
+    data = Data(**batch)
+    data["_visnet_idx_j"] = collision
+    assert _deferred_layers(model, data) is None
+    runner = torch.compile(model, backend="eager")
+    assert runner({**batch, "_visnet_idx_j": collision})["_visnet_idx_j"] is collision
+    data["batch"] = data["batch_seg"]
+    assert runner(data)["_visnet_idx_j"] is collision
+    with model.blocks[-1].module.s_proj.register_forward_hook(lambda module, inputs, out: out):
+        assert _deferred_layers(model, batch) is None
+    class RandomVectorProbe(BaseFFLayer):
+        def __init__(self):
+            super().__init__(input_fields={"atom_vector_feature"}, output_fields={"probe"})
+
+        def get_probe(self, atom_vector_feature):
+            return torch.rand_like(atom_vector_feature)
+
+    model.post_sequence.insert(0, RandomVectorProbe())
+    assert _deferred_layers(model, batch) is None
+    del model.post_sequence[0]
+    flags = ("eval_only", "test_only", "train_only", "test_exclude")
+    class ModeProbe(BaseFFLayer):
+        def __init__(self, flag):
+            super().__init__(input_fields={"Ea"}, output_fields={flag}, **{flag: True})
+            self.flag = flag
+
+        def get_output(self, Ea):
+            return {self.flag: Ea}
+
+    for flag in flags:
+        model.post_sequence.append(ModeProbe(flag))
+    assert _deferred_layers(model, batch) == (3, 4, 5, 6)
+    assert set(runner(batch)).intersection(flags) == {"train_only", "test_exclude"}
+    model.test_mode = True
+    assert set(runner(batch)).intersection(flags) == {"train_only", "test_only"}
+
+    model, batch = _force_fixture()
+    model.post_sequence.insert(1, VectorEnergy())
+    assert _deferred_layers(model, batch) is None
+    compiled = torch.compile(model, backend="aot_eager")
+    for runner in (model, compiled):
+        out = runner(batch)
+        params = tuple(model.blocks[-1].module.s_proj.parameters())
+        gradients = torch.autograd.grad(out["E"].sum() + out["Fa"].square().sum(), params)
+        assert all(torch.count_nonzero(g) for g in gradients)
+        if runner is model:
+            reference = gradients
+        else:
+            for actual, expected in zip(gradients, reference):
+                torch.testing.assert_close(actual, expected)
