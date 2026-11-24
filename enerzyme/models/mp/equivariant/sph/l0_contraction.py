@@ -103,4 +103,7 @@ class L0Contraction(Module):
             Shape ``(B, len(degrees))``.
         """
         weighted = sphc * sphc * self.cg_rep
+        if torch.compiler.is_compiling() and sphc.device.type == "cpu":
+            blocks = torch.split(weighted, [2 * degree + 1 for degree in self.degrees], dim=-1)
+            return torch.stack([block.sum(-1) for block in blocks], dim=-1)
         return weighted @ self.segment_sum_matrix.to(dtype=weighted.dtype)

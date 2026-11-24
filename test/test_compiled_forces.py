@@ -225,6 +225,25 @@ def test_compiled_topology_preserves_force_and_parameter_gradients(architecture)
     assert "linear" in operators
 
 
+def test_so3krates_cpu_compiler_keeps_degree_gradients():
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    model = build("so3krates").double()
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float64)
+    reference = forward(model, batch, torch.float64, train=True)
+    actual = forward(torch.compile(model), batch, torch.float64, train=True)
+    for field in ("E", "Fa"):
+        torch.testing.assert_close(actual[field], reference[field], rtol=1e-9, atol=1e-12)
+    weights = tuple(model.parameters())
+
+    def gradients(out):
+        return torch.autograd.grad(out["E"].square().sum() + out["Fa"].square().sum(), weights, allow_unused=True)
+
+    for value, target in zip(gradients(actual), gradients(reference)):
+        torch.testing.assert_close(value, target, rtol=1e-9, atol=1e-12)
+
+
 def _batch(distance):
     return {
         "Ra": torch.tensor([[0., 0., 0.], [distance, .1, -.2], [2.7, -.4, .3]],
