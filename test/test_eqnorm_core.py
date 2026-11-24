@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from e3nn import o3
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "enerzyme" / "config" / "eqnorm_layers_example.yaml"
-UPSTREAM = Path("/tmp/eqnorm-src")
+UPSTREAM = Path(os.environ.get("EQNORM_SRC", "/tmp/eqnorm-src"))
 
 
 def _edges(n: int):
@@ -336,7 +337,7 @@ def test_stack_energy_is_invariant_and_forces_match_a_finite_difference():
 
 def test_scalar_stack_matches_upstream_e3nn():
     if not (UPSTREAM / "eqnorm" / "eqnorm-mptrj.py").is_file():
-        pytest.skip("yzchen08/eqnorm checkout is not at /tmp/eqnorm-src")
+        pytest.skip(f"yzchen08/eqnorm checkout not found at {UPSTREAM}")
     root = str(UPSTREAM)
     if root not in sys.path:
         sys.path.insert(0, root)
