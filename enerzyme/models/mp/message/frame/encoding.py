@@ -114,13 +114,37 @@ class LocalSubstructure(nn.Module):
         hidden = x.unsqueeze(-1) * w_x + y.unsqueeze(-1) * w_y + z.unsqueeze(-1) * w_z + first.bias
         return (F.silu(hidden) * last.weight[0]).sum(-1) + last.bias[0]
 
+    def _can_fuse_axis_layers(self, axes: Tensor) -> bool:
+        # The fused expression bypasses the Sequential and its children.
+        # Keep their usual call boundaries when a hook or a custom layer is present.
+        from torch.nn.modules import module
+
+        if (module._global_forward_pre_hooks or module._global_forward_hooks
+                or module._global_backward_pre_hooks or module._global_backward_hooks):
+            return False
+        if type(self.lin) is not nn.Sequential or len(self.lin) != 3:
+            return False
+        first, activation, last = self.lin
+        if type(first) is not nn.Linear or type(activation) is not nn.SiLU or type(last) is not nn.Linear:
+            return False
+        if first.bias is None or last.bias is None or first.in_features != 3 or last.out_features != 1:
+            return False
+        if any(layer.weight.dtype != axes.dtype or layer.bias.dtype != axes.dtype for layer in (first, last)):
+            return False
+        return not any(
+            layer._forward_pre_hooks or layer._forward_hooks or layer._backward_pre_hooks or layer._backward_hooks
+            or "forward" in layer.__dict__
+            for layer in (self.lin, first, activation, last)
+        )
+
     def _endpoint(self, environment: Tensor, frame: Tensor, nodes: Tensor) -> Tensor:
         projected = scalarize(environment[nodes], frame)
         axes = projected.transpose(1, 2)
         if (torch.compiler.is_compiling() and axes.is_cuda and not self.training
                 and axes.dtype in (torch.float32, torch.float64)
                 and not torch.is_autocast_enabled("cuda")
-                and not torch._C._are_functorch_transforms_active()):
+                and not torch._C._are_functorch_transforms_active()
+                and self._can_fuse_axis_layers(axes)):
             mixed = checkpoint(self._mix_three_axes, axes, use_reentrant=False, preserve_rng_state=False)
         else:
             mixed = self.lin(axes).squeeze(-1)
