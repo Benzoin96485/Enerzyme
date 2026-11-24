@@ -295,6 +295,12 @@ def independent_magnetic_readout(core):
     return moment
 
 
+@torch.compiler.disable
+def _cpu_magnetic_readout(moment, fields):
+    # Dispatching a second compiled graph costs more than this linear readout
+    # on CPU. Its native autograd still propagates magnetic supervision.
+    return moment(fields)
+
 @torch.compiler.disable(recursive=False)
 def train_with_magnetic_readout(core, inputs, edges, topology, post_pairs):
     from ..layers.compiled_grad import forward_with_coordinate_gradients, has_module_hooks, native_forces
@@ -315,4 +321,6 @@ def train_with_magnetic_readout(core, inputs, edges, topology, post_pairs):
     # graph. Keep magnetic parameters out of the force VJP and expose Ma so
     # a magnetic loss can still differentiate both the head and atom features.
     fields = forward_with_coordinate_gradients(core, inputs, edges, topology, post_pairs, skip_post=(0,))
+    if fields["atom_feature_charge"].device.type == "cpu":
+        return _cpu_magnetic_readout(moment, fields)
     return moment(fields)
