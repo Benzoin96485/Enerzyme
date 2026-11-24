@@ -16,10 +16,16 @@ import subprocess
 import sys
 import time
 
-SYSTEMS = {"mol_batch": [16] * 8, "mol_large": [64]}
+# ``small`` and ``tiny`` are for Cores whose default systems exceed the memory
+# of the machine; their keys differ so ``--compare`` never mixes sets.
+SYSTEM_SETS = {
+    "default": {"mol_batch": [16] * 8, "mol_large": [64]},
+    "small": {"mol_batch_small": [16] * 2, "mol_large_small": [32]},
+    "tiny": {"mol_batch_tiny": [8] * 4, "mol_large_tiny": [12]},
+}
 
 
-def _worker(arch: str, reps: int, threads: int, use_compile: bool) -> dict:
+def _worker(arch: str, reps: int, threads: int, use_compile: bool, systems: str = "default") -> dict:
     import torch
     from core_harness import build, forward, make_batch, random_molecules
 
@@ -35,7 +41,7 @@ def _worker(arch: str, reps: int, threads: int, use_compile: bool) -> dict:
         if device.type == "cuda":
             torch.cuda.synchronize()
 
-    for name, sizes in SYSTEMS.items():
+    for name, sizes in SYSTEM_SETS[systems].items():
         batch = make_batch(random_molecules(11, sizes), dtype=torch.float32)
         batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
         entry = {}
@@ -62,7 +68,7 @@ def _worker(arch: str, reps: int, threads: int, use_compile: bool) -> dict:
     return result
 
 
-def run_all(archs, out_path, reps, threads, use_compile, timeout):
+def run_all(archs, out_path, reps, threads, use_compile, timeout, systems="default"):
     results = {}
     if os.path.exists(out_path):
         with open(out_path) as f:
@@ -71,13 +77,21 @@ def run_all(archs, out_path, reps, threads, use_compile, timeout):
     here = os.path.dirname(os.path.abspath(__file__))
     for arch in archs:
         cmd = [sys.executable, os.path.join(here, "bench_cores.py"), "--worker", arch,
-               "--reps", str(reps), "--threads", str(threads)] + (["--compile"] if use_compile else [])
+               "--reps", str(reps), "--threads", str(threads)]
+        cmd += (["--compile"] if use_compile else []) + ["--systems", systems]
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
-            line = [l for l in proc.stdout.splitlines() if l.startswith("BENCH ")]
-            results[arch] = json.loads(line[-1][6:]) if line else {"error": proc.stderr[-800:]}
         except subprocess.TimeoutExpired:
             results[arch] = {"error": "timeout"}
+        else:
+            line = [l for l in proc.stdout.splitlines() if l.startswith("BENCH ")]
+            start = proc.stderr.rfind("Traceback")
+            if line:
+                results[arch] = json.loads(line[-1][6:])
+            elif proc.returncode < 0:
+                results[arch] = {"error": f"killed by signal {-proc.returncode} (out of memory?)"}
+            else:
+                results[arch] = {"error": proc.stderr[start:][-1500:] if start >= 0 else proc.stderr[-800:]}
         print(arch, results[arch], flush=True)
         with open(out_path, "w") as f:
             json.dump(results, f, indent=1, sort_keys=True)
@@ -90,7 +104,7 @@ def compare(base_path, new_path, threshold):
         new = json.load(f)
     worse = []
     for arch in sorted(set(base) & set(new)):
-        for system in SYSTEMS:
+        for system in (name for systems in SYSTEM_SETS.values() for name in systems):
             b, n = base[arch].get(system), new[arch].get(system)
             if not b or not n:
                 continue
@@ -111,12 +125,14 @@ def main():
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=1800)
     parser.add_argument("--compile", action="store_true")
+    parser.add_argument("--systems", choices=sorted(SYSTEM_SETS), default="default")
     parser.add_argument("--worker", default=None)
     parser.add_argument("--compare", nargs=2, default=None)
     parser.add_argument("--threshold", type=float, default=0.03)
     args = parser.parse_args()
     if args.worker:
-        print("BENCH " + json.dumps(_worker(args.worker, args.reps, args.threads, args.compile)), flush=True)
+        print("BENCH " + json.dumps(_worker(args.worker, args.reps, args.threads, args.compile, args.systems)),
+              flush=True)
         return
     if args.compare:
         worse = compare(*args.compare, args.threshold)
@@ -124,7 +140,7 @@ def main():
     from core_harness import ARCHITECTURES
 
     archs = args.only.split(",") if args.only else ARCHITECTURES
-    run_all(archs, args.out, args.reps, args.threads, args.compile, args.timeout)
+    run_all(archs, args.out, args.reps, args.threads, args.compile, args.timeout, args.systems)
 
 
 if __name__ == "__main__":
