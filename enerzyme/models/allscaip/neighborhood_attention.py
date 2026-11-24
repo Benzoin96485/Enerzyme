@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from .base_attention import BaseAttention
+from ..mp.nonlocal_ import GlobalAttention
 from .nn_utils import get_normalization
 from .types import GraphAttentionData
 
@@ -32,8 +32,8 @@ class NeighborhoodAttention(nn.Module):
     ) -> None:
         super().__init__()
         self.attn_num_heads = attn_num_heads
-        self.src_attn = BaseAttention(hidden_size, attn_num_heads, atten_dropout)
-        self.dst_attn = BaseAttention(hidden_size, attn_num_heads, atten_dropout)
+        self.src_attn = GlobalAttention(hidden_size, attn_num_heads, atten_dropout)
+        self.dst_attn = GlobalAttention(hidden_size, attn_num_heads, atten_dropout)
         self.use_freq_mask = use_freq_mask
 
         if use_freq_mask:
@@ -95,7 +95,7 @@ class NeighborhoodAttention(nn.Module):
 
     def multi_head_self_attention(
         self,
-        attn_module: BaseAttention,
+        attn_module: GlobalAttention,
         input_tensor: Tensor,
         attn_mask: Tensor,
         frequency_vectors: Tensor | None = None,

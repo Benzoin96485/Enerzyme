@@ -25,6 +25,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module
 
+from ..mp.nn.mlp import xavier_linear as _xavier_linear
 from ..mp.nn.field_norm import VECNORM_TYPES, VecLayerNorm, normalize_vecnorm_type  # noqa: F401
 from ..mp.ops import scatter_sum
 from ..mp.ops.rejection import vector_rejection
@@ -59,12 +60,6 @@ def normalize_activation(value: object) -> str:
             f"activation must be 'silu' or 'swish' (exact SiLU), got {value!r}"
         )
     return "silu"
-
-
-def _xavier_linear(layer: Linear) -> None:
-    torch.nn.init.xavier_uniform_(layer.weight)
-    if layer.bias is not None:
-        layer.bias.data.fill_(0)
 
 
 class EdgeEmbedding(Module):
