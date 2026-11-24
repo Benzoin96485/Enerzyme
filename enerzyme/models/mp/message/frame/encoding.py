@@ -118,6 +118,8 @@ class LocalSubstructure(nn.Module):
         projected = scalarize(environment[nodes], frame)
         axes = projected.transpose(1, 2)
         if (torch.compiler.is_compiling() and axes.is_cuda and not self.training
+                and axes.dtype in (torch.float32, torch.float64)
+                and not torch.is_autocast_enabled("cuda")
                 and not torch._C._are_functorch_transforms_active()):
             mixed = checkpoint(self._mix_three_axes, axes, use_reentrant=False, preserve_rng_state=False)
         else:
