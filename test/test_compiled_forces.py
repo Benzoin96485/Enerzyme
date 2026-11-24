@@ -73,6 +73,26 @@ def test_default_compiled_training_captures_the_learned_interactions():
         torch.compiler.reset()
 
 
+def test_compiled_mace_preserves_scripted_parameter_gradients():
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    model = build("mace").double()
+    batch = make_batch(random_molecules(107, [5, 4]), torch.float64)
+    weights = tuple(model.parameters())
+
+    def derivatives(runner):
+        out = forward(runner, batch, torch.float64, train=True)
+        return [torch.autograd.grad(out[field].square().sum(), weights,
+                                    retain_graph=True, allow_unused=True) for field in ("E", "Fa")]
+
+    reference = derivatives(model)
+    compiled = derivatives(torch.compile(model, backend="eager"))
+    for loss_gradients, expected in zip(compiled, reference):
+        for gradient, target in zip(loss_gradients, expected):
+            torch.testing.assert_close(gradient, target)
+
+
 def _batch(distance):
     return {
         "Ra": torch.tensor([[0., 0., 0.], [distance, .1, -.2], [2.7, -.4, .3]],

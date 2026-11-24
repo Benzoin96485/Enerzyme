@@ -49,11 +49,19 @@ def _short_range_edges(core, inputs):
 @torch.compiler.disable(recursive=False)
 def compiled_training(core, inputs):
     """Keep differentiable distances inside the VJP and discrete sizes outside it."""
+    from torch._dynamo import config
+
+    if getattr(core, "_scripted_force_kernels", False):
+        return _scripted_force_training(core, inputs)
     edges = _short_range_edges(core, inputs)
-    # The TorchScript optimizing executor detaches closed-over e3nn weights
-    # inside a functional coordinate VJP. Keep their parameter gradients live.
-    with torch.jit.optimized_execution(False):
+    with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
         return forward_with_coordinate_gradients(core, inputs, edges)
+
+
+@torch.compiler.disable
+def _scripted_force_training(core, inputs):
+    """Use native higher derivatives for scripted kernels with closed-over weights."""
+    return core._run_layers(inputs)
 
 
 @torch.compiler.disable(recursive=False)

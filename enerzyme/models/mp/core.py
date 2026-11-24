@@ -130,6 +130,12 @@ class ComposableCore(BaseFFCore):
 
     def build(self, built_layers: List[nn.Module]) -> None:
         self._builder(self, built_layers)
+        # e3nn's generated TorchScript kernels cannot participate in a
+        # compiled coordinate VJP. FX versions of the same kernels can.
+        self._scripted_force_kernels = any(
+            isinstance(getattr(module, name), torch.jit.ScriptModule)
+            for module in self.modules() for name in getattr(module, "__codegen__", ())
+        )
 
     def compute_dtype(self, inputs: Dict[str, Any]) -> Optional[torch.dtype]:
         node = inputs.get(self.node_field)
