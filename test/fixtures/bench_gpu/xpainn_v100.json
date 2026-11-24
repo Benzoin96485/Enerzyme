@@ -25,6 +25,43 @@
             "delta_percent": [-1.66004, -1.48588, 0.01187, 0.00329]
           }
         }
+      },
+      "ordinary_compile": {
+        "job": "6317931",
+        "repetitions": 7,
+        "systems": {
+          "mol_batch_32x20": {
+            "samples": [[null, null, null, null], [6.968502886593342, 16.667113173753023, 821.482421875, 989.6513671875]],
+            "delta_percent": [null, null, null, null],
+            "errors": {
+              "0": {
+                "infer": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.",
+                "train": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation."
+              }
+            }
+          },
+          "bulk_256": {
+            "samples": [[null, null, null, null], [8.020268054679036, 16.07843884266913, 866.92529296875, 1184.1005859375]],
+            "delta_percent": [null, null, null, null],
+            "errors": {
+              "0": {
+                "infer": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "train": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          },
+          "large_2000": {
+            "samples": [[null, null, null, null], [29.24265107139945, 75.14967489987612, 5305.88671875, 6249.36669921875]],
+            "delta_percent": [null, null, null, null],
+            "errors": {
+              "0": {
+                "infer": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "train": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          }
+        },
+        "compile_capture": [{"bulk_256": {"infer": {"new_calls": 348, "new_graphs": 20}, "train": {"new_calls": 0, "new_graphs": 0}}, "large_2000": {"infer": {"new_calls": 7, "new_graphs": 1}, "train": {"new_calls": 0, "new_graphs": 0}}, "mol_batch_32x20": {"infer": {"new_calls": 345, "new_graphs": 19}, "train": {"new_calls": 7, "new_graphs": 1}}}, {"bulk_256": {"infer": {"new_calls": 1149, "new_graphs": 4}, "train": {"new_calls": 1148, "new_graphs": 1}}, "large_2000": {"infer": {"new_calls": 1162, "new_graphs": 2}, "train": {"new_calls": 1166, "new_graphs": 1}}, "mol_batch_32x20": {"infer": {"new_calls": 2227, "new_graphs": 6}, "train": {"new_calls": 1115, "new_graphs": 1}}}]
       }
     },
     "float64": {
@@ -45,6 +82,43 @@
             "delta_percent": [-1.71025, -1.58349, 0.02967, 0.04418]
           }
         }
+      },
+      "ordinary_compile": {
+        "job": "6317931",
+        "repetitions": 7,
+        "systems": {
+          "mol_batch_32x20": {
+            "samples": [[null, null, null, null], [12.122925138100982, 28.289414010941982, 1638.68701171875, 1970.34912109375]],
+            "delta_percent": [null, null, null, null],
+            "errors": {
+              "0": {
+                "infer": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation.",
+                "train": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation."
+              }
+            }
+          },
+          "bulk_256": {
+            "samples": [[null, null, null, null], [11.578421108424664, 28.824339853599668, 1690.32666015625, 2318.13330078125]],
+            "delta_percent": [null, null, null, null],
+            "errors": {
+              "0": {
+                "infer": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "train": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          },
+          "large_2000": {
+            "samples": [[null, null, null, null], [58.288851054385304, 151.33163798600435, 10563.5126953125, 12445.89306640625]],
+            "delta_percent": [null, null, null, null],
+            "errors": {
+              "0": {
+                "infer": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer.",
+                "train": "RuntimeError: This backward function was compiled with non-empty donated buffers which requires create_graph=False and retain_graph=False. Please keep backward(create_graph=False, retain_graph=False) across all backward() function calls, or set torch._functorch.config.donated_buffer=False to disable donated buffer."
+              }
+            }
+          }
+        },
+        "compile_capture": [{"bulk_256": {"infer": {"new_calls": 348, "new_graphs": 20}, "train": {"new_calls": 0, "new_graphs": 0}}, "large_2000": {"infer": {"new_calls": 7, "new_graphs": 1}, "train": {"new_calls": 0, "new_graphs": 0}}, "mol_batch_32x20": {"infer": {"new_calls": 345, "new_graphs": 19}, "train": {"new_calls": 7, "new_graphs": 1}}}, {"bulk_256": {"infer": {"new_calls": 1149, "new_graphs": 4}, "train": {"new_calls": 1148, "new_graphs": 1}}, "large_2000": {"infer": {"new_calls": 1162, "new_graphs": 2}, "train": {"new_calls": 1166, "new_graphs": 1}}, "mol_batch_32x20": {"infer": {"new_calls": 2227, "new_graphs": 6}, "train": {"new_calls": 1115, "new_graphs": 1}}}]
       }
     }
   },
