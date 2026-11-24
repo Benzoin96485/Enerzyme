@@ -6,6 +6,8 @@ import e3nn.o3 as o3
 from e3nn.util.jit import compile_mode
 from e3nn.o3 import Irreps
 
+from ..cg import wigner_3j
+
 _INPUT = namedtuple("_INPUT", "tensor, start, stop")
 _TP = namedtuple("_TP", "op, args")
 
@@ -239,7 +241,7 @@ def _wigner_nj(
                 if filter_ir_mid is not None and ir_out not in filter_ir_mid:
                     continue
 
-                C = o3.wigner_3j(ir_out.l, ir_left.l, ir.l, dtype=dtype)
+                C = wigner_3j(ir_out.l, ir_left.l, ir.l, dtype=dtype)
                 if normalization == "component":
                     C *= ir_out.dim**0.5
                 if normalization == "norm":

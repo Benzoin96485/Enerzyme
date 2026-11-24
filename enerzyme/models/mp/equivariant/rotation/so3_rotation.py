@@ -20,27 +20,16 @@ from .wigner_jd import (
 )
 
 
-class SO3_Rotation:
-    """Build Wigner-D matrices from per-edge 3x3 rotation matrices and apply them."""
+class DegreeRotation:
+    """Apply a degree-major rotation to embeddings with per-layer order cutoffs."""
 
-    def __init__(
-        self,
-        rot_mat3x3: torch.Tensor,
-        lmax: int,
-        apply_rotate_inv_rescale: bool = False,
-    ) -> None:
-        self.device = rot_mat3x3.device
-        self.dtype = rot_mat3x3.dtype
-        # EquiformerV2 needs mmax-truncation rescale on rotate-back; paper eSCN
-        # (fairchem v1) does not — keep False for escn backward compatibility.
+    def __init__(self, matrices, lmax, apply_rotate_inv_rescale=False, mapping=None):
+        self.wigner, self.wigner_inv = matrices
+        self.device = self.wigner.device
+        self.dtype = self.wigner.dtype
         self.apply_rotate_inv_rescale = apply_rotate_inv_rescale
-
-        # Keep the Wigner graph so EnergyReduce+Force can form Fa = -dE/dRa
-        # through edge frames (fairchem v1 detached here for direct ForceBlock).
-        self.wigner = self.RotationToWignerDMatrix(rot_mat3x3, 0, lmax)
-        self.wigner_inv = torch.transpose(self.wigner, 1, 2).contiguous()
-
-        self.set_lmax(lmax)
+        self.lmax = lmax
+        self.mapping = mapping if mapping is not None else CoefficientMapping([lmax], [lmax], self.device)
 
     def set_lmax(self, lmax: int) -> None:
         self.lmax = lmax
@@ -59,6 +48,14 @@ class SO3_Rotation:
                 in_lmax, in_mmax
             )
         return torch.bmm(wigner_inv, embedding)
+
+
+class SO3_Rotation(DegreeRotation):
+    """Degree-major Wigner-D from explicit per-edge rotation matrices."""
+
+    def __init__(self, rot_mat3x3, lmax, apply_rotate_inv_rescale=False):
+        wigner = self.RotationToWignerDMatrix(rot_mat3x3, 0, lmax)
+        super().__init__((wigner, wigner.transpose(1, 2).contiguous()), lmax, apply_rotate_inv_rescale)
 
     def RotationToWignerDMatrix(
         self, edge_rot_mat: torch.Tensor, start_lmax: int, end_lmax: int

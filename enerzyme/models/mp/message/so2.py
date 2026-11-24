@@ -4,13 +4,9 @@ import torch
 
 from ..block import Block, BlockState
 from ..core import Embed
-from ..equivariant import CoefficientMapping, SO3_Embedding, SO3_Rotation, init_edge_rot_mat
+from ..equivariant import CoefficientMapping, SO3_Embedding
+from ..equivariant.rotation.so3_rotation import DegreeRotation
 from ..head import Head
-
-
-def _frame(inputs, vec):
-    frame = inputs.get("edge_rot_mat")
-    return init_edge_rot_mat(vec) if frame is None else frame.to(vec)
 
 
 def _seed(node, projection, lmax):
@@ -53,7 +49,9 @@ class ChannelEmbed(Embed):
         node = inputs["atom_embedding"]
         z = inputs["Za"].long()
         edge = torch.stack((ctx.sender, ctx.receiver))
-        rotation = [SO3_Rotation(_frame(inputs, -ctx.vec), self.lmax, apply_rotate_inv_rescale=self.degree is not None)]
+        frame = inputs.get("edge_rot_mat")
+        matrices = ctx.edge_rotation(self.lmax, "jd", edge_sign=-1, frame=frame)
+        rotation = [DegreeRotation(matrices, self.lmax, apply_rotate_inv_rescale=self.degree is not None)]
         mapping = self.mapping.to(node.device)
         x = SO3_Embedding(ctx.num_nodes, [self.lmax], self.sphere_proj.out_features, node.device, node.dtype)
         x.embedding[:, 0, :] = self.sphere_proj(node)
@@ -98,7 +96,8 @@ class FusedChannelEmbed(Embed):
         z = inputs["Za"].long()
         batch = ctx.batch if ctx.batch is not None else z.new_zeros(ctx.num_nodes)
         edge = torch.stack((ctx.sender, ctx.receiver))
-        rotation = self.rotation.for_edges(_frame(inputs, -ctx.vec))
+        rotation = ctx.edge_rotation(self.lmax, self.rotation, mmax=self.rotation.mmax,
+                                     edge_sign=-1, frame=inputs.get("edge_rot_mat"))
         window = inputs.get("edge_envelope_weight")
         if window is None and self.envelope is not None:
             window = self.envelope(ctx.edge_length())
@@ -135,7 +134,8 @@ class SmoothChannelEmbed(Embed):
         rotation = radial = distance = None
         if ctx.num_edges:
             vec = ctx.vec.to(node.device)
-            rotation = [SO3_Rotation(_frame(inputs, vec), self.lmax, apply_rotate_inv_rescale=False)]
+            matrices = ctx.edge_rotation(self.lmax, "jd", frame=inputs.get("edge_rot_mat"))
+            rotation = [DegreeRotation(matrices, self.lmax)]
             distance = torch.linalg.vector_norm(vec, dim=-1)
             radial = torch.cat((ctx.rbf.to(node.device), self.source(z[src]), self.target(z[dst])), dim=1)
             x = x + self.degree(radial, distance, edge, rotation, ctx.num_nodes)

@@ -118,7 +118,7 @@ class ClusterEmbed(FieldEmbed):
         edge_embed = self.edge_embed(attrs, ctx.rbf, edge)
         vec = -ctx.vec
         sh = self.sph(vec)
-        rotation, inverse = self.wigner.get_wigner(vec)
+        rotation, inverse = ctx.edge_rotation(self.wigner.lmax, self.wigner, mmax=self.wigner.mmax, edge_sign=-1)
         x = self.seed(x, attrs, ctx.rbf, sh, edge, cutoff)
         return BlockState(scalar=attrs, equi=x, edge=edge_embed,
                           aux={"edge": edge, "rotation": rotation, "inverse": inverse, "cutoff": cutoff})

@@ -14,6 +14,8 @@ from e3nn.util.jit import compile_mode
 from opt_einsum_fx import optimize_einsums_full
 from torch import fx, nn
 
+from ..mp.equivariant.cg import wigner_3j
+
 
 def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor):
     if len(xs) > 0:
@@ -162,7 +164,7 @@ def CODEGEN_MAIN_LEFT_RIGHT(
             graph.erase_node(w3j.node)
         else:
             if w3j_name not in constants:
-                constants[w3j_name] = o3.wigner_3j(
+                constants[w3j_name] = wigner_3j(
                     mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l
                 )
 
@@ -612,7 +614,7 @@ class Simple_TensorProduct(torch.nn.Module):
             # Compute outer product between x1 and x2
             xx = torch.einsum("zui,zvj->zuvij", x1, x2)
             # Get Wigner 3j symbols
-            w3j = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l).to(
+            w3j = wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l).to(
                 x1s.device
             )
 
