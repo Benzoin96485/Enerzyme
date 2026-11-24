@@ -91,16 +91,19 @@ class OrbitalEmbed(Embed):
         if ctx.receiver.numel() == 0:
             return BlockState(scalar=atom_embedding.new_zeros(ctx.num_nodes, self.n_orbit), equi=(coeff, species, None))
         pass_orbitals = self.hyper.ndim == 4
+        # CPU Inductor gives incorrect coordinate derivatives for the packed
+        # contraction. Compiled traces retain the tested ordered-shell formulation.
+        packed = pass_orbitals and not torch.compiler.is_compiling()
         pair, window = pair_gaussian_orbitals(
             ctx.receiver, ctx.sender, ctx.vec, ctx.dist, species, self.rs, self.inta, self.lmax, self.cutoff_sr,
             species_checked=True,
-            symmetric_channels=(self.representatives, self.multiplicities) if pass_orbitals else None,
+            symmetric_channels=(self.representatives, self.multiplicities) if packed else None,
         )
         psi = aggregate_weighted_orbitals(pair, coeff, ctx.receiver, ctx.sender, ctx.num_nodes)
-        shell = self.packed_shells if pass_orbitals else self.l_of_channel
+        shell = self.packed_shells if packed else self.l_of_channel
         first = self.hyper[0] if pass_orbitals else self.hyper
-        density = _project_orbitals(psi, first, shell, pass_orbitals)
-        return BlockState(scalar=density, equi=(coeff, species, psi), edge=(pair, window, self.hyper, shell))
+        density = _project_orbitals(psi, first, shell, packed)
+        return BlockState(scalar=density, equi=(coeff, species, psi), edge=(pair, window, self.hyper, shell, packed))
 
 
 def _project_orbitals(psi, hyper, shell, packed):
@@ -120,15 +123,15 @@ class OrbitalUpdate(SpeciesMLP):
         coeff = coeff + super().forward(state.scalar, species)
         if state.edge is None:
             return BlockState(scalar=state.scalar, equi=(coeff, species, None))
-        pair, window, hyper, shell = state.edge
+        pair, window, hyper, shell, packed = state.edge
         if self.orbital_step is None:
             contraction = hyper
         else:
             pair = add_neighbor_orbital(pair, psi, ctx.sender, window)
             contraction = hyper[self.orbital_step]
         psi = aggregate_weighted_orbitals(pair, coeff, ctx.receiver, ctx.sender, ctx.num_nodes)
-        density = _project_orbitals(psi, contraction, shell, self.orbital_step is not None)
-        return BlockState(scalar=density, equi=(coeff, species, psi), edge=(pair, window, hyper, shell))
+        density = _project_orbitals(psi, contraction, shell, packed)
+        return BlockState(scalar=density, equi=(coeff, species, psi), edge=(pair, window, hyper, shell, packed))
 
 
 def build_orbital_stack(core, built_layers) -> None:
