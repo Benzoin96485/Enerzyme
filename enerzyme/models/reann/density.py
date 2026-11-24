@@ -21,6 +21,8 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
+from ..mp.ops import scatter_sum
+
 from ..mp.basis.cartesian import cartesian_powers
 from ..mp.basis.envelope import cosine_transition
 
@@ -155,11 +157,8 @@ def aggregate_weighted_orbitals(
         raise ValueError(
             f"pair has {pair.shape[0]} edges but idx_i has {idx_i.shape[0]}"
         )
-    weighted = pair * coeff.to(dtype=pair.dtype).index_select(0, idx_j.long()).unsqueeze(1)
-    accumulated = weighted.new_zeros((int(n_atoms), pair.shape[1], pair.shape[2]))
-    if weighted.shape[0] == 0:
-        return accumulated
-    return accumulated.index_add(0, idx_i.long(), weighted)
+    weighted = pair * coeff.to(dtype=pair.dtype)[idx_j.long()].unsqueeze(1)
+    return scatter_sum(weighted, idx_i, int(n_atoms))
 
 
 def invariant_orbital_density(

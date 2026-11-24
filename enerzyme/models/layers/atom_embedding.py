@@ -8,6 +8,12 @@ from torch.nn import Embedding, Parameter, Linear, init
 from . import BaseFFLayer
 
 
+def one_hot_species(indices: Tensor, width: int, dtype: torch.dtype) -> Tensor:
+    """Encode species directly in the model dtype, including empty batches."""
+    rows = indices.new_zeros((*indices.shape, width), dtype=dtype)
+    return rows.scatter_(-1, indices.unsqueeze(-1), 1)
+
+
 class BaseAtomEmbedding(BaseFFLayer):
     def __init__(self, max_Za, dim_embedding) -> None:
         super().__init__(input_fields={"Za"}, output_fields={"atom_embedding"})
@@ -76,8 +82,7 @@ class OneHotAtomEmbedding(BaseAtomEmbedding):
             raise ValueError(
                 f"atomic numbers {missing} are outside the one-hot vocabulary"
             )
-        encoded = torch.nn.functional.one_hot(index, num_classes=self.dim_embedding)
-        return encoded.to(dtype=self._dtype_probe.dtype)
+        return one_hot_species(index, self.dim_embedding, self._dtype_probe.dtype)
 
 
 class RandomAtomEmbedding(BaseAtomEmbedding):
