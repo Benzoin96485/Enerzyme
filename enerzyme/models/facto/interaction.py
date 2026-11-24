@@ -239,6 +239,13 @@ class FACTOInteraction(nn.Module):
                 idx_i,
                 idx_j,
             )
+        if torch.compiler.is_compiling() and scalars.device.type == "cpu":
+            # CPU Inductor can fuse the next atom sum into the previous block's
+            # accumulator. Reduce the residual components along a separate axis.
+            return scalars_out, [
+                torch.stack((stored, self.residual_scale * (new + carried))).sum(0)
+                for stored, new, carried in zip(tensors, injected, transported)
+            ]
         tensors_out = [
             stored + self.residual_scale * (new + carried)
             for stored, new, carried in zip(tensors, injected, transported)
