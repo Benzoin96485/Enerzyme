@@ -68,17 +68,14 @@ Currently supported model architectures:
 | EFA / SO3LR+EFA | internal |             ✅             |     via readout / SO3LR     |       ✅       |   via readout   | [arXiv:2412.08541](https://arxiv.org/abs/2412.08541) | [euclidean_fast_attention](https://github.com/thorben-frank/euclidean_fast_attention) |
 |  DPA4C   | internal |             ✅             |         via readout         |       ✅       |   via readout   | [arXiv:2608.19041](https://arxiv.org/abs/2608.19041) | [deepmd-kit](https://github.com/deepmodeling/deepmd-kit) checkpoints do not load |
 
-Shared equivariant tooling (for developers):
+The [architecture registry](enerzyme/models/presets/builtin.py) maps each YAML name and alias to its preset. The preset constructs an embedding, message-passing blocks and a head using the [shared message-passing library](enerzyme/models/mp/). Each architecture retains its default parameters and layer stack. Geometry, physics, readouts and force differentiation remain available through the YAML layer interface.
 
-- `enerzyme.models.so3` — SH-array / SPHC primitives (EquiformerV2, So3krates, eSCN-style SO2, TECE), including unified `spherical_harmonics(..., layout=...)`, recursive/direct `WignerD`, `uvSO2Linear` / `SO2Gate` / `ComplexProductBasis`, array dropout, and `SphereSampleReadout`.
-- `enerzyme.models.efa` — Euclidean Fast Attention (ERoPE + Lebedev linear nonlocal): SpookyNet `use_efa`, architectures `efa` / `so3lr_efa`, or hook any Core via `EFABlock` / `apply_efa_if_configured` on invariant features + `Ra` + `batch_seg`. Distinct from TECE Radial Rotary Attention.
-- `enerzyme.models.e3nn_nn` — flat e3nn Irreps helpers (Equiformer V1, MACE, TACE, TECE, NequIP): TP rescale, Gate/Activation, irreps Linear / ElementLinear, path generation, scatter TP, tools.
-- Representation-agnostic blocks: `activation.SmoothLeakyReLU`, `activation.ScaledSigmoid` / `ScaledSiLU`, `blocks.drop` (`GraphDropPath`), `blocks.radial_mlp`.
-- `enerzyme.models.layers.gated_equivariant` — Cartesian gated equivariant blocks for tensor heads. PaiNN, NewtonNet, LEFTNet, and AlphaNet store vectors as `atom_vector_feature` with shape `[N, 3, F]`. `EquivariantDipole` and `EquivariantPolarizability` consume that pair.
-- `enerzyme.models.local_frame` — local Cartesian frames, local substructure encoding, and frame transitions shared by LEFTNet and AlphaNet.
-- `RadialWindow`, `IsolatedAtomResidual`, and `ScreenedZBLRepulsionEnergy` — cutoff envelope, covalent distance weight, isolated-atom residual, and learnable screened ZBL. Geodite uses them outside the Core; later stacks can reuse the same layers.
+- [Basis functions](enerzyme/models/mp/basis/) implement radial functions, cutoff envelopes and spherical harmonics.
+- [Equivariant operators](enerzyme/models/mp/equivariant/) handle flat irreducible representations, spherical arrays, SO(2) operations, rotation and tensor products.
+- [Neural-network primitives](enerzyme/models/mp/nn/) provide gated Cartesian maps, normalization, activation and radial networks.
+- [Message blocks](enerzyme/models/mp/message/) include scalar, vector, local-frame and spherical operations. [Long-range modules](enerzyme/models/mp/nonlocal_/) provide Performer, EFA, atom-fragment and dense attention.
 
-Architecture packages keep `core.py` + `interaction.py` (plus embedding / input blocks as needed). Equiformer-specific readouts live in each package's `interaction.py` and are re-exported from `layers` for YAML layer-stack discovery.
+The [developer guide](docs/developer_guide.rst) builds SchNet from a complete [training configuration](example/L3-COMT-aselmdb-smoke/config/train_otf_batch_schnet.yaml).
 
 ## Usage
 

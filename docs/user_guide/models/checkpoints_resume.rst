@@ -64,6 +64,20 @@ EMA
 
 Exponential moving average weights can stabilize late training. Check whether your evaluation uses EMA weights in the saved checkpoint.
 
+Checkpoints from the main branch
+--------------------------------
+
+The trainer recognizes the original SchNet, PhysNet, SpookyNet and MACE
+parameter names when loading checkpoints created before the preset migration.
+Use the architecture, build parameters and layer stack from the saved run.
+Loading converts the model weights and reorders the EMA shadow parameters.
+Resuming with optimizer state also maps the saved Adam or Muon parameter
+groups to the new module order. The trainer logs a warning when an optimizer
+layout cannot be mapped and continues with fresh optimizer state.
+
+New checkpoints carry the :code:`enerzyme_format` field. The conversion runs
+in memory when loading older files. The next save writes the current format.
+
 Lightning multi-GPU
 -------------------
 

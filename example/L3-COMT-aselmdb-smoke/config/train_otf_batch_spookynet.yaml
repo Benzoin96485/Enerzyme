@@ -56,7 +56,7 @@ Modelhub:
         params:
           attribute: spin
           num_residual: 1
-      - name: Core
+      - name: Core  # Configure the spookynet message-passing blocks here.
         params:
           dropout_rate: 0.0
           num_modules: 1

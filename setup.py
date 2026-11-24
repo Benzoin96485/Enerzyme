@@ -24,6 +24,7 @@ setup(
         "models/mp/equivariant/data/Jd.pt",
         "models/mp/equivariant/data/cgmatrix.npz",
         "models/mp/equivariant/data/lebedev_grids.npz",
+        "models/mp/NOTICE",
         "models/mp/nonlocal_/NOTICE",
         "qm/xtb_population/xtbml.toml",
     ]},

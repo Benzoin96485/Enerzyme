@@ -12,7 +12,7 @@ are the parity-allowed couplings of ``1o`` and ``2e``:
 
 That is fewer paths than an SO(3) product of the same two degrees, and each
 output degree still sees both input degrees. Features use the polynomial
-spherical-harmonic order from :func:`enerzyme.models.layers.polynomial_harmonics.polynomial_spherical_harmonics`
+spherical-harmonic order from :func:`enerzyme.models.mp.basis.angular.polynomial_spherical_harmonics`
 (``l = 1`` then ``l = 2``, Cartesian ``(x, y, z)``). That order matches the
 e3nn real harmonics, up to one scale per degree, so
 :class:`e3nn.o3.FullyConnectedTensorProduct` is equivariant on these tensors.
@@ -31,7 +31,7 @@ from e3nn import o3
 from torch import Tensor
 from torch.nn import Module, Parameter, init
 
-from ..layers.polynomial_harmonics import angular_dim
+from ..mp.basis.angular import angular_dim
 from ..mp.equivariant.cg import coupling_paths
 
 
