@@ -15,13 +15,7 @@ from torch import Tensor
 from torch.nn import AvgPool1d, Conv1d, Embedding, GroupNorm, Linear, Module
 
 from ..mp.nn.activation import get_activation_fn
-from .geometry import (
-    bilinear_sphere_index,
-    edge_spin_frames,
-    project_neighbors,
-    source_neighbor_pairs,
-    splat_sphere,
-)
+from .geometry import sphere_projection, splat_sphere
 
 
 def _swish() -> Module:
@@ -210,27 +204,13 @@ class SpinConvolution(Module):
         vij: Tensor,
         distance: Tensor,
         num_nodes: int,
+        projection=None,
     ) -> Tensor:
         if messages.shape[0] == 0:
             return messages.new_zeros((0, self.mid_channels))
-        frames = edge_spin_frames(vij, idx_i, distance, self.cutoff, num_nodes)
-        source_edge, query_edge = source_neighbor_pairs(idx_i, idx_j, num_nodes)
-        if source_edge.numel() == 0:
-            grid = messages.new_zeros(
-                (messages.shape[0], self.hidden_channels, self.n_lat, self.n_long)
-            )
-        else:
-            local = project_neighbors(vij, frames, source_edge, query_edge)
-            index, weight = bilinear_sphere_index(local, query_edge, self.n_lat, self.n_long)
-            grid = splat_sphere(
-                messages,
-                messages.shape[0],
-                self.n_lat,
-                self.n_long,
-                index,
-                weight,
-                source_edge,
-            )
+        if projection is None:
+            projection = sphere_projection(vij, idx_i, idx_j, distance, self.cutoff, num_nodes, self.n_lat, self.n_long)
+        grid = splat_sphere(messages, messages.shape[0], self.n_lat, self.n_long, *projection)
         return self.pool_grid(grid)
 
 
@@ -287,8 +267,9 @@ class MessageBlock(Module):
         vij: Tensor,
         distance: Tensor,
         num_nodes: int,
+        projection=None,
     ) -> Tensor:
-        hidden = self.spin(messages, idx_i, idx_j, vij, distance, num_nodes)
+        hidden = self.spin(messages, idx_i, idx_j, vij, distance, num_nodes, projection)
         hidden = self.mix_spin(hidden, atom_embedding, idx_j, idx_i)
         radial = self.dist2(self.act(self.dist1(distance_embed)))
         hidden = self.act(hidden + radial)

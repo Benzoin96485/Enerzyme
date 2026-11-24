@@ -31,14 +31,14 @@ def _rotation(dtype=torch.float64, improper=False):
 
 
 def _core(**kwargs):
-    from enerzyme.models.dpa3 import DPA3Core
+    from enerzyme.models.presets.triplet_graphs import dpa3
 
     params = dict(
         dim_embedding=8, e_dim=8, a_dim=8, nlayers=2, e_sel=8, a_sel=6,
         axis_neuron=2, e_rcut=6.0, e_rcut_smth=5.0, a_rcut=4.0, a_rcut_smth=3.5,
     )
     params.update(kwargs)
-    return DPA3Core(**params)
+    return dpa3(**params)
 
 
 def _geometry(n=4, seed=0, dtype=torch.float32):
@@ -58,14 +58,14 @@ def test_dpa3_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, _, _ = get_ff_core("dpa3")
-    assert core_cls.__name__ == "DPA3Core"
+    assert core_cls.__name__ == "dpa3"
     with EXAMPLE.open() as stream:
         ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
     model = build_model(
         ff["architecture"], layer_params=ff["layers"],
         build_params=ff["build_params"], verbose=0,
     )
-    assert model.__class__.__name__ == "DPA3Core"
+    assert model.architecture == "dpa3"
 
 
 def test_dpa3_shapes_and_geometry_autograd():

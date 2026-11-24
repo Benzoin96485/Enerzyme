@@ -12,7 +12,6 @@ bond-graph basis uses ``bond_cutoff``. The magnetic-moment head is
 ``SimpleReadout``.
 """
 
-from .core import CHGNetCore
 
 
 _ENERGY = {
@@ -60,7 +59,6 @@ DEFAULT_LAYER_PARAMS = [
 ]
 
 __all__ = [
-    "CHGNetCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
 ]

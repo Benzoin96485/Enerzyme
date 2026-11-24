@@ -150,6 +150,50 @@ KEY_MAPS["geodite"] = [
     (r"^couplings\.(\d+)\.", r"blocks.\1.coupling."),
 ]
 
+KEY_MAPS["dpa3"] = [
+    (r"^(edge_embed|angle_embed)(?=\.|$)", r"embed.\1"),
+    (r"^blocks\.(\d+)\.", r"blocks.\1.module."),
+]
+
+KEY_MAPS["alignn"] = [
+    (r"^(atom_mlp|edge_mlp|angle_mlp|angle_centers|angle_coeff)(?=\.|$)", r"embed.\1"),
+    (r"^alignn\.(\d+)\.", r"blocks.\1.module."),
+    (r"^gcn\.0\.", r"blocks.2.module."),
+    (r"^gcn\.1\.", r"blocks.3.module."),
+]
+
+KEY_MAPS["chgnet"] = [
+    (r"^(atom_weight|bond_weight|bond_embed|angle_embed|fourier)(?=\.|$)", r"embed.\1"),
+    (r"^atom_convs\.(\d+)\.", r"blocks.\1.atom."),
+    (r"^bond_convs\.(\d+)\.", r"blocks.\1.bond."),
+    (r"^angle_updates\.(\d+)\.", r"blocks.\1.angle."),
+    (r"^readout_norm\.", r"head.norm."),
+]
+
+KEY_MAPS["spinconv"] = [
+    (r"^(gaussian_center|gaussian_coeff|distance_map|init_fc1|init_fc2|init_mix|pair_scale)(?=\.|$)", r"embed.\1"),
+    (r"^interactions\.(\d+)\.", r"blocks.\1.message."),
+    (r"^energy_mix\.", r"head.mixture."),
+]
+
+KEY_MAPS["gemnet"] = [
+    (r"^(edge_emb|triplet_radial|mlp_rbf3|mlp_cbf3|mlp_rbf_h|mlp_rbf_out|quad_cbf_radial|quad_sbf_radial|mlp_rbf4|mlp_cbf4|mlp_sbf4)(?=\.|$)", r"embed.\1"),
+    (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
+    (r"^readouts\.", r"head.readouts."),
+]
+
+KEY_MAPS["gemnet-q"] = [
+    (r"^(edge_emb|triplet_radial|mlp_rbf3|mlp_cbf3|mlp_rbf_h|mlp_rbf_out|quad_cbf_radial|quad_sbf_radial|mlp_rbf4|mlp_cbf4|mlp_sbf4)(?=\.|$)", r"embed.\1"),
+    (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
+    (r"^readouts\.", r"head.readouts."),
+]
+
+KEY_MAPS["gemnet-oc"] = [
+    (r"^(edge_emb|mlp_rbf_tint|mlp_rbf_h|mlp_rbf_out|mlp_cbf_tint|mlp_rbf_qint|mlp_cbf_qint|mlp_sbf_qint|mlp_rbf_aeint|mlp_cbf_aeint|mlp_rbf_eaint|mlp_cbf_eaint|mlp_rbf_aint)(?=\.|$)", r"embed.\1"),
+    (r"^interactions\.(\d+)\.", r"blocks.\1.interaction."),
+    (r"^readouts\.", r"head.readouts."),
+]
+
 
 KEY_MAPS["dimenet"] = KEY_MAPS["dimenet++"] = [
     (r"^sbf\.", "embed.basis."),

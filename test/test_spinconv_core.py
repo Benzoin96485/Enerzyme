@@ -27,7 +27,7 @@ def _basis(dist: torch.Tensor, num_rbf: int, cutoff: float, scalar: float = 3.0)
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.spinconv import SpinConvCore
+    from enerzyme.models.presets.triplet_graphs import spinconv
 
     params = dict(
         dim_embedding=8,
@@ -47,7 +47,7 @@ def _tiny(**kwargs):
         residual_first=False,
     )
     params.update(kwargs)
-    return SpinConvCore(**params)
+    return spinconv(**params)
 
 
 def _edges(n: int):
@@ -99,10 +99,10 @@ def _rotate(pos: torch.Tensor) -> torch.Tensor:
 
 def test_registration_and_example_yaml():
     from enerzyme.models.ff import build_model, get_ff_core
-    from enerzyme.models.spinconv import SpinConvCore
+    from enerzyme.models.presets.triplet_graphs import spinconv
 
     core_cls, defaults, layers = get_ff_core("SpinConv")
-    assert core_cls is SpinConvCore
+    assert core_cls is spinconv
     assert defaults["cutoff_sr"] == 6.0
     assert defaults["num_rbf"] == 512
     assert defaults["hidden_channels"] == 32
@@ -120,7 +120,7 @@ def test_registration_and_example_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert isinstance(model, SpinConvCore)
+    assert model.architecture == "spinconv"
     assert model.num_interactions == 3
     assert model.hidden_channels == 32
     assert model.mid_hidden_channels == 256
@@ -179,10 +179,10 @@ def test_angles_change_features_when_bond_lengths_stay_fixed():
     # initialization its gain is well below 1, so the atomic latent barely
     # moves. The spin convolution itself is where the angle enters.
     messages = torch.randn(4, core.hidden_channels)
-    spun_wide = core.interactions[0].spin(
+    spun_wide = core.blocks[0].message.spin(
         messages, wide["idx_i_sr"], wide["idx_j_sr"], wide["vij_sr"], wide["Dij_sr"], 3
     )
-    spun_narrow = core.interactions[0].spin(
+    spun_narrow = core.blocks[0].message.spin(
         messages, narrow["idx_i_sr"], narrow["idx_j_sr"], narrow["vij_sr"], narrow["Dij_sr"], 3
     )
     assert float((spun_wide - spun_narrow).abs().max()) > 1e-2
@@ -209,7 +209,7 @@ def test_rotation_translation_order_and_inversion():
     packed_inv = _pack(-pos, embedding)
 
     def _spin(packed):
-        return core.interactions[0].spin(
+        return core.blocks[0].message.spin(
             messages,
             packed["idx_i_sr"],
             packed["idx_j_sr"],
@@ -259,12 +259,12 @@ def test_batch_isolation_scale_and_isolated_atom():
 
     za_source = left["Za"][left["idx_j_sr"]]
     za_target = left["Za"][left["idx_i_sr"]]
-    unscaled = core.pair_scale(left["Dij_sr"], za_source, za_target)
+    unscaled = core.embed.pair_scale(left["Dij_sr"], za_source, za_target)
     with torch.no_grad():
-        core.pair_scale.gain.weight.fill_(4.0)
-    stretched = core.pair_scale(left["Dij_sr"], za_source, za_target)
+        core.embed.pair_scale.gain.weight.fill_(4.0)
+    stretched = core.embed.pair_scale(left["Dij_sr"], za_source, za_target)
     assert float((stretched - unscaled).abs().max()) > 0.1
-    painted = gaussian_expansion(stretched, core.gaussian_center, core.gaussian_coeff)
+    painted = gaussian_expansion(stretched, core.embed.gaussian_center, core.embed.gaussian_coeff)
     assert float((painted - left["rbf"]).abs().max()) > 1e-3
     assert torch.isfinite(_forward(core, left)).all()
 
