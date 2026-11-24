@@ -37,3 +37,14 @@ def test_performer_exact_masks_other_molecules():
     )
     expected = (kernel / (kernel.sum(-1, keepdim=True) + 1e-8)) @ v
     torch.testing.assert_close(layer(q, k, v, 2, batch), expected)
+
+
+def test_force_loss_differentiates_attention_weights_twice():
+    devices = ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
+    for device in devices:
+        layer = GlobalAttention(16, 2, 0).to(device).train()
+        x = torch.randn(2, 4, 16, device=device, requires_grad=True)
+        energy = layer(x, x, x).square().sum()
+        force, = torch.autograd.grad(energy, x, create_graph=True)
+        grad, = torch.autograd.grad(force.square().sum(), layer.attn_in_proj_q.weight)
+        assert torch.isfinite(grad).all() and grad.abs().sum() > 0

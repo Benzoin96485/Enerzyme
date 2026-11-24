@@ -125,7 +125,7 @@ def _worker(arch, reps, threads, use_compile, systems="default", precision="floa
         for mode in ("infer", "train"):
             try:
                 entry.update(measure(batch, mode))
-            except (RuntimeError, NotImplementedError) as exc:
+            except (RuntimeError, ValueError, NotImplementedError) as exc:
                 entry[f"{mode}_error"] = f"{type(exc).__name__}: {exc}"[:2500]
             if f"{mode}_error" in entry:
                 model.zero_grad(set_to_none=True)

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import math
+from contextlib import nullcontext
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
+from torch.nn.attention import SDPBackend, sdpa_kernel
 
 
 class GlobalAttention(nn.Module):
@@ -66,14 +68,17 @@ class GlobalAttention(nn.Module):
         if embed_dim != head_dim_v:
             v = F.pad(v, (0, embed_dim - head_dim_v))
 
-        attn_output = F.scaled_dot_product_attention(
-            query=q,
-            key=k,
-            value=v,
-            attn_mask=attn_mask,
-            dropout_p=self.attn_dropout if self.training else 0.0,
-            scale=1.0 / math.sqrt(embed_dim),
-        )
+        # Force-loss training differentiates attention backward a second time.
+        backend = sdpa_kernel(SDPBackend.MATH) if self.training and torch.is_grad_enabled() else nullcontext()
+        with backend:
+            attn_output = F.scaled_dot_product_attention(
+                query=q,
+                key=k,
+                value=v,
+                attn_mask=attn_mask,
+                dropout_p=self.attn_dropout if self.training else 0.0,
+                scale=1.0 / math.sqrt(embed_dim),
+            )
 
         if attn_output.shape[-1] != head_dim_v:
             attn_output = attn_output[..., :head_dim_v]
