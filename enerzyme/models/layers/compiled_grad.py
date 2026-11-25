@@ -259,10 +259,8 @@ def compiled_coordinate_vjp(core, inputs):
         if separate_vectors:
             return train_with_vector_outputs(core, inputs, edges, topology, post_pairs)
         if core.training and getattr(core, "architecture", None) == "chgnet":
-            coordinates = inputs.get("Ra")
-            if isinstance(coordinates, Tensor) and coordinates.device.type == "cpu":
-                from ..chgnet.stages import train_with_magnetic_readout
-                return train_with_magnetic_readout(core, inputs, edges, topology, post_pairs)
+            from ..chgnet.stages import train_with_magnetic_readout
+            return train_with_magnetic_readout(core, inputs, edges, topology, post_pairs)
         return forward_with_coordinate_gradients(core, inputs, edges, topology, post_pairs)
 
 
