@@ -328,6 +328,13 @@ zero gradients to unused parameters in the shared feature graph. Use eager
 training if the optimizer must skip those parameters for a magnetic-only step.
 
 :code:`GraphContext` caches geometry for the duration of one forward pass.
+The context crosses compiler graph breaks and Dynamo guards on its cache keys,
+so every key is a constant. Graphs derived with :code:`within`,
+:code:`closest` or :code:`subset(indices, key=...)` carry a constant
+provenance :code:`key` that pair tables and quadruplets of related graphs use
+as their own key. Name a selection with :code:`key` when a block reuses it;
+an unnamed subset is rebuilt on every call. Caching under a tensor or another
+context object recompiles the model on every forward pass.
 Each block returns a :code:`BlockState` carrying node, edge or auxiliary
 features. The head can consume the final state or request intermediate
 states. The SchNet preset in :code:`enerzyme/models/presets/scalar.py`
