@@ -1,11 +1,11 @@
 {
   "cpu": {
-    "revision": "dede8a8",
-    "job": "6319985",
+    "revision": "81620f7",
+    "job": "6324950",
     "test_files_and_shards": 170,
     "results": {
-      "passed": 1622,
-      "skipped": 61,
+      "passed": 1638,
+      "skipped": 63,
       "errors": 0,
       "failures": 0
     },
@@ -13,31 +13,37 @@
       "preset does not declare inversion symmetry": 42,
       "CUDA + Triton required": 2,
       "CUDA and Triton required": 2,
+      "CUDA-only local-frame fusion": 1,
       "set UMA_CHECKPOINT to a local uma-*.pt for live train smoke": 1,
+      "compiled single-precision CUDA training": 1,
       "CUDA not available": 6,
       "set UMA_CHECKPOINT to a local uma-*.pt for live flow train smoke": 1,
       "fixture has no Muon trajectory": 7
     }
   },
   "cuda": {
-    "revision": "67d7a1b",
-    "job": "6318243",
+    "revision": "81620f7",
+    "job": "6325031",
     "device": "Tesla V100-PCIE-32GB (sm70)",
     "pytest_files": [
+      "test/test_e2former_triton_parity.py",
       "test/test_scatter.py",
-      "test/test_e2former_triton_parity.py"
+      "test/test_local_frame_ops.py",
+      "test/test_dpa4_core.py::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles"
     ],
     "results": {
-      "passed": 22,
+      "passed": 34,
       "skipped": 1,
       "errors": 0,
       "failures": 0
     },
     "cpu_skips_passed_on_cuda": [
+      "test.test_dpa4_core::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles",
       "test.test_e2former_triton_parity::test_attention_triton_qk_matches_qk_alpha_module_on_cuda",
       "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype0]",
       "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype1]",
       "test.test_e2former_triton_parity::test_triton_sparse_qk_v_match_pytorch_on_cuda",
+      "test.test_local_frame_ops::test_compiled_local_frame_projection_honors_nested_hook",
       "test.test_scatter::test_scatter_sum_basic_equivalence[cuda]",
       "test.test_scatter::test_scatter_sum_empty_input_equivalence[cuda]",
       "test.test_scatter::test_scatter_sum_grad_equivalence[cuda]",
@@ -51,10 +57,10 @@
   },
   "notes": "The runs use the recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run.",
   "wheel": {
-    "revision": "dede8a8",
-    "job": "6319987",
+    "revision": "81620f7",
+    "job": "6324951",
     "filename": "enerzyme-0.6.0-py3-none-any.whl",
-    "sha256": "840619606c2833e40af26e7447bcb49ed2d6cbcaeed1e1c9df90655569cfc7af",
+    "sha256": "75a50c3260005e28ecca53061f039dffef679dde1de450cc0922a89caf9995ac",
     "results": {
       "passed": 58,
       "skipped": 0,
