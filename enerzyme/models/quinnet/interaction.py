@@ -187,6 +187,17 @@ class QuinNetInteraction(Module):
         )
         return five_iii, five_ii, torsion
 
+    def _vector_message(self, scalar_message: Tensor, vector: Tensor, idx_j: Tensor, direction: Tensor) -> Tensor:
+        gate, coeff = torch.split(
+            F.silu(self.s_proj(scalar_message)), self.hidden_channels, dim=-1
+        )
+        vector_message = gather_sender(vector, idx_j) * gate.unsqueeze(1)
+        return vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
+
+    @staticmethod
+    def _vector_residual(vec3: Tensor, out_scale: Tensor, aggregated: Tensor) -> Tensor:
+        return vec3 * out_scale.unsqueeze(1) + aggregated
+
     def forward(
         self,
         scalar: Tensor,
@@ -197,6 +208,19 @@ class QuinNetInteraction(Module):
         window: Tensor,
         direction: Tensor,
     ) -> tuple[Tensor, Tensor, Optional[Tensor]]:
+        return self._update(scalar, vector, edge, idx_i, idx_j, window, direction, defer_vector=False)
+
+    def _update(
+        self,
+        scalar: Tensor,
+        vector: Tensor,
+        edge: Tensor,
+        idx_i: Tensor,
+        idx_j: Tensor,
+        window: Tensor,
+        direction: Tensor,
+        *, defer_vector: bool,
+    ):
         n_atoms = int(scalar.shape[0])
         if idx_i.shape != idx_j.shape or idx_i.ndim != 1:
             raise ValueError(
@@ -268,13 +292,11 @@ class QuinNetInteraction(Module):
         scalar_message = (value_j * attention.unsqueeze(-1)).reshape(
             n_edges, self.hidden_channels
         )
-        gate, coeff = torch.split(
-            F.silu(self.s_proj(scalar_message)), self.hidden_channels, dim=-1
-        )
-        vector_message = gather_sender(vector, idx_j) * gate.unsqueeze(1)
-        vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
+        if not defer_vector:
+            vector_message = self._vector_message(scalar_message, vector, idx_j, direction)
         aggregated_scalar = scatter_sum(scalar_message, idx_i, node_shape[0])
-        aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
+        if not defer_vector:
+            aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
         out_scale, out_gate, out_bias = torch.split(
             self.o_proj(aggregated_scalar), self.hidden_channels, dim=-1
         )
@@ -283,7 +305,9 @@ class QuinNetInteraction(Module):
         )
         mixed = (terms * self.ratio.to(dtype=terms.dtype).view(-1, 1, 1)).sum(dim=0)
         delta_scalar = mixed * out_gate + out_bias
-        delta_vector = vec3 * out_scale.unsqueeze(1) + aggregated_vector
+        if defer_vector:
+            return delta_scalar, (scalar_message, vector, vec3, out_scale)
+        delta_vector = self._vector_residual(vec3, out_scale, aggregated_vector)
         delta_edge = None
         if not self.last_layer:
             delta_edge = torsion_edge + five_iii_edge + five_ii_edge

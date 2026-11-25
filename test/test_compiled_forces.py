@@ -503,3 +503,91 @@ def test_reusable_inference_uses_a_distinct_compiler_cache_tag():
         assert tags == {"project-A:enerzyme-retained-backward"}
     finally:
         torch.compiler.reset()
+
+
+@pytest.mark.parametrize("architecture", ["visnet", "quinnet", "freecg", "visnet_lsrm"])
+def test_compiled_force_and_vector_supervision_preserve_terminal_gradients(architecture):
+    from torch._dynamo.backends.registry import lookup_backend
+    from enerzyme.models.ff import get_ff_core
+    from scripts.core_harness import make_batch, random_molecules
+
+    torch.manual_seed(53)
+    _, defaults, layers = get_ff_core(architecture)
+    layers = copy.deepcopy(layers)
+    for spec in layers:
+        if spec["name"] == "Core":
+            spec["params"].update(num_layers=2, num_heads=2)
+            if architecture == "freecg":
+                spec["params"]["num_groups"] = 2
+    reduce_at = next(i for i, layer in enumerate(layers) if layer["name"] == "EnergyReduce")
+    layers.insert(reduce_at, {"name": "EquivariantDipole", "params": {"n_layers": 1}})
+    model = build_model(
+        architecture, layers, {**defaults, "dim_embedding": 8, "num_rbf": 6, "max_Za": 8}, verbose=0
+    ).double().train()
+    batch = make_batch(random_molecules(107, [3, 2], density=0.12), torch.float64)
+    batch["Ra"].requires_grad_()
+    params = dict(model.named_parameters())
+    dense_layers_per_graph = []
+
+    def capture(graph, example):
+        dense_layers_per_graph.append(sum(node.target is torch.nn.functional.linear for node in graph.graph.nodes))
+        return lookup_backend("aot_eager")(graph, example)
+
+    compiled = torch.compile(model, backend=capture)
+    scalar_only = ("head.out_norm.", "post_sequence.0.head.")
+    if architecture == "quinnet":
+        # The final block's higher-body terms contribute only to the scalar update.
+        scalar_only += tuple("blocks.1.module." + field for field in (
+            "ratio", "f_proj", "vec_proj_improper", "dst_proj", "src_proj", "trg_proj",
+        ))
+    elif architecture == "visnet_lsrm":
+        scalar_only += ("head.short.out_norm.", "head.out_norm_long.",
+                        *(f"blocks.4.module.mix.{i}." for i in (2, 3, 4, 5)))
+
+    def step(runner, target):
+        result = runner(batch)
+        loss = result["E"].square().sum() + result["Fa"].square().sum()
+        vector_loss = result["atom_vector_feature"].square().sum()
+        if "atom_l2_feature" in result:
+            vector_loss = vector_loss + result["atom_l2_feature"].square().sum()
+        if target == "vector":
+            loss = vector_loss
+        elif target == "forces_and_vector":
+            loss = loss + vector_loss
+        elif target == "forces_and_dipole":
+            loss = loss + result["M2"].square().sum()
+        gradients = torch.autograd.grad(loss, [batch["Ra"], *params.values()], allow_unused=True)
+        return result, dict(zip(["Ra", *params], gradients))
+
+    for target in ("forces", "forces_and_vector", "forces_and_dipole", "vector"):
+        expected, reference = step(model, target)
+        actual, gradients = step(compiled, target)
+        assert expected.keys() == actual.keys()
+        for name, value in expected.items():
+            if isinstance(value, torch.Tensor):
+                torch.testing.assert_close(actual[name], value, atol=1e-10, rtol=1e-8)
+        for name, value in reference.items():
+            observed = gradients[name]
+            if target == "vector" and value is None and observed is not None:
+                # The shared prefix still returns energy and scalar fields when a
+                # caller uses only raw vectors. AOT supplies zeros to these scalar heads.
+                assert name.startswith(scalar_only)
+                assert torch.count_nonzero(observed) == 0
+            elif value is None:
+                assert observed is None, name
+            else:
+                torch.testing.assert_close(observed, value, atol=1e-10, rtol=1e-8)
+        if architecture == "visnet_lsrm":
+            terminal = [grad for name, grad in gradients.items()
+                        if name.startswith(("blocks.4.module.mlp_", "blocks.4.module.mix.0.", "blocks.4.module.mix.1."))]
+            assert len(terminal) == 10
+        else:
+            terminal = [gradients["blocks.1.module.s_proj." + p] for p in ("weight", "bias")]
+            if architecture == "freecg":
+                terminal.append(gradients["blocks.1.module.group_cg.tp_weight"])
+        if target == "forces":
+            assert all(grad is None for grad in terminal)
+        else:
+            assert all(grad is not None and torch.count_nonzero(grad) for grad in terminal)
+    vector_projections = 6 if architecture == "visnet_lsrm" else 1
+    assert vector_projections in dense_layers_per_graph and max(dense_layers_per_graph) > vector_projections

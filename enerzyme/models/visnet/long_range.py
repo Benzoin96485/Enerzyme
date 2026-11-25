@@ -65,6 +65,15 @@ def normalize_fragment_mode(value: object) -> str:
     return key
 
 
+def _fragment_distance(delta: Tensor) -> Tensor:
+    # A singleton's center follows its atom, so its own distance is constant.
+    # Differentiating the Euclidean norm at zero would introduce 0/0 in a Hessian.
+    coincident = (delta == 0).all(dim=-1)
+    safe = torch.where(coincident.unsqueeze(-1), torch.ones_like(delta), delta)
+    distance = torch.linalg.vector_norm(safe, dim=-1)
+    return torch.where(coincident, torch.zeros_like(distance), distance)
+
+
 def _fragment_direction(delta: Tensor, distance: Tensor) -> Tensor:
     unit = delta / distance.clamp_min(1e-12).unsqueeze(-1)
     return torch.where((distance < 1e-8).unsqueeze(-1), torch.zeros_like(unit), unit)
@@ -105,7 +114,7 @@ def bipartite_radius_edges(
             continue
         # [Na, Nc, 3], fragment minus atom, matching the released ``u_ij``.
         delta = cluster_pos[fragments].unsqueeze(0) - atom_pos[atoms].unsqueeze(1)
-        dist = torch.linalg.vector_norm(delta, dim=-1)
+        dist = _fragment_distance(delta)
         within = dist <= limit
         if not bool(within.any()):
             continue
@@ -220,7 +229,7 @@ def fragment_geometry(
         weights = numbers if center == "atomic_number" else None
         centers = weighted_fragment_centers(positions, ids, weights)
         delta = centers[fragments] - positions[atoms]
-        distance = torch.linalg.vector_norm(delta, dim=-1)
+        distance = _fragment_distance(delta)
         direction = _fragment_direction(delta, distance)
     else:
         ids, centers, cluster_batch = resolve_long_range_fragments(

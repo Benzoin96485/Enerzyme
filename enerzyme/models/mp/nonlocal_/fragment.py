@@ -92,6 +92,21 @@ class FragmentLR(Module):
         edge_attr: Tensor,
         direction: Tensor,
     ) -> tuple[Tensor, Tensor]:
+        return self._update(
+            node_scalar, node_vector, group_scalar, group_vector, idx_atom, idx_fragment,
+            edge_attr, direction, defer_vector=False,
+        )
+
+    def _vector_message(self, scalar_message, group_vector, idx_fragment, direction):
+        fragment_vector = group_vector.index_select(0, idx_fragment)
+        message = self.mlp_pos(scalar_message).unsqueeze(1) * direction.unsqueeze(-1)
+        return message + self.mlp_vec(scalar_message).unsqueeze(1) * fragment_vector
+
+    def _vector_residual(self, aggregated_vector, aggregated_scalar, vector):
+        return aggregated_vector + self.mix[0](aggregated_scalar).unsqueeze(1) * self.mix[1](vector)
+
+    def _update(self, node_scalar, node_vector, group_scalar, group_vector, idx_atom,
+                idx_fragment, edge_attr, direction, *, defer_vector):
         n_atoms = int(node_scalar.shape[0])
         scalar = self.norm_node(node_scalar)
         vector = self.norm_node_vec(node_vector)
@@ -102,7 +117,7 @@ class FragmentLR(Module):
             group_vector = self.drop_vector(group_vector)
 
         n_edges = int(idx_atom.shape[0])
-        if not torch.compiler.is_compiling() and n_edges == 0:
+        if not defer_vector and not torch.compiler.is_compiling() and n_edges == 0:
             return node_scalar.new_zeros(n_atoms, self.hidden_channels), node_vector.new_zeros(
                 n_atoms, 3, self.hidden_channels
             )
@@ -119,14 +134,16 @@ class FragmentLR(Module):
         scalar_message = (value_j * attention.unsqueeze(-1)).reshape(
             n_edges, self.hidden_channels
         )
-        fragment_vector = group_vector.index_select(0, idx_fragment)
-        vector_message = self.mlp_pos(scalar_message).unsqueeze(1) * direction.unsqueeze(-1)
-        vector_message = vector_message + self.mlp_vec(scalar_message).unsqueeze(1) * fragment_vector
+        if not defer_vector:
+            vector_message = self._vector_message(scalar_message, group_vector, idx_fragment, direction)
         aggregated_scalar = scatter_sum(scalar_message, idx_atom, n_atoms)
-        aggregated_vector = scatter_sum(vector_message, idx_atom, n_atoms)
+        if not defer_vector:
+            aggregated_vector = scatter_sum(vector_message, idx_atom, n_atoms)
         left = self.mix[2](vector)
         right = self.mix[3](vector)
         dot = (left * right).sum(dim=1)
         delta_scalar = dot * self.mix[4](aggregated_scalar) + self.mix[5](aggregated_scalar)
-        delta_vector = aggregated_vector + self.mix[0](aggregated_scalar).unsqueeze(1) * self.mix[1](vector)
+        if defer_vector:
+            return delta_scalar, (scalar_message, group_vector, aggregated_scalar, vector)
+        delta_vector = self._vector_residual(aggregated_vector, aggregated_scalar, vector)
         return delta_scalar, delta_vector

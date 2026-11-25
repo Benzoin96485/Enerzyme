@@ -11,6 +11,16 @@ ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "enerzyme" / "config" / "visnet_lsrm_layers_example.yaml"
 
 
+def test_compiled_fragment_partition_keeps_configured_joint_paths():
+    from enerzyme.models.presets.compiled_vector import _deferred_layers
+
+    standard = _build().train()
+    assert _deferred_layers(standard, {}) == ()
+    assert _deferred_layers(standard, {"_lsrm_atoms": torch.tensor([1])}) is None
+    for params in ({"dropout": 0.2}, {"long_layers": 0}, {"lmax": 2}):
+        assert _deferred_layers(_build(**params).train(), {}) is None
+
+
 def _edges(n: int, groups=None):
     idx_i, idx_j = [], []
     if groups is None:

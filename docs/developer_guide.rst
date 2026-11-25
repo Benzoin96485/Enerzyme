@@ -403,6 +403,25 @@ auxiliary parameters contribute to the loss. AdamW skips a parameter whose
 gradient is :code:`None` and applies weight decay to a parameter with an
 explicit zero gradient.
 
+For the standard ViSNet, QuinNet and FreeCG force-training stacks, :code:`torch.compile(model)`
+returns the full output dictionary and computes the final vector update in a
+separate differentiable graph. An energy/force loss leaves
+:code:`blocks[-1].module.s_proj` unused. Supervising Cartesian vectors, the
+degree-two features or a dipole head differentiates this projection. FreeCG
+also places its last group tensor-product weights in the vector graph. Custom
+layers before force evaluation retain the joint execution path. When a hook
+is active on the input, final update or readout, ordinary compilation uses
+native force derivatives so callbacks installed after compilation take effect.
+When training exclusively on vectors, AOTAutograd can still assign zeros to
+unused scalar readout weights.
+
+The standard ViSNet-LSRM model applies this split to its final atom–fragment
+update. An energy/force loss leaves the ten parameter tensors of
+:code:`mlp_pos`, :code:`mlp_vec` and the first two :code:`mix` projections
+unused. Vector or dipole supervision differentiates them. Configurations
+with fragment dropout, no long-range layers, or a degree-two short-range
+head retain the joint execution path.
+
 The following CPU example uses the same model, weights, two structures and
 squared loss as the recorded checks. Run it from the repository checkout.
 Keep the dynamic-shape and scalar capture settings active when executing the

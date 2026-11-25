@@ -169,15 +169,19 @@ class FragmentEdges(Block):
         return BlockState(scalar, vector, None, short)
 
 
-def fragment_step(block, state, ctx):
-    if ctx.num_nodes == 0:
-        return state
+def fragment_inputs(state, ctx):
     ids, atoms, fragments, edges, directions = ctx.cache["fragment_graph"]
     vector = state.equi
     group_scalar = scatter_mean(state.scalar, ids, dim=0)
     group_vector = scatter_mean(vector.reshape(ctx.num_nodes, -1), ids, dim=0).reshape(-1, 3, vector.shape[-1])
-    ds, dv = block(state.scalar, vector, group_scalar, group_vector, atoms, fragments, edges, directions)
-    return BlockState(state.scalar + ds, vector + dv, None, state.aux)
+    return state.scalar, vector, group_scalar, group_vector, atoms, fragments, edges, directions
+
+
+def fragment_step(block, state, ctx):
+    if ctx.num_nodes == 0:
+        return state
+    ds, dv = block(*fragment_inputs(state, ctx))
+    return BlockState(state.scalar + ds, state.equi + dv, None, state.aux)
 
 
 class FragmentFusionHead(Head):

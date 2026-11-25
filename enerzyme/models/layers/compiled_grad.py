@@ -239,6 +239,11 @@ def compiled_coordinate_vjp(core, inputs):
         # Scripted kernels close over weights, and force hooks can replace
         # either the inputs or outputs of the coordinate differentiation.
         return native_forces(core, inputs)
+    separate_vectors = core.training and getattr(core, "architecture", None) in ("visnet", "quinnet", "freecg", "visnet_lsrm")
+    if separate_vectors:
+        from ..presets.compiled_vector import has_training_hooks, train_with_vector_outputs
+        if has_training_hooks(core):
+            return native_forces(core, inputs)
     edges, topology = _prepare_radius_graph(core, inputs)
     if getattr(core, "_native_empty_short_range_forces", False) and edges is not None and edges.numel() == 0:
         # With no MACE messages, an energy/force loss can be independent of
@@ -251,6 +256,8 @@ def compiled_coordinate_vjp(core, inputs):
         # energy or its inputs, including after the first compiled call.
         options["skip_nnmodule_hook_guards"] = False
     with config.patch(options):
+        if separate_vectors:
+            return train_with_vector_outputs(core, inputs, edges, topology, post_pairs)
         if core.training and getattr(core, "architecture", None) == "chgnet":
             coordinates = inputs.get("Ra")
             if isinstance(coordinates, Tensor) and coordinates.device.type == "cpu":
