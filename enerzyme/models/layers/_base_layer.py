@@ -69,20 +69,27 @@ class BaseFFModule(ABC, Module):
 
     def _forward(self, net_input: Union[Dict[str, Tensor], Data], extra_inputs=None) -> Dict[str, Tensor]:
         relevant_input = dict()
-        if not self.adapted_relevant_fields:
-            self._get_relevant_input_fields(net_input.keys())
         relevant_input_fields = self._input_fields
+        if not self.adapted_relevant_fields:
+            if torch.compiler.is_compiling():
+                # Adapting mutates this layer while it is traced, and the next
+                # call then fails the guard on the flag and recompiles every
+                # graph that inlines the layer. Resolve the same fields locally.
+                relevant_input_fields = relevant_input_fields | self.get_relevant_input_fields(net_input.keys())
+            else:
+                self._get_relevant_input_fields(net_input.keys())
+                relevant_input_fields = self._input_fields
         if isinstance(net_input, Data):
             net_output = net_input
             for k in relevant_input_fields:
                 if k == "batch_seg":
                     relevant_input[k] = net_input["batch"]
                 else:
-                    relevant_input[k] = net_input.get(self._name_mapping[k], None)
+                    relevant_input[k] = net_input.get(self._name_mapping.get(k, k), None)
         else:
             net_output = net_input.copy()
             for k in relevant_input_fields:
-                relevant_input[k] = net_input.get(self._name_mapping[k], None)
+                relevant_input[k] = net_input.get(self._name_mapping.get(k, k), None)
         if extra_inputs is not None:
             relevant_input.update(extra_inputs)
         relevant_output = self.get_output(**relevant_input)
