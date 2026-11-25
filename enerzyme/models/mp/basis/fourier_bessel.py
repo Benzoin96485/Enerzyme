@@ -92,8 +92,29 @@ def real_sph_harm_l0(degree: int, angle: Tensor) -> Tensor:
     return pref * p
 
 
+def columnwise_spherical_bessel(scaled: Tensor, zeros: Tensor, normalizer: Tensor) -> Tensor:
+    """The same (edge, degree, frequency) values, one column per root.
+
+    Each column scales the distances by one root, so the coordinate derivative
+    adds the columns elementwise instead of reducing a broadcast frequency
+    axis. On a V100 Inductor fuses that float64 reduction with the whole
+    recurrence derivative into a persistent kernel that cost 32 ms per DimeNet++
+    call, against under 1 ms for this form.
+    """
+    zeros = zeros.to(scaled)
+    normalizer = normalizer.to(scaled)
+    flat = scaled.reshape(-1)
+    return torch.stack([
+        torch.stack([spherical_jn(ell, flat * zeros[ell, n]) * normalizer[ell, n]
+                     for n in range(zeros.shape[1])], dim=-1)
+        for ell in range(zeros.shape[0])
+    ], dim=1)
+
+
 def normalized_spherical_bessel(scaled: Tensor, zeros: Tensor, normalizer: Tensor) -> Tensor:
     """Evaluate every radial frequency together, returning (edge, degree, frequency)."""
+    if torch.compiler.is_compiling() and scaled.is_cuda and scaled.dtype == torch.float64:
+        return columnwise_spherical_bessel(scaled, zeros, normalizer)
     zeros = zeros.to(scaled)
     normalizer = normalizer.to(scaled)
     scaled = scaled.reshape(-1, 1)

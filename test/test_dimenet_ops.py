@@ -154,3 +154,27 @@ def test_interaction_bilinear_finite():
     out = block(x, rbf, sbf, idx_kj, idx_ji)
     assert out.shape == (e, 8)
     assert torch.isfinite(out).all()
+
+
+def test_columnwise_spherical_bessel_matches_vectorized_values_and_derivatives():
+    # CUDA float64 compilation evaluates one column per root; eager and other
+    # devices broadcast the roots. Both must give the same basis and forces.
+    from enerzyme.models.mp.basis.fourier_bessel import (
+        columnwise_spherical_bessel, normalized_spherical_bessel, register_bessel_tables,
+    )
+
+    tables = torch.nn.Module()
+    register_bessel_tables(tables, 7, 6)
+    # Interatomic distances stay above ~0.15 of the cutoff. Much closer, the
+    # upward recurrence is ill-conditioned and only the summation order differs.
+    scaled = (torch.rand(37, dtype=torch.float64, generator=torch.Generator().manual_seed(3)) * 1.05
+              + 0.15).requires_grad_()
+    weight = torch.randn(37, 7, 6, dtype=torch.float64, generator=torch.Generator().manual_seed(4))
+    results = []
+    for evaluate in (normalized_spherical_bessel, columnwise_spherical_bessel):
+        values = evaluate(scaled, tables.zeros, tables.normalizer)
+        first, = torch.autograd.grad((values * weight).sum(), scaled, create_graph=True)
+        second, = torch.autograd.grad(first.square().sum(), scaled)
+        results.append((values, first, second))
+    for actual, expected in zip(results[1], results[0]):
+        torch.testing.assert_close(actual, expected, rtol=1e-12, atol=1e-12)
