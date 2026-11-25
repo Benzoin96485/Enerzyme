@@ -104,7 +104,7 @@ class SpinConvEmbed(Embed):
         )
         num_nodes = int(inputs["atom_embedding"].shape[0])
         selected, projection = self.projection.prepare(ctx)
-        edges = ctx if selected is None else ctx.subset(selected)
+        edges = ctx if selected is None else ctx.subset(selected, key="spinconv_selected")
         idx_i, idx_j = edges.receiver, edges.sender
         distance, vij, basis = edges.dist, edges.vec, edges.rbf
 

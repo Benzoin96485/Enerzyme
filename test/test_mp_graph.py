@@ -189,3 +189,78 @@ def test_periodic_line_graph_backtracking_and_duplicate_reverse_edges():
     reverse = dup.reverse_edge(distinct=True)
     assert torch.equal(reverse[reverse], torch.arange(4))
     assert torch.equal(reverse, torch.tensor([1, 0, 3, 2]))
+
+
+def _cache_keys(ctx, seen=None):
+    """Every cache key reachable from ``ctx``, including derived graphs stored as values."""
+    seen = set() if seen is None else seen
+    if id(ctx) in seen:
+        return []
+    seen.add(id(ctx))
+    keys = []
+    for key, value in ctx.cache.items():
+        keys.append(key)
+        for item in (value if isinstance(value, tuple) else (value,)):
+            if isinstance(item, GraphContext):
+                keys += _cache_keys(item, seen)
+    return keys
+
+
+def _holds_runtime_object(key):
+    if isinstance(key, (torch.Tensor, GraphContext)):
+        return True
+    return isinstance(key, tuple) and any(_holds_runtime_object(k) for k in key)
+
+
+def test_graph_cache_keys_are_constants():
+    # The context crosses compiler graph breaks and Dynamo guards on its cache
+    # keys. A tensor or context in a key changes on every call and recompiles.
+    from enerzyme.models.mp.graph import QuadrupletRequest, ReverseEdgeRequest, TripletRequest
+
+    receiver, sender, vec, dist, n = _graph(n_nodes=6, cutoff=10)
+    inputs = {"idx_i_sr": receiver, "idx_j_sr": sender, "vij_sr": vec, "Dij_sr": dist}
+    req = GraphRequires(rbf=False, topology=(
+        ReverseEdgeRequest(2.0), TripletRequest("receiver", edge_cutoff=2.0, cutoff=1.5, strict=True),
+        QuadrupletRequest(2.0, 2.5)))
+    ctx = GraphContext.from_inputs(inputs, req, n)
+    near, far = ctx.within(2.0), ctx.within(2.5)
+    near.cross_pairs(far)
+    near.quadruplets(far)
+    ctx.triplets("receiver", cutoff=1.2)
+    capped = ctx.closest(2.5, 2)
+    capped.triplets("receiver")
+    named = ctx.subset(torch.arange(3), key="first")
+
+    keys = _cache_keys(ctx)
+    assert keys and not [k for k in keys if _holds_runtime_object(k)]
+    assert near.key == (("within", 2.0),) and capped.key == (("closest", 2.5, 2),)
+    assert ctx.within(2.0) is near and ctx.closest(2.5, 2) is capped
+    assert ctx.subset(torch.arange(3), key="first") is named
+    assert ctx.subset(torch.arange(3)) is not ctx.subset(torch.arange(3))
+    assert near.quadruplets(far) is near.quadruplets(ctx.within(2.5))
+    unnamed = GraphContext(receiver, sender, n, vec=vec)
+    assert unnamed.key is None and unnamed.within(2.0).key is None
+
+
+def test_graph_context_reused_after_a_graph_break_does_not_recompile():
+    import torch._dynamo
+
+    receiver, sender, vec, dist, n = _graph(n_nodes=6, cutoff=10)
+    req = GraphRequires(rbf=False)
+
+    def evaluate(receiver, sender, vec):
+        ctx = GraphContext.from_inputs({"idx_i_sr": receiver, "idx_j_sr": sender, "vij_sr": vec}, req, n)
+        near = ctx.within(2.0)
+        pairs = near.triplets("receiver", cutoff=1.5)
+        capped = ctx.closest(2.5, 3)
+        torch._dynamo.graph_break()
+        return near.vec.sum() + capped.vec.sum() + pairs.first.numel()
+
+    torch._dynamo.reset()
+    compiled = torch.compile(evaluate, backend="eager")
+    expected = evaluate(receiver, sender, vec)
+    compiled(receiver.clone(), sender.clone(), vec.clone())
+    with torch._dynamo.config.patch(error_on_recompile=True):
+        for _ in range(3):
+            torch.testing.assert_close(compiled(receiver.clone(), sender.clone(), vec.clone()), expected)
+    torch._dynamo.reset()

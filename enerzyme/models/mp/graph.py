@@ -8,6 +8,12 @@ orientation (main-branch MACE), so blocks never see the difference.
 
 The Core builds declared topology, harmonics and rotations on entry. All blocks
 share those results and can cache additional quantities for this forward pass.
+
+Cache keys are built only from constants. The context crosses compiler graph
+breaks, and Dynamo guards on its cache keys: a key holding a tensor or another
+context is new on every call and would force a recompilation each time. Derived
+graphs therefore carry a provenance ``key`` (for example ``(("within", 5.0),)``)
+instead of being looked up by identity.
 """
 
 from __future__ import annotations
@@ -87,8 +93,8 @@ class RotationRequest:
     frame_field: Optional[str] = None
 
     def prepare(self, ctx):
-        frame = ctx.inputs.get(self.frame_field) if self.frame_field else None
-        return ctx.edge_rotation(self.lmax, self.backend, mmax=self.mmax, edge_sign=self.edge_sign, frame=frame)
+        return ctx.edge_rotation(self.lmax, self.backend, mmax=self.mmax, edge_sign=self.edge_sign,
+                                 frame_field=self.frame_field or None)
 
 
 @dataclass(frozen=True)
@@ -459,12 +465,16 @@ class GraphContext:
     batch: Optional[Tensor] = None
     inputs: Dict[str, Any] = field(default_factory=dict)
     cache: Dict[Hashable, Any] = field(default_factory=dict)
+    # Provenance from the Core's root context: ``()`` for the root, one constant
+    # step per derived selection, ``None`` when unknown. Graphs with a key can
+    # be used as constant cache keys by their relatives.
+    key: Optional[Tuple[Hashable, ...]] = None
 
     @classmethod
     def from_inputs(cls, inputs: Dict[str, Any], requires: GraphRequires, num_nodes: int,
                     dtype: Optional[torch.dtype] = None) -> "GraphContext":
         if requires.edge_set == "internal":
-            return cls(None, None, num_nodes, inputs=inputs, batch=inputs.get("batch_seg"))
+            return cls(None, None, num_nodes, inputs=inputs, batch=inputs.get("batch_seg"), key=())
         names = requires.edge_fields
         receiver = inputs[names["receiver"]].long()
         sender = inputs[names["sender"]].long()
@@ -484,7 +494,7 @@ class GraphContext:
             vec = -vec if vec is not None else None
         ctx = cls(
             receiver=receiver, sender=sender, num_nodes=int(num_nodes), vec=vec, dist=dist, rbf=rbf,
-            cutoff_values=cutoff_values, batch=inputs.get("batch_seg"), inputs=inputs,
+            cutoff_values=cutoff_values, batch=inputs.get("batch_seg"), inputs=inputs, key=(),
         )
         if "_prepared_topology" in inputs:
             inputs["_prepared_topology"].apply(ctx)
@@ -528,20 +538,40 @@ class GraphContext:
             self.vec, list(range(int(lmax) + 1)), layout=layout, normalization=normalization,
             normalize_input=normalize, edge_sign=edge_sign))
 
-    def edge_rotation(self, lmax, backend="cg", *, mmax=None, edge_sign=1, frame=None):
-        """Cache the rotation of this graph's edges, including any supplied frame."""
+    def edge_rotation(self, lmax, backend="cg", *, mmax=None, edge_sign=1, frame=None, frame_field=None):
+        """Rotation of this graph's edges, optionally about per-edge frames.
+
+        ``frame_field`` names an input holding the frames; that result is cached
+        like a rotation without frames. A frame tensor passed directly has no
+        constant cache key and is rotated on every call.
+        """
         from .equivariant.rotation import edge_rotation
 
         if edge_sign not in (1, -1):
             raise ValueError("edge_sign must be 1 or -1")
-        key = ("edge_rotation", lmax, backend, mmax, edge_sign, frame)
-        return self.cached(key, lambda: edge_rotation(
-            self.vec if edge_sign == 1 else -self.vec, lmax, backend, frame=frame, mmax=mmax))
+        if frame_field is not None:
+            if frame is not None:
+                raise ValueError("pass either frame or frame_field")
+            frame = self.inputs.get(frame_field)
 
-    def csr(self, indices=None) -> ReceiverCSR:
+        def build():
+            return edge_rotation(self.vec if edge_sign == 1 else -self.vec, lmax, backend, frame=frame, mmax=mmax)
+
+        if frame is not None and frame_field is None:
+            return build()
+        key = ("edge_rotation", lmax, backend, mmax, edge_sign, None if frame is None else frame_field)
+        return self.cached(key, build)
+
+    def csr(self, indices=None, key: Optional[Hashable] = None) -> ReceiverCSR:
+        """Receiver CSR of every edge, or of the edges in ``indices``.
+
+        A selection is cached only under a constant ``key`` naming it.
+        """
         if indices is None:
             return self.cached("csr", lambda: receiver_csr(self.receiver, self.num_nodes))
-        return self.cached(("csr", indices), lambda: receiver_csr(self.receiver[indices], self.num_nodes))
+        if key is None:
+            return receiver_csr(self.receiver[indices], self.num_nodes)
+        return self.cached(("csr", key), lambda: receiver_csr(self.receiver[indices], self.num_nodes))
 
     def edge_indices(self, cutoff, strict=False):
         def select():
@@ -549,51 +579,80 @@ class GraphContext:
             return torch.where(length < cutoff if strict else length <= cutoff)[0]
         return self.cached(("edge_indices", cutoff, strict), select)
 
-    def subset(self, indices: Tensor) -> "GraphContext":
-        """A graph indexed locally in the order given by edge indices or a mask."""
-        def select():
-            fields = (self.sender, self.vec, self.dist, self.rbf, self.cutoff_values)
-            if any(t is not None and (not t.ndim or t.shape[0] != self.num_edges) for t in fields):
-                raise ValueError("receiver, sender, vectors, distances and radial features must describe the same edges")
-            graph = GraphContext(
-                self.receiver[indices], self.sender[indices], self.num_nodes,
-                vec=self.vec[indices] if self.vec is not None else None,
-                dist=self.dist[indices] if self.dist is not None else None,
-                rbf=self.rbf[indices] if self.rbf is not None else None,
-                cutoff_values=self.cutoff_values[indices] if self.cutoff_values is not None else None,
-                batch=self.batch, inputs=self.inputs)
-            if ("csr", indices) in self.cache:
-                graph.cache["csr"] = self.cache[("csr", indices)]
-            return graph
-        return self.cached(("subset", indices), select)
+    def _select(self, indices: Tensor, step: Optional[Hashable], csr_key: Optional[Hashable]) -> "GraphContext":
+        fields = (self.sender, self.vec, self.dist, self.rbf, self.cutoff_values)
+        if any(t is not None and (not t.ndim or t.shape[0] != self.num_edges) for t in fields):
+            raise ValueError("receiver, sender, vectors, distances and radial features must describe the same edges")
+        graph = GraphContext(
+            self.receiver[indices], self.sender[indices], self.num_nodes,
+            vec=self.vec[indices] if self.vec is not None else None,
+            dist=self.dist[indices] if self.dist is not None else None,
+            rbf=self.rbf[indices] if self.rbf is not None else None,
+            cutoff_values=self.cutoff_values[indices] if self.cutoff_values is not None else None,
+            batch=self.batch, inputs=self.inputs,
+            key=None if self.key is None or step is None else self.key + (step,))
+        if csr_key is not None and csr_key in self.cache:
+            graph.cache["csr"] = self.cache[csr_key]
+        return graph
+
+    def subset(self, indices: Tensor, key: Optional[Hashable] = None) -> "GraphContext":
+        """A graph indexed locally in the order given by edge indices or a mask.
+
+        ``key`` is a constant naming the selection within this graph. Named
+        subsets are cached and can serve as cache keys for pair tables; an
+        unnamed subset is rebuilt on every call.
+        """
+        if key is None:
+            return self._select(indices, None, None)
+        return self.cached(("subset", key), lambda: self._select(indices, ("subset", key), None))
 
     def within(self, cutoff: Optional[float]) -> "GraphContext":
         """Edges strictly inside the cutoff, retaining input edge order."""
         if cutoff is None:
             return self
-        return self.cached(("within", cutoff), lambda: self.subset(self.edge_indices(cutoff, strict=True)))
+        return self.cached(("within", cutoff), lambda: self._select(
+            self.edge_indices(cutoff, strict=True), ("within", cutoff), ("csr", ("edge_indices", cutoff, True))))
 
-    def closest_indices(self, cutoff, max_neighbors):
-        """Indices of the nearest incoming edges strictly inside the cutoff."""
+    def _closest(self, cutoff, max_neighbors):
+        """Nearest incoming edges inside the cutoff and whether the cap removed any."""
         if max_neighbors < 1 or cutoff <= 0:
             raise ValueError("max_neighbors and cutoff must be positive")
 
         def select():
             indices = self.edge_indices(cutoff, strict=True)
-            if indices.numel() and int(self.csr(indices).counts.max()) > max_neighbors:
+            counts = self.csr(indices, key=("edge_indices", cutoff, True)).counts
+            if indices.numel() and int(counts.max()) > max_neighbors:
                 rank = self.cached("distance_rank", lambda: receiver_rank(
                     self.receiver, self.edge_length(), self.num_nodes))
-                return indices[rank[indices] < max_neighbors]
-            return indices
+                return indices[rank[indices] < max_neighbors], True
+            return indices, False
         return self.cached(("closest", cutoff, max_neighbors), select)
 
+    def closest_indices(self, cutoff, max_neighbors):
+        """Indices of the nearest incoming edges strictly inside the cutoff."""
+        return self._closest(cutoff, max_neighbors)[0]
+
     def closest(self, cutoff, max_neighbors):
-        return self.subset(self.closest_indices(cutoff, max_neighbors))
+        def build():
+            indices, capped = self._closest(cutoff, max_neighbors)
+            csr_key = None if capped else ("csr", ("edge_indices", cutoff, True))
+            return self._select(indices, ("closest", cutoff, max_neighbors), csr_key)
+        return self.cached(("closest_graph", cutoff, max_neighbors), build)
+
+    def _relative(self, other: "GraphContext") -> Optional[Hashable]:
+        """A constant naming ``other`` for this graph's cache, or None."""
+        if other is self:
+            return "self"
+        if self.key is None or other.key is None:
+            return None
+        return other.key
 
     def cross_pairs(self, other):
         """For each edge of this graph, enumerate all of the other graph's incoming edges."""
-        return self.cached(("cross_pairs", other), lambda: cross_receiver_pairs(
-            self.receiver, other.receiver, self.num_nodes, csr=other.csr()))
+        def build():
+            return cross_receiver_pairs(self.receiver, other.receiver, self.num_nodes, csr=other.csr())
+        name = self._relative(other)
+        return build() if name is None else self.cached(("cross_pairs", name), build)
 
     def triplets(self, kind, *, cutoff=None, include_self=False, strict=False, exclude_backtracking=False,
                  exclude_same_sender=False):
@@ -620,8 +679,10 @@ class GraphContext:
             key = ("_prepared_quads", interaction.cache["_prepared_cutoff"], images)
             if key in self.cache:
                 return self.cache[key]
-        return self.cached(("quadruplets", interaction, images),
-                           lambda: dihedral_quadruplets(self, interaction, images))
+        name = self._relative(interaction)
+        if name is None:
+            return dihedral_quadruplets(self, interaction, images)
+        return self.cached(("quadruplets", name, images), lambda: dihedral_quadruplets(self, interaction, images))
 
     def reverse_edge(self, *, atol=_OPPOSITE_TOL, rtol=0.0, metric="l2", distinct=False) -> Tensor:
         return self.cached(("reverse_edge", atol, rtol, metric, distinct), lambda: reverse_edge_index(
@@ -636,7 +697,7 @@ class GraphContext:
         """
         def build() -> EdgePairs:
             subset = None if cutoff is None else self.edge_indices(cutoff, strict)
-            csr = self.csr(subset)
+            csr = self.csr(subset, key=None if cutoff is None else ("edge_indices", cutoff, strict))
             return receiver_pairs(self.receiver, self.num_nodes, subset, include_self, csr=csr)
 
         return self.cached(("receiver_pairs", cutoff, include_self, strict), build)

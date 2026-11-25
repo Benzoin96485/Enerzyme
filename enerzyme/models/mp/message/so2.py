@@ -56,8 +56,7 @@ class ChannelEmbed(Embed):
         node = inputs["atom_embedding"]
         z = inputs["Za"].long()
         edge = torch.stack((ctx.sender, ctx.receiver))
-        frame = inputs.get("edge_rot_mat")
-        matrices = ctx.edge_rotation(self.lmax, "jd", edge_sign=-1, frame=frame)
+        matrices = ctx.edge_rotation(self.lmax, "jd", edge_sign=-1, frame_field="edge_rot_mat")
         rotation = [DegreeRotation(matrices, self.lmax, apply_rotate_inv_rescale=self.degree is not None,
                                    mapping=self.rotation_mapping.to(node.device))]
         mapping = self.mapping.to(node.device)
@@ -105,7 +104,7 @@ class FusedChannelEmbed(Embed):
         batch = ctx.batch if ctx.batch is not None else z.new_zeros(ctx.num_nodes)
         edge = torch.stack((ctx.sender, ctx.receiver))
         rotation = ctx.edge_rotation(self.lmax, self.rotation, mmax=self.rotation.mmax,
-                                     edge_sign=-1, frame=inputs.get("edge_rot_mat"))
+                                     edge_sign=-1, frame_field="edge_rot_mat")
         window = inputs.get("edge_envelope_weight")
         if window is None and self.envelope is not None:
             window = self.envelope(ctx.edge_length())
@@ -143,7 +142,7 @@ class SmoothChannelEmbed(Embed):
         rotation = radial = distance = None
         if ctx.num_edges:
             vec = ctx.vec.to(node.device)
-            matrices = ctx.edge_rotation(self.lmax, "jd", frame=inputs.get("edge_rot_mat"))
+            matrices = ctx.edge_rotation(self.lmax, "jd", frame_field="edge_rot_mat")
             rotation = [DegreeRotation(matrices, self.lmax, mapping=self.rotation_mapping.to(node.device))]
             distance = torch.linalg.vector_norm(vec, dim=-1)
             radial = torch.cat((ctx.rbf.to(node.device), self.source(z[src]), self.target(z[dst])), dim=1)

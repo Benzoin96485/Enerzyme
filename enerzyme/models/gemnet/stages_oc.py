@@ -97,19 +97,20 @@ class GemNetOCGraphRequest:
             raise ValueError("edge index is outside atom_embedding")
 
         capped_ids = ctx.closest_indices(*self.main)
-        capped = ctx.subset(capped_ids)
+        capped = ctx.subset(capped_ids, key="gemnet_oc_capped")
         canonical = canonical_edge_indices(capped.receiver, capped.sender, capped.vec)
         main, _ = _main_graph(ctx, capped, canonical)
         atom_edge = ctx.closest_indices(*self.atom_edge) if self.atom_edge else None
         atom_atom = ctx.closest_indices(*self.atom_atom) if self.atom_atom else None
         quad_edges = ctx.closest_indices(*self.quadruplet) if self.quadruplet else None
-        ae = ctx.subset(atom_edge) if atom_edge is not None else None
+        ae = ctx.subset(atom_edge, key="gemnet_oc_atom_edge") if atom_edge is not None else None
         return OCIndices(
             capped_ids, canonical, atom_edge, atom_atom, quad_edges,
             mixed_triplet_indices(main, main),
             mixed_triplet_indices(main, ae) if self.use_a2e else None,
             mixed_triplet_indices(ae, main) if self.use_e2a else None,
-            quadruplet_indices(main, ctx.subset(quad_edges), images=True) if quad_edges is not None else None,
+            quadruplet_indices(main, ctx.subset(quad_edges, key="gemnet_oc_quad_edges"), images=True)
+            if quad_edges is not None else None,
         )
 
 
@@ -243,12 +244,12 @@ class GemNetOCEmbed(Embed):
                 f"(N, {self.dim_embedding}), got {tuple(inputs["atom_embedding"].shape)}"
             )
         indices = self.graph_request.prepare(ctx)
-        main, swap = _main_graph(ctx, ctx.subset(indices.capped), indices.canonical)
+        main, swap = _main_graph(ctx, ctx.subset(indices.capped, key="gemnet_oc_capped"), indices.canonical)
         main_i, main_j, main_d = main.receiver, main.sender, main.dist
         if self.atom_edge_interaction or self.edge_atom_interaction:
-            ae = ctx.subset(indices.atom_edge)
+            ae = ctx.subset(indices.atom_edge, key="gemnet_oc_atom_edge")
         if self.atom_interaction:
-            a2a = ctx.subset(indices.atom_atom)
+            a2a = ctx.subset(indices.atom_atom, key="gemnet_oc_atom_atom")
 
         rbf_main = self._basis(main_d, self.cutoff)
         rbf_e2e = self.mlp_rbf_tint(rbf_main)
@@ -263,7 +264,7 @@ class GemNetOCEmbed(Embed):
             assert self.mlp_rbf_qint is not None
             assert self.mlp_cbf_qint is not None
             assert self.mlp_sbf_qint is not None
-            interaction = ctx.subset(indices.quad_edges)
+            interaction = ctx.subset(indices.quad_edges, key="gemnet_oc_quad_edges")
             quad_kwargs = self._quadruplet_basis(main, interaction, rbf_main, indices.quadruplets)
         ae_kwargs: dict = {}
         if self.atom_edge_interaction:

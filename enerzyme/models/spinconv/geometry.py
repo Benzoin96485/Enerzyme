@@ -272,7 +272,7 @@ class SpinProjectionRequest:
             mask = symmetric_neighbor_mask(i, j, ctx.dist, ctx.num_nodes, self.max_neighbors)
             if not bool(mask.all()):
                 selected = torch.where(mask)[0]
-                edges = ctx.subset(selected)
+                edges = ctx.subset(selected, key="spinconv_selected")
         projection = sphere_projection(
             edges.vec, edges.receiver, edges.sender, edges.dist, self.cutoff, ctx.num_nodes,
             self.n_lat, self.n_long, pairs=edges.triplets("path"),
