@@ -377,3 +377,38 @@ def test_compiled_attention_preserves_channels_split_across_heads():
     compiled = torch.compile(block, backend="eager", fullgraph=True)
     for actual, reference in zip(gradients(compiled), expected):
         torch.testing.assert_close(actual, reference, rtol=2e-12, atol=2e-12)
+
+
+def test_compiled_force_training_with_dropout_accepts_new_edge_counts():
+    # A second batch with a different edge count retraces with a symbolic
+    # number of edges. The composite dropout called numel() on it inside the
+    # coordinate VJP; the native operator accepts the symbolic size.
+    from torch._inductor import config
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    from enerzyme.models.ff import get_ff_core
+
+    torch.manual_seed(5)
+    _, params, _ = get_ff_core("geodite")
+    params = {**params, "dim_embedding": 16, "num_layers": 1, "num_heads": 4, "num_rbf": 4}
+    model = build("geodite", build_params=params).double().train()
+    compiled = torch.compile(model, backend="aot_eager")
+    for sizes in ([5, 4], [8, 6]):
+        batch = make_batch(random_molecules(107, sizes, density=0.12), torch.float64)
+
+        def run(fn):
+            model.zero_grad(set_to_none=True)
+            torch.manual_seed(7)
+            out = forward(fn, batch, torch.float64, train=True)
+            (out["E"].square().sum() + out["Fa"].square().sum()).backward()
+            return out["E"].detach(), out["Fa"].detach(), {
+                name: p.grad.clone() for name, p in model.named_parameters() if p.grad is not None}
+
+        energy, forces, grads = run(model)
+        with config.patch(fallback_random=True):
+            c_energy, c_forces, c_grads = run(compiled)
+        torch.testing.assert_close(c_energy, energy, rtol=1e-10, atol=1e-10)
+        torch.testing.assert_close(c_forces, forces, rtol=1e-10, atol=1e-10)
+        assert c_grads.keys() == grads.keys()
+        for name in grads:
+            torch.testing.assert_close(c_grads[name], grads[name], rtol=1e-8, atol=1e-10)

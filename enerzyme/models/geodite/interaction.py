@@ -371,7 +371,12 @@ class InteractionBlock(Module):
         attended = self.edge_attention(edges).reshape(-1, self.num_heads, self.head_dim)
         logits = (query[idx_i] * key[idx_j] * attended).sum(dim=-1, keepdim=True)
         attention = F.silu(logits) / math.sqrt(self.channels)
-        attention = F.dropout(attention, p=self.dropout, training=self.training)
+        if torch.compiler.is_compiling() and self.training and 0.0 < self.dropout < 1.0:
+            # The composite dropout checks numel() under the coordinate VJP.
+            # The native operator accepts a symbolic edge count.
+            attention = torch.ops.aten.native_dropout.default(attention, self.dropout, True)[0]
+        else:
+            attention = F.dropout(attention, p=self.dropout, training=self.training)
         neighbor_values = values[idx_j]
         if torch.compiler.is_compiling() and values.device.type == "cpu":
             # A scalar/vector split can cut through a head. CPU Inductor drops
