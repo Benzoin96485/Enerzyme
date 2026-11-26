@@ -165,5 +165,105 @@
         }
       }
     }
+  },
+  "charge_bias": {
+    "objective": "sum(E²) + sum(Fa²) for the two default frozen models. The electrostatic energy consumes the corrected atomic charges.",
+    "identity": "A uniform increment of the charge readout bias adds the same increment to every raw atomic charge when all element scales equal one. Subtracting the per-graph mean cancels it for every atom and every geometry. The exact derivative of this energy/force loss along that bias is zero. The raw graph charge returned before correction retains a nonzero derivative.",
+    "scope": "This identity depends on the measured scales and loss. Element-dependent scales, supervision of uncorrected charges, and other readout fields have different derivatives.",
+    "frozen_scales": {
+      "so3lr": {
+        "count": 119,
+        "unique_values": [
+          1.0
+        ]
+      },
+      "so3lr_efa": {
+        "count": 119,
+        "unique_values": [
+          1.0
+        ]
+      }
+    },
+    "alternative_projections": {
+      "so3lr/mean": {
+        "tensors": 123,
+        "missing": [],
+        "outside": {
+          "post_sequence.0.head.bias": {
+            "elements": 1,
+            "ratio": 1.236912728713193,
+            "actual": -4.0745362639427185e-10,
+            "reference": -5.311449058353901e-10,
+            "max_abs": 7.683411240577698e-09
+          }
+        }
+      },
+      "so3lr/first": {
+        "tensors": 123,
+        "missing": [],
+        "outside": {
+          "post_sequence.0.head.bias": {
+            "elements": 1,
+            "ratio": 2.4920154792314637,
+            "actual": 2.637534635141492e-10,
+            "reference": 1.4551915228366852e-11,
+            "max_abs": 1.0011717677116394e-08
+          }
+        }
+      },
+      "so3lr/last": {
+        "tensors": 123,
+        "missing": [],
+        "outside": {
+          "post_sequence.0.head.bias": {
+            "elements": 1,
+            "ratio": 2.7102942063533297,
+            "actual": 2.5283952709287405e-10,
+            "reference": -1.8189894035458565e-11,
+            "max_abs": 1.3737007975578308e-08
+          }
+        }
+      },
+      "so3lr_efa/mean": {
+        "tensors": 141,
+        "missing": [],
+        "outside": {
+          "post_sequence.0.head.bias": {
+            "elements": 1,
+            "ratio": 11.059455509184303,
+            "actual": -1.1641532182693481e-09,
+            "reference": -5.820766091346741e-11,
+            "max_abs": 1.1059455573558807e-09
+          }
+        }
+      },
+      "so3lr_efa/first": {
+        "tensors": 141,
+        "missing": [],
+        "outside": {
+          "post_sequence.0.head.bias": {
+            "elements": 1,
+            "ratio": 30.85005974542478,
+            "actual": -3.259629011154175e-09,
+            "reference": -1.7462298274040222e-10,
+            "max_abs": 3.0850060284137726e-09
+          }
+        }
+      },
+      "so3lr_efa/last": {
+        "tensors": 141,
+        "missing": [],
+        "outside": {
+          "post_sequence.0.head.bias": {
+            "elements": 1,
+            "ratio": 32.596289352600245,
+            "actual": 3.026798367500305e-09,
+            "reference": -2.3283064365386963e-10,
+            "max_abs": 3.259629011154175e-09
+          }
+        }
+      }
+    },
+    "projection_control": "Job 6338990, CPU float64. Compute raw_Q using sum. For corrected charges, subtract the per-graph mean directly or first express the charges relative to the first or final atom before centering. These are diagnostic alternatives on the same frozen checkout and weights."
   }
 }

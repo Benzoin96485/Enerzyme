@@ -447,7 +447,6 @@ layers or a degree-two short-range head retain the joint execution path.
 In ordinary compiled training, ViSNet-LSRM, Geodite and AlphaNet use PyTorch's
 random draws for configured dropout so the caller can reproduce eager masks.
 
-Two frozen-weight checks show where single precision affects force fitting.
 In the pre-refactor ViSNet-LSRM model, reordering the same directed edges
 in the 32-molecule batch left energies and forces within tolerance, but 158
 weight-gradient elements crossed the elementwise limit. One atom had only two
@@ -463,6 +462,14 @@ bias. Two native FP32 readings were −1.760254 and −1.741699, with disjoint
 acceptance intervals. The independently projected FP64 derivative was
 −1.753249819. The original comparisons and the per-element derivation are
 in :file:`test/fixtures/bench_gpu/schnet_charge_bias_sensitivity.json`.
+
+On frozen AlphaNet FP32 weights, ordinary CPU Inductor exceeded the gradient
+tolerance in 50 parameter tensors for the 32-molecule batch and 21 for the
+periodic system. Native force training reproduced every reference tensor,
+with median step times 32% and 33% longer in the same-node comparisons.
+Raising the precision of the complex contraction changed native gradients
+on these inputs. The measured alternatives and per-case errors are in
+:file:`test/fixtures/validation/alphanet_fp32_force_gradients.json`.
 
 The following CPU example uses the same model, weights, two structures and
 squared loss as the recorded checks. Run it from the repository checkout.
