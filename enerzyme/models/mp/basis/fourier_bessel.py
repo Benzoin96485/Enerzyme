@@ -92,7 +92,20 @@ def real_sph_harm_l0(degree: int, angle: Tensor) -> Tensor:
     return pref * p
 
 
-def columnwise_spherical_bessel(scaled: Tensor, zeros: Tensor, normalizer: Tensor) -> Tensor:
+def _normalized_bessel_term(
+    order: int, argument: Tensor, normalizer: Tensor, envelope: Tensor | None,
+) -> Tensor:
+    value = spherical_jn(order, argument)
+    if envelope is None:
+        return value * normalizer
+    # Preserve DimeNet's multiplication order. Roundoff in this term can
+    # propagate through six interactions into the mixed force-loss gradients.
+    return (envelope * normalizer) * value
+
+
+def columnwise_spherical_bessel(
+    scaled: Tensor, zeros: Tensor, normalizer: Tensor, envelope: Tensor | None = None,
+) -> Tensor:
     """The same (edge, degree, frequency) values, one column per root.
 
     Each column scales the distances by one root, so the coordinate derivative
@@ -104,22 +117,28 @@ def columnwise_spherical_bessel(scaled: Tensor, zeros: Tensor, normalizer: Tenso
     zeros = zeros.to(scaled)
     normalizer = normalizer.to(scaled)
     flat = scaled.reshape(-1)
+    if envelope is not None:
+        envelope = envelope.reshape(-1)
     return torch.stack([
-        torch.stack([spherical_jn(ell, flat * zeros[ell, n]) * normalizer[ell, n]
+        torch.stack([_normalized_bessel_term(ell, flat * zeros[ell, n], normalizer[ell, n], envelope)
                      for n in range(zeros.shape[1])], dim=-1)
         for ell in range(zeros.shape[0])
     ], dim=1)
 
 
-def normalized_spherical_bessel(scaled: Tensor, zeros: Tensor, normalizer: Tensor) -> Tensor:
-    """Evaluate every radial frequency together, returning (edge, degree, frequency)."""
+def normalized_spherical_bessel(
+    scaled: Tensor, zeros: Tensor, normalizer: Tensor, envelope: Tensor | None = None,
+) -> Tensor:
+    """Return (edge, degree, frequency), optionally applying a per-edge envelope."""
     if torch.compiler.is_compiling() and scaled.is_cuda and scaled.dtype == torch.float64:
-        return columnwise_spherical_bessel(scaled, zeros, normalizer)
+        return columnwise_spherical_bessel(scaled, zeros, normalizer, envelope)
     zeros = zeros.to(scaled)
     normalizer = normalizer.to(scaled)
     scaled = scaled.reshape(-1, 1)
+    if envelope is not None:
+        envelope = envelope.reshape(-1, 1)
     return torch.stack([
-        spherical_jn(ell, scaled * zeros[ell]) * normalizer[ell]
+        _normalized_bessel_term(ell, scaled * zeros[ell], normalizer[ell], envelope)
         for ell in range(zeros.shape[0])
     ], dim=1)
 
@@ -184,8 +203,8 @@ class SphericalFourierBesselBasis(Module):
         """
         d_scaled = dist / self.cutoff
         env = self.envelope(d_scaled)
-        radial = normalized_spherical_bessel(d_scaled, self.zeros, self.normalizer)
-        rbf = (env[:, None, None] * radial).index_select(0, idx_kj)
+        radial = normalized_spherical_bessel(d_scaled, self.zeros, self.normalizer, envelope=env)
+        rbf = radial.index_select(0, idx_kj)
         angular = torch.stack(
             [real_sph_harm_l0(ell, angle) for ell in range(self.num_spherical)],
             dim=-1,

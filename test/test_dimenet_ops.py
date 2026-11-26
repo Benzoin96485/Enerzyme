@@ -98,6 +98,40 @@ def test_sbf_l0_matches_normalized_j0_times_y00():
     assert torch.allclose(out[:, :1], expected, atol=1e-5)
 
 
+def test_sbf_preserves_frozen_envelope_product_in_force_loss():
+    # Combining the envelope with the normalized Bessel value instead changes
+    # the force-loss gradients of the frozen six-block DimeNet. Compare with
+    # its original per-root expression while keeping the production vectorization.
+    from enerzyme.models.mp.basis.fourier_bessel import columnwise_spherical_bessel
+
+    generator = torch.Generator().manual_seed(17)
+    basis = SphericalFourierBesselBasis(7, 6, cutoff=5.0).double()
+    distance = torch.tensor([0.96, 1.11, 1.39, 2.01, 3.65], dtype=torch.float64, requires_grad=True)
+    angle = torch.tensor([0.4, 2.1, 1.5, 0.8, 2.7], dtype=torch.float64)
+    incoming = torch.tensor([3, 1, 4, 0, 1])
+    scaled = distance / basis.cutoff
+    env = basis.envelope(scaled)
+    angular = torch.stack([real_sph_harm_l0(ell, angle) for ell in range(7)], dim=-1)
+    columns = [
+        (env * basis.normalizer[ell, n]) * spherical_jn(ell, scaled * basis.zeros[ell, n])
+        for ell in range(7) for n in range(6)
+    ]
+    radial = torch.stack(columns, dim=-1).reshape(-1, 7, 6)
+    expected = (radial.index_select(0, incoming) * angular.unsqueeze(-1)).flatten(1)
+    per_root = columnwise_spherical_bessel(scaled, basis.zeros, basis.normalizer, env)
+    compiled_path = (per_root.index_select(0, incoming) * angular.unsqueeze(-1)).flatten(1)
+    actual = basis(distance, angle, incoming)
+    weight = torch.randn(expected.shape, generator=generator, dtype=torch.float64, requires_grad=True)
+    for value in (actual, compiled_path):
+        torch.testing.assert_close(value, expected, rtol=0, atol=0)
+        derivatives = []
+        for values in (value, expected):
+            force, = torch.autograd.grad((values * weight).sum(), distance, create_graph=True)
+            grad_weight, = torch.autograd.grad(force.square().sum(), weight, retain_graph=True)
+            derivatives.append(grad_weight)
+        torch.testing.assert_close(*derivatives, rtol=1e-8, atol=1e-10)
+
+
 def test_directed_triplets_complete_graph_count():
     n = 4
     idx_i, idx_j = [], []
