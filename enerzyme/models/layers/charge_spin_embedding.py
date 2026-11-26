@@ -99,7 +99,12 @@ class ChargeSpinEmbeddingLayer(BaseFFLayer):
         v = self.Wv[idx_atom]
         y = F.softplus((q * k).sum(dim=-1) / self.sqrt_dim)
         denom = scatter_sum(y, batch_seg, psi.shape[0]) + 1e-6
-        att = psi[batch_seg] * y / denom[batch_seg]
+        if psi.ndim == 1 and psi.shape[0] == 1:
+            # A single graph shares one attention normalization. Broadcasting
+            # gives its backward a sum instead of an atomic scatter to one row.
+            att = psi * y / denom
+        else:
+            att = psi[batch_seg] * y / denom[batch_seg]
         v_att = att[:, None] * v
         return v_att + self.mlp(v_att)
 

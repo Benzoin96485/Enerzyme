@@ -241,6 +241,29 @@ def test_charge_spin_embedding_shapes():
     assert emb.Wq.in_features == 118
 
 
+def test_compiled_single_graph_charge_attention_gradients():
+    from enerzyme.models.layers import ChargeSpinEmbeddingLayer
+
+    torch.manual_seed(39)
+    layer = ChargeSpinEmbeddingLayer(dim_embedding=8, max_Za=8)
+    species = torch.randint(1, 9, (256,))
+    batch = torch.zeros_like(species)
+
+    def evaluate(run, totals):
+        result = run(Za=species, batch_seg=batch, Q=totals)["charge_embedding"]
+        gradients = torch.autograd.grad(result.square().sum(), (totals, *layer.parameters()))
+        return result, gradients
+
+    # An empty second graph exercises the indexed, multi-graph reference.
+    expected, expected_grads = evaluate(layer.get_output, torch.tensor([1.5, 0.0], requires_grad=True))
+    actual, actual_grads = evaluate(torch.compile(layer.get_output, fullgraph=True),
+                                    torch.tensor([1.5], requires_grad=True))
+    torch.testing.assert_close(actual, expected)
+    torch.testing.assert_close(actual_grads[0], expected_grads[0][:1])
+    for measured, reference in zip(actual_grads[1:], expected_grads[1:]):
+        torch.testing.assert_close(measured, reference)
+
+
 def test_charge_spin_one_hot_matches_z_table_convention():
     from enerzyme.models.layers import ChargeSpinEmbeddingLayer
 
