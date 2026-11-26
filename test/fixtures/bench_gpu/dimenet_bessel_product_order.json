@@ -243,5 +243,155 @@
   }
  },
  "direct_parent_performance": {},
- "snapshot_sha256": "accb6370e15324df43fc76dba0dfe8f176c249395f70e59b8ebdbd0573a02697"
+ "snapshot_sha256": "accb6370e15324df43fc76dba0dfe8f176c249395f70e59b8ebdbd0573a02697",
+ "same_source_cpu_inductor": {
+  "source": "2e21446c2d1267dcef4e55a1885dab1b9a97444a",
+  "job": "6339218",
+  "system": "5 and 4 atoms, coordinate seed 107, weight seed 142",
+  "method": "Independent ordinary CPU Inductor training vs native eager on this same source and seed, using scripts/check_compiled_forces.py. This probe has its own generated weights and geometry. Its results are independent of the frozen-checkpoint original-vs-candidate comparisons and the ordinary V100 matrix.",
+  "cases": {
+   "dimenet++-float32": {
+    "compared_weights": 147,
+    "failed_weight_tensors": 0,
+    "failed_fields": [],
+    "field_errors": {
+     "E": {
+      "max_abs": 7.152557373046875e-07,
+      "relative_l2": 2.1338988109013592e-07
+     },
+     "Fa": {
+      "max_abs": 3.0517578125e-05,
+      "relative_l2": 2.7962879176923134e-06
+     }
+    },
+    "changed_gradient_participation": {},
+    "graphs": [
+     {
+      "operations": 636,
+      "learned_operators": [
+       "embedding",
+       "index_add_",
+       "linear"
+      ]
+     }
+    ],
+    "atol": 0.0007,
+    "rtol": 0.001,
+    "receipt_sha256": "897f94397e3e5ed10114e13be533956ed68d3fdca71ea4766268384dda34f88b",
+    "earlier_same_source_control": {
+     "revision": "882b187",
+     "failed_weight_tensors": 1,
+     "failed_fields": [],
+     "receipt_sha256": "ff317b9e1cab8462cf8390aef45826464a2233f0a157cddab63239f25ffb37f7"
+    }
+   },
+   "dimenet++-float64": {
+    "compared_weights": 147,
+    "failed_weight_tensors": 0,
+    "failed_fields": [],
+    "field_errors": {
+     "E": {
+      "max_abs": 5.329070518200751e-15,
+      "relative_l2": 1.5682469947838923e-15
+     },
+     "Fa": {
+      "max_abs": 1.6431300764452317e-14,
+      "relative_l2": 1.8285585039816304e-15
+     }
+    },
+    "changed_gradient_participation": {},
+    "graphs": [
+     {
+      "operations": 636,
+      "learned_operators": [
+       "embedding",
+       "index_add_",
+       "linear"
+      ]
+     }
+    ],
+    "atol": 1e-10,
+    "rtol": 1e-08,
+    "receipt_sha256": "ae40cabc725cc34179e1f31307c3e5ce0b67ee4a45a2458d32d85ab3ea3bf657",
+    "earlier_same_source_control": {
+     "revision": "882b187",
+     "failed_weight_tensors": 0,
+     "failed_fields": [],
+     "receipt_sha256": "05f2289d638f271633d9474992ab87b08cc8f436942349ee123b46fe027cb5a5"
+    }
+   },
+   "dimenet-float32": {
+    "compared_weights": 188,
+    "failed_weight_tensors": 163,
+    "failed_fields": [],
+    "field_errors": {
+     "E": {
+      "max_abs": 0.0001220703125,
+      "relative_l2": 2.8277516336076734e-07
+     },
+     "Fa": {
+      "max_abs": 0.001953125,
+      "relative_l2": 7.755007458788049e-07
+     }
+    },
+    "changed_gradient_participation": {},
+    "graphs": [
+     {
+      "operations": 697,
+      "learned_operators": [
+       "einsum",
+       "embedding",
+       "index_add_",
+       "linear"
+      ]
+     }
+    ],
+    "atol": 0.0007,
+    "rtol": 0.001,
+    "receipt_sha256": "765611410b7b90896900253298942a0b6064d49717b32fb29c15fa340d304ce6",
+    "earlier_same_source_control": {
+     "revision": "882b187",
+     "failed_weight_tensors": 163,
+     "failed_fields": [],
+     "receipt_sha256": "1bc65805c07104a00d2eb78ec005f413dc644e1978f4c8a851d17d314aa950f6"
+    }
+   },
+   "dimenet-float64": {
+    "compared_weights": 188,
+    "failed_weight_tensors": 10,
+    "failed_fields": [],
+    "field_errors": {
+     "E": {
+      "max_abs": 3.410605131648481e-13,
+      "relative_l2": 7.901015292584264e-16
+     },
+     "Fa": {
+      "max_abs": 9.322320693172514e-12,
+      "relative_l2": 3.3507534183444228e-15
+     }
+    },
+    "changed_gradient_participation": {},
+    "graphs": [
+     {
+      "operations": 697,
+      "learned_operators": [
+       "einsum",
+       "embedding",
+       "index_add_",
+       "linear"
+      ]
+     }
+    ],
+    "atol": 1e-10,
+    "rtol": 1e-08,
+    "receipt_sha256": "fcde90bb23d6e633e3777eff636e7a0f13e3dd96329497961f14a4d1d66687fd",
+    "earlier_same_source_control": {
+     "revision": "882b187",
+     "failed_weight_tensors": 7,
+     "failed_fields": [],
+     "receipt_sha256": "403e261d7e5c7db3f341064fae389e471f32c67ee23b7e80a154dcbb03908056"
+    }
+   }
+  }
+ }
 }
