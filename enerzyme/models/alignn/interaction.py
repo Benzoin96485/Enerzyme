@@ -19,6 +19,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Module, Sequential
+from torch.utils.checkpoint import checkpoint
 
 from ..mp.nn.norm import feature_norm as normalization
 from ..mp.ops import scatter_sum
@@ -92,6 +93,21 @@ class EdgeGatedGraphConv(Module):
         self.norm_nodes = normalization(norm, width)
         self.norm_edges = normalization(norm, width)
 
+    def _gate_message(self, node, edge, src, dst):
+        return self.src_gate(node)[src] + self.dst_gate(node)[dst] + self.edge_gate(edge)
+
+    def _can_recompute_gates(self):
+        from torch.nn.modules import module
+
+        if (module._global_forward_pre_hooks or module._global_forward_hooks
+                or module._global_backward_pre_hooks or module._global_backward_hooks):
+            return False
+        return all(
+            type(layer) is Linear and "forward" not in layer.__dict__
+            and not (layer._forward_pre_hooks or layer._forward_hooks or layer._backward_pre_hooks or layer._backward_hooks)
+            for layer in (self.src_gate, self.dst_gate, self.edge_gate)
+        )
+
     def forward(
         self,
         node: Tensor,
@@ -105,7 +121,16 @@ class EdgeGatedGraphConv(Module):
             if self.residual:
                 updated = node + updated
             return updated, edge
-        message = self.src_gate(node)[src] + self.dst_gate(node)[dst] + self.edge_gate(edge)
+        if (torch.compiler.is_compiling() and node.is_cuda and not self.training
+                and not torch._C._are_functorch_transforms_active() and self._can_recompute_gates()):
+            # Rebuild the edge projections during the force backward instead of
+            # retaining the hidden state of every line-graph edge.
+            message = checkpoint(
+                self._gate_message, node, edge, src, dst,
+                use_reentrant=False, preserve_rng_state=False,
+            )
+        else:
+            message = self._gate_message(node, edge, src, dst)
         gate = torch.sigmoid(message)
         neighbor = self.dst_update(node)[src] * gate
         summed = scatter_sum(neighbor, dst, node.shape[0])
