@@ -110,6 +110,35 @@ def cpu_inductor_options(options):
     return tuple(overrides.get(key) for key in options)
 
 
+def float64_cuda_reduction_scope(core, inputs):
+    """Compile float64 CUDA forces without Inductor's mix-order reductions.
+
+    PyTorch 2.13 starts their accumulators in float32 and Triton rejects the
+    float64 update ("Loop-carried variable accum0 has initial type fp32 but is
+    re-assigned to fp64"), for example in ALIGNN's LayerNorm backward. A preset
+    can also opt out in every dtype with ``_cuda_mix_order_reduction=False``
+    (AllScAIP, whose dynamic attention ranges raise CantSplit). Training lowers
+    its backward inside this scope so the weight backward is covered.
+    """
+    from contextlib import ExitStack
+    from torch._functorch import config as autograd_config
+    from torch._inductor import config
+
+    try:
+        coordinates = inputs["Ra"]
+    except (KeyError, TypeError, AttributeError):
+        coordinates = None
+    scope = ExitStack()
+    opted_out = getattr(core, "_cuda_mix_order_reduction", True) is False
+    if (getattr(coordinates, "is_cuda", False)
+            and (opted_out or getattr(coordinates, "dtype", None) == torch.float64)
+            and getattr(config.triton, "mix_order_reduction", False)):
+        scope.enter_context(config.patch({"triton.mix_order_reduction": False}))
+        if core.training and hasattr(autograd_config, "force_non_lazy_backward_lowering"):
+            scope.enter_context(autograd_config.patch(force_non_lazy_backward_lowering=True))
+    return scope
+
+
 @torch.compiler.disable(recursive=False)
 def compiled_cpu_forces_with_options(core, inputs, options):
     """Lower the forward and backward under the preset's required CPU kernel options."""
@@ -255,7 +284,7 @@ def compiled_coordinate_vjp(core, inputs):
         # A cached joint VJP must be retraced when callbacks change the
         # energy or its inputs, including after the first compiled call.
         options["skip_nnmodule_hook_guards"] = False
-    with config.patch(options):
+    with config.patch(options), float64_cuda_reduction_scope(core, inputs):
         if separate_vectors:
             return train_with_vector_outputs(core, inputs, edges, topology, post_pairs)
         if core.training and getattr(core, "architecture", None) == "chgnet":
@@ -290,7 +319,7 @@ def retained_inference(core, inputs, *, joint=False):
         )
     else:
         cache_scope = nullcontext()
-    with config.patch(donated_buffer=False), cache_scope:
+    with config.patch(donated_buffer=False), cache_scope, float64_cuda_reduction_scope(core, inputs):
         return run(inputs)
 
 

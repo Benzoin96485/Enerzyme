@@ -26,3 +26,31 @@ def test_compiled_pipeline_second_call_reuses_its_graphs():
             for key, value in expected.items():
                 torch.testing.assert_close(out[key].detach(), value, rtol=1e-12, atol=1e-12)
     torch._dynamo.reset()
+
+
+def test_float64_cuda_forces_compile_without_mix_order_reductions():
+    # PyTorch 2.13 emits float32 accumulators for float64 mix-order reductions,
+    # which Triton rejects. Only float64 CUDA coordinates change the setting.
+    from types import SimpleNamespace
+    from torch._functorch import config as autograd_config
+    from torch._inductor import config
+    from enerzyme.models.layers.compiled_grad import float64_cuda_reduction_scope
+
+    if not hasattr(config.triton, "mix_order_reduction"):
+        return
+    default = config.triton.mix_order_reduction
+    lazy = getattr(autograd_config, "force_non_lazy_backward_lowering", None)
+    cuda64 = SimpleNamespace(is_cuda=True, dtype=torch.float64)
+    for training in (False, True):
+        core = SimpleNamespace(training=training)
+        with float64_cuda_reduction_scope(core, {"Ra": cuda64}):
+            assert config.triton.mix_order_reduction is False
+            if lazy is not None:
+                assert autograd_config.force_non_lazy_backward_lowering is (training or lazy)
+        assert config.triton.mix_order_reduction == default
+    with float64_cuda_reduction_scope(SimpleNamespace(training=False, _cuda_mix_order_reduction=False),
+                                      {"Ra": SimpleNamespace(is_cuda=True, dtype=torch.float32)}):
+        assert config.triton.mix_order_reduction is False
+    for coordinates in (torch.zeros(2, 3, dtype=torch.float64), SimpleNamespace(is_cuda=True, dtype=torch.float32)):
+        with float64_cuda_reduction_scope(SimpleNamespace(training=True), {"Ra": coordinates}):
+            assert config.triton.mix_order_reduction == default
