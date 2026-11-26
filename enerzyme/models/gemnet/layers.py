@@ -110,6 +110,11 @@ class BasisDownProjection(Module):
         return torch.einsum("eln,lni->eil", radial, self.weight)
 
 
+def _contract_edge_features(radial: Tensor, angular_sum: Tensor, weight: Tensor) -> Tensor:
+    mixed = torch.einsum("eil,els->eis", radial, angular_sum)
+    return torch.einsum("eis,sio->eo", mixed, weight)
+
+
 class BilinearAggregate(Module):
     """Sum ``Y · m`` over neighbor edges, then a bilinear map with the radial factor.
 
@@ -135,25 +140,6 @@ class BilinearAggregate(Module):
         radial_w: Tensor,
         num_edges: int,
     ) -> Tensor:
-        if (torch.compiler.is_compiling() and self.recompute_force_inference and msg.is_cuda
-                and not self.training and not torch._C._are_functorch_transforms_active()):
-            # The force backward can rebuild the edge contractions instead of
-            # retaining a full edge-by-channel matrix from every interaction.
-            return checkpoint(
-                self._aggregate, msg, idx_src, idx_dst, angular, radial_w, num_edges,
-                use_reentrant=False, preserve_rng_state=False,
-            )
-        return self._aggregate(msg, idx_src, idx_dst, angular, radial_w, num_edges)
-
-    def _aggregate(
-        self,
-        msg: Tensor,
-        idx_src: Tensor,
-        idx_dst: Tensor,
-        angular: Tensor,
-        radial_w: Tensor,
-        num_edges: int,
-    ) -> Tensor:
         if num_edges == 0:
             return msg.new_zeros(0, self.units_out)
         if idx_dst.numel() == 0:
@@ -163,8 +149,15 @@ class BilinearAggregate(Module):
         flat = contrib.reshape(contrib.shape[0], -1)
         summed = scatter_sum(flat, idx_dst, num_edges)
         sum_k = summed.view(num_edges, angular.shape[-1], self.emb_in)
-        mixed = torch.einsum("eil,els->eis", radial_w, sum_k)
-        return torch.einsum("eis,sio->eo", mixed, self.weight)
+        if (torch.compiler.is_compiling() and self.recompute_force_inference and msg.is_cuda
+                and not self.training and not torch._C._are_functorch_transforms_active()):
+            # Keep the neighbor sum for the force backward. Rebuilding only the
+            # two contractions saves the edge-channel intermediate and a scatter.
+            return checkpoint(
+                _contract_edge_features, radial_w, sum_k, self.weight,
+                use_reentrant=False, preserve_rng_state=False,
+            )
+        return _contract_edge_features(radial_w, sum_k, self.weight)
 
 
 class EdgeEmbedding(Module):
