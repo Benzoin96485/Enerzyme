@@ -312,10 +312,11 @@ class SeparableGateS2Activation_SwiGLU_Merge(GateActivation):
 
 
     def forward(self, inputs, scalars):
-        """
-            `inputs`: shape  [N, (lmax + 1) ** 2, 2 * num_channels]
-            `scalars`: shape [N, 2 * num_channels + num_channels] or
-                             [N, 1, 2 * num_channels + num_channels]
+        """Gate and merge the scalar and spherical-grid features.
+
+        With ``C = num_channels``, the input shape is
+        ``[N, (lmax + 1) ** 2, 2 * C]``. The scalar gates have shape
+        ``[N, 3 * C]`` or ``[N, 1, 3 * C]``.
         """
         scalars = scalars.view(scalars.shape[0], 1, scalars.shape[-1])
         # 3. SwiGLU to type-0 path
@@ -348,11 +349,7 @@ class SeparableGateS2Activation_SwiGLU_Merge_MemoryEfficient(SeparableGateS2Acti
 
 
     def kernel(self, inputs, scalars):
-        """
-            `inputs`: shape  [N, (lmax + 1) ** 2, 2 * num_channels]
-            `scalars`: shape [N, 2 * num_channels + num_channels] or
-                             [N, 1, 2 * num_channels + num_channels]
-        """
+        """Apply the checkpointed operation with the same input shapes as ``forward``."""
         scalars = scalars.view(scalars.shape[0], 1, scalars.shape[-1])
         # 3. SwiGLU to type-0 path
         output_scalars = scalars.narrow(2, 0, inputs.shape[2])

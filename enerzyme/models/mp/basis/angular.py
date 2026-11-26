@@ -101,7 +101,7 @@ def _higher_tesseral_blocks(x: Tensor, y: Tensor, z: Tensor, squared, lmax: int)
 
 
 def degree_widths(lmax: int) -> List[int]:
-    """Multiplicities ``2l + 1`` for ``l = 1 .. lmax``."""
+    """Return the multiplicity ``2l + 1`` for each degree from one through ``lmax``."""
     return [2 * degree + 1 for degree in range(1, int(lmax) + 1)]
 
 

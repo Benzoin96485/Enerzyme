@@ -16,9 +16,9 @@ from torch import Tensor
 class FocusSO2Linear(nn.Module):
     """SO(2)-equivariant linear in m-major reduced layout with focus streams.
 
-    Weight is block-diagonal over |m| groups:
-    - m=0: unconstrained cross-l mixing
-    - |m|>0: SO(2)-constrained 2x2 coupling of (-m, +m) pairs
+    Weights are block-diagonal in the absolute order ``|m|``. At zero order
+    they mix degrees freely. Each nonzero order couples the ``(-m, +m)`` pair
+    with an SO(2)-constrained two-by-two matrix.
 
     Input / output layout: ``(F, E, D_m_trunc, C)``.
     """

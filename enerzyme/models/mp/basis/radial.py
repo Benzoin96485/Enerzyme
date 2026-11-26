@@ -496,7 +496,7 @@ class ExponentialBasis(DistanceBasis):
         cutoff_fn: Short range cutoff function, whose are called by `cutoff_fn(x, cutoff=cutoff)`
         where x is the distance.
 
-        References:
+        References
         ----------
         [1] Commun. Math. Phys. 1973, 32, 319−340.
 
@@ -585,7 +585,7 @@ class ExponentialGaussianBasis(ExponentialBasis):
         - `PhysNet`: A constant number (2K^{-1}(1-\exp(-`cutoff`)))^{-2}, where K is `num_basis_functions` [1].
         - `SpookyNet`: A constant number K or K+1 (`no_basis_function_at_infinity=True`).
 
-        References:
+        References
         ----------
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         '''
@@ -676,7 +676,7 @@ class ExponentialBernsteinBasis(ExponentialBasis):
         with 0.0, but should not be necessary because issues are only present when
         r = 0, which will not occur with chemically meaningful inputs.
 
-        References:
+        References
         ----------
         [1] Commun. Kharkov Math. Soc. 1912, 13, 1.
         '''

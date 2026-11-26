@@ -22,15 +22,23 @@ from ..rotation.fused import CoefficientMappingModule
 class SO3Grid(nn.Module):
     """Project between SH coeffs and an e3nn lat–long S² grid (flat).
 
-    Args:
-        lmax: Maximum spherical degree.
-        mmax: Maximum order retained after coefficient masking.
-        normalization: e3nn ``ToS2Grid`` / ``FromS2Grid`` normalization.
-        resolution: If set, isotropic ``lat = long = resolution``.
-        resolution_list: ``[lat, long]``; wins over ``resolution``.
-        rescale_by_mmax: Rescale high-``l`` columns when ``lmax != mmax``.
-            ``None`` means enable whenever ``lmax != mmax``.
-        use_m_primary: Remap coeff axis with EquiformerV3 ``to_m``.
+    Parameters
+    ----------
+    lmax : int
+        Maximum spherical degree.
+    mmax : int
+        Maximum order retained after masking the coefficients.
+    normalization : str
+        Normalization for e3nn's ``ToS2Grid`` and ``FromS2Grid``.
+    resolution : int, optional
+        Use this many grid points along both latitude and longitude.
+    resolution_list : sequence of int, optional
+        Latitude and longitude counts. These take precedence over ``resolution``.
+    rescale_by_mmax : bool, optional
+        Rescale high-degree columns. The default enables rescaling when
+        ``lmax != mmax``.
+    use_m_primary : bool
+        Remap the coefficient axis with EquiformerV3's ``to_m`` ordering.
     """
 
     def __init__(
