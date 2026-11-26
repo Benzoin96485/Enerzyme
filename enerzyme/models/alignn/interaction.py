@@ -115,6 +115,25 @@ class EdgeGatedGraphConv(Module):
         src: Tensor,
         dst: Tensor,
     ) -> tuple[Tensor, Tensor]:
+        if (torch.compiler.is_compiling() and node.is_cuda and not self.training
+                and not torch._C._are_functorch_transforms_active()):
+            from torch._dynamo import config
+            from ..layers.compiled_grad import compiling_fullgraph
+
+            if getattr(config, "skip_nnmodule_hook_guards", False) and not compiling_fullgraph():
+                return self._with_live_gate_hooks(node, edge, src, dst)
+        return self._convolve(node, edge, src, dst)
+
+    @torch.compiler.disable(recursive=False)
+    def _with_live_gate_hooks(self, node, edge, src, dst):
+        from torch._dynamo import config
+
+        # A standalone compiled convolution also needs to retrace when a gate
+        # acquires a hook after warmup, before it chooses whether to checkpoint.
+        with config.patch(skip_nnmodule_hook_guards=False):
+            return self._convolve(node, edge, src, dst)
+
+    def _convolve(self, node, edge, src, dst):
         updated = self.src_update(node)
         if edge.shape[0] == 0:
             updated = F.silu(_apply_norm(self.norm_nodes, updated))

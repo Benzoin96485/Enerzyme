@@ -218,6 +218,15 @@ def test_compiled_gate_preserves_live_hooks_and_force_gradients():
     check()
     assert calls.item() == 1
     hook.remove()
+
+    def shift_gate(_, inputs, output):
+        calls.add_(1)
+        return output + 0.25
+
+    hook = conv.edge_gate.register_forward_hook(shift_gate)
+    check()
+    assert calls.item() == 1
+    hook.remove()
     check()
     assert calls.item() == 0
 

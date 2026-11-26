@@ -347,6 +347,7 @@ def retained_inference(core, inputs, *, joint=False):
     Only this configuration frame is skipped, so the layers still compile.
     """
     from contextlib import nullcontext
+    from torch._dynamo import config as dynamo_config
     from torch._functorch import config
 
     run = partial(compiled_coordinate_vjp, core) if joint else core._run_layers
@@ -363,7 +364,12 @@ def retained_inference(core, inputs, *, joint=False):
         )
     else:
         cache_scope = nullcontext()
-    with config.patch(donated_buffer=False), cache_scope, float64_cuda_reduction_scope(core, inputs):
+    hook_scope = nullcontext()
+    if (getattr(core, "architecture", None) == "alignn" and getattr(inputs.get("Ra"), "is_cuda", False)
+            and hasattr(dynamo_config, "skip_nnmodule_hook_guards")):
+        # Guard every gate within the same trace of the full convolution stack.
+        hook_scope = dynamo_config.patch(skip_nnmodule_hook_guards=False)
+    with config.patch(donated_buffer=False), cache_scope, hook_scope, float64_cuda_reduction_scope(core, inputs):
         return run(inputs)
 
 
