@@ -48,6 +48,9 @@ def test_float64_cuda_forces_compile_without_mix_order_reductions():
             if lazy is not None:
                 assert autograd_config.force_non_lazy_backward_lowering is (training or lazy)
         assert config.triton.mix_order_reduction == default
+    with float64_cuda_reduction_scope(SimpleNamespace(training=False, _cuda_mix_order_reduction=False),
+                                      {"Ra": SimpleNamespace(is_cuda=True, dtype=torch.float32)}):
+        assert config.triton.mix_order_reduction is False
     for coordinates in (torch.zeros(2, 3, dtype=torch.float64), SimpleNamespace(is_cuda=True, dtype=torch.float32)):
         with float64_cuda_reduction_scope(SimpleNamespace(training=True), {"Ra": coordinates}):
             assert config.triton.mix_order_reduction == default

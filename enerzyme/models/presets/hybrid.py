@@ -328,4 +328,7 @@ def allscaip(
         architecture="allscaip", dim_embedding=dim_embedding, dim_feature_out=dim_embedding,
         num_layers=num_layers, atten_num_heads=atten_num_heads, equivariant_mode=equivariant_mode,
         cutoff_sr=cutoff_sr, knn_k=knn_k,
+        # Inductor's mix-order reduction cannot split this preset's symbolic
+        # attention ranges once a third system size compiles dynamically.
+        _cuda_mix_order_reduction=False,
     )

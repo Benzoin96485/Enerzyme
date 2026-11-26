@@ -115,8 +115,10 @@ def float64_cuda_reduction_scope(core, inputs):
 
     PyTorch 2.13 starts their accumulators in float32 and Triton rejects the
     float64 update ("Loop-carried variable accum0 has initial type fp32 but is
-    re-assigned to fp64"), for example in ALIGNN's LayerNorm backward. Training
-    lowers its backward inside this scope so the weight backward is covered.
+    re-assigned to fp64"), for example in ALIGNN's LayerNorm backward. A preset
+    can also opt out in every dtype with ``_cuda_mix_order_reduction=False``
+    (AllScAIP, whose dynamic attention ranges raise CantSplit). Training lowers
+    its backward inside this scope so the weight backward is covered.
     """
     from contextlib import ExitStack
     from torch._functorch import config as autograd_config
@@ -127,7 +129,9 @@ def float64_cuda_reduction_scope(core, inputs):
     except (KeyError, TypeError, AttributeError):
         coordinates = None
     scope = ExitStack()
-    if (getattr(coordinates, "is_cuda", False) and getattr(coordinates, "dtype", None) == torch.float64
+    opted_out = getattr(core, "_cuda_mix_order_reduction", True) is False
+    if (getattr(coordinates, "is_cuda", False)
+            and (opted_out or getattr(coordinates, "dtype", None) == torch.float64)
             and getattr(config.triton, "mix_order_reduction", False)):
         scope.enter_context(config.patch({"triton.mix_order_reduction": False}))
         if core.training and hasattr(autograd_config, "force_non_lazy_backward_lowering"):
