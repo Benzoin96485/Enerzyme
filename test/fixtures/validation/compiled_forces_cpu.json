@@ -2929,6 +2929,7 @@
     }
   },
   "related_checks": {
+    "integrated_training_041cdbc": "compiled_training_041cdbc_cpu.json records the 116 default CPU training comparisons after the DimeNet correction. Four cases exceeded tolerance. Parameter participation matched in every case. suite_coverage.json also records the four EquFlash checks at 244415d.",
     "integrated_training_882b187": "compiled_training_882b187_cpu.json covers all 116 default CPU training cases at 882b187. dimenet_bessel_product_order.json in ../bench_gpu records the subsequent DimeNet and DimeNet++ checks at 2e21446.",
     "frozen_models": "frozen_models_cpu.json records outputs against pre-refactor weights and inputs for all 58 native presets.",
     "vector_models": "vector_force_inductor_cpu.json records corrected QuinNet gradients, ViSNet family controls, and the effect of auxiliary zero gradients on optimizer updates.",

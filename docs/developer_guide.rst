@@ -328,9 +328,13 @@ The full training sweep at :code:`882b187` recorded 86 compiled matches, 25
 matches with native gradients, and five numerical mismatches. Gradient
 participation matched eager in all 116 cases. The per-parameter errors appear
 in :code:`test/fixtures/validation/compiled_training_882b187_cpu.json`.
-After the Bessel product fix at :code:`2e21446`, DimeNet++ passed in both
-precisions on the same batch. DimeNet still exceeded tolerance in both.
-The separate frozen-weight checks and timing controls appear in
+The subsequent sweep at :code:`041cdbc` recorded 87 compiled matches and 25
+matches with native gradients. DimeNet++ passed in both precisions after the
+Bessel product fix. The four remaining mismatches were DimeNet in both
+precisions, AlphaNet in float32, and ViSNet-LSRM in float32. All four
+retained the same set of active weights as eager. The comparisons are in
+:code:`test/fixtures/validation/compiled_training_041cdbc_cpu.json`, with
+separate frozen-weight and timing controls in
 :code:`test/fixtures/bench_gpu/dimenet_bessel_product_order.json`.
 
 The second command prepares the batch's discrete neighbors before compiling
