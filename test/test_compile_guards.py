@@ -54,3 +54,27 @@ def test_float64_cuda_forces_compile_without_mix_order_reductions():
     for coordinates in (torch.zeros(2, 3, dtype=torch.float64), SimpleNamespace(is_cuda=True, dtype=torch.float32)):
         with float64_cuda_reduction_scope(SimpleNamespace(training=True), {"Ra": coordinates}):
             assert config.triton.mix_order_reduction == default
+
+
+def test_float64_cuda_scope_is_not_traced_into_recompiles():
+    # The force entry points only skip their own frame. Traced, the scope would
+    # guard on the Inductor flag it patches and recompile on every later call.
+    from types import SimpleNamespace
+    from enerzyme.models.layers.compiled_grad import float64_cuda_reduction_scope
+
+    core = SimpleNamespace(training=False)
+    inputs = {"Ra": SimpleNamespace(is_cuda=True, dtype=torch.float64)}
+
+    def step(x):
+        with float64_cuda_reduction_scope(core, inputs):
+            y = x * 2
+        return y + 1
+
+    torch._dynamo.reset()
+    compiled = torch.compile(step, backend="eager")
+    x = torch.ones(3)
+    compiled(x)
+    with torch._dynamo.config.patch(error_on_recompile=True):
+        for _ in range(3):
+            torch.testing.assert_close(compiled(x), x * 2 + 1)
+    torch._dynamo.reset()
