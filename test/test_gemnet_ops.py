@@ -270,15 +270,16 @@ def test_bilinear_empty_neighbors_are_zero():
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA Inductor")
-def test_compiled_bilinear_force_inference_retains_gradients():
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_compiled_bilinear_force_inference_retains_gradients(dtype):
     from torch._functorch import config
 
     torch.manual_seed(7)
-    module = BilinearAggregate(8, 4, 5).cuda().double().eval()
+    module = BilinearAggregate(8, 4, 5).to(device="cuda", dtype=dtype).eval()
     module.recompute_force_inference = True
-    msg = torch.randn(5, 8, dtype=torch.float64, device="cuda", requires_grad=True)
-    angular = torch.randn(7, 3, dtype=torch.float64, device="cuda", requires_grad=True)
-    radial = torch.randn(5, 4, 3, dtype=torch.float64, device="cuda", requires_grad=True)
+    msg = torch.randn(5, 8, dtype=dtype, device="cuda", requires_grad=True)
+    angular = torch.randn(7, 3, dtype=dtype, device="cuda", requires_grad=True)
+    radial = torch.randn(5, 4, 3, dtype=dtype, device="cuda", requires_grad=True)
     src = torch.tensor([0, 1, 2, 0, 3, 4, 2], device="cuda")
     dst = torch.tensor([1, 1, 0, 2, 0, 3, 3], device="cuda")
     inputs = (msg, src, dst, angular, radial, 5)
