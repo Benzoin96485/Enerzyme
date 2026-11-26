@@ -110,6 +110,7 @@ def cpu_inductor_options(options):
     return tuple(overrides.get(key) for key in options)
 
 
+@torch.compiler.disable
 def float64_cuda_reduction_scope(core, inputs):
     """Compile float64 CUDA forces without Inductor's mix-order reductions.
 
@@ -119,6 +120,9 @@ def float64_cuda_reduction_scope(core, inputs):
     can also opt out in every dtype with ``_cuda_mix_order_reduction=False``
     (AllScAIP, whose dynamic attention ranges raise CantSplit). Training lowers
     its backward inside this scope so the weight backward is covered.
+
+    Its callers only skip their own frame, so Dynamo would otherwise trace this
+    function, guard on the flag it patches, and recompile on later calls.
     """
     from contextlib import ExitStack
     from torch._functorch import config as autograd_config
