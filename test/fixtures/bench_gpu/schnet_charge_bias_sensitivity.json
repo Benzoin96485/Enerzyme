@@ -1,0 +1,201 @@
+{
+  "model": "SchNet",
+  "system": "large_2000",
+  "mode": "energy-and-force training",
+  "loss": "sum(E**2) + sum(Fa**2)",
+  "parameter": "lin2.bias[1] (charge channel in main checkpoint names)",
+  "conclusion": "The stored native FP32 reference bands for this scalar are disjoint. Their original cross-revision gradient comparison remains failed.",
+  "paired_v100": {
+    "job": "6325032",
+    "node": "d-12-13-1",
+    "gpu": "Tesla V100-PCIE-32GB",
+    "gpu_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+    "torch": "2.13.0+cu126",
+    "model_revisions": {
+      "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
+      "new": "81620f7fb09f51a76ea65b77acc9a7d591944725"
+    },
+    "order": [
+      "base",
+      "new"
+    ],
+    "driver": "scripts/bench_frozen_compile.py",
+    "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
+    "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+    "main_checkpoint": {
+      "file": "test/fixtures/main_legacy/schnet_default.pt.gz",
+      "sha256": "e0ec083cfe71c322d4758fe5ae65c8aa20f692ea2a2fc4ea7a6d11870c04ab10"
+    },
+    "archive": ".refactor/bench/raw-main-trained-compile-81620f7",
+    "extract": "torch.load(file, map_location=\"cpu\", weights_only=True)[(\"large_2000\", \"train\")][1][\"lin2.bias\"][1].item()",
+    "replay": "Use the pinned driver once per model revision and precision with --model-tree CHECKOUT --main-fixture test/fixtures/main_legacy/schnet_default.pt.gz --precision DTYPE --device cuda --systems mol_batch_32x20 bulk_256 large_2000 --modes infer train --threads 2 --reps 5 --out RUN.json --eager-grad-out RUN.grad.pt. Native FP32 repeats can differ.",
+    "sampling": "The --eager-grad-out files store native training gradients collected before torch.compile(model)."
+  },
+  "historical_fp32": {
+    "acceptance": "abs(actual - reference) <= 0.0007 + 0.001 * abs(reference)",
+    "base": {
+      "file": "pair-schnet_default-float32_6325032_1795644107/0-base.grad.pt",
+      "sha256": "730126c39e1843f40bbc0bc19b41a86da6d3065295669ec5568a67ca784fbbd8",
+      "value": -1.76025390625,
+      "interval": [
+        -1.76271416015625,
+        -1.75779365234375
+      ]
+    },
+    "new": {
+      "file": "pair-schnet_default-float32_6325032_1795644107/1-new.grad.pt",
+      "sha256": "acbb9f046ae3d0854146d51882962fcc0a86bf9e00bafe2c8116b0c2b557f6b1",
+      "value": -1.74169921875,
+      "interval": [
+        -1.74414091796875,
+        -1.73925751953125
+      ]
+    },
+    "separation_between_intervals": 0.013652734375000142,
+    "active_parameter_tensors": 30,
+    "out_of_tolerance_elements": 1,
+    "worst_other_gradient_tensor_ratio": 0.06165945826493244,
+    "energy_and_force_max_tolerance_ratios": {
+      "E": 0.003829594092131149,
+      "Fa": 0.0013812312977039103
+    }
+  },
+  "historical_fp64": {
+    "base": {
+      "file": "pair-schnet_default-float64_6325032_1795644413/0-base.grad.pt",
+      "sha256": "7ac5de1b662657111dd0e0c64e922e8971f8debcc3baeb5a6c8abae5058231b1",
+      "value": -1.7532498188938916
+    },
+    "new": {
+      "file": "pair-schnet_default-float64_6325032_1795644413/1-new.grad.pt",
+      "sha256": "7bb81f7a7030ae81fdfbe64a8b806c3b818f312f6be7d536dfa2604741ad8c0b",
+      "value": -1.7532498189066246
+    }
+  },
+  "analytic_control": {
+    "model_revision": "882b187acd561b57af232279dd67700532e50c97",
+    "torch": "2.13.0+cu126",
+    "device": "cpu",
+    "threads": 2,
+    "dtype": "float64",
+    "presnapshot_checkpoint": {
+      "file": "test/fixtures/presnapshot/schnet.pt",
+      "sha256": "f5a4c532d978c545c66726a859e213cf29753a6305dc4bc0dc352acc2d56340e"
+    },
+    "batch": "scripts/bench_cores.py _batch(\"large_2000\", [2000], torch.float64, max(cutoff_sr or 0, cutoff_lr or 0, 6)).",
+    "source": {
+      "file": ".refactor/bench/schnet-grad-882b187-6338814/cpu-fp64-identity.py",
+      "sha256": "437613d2df40e30d5dfadf10907bde04f9bdd36e4e859c8171e29c213ebb9576"
+    },
+    "derivation": "For one structure q_corrected[i] = q_raw[i] + (Q - sum(q_raw)) / N. A shared readout bias changes each q_raw[i] by its species affine scale s[i]. Its entry in the corrected charge Jacobian is s[i] - mean(s). The scales are position independent, so this identity also applies to the force-loss derivative.",
+    "reproduce": "With the same checkpoint, double-precision acceptance batch and loss, compute g = torch.autograd.grad(loss, outputs[\"Qa\"])[0] and s = atomic_affine.scales[\"Qa\"][batch[\"Za\"]]. Use math.fsum(s) / N for the mean and math.fsum(g_i * (s_i - mean) for each atom) for the scalar.",
+    "main": {
+      "scale_range": 0.002993762493133545,
+      "sum_abs_dL_dQa": 583992.7760792773,
+      "projected_charge_bias": -1.753249818908592,
+      "native_autograd_charge_bias": -1.753249818905715
+    },
+    "snapshot": {
+      "scale_range": 0.0,
+      "sum_abs_dL_dQa": 3294657.412145502,
+      "projected_charge_bias": 0.0,
+      "native_autograd_charge_bias": -1.4551915228366852e-11
+    }
+  },
+  "independent_repeat_control": {
+    "job": "6338814",
+    "gpu_uuid": "9a19f472-727c-1aec-eb16-7d4406811551",
+    "model_revision": "882b187acd561b57af232279dd67700532e50c97",
+    "torch": "2.13.0+cu126",
+    "dtype": "float32",
+    "archive": ".refactor/bench/schnet-grad-882b187-6338814",
+    "raw_reports": [
+      "main-default.json",
+      "snapshot-default.json"
+    ],
+    "execution": "Standard torch.compile(model) with its default graph-break policy. Dynamo reported the per-frame recompilation limit in BaseFFLayer.forward. These numerical measurements refer to the ordinary entry point.",
+    "procedure": "Reset seed 7 and clear weight gradients before every run. Compare two native passes on identical weights, then two additional default torch.compile passes against the first compiled pass. Ratios above one fail the original elementwise gate.",
+    "main_large_2000": {
+      "native_repeat_charge_bias": [
+        -1.7431640625,
+        -1.75537109375
+      ],
+      "native_repeat_charge_bias_ratio": 4.996402590135102,
+      "compiled_vs_native_max_ratio": 0.3997122072108082,
+      "compiled_vs_native_failing_elements": 0,
+      "max_ratio_in_two_compiled_repeats": 4.798464491362764
+    },
+    "snapshot_bulk_256": {
+      "native_repeat_charge_bias": [
+        0.001708984375,
+        -0.000244140625
+      ],
+      "native_repeat_charge_bias_ratio": 2.783383202282374,
+      "compiled_vs_native_max_ratio": 2.4354603019970775,
+      "compiled_vs_native_failing_elements": 1,
+      "max_ratio_in_two_compiled_repeats": 5.580357142857143
+    },
+    "snapshot_large_2000": {
+      "native_repeat_charge_bias": [
+        0.021484375,
+        -0.03515625
+      ],
+      "native_repeat_charge_bias_ratio": 78.50568489442338,
+      "compiled_vs_native_max_ratio": 51.43475906876015,
+      "compiled_vs_native_failing_elements": 6,
+      "max_ratio_in_two_compiled_repeats": 87.33624454148472
+    },
+    "scope": "Five further weight tensors also exceed the elementwise gate for the default 2000-atom compiled pass. The shared charge-bias identity covers only the bias entry."
+  },
+  "local_precision_experiments": {
+    "acceptance": "Experimental controls on the independent repeat GPU. Their native and compiled paths use the same experimental arithmetic. The original historical comparison continues to use the unchanged checkpoint references.",
+    "timing": "Five warm training calls per shape. These timings describe one diagnostic pass and are unsuitable for a three-percent performance verdict.",
+    "unmodified_large_2000_training_median_ms": {
+      "main": 5.439297994598746,
+      "snapshot": 18.081706017255783
+    },
+    "bias32_anchor": {
+      "operation": "Center the charge at the first atom, accumulate the conserving shift and readout bias in FP64, and restore public FP32 fields.",
+      "main": {
+        "large_2000_compiled_vs_native_failing_elements": 0,
+        "large_2000_compiled_vs_native_max_ratio": 0.11832195799176085,
+        "large_2000_compiled_repeat_max_ratio": 0.2785166548030074,
+        "large_2000_original_native_vs_modified_native_max_ratio": 0.508056393273136,
+        "large_2000_failed_parameters": [],
+        "training_median_ms": 5.109250079840422
+      },
+      "snapshot": {
+        "large_2000_compiled_vs_native_failing_elements": 2,
+        "large_2000_compiled_vs_native_max_ratio": 1.1402136672850174,
+        "large_2000_compiled_repeat_max_ratio": 0.8449896747253248,
+        "large_2000_original_native_vs_modified_native_max_ratio": 60.25037280414263,
+        "large_2000_failed_parameters": [
+          "blocks.1.message.pre.weight",
+          "blocks.3.message.pre.weight"
+        ],
+        "training_median_ms": 17.917170887812972
+      }
+    },
+    "bias32_anchor_physics64": {
+      "operation": "Also accumulate electrostatic pair energies and the molecular energy in FP64 with public FP32 outputs.",
+      "main": {
+        "large_2000_compiled_vs_native_failing_elements": 0,
+        "large_2000_compiled_vs_native_max_ratio": 0.3082258323823539,
+        "large_2000_compiled_repeat_max_ratio": 0.05669607796253031,
+        "large_2000_original_native_vs_modified_native_max_ratio": 0.9422467950474236,
+        "large_2000_failed_parameters": [],
+        "training_median_ms": 5.532879149541259
+      },
+      "snapshot": {
+        "large_2000_compiled_vs_native_failing_elements": 1,
+        "large_2000_compiled_vs_native_max_ratio": 1.0678719041884985,
+        "large_2000_compiled_repeat_max_ratio": 1.3909223307045382,
+        "large_2000_original_native_vs_modified_native_max_ratio": 59.109079646888944,
+        "large_2000_failed_parameters": [
+          "blocks.2.update.net.2.weight"
+        ],
+        "training_median_ms": 18.122826935723424
+      }
+    }
+  }
+}
