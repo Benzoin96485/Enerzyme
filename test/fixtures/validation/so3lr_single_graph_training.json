@@ -164,6 +164,152 @@
           }
         }
       }
+    },
+    "cuda": {
+      "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+      "torch": "2.13.0+cu126",
+      "device": "Tesla V100-PCIE-32GB",
+      "job": "6338929",
+      "cases": {
+        "so3lr/bulk_256": {
+          "fixture_sha256": "3183adeb6ebb71a7de33ba700292bf08babe64d1ae4780bee20ee21fc7c74d06",
+          "completed_force_training": true,
+          "comparisons": {
+            "native_repeat": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            },
+            "reordered_native_vs_native": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            },
+            "eager_backend_vs_native": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            },
+            "inductor_vs_native": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            }
+          }
+        },
+        "so3lr/large_2000": {
+          "fixture_sha256": "3183adeb6ebb71a7de33ba700292bf08babe64d1ae4780bee20ee21fc7c74d06",
+          "completed_force_training": true,
+          "comparisons": {
+            "native_repeat": {
+              "passed": false,
+              "missing": [],
+              "tensors": 123,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 1.7462297854758921,
+                  "actual": 6.548361852765083e-11,
+                  "reference": 2.4010660126805305e-10,
+                  "max_abs": 3.725290298461914e-09
+                }
+              }
+            },
+            "reordered_native_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 123,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 1.6007106366862345,
+                  "actual": 8.003553375601768e-11,
+                  "reference": 2.4010660126805305e-10,
+                  "max_abs": 4.656612873077393e-10
+                }
+              }
+            },
+            "eager_backend_vs_native": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            },
+            "inductor_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 123,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 7.057678716298398,
+                  "actual": -4.656612873077393e-10,
+                  "reference": 2.4010660126805305e-10,
+                  "max_abs": 9.313225746154785e-10
+                }
+              }
+            }
+          }
+        },
+        "so3lr_efa/large_2000": {
+          "fixture_sha256": "14c86f7693f0b6935bd07855d5c9a9022b2a44478c45186bf3191a39dc804f5f",
+          "completed_force_training": true,
+          "comparisons": {
+            "native_repeat": {
+              "passed": true,
+              "missing": [],
+              "tensors": 141,
+              "outside": {}
+            },
+            "reordered_native_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 141,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 5.2386893602393245,
+                  "actual": 7.566995918750763e-10,
+                  "reference": 2.3283064365386963e-10,
+                  "max_abs": 4.6566128730773926e-09
+                }
+              }
+            },
+            "eager_backend_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 141,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 4.074536169075031,
+                  "actual": -1.7462298274040222e-10,
+                  "reference": 2.3283064365386963e-10,
+                  "max_abs": 4.6566128730773926e-09
+                }
+              }
+            },
+            "inductor_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 141,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 18.62645105862871,
+                  "actual": -1.6298145055770874e-09,
+                  "reference": 2.3283064365386963e-10,
+                  "max_abs": 9.313225746154785e-09
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "charge_bias": {
