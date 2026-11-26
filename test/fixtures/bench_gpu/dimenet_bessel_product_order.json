@@ -688,6 +688,68 @@
       },
       "receipt_sha256": "a6cb662ae859d698a1bfab0856b83207ff21a0cddaeca1e27ffe12b6e41310e4"
      }
+    },
+    "isolated_aot_decompositions": {
+     "all": {
+      "job": "6339260",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 154,
+      "failed_fields": [],
+      "energy_max_abs": 0.000274658203125,
+      "force_max_abs": 0.0029296875,
+      "called_operators": 39,
+      "receipt_sha256": "73abaffe587f2af7bea490e8d76aab7eeb15af0caf479fa0f4ea7a29fb50fdb8"
+     },
+     "empty": {
+      "job": "6339253",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 0,
+      "failed_fields": [],
+      "energy_max_abs": 0.0,
+      "force_max_abs": 0.0,
+      "called_operators": 0,
+      "receipt_sha256": "6b734170f4269c885cb99c3996dbe2d95f4487175fcd1be79baa541e4af1bc1a"
+     },
+     "only=silu+sigmoid_backward": {
+      "job": "6339387",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 162,
+      "failed_fields": [],
+      "energy_max_abs": 3.0517578125e-05,
+      "force_max_abs": 0.00244140625,
+      "called_operators": 3,
+      "receipt_sha256": "a99c978545b7c54c24c71b4715ed65563c622c11cd96adecf5f71f1bbc7c657f"
+     },
+     "only=bmm+mm.default+addmm": {
+      "job": "6339388",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 0,
+      "failed_fields": [],
+      "energy_max_abs": 0.0,
+      "force_max_abs": 0.0,
+      "called_operators": 3,
+      "receipt_sha256": "143621b34aaa33554673ce4fc40c02f4df906d422eeb3844503b2e770cf3b971"
+     },
+     "only=linalg_cross+linalg_vector_norm+norm.ScalarOpt_dim": {
+      "job": "6339390",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 162,
+      "failed_fields": [],
+      "energy_max_abs": 0.00018310546875,
+      "force_max_abs": 0.00390625,
+      "called_operators": 3,
+      "receipt_sha256": "16c3e9dfe2a6eafeda41f2a61c2509c5afb72ee9299e77147f3ce92a9f8dd35b"
+     },
+     "only=index_add+index_select": {
+      "job": "6339391",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 0,
+      "failed_fields": [],
+      "energy_max_abs": 0.0,
+      "force_max_abs": 0.0,
+      "called_operators": 2,
+      "receipt_sha256": "f9a39f387a1cd9a4d3faae990c0abdb273da3163d76502b790a683f455314110"
+     }
     }
    },
    "dimenet-float64": {
@@ -761,6 +823,68 @@
        }
       },
       "receipt_sha256": "37451dd10fc3316bbff435d12b0f0bb93a8e1114ae09b3b410b23a3a0cbe89c3"
+     }
+    },
+    "isolated_aot_decompositions": {
+     "all": {
+      "job": "6339254",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 9,
+      "failed_fields": [],
+      "energy_max_abs": 5.684341886080802e-14,
+      "force_max_abs": 1.1368683772161603e-11,
+      "called_operators": 39,
+      "receipt_sha256": "8e1f5b468e4b7364a1a097ef2687fed0766fcbb772258fb778c505bef710bfd1"
+     },
+     "empty": {
+      "job": "6339256",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 0,
+      "failed_fields": [],
+      "energy_max_abs": 0.0,
+      "force_max_abs": 0.0,
+      "called_operators": 0,
+      "receipt_sha256": "8c0cd812dc8c1f870dd0524b9d0a26d88fb2634faa4bdfe75c2c1ab6d75639ed"
+     },
+     "only=silu+sigmoid_backward": {
+      "job": "6339394",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 9,
+      "failed_fields": [],
+      "energy_max_abs": 5.115907697472721e-13,
+      "force_max_abs": 1.2960299500264227e-11,
+      "called_operators": 3,
+      "receipt_sha256": "8cc6556356a21ef020c47b16151bb4ba42ef227740cca0e9d2e7a90bfe7db4af"
+     },
+     "only=bmm+mm.default+addmm": {
+      "job": "6339395",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 0,
+      "failed_fields": [],
+      "energy_max_abs": 0.0,
+      "force_max_abs": 0.0,
+      "called_operators": 3,
+      "receipt_sha256": "435168dcf141c404baaf314cb24363aec62f4b63c91bd286992a423c31be9eb6"
+     },
+     "only=linalg_cross+linalg_vector_norm+norm.ScalarOpt_dim": {
+      "job": "6339397",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 14,
+      "failed_fields": [],
+      "energy_max_abs": 2.8421709430404007e-13,
+      "force_max_abs": 1.546140993013978e-11,
+      "called_operators": 3,
+      "receipt_sha256": "d4ae7b5266318d039fbe27479cd0e33b89519343677de2db0e39914cb2dd48df"
+     },
+     "only=index_add+index_select": {
+      "job": "6339386",
+      "compiled_machine_code": false,
+      "failed_weight_tensors": 0,
+      "failed_fields": [],
+      "energy_max_abs": 0.0,
+      "force_max_abs": 0.0,
+      "called_operators": 2,
+      "receipt_sha256": "d88abe4e54ae4425afcd4e5a1c36fec4aac70a0ca03d4dfe7cf3fbc9062f29ce"
      }
     }
    }
