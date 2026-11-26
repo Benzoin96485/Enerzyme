@@ -15,6 +15,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Module, ModuleList, init
+from torch.utils.checkpoint import checkpoint
 
 from ..mp.ops import scatter_sum
 
@@ -116,6 +117,8 @@ class BilinearAggregate(Module):
     edge. ``weight`` has shape ``(emb_in, interm, units_out)``.
     """
 
+    recompute_force_inference = False
+
     def __init__(self, emb_in: int, emb_interm: int, units_out: int) -> None:
         super().__init__()
         self.emb_in = emb_in
@@ -124,6 +127,25 @@ class BilinearAggregate(Module):
         he_orthogonal_(self.weight)
 
     def forward(
+        self,
+        msg: Tensor,
+        idx_src: Tensor,
+        idx_dst: Tensor,
+        angular: Tensor,
+        radial_w: Tensor,
+        num_edges: int,
+    ) -> Tensor:
+        if (torch.compiler.is_compiling() and self.recompute_force_inference and msg.is_cuda
+                and not self.training and not torch._C._are_functorch_transforms_active()):
+            # The force backward can rebuild the edge contractions instead of
+            # retaining a full edge-by-channel matrix from every interaction.
+            return checkpoint(
+                self._aggregate, msg, idx_src, idx_dst, angular, radial_w, num_edges,
+                use_reentrant=False, preserve_rng_state=False,
+            )
+        return self._aggregate(msg, idx_src, idx_dst, angular, radial_w, num_edges)
+
+    def _aggregate(
         self,
         msg: Tensor,
         idx_src: Tensor,
@@ -369,6 +391,7 @@ class GemNetInteraction(Module):
         self.trip = TripletInteraction(
             emb_edge, emb_trip, emb_bil_trip, emb_rbf, emb_cbf
         )
+        self.trip.bilinear.recompute_force_inference = triplets_only
         self.quad: Optional[QuadrupletInteraction]
         if triplets_only:
             self.quad = None
