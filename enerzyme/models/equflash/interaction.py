@@ -140,6 +140,9 @@ class EquFlashConvolution(nn.Module):
         idx_receiver: Tensor,
     ) -> Tensor:
         aggregated = irreps_convolution(self.tp, self.weight_nn, features, idx_sender, idx_receiver, sph, rbf)
+        if idx_sender.numel() == 0:
+            # Leave the trainable normalization disconnected for isolated atoms.
+            return aggregated
         return aggregated / self.denominator
 
 

@@ -60,6 +60,27 @@ def _run(core, pos, embedding, rbf, idx_i, idx_j):
     )["atom_feature"]
 
 
+def test_equflash_empty_neighborhood_leaves_trainable_denominators_unused():
+    core = _tiny_core(train_denominator=True)
+    embedding = torch.randn(2, 4, requires_grad=True)
+    pos = torch.randn(2, 3)
+    empty = torch.empty(0, dtype=torch.long)
+    denominators = [block.module.conv.denominator for block in core.blocks]
+
+    isolated = _run(core, pos, embedding, torch.empty(0, 3), empty, empty)
+    isolated.sum().backward()
+    assert all(denominator.grad is None for denominator in denominators)
+
+    i, j = _edges(2)
+    _run(core, pos, embedding, torch.ones(len(i), 3), i, j).sum().backward()
+    assert all(denominator.grad is not None for denominator in denominators)
+
+    with torch.no_grad():
+        for denominator in denominators:
+            denominator.zero_()
+    torch.testing.assert_close(_run(core, pos, embedding, torch.empty(0, 3), empty, empty), isolated)
+
+
 def test_equflash_irreps_match_published_natural_parity():
     from enerzyme.models.equflash.irreps import equflash_irreps
 
