@@ -1,0 +1,149 @@
+{
+  "architecture": "gemnet",
+  "job": "6338668",
+  "device": "Tesla V100-PCIE-32GB",
+  "gpu_uuid": "GPU-e7d358e7-783a-3a6f-9e59-ddd2825dcbd8",
+  "baseline": "1aa0f8b",
+  "experimental_base": "2a3b024",
+  "production_candidate": "f53ec5e",
+  "snapshot_sha256": "39566781242ab4a660c1a90d96906a36420d0e85e44da5b44e1bc93b93d7ee2e",
+  "frozen_driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+  "system": "mol_batch_32x20",
+  "mode": "ordinary CUDA Inductor force inference",
+  "repetitions": 11,
+  "torch": "2.13.0+cu126",
+  "experiments": {
+    "original": "Default bilinear contractions.",
+    "full": "Recompute the full bilinear aggregate in the force backward, retaining the original einsum order.",
+    "bmm": "Reorder the two contractions to flatten the shared weights without an edge-sized transpose.",
+    "bmm-remat": "Apply the reordered contractions and recompute only the contractions after scatter."
+  },
+  "results": {
+    "float32": {
+      "baseline": {
+        "infer_ms": 25.432939874008298,
+        "infer_peak_mb": 852.4326171875,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 5.7220458984375e-06,
+          "force_max_abs": 6.9141387939453125e-06,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 31,
+          "new_calls": 1001
+        }
+      },
+      "full": {
+        "infer_ms": 25.040513137355447,
+        "infer_peak_mb": 736.33837890625,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 3.814697265625e-06,
+          "force_max_abs": 5.9604644775390625e-06,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 941
+        }
+      },
+      "full_relative_to_baseline_percent": {
+        "infer_ms": -1.5429861376501708,
+        "infer_peak_mb": -13.619168945492621
+      },
+      "original": {
+        "infer_ms": 22.64757500961423,
+        "infer_peak_mb": 1075.73779296875,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 4.76837158203125e-06,
+          "force_max_abs": 6.4373016357421875e-06,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 985
+        }
+      },
+      "bmm": {
+        "infer_ms": 23.792726919054985,
+        "infer_peak_mb": 1075.306640625,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 7.033348083496094e-06,
+          "force_max_abs": 9.5367431640625e-06,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 1001
+        }
+      },
+      "bmm-remat": {
+        "infer_ms": 23.948172107338905,
+        "infer_peak_mb": 750.6953125,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 5.602836608886719e-06,
+          "force_max_abs": 1.1444091796875e-05,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 985
+        }
+      }
+    },
+    "float64": {
+      "baseline": {
+        "infer_ms": 63.5533828753978,
+        "infer_peak_mb": 1674.068359375,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 8.881784197001252e-15,
+          "force_max_abs": 1.5987211554602254e-14,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 31,
+          "new_calls": 1001
+        }
+      },
+      "full": {
+        "infer_ms": 63.52825206704438,
+        "infer_peak_mb": 1440.7119140625,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 8.881784197001252e-15,
+          "force_max_abs": 1.7763568394002505e-14,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 1838
+        }
+      },
+      "full_relative_to_baseline_percent": {
+        "infer_ms": -0.03954283346756515,
+        "infer_peak_mb": -13.9394812646493
+      }
+    }
+  },
+  "scope": "All runs used the frozen baseline weights, geometry and driver on the same physical device. Each run checked its E/F directly against its own unchanged eager implementation. The exploratory variants were applied only during compilation. These small-system results do not replace the separate formal full-system pairs for the production commit.",
+  "raw_directory": ".refactor/bench/gemnet-bilinear-6338668"
+}
