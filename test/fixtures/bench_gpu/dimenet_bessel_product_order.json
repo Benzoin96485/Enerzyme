@@ -486,6 +486,60 @@
  },
  "snapshot_sha256": "accb6370e15324df43fc76dba0dfe8f176c249395f70e59b8ebdbd0573a02697",
  "direct_parent_performance_method": "Ordinary eager model with the same frozen checkpoint in four fresh processes on the same allocated node/device in parent, fix, fix, parent order. Each leg uses two warmups followed by seven CPU or fifteen V100 repetitions with two threads. Each timing covers a complete E/F forward or E/F loss followed by weight backward. Median per leg, then median by source. GPU peak is measured after resetting allocation counters before each timed call. The formal compiled matrix has its own source and controls.",
+ "dimenetpp_float64_cpu_interleaved_repeat": {
+  "job": "6339285",
+  "host": "d-18-10-4",
+  "order": [
+   "B1",
+   "A1",
+   "A2",
+   "B2",
+   "A3",
+   "B3",
+   "B4",
+   "A4"
+  ],
+  "A": "c52e9c514c8db25ab224006be64965ae399b37bb",
+  "B": "2e21446c2d1267dcef4e55a1885dab1b9a97444a",
+  "repetitions_per_leg": 7,
+  "system": "mol_batch_32x20",
+  "modes": {
+   "infer": {
+    "median_ms_each_leg": [
+     903.554956,
+     904.291607,
+     988.329332,
+     963.97796,
+     926.084556,
+     926.279525,
+     955.358174,
+     951.660651
+    ],
+    "relative_percent_all_eight": 0.20729606900282693,
+    "relative_percent_per_quartet": [
+     -1.3255704025580295,
+     0.20729606900282693
+    ]
+   },
+   "train": {
+    "median_ms_each_leg": [
+     2939.653056,
+     3130.600109,
+     3162.106401,
+     3324.653663,
+     3163.013622,
+     3156.753525,
+     3188.419613,
+     2993.169626
+    ],
+    "relative_percent_all_eight": 0.8337688706222535,
+    "relative_percent_per_quartet": [
+     -0.4513128167485392,
+     3.0699198251026516
+    ]
+   }
+  }
+ },
  "same_source_cpu_inductor": {
   "source": "2e21446c2d1267dcef4e55a1885dab1b9a97444a",
   "job": "6339218",
