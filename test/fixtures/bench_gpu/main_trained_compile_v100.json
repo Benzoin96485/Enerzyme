@@ -1,8 +1,8 @@
 {
   "scope": "Four trained main checkpoints, independent of the Phase 0 default-model snapshot matrix.",
   "baseline": "b05ea1a",
-  "candidate": "81620f7",
-  "benchmark_driver": "70ae60a",
+  "candidate": "3927c58",
+  "benchmark_driver": "3927c58",
   "systems": [
     "mol_batch_32x20",
     "bulk_256",
@@ -28,24 +28,28 @@
     "schnet_default": {
       "scripted_force_kernels": false,
       "force_layer_hooks": false,
+      "replaced_force_coordinates": false,
       "native_cpu_force_training": false,
       "native_cpu_force_inference": false
     },
     "physnet_ff01": {
       "scripted_force_kernels": false,
       "force_layer_hooks": false,
+      "replaced_force_coordinates": false,
       "native_cpu_force_training": false,
       "native_cpu_force_inference": false
     },
     "spookynet_ff02": {
       "scripted_force_kernels": false,
       "force_layer_hooks": false,
+      "replaced_force_coordinates": false,
       "native_cpu_force_training": false,
       "native_cpu_force_inference": false
     },
     "mace_ff04": {
       "scripted_force_kernels": true,
       "force_layer_hooks": false,
+      "replaced_force_coordinates": false,
       "native_cpu_force_training": false,
       "native_cpu_force_inference": false
     }
@@ -84,21 +88,21 @@
           "train"
         ],
         "device_name": "Tesla V100-PCIE-32GB",
-        "device_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "device_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "params": 681679,
         "architecture": "schnet",
         "comparisons": {
           "mol_batch_32x20": {
             "infer": {
               "baseline": {
-                "ms": 12.09361501969397,
+                "ms": 12.230883119627833,
                 "peak_MiB": 40.26806640625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 2.86102294921875e-06,
-                  "force_max_abs": 5.662441253662109e-07,
+                  "energy_max_abs": 1.9073486328125e-06,
+                  "force_max_abs": 4.76837158203125e-07,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
@@ -112,13 +116,13 @@
                 }
               },
               "candidate": {
-                "ms": 7.817466976121068,
-                "peak_MiB": 39.7236328125,
+                "ms": 7.9626229126006365,
+                "peak_MiB": 38.412109375,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 2.86102294921875e-06,
+                  "energy_max_abs": 1.430511474609375e-06,
                   "force_max_abs": 5.960464477539062e-07,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
@@ -128,8 +132,8 @@
                 },
                 "error": null,
                 "capture": {
-                  "new_graphs": 11,
-                  "new_calls": 221
+                  "new_graphs": 10,
+                  "new_calls": 159
                 }
               },
               "cross_native": {
@@ -137,12 +141,12 @@
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
                 "energy_max_abs": 1.9073486328125e-06,
-                "force_max_abs": 4.76837158203125e-07,
+                "force_max_abs": 3.5762786865234375e-07,
                 "gradient_max_abs": 0.0
               },
               "delta_percent": {
-                "ms": -35.358724720518765,
-                "peak_MiB": -1.3520231844693198
+                "ms": -34.897400010123505,
+                "peak_MiB": -4.609004595666255
               },
               "status": "both_validated"
             },
@@ -158,15 +162,15 @@
                 }
               },
               "candidate": {
-                "ms": 4.835230065509677,
+                "ms": 5.112566985189915,
                 "peak_MiB": 43.8359375,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 30,
                   "reference_active_parameters": 30,
-                  "energy_max_abs": 2.86102294921875e-06,
-                  "force_max_abs": 6.258487701416016e-07,
-                  "gradient_max_abs": 0.0010986328125,
+                  "energy_max_abs": 1.9073486328125e-06,
+                  "force_max_abs": 5.364418029785156e-07,
+                  "gradient_max_abs": 0.0013427734375,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -175,7 +179,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 273
+                  "new_calls": 274
                 }
               },
               "cross_native": {
@@ -183,7 +187,7 @@
                 "active_parameters": 30,
                 "reference_active_parameters": 30,
                 "energy_max_abs": 1.9073486328125e-06,
-                "force_max_abs": 3.2782554626464844e-07,
+                "force_max_abs": 4.76837158203125e-07,
                 "gradient_max_abs": 0.0009765625
               },
               "status": "candidate_only_validated"
@@ -202,7 +206,7 @@
                 }
               },
               "candidate": {
-                "ms": 8.907420095056295,
+                "ms": 7.866780972108245,
                 "peak_MiB": 40.85205078125,
                 "numerical": {
                   "passed": true,
@@ -219,15 +223,15 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 63
+                  "new_calls": 64
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 3.814697265625e-06,
-                "force_max_abs": 3.8743019104003906e-07,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 3.2782554626464844e-07,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -244,15 +248,15 @@
                 }
               },
               "candidate": {
-                "ms": 5.7860021479427814,
+                "ms": 5.281843012198806,
                 "peak_MiB": 43.330078125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 30,
                   "reference_active_parameters": 30,
-                  "energy_max_abs": 3.814697265625e-06,
-                  "force_max_abs": 4.6193599700927734e-07,
-                  "gradient_max_abs": 0.001953125,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 3.8743019104003906e-07,
+                  "gradient_max_abs": 0.0009765625,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -261,7 +265,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 275
+                  "new_calls": 276
                 }
               },
               "cross_native": {
@@ -269,7 +273,7 @@
                 "active_parameters": 30,
                 "reference_active_parameters": 30,
                 "energy_max_abs": 3.814697265625e-06,
-                "force_max_abs": 4.76837158203125e-07,
+                "force_max_abs": 3.2782554626464844e-07,
                 "gradient_max_abs": 0.001953125
               },
               "status": "candidate_only_validated"
@@ -288,14 +292,14 @@
                 }
               },
               "candidate": {
-                "ms": 7.290278095752001,
+                "ms": 7.7292590867727995,
                 "peak_MiB": 154.57470703125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 1.52587890625e-05,
-                  "force_max_abs": 4.76837158203125e-07,
+                  "energy_max_abs": 3.0517578125e-05,
+                  "force_max_abs": 3.725290298461914e-07,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -305,15 +309,15 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 63
+                  "new_calls": 64
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 4.57763671875e-05,
-                "force_max_abs": 5.364418029785156e-07,
+                "energy_max_abs": 7.62939453125e-05,
+                "force_max_abs": 4.76837158203125e-07,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -330,15 +334,15 @@
                 }
               },
               "candidate": {
-                "ms": 5.871974164620042,
+                "ms": 5.376354791224003,
                 "peak_MiB": 172.0556640625,
                 "numerical": {
                   "passed": false,
                   "active_parameters": 30,
                   "reference_active_parameters": 30,
                   "energy_max_abs": 7.62939453125e-05,
-                  "force_max_abs": 9.387731552124023e-07,
-                  "gradient_max_abs": 0.4375,
+                  "force_max_abs": 9.5367431640625e-07,
+                  "gradient_max_abs": 0.3125,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -347,16 +351,16 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 272
+                  "new_calls": 273
                 }
               },
               "cross_native": {
                 "passed": false,
                 "active_parameters": 30,
                 "reference_active_parameters": 30,
-                "energy_max_abs": 0.0002288818359375,
-                "force_max_abs": 5.364418029785156e-07,
-                "gradient_max_abs": 2.9375
+                "energy_max_abs": 7.62939453125e-05,
+                "force_max_abs": 5.960464477539062e-07,
+                "gradient_max_abs": 0.3125
               },
               "status": "neither_validated"
             }
@@ -370,23 +374,23 @@
         "source": {
           "baseline": {
             "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795644109448537601,
-            "finished_unix_ns": 1795644164456008359
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795734764865177238,
+            "finished_unix_ns": 1795734806307372676
           },
           "candidate": {
-            "model_revision": "81620f7fb09f51a76ea65b77acc9a7d591944725",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795644167909129503,
-            "finished_unix_ns": 1795644407658693227
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795734809893302044,
+            "finished_unix_ns": 1795735005964498098
           }
         },
         "measurement_order": [
@@ -395,20 +399,20 @@
         ]
       },
       "allocation": {
-        "job": "6325032",
-        "node": "d-12-13-1",
+        "job": "6339000",
+        "node": "d-8-15-2",
         "gpu": "Tesla V100-PCIE-32GB",
-        "gpu_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "requested_order": [
           "base",
           "new"
         ],
         "model_revisions": {
           "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-          "new": "81620f7fb09f51a76ea65b77acc9a7d591944725"
+          "new": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1"
         },
-        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+        "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
         "fixture_sha256": "e0ec083cfe71c322d4758fe5ae65c8aa20f692ea2a2fc4ea7a6d11870c04ab10",
         "repetitions_per_leg": 5,
         "legs": [
@@ -453,14 +457,14 @@
           "train"
         ],
         "device_name": "Tesla V100-PCIE-32GB",
-        "device_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "device_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "params": 681679,
         "architecture": "schnet",
         "comparisons": {
           "mol_batch_32x20": {
             "infer": {
               "baseline": {
-                "ms": 11.952283093705773,
+                "ms": 13.160652946680784,
                 "peak_MiB": 64.25537109375,
                 "numerical": {
                   "passed": true,
@@ -481,14 +485,14 @@
                 }
               },
               "candidate": {
-                "ms": 7.991141872480512,
-                "peak_MiB": 64.08837890625,
+                "ms": 7.102800998836756,
+                "peak_MiB": 61.54736328125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 3.1086244689504383e-15,
-                  "force_max_abs": 8.881784197001252e-16,
+                  "energy_max_abs": 4.440892098500626e-15,
+                  "force_max_abs": 7.771561172376096e-16,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -497,21 +501,21 @@
                 },
                 "error": null,
                 "capture": {
-                  "new_graphs": 11,
-                  "new_calls": 221
+                  "new_graphs": 10,
+                  "new_calls": 159
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 4.440892098500626e-15,
-                "force_max_abs": 7.771561172376096e-16,
+                "energy_max_abs": 3.552713678800501e-15,
+                "force_max_abs": 7.216449660063518e-16,
                 "gradient_max_abs": 0.0
               },
               "delta_percent": {
-                "ms": -33.14129350995083,
-                "peak_MiB": -0.25988829362817434
+                "ms": -46.030025807890205,
+                "peak_MiB": -4.214445837607816
               },
               "status": "both_validated"
             },
@@ -527,15 +531,15 @@
                 }
               },
               "candidate": {
-                "ms": 6.04268885217607,
+                "ms": 5.323651945218444,
                 "peak_MiB": 72.4580078125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 30,
                   "reference_active_parameters": 30,
                   "energy_max_abs": 5.329070518200751e-15,
-                  "force_max_abs": 7.771561172376096e-16,
-                  "gradient_max_abs": 2.7284841053187847e-12,
+                  "force_max_abs": 9.992007221626409e-16,
+                  "gradient_max_abs": 2.2737367544323206e-12,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -544,16 +548,16 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 273
+                  "new_calls": 274
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 30,
                 "reference_active_parameters": 30,
-                "energy_max_abs": 3.552713678800501e-15,
-                "force_max_abs": 6.661338147750939e-16,
-                "gradient_max_abs": 9.094947017729282e-13
+                "energy_max_abs": 5.329070518200751e-15,
+                "force_max_abs": 7.771561172376096e-16,
+                "gradient_max_abs": 1.8189894035458565e-12
               },
               "status": "candidate_only_validated"
             }
@@ -571,14 +575,14 @@
                 }
               },
               "candidate": {
-                "ms": 7.367065874859691,
+                "ms": 7.464939029887319,
                 "peak_MiB": 63.869140625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 1.4210854715202004e-14,
-                  "force_max_abs": 7.771561172376096e-16,
+                  "energy_max_abs": 7.105427357601002e-15,
+                  "force_max_abs": 6.661338147750939e-16,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -588,7 +592,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 63
+                  "new_calls": 64
                 }
               },
               "cross_native": {
@@ -596,7 +600,7 @@
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 6.661338147750939e-16,
+                "force_max_abs": 8.604228440844963e-16,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -613,14 +617,14 @@
                 }
               },
               "candidate": {
-                "ms": 5.897287977859378,
+                "ms": 6.056118989363313,
                 "peak_MiB": 69.6640625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 30,
                   "reference_active_parameters": 30,
-                  "energy_max_abs": 1.4210854715202004e-14,
-                  "force_max_abs": 8.326672684688674e-16,
+                  "energy_max_abs": 2.1316282072803006e-14,
+                  "force_max_abs": 1.1102230246251565e-15,
                   "gradient_max_abs": 1.3642420526593924e-11,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
@@ -630,16 +634,16 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 275
+                  "new_calls": 276
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 30,
                 "reference_active_parameters": 30,
-                "energy_max_abs": 0.0,
-                "force_max_abs": 6.106226635438361e-16,
-                "gradient_max_abs": 1.8189894035458565e-12
+                "energy_max_abs": 7.105427357601002e-15,
+                "force_max_abs": 7.771561172376096e-16,
+                "gradient_max_abs": 3.637978807091713e-12
               },
               "status": "candidate_only_validated"
             }
@@ -657,13 +661,13 @@
                 }
               },
               "candidate": {
-                "ms": 7.752507226541638,
+                "ms": 7.880636025220156,
                 "peak_MiB": 284.83935546875,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 1.7053025658242404e-13,
+                  "energy_max_abs": 0.0,
                   "force_max_abs": 8.881784197001252e-16,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
@@ -674,15 +678,15 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 63
+                  "new_calls": 64
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 1.7053025658242404e-13,
-                "force_max_abs": 1.1102230246251565e-15,
+                "energy_max_abs": 2.5579538487363607e-13,
+                "force_max_abs": 1.3322676295501878e-15,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -699,15 +703,15 @@
                 }
               },
               "candidate": {
-                "ms": 7.003952981904149,
+                "ms": 7.3140908498317,
                 "peak_MiB": 326.1025390625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 30,
                   "reference_active_parameters": 30,
-                  "energy_max_abs": 1.7053025658242404e-13,
+                  "energy_max_abs": 1.9895196601282805e-13,
                   "force_max_abs": 1.6653345369377348e-15,
-                  "gradient_max_abs": 8.149072527885437e-10,
+                  "gradient_max_abs": 6.984919309616089e-10,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -716,16 +720,16 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 272
+                  "new_calls": 273
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 30,
                 "reference_active_parameters": 30,
-                "energy_max_abs": 1.1368683772161603e-13,
+                "energy_max_abs": 2.5579538487363607e-13,
                 "force_max_abs": 8.881784197001252e-16,
-                "gradient_max_abs": 4.656612873077393e-10
+                "gradient_max_abs": 1.1641532182693481e-09
               },
               "status": "candidate_only_validated"
             }
@@ -738,23 +742,23 @@
         "source": {
           "baseline": {
             "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795644415047274985,
-            "finished_unix_ns": 1795644467691706969
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795735013548645190,
+            "finished_unix_ns": 1795735052414233398
           },
           "candidate": {
-            "model_revision": "81620f7fb09f51a76ea65b77acc9a7d591944725",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795644471142883453,
-            "finished_unix_ns": 1795644765672190390
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795735055922960515,
+            "finished_unix_ns": 1795735334030950175
           }
         },
         "measurement_order": [
@@ -763,20 +767,20 @@
         ]
       },
       "allocation": {
-        "job": "6325032",
-        "node": "d-12-13-1",
+        "job": "6339000",
+        "node": "d-8-15-2",
         "gpu": "Tesla V100-PCIE-32GB",
-        "gpu_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "requested_order": [
           "base",
           "new"
         ],
         "model_revisions": {
           "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-          "new": "81620f7fb09f51a76ea65b77acc9a7d591944725"
+          "new": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1"
         },
-        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+        "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
         "fixture_sha256": "e0ec083cfe71c322d4758fe5ae65c8aa20f692ea2a2fc4ea7a6d11870c04ab10",
         "repetitions_per_leg": 5,
         "legs": [
@@ -823,14 +827,14 @@
           "train"
         ],
         "device_name": "Tesla V100-PCIE-32GB",
-        "device_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "device_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "params": 9509,
         "architecture": "physnet",
         "comparisons": {
           "mol_batch_32x20": {
             "infer": {
               "baseline": {
-                "ms": 8.64185206592083,
+                "ms": 8.653563912957907,
                 "peak_MiB": 26.7587890625,
                 "numerical": {
                   "passed": true,
@@ -851,8 +855,8 @@
                 }
               },
               "candidate": {
-                "ms": 7.560558849945664,
-                "peak_MiB": 26.88134765625,
+                "ms": 7.683376083150506,
+                "peak_MiB": 24.16650390625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
@@ -867,8 +871,8 @@
                 },
                 "error": null,
                 "capture": {
-                  "new_graphs": 11,
-                  "new_calls": 367
+                  "new_graphs": 10,
+                  "new_calls": 224
                 }
               },
               "cross_native": {
@@ -876,12 +880,12 @@
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 1.4551915228366852e-11,
+                "force_max_abs": 7.275957614183426e-12,
                 "gradient_max_abs": 0.0
               },
               "delta_percent": {
-                "ms": -12.512285650424971,
-                "peak_MiB": 0.45801248129631045
+                "ms": -11.211425021714284,
+                "peak_MiB": -9.687602642239334
               },
               "status": "both_validated"
             },
@@ -897,14 +901,14 @@
                 }
               },
               "candidate": {
-                "ms": 7.734581828117371,
+                "ms": 8.08844598941505,
                 "peak_MiB": 34.00732421875,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 68,
                   "reference_active_parameters": 68,
                   "energy_max_abs": 5.960464477539063e-08,
-                  "force_max_abs": 1.2732925824820995e-11,
+                  "force_max_abs": 1.4551915228366852e-11,
                   "gradient_max_abs": 6.103515625e-05,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
@@ -914,16 +918,16 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 309
+                  "new_calls": 310
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 68,
                 "reference_active_parameters": 68,
-                "energy_max_abs": 2.9802322387695312e-08,
-                "force_max_abs": 7.275957614183426e-12,
-                "gradient_max_abs": 3.0517578125e-05
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.4551915228366852e-11,
+                "gradient_max_abs": 1.52587890625e-05
               },
               "status": "candidate_only_validated"
             }
@@ -941,14 +945,14 @@
                 }
               },
               "candidate": {
-                "ms": 7.768628187477589,
+                "ms": 8.909438969567418,
                 "peak_MiB": 63.72900390625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
                   "energy_max_abs": 0.0,
-                  "force_max_abs": 1.5916157281026244e-11,
+                  "force_max_abs": 2.148681232938543e-11,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -958,7 +962,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 144
+                  "new_calls": 145
                 }
               },
               "cross_native": {
@@ -966,7 +970,7 @@
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 1.5290879673557356e-11,
+                "force_max_abs": 1.318767317570746e-11,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -983,14 +987,14 @@
                 }
               },
               "candidate": {
-                "ms": 8.346739923581481,
+                "ms": 8.513788925483823,
                 "peak_MiB": 87.70751953125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 68,
                   "reference_active_parameters": 68,
                   "energy_max_abs": 0.0,
-                  "force_max_abs": 2.1373125491663814e-11,
+                  "force_max_abs": 2.1827872842550278e-11,
                   "gradient_max_abs": 0.0001220703125,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
@@ -1000,7 +1004,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 311
+                  "new_calls": 312
                 }
               },
               "cross_native": {
@@ -1008,8 +1012,8 @@
                 "active_parameters": 68,
                 "reference_active_parameters": 68,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 1.4097167877480388e-11,
-                "gradient_max_abs": 0.0001220703125
+                "force_max_abs": 1.7053025658242404e-11,
+                "gradient_max_abs": 6.103515625e-05
               },
               "status": "candidate_only_validated"
             }
@@ -1027,14 +1031,14 @@
                 }
               },
               "candidate": {
-                "ms": 8.115663193166256,
+                "ms": 8.463382022455335,
                 "peak_MiB": 257.56005859375,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 0.0,
-                  "force_max_abs": 2.2964741219766438e-11,
+                  "energy_max_abs": 1.1444091796875e-05,
+                  "force_max_abs": 1.9099388737231493e-11,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -1044,30 +1048,30 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 144
+                  "new_calls": 145
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 1.9073486328125e-05,
-                "force_max_abs": 1.6143530956469476e-11,
+                "energy_max_abs": 3.814697265625e-06,
+                "force_max_abs": 1.4551915228366852e-11,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
             },
             "train": {
               "baseline": {
-                "ms": 26.351267006248236,
+                "ms": 26.11054596491158,
                 "peak_MiB": 478.71923828125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 68,
                   "reference_active_parameters": 68,
-                  "energy_max_abs": 0.0,
-                  "force_max_abs": 1.3869794202037156e-11,
-                  "gradient_max_abs": 0.0078125,
+                  "energy_max_abs": 1.1444091796875e-05,
+                  "force_max_abs": 1.4551915228366852e-11,
+                  "gradient_max_abs": 0.03125,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
                     "Fa": "NegBackward0"
@@ -1080,14 +1084,14 @@
                 }
               },
               "candidate": {
-                "ms": 8.315993007272482,
+                "ms": 8.346972055733204,
                 "peak_MiB": 386.59619140625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 68,
                   "reference_active_parameters": 68,
                   "energy_max_abs": 3.814697265625e-06,
-                  "force_max_abs": 2.637534635141492e-11,
+                  "force_max_abs": 2.5011104298755527e-11,
                   "gradient_max_abs": 0.015625,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
@@ -1097,19 +1101,19 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 308
+                  "new_calls": 309
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 68,
                 "reference_active_parameters": 68,
-                "energy_max_abs": 1.9073486328125e-05,
-                "force_max_abs": 1.9554136088117957e-11,
-                "gradient_max_abs": 0.0546875
+                "energy_max_abs": 7.62939453125e-06,
+                "force_max_abs": 2.1941559680271894e-11,
+                "gradient_max_abs": 0.03125
               },
               "delta_percent": {
-                "ms": -68.44177167913539,
+                "ms": -68.0321810698627,
                 "peak_MiB": -19.243648365950406
               },
               "status": "both_validated"
@@ -1123,23 +1127,23 @@
         "source": {
           "baseline": {
             "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795644773138107750,
-            "finished_unix_ns": 1795644840599327015
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795735341546256860,
+            "finished_unix_ns": 1795735401789012417
           },
           "candidate": {
-            "model_revision": "81620f7fb09f51a76ea65b77acc9a7d591944725",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795644844360449282,
-            "finished_unix_ns": 1795645029760866065
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795735405373534709,
+            "finished_unix_ns": 1795735576376064056
           }
         },
         "measurement_order": [
@@ -1148,20 +1152,20 @@
         ]
       },
       "allocation": {
-        "job": "6325032",
-        "node": "d-12-13-1",
+        "job": "6339000",
+        "node": "d-8-15-2",
         "gpu": "Tesla V100-PCIE-32GB",
-        "gpu_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "requested_order": [
           "base",
           "new"
         ],
         "model_revisions": {
           "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-          "new": "81620f7fb09f51a76ea65b77acc9a7d591944725"
+          "new": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1"
         },
-        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+        "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
         "fixture_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
         "repetitions_per_leg": 5,
         "legs": [
@@ -1208,14 +1212,14 @@
           "train"
         ],
         "device_name": "Tesla V100-PCIE-32GB",
-        "device_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "device_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "params": 9509,
         "architecture": "physnet",
         "comparisons": {
           "mol_batch_32x20": {
             "infer": {
               "baseline": {
-                "ms": 8.12825607135892,
+                "ms": 8.706229971721768,
                 "peak_MiB": 36.9775390625,
                 "numerical": {
                   "passed": true,
@@ -1236,14 +1240,14 @@
                 }
               },
               "candidate": {
-                "ms": 8.023201953619719,
-                "peak_MiB": 37.1416015625,
+                "ms": 7.62614794075489,
+                "peak_MiB": 31.48828125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
                   "energy_max_abs": 1.1102230246251565e-16,
-                  "force_max_abs": 3.049318610115481e-20,
+                  "force_max_abs": 2.710505431213761e-20,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -1252,21 +1256,21 @@
                 },
                 "error": null,
                 "capture": {
-                  "new_graphs": 11,
-                  "new_calls": 367
+                  "new_graphs": 10,
+                  "new_calls": 224
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 5.551115123125783e-17,
+                "energy_max_abs": 0.0,
                 "force_max_abs": 1.3552527156068805e-20,
                 "gradient_max_abs": 0.0
               },
               "delta_percent": {
-                "ms": -1.29245580868661,
-                "peak_MiB": 0.4436815000660177
+                "ms": -12.405852297435672,
+                "peak_MiB": -14.844843523042384
               },
               "status": "both_validated"
             },
@@ -1282,15 +1286,15 @@
                 }
               },
               "candidate": {
-                "ms": 8.534437045454979,
+                "ms": 8.324770955368876,
                 "peak_MiB": 51.6083984375,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 68,
                   "reference_active_parameters": 68,
                   "energy_max_abs": 1.1102230246251565e-16,
-                  "force_max_abs": 3.049318610115481e-20,
-                  "gradient_max_abs": 1.2789769243681803e-13,
+                  "force_max_abs": 2.710505431213761e-20,
+                  "gradient_max_abs": 1.5631940186722204e-13,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -1299,16 +1303,16 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 309
+                  "new_calls": 310
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 68,
                 "reference_active_parameters": 68,
-                "energy_max_abs": 5.551115123125783e-17,
-                "force_max_abs": 1.0164395367051604e-20,
-                "gradient_max_abs": 2.842170943040401e-14
+                "energy_max_abs": 0.0,
+                "force_max_abs": 2.710505431213761e-20,
+                "gradient_max_abs": 5.684341886080802e-14
               },
               "status": "candidate_only_validated"
             }
@@ -1326,14 +1330,14 @@
                 }
               },
               "candidate": {
-                "ms": 7.755141938105226,
+                "ms": 8.03529005497694,
                 "peak_MiB": 105.0791015625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
                   "energy_max_abs": 8.881784197001252e-16,
-                  "force_max_abs": 3.5575383784680614e-20,
+                  "force_max_abs": 4.171637265227429e-20,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -1343,7 +1347,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 144
+                  "new_calls": 145
                 }
               },
               "cross_native": {
@@ -1351,7 +1355,7 @@
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 2.395515053953568e-20,
+                "force_max_abs": 2.7740329022578336e-20,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -1368,14 +1372,14 @@
                 }
               },
               "candidate": {
-                "ms": 8.276687003672123,
+                "ms": 8.578434120863676,
                 "peak_MiB": 153.23876953125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 68,
                   "reference_active_parameters": 68,
-                  "energy_max_abs": 0.0,
-                  "force_max_abs": 4.298692207315574e-20,
+                  "energy_max_abs": 8.881784197001252e-16,
+                  "force_max_abs": 3.621065849512134e-20,
                   "gradient_max_abs": 4.547473508864641e-13,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
@@ -1385,15 +1389,15 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 311
+                  "new_calls": 312
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 68,
                 "reference_active_parameters": 68,
-                "energy_max_abs": 0.0,
-                "force_max_abs": 2.9857911390714087e-20,
+                "energy_max_abs": 8.881784197001252e-16,
+                "force_max_abs": 2.964615315390051e-20,
                 "gradient_max_abs": 4.547473508864641e-13
               },
               "status": "candidate_only_validated"
@@ -1412,14 +1416,14 @@
                 }
               },
               "candidate": {
-                "ms": 10.079489788040519,
+                "ms": 10.624127928167582,
                 "peak_MiB": 470.2958984375,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 2.1316282072803006e-14,
-                  "force_max_abs": 4.309280119156253e-20,
+                  "energy_max_abs": 4.263256414560601e-14,
+                  "force_max_abs": 4.489274620447792e-20,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -1429,30 +1433,30 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 144
+                  "new_calls": 145
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 3.552713678800501e-14,
-                "force_max_abs": 2.9963790509120874e-20,
+                "energy_max_abs": 4.973799150320701e-14,
+                "force_max_abs": 3.451659260061274e-20,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
             },
             "train": {
               "baseline": {
-                "ms": 31.736328033730388,
+                "ms": 32.9139509703964,
                 "peak_MiB": 901.20654296875,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 68,
                   "reference_active_parameters": 68,
-                  "energy_max_abs": 0.0,
-                  "force_max_abs": 3.3034284942917713e-20,
-                  "gradient_max_abs": 1.4551915228366852e-11,
+                  "energy_max_abs": 7.105427357601002e-14,
+                  "force_max_abs": 2.879912020664621e-20,
+                  "gradient_max_abs": 7.566995918750763e-10,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
                     "Fa": "NegBackward0"
@@ -1465,15 +1469,15 @@
                 }
               },
               "candidate": {
-                "ms": 13.950119959190488,
+                "ms": 14.104756992310286,
                 "peak_MiB": 726.0322265625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 68,
                   "reference_active_parameters": 68,
-                  "energy_max_abs": 7.105427357601002e-15,
-                  "force_max_abs": 4.971024609198675e-20,
-                  "gradient_max_abs": 4.3655745685100555e-11,
+                  "energy_max_abs": 2.842170943040401e-14,
+                  "force_max_abs": 4.341043854678289e-20,
+                  "gradient_max_abs": 8.731149137020111e-11,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -1482,19 +1486,19 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 308
+                  "new_calls": 309
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 68,
                 "reference_active_parameters": 68,
-                "energy_max_abs": 3.552713678800501e-14,
-                "force_max_abs": 2.879912020664621e-20,
+                "energy_max_abs": 4.973799150320701e-14,
+                "force_max_abs": 3.017554874593445e-20,
                 "gradient_max_abs": 7.566995918750763e-10
               },
               "delta_percent": {
-                "ms": -56.04368613670789,
+                "ms": -57.146569839043494,
                 "peak_MiB": -19.437754616071878
               },
               "status": "both_validated"
@@ -1508,23 +1512,23 @@
         "source": {
           "baseline": {
             "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795645037180892085,
-            "finished_unix_ns": 1795645104391240379
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795735583869776219,
+            "finished_unix_ns": 1795735647066899879
           },
           "candidate": {
-            "model_revision": "81620f7fb09f51a76ea65b77acc9a7d591944725",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795645107971651039,
-            "finished_unix_ns": 1795645289994918594
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795735650650241121,
+            "finished_unix_ns": 1795735816981038389
           }
         },
         "measurement_order": [
@@ -1533,20 +1537,20 @@
         ]
       },
       "allocation": {
-        "job": "6325032",
-        "node": "d-12-13-1",
+        "job": "6339000",
+        "node": "d-8-15-2",
         "gpu": "Tesla V100-PCIE-32GB",
-        "gpu_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "requested_order": [
           "base",
           "new"
         ],
         "model_revisions": {
           "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-          "new": "81620f7fb09f51a76ea65b77acc9a7d591944725"
+          "new": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1"
         },
-        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+        "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
         "fixture_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
         "repetitions_per_leg": 5,
         "legs": [
@@ -1593,7 +1597,7 @@
           "train"
         ],
         "device_name": "Tesla V100-PCIE-32GB",
-        "device_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "device_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "params": 26167,
         "architecture": "spookynet",
         "comparisons": {
@@ -1603,21 +1607,21 @@
                 "ms": null,
                 "peak_MiB": null,
                 "numerical": null,
-                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
+                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"/home/gridsan/wlluo/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
                 "capture": {
                   "new_graphs": 7,
                   "new_calls": 45
                 }
               },
               "candidate": {
-                "ms": 16.61980291828513,
-                "peak_MiB": 41.2109375,
+                "ms": 15.71023790165782,
+                "peak_MiB": 40.4248046875,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
                   "energy_max_abs": 1.4901161193847656e-08,
-                  "force_max_abs": 1.1641532182693481e-09,
+                  "force_max_abs": 1.0477378964424133e-09,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -1626,16 +1630,16 @@
                 },
                 "error": null,
                 "capture": {
-                  "new_graphs": 15,
-                  "new_calls": 824
+                  "new_graphs": 14,
+                  "new_calls": 483
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 1.4901161193847656e-08,
-                "force_max_abs": 8.149072527885437e-10,
+                "energy_max_abs": 7.450580596923828e-09,
+                "force_max_abs": 9.313225746154785e-10,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -1645,22 +1649,22 @@
                 "ms": null,
                 "peak_MiB": null,
                 "numerical": null,
-                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
+                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"/home/gridsan/wlluo/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
                 "capture": {
                   "new_graphs": 3,
                   "new_calls": 29
                 }
               },
               "candidate": {
-                "ms": 19.450894091278315,
-                "peak_MiB": 72.78369140625,
+                "ms": 19.552816869691014,
+                "peak_MiB": 72.783203125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 304,
                   "reference_active_parameters": 304,
                   "energy_max_abs": 1.4901161193847656e-08,
-                  "force_max_abs": 9.89530235528946e-10,
-                  "gradient_max_abs": 1.52587890625e-05,
+                  "force_max_abs": 1.1059455573558807e-09,
+                  "gradient_max_abs": 1.1444091796875e-05,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -1669,7 +1673,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 887
+                  "new_calls": 888
                 }
               },
               "cross_native": {
@@ -1677,7 +1681,7 @@
                 "active_parameters": 304,
                 "reference_active_parameters": 304,
                 "energy_max_abs": 1.4901161193847656e-08,
-                "force_max_abs": 1.3969838619232178e-09,
+                "force_max_abs": 6.984919309616089e-10,
                 "gradient_max_abs": 5.7220458984375e-06
               },
               "status": "candidate_only_validated"
@@ -1686,8 +1690,29 @@
           "bulk_256": {
             "infer": {
               "baseline": {
-                "ms": 20.233829971402884,
+                "ms": 20.285219186916947,
                 "peak_MiB": 28.6318359375,
+                "numerical": {
+                  "passed": true,
+                  "active_parameters": 0,
+                  "reference_active_parameters": 0,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 6.402842700481415e-10,
+                  "gradient_max_abs": 0.0,
+                  "output_grad_functions": {
+                    "E": "ScatterAddBackward0",
+                    "Fa": "NoneType"
+                  }
+                },
+                "error": null,
+                "capture": {
+                  "new_graphs": 11,
+                  "new_calls": 305
+                }
+              },
+              "candidate": {
+                "ms": 17.24601211026311,
+                "peak_MiB": 27.69775390625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
@@ -1702,29 +1727,8 @@
                 },
                 "error": null,
                 "capture": {
-                  "new_graphs": 11,
-                  "new_calls": 305
-                }
-              },
-              "candidate": {
-                "ms": 16.978540923446417,
-                "peak_MiB": 27.6982421875,
-                "numerical": {
-                  "passed": true,
-                  "active_parameters": 0,
-                  "reference_active_parameters": 0,
-                  "energy_max_abs": 0.0,
-                  "force_max_abs": 6.912159733474255e-10,
-                  "gradient_max_abs": 0.0,
-                  "output_grad_functions": {
-                    "E": "ScatterAddBackward0",
-                    "Fa": "NoneType"
-                  }
-                },
-                "error": null,
-                "capture": {
                   "new_graphs": 1,
-                  "new_calls": 291
+                  "new_calls": 292
                 }
               },
               "cross_native": {
@@ -1732,12 +1736,12 @@
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 5.820766091346741e-10,
+                "force_max_abs": 5.238689482212067e-10,
                 "gradient_max_abs": 0.0
               },
               "delta_percent": {
-                "ms": -16.088348338190393,
-                "peak_MiB": -3.260684197960362
+                "ms": -14.982372379855724,
+                "peak_MiB": -3.262389576724989
               },
               "status": "both_validated"
             },
@@ -1753,15 +1757,15 @@
                 }
               },
               "candidate": {
-                "ms": 19.804421113803983,
-                "peak_MiB": 47.0498046875,
+                "ms": 19.705165876075625,
+                "peak_MiB": 47.04931640625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 304,
                   "reference_active_parameters": 304,
-                  "energy_max_abs": 2.384185791015625e-07,
-                  "force_max_abs": 7.275957614183426e-10,
-                  "gradient_max_abs": 0.0001220703125,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 8.149072527885437e-10,
+                  "gradient_max_abs": 3.0517578125e-05,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -1770,7 +1774,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 838
+                  "new_calls": 839
                 }
               },
               "cross_native": {
@@ -1778,7 +1782,7 @@
                 "active_parameters": 304,
                 "reference_active_parameters": 304,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 4.94765117764473e-10,
+                "force_max_abs": 4.656612873077393e-10,
                 "gradient_max_abs": 3.0517578125e-05
               },
               "status": "candidate_only_validated"
@@ -1797,14 +1801,14 @@
                 }
               },
               "candidate": {
-                "ms": 17.33731897547841,
-                "peak_MiB": 92.14111328125,
+                "ms": 17.531085992231965,
+                "peak_MiB": 92.140625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 9.5367431640625e-07,
-                  "force_max_abs": 1.3387762010097504e-09,
+                  "energy_max_abs": 4.76837158203125e-07,
+                  "force_max_abs": 8.440110832452774e-10,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -1814,15 +1818,15 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 291
+                  "new_calls": 292
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 9.5367431640625e-07,
-                "force_max_abs": 7.566995918750763e-10,
+                "energy_max_abs": 4.76837158203125e-07,
+                "force_max_abs": 1.280568540096283e-09,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -1839,15 +1843,15 @@
                 }
               },
               "candidate": {
-                "ms": 20.545430947095156,
-                "peak_MiB": 224.330078125,
+                "ms": 20.1304629445076,
+                "peak_MiB": 224.32958984375,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 304,
                   "reference_active_parameters": 304,
-                  "energy_max_abs": 1.430511474609375e-06,
-                  "force_max_abs": 1.3969838619232178e-09,
-                  "gradient_max_abs": 0.00390625,
+                  "energy_max_abs": 1.1444091796875e-05,
+                  "force_max_abs": 1.4551915228366852e-09,
+                  "gradient_max_abs": 0.033203125,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -1856,7 +1860,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 835
+                  "new_calls": 836
                 }
               },
               "cross_native": {
@@ -1864,8 +1868,8 @@
                 "active_parameters": 304,
                 "reference_active_parameters": 304,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 1.1641532182693481e-09,
-                "gradient_max_abs": 0.001953125
+                "force_max_abs": 8.149072527885437e-10,
+                "gradient_max_abs": 0.0009765625
               },
               "status": "candidate_only_validated"
             }
@@ -1878,23 +1882,23 @@
         "source": {
           "baseline": {
             "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795645297558080279,
-            "finished_unix_ns": 1795645402529987267
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795735824190147206,
+            "finished_unix_ns": 1795735908592349093
           },
           "candidate": {
-            "model_revision": "81620f7fb09f51a76ea65b77acc9a7d591944725",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795645406580503838,
-            "finished_unix_ns": 1795645851669698292
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795735912507567277,
+            "finished_unix_ns": 1795736332627043004
           }
         },
         "measurement_order": [
@@ -1903,20 +1907,20 @@
         ]
       },
       "allocation": {
-        "job": "6325032",
-        "node": "d-12-13-1",
+        "job": "6339000",
+        "node": "d-8-15-2",
         "gpu": "Tesla V100-PCIE-32GB",
-        "gpu_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "requested_order": [
           "base",
           "new"
         ],
         "model_revisions": {
           "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-          "new": "81620f7fb09f51a76ea65b77acc9a7d591944725"
+          "new": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1"
         },
-        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+        "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
         "fixture_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
         "repetitions_per_leg": 5,
         "legs": [
@@ -1963,7 +1967,7 @@
           "train"
         ],
         "device_name": "Tesla V100-PCIE-32GB",
-        "device_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "device_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "params": 26167,
         "architecture": "spookynet",
         "comparisons": {
@@ -1973,21 +1977,21 @@
                 "ms": null,
                 "peak_MiB": null,
                 "numerical": null,
-                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
+                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"/home/gridsan/wlluo/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
                 "capture": {
                   "new_graphs": 7,
                   "new_calls": 45
                 }
               },
               "candidate": {
-                "ms": 17.635656986385584,
-                "peak_MiB": 65.92529296875,
+                "ms": 15.719024930149317,
+                "peak_MiB": 64.35595703125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
                   "energy_max_abs": 2.7755575615628914e-17,
-                  "force_max_abs": 1.734723475976807e-18,
+                  "force_max_abs": 2.168404344971009e-18,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -1996,16 +2000,16 @@
                 },
                 "error": null,
                 "capture": {
-                  "new_graphs": 15,
-                  "new_calls": 824
+                  "new_graphs": 14,
+                  "new_calls": 483
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 2.0816681711721685e-17,
-                "force_max_abs": 3.0357660829594124e-18,
+                "energy_max_abs": 2.7755575615628914e-17,
+                "force_max_abs": 2.6020852139652106e-18,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -2015,22 +2019,22 @@
                 "ms": null,
                 "peak_MiB": null,
                 "numerical": null,
-                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
+                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"/home/gridsan/wlluo/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
                 "capture": {
                   "new_graphs": 3,
                   "new_calls": 29
                 }
               },
               "candidate": {
-                "ms": 20.381940994411707,
-                "peak_MiB": 129.5576171875,
+                "ms": 19.75711598061025,
+                "peak_MiB": 129.55712890625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 304,
                   "reference_active_parameters": 304,
-                  "energy_max_abs": 2.0816681711721685e-17,
-                  "force_max_abs": 2.168404344971009e-18,
-                  "gradient_max_abs": 5.3290705182007514e-14,
+                  "energy_max_abs": 2.7755575615628914e-17,
+                  "force_max_abs": 2.2768245622195593e-18,
+                  "gradient_max_abs": 4.618527782440651e-14,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -2039,15 +2043,15 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 887
+                  "new_calls": 888
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 304,
                 "reference_active_parameters": 304,
-                "energy_max_abs": 2.0816681711721685e-17,
-                "force_max_abs": 3.0357660829594124e-18,
+                "energy_max_abs": 1.3877787807814457e-17,
+                "force_max_abs": 1.734723475976807e-18,
                 "gradient_max_abs": 1.0658141036401503e-14
               },
               "status": "candidate_only_validated"
@@ -2056,14 +2060,14 @@
           "bulk_256": {
             "infer": {
               "baseline": {
-                "ms": 21.051977993920445,
+                "ms": 20.696732914075255,
                 "peak_MiB": 40.2275390625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
                   "energy_max_abs": 0.0,
-                  "force_max_abs": 1.463672932855431e-18,
+                  "force_max_abs": 6.505213034913027e-19,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2077,14 +2081,14 @@
                 }
               },
               "candidate": {
-                "ms": 17.83482893370092,
-                "peak_MiB": 38.3017578125,
+                "ms": 17.015050863847136,
+                "peak_MiB": 38.30126953125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
                   "energy_max_abs": 0.0,
-                  "force_max_abs": 1.111307226797642e-18,
+                  "force_max_abs": 8.402566836762659e-19,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2094,7 +2098,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 291
+                  "new_calls": 292
                 }
               },
               "cross_native": {
@@ -2102,12 +2106,12 @@
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 1.0299920638612292e-18,
+                "force_max_abs": 5.421010862427522e-19,
                 "gradient_max_abs": 0.0
               },
               "delta_percent": {
-                "ms": -15.28193246804932,
-                "peak_MiB": -4.787221129803609
+                "ms": -17.788711220814534,
+                "peak_MiB": -4.788434928264507
               },
               "status": "both_validated"
             },
@@ -2123,14 +2127,14 @@
                 }
               },
               "candidate": {
-                "ms": 20.946307107806206,
-                "peak_MiB": 78.810546875,
+                "ms": 19.800353096798062,
+                "peak_MiB": 78.81005859375,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 304,
                   "reference_active_parameters": 304,
                   "energy_max_abs": 2.220446049250313e-16,
-                  "force_max_abs": 1.5178830414797062e-18,
+                  "force_max_abs": 9.75781955236954e-19,
                   "gradient_max_abs": 1.1368683772161603e-13,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
@@ -2140,7 +2144,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 838
+                  "new_calls": 839
                 }
               },
               "cross_native": {
@@ -2148,8 +2152,8 @@
                 "active_parameters": 304,
                 "reference_active_parameters": 304,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 9.893344823930228e-19,
-                "gradient_max_abs": 8.526512829121202e-14
+                "force_max_abs": 1.0842021724855044e-18,
+                "gradient_max_abs": 5.684341886080802e-14
               },
               "status": "candidate_only_validated"
             }
@@ -2167,14 +2171,14 @@
                 }
               },
               "candidate": {
-                "ms": 18.388086929917336,
-                "peak_MiB": 165.0322265625,
+                "ms": 18.666828982532024,
+                "peak_MiB": 165.03173828125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 5.329070518200751e-15,
-                  "force_max_abs": 2.3852447794681098e-18,
+                  "energy_max_abs": 8.881784197001252e-16,
+                  "force_max_abs": 1.6263032587282567e-18,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2184,15 +2188,15 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 291
+                  "new_calls": 292
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 5.329070518200751e-15,
-                "force_max_abs": 1.734723475976807e-18,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.951563910473908e-18,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -2209,15 +2213,15 @@
                 }
               },
               "candidate": {
-                "ms": 21.208056015893817,
-                "peak_MiB": 429.15087890625,
+                "ms": 20.28322988189757,
+                "peak_MiB": 429.150390625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 304,
                   "reference_active_parameters": 304,
-                  "energy_max_abs": 6.217248937900877e-15,
-                  "force_max_abs": 1.6263032587282567e-18,
-                  "gradient_max_abs": 2.1827872842550278e-11,
+                  "energy_max_abs": 7.105427357601002e-15,
+                  "force_max_abs": 2.6020852139652106e-18,
+                  "gradient_max_abs": 2.546585164964199e-11,
                   "output_grad_functions": {
                     "E": "CompiledFunctionBackward",
                     "Fa": "CompiledFunctionBackward"
@@ -2226,16 +2230,16 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 1,
-                  "new_calls": 835
+                  "new_calls": 836
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 304,
                 "reference_active_parameters": 304,
-                "energy_max_abs": 8.881784197001252e-16,
-                "force_max_abs": 2.168404344971009e-18,
-                "gradient_max_abs": 3.637978807091713e-12
+                "energy_max_abs": 2.6645352591003757e-15,
+                "force_max_abs": 1.734723475976807e-18,
+                "gradient_max_abs": 9.094947017729282e-12
               },
               "status": "candidate_only_validated"
             }
@@ -2248,23 +2252,23 @@
         "source": {
           "baseline": {
             "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795645861578309055,
-            "finished_unix_ns": 1795645960922453575
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795736342079660627,
+            "finished_unix_ns": 1795736432119212249
           },
           "candidate": {
-            "model_revision": "81620f7fb09f51a76ea65b77acc9a7d591944725",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795645964977721355,
-            "finished_unix_ns": 1795646452197099582
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795736436047184519,
+            "finished_unix_ns": 1795736868236400322
           }
         },
         "measurement_order": [
@@ -2273,20 +2277,20 @@
         ]
       },
       "allocation": {
-        "job": "6325032",
-        "node": "d-12-13-1",
+        "job": "6339000",
+        "node": "d-8-15-2",
         "gpu": "Tesla V100-PCIE-32GB",
-        "gpu_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "requested_order": [
           "base",
           "new"
         ],
         "model_revisions": {
           "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-          "new": "81620f7fb09f51a76ea65b77acc9a7d591944725"
+          "new": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1"
         },
-        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+        "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
         "fixture_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
         "repetitions_per_leg": 5,
         "legs": [
@@ -2331,7 +2335,7 @@
           "train"
         ],
         "device_name": "Tesla V100-PCIE-32GB",
-        "device_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "device_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "params": 217748,
         "architecture": "mace",
         "comparisons": {
@@ -2341,21 +2345,21 @@
                 "ms": null,
                 "peak_MiB": null,
                 "numerical": null,
-                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
+                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"/home/gridsan/wlluo/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
                 "capture": {
                   "new_graphs": 7,
                   "new_calls": 38
                 }
               },
               "candidate": {
-                "ms": 21.25723985955119,
-                "peak_MiB": 187.35107421875,
+                "ms": 20.263672107830644,
+                "peak_MiB": 185.77392578125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 4.76837158203125e-07,
-                  "force_max_abs": 5.513429641723633e-07,
+                  "energy_max_abs": 3.5762786865234375e-07,
+                  "force_max_abs": 6.258487701416016e-07,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2365,7 +2369,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 29,
-                  "new_calls": 342
+                  "new_calls": 343
                 }
               },
               "cross_native": {
@@ -2383,14 +2387,14 @@
                 "ms": null,
                 "peak_MiB": null,
                 "numerical": null,
-                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
+                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"/home/gridsan/wlluo/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
                 "capture": {
                   "new_graphs": 3,
                   "new_calls": 22
                 }
               },
               "candidate": {
-                "ms": 56.83399201370776,
+                "ms": 57.01481597498059,
                 "peak_MiB": 311.13671875,
                 "numerical": {
                   "passed": true,
@@ -2416,7 +2420,7 @@
                 "reference_active_parameters": 60,
                 "energy_max_abs": 2.384185791015625e-07,
                 "force_max_abs": 1.7881393432617188e-07,
-                "gradient_max_abs": 4.57763671875e-05
+                "gradient_max_abs": 7.62939453125e-05
               },
               "status": "candidate_only_validated"
             }
@@ -2434,14 +2438,14 @@
                 }
               },
               "candidate": {
-                "ms": 21.868591895326972,
+                "ms": 22.386204916983843,
                 "peak_MiB": 124.34423828125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 0.0,
-                  "force_max_abs": 1.043081283569336e-07,
+                  "energy_max_abs": 9.5367431640625e-07,
+                  "force_max_abs": 1.1175870895385742e-07,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2451,14 +2455,14 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 13,
-                  "new_calls": 158
+                  "new_calls": 159
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 9.5367431640625e-07,
+                "energy_max_abs": 0.0,
                 "force_max_abs": 8.940696716308594e-08,
                 "gradient_max_abs": 0.0
               },
@@ -2476,14 +2480,14 @@
                 }
               },
               "candidate": {
-                "ms": 56.68813781812787,
+                "ms": 58.30589705146849,
                 "peak_MiB": 185.8408203125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 60,
                   "reference_active_parameters": 60,
                   "energy_max_abs": 9.5367431640625e-07,
-                  "force_max_abs": 7.450580596923828e-08,
+                  "force_max_abs": 8.940696716308594e-08,
                   "gradient_max_abs": 0.0001220703125,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2500,9 +2504,9 @@
                 "passed": true,
                 "active_parameters": 60,
                 "reference_active_parameters": 60,
-                "energy_max_abs": 1.9073486328125e-06,
-                "force_max_abs": 1.1920928955078125e-07,
-                "gradient_max_abs": 0.001708984375
+                "energy_max_abs": 9.5367431640625e-07,
+                "force_max_abs": 8.940696716308594e-08,
+                "gradient_max_abs": 0.0001220703125
               },
               "status": "candidate_only_validated"
             }
@@ -2520,7 +2524,7 @@
                 }
               },
               "candidate": {
-                "ms": 31.270374078303576,
+                "ms": 31.382083194330335,
                 "peak_MiB": 698.60888671875,
                 "numerical": {
                   "passed": true,
@@ -2544,8 +2548,8 @@
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 1.52587890625e-05,
-                "force_max_abs": 1.1920928955078125e-07,
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.043081283569336e-07,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -2562,14 +2566,14 @@
                 }
               },
               "candidate": {
-                "ms": 85.78149788081646,
+                "ms": 85.3018038906157,
                 "peak_MiB": 1141.40869140625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 60,
                   "reference_active_parameters": 60,
-                  "energy_max_abs": 1.52587890625e-05,
-                  "force_max_abs": 8.940696716308594e-08,
+                  "energy_max_abs": 7.62939453125e-06,
+                  "force_max_abs": 1.4901161193847656e-07,
                   "gradient_max_abs": 0.015625,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2586,9 +2590,9 @@
                 "passed": true,
                 "active_parameters": 60,
                 "reference_active_parameters": 60,
-                "energy_max_abs": 7.62939453125e-06,
-                "force_max_abs": 1.1920928955078125e-07,
-                "gradient_max_abs": 0.00390625
+                "energy_max_abs": 0.0,
+                "force_max_abs": 1.4901161193847656e-07,
+                "gradient_max_abs": 0.0078125
               },
               "status": "candidate_only_validated"
             }
@@ -2600,23 +2604,23 @@
         "source": {
           "baseline": {
             "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795646462150842500,
-            "finished_unix_ns": 1795646537528747398
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795736878937216459,
+            "finished_unix_ns": 1795736948951124256
           },
           "candidate": {
-            "model_revision": "81620f7fb09f51a76ea65b77acc9a7d591944725",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795646541328462376,
-            "finished_unix_ns": 1795646634065250026
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795736952676216098,
+            "finished_unix_ns": 1795737036052198128
           }
         },
         "measurement_order": [
@@ -2625,20 +2629,20 @@
         ]
       },
       "allocation": {
-        "job": "6325032",
-        "node": "d-12-13-1",
+        "job": "6339000",
+        "node": "d-8-15-2",
         "gpu": "Tesla V100-PCIE-32GB",
-        "gpu_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "requested_order": [
           "base",
           "new"
         ],
         "model_revisions": {
           "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-          "new": "81620f7fb09f51a76ea65b77acc9a7d591944725"
+          "new": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1"
         },
-        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+        "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
         "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
         "repetitions_per_leg": 5,
         "legs": [
@@ -2683,7 +2687,7 @@
           "train"
         ],
         "device_name": "Tesla V100-PCIE-32GB",
-        "device_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "device_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "params": 217748,
         "architecture": "mace",
         "comparisons": {
@@ -2693,21 +2697,21 @@
                 "ms": null,
                 "peak_MiB": null,
                 "numerical": null,
-                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
+                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"/home/gridsan/wlluo/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
                 "capture": {
                   "new_graphs": 7,
                   "new_calls": 38
                 }
               },
               "candidate": {
-                "ms": 23.62346206791699,
-                "peak_MiB": 361.71630859375,
+                "ms": 21.823960822075605,
+                "peak_MiB": 358.60986328125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 4.440892098500626e-16,
-                  "force_max_abs": 7.771561172376096e-16,
+                  "energy_max_abs": 5.551115123125783e-16,
+                  "force_max_abs": 6.938893903907228e-16,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2717,14 +2721,14 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 29,
-                  "new_calls": 342
+                  "new_calls": 343
                 }
               },
               "cross_native": {
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 6.661338147750939e-16,
+                "energy_max_abs": 4.440892098500626e-16,
                 "force_max_abs": 3.885780586188048e-16,
                 "gradient_max_abs": 0.0
               },
@@ -2735,22 +2739,22 @@
                 "ms": null,
                 "peak_MiB": null,
                 "numerical": null,
-                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"<environment>/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
+                "error": "TorchRuntimeError: RuntimeError when making fake tensor call\n  Explanation: Dynamo failed to run FX node with fake tensors: call_function torch_scatter.segment_sum_coo(*(FakeTensor(..., device='cuda:0', size=(640,), grad_fn=<SoftplusBackward0>), FakeTensor(..., device='cuda:0', size=(640,), dtype=torch.int64), None, None), **{}): got RuntimeError(\"The tensor has a non-zero number of elements, but its data is not allocated yet.\\nIf you're using torch.compile/export/fx, it is likely that we are erroneously tracing into a custom kernel. To fix this, please wrap the custom kernel into an opaque custom op. Please see the following for details: https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html\\nIf you're using Caffe2, Caffe2 uses a lazy allocation, so you will need to call mutable_data() or raw_mutable_data() to actually allocate memory.\")\n  Hint: Your code may result in an error when running in eager. Please double check that your code doesn't contain a similar error when actually running eager/uncompiled. You can do this by removing the `torch.compile` call, or by using `torch.compiler.set_stance(\"force_eager\")`. \n\n  Developer debug context: \n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb4315.html\n\nfrom user code:\n   File \"<main>/enerzyme/models/layers/_base_layer.py\", line 127, in forward\n    return self._forward(net_input)\n           ~~~~~~~~~~~~~^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 85, in _forward\n    relevant_output = self.get_output(**relevant_input)\n  File \"<main>/enerzyme/models/layers/_base_layer.py\", line 119, in get_output\n    relevant_output[k] = getattr(self, f\"get_{k}\")(**relevant_input)\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\n  File \"<main>/enerzyme/models/layers/electron_embedding.py\", line 138, in get_electron_embedding\n    anorm = segment_sum_coo(a, batch_seg)\n  File \"/home/gridsan/wlluo/.conda/envs/enerzyme-dev/lib/python3.13/site-packages/torch_scatter/segment_coo.py\", line 9, in segment_sum_coo\n    return torch.ops.torch_scatter.segment_sum_coo(src, index, out, dim_size)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if ",
                 "capture": {
                   "new_graphs": 3,
                   "new_calls": 22
                 }
               },
               "candidate": {
-                "ms": 56.56972201541066,
+                "ms": 57.405811036005616,
                 "peak_MiB": 611.361328125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 60,
                   "reference_active_parameters": 60,
-                  "energy_max_abs": 4.440892098500626e-16,
+                  "energy_max_abs": 3.3306690738754696e-16,
                   "force_max_abs": 4.440892098500626e-16,
-                  "gradient_max_abs": 1.4210854715202004e-13,
+                  "gradient_max_abs": 1.7053025658242404e-13,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
                     "Fa": "NegBackward0"
@@ -2768,7 +2772,7 @@
                 "reference_active_parameters": 60,
                 "energy_max_abs": 4.440892098500626e-16,
                 "force_max_abs": 3.3306690738754696e-16,
-                "gradient_max_abs": 2.1316282072803006e-14
+                "gradient_max_abs": 1.7053025658242404e-13
               },
               "status": "candidate_only_validated"
             }
@@ -2786,14 +2790,14 @@
                 }
               },
               "candidate": {
-                "ms": 21.772413980215788,
+                "ms": 21.77947317250073,
                 "peak_MiB": 227.6640625,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 3.552713678800501e-15,
-                  "force_max_abs": 2.220446049250313e-16,
+                  "energy_max_abs": 0.0,
+                  "force_max_abs": 1.942890293094024e-16,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2803,7 +2807,7 @@
                 "error": null,
                 "capture": {
                   "new_graphs": 13,
-                  "new_calls": 158
+                  "new_calls": 159
                 }
               },
               "cross_native": {
@@ -2811,7 +2815,7 @@
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
                 "energy_max_abs": 0.0,
-                "force_max_abs": 1.8041124150158794e-16,
+                "force_max_abs": 1.6653345369377348e-16,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -2828,15 +2832,15 @@
                 }
               },
               "candidate": {
-                "ms": 56.274970062077045,
+                "ms": 55.82653312012553,
                 "peak_MiB": 346.89453125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 60,
                   "reference_active_parameters": 60,
                   "energy_max_abs": 1.7763568394002505e-15,
-                  "force_max_abs": 1.6653345369377348e-16,
-                  "gradient_max_abs": 5.684341886080802e-14,
+                  "force_max_abs": 1.942890293094024e-16,
+                  "gradient_max_abs": 2.2737367544323206e-13,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
                     "Fa": "NegBackward0"
@@ -2852,9 +2856,9 @@
                 "passed": true,
                 "active_parameters": 60,
                 "reference_active_parameters": 60,
-                "energy_max_abs": 1.7763568394002505e-15,
-                "force_max_abs": 1.942890293094024e-16,
-                "gradient_max_abs": 8.526512829121202e-14
+                "energy_max_abs": 3.552713678800501e-15,
+                "force_max_abs": 1.3877787807814457e-16,
+                "gradient_max_abs": 2.2737367544323206e-13
               },
               "status": "candidate_only_validated"
             }
@@ -2872,14 +2876,14 @@
                 }
               },
               "candidate": {
-                "ms": 52.03932407312095,
+                "ms": 52.08166711963713,
                 "peak_MiB": 1369.6162109375,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 0,
                   "reference_active_parameters": 0,
-                  "energy_max_abs": 9.947598300641403e-14,
-                  "force_max_abs": 1.942890293094024e-16,
+                  "energy_max_abs": 7.105427357601002e-14,
+                  "force_max_abs": 2.220446049250313e-16,
                   "gradient_max_abs": 0.0,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2896,8 +2900,8 @@
                 "passed": true,
                 "active_parameters": 0,
                 "reference_active_parameters": 0,
-                "energy_max_abs": 1.8474111129762605e-13,
-                "force_max_abs": 2.7929047963226594e-16,
+                "energy_max_abs": 1.4210854715202004e-13,
+                "force_max_abs": 1.942890293094024e-16,
                 "gradient_max_abs": 0.0
               },
               "status": "candidate_only_validated"
@@ -2914,14 +2918,14 @@
                 }
               },
               "candidate": {
-                "ms": 147.98288699239492,
+                "ms": 147.54475699737668,
                 "peak_MiB": 2255.9111328125,
                 "numerical": {
                   "passed": true,
                   "active_parameters": 60,
                   "reference_active_parameters": 60,
-                  "energy_max_abs": 1.5631940186722204e-13,
-                  "force_max_abs": 2.220446049250313e-16,
+                  "energy_max_abs": 1.1368683772161603e-13,
+                  "force_max_abs": 1.6653345369377348e-16,
                   "gradient_max_abs": 7.275957614183426e-11,
                   "output_grad_functions": {
                     "E": "ScatterAddBackward0",
@@ -2938,8 +2942,8 @@
                 "passed": true,
                 "active_parameters": 60,
                 "reference_active_parameters": 60,
-                "energy_max_abs": 7.105427357601002e-14,
-                "force_max_abs": 2.0816681711721685e-16,
+                "energy_max_abs": 5.684341886080802e-14,
+                "force_max_abs": 1.942890293094024e-16,
                 "gradient_max_abs": 7.275957614183426e-11
               },
               "status": "candidate_only_validated"
@@ -2952,23 +2956,23 @@
         "source": {
           "baseline": {
             "model_revision": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795646641714701954,
-            "finished_unix_ns": 1795646716213695699
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795737043343030187,
+            "finished_unix_ns": 1795737114309210037
           },
           "candidate": {
-            "model_revision": "81620f7fb09f51a76ea65b77acc9a7d591944725",
-            "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-            "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+            "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+            "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
             "torch": "2.13.0+cu126",
-            "slurm_job_id": "6325032",
-            "node": "d-12-13-1",
-            "started_unix_ns": 1795646720045306695,
-            "finished_unix_ns": 1795646813712446131
+            "slurm_job_id": "6339000",
+            "node": "d-8-15-2",
+            "started_unix_ns": 1795737118044454154,
+            "finished_unix_ns": 1795737204264223835
           }
         },
         "measurement_order": [
@@ -2977,20 +2981,20 @@
         ]
       },
       "allocation": {
-        "job": "6325032",
-        "node": "d-12-13-1",
+        "job": "6339000",
+        "node": "d-8-15-2",
         "gpu": "Tesla V100-PCIE-32GB",
-        "gpu_uuid": "34f059c2-96ad-b500-81b4-48607e7bcca1",
+        "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
         "requested_order": [
           "base",
           "new"
         ],
         "model_revisions": {
           "base": "b05ea1abb732ffab1cd0d93e284f24bdb9004c4d",
-          "new": "81620f7fb09f51a76ea65b77acc9a7d591944725"
+          "new": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1"
         },
-        "driver_revision": "70ae60afacbb11ee9b986995744e7e343db49ff3",
-        "driver_sha256": "dc35add5eef512d272356c91278b4a3df9abaaef6d15fa19c542fb08f32175ec",
+        "driver_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+        "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
         "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
         "repetitions_per_leg": 5,
         "legs": [
