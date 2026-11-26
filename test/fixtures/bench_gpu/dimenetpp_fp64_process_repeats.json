@@ -1,0 +1,320 @@
+{
+ "job": "6334306",
+ "device": "GPU-4163ef98-d563-542a-eccc-2939797f3efc, Tesla V100-PCIE-32GB\nGPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65, Tesla V100-PCIE-32GB",
+ "model": "dimenet++",
+ "precision": "float64",
+ "system": "mol_batch_32x20",
+ "mode": "compiled force inference",
+ "method": "Frozen pre-refactor weights and acceptance inputs. Three rounds of six fresh processes on one V100 in the order 5d53f9c, 2a3b024, baseline, 2a3b024, 5d53f9c, baseline; each process compiles, runs nine calls and reports the median of calls 3-9.",
+ "trees": {
+  "baseline": "1aa0f8b",
+  "5d53f9c": "mix-order reductions enabled in float64",
+  "2a3b024": "float64 CUDA forces compiled without mix-order reductions"
+ },
+ "mean_of_process_medians_ms": {
+  "baseline": 32.126,
+  "2a3b024": 32.8,
+  "5d53f9c": 33.987
+ },
+ "relative_to_baseline_percent": {
+  "5d53f9c": 5.79,
+  "2a3b024": 2.1
+ },
+ "processes": {
+  "baseline": [
+   {
+    "round": 1,
+    "median_ms": 32.279,
+    "times_ms": [
+     93698.739,
+     634.812,
+     32.794,
+     31.968,
+     32.059,
+     32.27,
+     32.279,
+     33.156,
+     33.982
+    ],
+    "median_peak_mib": 1395.0
+   },
+   {
+    "round": 1,
+    "median_ms": 32.256,
+    "times_ms": [
+     93149.971,
+     623.467,
+     32.256,
+     32.291,
+     32.19,
+     33.502,
+     32.242,
+     32.177,
+     32.344
+    ],
+    "median_peak_mib": 1395.0
+   },
+   {
+    "round": 2,
+    "median_ms": 33.405,
+    "times_ms": [
+     89875.4,
+     626.025,
+     34.724,
+     33.405,
+     33.352,
+     33.422,
+     33.353,
+     33.313,
+     33.413
+    ],
+    "median_peak_mib": 1395.0
+   },
+   {
+    "round": 2,
+    "median_ms": 31.785,
+    "times_ms": [
+     85686.698,
+     611.835,
+     31.748,
+     33.017,
+     31.785,
+     31.797,
+     31.754,
+     31.796,
+     31.775
+    ],
+    "median_peak_mib": 1395.0
+   },
+   {
+    "round": 3,
+    "median_ms": 31.648,
+    "times_ms": [
+     86467.421,
+     946.292,
+     31.656,
+     31.54,
+     31.536,
+     31.642,
+     31.676,
+     32.557,
+     31.648
+    ],
+    "median_peak_mib": 1395.0
+   },
+   {
+    "round": 3,
+    "median_ms": 31.384,
+    "times_ms": [
+     93392.515,
+     591.092,
+     31.393,
+     32.437,
+     31.367,
+     31.384,
+     31.4,
+     31.375,
+     31.359
+    ],
+    "median_peak_mib": 1395.0
+   }
+  ],
+  "2a3b024": [
+   {
+    "round": 1,
+    "median_ms": 32.994,
+    "times_ms": [
+     90530.558,
+     34.011,
+     32.867,
+     32.996,
+     33.003,
+     32.934,
+     32.818,
+     33.014,
+     32.994
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 1,
+    "median_ms": 32.945,
+    "times_ms": [
+     102322.127,
+     34.227,
+     32.945,
+     32.996,
+     33.23,
+     32.689,
+     32.974,
+     32.925,
+     32.887
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 2,
+    "median_ms": 32.698,
+    "times_ms": [
+     100090.118,
+     33.771,
+     32.719,
+     32.674,
+     32.698,
+     32.927,
+     32.665,
+     32.796,
+     32.637
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 2,
+    "median_ms": 32.764,
+    "times_ms": [
+     86494.048,
+     33.847,
+     32.823,
+     32.752,
+     33.514,
+     32.764,
+     32.718,
+     32.731,
+     32.783
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 3,
+    "median_ms": 32.783,
+    "times_ms": [
+     82507.103,
+     33.944,
+     32.819,
+     32.783,
+     32.808,
+     32.808,
+     32.78,
+     32.76,
+     32.767
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 3,
+    "median_ms": 32.617,
+    "times_ms": [
+     82476.544,
+     33.828,
+     32.617,
+     32.69,
+     33.16,
+     32.739,
+     32.586,
+     32.617,
+     32.573
+    ],
+    "median_peak_mib": 1387.3
+   }
+  ],
+  "5d53f9c": [
+   {
+    "round": 1,
+    "median_ms": 34.86,
+    "times_ms": [
+     92149.046,
+     35.493,
+     34.761,
+     35.486,
+     34.86,
+     34.867,
+     34.808,
+     34.897,
+     34.826
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 1,
+    "median_ms": 34.762,
+    "times_ms": [
+     96879.094,
+     35.232,
+     34.716,
+     34.72,
+     34.81,
+     34.798,
+     35.103,
+     34.762,
+     34.744
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 2,
+    "median_ms": 34.607,
+    "times_ms": [
+     99024.735,
+     35.776,
+     34.607,
+     34.64,
+     34.59,
+     34.671,
+     34.552,
+     34.52,
+     34.772
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 2,
+    "median_ms": 32.626,
+    "times_ms": [
+     85068.706,
+     33.125,
+     32.626,
+     32.614,
+     32.587,
+     32.594,
+     32.627,
+     32.632,
+     32.631
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 3,
+    "median_ms": 34.523,
+    "times_ms": [
+     83341.98,
+     33.731,
+     32.533,
+     32.62,
+     34.693,
+     34.523,
+     34.555,
+     34.557,
+     34.508
+    ],
+    "median_peak_mib": 1387.3
+   },
+   {
+    "round": 3,
+    "median_ms": 32.545,
+    "times_ms": [
+     84701.09,
+     33.485,
+     32.545,
+     32.561,
+     32.621,
+     32.509,
+     32.533,
+     32.643,
+     32.518
+    ],
+    "median_peak_mib": 1387.3
+   }
+  ]
+ },
+ "conclusion": "The float64 scope does not slow DimeNet++; across processes 2a3b024 is within 3% of the pre-refactor compile and faster than 5d53f9c. The +4.2% of the single-process balanced recheck reflects process-to-process variation of about 2 ms in each checkout."
+}
