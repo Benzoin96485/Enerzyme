@@ -73,5 +73,50 @@
       "failures": 0
     },
     "method": "Build from git archive with no index, install into a fresh target directory, load the registry and bundled Jd, CG and Lebedev data, and run the 58 frozen-weight checks outside the source checkout. The isolated test directory contains only the test harness and the frozen-weight symlink."
+  },
+  "documentation": {
+    "revision": "b0d6961",
+    "sphinx": "8.2.3",
+    "builder": "html",
+    "options": [
+      "-j4",
+      "-W",
+      "--keep-going",
+      "-E",
+      "-a"
+    ],
+    "source_documents": 999,
+    "generated_api_documents": 956,
+    "warnings": 0,
+    "exit_code": 0,
+    "method": "Copy docs to a fresh source directory and build into an empty output directory with the repository source available for autodoc."
+  },
+  "targeted_force_training": {
+    "revision": "244415d",
+    "job": "6339354",
+    "device": "CPU",
+    "command": "scripts/check_compiled_forces.py <architecture> --dtype <precision>",
+    "cases": {
+      "equflash/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 66,
+        "graphs_with_learned_operators": 0
+      },
+      "equflash/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 66,
+        "graphs_with_learned_operators": 0
+      },
+      "equflashv2/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 34,
+        "graphs_with_learned_operators": 0
+      },
+      "equflashv2/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 34,
+        "graphs_with_learned_operators": 0
+      }
+    }
   }
 }
