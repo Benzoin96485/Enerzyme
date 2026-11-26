@@ -327,6 +327,26 @@ def test_equflash_force_matches_energy_finite_difference():
     assert torch.allclose(analytical, numerical, atol=1e-5, rtol=1e-4)
 
 
+def test_channelwise_conv_only_normalizes_nonempty_neighborhoods():
+    from enerzyme.models.equflash.interaction_v2 import ChannelwiseConv
+
+    conv = ChannelwiseConv("1x0e", "1x0e", "1x0e", 2, [4], train_denominator=True)
+    features = torch.ones(2, 1, requires_grad=True)
+    empty = torch.empty(0, dtype=torch.long)
+    with torch.no_grad():
+        conv.denominator.zero_()
+    result = conv(features, empty, empty, torch.empty(0, 2), torch.empty(0, 1))
+    torch.testing.assert_close(result, torch.zeros_like(features))
+    assert not result.requires_grad
+
+    with torch.no_grad():
+        conv.denominator.fill_(2)
+    idx_i, idx_j = _edges(2)
+    result = conv(features, idx_i, idx_j, torch.ones(2, 2), torch.ones(2, 1))
+    gradient, = torch.autograd.grad(result.sum(), conv.denominator)
+    torch.testing.assert_close(gradient, -result.sum() / conv.denominator)
+
+
 def test_channelwise_conv_rejects_mismatched_multiplicity():
     from enerzyme.models.equflash.interaction_v2 import ChannelwiseConv
 

@@ -175,8 +175,9 @@ class ChannelwiseConv(nn.Module):
         rbf: Tensor,
         edge_sh: Tensor,
     ) -> Tensor:
-        aggregated = irreps_convolution(self.tp, self.radial, features, idx_j, idx_i, edge_sh, rbf)
-        return aggregated / self.denominator
+        return irreps_convolution(
+            self.tp, self.radial, features, idx_j, idx_i, edge_sh, rbf, denominator=self.denominator
+        )
 
 
 class ScalarGate(nn.Module):

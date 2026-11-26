@@ -14,12 +14,13 @@ def weighted_messages(tp, features, sender, edge_sh, weights):
     return tp(features[sender], edge_sh, weights)
 
 
-def irreps_convolution(tp, radial, features, sender, receiver, edge_sh, rbf):
-    """Sum radial-weighted tensor-product messages onto receiver atoms."""
+def irreps_convolution(tp, radial, features, sender, receiver, edge_sh, rbf, *, denominator=None):
+    """Sum radial-weighted messages onto receivers and normalize a nonempty edge set."""
     if sender.numel() == 0:
         return features.new_zeros(features.shape[0], tp.output_mask.numel())
     messages = weighted_messages(tp, features, sender, edge_sh, radial(rbf))
-    return scatter_sum(messages, receiver, features.shape[0])
+    aggregated = scatter_sum(messages, receiver, features.shape[0])
+    return aggregated if denominator is None else aggregated / denominator
 
 
 class IrrepsEmbed(Embed):
