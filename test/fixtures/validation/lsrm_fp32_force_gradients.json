@@ -1,0 +1,1144 @@
+{
+ "model": "visnet_lsrm",
+ "checkpoint_source": "1aa0f8b",
+ "refactor_source": "455e150",
+ "torch": "2.13.0+cu126",
+ "inputs": {
+  "official_systems": "scripts/bench_cores.py::_batch with the acceptance sizes, fixed coordinate seed 11, cutoff 9.0 and torch.float32. Periodic offsets and positions are promoted from these values for the float64 run. The snapshot loads strictly into the pre-refactor source. The candidate uses the registered presnapshot parameter map.",
+  "edge_order": "A CPU torch.Generator is seeded with 726. torch.randperm of the directed pair count indexes both endpoint arrays and periodic offsets together. The molecule and atom orders stay fixed.",
+  "candidate_training": "scripts/check_compiled_forces.py::step, using an Inductor-delegating backend to count captured calls. Each arithmetic candidate is applied equally to eager and compiled training.",
+  "cpu_threads": 2
+ },
+ "snapshot_sha256": "b84fdb41f5ed4e1196a617a463ce2c165249678afcc7e21e5ad1f96049359cea",
+ "directions": "Each comparison casts the same parameter and coordinate values to both precisions. The loss is the sum of squared graph energies and squared forces. A weight element passes when its absolute difference is at most 7e-4 + 1e-3 times the absolute reference. The E/F gate is 3e-4 + 3e-4 times the absolute reference. Edge-order controls permute the same directed pairs and their periodic offsets. All compute controls run on CPU.",
+ "short_block_zero_identities": {
+  "assumptions": "The standard embed initializes every Cartesian vector component to zero. ViSNet and FragmentLR use SiLU attention.",
+  "blocks.0.module.s_proj.bias": "Channels 0 to 127 gate the zero incoming vector. Channels 128 to 255 multiply the live bond direction.",
+  "blocks.0.module.o_proj.bias": "Channels 0 to 127 multiply a projection of the zero vector. Channels 128 to 255 multiply its zero vector dot product. Channels 256 to 383 contribute to the scalar residual.",
+  "measured_fp64_chunks": {
+   "blocks.0.module.s_proj.bias": [{"abs_max": 0.0,"nonzero": 0},{"abs_max": 4825.328865847001,"nonzero": 128}],
+   "blocks.0.module.o_proj.bias": [{"abs_max": 0.0,"nonzero": 0},{"abs_max": 0.0,"nonzero": 0},{"abs_max": 4.844862923113145,"nonzero": 128}]
+  }
+ },
+ "local_force_fit_cancellation": {
+  "layout": "5+4 atoms (seed 107) and 128 channels (initialization seed 142). Contributions are the derivatives at each affine projection output summed for the stored bias.",
+  "blocks.0.module.s_proj.bias[141]": {
+   "fp32": {"stage": "combined","sum": -1.22438445687294,"sum_abs": 641.3905319869518,"max_abs": 97.15828704833984,"rows": 32,"stored_weight_gradient": -1.224365234375},
+   "fp64": {"stage": "combined","sum": -1.2468439411345145,"sum_abs": 641.4119598004207,"max_abs": 97.16026846417914,"rows": 32,"stored_weight_gradient": -1.2468439411345003}
+  },
+  "blocks.1.module.s_proj.bias[246]": {
+   "fp32": {"stage": "combined","sum": 0.13239477574825287,"sum_abs": 556.0320361703634,"max_abs": 65.82050323486328,"rows": 32,"stored_weight_gradient": 0.13241195678710938},
+   "fp64": {"stage": "combined","sum": 0.12426171715323875,"sum_abs": 556.0411810548691,"max_abs": 65.82073490914567,"rows": 32,"stored_weight_gradient": 0.12426171715324585}
+  }
+ },
+ "frozen_molecules": {
+  "frozen-1": {
+   "permuted_edge_order": {
+    "weight_tensors_outside": 18,
+    "weight_elements_outside": 173,
+    "largest_weight_tolerance_ratio": 6.8598,
+    "max_abs_E": 9.5367431640625e-07,
+    "max_abs_Fa": 6.079673767089844e-06,
+    "different_gradient_presence": 0
+   },
+   "native_fp32_vs_fp64": {
+    "weight_tensors_outside": 33,
+    "weight_elements_outside": 850,
+    "largest_weight_tolerance_ratio": 20.7923,
+    "max_abs_E": 2.1409502917180134e-06,
+    "max_abs_Fa": 1.2426915670715744e-05,
+    "different_gradient_presence": 0
+   },
+   "permuted_edges_with_wide_scatter": {"weight_tensors_outside": 0,"weight_elements_outside": 0,"largest_weight_tolerance_ratio": 0.0,"max_abs_E": 1.9073486328125e-06,"max_abs_Fa": 6.556510925292969e-07,"different_gradient_presence": 0}
+  },
+  "frozen-3": {
+   "permuted_edge_order": {
+    "weight_tensors_outside": 20,
+    "weight_elements_outside": 244,
+    "largest_weight_tolerance_ratio": 8.4317,
+    "max_abs_E": 1.9073486328125e-06,
+    "max_abs_Fa": 5.9604644775390625e-06,
+    "different_gradient_presence": 0
+   },
+   "native_fp32_vs_fp64": {
+    "weight_tensors_outside": 48,
+    "weight_elements_outside": 1229,
+    "largest_weight_tolerance_ratio": 21.6159,
+    "max_abs_E": 3.3994752257626715e-06,
+    "max_abs_Fa": 1.2665334249373217e-05,
+    "different_gradient_presence": 0
+   },
+   "permuted_edges_with_wide_scatter": {"weight_tensors_outside": 0,"weight_elements_outside": 0,"largest_weight_tolerance_ratio": 0.0,"max_abs_E": 0.0,"max_abs_Fa": 3.5762786865234375e-07,"different_gradient_presence": 0}
+  }
+ },
+ "matched_compiler_controls_input": "Default 128-channel model initialized with seed 142. Coordinates use 5+4 atoms, seed 107, density 0.12. Every candidate is compared against its own eager execution. Numeric gradients are compared with their original presence masks.",
+ "matched_compiler_controls": {
+  "source": {
+   "implementation": "Unmodified ordinary training.",
+   "captured_operators": [1097,69],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 4,
+    "weight_elements_outside": 11,
+    "largest_weight_tolerance_ratio": 7.1078,
+    "max_abs_E": 1.7881393432617188e-07,
+    "max_abs_Fa": 1.4603137969970703e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {"weight_tensors_outside": 0,"weight_elements_outside": 0,"largest_weight_tolerance_ratio": 0.0,"max_abs_E": 0.0,"max_abs_Fa": 0.0,"different_gradient_presence": 0},
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 10,
+    "weight_elements_outside": 26,
+    "largest_weight_tolerance_ratio": 11.5462,
+    "max_abs_E": 2.9517684740909544e-07,
+    "max_abs_Fa": 2.599166377348361e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "bias64": {
+   "implementation": "Widen only the final bias addition of each short s_proj/o_proj.",
+   "captured_operators": [1145,69],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 4,
+    "weight_elements_outside": 11,
+    "largest_weight_tolerance_ratio": 6.881,
+    "max_abs_E": 1.7881393432617188e-07,
+    "max_abs_Fa": 1.519918441772461e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {"weight_tensors_outside": 0,"weight_elements_outside": 0,"largest_weight_tolerance_ratio": 0.0,"max_abs_E": 0.0,"max_abs_Fa": 0.0,"different_gradient_presence": 0},
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 10,
+    "weight_elements_outside": 26,
+    "largest_weight_tolerance_ratio": 11.5364,
+    "max_abs_E": 2.9517684740909544e-07,
+    "max_abs_Fa": 2.599166377348361e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "proj64": {
+   "implementation": "Widen the short s_proj/o_proj GEMMs and cast their outputs back to float32.",
+   "captured_operators": [1145,69],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 3,
+    "weight_elements_outside": 8,
+    "largest_weight_tolerance_ratio": 5.6012,
+    "max_abs_E": 1.4901161193847656e-07,
+    "max_abs_Fa": 6.556510925292969e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {"weight_tensors_outside": 2,"weight_elements_outside": 3,"largest_weight_tolerance_ratio": 2.336,"max_abs_E": 5.960464477539063e-08,"max_abs_Fa": 7.450580596923828e-07,"different_gradient_presence": 0},
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 9,
+    "weight_elements_outside": 21,
+    "largest_weight_tolerance_ratio": 11.0775,
+    "max_abs_E": 2.3557220263370482e-07,
+    "max_abs_Fa": 2.8375849564499234e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "group64": {
+   "implementation": "Widen only atom-to-fragment scatter-mean.",
+   "captured_operators": [1105,69],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 4,
+    "weight_elements_outside": 11,
+    "largest_weight_tolerance_ratio": 6.8997,
+    "max_abs_E": 8.940696716308594e-08,
+    "max_abs_Fa": 1.385807991027832e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {"weight_tensors_outside": 0,"weight_elements_outside": 0,"largest_weight_tolerance_ratio": 0.0,"max_abs_E": 5.960464477539063e-08,"max_abs_Fa": 2.086162567138672e-07,"different_gradient_presence": 0},
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 10,
+    "weight_elements_outside": 26,
+    "largest_weight_tolerance_ratio": 11.7187,
+    "max_abs_E": 3.5478149218448607e-07,
+    "max_abs_Fa": 2.599166377348361e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "gain64": {
+   "implementation": "In FP64 replace (norm − min)/span times the unit direction by an equivalent gain before casting the field back to float32.",
+   "captured_operators": [1117,73],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 175,
+    "weight_elements_outside": 1414755,
+    "largest_weight_tolerance_ratio": 132470.9989,
+    "max_abs_E": 2.384185791015625e-07,
+    "max_abs_Fa": 0.21321740746498108,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 1,
+    "weight_elements_outside": 1,
+    "largest_weight_tolerance_ratio": 1.0625,
+    "max_abs_E": 1.4901161193847656e-07,
+    "max_abs_Fa": 4.172325134277344e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 11,
+    "weight_elements_outside": 28,
+    "largest_weight_tolerance_ratio": 12.5965,
+    "max_abs_E": 1.759675578583142e-07,
+    "max_abs_Fa": 2.420352443022189e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "sum": {
+   "implementation": "Widen embedding, short and fragment scatter-add before restoring values to float32.",
+   "captured_operators": [1129,71],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 4,
+    "weight_elements_outside": 8,
+    "largest_weight_tolerance_ratio": 5.4652,
+    "max_abs_E": 2.384185791015625e-07,
+    "max_abs_Fa": 8.940696716308594e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 2,
+    "weight_elements_outside": 3,
+    "largest_weight_tolerance_ratio": 1.2053,
+    "max_abs_E": 2.384185791015625e-07,
+    "max_abs_Fa": 1.0579824447631836e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 9,
+    "weight_elements_outside": 25,
+    "largest_weight_tolerance_ratio": 11.507,
+    "max_abs_E": 5.335954265106579e-07,
+    "max_abs_Fa": 3.4336314042038296e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "sumproj": {
+   "implementation": "Combine widened scatter-add and s_proj/o_proj.",
+   "captured_operators": [1177,71],
+   "compiled_vs_own_eager": {"weight_tensors_outside": 3,"weight_elements_outside": 5,"largest_weight_tolerance_ratio": 2.0825,"max_abs_E": 2.086162567138672e-07,"max_abs_Fa": 9.08970832824707e-07,"different_gradient_presence": 0},
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 2,
+    "weight_elements_outside": 4,
+    "largest_weight_tolerance_ratio": 3.7281,
+    "max_abs_E": 1.1920928955078125e-07,
+    "max_abs_Fa": 1.0728836059570312e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 8,
+    "weight_elements_outside": 20,
+    "largest_weight_tolerance_ratio": 8.5802,
+    "max_abs_E": 4.143861369598767e-07,
+    "max_abs_Fa": 3.1356081803268765e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "sumleaves": {
+   "implementation": "Widen all linear layers, scatter-adds, SiLU and vector normalization, then round back to float32.",
+   "captured_operators": [1539,101],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 1,
+    "weight_elements_outside": 3,
+    "largest_weight_tolerance_ratio": 2.2143,
+    "max_abs_E": 2.980232238769531e-07,
+    "max_abs_Fa": 2.384185791015625e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 7,
+    "weight_elements_outside": 16,
+    "largest_weight_tolerance_ratio": 7.917,
+    "max_abs_E": 3.8743019104003906e-07,
+    "max_abs_Fa": 7.152557373046875e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 5,
+    "weight_elements_outside": 11,
+    "largest_weight_tolerance_ratio": 4.1381,
+    "max_abs_E": 5.932000712860486e-07,
+    "max_abs_Fa": 2.599166377348361e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "first64": {
+   "implementation": "Widen embedding and first-block linear projections and scatter-adds.",
+   "captured_operators": [1182,71],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 2,
+    "weight_elements_outside": 4,
+    "largest_weight_tolerance_ratio": 1.6474,
+    "max_abs_E": 2.980232238769531e-07,
+    "max_abs_Fa": 8.940696716308594e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {"weight_tensors_outside": 8,"weight_elements_outside": 13,"largest_weight_tolerance_ratio": 5.648,"max_abs_E": 1.1920928955078125e-07,"max_abs_Fa": 9.5367431640625e-07,"different_gradient_presence": 0},
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 6,
+    "weight_elements_outside": 17,
+    "largest_weight_tolerance_ratio": 8.5674,
+    "max_abs_E": 3.5478149218448607e-07,
+    "max_abs_Fa": 2.0031199295944546e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "linears": {
+   "implementation": "Widen every linear layer and cast the result back.",
+   "captured_operators": [1419,91],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 2,
+    "weight_elements_outside": 4,
+    "largest_weight_tolerance_ratio": 2.425,
+    "max_abs_E": 1.7881393432617188e-07,
+    "max_abs_Fa": 7.152557373046875e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 6,
+    "weight_elements_outside": 13,
+    "largest_weight_tolerance_ratio": 7.7173,
+    "max_abs_E": 2.086162567138672e-07,
+    "max_abs_Fa": 4.76837158203125e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 5,
+    "weight_elements_outside": 13,
+    "largest_weight_tolerance_ratio": 4.4287,
+    "max_abs_E": 4.739907817352673e-07,
+    "max_abs_Fa": 2.718375666899142e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "silu64": {
+   "implementation": "Widen just SiLU and vector normalization.",
+   "captured_operators": [1185,77],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 3,
+    "weight_elements_outside": 9,
+    "largest_weight_tolerance_ratio": 6.2042,
+    "max_abs_E": 2.980232238769531e-07,
+    "max_abs_Fa": 1.3113021850585938e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 1,
+    "weight_elements_outside": 1,
+    "largest_weight_tolerance_ratio": 1.3519,
+    "max_abs_E": 1.7881393432617188e-07,
+    "max_abs_Fa": 2.980232238769531e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 8,
+    "weight_elements_outside": 22,
+    "largest_weight_tolerance_ratio": 11.4914,
+    "max_abs_E": 1.1636291308292357e-07,
+    "max_abs_Fa": 2.718375666899142e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "geo": {
+   "implementation": "Diagnostic: widen pair geometry through the neighbor and edge embed and restore its outputs before the first block; the intermediate public geometry fields change dtype.",
+   "captured_operators": [1104,69],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 2,
+    "weight_elements_outside": 3,
+    "largest_weight_tolerance_ratio": 2.1184,
+    "max_abs_E": 8.940696716308594e-08,
+    "max_abs_Fa": 1.0132789611816406e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 11,
+    "weight_elements_outside": 27,
+    "largest_weight_tolerance_ratio": 14.3837,
+    "max_abs_E": 2.682209014892578e-07,
+    "max_abs_Fa": 5.960464477539062e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 5,
+    "weight_elements_outside": 9,
+    "largest_weight_tolerance_ratio": 3.5448,
+    "max_abs_E": 1.9359697323029224e-07,
+    "max_abs_Fa": 2.718375666899142e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "geomembed": {
+   "implementation": "Per-layer rounding: widen the initial distance and radial calculations, neighbor embedding and edge embedding internally; restore each layer output dtype.",
+   "captured_operators": [1117,69],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 3,
+    "weight_elements_outside": 5,
+    "largest_weight_tolerance_ratio": 2.7579,
+    "max_abs_E": 2.384185791015625e-07,
+    "max_abs_Fa": 1.7881393432617188e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 9,
+    "weight_elements_outside": 21,
+    "largest_weight_tolerance_ratio": 7.8888,
+    "max_abs_E": 1.7881393432617188e-07,
+    "max_abs_Fa": 2.086162567138672e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 4,
+    "weight_elements_outside": 11,
+    "largest_weight_tolerance_ratio": 8.0737,
+    "max_abs_E": 4.143861369598767e-07,
+    "max_abs_Fa": 1.3125020388859987e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "embedding": {
+   "implementation": "Widen neighbor and edge embedding internally, then restore each output dtype.",
+   "captured_operators": [1110,69],
+   "compiled_vs_own_eager": {"weight_tensors_outside": 4,"weight_elements_outside": 8,"largest_weight_tolerance_ratio": 3.5108,"max_abs_E": 2.086162567138672e-07,"max_abs_Fa": 4.76837158203125e-07,"different_gradient_presence": 0},
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 7,
+    "weight_elements_outside": 16,
+    "largest_weight_tolerance_ratio": 4.5094,
+    "max_abs_E": 1.4901161193847656e-07,
+    "max_abs_Fa": 1.1622905731201172e-06,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 6,
+    "weight_elements_outside": 17,
+    "largest_weight_tolerance_ratio": 9.673,
+    "max_abs_E": 4.143861369598767e-07,
+    "max_abs_Fa": 2.1819338639206265e-06,
+    "different_gradient_presence": 0
+   }
+  },
+  "attnsum": {
+   "implementation": "Combine widened short-range attention with widened message scatters.",
+   "captured_operators": [1153,71],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 4,
+    "weight_elements_outside": 5,
+    "largest_weight_tolerance_ratio": 4.2062,
+    "max_abs_E": 3.8743019104003906e-07,
+    "max_abs_Fa": 4.470348358154297e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 2,
+    "weight_elements_outside": 2,
+    "largest_weight_tolerance_ratio": 2.0118,
+    "max_abs_E": 8.940696716308594e-08,
+    "max_abs_Fa": 7.003545761108398e-07,
+    "different_gradient_presence": 0
+   },
+   "candidate_eager_vs_fp64": {
+    "weight_tensors_outside": 8,
+    "weight_elements_outside": 23,
+    "largest_weight_tolerance_ratio": 10.7625,
+    "max_abs_E": 2.3557220263370482e-07,
+    "max_abs_Fa": 2.897189601225314e-06,
+    "different_gradient_presence": 0
+   }
+  }
+ },
+ "original_complete_inputs": {
+  "mol_batch_32x20": {
+   "same_order_native_repeat": {
+    "participating_weights": 182,
+    "different_gradient_presence": [],
+    "weight_tensors_outside": 0,
+    "weight_elements_outside": 0,
+    "maximum_tolerance_ratio": 0.0,
+    "maximum_tensor_relative_l2": 0.0,
+    "E": {"maximum_abs": 0.0,"ratio": 0.0},
+    "Fa": {"maximum_abs": 0.0,"ratio": 0.0},
+    "outside_by_parameter": {}
+   },
+   "upstream_native_changed_edge_order": {
+    "participating_weights": 182,
+    "different_gradient_presence": [],
+    "weight_tensors_outside": 42,
+    "weight_elements_outside": 158,
+    "maximum_tolerance_ratio": 13.957494384804386,
+    "maximum_tensor_relative_l2": 7.81116806089457e-05,
+    "E": {"maximum_abs": 2.86102294921875e-06,"ratio": 0.0019103352806527053},
+    "Fa": {"maximum_abs": 1.0907649993896484e-05,"ratio": 0.019767790063623124},
+    "outside_by_parameter": {
+     "vis_layers.0.k_proj.weight": {"count": 5,"ratio": 1.5834038339076109,"flat_index": 7321,"reference": -0.31110072135925293,"actual": -0.3127017021179199,"maximum_abs": 0.00405120849609375,"relative_l2": 4.874487772589964e-05},
+     "vis_layers.2.dv_proj.bias": {"count": 1,"ratio": 1.1732432254733682,"flat_index": 87,"reference": 0.031770944595336914,"actual": 0.03262948989868164,"maximum_abs": 0.0062255859375,"relative_l2": 4.2361556902231114e-05},
+     "vis_layers.3.s_proj.bias": {"count": 1,"ratio": 2.3251967705168095,"flat_index": 20,"reference": 1731.13427734375,"actual": 1727.107421875,"maximum_abs": 149.125,"relative_l2": 8.554888793516103e-06},
+     "vis_layers.3.k_proj.weight": {"count": 2,"ratio": 1.5723289229595756,"flat_index": 812,"reference": -0.01949401944875717,"actual": -0.020625300705432892,"maximum_abs": 0.002986907958984375,"relative_l2": 4.903063235844921e-05},
+     "pre_sequence.3.embedding.weight": {"count": 1,"ratio": 1.2360356682827551,"flat_index": 850,"reference": 0.8755714893341064,"actual": 0.8736240267753601,"maximum_abs": 0.00571441650390625,"relative_l2": 1.135780965179014e-05},
+     "vis_layers.2.k_proj.weight": {"count": 4,"ratio": 1.3771482593923998,"flat_index": 2267,"reference": -0.071877121925354,"actual": -0.07081413269042969,"maximum_abs": 0.00713348388671875,"relative_l2": 5.8459362057821655e-05},
+     "vis_layers.2.dv_proj.weight": {"count": 1,"ratio": 2.0569334113100415,"flat_index": 4874,"reference": 0.007020324468612671,"actual": 0.005566030740737915,"maximum_abs": 0.00728607177734375,"relative_l2": 4.652466953674515e-05},
+     "vis_layers.0.dv_proj.bias": {"count": 1,"ratio": 1.0745926645340325,"flat_index": 59,"reference": 0.8442068099975586,"actual": 0.8458662033081055,"maximum_abs": 0.0065364837646484375,"relative_l2": 4.687841165515881e-05},
+     "vis_layers.3.dk_proj.weight": {"count": 3,"ratio": 2.5992928072647077,"flat_index": 12170,"reference": -0.3717079162597656,"actual": -0.36892223358154297,"maximum_abs": 0.00406646728515625,"relative_l2": 5.5915745441206113e-05},
+     "vis_layers.4.q_proj.weight": {"count": 1,"ratio": 1.4404198286090892,"flat_index": 2266,"reference": -0.19178146123886108,"actual": -0.19049692153930664,"maximum_abs": 0.0018053054809570312,"relative_l2": 3.5715639362847604e-05},
+     "vis_layers.3.dv_proj.weight": {"count": 1,"ratio": 1.154479510779874,"flat_index": 16218,"reference": -0.18301111459732056,"actual": -0.18403053283691406,"maximum_abs": 0.007049560546875,"relative_l2": 5.5391510903602335e-05},
+     "vis_layers.2.s_proj.bias": {"count": 2,"ratio": 1.4042925774954371,"flat_index": 42,"reference": -1109.17822265625,"actual": -1110.73681640625,"maximum_abs": 154.5,"relative_l2": 9.610395585117375e-06},
+     "vis_layers.2.q_proj.weight": {"count": 1,"ratio": 1.3135556452020902,"flat_index": 3044,"reference": 0.021555468440055847,"actual": 0.02250327169895172,"maximum_abs": 0.0088653564453125,"relative_l2": 6.777049571276563e-05},
+     "vis_layers.1.o_proj.weight": {"count": 1,"ratio": 1.4861302037154867,"flat_index": 8693,"reference": 0.3194469213485718,"actual": 0.32096195220947266,"maximum_abs": 0.0098724365234375,"relative_l2": 4.259585132481836e-05},
+     "vis_layers.1.vec_proj.weight": {"count": 1,"ratio": 1.136576305804825,"flat_index": 39358,"reference": 0.06980012357234955,"actual": 0.07067506015300751,"maximum_abs": 0.002254486083984375,"relative_l2": 5.3323502670734285e-05},
+     "vis_layers.3.o_proj.bias": {"count": 1,"ratio": 4.139580273746784,"flat_index": 11,"reference": -161.05587768554688,"actual": -161.72547912597656,"maximum_abs": 39.15625,"relative_l2": 8.446094859725403e-06},
+     "vis_layers.0.v_proj.weight": {"count": 2,"ratio": 1.3420575312562726,"flat_index": 1930,"reference": -0.05005865544080734,"actual": -0.05106527730822563,"maximum_abs": 0.00496673583984375,"relative_l2": 6.084883233258195e-05},
+     "vis_layers.2.s_proj.weight": {"count": 1,"ratio": 1.2999210307144111,"flat_index": 22962,"reference": 0.3562126159667969,"actual": 0.35483962297439575,"maximum_abs": 0.012451171875,"relative_l2": 4.9187957889211935e-05},
+     "vis_layers.1.k_proj.weight": {"count": 3,"ratio": 1.2974469707349223,"flat_index": 15053,"reference": -0.26400384306907654,"actual": -0.26525458693504333,"maximum_abs": 0.00647735595703125,"relative_l2": 5.1250120069441916e-05},
+     "vis_layers.5.dk_proj.bias": {"count": 1,"ratio": 1.5649765487731861,"flat_index": 42,"reference": -0.19579696655273438,"actual": -0.1943950653076172,"maximum_abs": 0.001819610595703125,"relative_l2": 2.3188177711739447e-05},
+     "vis_layers.1.dk_proj.bias": {"count": 1,"ratio": 1.0550747652690642,"flat_index": 117,"reference": 13.173848152160645,"actual": 13.159210205078125,"maximum_abs": 0.014637947082519531,"relative_l2": 4.0616463639236214e-05},
+     "vis_layers.0.dk_proj.weight": {"count": 5,"ratio": 1.474325673876409,"flat_index": 9043,"reference": 0.01040804386138916,"actual": 0.009360671043395996,"maximum_abs": 0.0036144256591796875,"relative_l2": 4.287576671654619e-05},
+     "vis_layers.2.dk_proj.weight": {"count": 4,"ratio": 2.472857003275454,"flat_index": 2906,"reference": 0.07425439357757568,"actual": 0.07616901397705078,"maximum_abs": 0.0159149169921875,"relative_l2": 6.436766957604701e-05},
+     "vis_layers.2.v_proj.weight": {"count": 2,"ratio": 1.0992001020441167,"flat_index": 2689,"reference": -0.8070885539054871,"actual": -0.8087451457977295,"maximum_abs": 0.009246826171875,"relative_l2": 5.121003590776152e-05},
+     "vis_layers.1.s_proj.weight": {"count": 1,"ratio": 1.795597644484944,"flat_index": 22951,"reference": 0.4509992003440857,"actual": 0.4489324688911438,"maximum_abs": 0.019805908203125,"relative_l2": 5.656745654377548e-05},
+     "vis_layers.1.layernorm.weight": {"count": 1,"ratio": 1.541164828885473,"flat_index": 100,"reference": 0.2553900480270386,"actual": 0.2539176344871521,"maximum_abs": 0.0032138824462890625,"relative_l2": 6.315277289477937e-05},
+     "neighborhood.combine.bias": {"count": 1,"ratio": 2.4057283717521853,"flat_index": 73,"reference": -0.4702262878417969,"actual": -0.4730415344238281,"maximum_abs": 0.0064697265625,"relative_l2": 6.121772964326904e-06},
+     "vis_layers.0.q_proj.weight": {"count": 5,"ratio": 1.949042837906717,"flat_index": 8069,"reference": -0.027052119374275208,"actual": -0.025635063648223877,"maximum_abs": 0.0045623779296875,"relative_l2": 4.6217696919363685e-05},
+     "vis_layers.1.dk_proj.weight": {"count": 2,"ratio": 1.5291272115353798,"flat_index": 15850,"reference": -0.17329716682434082,"actual": -0.17463254928588867,"maximum_abs": 0.0186614990234375,"relative_l2": 5.515058599376709e-05},
+     "edge_embedding.edge_proj.weight": {"count": 8,"ratio": 8.556964534852558,"flat_index": 1814,"reference": 0.15047550201416016,"actual": 0.14319801330566406,"maximum_abs": 0.018157958984375,"relative_l2": 5.193193614269171e-05},
+     "vis_layers.0.s_proj.bias": {"count": 1,"ratio": 8.98207722083525,"flat_index": 140,"reference": 1413.6834716796875,"actual": 1426.3875732421875,"maximum_abs": 173.5,"relative_l2": 9.633893383088267e-06},
+     "vis_layers.2.o_proj.bias": {"count": 1,"ratio": 1.658904488032904,"flat_index": 16,"reference": 50884.7265625,"actual": 50800.3125,"maximum_abs": 84.4140625,"relative_l2": 1.475718267080902e-05},
+     "neighborhood.combine.weight": {"count": 71,"ratio": 7.856758787406564,"flat_index": 16177,"reference": -0.14992141723632812,"actual": -0.1565990447998047,"maximum_abs": 0.0174560546875,"relative_l2": 1.0790009788141326e-05},
+     "vis_layers.3.o_proj.weight": {"count": 1,"ratio": 1.009644951554743,"flat_index": 6654,"reference": 0.3826179802417755,"actual": 0.383711040019989,"maximum_abs": 0.003662109375,"relative_l2": 3.118250723403509e-05},
+     "vis_layers.3.s_proj.weight": {"count": 2,"ratio": 1.5487826394580544,"flat_index": 22968,"reference": -0.09616465121507645,"actual": -0.09493156522512436,"maximum_abs": 0.0157470703125,"relative_l2": 5.6478186216834925e-05},
+     "vis_layers.1.dv_proj.bias": {"count": 2,"ratio": 1.7532845962287096,"flat_index": 114,"reference": 0.6902999877929688,"actual": 0.6927375793457031,"maximum_abs": 0.0179901123046875,"relative_l2": 5.58610537727737e-05},
+     "vis_layers.5.s_proj.bias": {"count": 2,"ratio": 13.957494384804386,"flat_index": 97,"reference": 43.278564453125,"actual": 43.89239501953125,"maximum_abs": 32.5,"relative_l2": 5.2570901896243886e-06},
+     "vis_layers.1.layernorm.bias": {"count": 1,"ratio": 1.7798759148060912,"flat_index": 52,"reference": -0.08951520919799805,"actual": -0.09092044830322266,"maximum_abs": 0.00200653076171875,"relative_l2": 5.314359487383116e-05},
+     "neighborhood.distance_proj.weight": {"count": 1,"ratio": 1.4835535819836632,"flat_index": 1115,"reference": -0.2796745300292969,"actual": -0.2811279296875,"maximum_abs": 0.00827789306640625,"relative_l2": 1.5413204240944066e-05},
+     "vis_layers.1.dv_proj.weight": {"count": 5,"ratio": 1.444971352802913,"flat_index": 1370,"reference": -0.1521364450454712,"actual": -0.1533677577972412,"maximum_abs": 0.01885986328125,"relative_l2": 6.386511164707922e-05},
+     "vis_layers.0.s_proj.weight": {"count": 4,"ratio": 1.7938462530759107,"flat_index": 28860,"reference": -0.19343191385269165,"actual": -0.19182923436164856,"maximum_abs": 0.0156097412109375,"relative_l2": 5.6466944754349233e-05},
+     "vis_layers.0.dv_proj.weight": {"count": 3,"ratio": 1.9359639255170302,"flat_index": 3082,"reference": 0.00775676965713501,"actual": 0.00912696123123169,"maximum_abs": 0.006317138671875,"relative_l2": 5.1655711023330294e-05}
+    }
+   },
+   "upstream_native_fp32_vs_fp64": {
+    "participating_weights": 182,
+    "different_gradient_presence": [],
+    "weight_tensors_outside": 88,
+    "weight_elements_outside": 2392,
+    "maximum_tolerance_ratio": 27.22103073976784,
+    "maximum_tensor_relative_l2": 0.00025761739709744653,
+    "E": {"maximum_abs": 5.218004811347043e-06,"ratio": 0.005423373558570493},
+    "Fa": {"maximum_abs": 4.937129918861083e-05,"ratio": 0.13487289041687833},
+    "outside_by_parameter": {
+     "vis_layers.0.k_proj.weight": {"count": 182,"ratio": 3.90761871371458,"flat_index": 7321,"reference": -0.3150672170121277,"actual": -0.31110072135925293,"maximum_abs": 0.02668283907945579,"relative_l2": 0.0001967702321493476},
+     "vis_layers.2.dv_proj.bias": {"count": 4,"ratio": 1.8503542994410966,"flat_index": 107,"reference": 3.3557499727196607,"actual": 3.3632545471191406,"maximum_abs": 0.025726258938949087,"relative_l2": 0.0001314525782088791},
+     "vis_layers.3.s_proj.bias": {"count": 5,"ratio": 6.601908470675774,"flat_index": 20,"reference": 1719.7758532346868,"actual": 1731.13427734375,"maximum_abs": 262.9438159293495,"relative_l2": 2.1211188495041404e-05},
+     "vis_layers.3.k_proj.weight": {"count": 29,"ratio": 3.0672270985970123,"flat_index": 812,"reference": -0.021707660743053324,"actual": -0.01949401944875717,"maximum_abs": 0.007016284522237015,"relative_l2": 0.00010984711965338232},
+     "pre_sequence.3.embedding.weight": {"count": 4,"ratio": 1.9476775856609385,"flat_index": 894,"reference": 1.7460470509254482,"actual": 1.7412829399108887,"maximum_abs": 0.011922688160694861,"relative_l2": 2.63781977742478e-05},
+     "pre_sequence.2.means": {"count": 1,"ratio": 1.2210792732445235,"flat_index": 11,"reference": -935.5189118665003,"actual": -936.662109375,"maximum_abs": 1.1431975084997248,"relative_l2": 0.00025761739709744653},
+     "vis_layers.3.layernorm.bias": {"count": 3,"ratio": 1.25821030560518,"flat_index": 29,"reference": 0.21555860220568457,"actual": 0.21671056747436523,"maximum_abs": 0.0020112297013668012,"relative_l2": 0.00012053934626735795},
+     "vis_layers.2.k_proj.weight": {"count": 89,"ratio": 2.936465061330573,"flat_index": 6405,"reference": 0.16494199516168417,"actual": 0.16240212321281433,"maximum_abs": 0.01832692196410335,"relative_l2": 0.0001629815786757312},
+     "vis_layers.5.dv_proj.weight": {"count": 13,"ratio": 2.373741223407116,"flat_index": 986,"reference": 0.18873128404004724,"actual": 0.18662166595458984,"maximum_abs": 0.0042699287493803695,"relative_l2": 7.893870360890844e-05},
+     "vis_layers.2.dv_proj.weight": {"count": 49,"ratio": 5.365578849114976,"flat_index": 6493,"reference": -0.05057724892302437,"actual": -0.054604530334472656,"maximum_abs": 0.011700320684695953,"relative_l2": 0.00010420697687736237},
+     "neighborhood.species.embedding.weight": {"count": 1,"ratio": 1.2080882855306205,"flat_index": 817,"reference": 0.10246806084919746,"actual": 0.10343751311302185,"maximum_abs": 0.0035542677191955363,"relative_l2": 4.184879719450152e-05},
+     "vis_layers.3.q_proj.weight": {"count": 21,"ratio": 1.4573160474015159,"flat_index": 8531,"reference": -0.05735473935582569,"actual": -0.05625103414058685,"maximum_abs": 0.0081554394442378,"relative_l2": 0.00010444483030629489},
+     "vis_layers.1.v_proj.weight": {"count": 43,"ratio": 2.6096785210815825,"flat_index": 7441,"reference": 0.2742919063071801,"actual": 0.2717493176460266,"maximum_abs": 0.023510785929914846,"relative_l2": 0.00017139483533291182},
+     "vis_layers.0.dk_proj.bias": {"count": 8,"ratio": 4.807543216888567,"flat_index": 101,"reference": -1.763647622063285,"actual": -1.775491714477539,"maximum_abs": 0.017546153502266293,"relative_l2": 0.00015075067615446028},
+     "vis_layers.5.q_proj.weight": {"count": 3,"ratio": 1.0858913341075052,"flat_index": 5769,"reference": 0.1716379644831288,"actual": 0.17069146037101746,"maximum_abs": 0.002308374031439797,"relative_l2": 5.5595005049463505e-05},
+     "vis_layers.0.dv_proj.bias": {"count": 7,"ratio": 1.82515673196404,"flat_index": 55,"reference": 0.3506383686470844,"actual": 0.3487207889556885,"maximum_abs": 0.02362575081171059,"relative_l2": 0.0001712118080937637},
+     "vis_layers.3.dk_proj.weight": {"count": 38,"ratio": 4.348668139663326,"flat_index": 13274,"reference": 0.4386495225383038,"actual": 0.443601131439209,"maximum_abs": 0.008748188317213135,"relative_l2": 0.00012427433878073655},
+     "vis_layers.4.q_proj.weight": {"count": 18,"ratio": 2.0836308422912833,"flat_index": 4414,"reference": -0.1105014159244852,"actual": -0.10881263017654419,"maximum_abs": 0.0033951433442922507,"relative_l2": 8.843723167591354e-05},
+     "vis_layers.3.dv_proj.weight": {"count": 22,"ratio": 1.82706268466863,"flat_index": 3907,"reference": -1.0317795109049932,"actual": -1.0349435806274414,"maximum_abs": 0.01659640549668495,"relative_l2": 0.0001363594170192272},
+     "vis_layers.2.s_proj.bias": {"count": 3,"ratio": 7.365163524137736,"flat_index": 42,"reference": -1117.413310023085,"actual": -1109.17822265625,"maximum_abs": 258.3553426670842,"relative_l2": 2.1621867100036743e-05},
+     "vis_layers.2.q_proj.weight": {"count": 79,"ratio": 3.5245065823576494,"flat_index": 6366,"reference": 0.10165759073169614,"actual": 0.10448303818702698,"maximum_abs": 0.018827617027412202,"relative_l2": 0.00016496395506405729},
+     "vis_layers.4.dv_proj.weight": {"count": 12,"ratio": 1.4923448290666845,"flat_index": 5354,"reference": -0.1830074908903523,"actual": -0.18168973922729492,"maximum_abs": 0.011990989933337914,"relative_l2": 0.00013745790595152542},
+     "vis_layers.1.o_proj.weight": {"count": 6,"ratio": 2.6491178439174807,"flat_index": 8693,"reference": 0.3221547296822176,"actual": 0.3194469213485718,"maximum_abs": 0.023867017489891396,"relative_l2": 0.00010465260799083215},
+     "vis_layers.5.k_proj.weight": {"count": 1,"ratio": 1.2037690922553712,"flat_index": 10020,"reference": -0.04019541096005019,"actual": -0.041086435317993164,"maximum_abs": 0.002619916584267301,"relative_l2": 5.8205023808088296e-05},
+     "vis_layers.1.vec_proj.weight": {"count": 4,"ratio": 1.8250041619197306,"flat_index": 39358,"reference": 0.07120758061667903,"actual": 0.06980012357234955,"maximum_abs": 0.006907299500543473,"relative_l2": 0.00014486850250928365},
+     "vis_layers.3.o_proj.bias": {"count": 2,"ratio": 27.22103073976784,"flat_index": 11,"reference": -156.76939835242283,"actual": -161.05587768554688,"maximum_abs": 61.99821945390431,"relative_l2": 1.715892473590371e-05},
+     "vis_layers.0.v_proj.weight": {"count": 148,"ratio": 2.55958781340795,"flat_index": 5443,"reference": -0.7696699309122229,"actual": -0.7659081816673279,"maximum_abs": 0.008522706829666049,"relative_l2": 0.0001388174578582087},
+     "vis_layers.2.s_proj.weight": {"count": 12,"ratio": 2.3131875498108134,"flat_index": 22962,"reference": 0.35377503667166654,"actual": 0.3562126159667969,"maximum_abs": 0.03124124749353996,"relative_l2": 0.00011118370363041504},
+     "vis_layers.1.k_proj.weight": {"count": 47,"ratio": 2.351821721610512,"flat_index": 14654,"reference": 0.3938074776747756,"actual": 0.39637991786003113,"maximum_abs": 0.015155635945845347,"relative_l2": 0.00012600351306370187},
+     "vis_layers.4.o_proj.weight": {"count": 3,"ratio": 1.124530129392539,"flat_index": 15002,"reference": 0.08430173892389314,"actual": 0.08518370985984802,"maximum_abs": 0.01784857476683044,"relative_l2": 0.00010608758752749136},
+     "vis_layers.2.v_proj.bias": {"count": 1,"ratio": 1.7544429454035526,"flat_index": 21,"reference": -2.1870949675195686,"actual": -2.1820297241210938,"maximum_abs": 0.005065243398474806,"relative_l2": 0.00010702339761179292},
+     "vis_layers.5.dk_proj.bias": {"count": 2,"ratio": 4.756106824830636,"flat_index": 42,"reference": -0.20007783287655734,"actual": -0.19579696655273438,"maximum_abs": 0.0043676142145798735,"relative_l2": 6.63233799654022e-05},
+     "vis_layers.1.q_proj.weight": {"count": 41,"ratio": 2.7606389771421638,"flat_index": 14691,"reference": 0.35251779900757213,"actual": 0.3554234206676483,"maximum_abs": 0.025364431447769675,"relative_l2": 0.00014706565052458157},
+     "vis_layers.5.dk_proj.weight": {"count": 6,"ratio": 2.452404013844207,"flat_index": 1114,"reference": -0.48586140206581696,"actual": -0.48295319080352783,"maximum_abs": 0.0029082112622891287,"relative_l2": 5.619421749063993e-05},
+     "vis_layers.3.dk_proj.bias": {"count": 5,"ratio": 2.5339058041908658,"flat_index": 76,"reference": 0.2481357477828663,"actual": 0.24573326110839844,"maximum_abs": 0.01204511069139258,"relative_l2": 0.0001427010351904736},
+     "vis_layers.1.dk_proj.bias": {"count": 3,"ratio": 1.9203023181927161,"flat_index": 117,"reference": 13.147257231997429,"actual": 13.173848152160645,"maximum_abs": 0.026590920163215515,"relative_l2": 0.00012011390486767923},
+     "vis_layers.0.dk_proj.weight": {"count": 103,"ratio": 4.664608421274175,"flat_index": 10975,"reference": -0.13775311954102776,"actual": -0.13384532928466797,"maximum_abs": 0.016398774093673296,"relative_l2": 0.00014611183039901673},
+     "vis_layers.4.k_proj.weight": {"count": 10,"ratio": 1.5807051186707295,"flat_index": 12981,"reference": 0.07175175986252905,"actual": 0.07297167181968689,"maximum_abs": 0.0037150578727143113,"relative_l2": 8.870137439131991e-05},
+     "long_rbf.means": {"count": 1,"ratio": 1.7815045087465045,"flat_index": 5,"reference": -1.0756749754139037,"actual": -1.0788383483886719,"maximum_abs": 0.014086686190836417,"relative_l2": 2.3029468986184746e-05},
+     "vis_layers.2.dk_proj.weight": {"count": 81,"ratio": 5.96755157790393,"flat_index": 2669,"reference": -0.33351429199716165,"actual": -0.3273467421531677,"maximum_abs": 0.054368502869834856,"relative_l2": 0.0001864027390662255},
+     "vis_layers.2.v_proj.weight": {"count": 68,"ratio": 4.815332469164936,"flat_index": 2733,"reference": -0.489418886786315,"actual": -0.49514633417129517,"maximum_abs": 0.013989906079982184,"relative_l2": 9.925919004468736e-05},
+     "vis_layers.2.o_proj.weight": {"count": 3,"ratio": 1.2749524455084114,"flat_index": 7957,"reference": 0.8473797625778787,"actual": 0.8493525981903076,"maximum_abs": 0.019964061332544247,"relative_l2": 8.878189836550331e-05},
+     "vis_layers.2.vec_proj.weight": {"count": 1,"ratio": 1.1642834470719219,"flat_index": 34101,"reference": 0.15611928997055474,"actual": 0.15711605548858643,"maximum_abs": 0.004069924146364201,"relative_l2": 7.991067269256314e-05},
+     "vis_layers.5.v_proj.weight": {"count": 3,"ratio": 1.2776729485199574,"flat_index": 1098,"reference": 0.032388184846412316,"actual": 0.03145243227481842,"maximum_abs": 0.005276530007559899,"relative_l2": 7.37689194550562e-05},
+     "long_blocks.0.mlp_vec.0.bias": {"count": 1,"ratio": 1.324845835999669,"flat_index": 20,"reference": -0.005275469042885117,"actual": -0.006209850311279297,"maximum_abs": 0.0012357071536301945,"relative_l2": 8.898550492728645e-05},
+     "neighborhood.distance_proj.bias": {"count": 3,"ratio": 4.746849127869069,"flat_index": 61,"reference": -0.9304623455339538,"actual": -0.938201904296875,"maximum_abs": 0.0259012299092376,"relative_l2": 2.019974437479078e-05},
+     "long_blocks.0.mlp_pos.0.bias": {"count": 2,"ratio": 1.5701689481807173,"flat_index": 68,"reference": 0.39309623815281913,"actual": 0.39481258392333984,"maximum_abs": 0.0022619342609671023,"relative_l2": 5.091975305465954e-05},
+     "vis_layers.2.dk_proj.bias": {"count": 3,"ratio": 2.9564838384152243,"flat_index": 24,"reference": -1.3322435339833931,"actual": -1.3382518291473389,"maximum_abs": 0.053023821463710874,"relative_l2": 0.0001896444186929275},
+     "vis_layers.1.s_proj.bias": {"count": 2,"ratio": 5.221584681929344,"flat_index": 63,"reference": 3503.40565232073,"actual": 3521.70263671875,"maximum_abs": 280.3317195759155,"relative_l2": 2.1801352554050105e-05},
+     "vis_layers.1.s_proj.weight": {"count": 26,"ratio": 3.1152805112884163,"flat_index": 22951,"reference": 0.4474246506916142,"actual": 0.4509992003440857,"maximum_abs": 0.04816379412790184,"relative_l2": 0.00014747086723942998},
+     "vis_layers.4.vec_proj.weight": {"count": 3,"ratio": 1.4187181425462119,"flat_index": 33101,"reference": -0.09782666072551915,"actual": -0.09895855188369751,"maximum_abs": 0.0015170545588620854,"relative_l2": 9.565912946225607e-05},
+     "vis_layers.1.layernorm.weight": {"count": 4,"ratio": 2.0043448477393393,"flat_index": 100,"reference": 0.2534789474113667,"actual": 0.2553900480270386,"maximum_abs": 0.008724616763036153,"relative_l2": 0.00015758077082653717},
+     "neighborhood.combine.bias": {"count": 3,"ratio": 5.382257526684534,"flat_index": 73,"reference": -0.4765588304626416,"actual": -0.4702262878417969,"maximum_abs": 0.018278383572294388,"relative_l2": 1.747938214371949e-05},
+     "vis_layers.4.dk_proj.weight": {"count": 12,"ratio": 2.912490325531907,"flat_index": 13962,"reference": 0.24208459443264507,"actual": 0.23934078216552734,"maximum_abs": 0.0057440943095841135,"relative_l2": 8.87271375243173e-05},
+     "vis_layers.4.s_proj.weight": {"count": 14,"ratio": 1.7418724553597447,"flat_index": 300,"reference": 0.017130210915254684,"actual": 0.015881061553955078,"maximum_abs": 0.02084677401983015,"relative_l2": 0.0001479222627458408},
+     "vis_layers.0.q_proj.weight": {"count": 219,"ratio": 4.91849157738303,"flat_index": 9610,"reference": -0.30216082356655366,"actual": -0.2972317039966583,"maximum_abs": 0.019086994779144106,"relative_l2": 0.00015134581463010642},
+     "vis_layers.1.dk_proj.weight": {"count": 59,"ratio": 5.278816685586087,"flat_index": 14624,"reference": -0.012146803078085355,"actual": -0.015906095504760742,"maximum_abs": 0.04238478387054556,"relative_l2": 0.00014420074456301566},
+     "edge_embedding.edge_proj.weight": {"count": 66,"ratio": 18.94268709119885,"flat_index": 1814,"reference": 0.13466470959424992,"actual": 0.15047550201416016,"maximum_abs": 0.0633492605464312,"relative_l2": 0.00015696443529454964},
+     "vis_layers.0.s_proj.bias": {"count": 1,"ratio": 10.892527538480744,"flat_index": 140,"reference": 1429.2593432044498,"actual": 1413.6834716796875,"maximum_abs": 297.3666905144928,"relative_l2": 2.394727830814415e-05},
+     "vis_layers.2.o_proj.bias": {"count": 1,"ratio": 1.7155526128508336,"flat_index": 16,"reference": 50797.57944147585,"actual": 50884.7265625,"maximum_abs": 87.14712102415069,"relative_l2": 1.8186742433795088e-05},
+     "edge_embedding.edge_proj.bias": {"count": 4,"ratio": 4.053041409088388,"flat_index": 13,"reference": 1.8999381391166423,"actual": 1.8894004821777344,"maximum_abs": 0.08179691436237135,"relative_l2": 0.00015481547198810457},
+     "vis_layers.4.s_proj.bias": {"count": 2,"ratio": 3.888780400486779,"flat_index": 155,"reference": 16628.409141205877,"actual": 16563.7421875,"maximum_abs": 261.22942962730303,"relative_l2": 2.077047941929824e-05},
+     "neighborhood.combine.weight": {"count": 334,"ratio": 15.28935995984893,"flat_index": 19289,"reference": -0.1893880064433322,"actual": -0.17578983306884766,"maximum_abs": 0.04844577945391393,"relative_l2": 2.8286530632377654e-05},
+     "vis_layers.3.v_proj.weight": {"count": 8,"ratio": 1.3801036606783224,"flat_index": 9804,"reference": -0.007546924160564301,"actual": -0.006570436060428619,"maximum_abs": 0.006628353351317173,"relative_l2": 0.00012645449935448286},
+     "long_rbf_proj.bias": {"count": 1,"ratio": 1.1724784576947875,"flat_index": 75,"reference": 1.0181769209035627,"actual": 1.016162395477295,"maximum_abs": 0.0029484158195600685,"relative_l2": 3.773408904367895e-06},
+     "vis_layers.0.layernorm.bias": {"count": 3,"ratio": 1.4372663484246604,"flat_index": 20,"reference": 0.4527457079487984,"actual": 0.45108890533447266,"maximum_abs": 0.004242371387963573,"relative_l2": 0.0001386062715039241},
+     "vis_layers.3.dv_proj.bias": {"count": 1,"ratio": 1.1202084013875866,"flat_index": 55,"reference": 1.2907681195218161,"actual": 1.292998194694519,"maximum_abs": 0.017637929807179376,"relative_l2": 0.00012511237559797138},
+     "vis_layers.4.v_proj.weight": {"count": 62,"ratio": 3.681765990426824,"flat_index": 3546,"reference": -0.007879783560086106,"actual": -0.005273535847663879,"maximum_abs": 0.006322983248082892,"relative_l2": 0.0001428713900999428},
+     "vis_layers.4.o_proj.bias": {"count": 1,"ratio": 1.0954708253347778,"flat_index": 107,"reference": 983.2610276236281,"actual": 984.3389282226562,"maximum_abs": 17.93100104224868,"relative_l2": 1.1938864804612987e-05},
+     "vis_layers.2.layernorm.weight": {"count": 2,"ratio": 1.9050115739616378,"flat_index": 20,"reference": 0.07749876527342667,"actual": 0.07897990942001343,"maximum_abs": 0.007555470227110561,"relative_l2": 0.00014370799446547898},
+     "vis_layers.3.o_proj.weight": {"count": 13,"ratio": 1.8371738494446879,"flat_index": 6654,"reference": 0.38461059847011536,"actual": 0.3826179802417755,"maximum_abs": 0.020642229629117992,"relative_l2": 0.0001103420606922308},
+     "vis_layers.3.s_proj.weight": {"count": 18,"ratio": 2.884879187645756,"flat_index": 22997,"reference": 0.18133985628600502,"actual": 0.18388241529464722,"maximum_abs": 0.03769853001119827,"relative_l2": 0.0001541185606407325},
+     "vis_layers.3.layernorm.weight": {"count": 1,"ratio": 1.8190433027960362,"flat_index": 6,"reference": -0.2335796693139655,"actual": -0.23527789115905762,"maximum_abs": 0.003567758959263756,"relative_l2": 0.00013137068998440626},
+     "vis_layers.0.layernorm.weight": {"count": 6,"ratio": 1.630817421713896,"flat_index": 5,"reference": -0.19770710370319367,"actual": -0.19624310731887817,"maximum_abs": 0.005296235634766333,"relative_l2": 0.00014179878184134102},
+     "vis_layers.1.dv_proj.bias": {"count": 8,"ratio": 8.032786919815637,"flat_index": 57,"reference": 0.34262275554436705,"actual": 0.3342475891113281,"maximum_abs": 0.04489420584147297,"relative_l2": 0.0001390176362082291},
+     "vis_layers.5.dv_proj.bias": {"count": 1,"ratio": 1.5766723337157473,"flat_index": 46,"reference": -0.9542562766113193,"actual": -0.9516480565071106,"maximum_abs": 0.005079273286060726,"relative_l2": 7.916719357400479e-05},
+     "vis_layers.5.s_proj.bias": {"count": 4,"ratio": 12.03153912622583,"flat_index": 97,"reference": 42.755725195180666,"actual": 43.278564453125,"maximum_abs": 260.6295257897582,"relative_l2": 1.9612520699319973e-05},
+     "vis_layers.1.o_proj.bias": {"count": 1,"ratio": 1.5555417166822194,"flat_index": 38,"reference": 43703.05723630683,"actual": 43635.07421875,"maximum_abs": 67.98301755682769,"relative_l2": 1.9853941809387048e-05},
+     "vis_layers.4.q_proj.bias": {"count": 1,"ratio": 1.7302589206540497,"flat_index": 34,"reference": -0.014676434367608904,"actual": -0.015913009643554688,"maximum_abs": 0.0012365752759457838,"relative_l2": 8.50926795004907e-05},
+     "vis_layers.1.layernorm.bias": {"count": 5,"ratio": 3.4710906122584864,"flat_index": 52,"reference": -0.09226523361281025,"actual": -0.08951520919799805,"maximum_abs": 0.004699313572245956,"relative_l2": 0.00012869271774538563},
+     "vis_layers.2.layernorm.bias": {"count": 6,"ratio": 2.904391738925028,"flat_index": 26,"reference": 0.02773025956704056,"actual": 0.02561664581298828,"maximum_abs": 0.005591707433385551,"relative_l2": 0.0001673159585021329},
+     "neighborhood.distance_proj.weight": {"count": 12,"ratio": 4.443596512254808,"flat_index": 4114,"reference": -1.063910819911869,"actual": -1.05607271194458,"maximum_abs": 0.016811494212461753,"relative_l2": 3.6992876028132496e-05},
+     "vis_layers.5.s_proj.weight": {"count": 6,"ratio": 1.5577019376592236,"flat_index": 27086,"reference": 1.2536801525714372,"actual": 1.256723403930664,"maximum_abs": 0.01659014754540067,"relative_l2": 0.00010519484828265858},
+     "vis_layers.1.dv_proj.weight": {"count": 66,"ratio": 3.5543644397090017,"flat_index": 14682,"reference": 1.9153818286479107,"actual": 1.924677848815918,"maximum_abs": 0.052494485919169165,"relative_l2": 0.00016276797521281276},
+     "vis_layers.0.s_proj.weight": {"count": 95,"ratio": 8.320554911327338,"flat_index": 19695,"reference": -1.3210732477747777,"actual": -1.304256796836853,"maximum_abs": 0.03798048298193635,"relative_l2": 0.0001462843602823044},
+     "vis_layers.0.dv_proj.weight": {"count": 121,"ratio": 5.638011503876588,"flat_index": 3082,"reference": 0.00378880030471751,"actual": 0.00775676965713501,"maximum_abs": 0.019832228891914383,"relative_l2": 0.00015928858074932826},
+     "vis_layers.1.v_proj.bias": {"count": 1,"ratio": 1.341715070170647,"flat_index": 125,"reference": -0.44913788877370653,"actual": -0.44759607315063477,"maximum_abs": 0.006720953166897914,"relative_l2": 0.00016981295438765016},
+     "vis_layers.4.dk_proj.bias": {"count": 5,"ratio": 2.0325865514756662,"flat_index": 106,"reference": -0.06232748989981052,"actual": -0.06387698650360107,"maximum_abs": 0.006840029132703762,"relative_l2": 9.489376926153121e-05}
+    }
+   },
+   "job": "6339007",
+   "directed_pairs": 12160,
+   "model_module_verified": ".refactor/worktrees/baseline/enerzyme/models/ff.py",
+   "identical_order_precision": "float32",
+   "changed_norm_extrema": {"repeat": {"different_minima": 0,"different_maxima": 0},"permuted": {"different_minima": 0,"different_maxima": 0},"fp64": {"different_minima": 0,"different_maxima": 0}},
+   "highest_single_molecule_absolute_gradient_delta": {
+    "molecule": 20,
+    "max_abs_parameter": "vis_layers.0.s_proj.bias",
+    "max_abs_delta": 302.5718426585081,
+    "max_ratio": 14.26617909505698,
+    "outside_elements": 137,
+    "fields": {"Fa": {"maximum_abs": 1.0043681317489783e-05,"ratio": 0.028438245993580528},"E": {"maximum_abs": 1.750518419552094e-06,"ratio": 0.0014504672949587048}}
+   },
+   "individual_molecules": [
+    {
+     "molecule": 0,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.7974752816271575,
+     "max_ratio": 20.762216363050946,
+     "outside_elements": 850,
+     "fields": {"Fa": {"maximum_abs": 1.2709969091417861e-05,"ratio": 0.01977725642727288},"E": {"maximum_abs": 2.1409502917180134e-06,"ratio": 0.0005551014007491402}}
+    },
+    {
+     "molecule": 1,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.10022815625484327,
+     "max_ratio": 6.588972548501708,
+     "outside_elements": 32,
+     "fields": {"Fa": {"maximum_abs": 2.5801059280183836e-06,"ratio": 0.006144669699783589},"E": {"maximum_abs": 1.4921265902856362e-06,"ratio": 0.000658012059141304}}
+    },
+    {
+     "molecule": 2,
+     "max_abs_parameter": "vis_layers.1.s_proj.bias",
+     "max_abs_delta": 0.6080701285545729,
+     "max_ratio": 6.2253840416131965,
+     "outside_elements": 126,
+     "fields": {"Fa": {"maximum_abs": 4.682045129600354e-06,"ratio": 0.009750861831073656},"E": {"maximum_abs": 5.547176424869349e-07,"ratio": 0.0003000621926641159}}
+    },
+    {
+     "molecule": 3,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.2973300908188321,
+     "max_ratio": 7.447694059181791,
+     "outside_elements": 27,
+     "fields": {"Fa": {"maximum_abs": 3.447295335079481e-06,"ratio": 0.006786702740320913},"E": {"maximum_abs": 2.072743122027987e-06,"ratio": 0.0027205267661394895}}
+    },
+    {
+     "molecule": 4,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.39247884205451555,
+     "max_ratio": 12.601863938998548,
+     "outside_elements": 323,
+     "fields": {"Fa": {"maximum_abs": 4.926699106116983e-05,"ratio": 0.13458794068144198},"E": {"maximum_abs": 3.948165261391523e-07,"ratio": 0.0002283352032339629}}
+    },
+    {
+     "molecule": 5,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.024672186977795718,
+     "max_ratio": 1.285315994078314,
+     "outside_elements": 1,
+     "fields": {"Fa": {"maximum_abs": 1.227811346315999e-06,"ratio": 0.003069202908506345},"E": {"maximum_abs": 1.6687283803662467e-06,"ratio": 0.0007003787195773816}}
+    },
+    {
+     "molecule": 6,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 16.509125129086897,
+     "max_ratio": 3.168880444782039,
+     "outside_elements": 6,
+     "fields": {"Fa": {"maximum_abs": 2.6456789549711424e-06,"ratio": 0.007832946483371864},"E": {"maximum_abs": 2.759126015661195e-06,"ratio": 0.0016399991136818088}}
+    },
+    {
+     "molecule": 7,
+     "max_abs_parameter": "vis_layers.1.s_proj.bias",
+     "max_abs_delta": 0.03275163210764731,
+     "max_ratio": 15.622222682351142,
+     "outside_elements": 9,
+     "fields": {"Fa": {"maximum_abs": 2.1547088654705338e-06,"ratio": 0.007142925261311607},"E": {"maximum_abs": 4.4802123433385077e-07,"ratio": 0.00031502525580880955}}
+    },
+    {
+     "molecule": 8,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.2935278392683358,
+     "max_ratio": 5.9703111412502645,
+     "outside_elements": 45,
+     "fields": {"Fa": {"maximum_abs": 2.1952822832904673e-06,"ratio": 0.0045301588909655325},"E": {"maximum_abs": 7.743405472382392e-07,"ratio": 0.00028516973795149006}}
+    },
+    {
+     "molecule": 9,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.08837226943342102,
+     "max_ratio": 8.203820845480935,
+     "outside_elements": 6,
+     "fields": {"Fa": {"maximum_abs": 3.179624127380709e-06,"ratio": 0.007219697475954973},"E": {"maximum_abs": 6.031610038093049e-07,"ratio": 0.00033140968204277497}}
+    },
+    {
+     "molecule": 10,
+     "max_abs_parameter": "vis_layers.1.s_proj.bias",
+     "max_abs_delta": 0.05338241970071067,
+     "max_ratio": 5.063542380001898,
+     "outside_elements": 18,
+     "fields": {"Fa": {"maximum_abs": 2.4352124059490166e-06,"ratio": 0.004248557305189883},"E": {"maximum_abs": 4.74116765225574e-06,"ratio": 0.0035859850572931796}}
+    },
+    {
+     "molecule": 11,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.09147673755137475,
+     "max_ratio": 5.990400777137814,
+     "outside_elements": 13,
+     "fields": {"Fa": {"maximum_abs": 4.266808330433136e-06,"ratio": 0.00974748332588368},"E": {"maximum_abs": 9.765741877387768e-07,"ratio": 0.00036843187961470893}}
+    },
+    {
+     "molecule": 12,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.027219098365392824,
+     "max_ratio": 3.205049132471118,
+     "outside_elements": 6,
+     "fields": {"Fa": {"maximum_abs": 2.2537040139658515e-06,"ratio": 0.005113861536609589},"E": {"maximum_abs": 2.6295337156589937e-06,"ratio": 0.002213303864196979}}
+    },
+    {
+     "molecule": 13,
+     "max_abs_parameter": "vis_layers.2.s_proj.bias",
+     "max_abs_delta": 0.28476058661090065,
+     "max_ratio": 5.830986180741884,
+     "outside_elements": 11,
+     "fields": {"Fa": {"maximum_abs": 2.851464364850287e-06,"ratio": 0.007491435650754388},"E": {"maximum_abs": 2.032522329109554e-06,"ratio": 0.0016155655826296234}}
+    },
+    {
+     "molecule": 14,
+     "max_abs_parameter": "vis_layers.5.s_proj.bias",
+     "max_abs_delta": 0.9199477134770859,
+     "max_ratio": 8.26737332603535,
+     "outside_elements": 1033,
+     "fields": {"Fa": {"maximum_abs": 3.0269169482566305e-06,"ratio": 0.008533700259046142},"E": {"maximum_abs": 1.2892008514064912e-06,"ratio": 0.0020659529382427}}
+    },
+    {
+     "molecule": 15,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.017961868597240027,
+     "max_ratio": 11.475443574184089,
+     "outside_elements": 9,
+     "fields": {"Fa": {"maximum_abs": 5.363068565578111e-06,"ratio": 0.011537040427514385},"E": {"maximum_abs": 1.8229979383832529e-06,"ratio": 0.0010415108644110907}}
+    },
+    {
+     "molecule": 16,
+     "max_abs_parameter": "vis_layers.3.s_proj.bias",
+     "max_abs_delta": 0.1553738580701065,
+     "max_ratio": 10.846391325241429,
+     "outside_elements": 16,
+     "fields": {"Fa": {"maximum_abs": 2.365274526905381e-06,"ratio": 0.005598518683277356},"E": {"maximum_abs": 2.779107167061312e-06,"ratio": 0.0019748171943050137}}
+    },
+    {
+     "molecule": 17,
+     "max_abs_parameter": "vis_layers.5.s_proj.bias",
+     "max_abs_delta": 0.011642661146595401,
+     "max_ratio": 1.449619049864388,
+     "outside_elements": 2,
+     "fields": {"Fa": {"maximum_abs": 2.1382688463467137e-06,"ratio": 0.00671121218477696},"E": {"maximum_abs": 9.536816953925609e-07,"ratio": 0.000345249184408195}}
+    },
+    {
+     "molecule": 18,
+     "max_abs_parameter": "vis_layers.5.s_proj.bias",
+     "max_abs_delta": 0.18365111747084484,
+     "max_ratio": 24.05811260196343,
+     "outside_elements": 142,
+     "fields": {"Fa": {"maximum_abs": 1.5543668714201875e-05,"ratio": 0.04904533601041512},"E": {"maximum_abs": 1.520865872350896e-06,"ratio": 0.0006508690525960213}}
+    },
+    {
+     "molecule": 19,
+     "max_abs_parameter": "vis_layers.2.s_proj.bias",
+     "max_abs_delta": 0.020226346259903494,
+     "max_ratio": 2.9007828699322564,
+     "outside_elements": 6,
+     "fields": {"Fa": {"maximum_abs": 8.691541357630506e-06,"ratio": 0.02738665988778139},"E": {"maximum_abs": 1.6990290907514805e-06,"ratio": 0.0007484820352360796}}
+    },
+    {
+     "molecule": 20,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 302.5718426585081,
+     "max_ratio": 14.26617909505698,
+     "outside_elements": 137,
+     "fields": {"Fa": {"maximum_abs": 1.0043681317489783e-05,"ratio": 0.028438245993580528},"E": {"maximum_abs": 1.750518419552094e-06,"ratio": 0.0014504672949587048}}
+    },
+    {
+     "molecule": 21,
+     "max_abs_parameter": "vis_layers.3.s_proj.bias",
+     "max_abs_delta": 0.05224362902779944,
+     "max_ratio": 1.9931997071707215,
+     "outside_elements": 10,
+     "fields": {"Fa": {"maximum_abs": 3.1918780119544188e-06,"ratio": 0.008168511295753801},"E": {"maximum_abs": 7.874162353260772e-07,"ratio": 0.0005100414064914982}}
+    },
+    {
+     "molecule": 22,
+     "max_abs_parameter": "pre_sequence.2.means",
+     "max_abs_delta": 0.8699453470899243,
+     "max_ratio": 53.13753973005553,
+     "outside_elements": 702,
+     "fields": {"Fa": {"maximum_abs": 4.4736216283758345e-05,"ratio": 0.0936936084776197},"E": {"maximum_abs": 1.23257153461509e-06,"ratio": 0.0007910433065104895}}
+    },
+    {
+     "molecule": 23,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.07638470529172992,
+     "max_ratio": 1.0035098521126193,
+     "outside_elements": 1,
+     "fields": {"Fa": {"maximum_abs": 4.2250129284049365e-06,"ratio": 0.00972939847835285},"E": {"maximum_abs": 1.5232085850414023e-06,"ratio": 0.0007361455350029992}}
+    },
+    {
+     "molecule": 24,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.05132053457140273,
+     "max_ratio": 8.986699636976107,
+     "outside_elements": 9,
+     "fields": {"Fa": {"maximum_abs": 2.5809367680817985e-06,"ratio": 0.004420675835034669},"E": {"maximum_abs": 4.3577047281750936e-07,"ratio": 0.0011212182777633382}}
+    },
+    {
+     "molecule": 25,
+     "max_abs_parameter": "vis_layers.1.s_proj.bias",
+     "max_abs_delta": 0.054218548003234446,
+     "max_ratio": 4.2632110575522795,
+     "outside_elements": 3,
+     "fields": {"Fa": {"maximum_abs": 3.7000573380602253e-06,"ratio": 0.011816848245867253},"E": {"maximum_abs": 2.4661007163029325e-06,"ratio": 0.005698851367052794}}
+    },
+    {
+     "molecule": 26,
+     "max_abs_parameter": "vis_layers.4.s_proj.bias",
+     "max_abs_delta": 0.025067708538358602,
+     "max_ratio": 2.467656909592272,
+     "outside_elements": 2,
+     "fields": {"Fa": {"maximum_abs": 1.7377192162992827e-06,"ratio": 0.004539131640858606},"E": {"maximum_abs": 7.472007190756358e-07,"ratio": 0.0004958176852688059}}
+    },
+    {
+     "molecule": 27,
+     "max_abs_parameter": "vis_layers.5.s_proj.bias",
+     "max_abs_delta": 0.01521482312318767,
+     "max_ratio": 2.206058429484071,
+     "outside_elements": 3,
+     "fields": {"Fa": {"maximum_abs": 1.3320009924697174e-06,"ratio": 0.0041907876887490305},"E": {"maximum_abs": 1.700026340145655e-06,"ratio": 0.0013037723020780654}}
+    },
+    {
+     "molecule": 28,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.3498122573347473,
+     "max_ratio": 3.9225768069676663,
+     "outside_elements": 29,
+     "fields": {"Fa": {"maximum_abs": 7.756747854692492e-06,"ratio": 0.010884371319873784},"E": {"maximum_abs": 9.148240183165512e-07,"ratio": 0.0004537217601503833}}
+    },
+    {
+     "molecule": 29,
+     "max_abs_parameter": "vis_layers.5.s_proj.bias",
+     "max_abs_delta": 0.05499062795831833,
+     "max_ratio": 3.378335130225964,
+     "outside_elements": 29,
+     "fields": {"Fa": {"maximum_abs": 8.334233213391773e-06,"ratio": 0.027674578231359766},"E": {"maximum_abs": 1.6636874233810772e-07,"ratio": 0.00017656829577013562}}
+    },
+    {
+     "molecule": 30,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.04316806901775294,
+     "max_ratio": 2.5555210026253126,
+     "outside_elements": 2,
+     "fields": {"Fa": {"maximum_abs": 2.7713601688794665e-06,"ratio": 0.00826299780006056},"E": {"maximum_abs": 6.617213896831231e-07,"ratio": 0.0003200452036472481}}
+    },
+    {
+     "molecule": 31,
+     "max_abs_parameter": "vis_layers.0.s_proj.bias",
+     "max_abs_delta": 0.05170495658853724,
+     "max_ratio": 2.1094457083697566,
+     "outside_elements": 5,
+     "fields": {"Fa": {"maximum_abs": 4.273144704081133e-06,"ratio": 0.008875442234566957},"E": {"maximum_abs": 1.1184015491494392e-08,"ratio": 6.2460377029796594e-06}}
+    }
+   ]
+  },
+  "bulk_256": {
+   "same_order_native_repeat": {
+    "participating_weights": 182,
+    "different_gradient_presence": [],
+    "weight_tensors_outside": 0,
+    "weight_elements_outside": 0,
+    "maximum_tolerance_ratio": 0.0,
+    "maximum_tensor_relative_l2": 0.0,
+    "E": {"maximum_abs": 0.0,"ratio": 0.0},
+    "Fa": {"maximum_abs": 0.0,"ratio": 0.0},
+    "outside_by_parameter": {}
+   },
+   "upstream_native_changed_edge_order": {
+    "participating_weights": 182,
+    "different_gradient_presence": [],
+    "weight_tensors_outside": 1,
+    "weight_elements_outside": 1,
+    "maximum_tolerance_ratio": 1.5366959728756813,
+    "maximum_tensor_relative_l2": 3.3608574131254937e-06,
+    "E": {"maximum_abs": 3.814697265625e-06,"ratio": 0.0002868945452826174},
+    "Fa": {"maximum_abs": 1.1175870895385742e-06,"ratio": 0.003652667483707505},
+    "outside_by_parameter": {
+     "vis_layers.3.s_proj.bias": {"count": 1,"ratio": 1.5366959728756813,"flat_index": 94,"reference": 0.2333831787109375,"actual": 0.2348175048828125,"maximum_abs": 0.0084228515625,"relative_l2": 2.791052680416485e-06}
+    }
+   },
+   "upstream_native_fp32_vs_fp64": {
+    "participating_weights": 182,
+    "different_gradient_presence": [],
+    "weight_tensors_outside": 2,
+    "weight_elements_outside": 2,
+    "maximum_tolerance_ratio": 1.2985948588774003,
+    "maximum_tensor_relative_l2": 1.373311141543148e-05,
+    "E": {"maximum_abs": 2.8801887026475015e-06,"ratio": 0.00021661233495956416},
+    "Fa": {"maximum_abs": 7.11999162153476e-06,"ratio": 0.021955095394316424},
+    "outside_by_parameter": {
+     "vis_layers.4.s_proj.bias": {"count": 1,"ratio": 1.1035884085732854,"flat_index": 191,"reference": 0.6209939486170732,"actual": 0.6224517822265625,"maximum_abs": 0.008909026776564133,"relative_l2": 5.616567296466277e-06},
+     "vis_layers.4.o_proj.bias": {"count": 1,"ratio": 1.2985948588774003,"flat_index": 11,"reference": -2.4932002046825907,"actual": -2.497346878051758,"maximum_abs": 0.005704766644953452,"relative_l2": 1.1035910121206788e-06}
+    }
+   },
+   "job": "6339008",
+   "directed_pairs": 44466,
+   "model_module_verified": ".refactor/worktrees/baseline/enerzyme/models/ff.py",
+   "identical_order_precision": "float32",
+   "changed_norm_extrema": {"repeat": {"different_minima": 0,"different_maxima": 0},"permuted": {"different_minima": 0,"different_maxima": 0},"fp64": {"different_minima": 0,"different_maxima": 0}}
+  },
+  "large_2000": {
+   "same_order_native_repeat": {
+    "participating_weights": 182,
+    "different_gradient_presence": [],
+    "weight_tensors_outside": 0,
+    "weight_elements_outside": 0,
+    "maximum_tolerance_ratio": 0.0,
+    "maximum_tensor_relative_l2": 0.0,
+    "E": {"maximum_abs": 0.0,"ratio": 0.0},
+    "Fa": {"maximum_abs": 0.0,"ratio": 0.0},
+    "outside_by_parameter": {}
+   },
+   "upstream_native_changed_edge_order": {
+    "participating_weights": 182,
+    "different_gradient_presence": [],
+    "weight_tensors_outside": 1,
+    "weight_elements_outside": 1,
+    "maximum_tolerance_ratio": 1.230734862478307,
+    "maximum_tensor_relative_l2": 2.4693772109491908e-06,
+    "E": {"maximum_abs": 0.0,"ratio": 0.0},
+    "Fa": {"maximum_abs": 2.034008502960205e-06,"ratio": 0.006774958723657039},
+    "outside_by_parameter": {
+     "vis_layers.1.s_proj.bias": {"count": 1,"ratio": 1.230734862478307,"flat_index": 52,"reference": -22.906005859375,"actual": -22.93505859375,"maximum_abs": 0.26171875,"relative_l2": 1.7332041562365077e-06}
+    }
+   },
+   "upstream_native_fp32_vs_fp64": {
+    "participating_weights": 182,
+    "different_gradient_presence": [],
+    "weight_tensors_outside": 30,
+    "weight_elements_outside": 48,
+    "maximum_tolerance_ratio": 9.774694355657301,
+    "maximum_tensor_relative_l2": 1.6056105952166643e-05,
+    "E": {"maximum_abs": 7.38745890203063e-05,"ratio": 0.0006650198461764727},
+    "Fa": {"maximum_abs": 4.225197688839666e-05,"ratio": 0.09963335241107536},
+    "outside_by_parameter": {
+     "vis_layers.0.q_proj.weight": {"count": 1,"ratio": 1.0422538113725215,"flat_index": 15600,"reference": 0.16528691300889703,"actual": 0.16618876159191132,"maximum_abs": 0.0021627894191169617,"relative_l2": 1.3635637426677128e-06},
+     "long_blocks.1.k_proj.weight": {"count": 3,"ratio": 2.472909967338029,"flat_index": 6937,"reference": -0.0865773902052881,"actual": -0.0846322551369667,"maximum_abs": 0.013980665364215383,"relative_l2": 5.976059956789429e-07},
+     "long_blocks.0.mlp_vec.2.bias": {"count": 2,"ratio": 6.095855995544324,"flat_index": 102,"reference": -1.533788975057007,"actual": -1.520172119140625,"maximum_abs": 0.027465216643861368,"relative_l2": 1.3940624178696371e-05},
+     "vis_layers.1.dv_proj.weight": {"count": 1,"ratio": 2.579012323448575,"flat_index": 14976,"reference": -0.35488632343775506,"actual": -0.35216575860977173,"maximum_abs": 0.003029519894511168,"relative_l2": 1.9250539192997012e-06},
+     "vis_layers.1.q_proj.weight": {"count": 1,"ratio": 1.0417526031307685,"flat_index": 5473,"reference": -0.045573027909009536,"actual": -0.04479632526636124,"maximum_abs": 0.005389520185701713,"relative_l2": 2.0294228792071572e-06},
+     "post_sequence.0.head.0.weight": {"count": 4,"ratio": 9.163839589424652,"flat_index": 12289,"reference": 2.1237212775545737,"actual": 2.149597406387329,"maximum_abs": 0.19781132819480263,"relative_l2": 3.642995156934785e-07},
+     "long_blocks.0.v_proj.weight": {"count": 2,"ratio": 1.422107192005677,"flat_index": 5800,"reference": -0.004385205714906313,"actual": -0.003383494447916746,"maximum_abs": 0.019712413766683312,"relative_l2": 4.946262776474433e-07},
+     "long_blocks.0.mlp_pos.2.weight": {"count": 6,"ratio": 3.7548604511039985,"flat_index": 1218,"reference": -0.32893888005972904,"actual": -0.3250753581523895,"maximum_abs": 0.005647881299665869,"relative_l2": 5.406933056507637e-06},
+     "vis_layers.2.k_proj.weight": {"count": 1,"ratio": 1.1270473634370246,"flat_index": 5215,"reference": -0.030134292527902066,"actual": -0.030957188457250595,"maximum_abs": 0.002781774873994891,"relative_l2": 1.7071420511983028e-06},
+     "long_blocks.1.q_proj.weight": {"count": 1,"ratio": 1.2411595587008528,"flat_index": 7941,"reference": 1.4712887296776092,"actual": 1.473983645439148,"maximum_abs": 0.02538495136104757,"relative_l2": 5.69568323680344e-07},
+     "vis_layers.2.q_proj.weight": {"count": 1,"ratio": 1.106654156581914,"flat_index": 8236,"reference": -0.32537380937206023,"actual": -0.3242390751838684,"maximum_abs": 0.004146675087909557,"relative_l2": 2.0471052235932465e-06},
+     "long_blocks.0.mlp_pos.0.weight": {
+      "count": 1,
+      "ratio": 1.2132506840920423,
+      "flat_index": 9515,
+      "reference": -0.002187908468305938,
+      "actual": -0.0013359785079956055,
+      "maximum_abs": 0.0025020791058238956,
+      "relative_l2": 5.403777619408559e-06
+     },
+     "vis_layers.0.s_proj.bias": {"count": 1,"ratio": 3.7004205105741694,"flat_index": 247,"reference": 97.35541544825242,"actual": 97.71826171875,"maximum_abs": 1.5034768249024637,"relative_l2": 6.758019874559988e-06},
+     "vis_layers.1.s_proj.bias": {"count": 2,"ratio": 9.774694355657301,"flat_index": 52,"reference": -23.13902504290627,"actual": -22.906005859375,"maximum_abs": 0.8196416721693822,"relative_l2": 5.612824229573781e-06},
+     "vis_layers.4.s_proj.bias": {"count": 1,"ratio": 1.506064523293936,"flat_index": 89,"reference": -128.78009228279006,"actual": -128.97509765625,"maximum_abs": 0.8368332365062088,"relative_l2": 5.072600514317921e-06},
+     "long_blocks.0.mix.0.weight": {"count": 1,"ratio": 1.067948610929292,"flat_index": 9039,"reference": -0.42858646001967504,"actual": -0.4273811876773834,"maximum_abs": 0.006481350951361264,"relative_l2": 4.3601175778420665e-06},
+     "long_rbf_proj.weight": {"count": 5,"ratio": 1.5927194979796004,"flat_index": 4764,"reference": -2.1261487812195092,"actual": -2.130650043487549,"maximum_abs": 0.020365053496789187,"relative_l2": 5.572739005613109e-07},
+     "vis_layers.0.s_proj.weight": {"count": 1,"ratio": 2.099096812461012,"flat_index": 24160,"reference": 0.4429172802819639,"actual": 0.4453163743019104,"maximum_abs": 0.004865572223991421,"relative_l2": 2.2066475021815716e-06},
+     "vis_layers.0.dv_proj.bias": {"count": 1,"ratio": 1.5383828504316492,"flat_index": 102,"reference": -2.1289552877837394,"actual": -2.124603271484375,"maximum_abs": 0.02243792132139788,"relative_l2": 2.023062559342349e-06},
+     "vis_layers.5.o_proj.bias": {"count": 1,"ratio": 1.4963221991899665,"flat_index": 74,"reference": 76.30052032228241,"actual": 76.185302734375,"maximum_abs": 0.19279475266012014,"relative_l2": 6.445160553900372e-07},
+     "vis_layers.4.k_proj.weight": {"count": 1,"ratio": 1.0136149686727216,"flat_index": 11018,"reference": -2.4842487680630647,"actual": -2.4810211658477783,"maximum_abs": 0.004075657570833613,"relative_l2": 1.492311181786437e-06},
+     "vis_layers.3.dk_proj.bias": {"count": 1,"ratio": 3.3966886921177615,"flat_index": 36,"reference": 0.012324261168608075,"actual": 0.014743804931640625,"maximum_abs": 0.010488070260180393,"relative_l2": 1.7678526621725174e-06},
+     "neighborhood.combine.weight": {"count": 1,"ratio": 1.3754689914019336,"flat_index": 15663,"reference": -3.381468425446087,"actual": -3.3758544921875,"maximum_abs": 0.13441077468451113,"relative_l2": 2.9666776571210697e-07},
+     "vis_layers.2.v_proj.weight": {"count": 1,"ratio": 1.0953232703070659,"flat_index": 6690,"reference": -0.03547847281928283,"actual": -0.03467288613319397,"maximum_abs": 0.003246527144540323,"relative_l2": 1.7452148013909432e-06},
+     "vis_layers.2.dk_proj.weight": {"count": 1,"ratio": 3.4929481147249324,"flat_index": 5760,"reference": -0.14818734359402058,"actual": -0.15115001797676086,"maximum_abs": 0.0030961838684930854,"relative_l2": 1.5740140115104314e-06},
+     "vis_layers.2.s_proj.bias": {"count": 1,"ratio": 1.3267251801689297,"flat_index": 50,"reference": -255.36486214338788,"actual": -255.70458984375,"maximum_abs": 0.8574290928227128,"relative_l2": 5.345200411708961e-06},
+     "long_blocks.0.mix.1.weight": {"count": 2,"ratio": 1.368125420065953,"flat_index": 1268,"reference": 0.7174082846543808,"actual": 0.7193474769592285,"maximum_abs": 0.00289348908393805,"relative_l2": 3.6538966479738046e-06},
+     "edge_embedding.edge_proj.weight": {"count": 1,"ratio": 1.2430691144890538,"flat_index": 4854,"reference": 1.1366622465957676,"actual": 1.1343791484832764,"maximum_abs": 0.011979186010648846,"relative_l2": 1.2874489129653197e-06},
+     "vis_layers.2.s_proj.weight": {"count": 1,"ratio": 2.0406974254609413,"flat_index": 19920,"reference": -0.2747998869630223,"actual": -0.2767891585826874,"maximum_abs": 0.007204691786633077,"relative_l2": 1.8742468165616428e-06},
+     "vis_layers.0.v_proj.weight": {"count": 1,"ratio": 1.9836439707501885,"flat_index": 565,"reference": -0.06465644185241656,"actual": -0.0661732479929924,"maximum_abs": 0.0032916448613704574,"relative_l2": 1.5005095170010522e-06}
+    }
+   },
+   "job": "6339005",
+   "directed_pairs": 247212,
+   "model_module_verified": ".refactor/worktrees/baseline/enerzyme/models/ff.py",
+   "identical_order_precision": "float32",
+   "changed_norm_extrema": {"repeat": {"different_minima": 0,"different_maxima": 0},"permuted": {"different_minima": 0,"different_maxima": 0},"fp64": {"different_minima": 0,"different_maxima": 0}}
+  }
+ },
+ "fragment_assignment_across_precisions": {
+  "small": {
+   "different_canonical_labels": 0,
+   "fp32_groups": 4,
+   "fp64_groups": 4,
+   "short_cutoff_changes": 0,
+   "long_cutoff_changes": 0,
+   "minimum_short_cutoff_margin": 0.17600423857560576,
+   "minimum_long_cutoff_margin": 5.176004238575606
+  },
+  "mol_batch_32x20": {
+   "different_canonical_labels": 0,
+   "fp32_groups": 64,
+   "fp64_groups": 64,
+   "short_cutoff_changes": 0,
+   "long_cutoff_changes": 0,
+   "minimum_short_cutoff_margin": 0.00014333965637192136,
+   "minimum_long_cutoff_margin": 2.026262138108746
+  },
+  "bulk_256": {
+   "different_canonical_labels": 0,
+   "fp32_groups": 11,
+   "fp64_groups": 11,
+   "short_cutoff_changes": 0,
+   "long_cutoff_changes": 0,
+   "minimum_short_cutoff_margin": 1.5718912301565524e-05,
+   "minimum_long_cutoff_margin": 0.0007561684370891442
+  },
+  "large_2000": {
+   "different_canonical_labels": 0,
+   "fp32_groups": 84,
+   "fp64_groups": 84,
+   "short_cutoff_changes": 0,
+   "long_cutoff_changes": 0,
+   "minimum_short_cutoff_margin": 5.8325143452719885e-05,
+   "minimum_long_cutoff_margin": 8.924186590419936e-05
+  }
+ },
+ "distance_to_own_fragment_center": {
+  "small": {"atoms": 9,"fragments": 4,"singleton_distances": [0.0],"smallest_multi": 0.2733234465122223},
+  "mol_batch_32x20": {"atoms": 640,"fragments": 64,"singleton_distances": [],"smallest_multi": 0.502708375453949},
+  "bulk_256": {"atoms": 256,"fragments": 11,"singleton_distances": [],"smallest_multi": 0.5352584719657898},
+  "large_2000": {"atoms": 2000,"fragments": 84,"singleton_distances": [],"smallest_multi": 0.063923180103302}
+ },
+ "matched_frozen_molecule_input": "The first 20-atom molecule of the official 32-molecule batch, with the original frozen checkpoint.",
+ "matched_frozen_molecule": {
+  "source": {
+   "captured_operators": [1097,69],
+   "compiled_vs_own_eager": {"weight_tensors_outside": 8,"weight_elements_outside": 42,"largest_weight_tolerance_ratio": 2.3218,"max_abs_E": 0.0,"max_abs_Fa": 3.4570693969726562e-06,"different_gradient_presence": 0},
+   "candidate_eager_vs_unmodified_eager": {"weight_tensors_outside": 0,"weight_elements_outside": 0,"largest_weight_tolerance_ratio": 0.0,"max_abs_E": 0.0,"max_abs_Fa": 0.0,"different_gradient_presence": 0}
+  },
+  "geomembed": {
+   "captured_operators": [1117,69],
+   "compiled_vs_own_eager": {"weight_tensors_outside": 9,"weight_elements_outside": 89,"largest_weight_tolerance_ratio": 7.7863,"max_abs_E": 9.5367431640625e-07,"max_abs_Fa": 6.318092346191406e-06,"different_gradient_presence": 0},
+   "candidate_eager_vs_unmodified_eager": {
+    "weight_tensors_outside": 39,
+    "weight_elements_outside": 1472,
+    "largest_weight_tolerance_ratio": 21.3839,
+    "max_abs_E": 1.9073486328125e-06,
+    "max_abs_Fa": 1.1563301086425781e-05,
+    "different_gradient_presence": 0
+   }
+  }
+ },
+ "weakly_connected_atom": {
+  "source": "1aa0f8b",
+  "system": "mol_batch_32x20",
+  "molecule_index": 20,
+  "local_atom_index": 17,
+  "nonself_neighbors_inside_four_angstrom_cutoff": 2,
+  "neighbor_distances_angstrom": [3.805007219314575,3.909113883972168],
+  "span_after_first_short_block": 4.109865743477982e-09,
+  "smallest_span_across_640_atoms": 4.109865743477982e-09,
+  "inverse_span": 243316950.58090827,
+  "ordinary_compiled_training": {
+   "captured_operators": [1097,69],
+   "compiled_vs_own_eager": {
+    "weight_tensors_outside": 8,
+    "weight_elements_outside": 16,
+    "largest_weight_tolerance_ratio": 2.947,
+    "max_abs_E": 7.152557373046875e-07,
+    "max_abs_Fa": 2.5033950805664062e-06,
+    "different_gradient_presence": 0
+   },
+   "affected_weights": {
+    "embed.neighborhood.combine.weight": {"index": 13122,"bad": 1,"ratio": 1.138553345658029,"max_abs": 0.0020837783813476562,"reference": -0.5314051508903503,"actual": -0.5300031304359436},
+    "embed.edge_embedding.edge_proj.weight": {"index": 5107,"bad": 6,"ratio": 1.7901118782220367,"max_abs": 0.0018976926803588867,"reference": -0.053880877792835236,"actual": -0.055230408906936646},
+    "blocks.2.module.dk_proj.bias": {"index": 59,"bad": 1,"ratio": 1.1788833950383624,"max_abs": 0.0028990507125854492,"reference": 1.7591496706008911,"actual": 1.7620487213134766},
+    "blocks.2.module.dv_proj.weight": {"index": 6462,"bad": 2,"ratio": 1.3217002409801997,"max_abs": 0.0011835098266601562,"reference": -0.04940696060657501,"actual": -0.05039745196700096},
+    "blocks.2.module.dv_proj.bias": {"index": 50,"bad": 1,"ratio": 2.6063189020427253,"max_abs": 0.0026868879795074463,"reference": 0.3309129774570465,"actual": 0.32822608947753906},
+    "blocks.2.module.s_proj.bias": {"index": 44,"bad": 3,"ratio": 2.9469876633104706,"max_abs": 83.75,"reference": -677.524169921875,"actual": -679.5228881835938},
+    "blocks.3.module.s_proj.bias": {"index": 65,"bad": 1,"ratio": 2.0750811463333343,"max_abs": 80.875,"reference": 368.58502197265625,"actual": 367.8187255859375},
+    "blocks.5.module.dv_proj.bias": {"index": 44,"bad": 1,"ratio": 1.4727229443409435,"max_abs": 0.0023560523986816406,"reference": 0.2981710135936737,"actual": 0.29964104294776917}
+   }
+  }
+ },
+ "pre_refactor_v100_repeated_eager_fields": {
+  "method": "Read saved eager E/F from the original 1aa0f8b on three different V100 devices with identical weights, seeds, edge order and positions. The files contain no weight gradients.",
+  "comparisons": [
+   {
+    "jobs": ["6327915","6318185"],
+    "cards": ["GPU-34f059c2-96ad-b500-81b4-48607e7bcca1","GPU-2c6a0c04-8630-be10-f0e0-b467c595f452"],
+    "max_abs": {
+     "mol_batch_32x20": {"E": 2.86102294921875e-06,"Fa": 2.5331974029541016e-06},
+     "bulk_256": {"E": 3.814697265625e-06,"Fa": 7.353723049163818e-06},
+     "large_2000": {"E": 3.0517578125e-05,"Fa": 0.00010421872138977051}
+    }
+   },
+   {
+    "jobs": ["6327915","6318565"],
+    "cards": ["GPU-34f059c2-96ad-b500-81b4-48607e7bcca1","GPU-590cd023-ff31-c1a2-8267-e0afba042725"],
+    "max_abs": {
+     "mol_batch_32x20": {"E": 1.9073486328125e-06,"Fa": 4.649162292480469e-06},
+     "bulk_256": {"E": 3.814697265625e-06,"Fa": 4.908069968223572e-06},
+     "large_2000": {"E": 3.0517578125e-05,"Fa": 8.910894393920898e-05}
+    }
+   },
+   {
+    "jobs": ["6318185","6318565"],
+    "cards": ["GPU-2c6a0c04-8630-be10-f0e0-b467c595f452","GPU-590cd023-ff31-c1a2-8267-e0afba042725"],
+    "max_abs": {"mol_batch_32x20": {"E": 2.86102294921875e-06,"Fa": 5.424022674560547e-06},"bulk_256": {"E": 0.0,"Fa": 7.845461368560791e-06},"large_2000": {"E": 0.0,"Fa": 8.048862218856812e-05}}
+   }
+  ]
+ },
+ "guidance": {
+  "verified_precision": "Float64 parameters and coordinates preserve the published max–min normalization, cutoffs, layer shapes, parameter ordering and absent gradients. The fixed 81620f7 V100 archive passed the float64 energy, forces and 182 participating derivatives for all three acceptance systems.",
+  "v100_reference": "test/fixtures/bench_gpu/raw_compile_v100.json (ViSNet-LSRM/float64, jobs 6324953 and 6327915)",
+  "fp32_status": "FP32 eager/compiled force-loss weight comparisons remain outside the strict per-element tolerance. A conditional change to the model equations or to the optimizer gradient mask is unsupported by the same-source controls."
+ },
+ "interpretation": "The affected channels receive real derivatives. Large terms of opposite sign reach these channels through differentiating the forces. The wide final bias additions make little difference in matched eager/compiled comparisons."
+}

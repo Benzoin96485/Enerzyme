@@ -3,6 +3,7 @@
  "device": "cpu",
  "method": "One eager and one ordinary Inductor force-loss backward on the same published preset weights. Atoms 5 + 4, coordinate seed 107, initialization seed 142, loss E.square().sum() + Fa.square().sum(). The output tolerance was atol/rtol 3e-4. Parameter tensors used atol 7e-4 and rtol 1e-3. A missing gradient counted as numerical zero when comparing values. Presence is also reported for the corrected edge preset runs.",
  "precision_control": "The same initialized weights and coordinates were used across precisions. Stochastic dropout was disabled in this comparison. The elementwise failure count here includes energies, forces and parameter gradients. Empty or absent auxiliary gradients are excluded from relative-L2 comparisons in the precision reference runs.",
+ "lsrm_fp32_detailed_controls": "lsrm_fp32_force_gradients.json",
  "precision_control_revisions": {
   "alphanet": "ca4e604",
   "quinnet": "ca4e604",
