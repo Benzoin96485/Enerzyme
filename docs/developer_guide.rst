@@ -324,7 +324,14 @@ runs. The latter also checked tensor shapes, dtypes and finiteness throughout.
 In its training sweep, 77 cases passed with learned operators captured, 25
 matched through native gradients, and 14 had a numerical or gradient-participation
 mismatch. The earlier training sweep recorded 77, 24 and 15 respectively.
-Later model-specific checks identify their own code revision.
+The full training sweep at :code:`882b187` recorded 86 compiled matches, 25
+matches with native gradients, and five numerical mismatches. Gradient
+participation matched eager in all 116 cases. The per-parameter errors appear
+in :code:`test/fixtures/validation/compiled_training_882b187_cpu.json`.
+After the Bessel product fix at :code:`2e21446`, DimeNet++ passed in both
+precisions on the same batch. DimeNet still exceeded tolerance in both.
+The separate frozen-weight checks and timing controls appear in
+:code:`test/fixtures/bench_gpu/dimenet_bessel_product_order.json`.
 
 The second command prepares the batch's discrete neighbors before compiling
 the graph that returns energy and forces for the loss. On CHGNet this leaves
