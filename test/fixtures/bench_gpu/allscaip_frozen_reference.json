@@ -167,5 +167,153 @@
     "mixed_float_double": "Old graph preprocessing casts positions to float32 in a float64 model, leading to a Float/Double matmul error.",
     "candidate_eager_missing": "The candidate eager worker did not return this output."
   },
-  "interpretation": "No default baseline invocation produced a matched reference. Clone-on-write enabled both nonperiodic float32 shapes in inference and training-forward mode. All four matching E and Fa tensors are zero on these initialized weights. The comparison does not measure trained nonzero outputs, weight gradients or performance. It does not change default acceptance counts."
+  "interpretation": "No default baseline invocation produced a matched reference. Clone-on-write enabled both nonperiodic float32 shapes in inference and training-forward mode. All four matching E and Fa tensors are zero on these initialized weights. The comparison does not measure trained nonzero outputs, weight gradients or performance. It does not change default acceptance counts.",
+  "adapted_cpu_controls": {
+    "scope": "Supplemental CPU numerical controls for the pinned AllScAIP implementations. Original baseline results and V100 acceptance statuses above retain their original classification.",
+    "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+    "candidate": "2a3b02436feeafdaa9d170ca19510c657135c784",
+    "device": "cpu",
+    "torch": "2.13.0+cu126",
+    "threads": 2,
+    "jobs": {
+      "paired_frozen_and_probes": [
+        "6339161",
+        "6339162"
+      ],
+      "finite_differences": "6339170",
+      "fairchem_attention": "6339186",
+      "attention_scale_control": "6339196"
+    },
+    "archive": ".refactor/bench/allscaip-adapted-2a3b024",
+    "comparison_sha256": "2bd41d9d4de4fce8398d510d72bcfeaf14b7a71e537e2ee42fee33f1a8655ef6",
+    "reproduction": {
+      "driver": {
+        "file": ".refactor/tools/allscaip-adapted-reference.py",
+        "sha256": "8a541f8f463d28ee608576a5513cf1620abf67fd5b8916585fb4486f8a113592"
+      },
+      "upstream_driver": {
+        "file": ".refactor/bench/allscaip-adapted-2a3b024/fairchem-attention-unmodified-driver.py",
+        "sha256": "94be417542c41bbb8d7fd677f4bae6829dfa3174d73d9f5f15faefe3ec531466"
+      },
+      "upstream_scale_control_driver": {
+        "file": ".refactor/tools/allscaip-fairchem-attention.py",
+        "sha256": "2adf36390aa9d9a1237b7bdc1372b7b3d4e07f8a163390ff9e626f557dd495a4"
+      },
+      "finite_difference_driver": {
+        "file": ".refactor/tools/allscaip-adapted-derivatives.py",
+        "sha256": "0b97b9a00cd34f69d5e091a7cef094f909749e15d861f9953336e1e5c46f0f0e"
+      },
+      "compare": {
+        "file": ".refactor/tools/allscaip-reduce-adapted.py",
+        "sha256": "10f3a34699c4abf67399bd21446466e84c7ce1c7163169782cb61e0aa5e5650d"
+      },
+      "inputs": "The six frozen runs use scripts/bench_cores.py _batch from the same acceptance driver, the presnapshot weights above, and seed 7. The candidate loads remap_snapshot(..., strict matching keys) and uses its ordinary eager CPU forward and backward. Both sides used default PyTorch SDPA.",
+      "parameter_matching": "Apply the allscaip rules in test/presnapshot_maps.py to the old parameter names (input_block -> embed.input_block, graph_blocks -> blocks). Compare every named trainable parameter, including whether its gradient is absent, plus output dtype/shape and finite values.",
+      "gate": "FP32 E/F (atol 3e-4, rtol 3e-4), FP32 gradients (7e-4, 1e-3), FP64 E/F/gradients (1e-10, 1e-8). Loss is sum(E**2) + sum(Fa**2)."
+    },
+    "frozen_source_adaptations": {
+      "all_rows": "Enclose the untouched old differentiable forward and backward in torch.autograd.graph.allow_mutation_on_saved_tensors() to preserve the amax output overwritten by masked_fill_.",
+      "periodic_only": "Supply batch[\"cell\"] to the frozen build_graph_attention_data in place of the core hard-coded cell=None. For bulk_256 the orthorhombic lengths are 20.8, 20.8 and 10.4. Both sides set pbc=True.",
+      "float64_only": "In graph_preprocess.py use float64 for the previously forced float32 position, frequency directions, neighbor mask, attention base mask, logspace frequencies and node padding mask. The old graph, frequency, attention and force formulas are retained."
+    },
+    "zero_readout": {
+      "source": "post_sequence.0.head.output.weight and .bias",
+      "weight_shape": [
+        2,
+        128
+      ],
+      "weight_and_bias_max_abs": 0,
+      "effect": "Both atomic energy and charge are zero. The initial atomic shifts are zero. Thus E, Fa, the squared loss and its 244 active parameter gradients are zero. These rows only verify the frozen initialization."
+    },
+    "frozen_check": {
+      "columns": [
+        "precision",
+        "system",
+        "archived_V100_candidate_E_F_infer",
+        "archived_V100_candidate_E_F_train",
+        "CPU_matching_active_gradients",
+        "CPU_max_gradient_difference"
+      ],
+      "rows": [
+        ["float32", "mol_batch_32x20", "exact", "exact", 244, 0.0],
+        ["float32", "bulk_256", "exact", "exact", 244, 0.0],
+        ["float32", "large_2000", "exact", "exact", 244, 0.0],
+        ["float64", "mol_batch_32x20", "exact", "exact", 244, 0.0],
+        ["float64", "bulk_256", "exact", "exact", 244, 0.0],
+        ["float64", "large_2000", "exact", "unavailable", 244, 0.0]
+      ],
+      "counts": {
+        "adapted_CPU_E_F_rows_exact": 12,
+        "CPU_training_rows_all_gradients_exact": 6,
+        "archived_candidate_GPU_E_F_rows_exact": 11
+      },
+      "V100_scope": "The independent CPU references matched all 11 stored candidate E/F pairs. The 2000-atom FP64 V100 training ran out of memory, so only the CPU result is available there. Per-parameter comparisons here used freshly evaluated CPU tensors on both sides. In the five available V100 training cells, the original candidate report independently found exactly matching compiled and eager gradients (244 active)."
+    },
+    "nonzero_path": {
+      "weights": "Copy the first two rows of the same frozen post_sequence.0.head.stack.stack.0.residual.1.weight into the zero readout matrix. The diagnostic tests the same backbone and energy/charge readout layout with a nonzero response. The probe readout uses untrained weights.",
+      "geometries": "mol_probe contains two random seed-11 molecules of 8 and 12 atoms. bulk_probe uses the bulk acceptance generator with a 4x3x2 grid, 2.6 spacing and seed-11 positional jitter in a periodic 10.4x7.8x5.2 cell.",
+      "upstream": "fairchem 645af7d03e91138ef07e51de387316c9e2e152dc supplied all four NeighborhoodAttention and all four NodeAttention modules (strict state_dict load). Enerzyme supplied the graph, embeddings, feed-forward layers and readout. The complete upstream head and atomic embeddings differ, so this tests the shared attention modules end to end.",
+      "execution_labels": {
+        "cpu": "candidate versus adapted frozen Enerzyme",
+        "fairchem_attention": "candidate versus the unchanged official attention modules",
+        "fairchem_enerzyme_scale": "candidate versus official attention after matching only the neighborhood softmax scale"
+      },
+      "definition_sources": [
+        "docs/developer_guide.rst (AllScAIP-style attention Core)",
+        "Enerzyme 1aa0f8b enerzyme/models/allscaip/base_attention.py::BaseAttention.scaled_dot_product_attention",
+        "fairchem 645af7d src/fairchem/core/models/allscaip/modules/base_attention.py::BaseAttention.scaled_dot_product_attention"
+      ],
+      "scale": "With frequency counts [10,10,12] the padded Q/K width is 104 and V width is 32. Frozen Enerzyme scales attention by 1/sqrt(104). Official fairchem uses 1/sqrt(32). Multiplying only official neighborhood queries by sqrt(32/104) reproduces the frozen scale. Official node attention is unchanged.",
+      "FP64_response_max_abs_E_and_Fa": {
+        "mol_probe": [
+          0.06541025281136958,
+          0.12165374614033535
+        ],
+        "bulk_probe": [
+          1.371286156827006,
+          0.0383316623122771
+        ]
+      },
+      "all_12_comparisons": "244 named parameter gradients active, 207 nonzero for each tested implementation and geometry. Max E/F errors below cover both inference and training. Each gradient measurement covers all tensors.",
+      "columns": [
+        "precision",
+        "system",
+        "comparison",
+        "max_abs_E",
+        "max_abs_Fa",
+        "max_abs_weight_gradient",
+        "out_of_tolerance_gradient_elements"
+      ],
+      "rows": [
+        ["float32", "mol_probe", "cpu", 0.0, 0.0, 0.0, 0],
+        ["float32", "mol_probe", "fairchem_attention", 0.018189333379268646, 0.012107901275157928, 1.0573582649230957, 732883],
+        ["float32", "mol_probe", "fairchem_enerzyme_scale", 6.556510925292969e-07, 1.1175870895385742e-07, 1.806020736694336e-05, 0],
+        ["float32", "bulk_probe", "cpu", 0.0, 4.190951585769653e-08, 1.52587890625e-05, 0],
+        ["float32", "bulk_probe", "fairchem_attention", 0.09418594837188721, 0.00413070572540164, 5.370674133300781, 1102236],
+        ["float32", "bulk_probe", "fairchem_enerzyme_scale", 1.3113021850585938e-06, 5.960464477539063e-08, 6.866455078125e-05, 0],
+        ["float64", "mol_probe", "cpu", 0.0, 0.0, 0.0, 0],
+        ["float64", "mol_probe", "fairchem_attention", 0.018189147284206203, 0.012107877044926725, 1.057356094242928, 1339572],
+        ["float64", "mol_probe", "fairchem_enerzyme_scale", 1.0755285551056204e-15, 2.463307335887066e-16, 1.1879386363489175e-14, 0],
+        ["float64", "bulk_probe", "cpu", 0.0, 7.28583859910259e-17, 1.4210854715202004e-14, 0],
+        ["float64", "bulk_probe", "fairchem_attention", 0.09418550575651685, 0.00413074545072973, 5.3706399069096875, 1339572],
+        ["float64", "bulk_probe", "fairchem_enerzyme_scale", 2.220446049250313e-16, 1.2836953722228372e-16, 1.4210854715202004e-14, 0]
+      ]
+    },
+    "nonzero_fp64_finite_difference": {
+      "method": "For each geometry select the largest-magnitude force component and largest-magnitude final-readout weight derivative of the force-and-energy loss. Centered differences at h=1e-5 independently check d(sum E)/dR = -Fa and d(loss)/dw in both the candidate and adapted frozen implementation.",
+      "columns": [
+        "system",
+        "derivative",
+        "flattened_index",
+        "candidate_autograd",
+        "largest_absolute_centered_difference_error_across_both_models"
+      ],
+      "rows": [
+        ["mol_probe", "force", 28, 0.12165374614033535, 2.2226276374937015e-11],
+        ["mol_probe", "readout_weight", 123, 0.5154210682348661, 1.899369550528718e-12],
+        ["bulk_probe", "force", 0, 0.038331662312277096, 1.2077831790247018e-10],
+        ["bulk_probe", "readout_weight", 10, 43.448795656831486, 8.812151008896763e-11]
+      ]
+    }
+  }
 }
