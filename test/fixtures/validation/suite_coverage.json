@@ -1,10 +1,10 @@
 {
   "cpu": {
-    "revision": "81620f7",
-    "job": "6324950",
-    "test_files_and_shards": 170,
+    "revision": "2a3b024",
+    "job": "6333817",
+    "test_files_and_shards": 171,
     "results": {
-      "passed": 1638,
+      "passed": 1643,
       "skipped": 63,
       "errors": 0,
       "failures": 0
@@ -22,8 +22,8 @@
     }
   },
   "cuda": {
-    "revision": "81620f7",
-    "job": "6325031",
+    "revision": "2a3b024",
+    "job": "6334531",
     "device": "Tesla V100-PCIE-32GB (sm70)",
     "pytest_files": [
       "test/test_e2former_triton_parity.py",
@@ -57,10 +57,10 @@
   },
   "notes": "The runs use the recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run.",
   "wheel": {
-    "revision": "81620f7",
-    "job": "6324951",
+    "revision": "2a3b024",
+    "job": "6333818",
     "filename": "enerzyme-0.6.0-py3-none-any.whl",
-    "sha256": "75a50c3260005e28ecca53061f039dffef679dde1de450cc0922a89caf9995ac",
+    "sha256": "e9b9d59391cc8d80399f4a460aab29fa1e91652ed8dea5a481f65a30f03e99c2",
     "results": {
       "passed": 58,
       "skipped": 0,
