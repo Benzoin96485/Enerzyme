@@ -1,0 +1,247 @@
+{
+ "architecture": "dimenet",
+ "precision": "float64",
+ "system": "mol_batch_32x20",
+ "reference": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+ "operator_ablation_base": "81620f7fb09f51a76ea65b77acc9a7d591944725",
+ "production_fix": "2e21446c2d1267dcef4e55a1885dab1b9a97444a",
+ "direct_parent": "c52e9c514c8db25ab224006be64965ae399b37bb",
+ "operator_ablation_method": "Restore individual pieces of the original radial basis or edge reduction on the migrated model. Use the official molecular batch and squared energy plus squared force training loss. Match every named gradient to its frozen parameter and check with absolute tolerance 1e-10 and relative tolerance 1e-8. A separate process repeated the unchanged baseline. The smallest included pair distance was 0.957151141668218.",
+ "operator_ablations": {
+  "candidate-repeat": {
+   "job": "6339155",
+   "fields": {
+    "E": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 1.8189894035458565e-12,
+     "max_tolerance_ratio": 4.6576664372901225e-08
+    },
+    "Fa": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 9.313225746154785e-10,
+     "max_tolerance_ratio": 0.0006197258856688413
+    }
+   },
+   "active_weights": 188,
+   "weight_tensors_outside": 62,
+   "weight_elements_outside": 342,
+   "worst_weight_ratio": 53.99990709985047,
+   "worst_weight_examples": {
+    "interactions.2.W": {
+     "finite": true,
+     "outside": 33,
+     "max_abs": 2.6832275390625,
+     "max_tolerance_ratio": 53.99990709985047
+    },
+    "interactions.5.dense_kj.weight": {
+     "finite": true,
+     "outside": 8,
+     "max_abs": 5.911853790283203,
+     "max_tolerance_ratio": 40.41518436441078
+    },
+    "interactions.3.W": {
+     "finite": true,
+     "outside": 31,
+     "max_abs": 6.552032470703125,
+     "max_tolerance_ratio": 40.30555093790389
+    }
+   }
+  },
+  "columns-current-product": {
+   "job": "6339210",
+   "fields": {
+    "E": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 1.8189894035458565e-12,
+     "max_tolerance_ratio": 4.6576664372901225e-08
+    },
+    "Fa": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 9.313225746154785e-10,
+     "max_tolerance_ratio": 0.0006197258856688413
+    }
+   },
+   "active_weights": 188,
+   "weight_tensors_outside": 62,
+   "weight_elements_outside": 342,
+   "worst_weight_ratio": 54.05693891015894,
+   "worst_weight_examples": {
+    "interactions.2.W": {
+     "finite": true,
+     "outside": 33,
+     "max_abs": 2.68438720703125,
+     "max_tolerance_ratio": 54.05693891015894
+    },
+    "interactions.5.dense_kj.weight": {
+     "finite": true,
+     "outside": 8,
+     "max_abs": 5.913242340087891,
+     "max_tolerance_ratio": 40.41690853098
+    },
+    "interactions.3.W": {
+     "finite": true,
+     "outside": 31,
+     "max_abs": 6.554412841796875,
+     "max_tolerance_ratio": 40.29815854003192
+    }
+   }
+  },
+  "old-basis-scatter": {
+   "job": "6339155",
+   "fields": {
+    "E": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 0.0,
+     "max_tolerance_ratio": 0.0
+    },
+    "Fa": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 1.4551915228366852e-10,
+     "max_tolerance_ratio": 3.914443315617829e-05
+    }
+   },
+   "active_weights": 188,
+   "weight_tensors_outside": 0,
+   "weight_elements_outside": 0,
+   "worst_weight_ratio": 0.09735733274880494,
+   "worst_weight_examples": {}
+  },
+  "old-basis": {
+   "job": "6339155",
+   "fields": {
+    "E": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 0.0,
+     "max_tolerance_ratio": 0.0
+    },
+    "Fa": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 1.4551915228366852e-10,
+     "max_tolerance_ratio": 3.914443315617829e-05
+    }
+   },
+   "active_weights": 188,
+   "weight_tensors_outside": 0,
+   "weight_elements_outside": 0,
+   "worst_weight_ratio": 0.09735733274880494,
+   "worst_weight_examples": {}
+  },
+  "old-scatter": {
+   "job": "6339155",
+   "fields": {
+    "E": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 1.8189894035458565e-12,
+     "max_tolerance_ratio": 4.6576664372901225e-08
+    },
+    "Fa": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 9.313225746154785e-10,
+     "max_tolerance_ratio": 0.0006197258856688413
+    }
+   },
+   "active_weights": 188,
+   "weight_tensors_outside": 62,
+   "weight_elements_outside": 342,
+   "worst_weight_ratio": 53.99990709985047,
+   "worst_weight_examples": {
+    "interactions.2.W": {
+     "finite": true,
+     "outside": 33,
+     "max_abs": 2.6832275390625,
+     "max_tolerance_ratio": 53.99990709985047
+    },
+    "interactions.5.dense_kj.weight": {
+     "finite": true,
+     "outside": 8,
+     "max_abs": 5.911853790283203,
+     "max_tolerance_ratio": 40.41518436441078
+    },
+    "interactions.3.W": {
+     "finite": true,
+     "outside": 31,
+     "max_abs": 6.552032470703125,
+     "max_tolerance_ratio": 40.30555093790389
+    }
+   }
+  },
+  "original-repeat": {
+   "job": "6339155",
+   "fields": {
+    "E": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 0.0,
+     "max_tolerance_ratio": 0.0
+    },
+    "Fa": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 0.0,
+     "max_tolerance_ratio": 0.0
+    }
+   },
+   "active_weights": 188,
+   "weight_tensors_outside": 0,
+   "weight_elements_outside": 0,
+   "worst_weight_ratio": 0.0,
+   "worst_weight_examples": {}
+  },
+  "vector-original-product": {
+   "job": "6339206",
+   "fields": {
+    "E": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 0.0,
+     "max_tolerance_ratio": 0.0
+    },
+    "Fa": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 1.1641532182693481e-10,
+     "max_tolerance_ratio": 6.253210870278916e-05
+    }
+   },
+   "active_weights": 188,
+   "weight_tensors_outside": 0,
+   "weight_elements_outside": 0,
+   "worst_weight_ratio": 0.06801878329531046,
+   "worst_weight_examples": {}
+  },
+  "vector-per-order-index": {
+   "job": "6339205",
+   "fields": {
+    "E": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 0.0,
+     "max_tolerance_ratio": 0.0
+    },
+    "Fa": {
+     "finite": true,
+     "outside": 0,
+     "max_abs": 1.1641532182693481e-10,
+     "max_tolerance_ratio": 6.253210870278916e-05
+    }
+   },
+   "active_weights": 188,
+   "weight_tensors_outside": 0,
+   "weight_elements_outside": 0,
+   "worst_weight_ratio": 0.06801878329531046,
+   "worst_weight_examples": {}
+  }
+ },
+ "direct_parent_performance": {},
+ "snapshot_sha256": "accb6370e15324df43fc76dba0dfe8f176c249395f70e59b8ebdbd0573a02697"
+}
