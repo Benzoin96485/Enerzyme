@@ -264,6 +264,23 @@ def test_compiled_single_graph_charge_attention_gradients():
         torch.testing.assert_close(measured, reference)
 
 
+def test_charge_spin_embedding_uses_module_precision():
+    from enerzyme.models.layers import ChargeSpinEmbeddingLayer
+
+    dtype = torch.float64 if torch.get_default_dtype() == torch.float32 else torch.float32
+    layer = ChargeSpinEmbeddingLayer(dim_embedding=4, max_Za=8, attribute="spin").to(dtype)
+    species = torch.tensor([1, 6, 8])
+    batch = torch.tensor([0, 1, 1])
+    neutral = layer.get_output(species, batch)["spin_embedding"]
+    totals = torch.tensor([1.0, -2.0], requires_grad=True)
+    charged = layer.get_output(species, batch, S=totals)["spin_embedding"]
+    assert neutral.dtype == charged.dtype == dtype
+    assert torch.count_nonzero(neutral) == 0
+    torch.testing.assert_close(charged, layer.get_output(species, batch, S=totals.to(dtype))["spin_embedding"])
+    gradient, = torch.autograd.grad(charged.square().sum(), totals)
+    assert torch.isfinite(gradient).all()
+
+
 def test_charge_spin_one_hot_matches_z_table_convention():
     from enerzyme.models.layers import ChargeSpinEmbeddingLayer
 

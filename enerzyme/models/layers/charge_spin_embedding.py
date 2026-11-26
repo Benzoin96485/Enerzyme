@@ -78,12 +78,9 @@ class ChargeSpinEmbeddingLayer(BaseFFLayer):
             size = batch_size_from_counts(counts)
             if size is None:
                 size = int(batch_seg.max()) + 1 if batch_seg.numel() else 1
-            psi = torch.zeros(
-                size,
-                dtype=torch.get_default_dtype(),
-                device=Za.device,
-            )
-        psi = psi.to(dtype=torch.get_default_dtype())
+            psi = self.Wq.weight.new_zeros(size, device=Za.device)
+        else:
+            psi = psi.to(dtype=self.Wq.weight.dtype)
         # Index 0 ↔ Z=1 (H), matching So3krates-torch AtomicNumberTable([1..N]).
         z_idx = (Za.long() - 1).clamp(min=0, max=self.num_elements - 1)
         one_hot = F.one_hot(z_idx, self.num_elements).to(dtype=psi.dtype)
