@@ -96,7 +96,11 @@ class RadialChannelMix(nn.Module):
         if torch.compiler.is_compiling():
             shell = _angular_shells(self.shells, raw.shape[2])
             weight = self.weight.index_select(0, shell)
-            return torch.einsum("irkc,kroc->iokc", raw, weight)
+            # The batched product leaves the channel axis outermost, so the
+            # atom count enters the stride of the last axis. A compiled
+            # backward then specializes that stride to the first dynamic
+            # system and rejects the next size. Keep the atom axis outermost.
+            return torch.einsum("irkc,kroc->iokc", raw, weight).contiguous()
         mixed = raw.new_zeros(raw.shape[0], self.n_radial, raw.shape[2], self.n_channels)
         for shell, (start, end) in enumerate(self.shells.tolist()):
             group = raw[:, :, start:end, :]

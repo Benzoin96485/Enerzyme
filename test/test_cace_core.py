@@ -446,3 +446,20 @@ def test_two_molecules_keep_separate_energies_and_simple_readout_fits():
     assert output["E"].shape == (1,)
     assert output["Fa"].shape == (3, 3)
     assert torch.isfinite(output["E"]).all()
+
+
+def test_compiled_inference_accepts_a_third_atom_count():
+    # The second size recompiles with a symbolic atom count. The radial mix
+    # used to keep the channel axis outermost, so the compiled backward fixed
+    # the atom-dependent stride of the second size and rejected the third.
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(1)
+    model = build("cace").double()
+    compiled = torch.compile(model)
+    for seed, sizes in ((11, [4, 5]), (12, [7, 9]), (13, [12, 10, 9])):
+        batch = make_batch(random_molecules(seed, sizes, density=0.12), torch.float64)
+        expected = forward(model, batch, torch.float64)
+        actual = forward(compiled, batch, torch.float64)
+        for key in ("E", "Fa"):
+            torch.testing.assert_close(actual[key].detach(), expected[key].detach(), rtol=1e-10, atol=1e-10)
