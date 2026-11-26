@@ -242,8 +242,250 @@
    "worst_weight_examples": {}
   }
  },
- "direct_parent_performance": {},
+ "direct_parent_performance": {
+  "dimenet++/float64/cpu": {
+   "architecture": "dimenet++",
+   "precision": "float64",
+   "system": "mol_batch_32x20",
+   "device": "cpu",
+   "job": "6339228",
+   "host": "d-18-10-4",
+   "fixture_sha256": "d10d74cba66b440860a96b9da37c8897fc28e7dadb5f5a01740a997197f845df",
+   "snapshot": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+   "torch": "2.13.0+cu126",
+   "frozen_cpu_fp64": [
+    {
+     "passed": true,
+     "differentiable_weights": 147,
+     "all_weights": 147,
+     "outside_tensors": 0,
+     "outside_elements": 0,
+     "worst_ratio": 0.1245861022535076
+    },
+    {
+     "passed": true,
+     "differentiable_weights": 147,
+     "all_weights": 147,
+     "outside_tensors": 0,
+     "outside_elements": 0,
+     "worst_ratio": 0.0567734136851427
+    },
+    {
+     "passed": true,
+     "differentiable_weights": 147,
+     "all_weights": 147,
+     "outside_tensors": 0,
+     "outside_elements": 0,
+     "worst_ratio": 0.0567734136851427
+    },
+    {
+     "passed": true,
+     "differentiable_weights": 147,
+     "all_weights": 147,
+     "outside_tensors": 0,
+     "outside_elements": 0,
+     "worst_ratio": 0.1245861022535076
+    }
+   ],
+   "modes": {
+    "infer": {
+     "median_ms_each_leg": [
+      904.307077,
+      894.46086,
+      923.908923,
+      904.327304
+     ],
+     "measurements_per_leg": [
+      7,
+      7,
+      7,
+      7
+     ],
+     "relative_time_percent": 0.5382736335365568
+    },
+    "train": {
+     "median_ms_each_leg": [
+      2907.611888,
+      3095.046266,
+      3033.419228,
+      3002.349728
+     ],
+     "measurements_per_leg": [
+      7,
+      7,
+      7,
+      7
+     ],
+     "relative_time_percent": 3.6972131495481397
+    }
+   }
+  },
+  "dimenet/float32/cpu": {
+   "architecture": "dimenet",
+   "precision": "float32",
+   "system": "mol_batch_32x20",
+   "device": "cpu",
+   "job": "6339229",
+   "host": "d-3-6-4",
+   "fixture_sha256": "accb6370e15324df43fc76dba0dfe8f176c249395f70e59b8ebdbd0573a02697",
+   "snapshot": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+   "torch": "2.13.0+cu126",
+   "modes": {
+    "infer": {
+     "median_ms_each_leg": [
+      4371.002812,
+      4396.422076,
+      4329.686507,
+      4352.552879
+     ],
+     "measurements_per_leg": [
+      7,
+      7,
+      7,
+      7
+     ],
+     "relative_time_percent": 0.029264351491842255
+    },
+    "train": {
+     "median_ms_each_leg": [
+      12789.6581,
+      12538.24276,
+      12469.963622,
+      12955.180124
+     ],
+     "measurements_per_leg": [
+      7,
+      7,
+      7,
+      7
+     ],
+     "relative_time_percent": -2.861279746995249
+    }
+   }
+  },
+  "dimenet/float64/cpu": {
+   "architecture": "dimenet",
+   "precision": "float64",
+   "system": "mol_batch_32x20",
+   "device": "cpu",
+   "job": "6339230",
+   "host": "d-3-6-4",
+   "fixture_sha256": "accb6370e15324df43fc76dba0dfe8f176c249395f70e59b8ebdbd0573a02697",
+   "snapshot": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+   "torch": "2.13.0+cu126",
+   "frozen_cpu_fp64": [
+    {
+     "passed": false,
+     "differentiable_weights": 188,
+     "all_weights": 188,
+     "outside_tensors": 62,
+     "outside_elements": 342,
+     "worst_ratio": 53.99990709985047
+    },
+    {
+     "passed": true,
+     "differentiable_weights": 188,
+     "all_weights": 188,
+     "outside_tensors": 0,
+     "outside_elements": 0,
+     "worst_ratio": 0.06801878329531046
+    },
+    {
+     "passed": true,
+     "differentiable_weights": 188,
+     "all_weights": 188,
+     "outside_tensors": 0,
+     "outside_elements": 0,
+     "worst_ratio": 0.06801878329531046
+    },
+    {
+     "passed": false,
+     "differentiable_weights": 188,
+     "all_weights": 188,
+     "outside_tensors": 62,
+     "outside_elements": 342,
+     "worst_ratio": 53.99990709985047
+    }
+   ],
+   "modes": {
+    "infer": {
+     "median_ms_each_leg": [
+      7299.459099,
+      7377.512285,
+      7354.860795,
+      7255.524009
+     ],
+     "measurements_per_leg": [
+      7,
+      7,
+      7,
+      7
+     ],
+     "relative_time_percent": 1.2187576631572883
+    },
+    "train": {
+     "median_ms_each_leg": [
+      21838.136414,
+      21677.573641,
+      21866.411832,
+      21506.664231
+     ],
+     "measurements_per_leg": [
+      7,
+      7,
+      7,
+      7
+     ],
+     "relative_time_percent": 0.45953568833170255
+    }
+   }
+  },
+  "dimenet++/float32/cpu": {
+   "architecture": "dimenet++",
+   "precision": "float32",
+   "system": "mol_batch_32x20",
+   "device": "cpu",
+   "job": "6339259",
+   "host": "d-3-6-4",
+   "fixture_sha256": "d10d74cba66b440860a96b9da37c8897fc28e7dadb5f5a01740a997197f845df",
+   "snapshot": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+   "torch": "2.13.0+cu126",
+   "modes": {
+    "infer": {
+     "median_ms_each_leg": [
+      584.086826,
+      573.252536,
+      556.095953,
+      575.625147
+     ],
+     "measurements_per_leg": [
+      7,
+      7,
+      7,
+      7
+     ],
+     "relative_time_percent": -2.618191818909499
+    },
+    "train": {
+     "median_ms_each_leg": [
+      1725.863025,
+      1719.039349,
+      1706.405496,
+      1655.74721
+     ],
+     "measurements_per_leg": [
+      7,
+      7,
+      7,
+      7
+     ],
+     "relative_time_percent": 1.2962644111467192
+    }
+   }
+  }
+ },
  "snapshot_sha256": "accb6370e15324df43fc76dba0dfe8f176c249395f70e59b8ebdbd0573a02697",
+ "direct_parent_performance_method": "Ordinary eager model with the same frozen checkpoint in four fresh processes on the same allocated node/device in parent, fix, fix, parent order. Each leg uses two warmups followed by seven CPU or fifteen V100 repetitions with two threads. Each timing covers a complete E/F forward or E/F loss followed by weight backward. Median per leg, then median by source. GPU peak is measured after resetting allocation counters before each timed call. The formal compiled matrix has its own source and controls.",
  "same_source_cpu_inductor": {
   "source": "2e21446c2d1267dcef4e55a1885dab1b9a97444a",
   "job": "6339218",
@@ -354,6 +596,44 @@
      "failed_weight_tensors": 163,
      "failed_fields": [],
      "receipt_sha256": "1bc65805c07104a00d2eb78ec005f413dc644e1978f4c8a851d17d314aa950f6"
+    },
+    "lowering_controls": {
+     "aot_eager": {
+      "job": "6339245",
+      "compiled_machine_code": false,
+      "failed_weights": 0,
+      "failed_fields": [],
+      "changed_gradient_participation": {},
+      "field_errors": {
+       "E": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+       },
+       "Fa": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+       }
+      },
+      "receipt_sha256": "9d2199b6245b553ab25d73c0693e1b866774bb0344f1fd0c37522c88d97f23dc"
+     },
+     "aot_eager_decomp_partition": {
+      "job": "6339243",
+      "compiled_machine_code": false,
+      "failed_weights": 154,
+      "failed_fields": [],
+      "changed_gradient_participation": {},
+      "field_errors": {
+       "E": {
+        "max_abs": 0.000274658203125,
+        "relative_l2": 6.362632339730649e-07
+       },
+       "Fa": {
+        "max_abs": 0.0029296875,
+        "relative_l2": 8.407384665139542e-07
+       }
+      },
+      "receipt_sha256": "a6cb662ae859d698a1bfab0856b83207ff21a0cddaeca1e27ffe12b6e41310e4"
+     }
     }
    },
    "dimenet-float64": {
@@ -390,6 +670,44 @@
      "failed_weight_tensors": 7,
      "failed_fields": [],
      "receipt_sha256": "403e261d7e5c7db3f341064fae389e471f32c67ee23b7e80a154dcbb03908056"
+    },
+    "lowering_controls": {
+     "aot_eager": {
+      "job": "6339244",
+      "compiled_machine_code": false,
+      "failed_weights": 0,
+      "failed_fields": [],
+      "changed_gradient_participation": {},
+      "field_errors": {
+       "E": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+       },
+       "Fa": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+       }
+      },
+      "receipt_sha256": "21857b8e55cc165ab2aede550a0257b2e525145d1c8f4e64a4463266a8e25511"
+     },
+     "aot_eager_decomp_partition": {
+      "job": "6339249",
+      "compiled_machine_code": false,
+      "failed_weights": 9,
+      "failed_fields": [],
+      "changed_gradient_participation": {},
+      "field_errors": {
+       "E": {
+        "max_abs": 5.684341886080802e-14,
+        "relative_l2": 1.3174072394871418e-16
+       },
+       "Fa": {
+        "max_abs": 1.1368683772161603e-11,
+        "relative_l2": 3.948844680136314e-15
+       }
+      },
+      "receipt_sha256": "37451dd10fc3316bbff435d12b0f0bb93a8e1114ae09b3b410b23a3a0cbe89c3"
+     }
     }
    }
   }
