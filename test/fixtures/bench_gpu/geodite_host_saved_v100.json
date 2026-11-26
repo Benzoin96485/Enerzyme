@@ -1,0 +1,337 @@
+{
+  "architecture": "geodite",
+  "system": "large_2000",
+  "precision": "float32",
+  "source_baseline": "1aa0f8b",
+  "source_candidate": "882b187",
+  "job": "6338874",
+  "method": "Independent CUDA processes reseed the same unmodified frozen geometry, weights and native dropout for energy/force training. Both native sources offload saved autograd tensors to host memory during the large backward. On the small molecular batch each is first compared against an ordinary native run on the same device, including every active and unused gradient. The ordinary compiled candidate runs on CUDA after the prior system/mode calls. Cross-source weight comparisons use the identities of the strictly remapped checkpoint tensors.",
+  "formal_limit": "This control applies to candidate 882b187 and the 1aa0f8b checkpoint. Its gradient comparison requires successful host-saving calibration. The earlier full Geodite FP32 row at 81620f7 has independent results. Offloading was used solely to obtain reference tensors and supplies no paired latency or memory measurement.",
+  "roles": {
+    "old-native": {
+      "revision": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "gpu_uuid": "9a19f472-727c-1aec-eb16-7d4406811551",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "409c11e46309d3e2114454e2cbda357f25517e28c099ceb940e36035abf89a09",
+      "complete": true,
+      "checks": {
+        "ordinary_native_vs_host_saved_small": {
+          "unused_match": true,
+          "passed": false,
+          "fields": {
+            "tensors": 2,
+            "missing": [],
+            "passed": true,
+            "failed_tensors": 0,
+            "elements_outside": 0,
+            "failed_examples": {}
+          },
+          "gradient": {
+            "tensors": 93,
+            "missing": [],
+            "passed": false,
+            "failed_tensors": 11,
+            "elements_outside": 499,
+            "failed_examples": {
+              "node_init.update.0.linear.weight": {
+                "outside": 101,
+                "max_abs": 0.05078125
+              },
+              "node_init.update.1.linear.weight": {
+                "outside": 55,
+                "max_abs": 0.046875
+              },
+              "couplings.0.gate.0.linear.weight": {
+                "outside": 62,
+                "max_abs": 0.0234375
+              },
+              "couplings.0.gate.1.linear.weight": {
+                "outside": 29,
+                "max_abs": 0.01953125
+              },
+              "couplings.1.gate.0.linear.weight": {
+                "outside": 52,
+                "max_abs": 0.015625
+              },
+              "couplings.1.gate.1.linear.weight": {
+                "outside": 21,
+                "max_abs": 0.015625
+              },
+              "couplings.2.gate.0.linear.weight": {
+                "outside": 51,
+                "max_abs": 0.0125732421875
+              },
+              "couplings.2.gate.1.linear.weight": {
+                "outside": 16,
+                "max_abs": 0.0125732421875
+              }
+            }
+          }
+        }
+      },
+      "worker_exit": 0,
+      "receipt_sha256": "d8f19e4e8294008a68b3977b59827d7588574ead2755f85d77f89b4ab2e86855"
+    },
+    "new-native": {
+      "revision": "882b187acd561b57af232279dd67700532e50c97",
+      "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "gpu_uuid": "9a19f472-727c-1aec-eb16-7d4406811551",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "409c11e46309d3e2114454e2cbda357f25517e28c099ceb940e36035abf89a09",
+      "complete": true,
+      "checks": {
+        "ordinary_native_vs_host_saved_small": {
+          "unused_match": true,
+          "passed": false,
+          "fields": {
+            "tensors": 2,
+            "missing": [],
+            "passed": true,
+            "failed_tensors": 0,
+            "elements_outside": 0,
+            "failed_examples": {}
+          },
+          "gradient": {
+            "tensors": 93,
+            "missing": [],
+            "passed": false,
+            "failed_tensors": 12,
+            "elements_outside": 477,
+            "failed_examples": {
+              "embed.node_init.update.0.linear.weight": {
+                "outside": 101,
+                "max_abs": 0.0625
+              },
+              "embed.node_init.update.1.linear.weight": {
+                "outside": 53,
+                "max_abs": 0.046875
+              },
+              "blocks.0.coupling.gate.0.linear.weight": {
+                "outside": 55,
+                "max_abs": 0.0234375
+              },
+              "blocks.1.coupling.gate.1.linear.weight": {
+                "outside": 21,
+                "max_abs": 0.0234375
+              },
+              "blocks.1.coupling.gate.0.linear.weight": {
+                "outside": 48,
+                "max_abs": 0.01953125
+              },
+              "blocks.0.coupling.gate.1.linear.weight": {
+                "outside": 36,
+                "max_abs": 0.015625
+              },
+              "blocks.2.coupling.gate.1.linear.weight": {
+                "outside": 19,
+                "max_abs": 0.013671875
+              },
+              "blocks.3.coupling.gate.1.linear.weight": {
+                "outside": 18,
+                "max_abs": 0.0126953125
+              }
+            }
+          }
+        },
+        "old-native_vs_new-native": {
+          "passed": true,
+          "fields": {
+            "tensors": 2,
+            "missing": [],
+            "passed": true,
+            "failed_tensors": 0,
+            "elements_outside": 0,
+            "failed_examples": {}
+          }
+        },
+        "cross_source_weights": {
+          "unused_match": true,
+          "passed": false,
+          "fields": {
+            "tensors": 2,
+            "missing": [],
+            "passed": true,
+            "failed_tensors": 0,
+            "elements_outside": 0,
+            "failed_examples": {}
+          },
+          "gradient": {
+            "tensors": 93,
+            "missing": [],
+            "passed": false,
+            "failed_tensors": 11,
+            "elements_outside": 2029,
+            "failed_examples": {
+              "node_init.update.1.linear.weight": {
+                "outside": 182,
+                "max_abs": 6.53125
+              },
+              "couplings.1.gate.1.linear.weight": {
+                "outside": 158,
+                "max_abs": 4.28125
+              },
+              "node_init.update.0.linear.weight": {
+                "outside": 329,
+                "max_abs": 3.46875
+              },
+              "couplings.0.gate.1.linear.weight": {
+                "outside": 211,
+                "max_abs": 2.81640625
+              },
+              "couplings.2.gate.1.linear.weight": {
+                "outside": 81,
+                "max_abs": 1.625
+              },
+              "couplings.0.gate.0.linear.weight": {
+                "outside": 280,
+                "max_abs": 1.125
+              },
+              "couplings.1.gate.0.linear.weight": {
+                "outside": 212,
+                "max_abs": 0.78125
+              },
+              "pre_sequence.4.embedding.weight": {
+                "outside": 8,
+                "max_abs": 0.45703125
+              }
+            }
+          }
+        }
+      },
+      "worker_exit": 0,
+      "receipt_sha256": "dee9d660c96f42bff1a87ae7da9a76b3e8e7233ad1c7d10b71d471c34c350377"
+    },
+    "new-compiled": {
+      "revision": "882b187acd561b57af232279dd67700532e50c97",
+      "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "gpu_uuid": "9a19f472-727c-1aec-eb16-7d4406811551",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "409c11e46309d3e2114454e2cbda357f25517e28c099ceb940e36035abf89a09",
+      "complete": true,
+      "checks": {
+        "old-native_vs_new-compiled": {
+          "passed": true,
+          "fields": {
+            "tensors": 2,
+            "missing": [],
+            "passed": true,
+            "failed_tensors": 0,
+            "elements_outside": 0,
+            "failed_examples": {}
+          }
+        },
+        "cross_source_weights": {
+          "unused_match": true,
+          "passed": false,
+          "fields": {
+            "tensors": 2,
+            "missing": [],
+            "passed": true,
+            "failed_tensors": 0,
+            "elements_outside": 0,
+            "failed_examples": {}
+          },
+          "gradient": {
+            "tensors": 93,
+            "missing": [],
+            "passed": false,
+            "failed_tensors": 17,
+            "elements_outside": 9651,
+            "failed_examples": {
+              "node_init.update.1.linear.weight": {
+                "outside": 733,
+                "max_abs": 16.4375
+              },
+              "node_init.update.0.linear.weight": {
+                "outside": 1119,
+                "max_abs": 9.5625
+              },
+              "interactions.0.norm.affine": {
+                "outside": 2,
+                "max_abs": 6.6875
+              },
+              "couplings.0.gate.1.linear.weight": {
+                "outside": 888,
+                "max_abs": 6.09375
+              },
+              "couplings.1.gate.1.linear.weight": {
+                "outside": 975,
+                "max_abs": 4.5625
+              },
+              "interactions.1.norm.affine": {
+                "outside": 2,
+                "max_abs": 4.234375
+              },
+              "couplings.0.gate.0.linear.weight": {
+                "outside": 884,
+                "max_abs": 4.109375
+              },
+              "couplings.2.gate.1.linear.weight": {
+                "outside": 849,
+                "max_abs": 4.09375
+              }
+            }
+          }
+        },
+        "new-native_vs_new-compiled": {
+          "unused_match": true,
+          "passed": false,
+          "fields": {
+            "tensors": 2,
+            "missing": [],
+            "passed": true,
+            "failed_tensors": 0,
+            "elements_outside": 0,
+            "failed_examples": {}
+          },
+          "gradient": {
+            "tensors": 93,
+            "missing": [],
+            "passed": false,
+            "failed_tensors": 17,
+            "elements_outside": 9527,
+            "failed_examples": {
+              "embed.node_init.update.1.linear.weight": {
+                "outside": 709,
+                "max_abs": 16.375
+              },
+              "embed.node_init.update.0.linear.weight": {
+                "outside": 1165,
+                "max_abs": 8.625
+              },
+              "blocks.0.message.norm.affine": {
+                "outside": 2,
+                "max_abs": 6.625
+              },
+              "blocks.0.coupling.gate.1.linear.weight": {
+                "outside": 824,
+                "max_abs": 6.28125
+              },
+              "blocks.1.coupling.gate.1.linear.weight": {
+                "outside": 965,
+                "max_abs": 4.625
+              },
+              "blocks.1.message.norm.affine": {
+                "outside": 2,
+                "max_abs": 4.1875
+              },
+              "blocks.0.coupling.gate.0.linear.weight": {
+                "outside": 852,
+                "max_abs": 4.1328125
+              },
+              "blocks.2.coupling.gate.1.linear.weight": {
+                "outside": 814,
+                "max_abs": 4.0
+              }
+            }
+          }
+        }
+      },
+      "worker_exit": 0,
+      "receipt_sha256": "a4eafa5e363ad6b74e41561b44fda6feb03f346340bdb87a1e3331df24da8162"
+    }
+  },
+  "complete": true,
+  "passes_all_controls": false
+}
