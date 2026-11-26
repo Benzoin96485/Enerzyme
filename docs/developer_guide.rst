@@ -213,6 +213,13 @@ same Cartesian frame to all backends. Existing presets select their upstream
 frame convention explicitly. The measurements in :code:`test/fixtures/bench_rotations.json`
 can be reproduced with :code:`scripts/bench_rotations.py`.
 
+The registry retains the original checkpoint-compatible defaults. The rotation
+tests select :code:`equivariant_mode=True`
+for AllScAIP, :code:`copy_major=True` in both EquFlashV2 nonlinearities, and
+the analytic electrostatics backend for MACE-Polar. The default EquFlashV2
+and MACE-Polar configurations reproduce rotation residuals present in the
+pre-refactor models.
+
 The paired GPU measurements in :code:`test/fixtures/bench_gpu/` cover the
 three acceptance systems in both precisions. Run
 :code:`python scripts/report_eager_gates.py` to summarize the archived ratios
@@ -279,12 +286,12 @@ training graphs use the same setting. The model restores the compiler settings
 before returning. An explicit conflicting backend override uses native
 derivatives for that call.
 
-DPA4 uses native derivatives for CPU float64 force training under ordinary
+DPA4 uses native derivatives for CPU and CUDA float64 force training under ordinary
 Inductor. Its published degree normalization accumulates in float32. Compiling
 the full coordinate derivative changes rounding enough to alter forces and
-force-loss parameter gradients. CPU float64 force inference uses native
+force-loss parameter gradients. Float64 force inference on these devices uses native
 normalization within otherwise compiled layers. For both modes, use
-:code:`torch.compile(model)` on Inductor. The CPU float64 force path reports
+:code:`torch.compile(model)` on Inductor. The float64 force path reports
 the restriction when :code:`fullgraph=True`. The checks and measured errors
 are in :code:`test/fixtures/validation/dpa4_degree_norm_inference.json`.
 
@@ -416,18 +423,21 @@ separate differentiable graph. An energy/force loss leaves
 :code:`blocks[-1].module.s_proj` unused. Supervising Cartesian vectors, the
 degree-two features or a dipole head differentiates this projection. FreeCG
 also places its last group tensor-product weights in the vector graph. Custom
-layers before force evaluation retain the joint execution path. When a hook
-is active on the input, final update or readout, ordinary compilation uses
-native force derivatives so callbacks installed after compilation take effect.
+layers that replace coordinates before force evaluation use native differentiation
+with respect to the replacement tensor. A backward hook within the message stack
+or a custom forward on the final update also uses native differentiation.
 When training exclusively on vectors, AOTAutograd can still assign zeros to
 unused scalar readout weights.
 
 The standard ViSNet-LSRM model applies this split to its final atom–fragment
 update. An energy/force loss leaves the ten parameter tensors of
 :code:`mlp_pos`, :code:`mlp_vec` and the first two :code:`mix` projections
-unused. Vector or dipole supervision differentiates them. Configurations
-with fragment dropout, no long-range layers, or a degree-two short-range
-head retain the joint execution path.
+unused. Vector or dipole supervision differentiates them. A batch with no
+atom–fragment edges reuses the prepared indices for native differentiation,
+so disconnected weights keep absent gradients. Configurations with no long-range
+layers or a degree-two short-range head retain the joint execution path.
+In ordinary compiled training, ViSNet-LSRM, Geodite and AlphaNet use PyTorch's
+random draws for configured dropout so the caller can reproduce eager masks.
 
 The following CPU example uses the same model, weights, two structures and
 squared loss as the recorded checks. Run it from the repository checkout.

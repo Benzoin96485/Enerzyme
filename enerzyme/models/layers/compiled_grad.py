@@ -28,7 +28,7 @@ def compiling_fullgraph() -> bool:
 
 
 @torch.compiler.assume_constant_result
-def _cpu_backend_may_use_inductor() -> bool:
+def _backend_may_use_inductor() -> bool:
     """Custom backends may delegate to Inductor. Eager backends do no kernel lowering."""
     from torch._dynamo.backends.registry import lookup_backend
     from torch._dynamo.symbolic_convert import InstructionTranslator
@@ -42,8 +42,8 @@ def _cpu_backend_may_use_inductor() -> bool:
     return all(compiler is not lookup_backend(name) for name in ("eager", "aot_eager"))
 
 
-def uses_cpu_inductor_forces(core, inputs, *, include_eval=False, dtype=None):
-    """Detect an active force layer on CPU coordinates, optionally of the given dtype."""
+def inductor_force_device(core, inputs, *, devices=("cpu",), include_eval=False, dtype=None):
+    """Return the device of an active force head with the requested coordinate dtype."""
     for stages in (core.pre_sequence, core.post_sequence):
         for layer in stages:
             if type(layer) is not ForceLayer:
@@ -53,16 +53,22 @@ def uses_cpu_inductor_forces(core, inputs, *, include_eval=False, dtype=None):
             if (layer.test_only and not core.test_mode) or (layer.test_exclude and core.test_mode):
                 continue
             coordinates = inputs.get(layer._name_mapping["Ra"])
-            if (coordinates is not None and coordinates.device.type == "cpu"
+            if (coordinates is not None and coordinates.device.type in devices
                     and (dtype is None or coordinates.dtype == dtype)):
-                return _cpu_backend_may_use_inductor()
-    return False
+                return coordinates.device.type if _backend_may_use_inductor() else None
+    return None
+
+
+def uses_cpu_inductor_forces(core, inputs, *, include_eval=False, dtype=None):
+    return inductor_force_device(core, inputs, include_eval=include_eval, dtype=dtype) == "cpu"
 
 
 @torch.compiler.disable
-def native_forces(core, inputs):
+def native_forces(core, inputs, prepared_topology=None):
     """Run the original force layers with native coordinate and weight derivatives."""
-    return core._run_layers(inputs)
+    if prepared_topology is None:
+        return core._run_layers(inputs)
+    return core._run_layers(inputs, prepared_topology=prepared_topology)
 
 
 @torch.compiler.disable
@@ -91,6 +97,30 @@ def has_force_hooks(core):
     return False
 
 
+def _replaces_force_coordinates(core):
+    """A joint VJP takes its coordinates from the input to the whole pipeline."""
+    positions = set()
+    for layer in reversed([*core.pre_sequence, core, *core.post_sequence]):
+        if layer is not core and (
+            (layer.train_only and not layer.training) or (layer.eval_only and layer.training)
+            or (layer.test_only and not core.test_mode) or (layer.test_exclude and core.test_mode)
+        ):
+            continue
+        if positions:
+            if layer._forward_hooks or layer._forward_pre_hooks:
+                return True
+            if any(layer._name_mapping[key] in positions for key in layer._output_fields):
+                return True
+        if type(layer) is ForceLayer:
+            positions.add(layer._name_mapping["Ra"])
+    return False
+
+
+@torch.compiler.disable
+def _requires_native_vjp(core):
+    return has_force_hooks(core) or _replaces_force_coordinates(core)
+
+
 @torch.compiler.assume_constant_result
 def cpu_inductor_options(options):
     """Read explicit Inductor backend overrides before entering its lowering."""
@@ -112,7 +142,7 @@ def cpu_inductor_options(options):
 
 @torch.compiler.disable
 def float64_cuda_reduction_scope(core, inputs):
-    """Compile float64 CUDA forces without Inductor's mix-order reductions.
+    """Preserve native dropout draws and float64 CUDA reduction semantics.
 
     PyTorch 2.13 starts their accumulators in float32 and Triton rejects the
     float64 update ("Loop-carried variable accum0 has initial type fp32 but is
@@ -128,15 +158,26 @@ def float64_cuda_reduction_scope(core, inputs):
     from torch._functorch import config as autograd_config
     from torch._inductor import config
 
-    try:
-        coordinates = inputs["Ra"]
-    except (KeyError, TypeError, AttributeError):
-        coordinates = None
     scope = ExitStack()
+    if core.training and getattr(core, "_match_training_dropout", False) and hasattr(config, "fallback_random"):
+        # In a force loss both the sampled energy and its coordinate derivative
+        # must see the eager mask for the caller's seed.
+        scope.enter_context(config.patch(fallback_random=True))
+    if not getattr(config.triton, "mix_order_reduction", False):
+        return scope
+    # Multiple force heads can use different names for the differentiated
+    # coordinates. A stack without a force head uses the standard input.
+    names = {
+        layer._name_mapping["Ra"]
+        for sequence in (getattr(core, "pre_sequence", ()), getattr(core, "post_sequence", ()))
+        for layer in sequence if type(layer) is ForceLayer
+        and not ((layer.train_only and not layer.training) or (layer.eval_only and layer.training)
+                 or (layer.test_only and not core.test_mode) or (layer.test_exclude and core.test_mode))
+    }
     opted_out = getattr(core, "_cuda_mix_order_reduction", True) is False
-    if (getattr(coordinates, "is_cuda", False)
-            and (opted_out or getattr(coordinates, "dtype", None) == torch.float64)
-            and getattr(config.triton, "mix_order_reduction", False)):
+    coordinates = (inputs.get(name) for name in names or ("Ra",))
+    if any(getattr(value, "is_cuda", False) and (opted_out or value.dtype == torch.float64)
+           for value in coordinates):
         scope.enter_context(config.patch({"triton.mix_order_reduction": False}))
         if core.training and hasattr(autograd_config, "force_non_lazy_backward_lowering"):
             scope.enter_context(autograd_config.patch(force_non_lazy_backward_lowering=True))
@@ -268,9 +309,8 @@ def compiled_coordinate_vjp(core, inputs):
     """Keep differentiable distances inside the VJP and discrete sizes outside it."""
     from torch._dynamo import config
 
-    if getattr(core, "_scripted_force_kernels", False) or has_force_hooks(core):
-        # Scripted kernels close over weights, and force hooks can replace
-        # either the inputs or outputs of the coordinate differentiation.
+    if getattr(core, "_scripted_force_kernels", False) or _requires_native_vjp(core):
+        # Differentiate the live coordinate tensor if an earlier stage replaced it.
         return native_forces(core, inputs)
     separate_vectors = core.training and getattr(core, "architecture", None) in ("visnet", "quinnet", "freecg", "visnet_lsrm")
     if separate_vectors:
@@ -339,7 +379,9 @@ def forward_with_coordinate_gradients(core, inputs: Dict[str, Any], edges=None, 
         if compiling_fullgraph():
             torch._assert(not has_force_hooks(core),
                           "ForceLayer hooks require ordinary torch.compile with graph breaks")
-    elif has_force_hooks(core):
+            torch._assert(not _replaces_force_coordinates(core),
+                          "Replaced force coordinates require ordinary torch.compile with graph breaks")
+    elif _requires_native_vjp(core):
         return core._run_layers(inputs)
 
     def active(layer):

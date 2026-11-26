@@ -17,7 +17,8 @@ def test_compiled_fragment_partition_keeps_configured_joint_paths():
     standard = _build().train()
     assert _deferred_layers(standard, {}) == ()
     assert _deferred_layers(standard, {"_lsrm_atoms": torch.tensor([1])}) is None
-    for params in ({"dropout": 0.2}, {"long_layers": 0}, {"lmax": 2}):
+    assert _deferred_layers(_build(dropout=0.2).train(), {}) == ()
+    for params in ({"long_layers": 0}, {"lmax": 2}):
         assert _deferred_layers(_build(**params).train(), {}) is None
 
 
@@ -340,3 +341,123 @@ def test_energy_force_rotation_translation_and_dipole():
             e_minus = _forward(model, minus.requires_grad_(True), za, batch, cluster_ids)["E"][0]
             numerical[atom, coord] = -(e_plus - e_minus).detach() / (2 * step)
     assert torch.allclose(analytical, numerical, atol=1e-4, rtol=1e-4)
+
+
+def test_compiled_fragment_force_training_reuses_selected_edges_and_preserves_empty_gradients(monkeypatch):
+    from scripts.core_harness import forward, make_batch, random_molecules
+    from enerzyme.models.layers._base_layer import BaseFFLayer
+    from enerzyme.models.visnet import long_range
+
+    torch.manual_seed(42)
+    model = _build().double().train()
+    graph = model.blocks[model._force_topology_block]
+    graph.cutoff_lr = 1e-5
+    batch = make_batch(random_molecules(107, [3, 2], density=0.12), torch.float64)
+    calls = []
+    resolve = long_range.resolve_long_range_fragments
+
+    def count_clustering(*args, **kwargs):
+        calls.append(1)
+        return resolve(*args, **kwargs)
+
+    monkeypatch.setattr(long_range, "resolve_long_range_fragments", count_clustering)
+    torch.compiler.reset()
+    compiled = torch.compile(model, backend="aot_eager")
+    parameters = tuple(model.parameters())
+
+    def run(runner, objective):
+        calls.clear()
+        out = forward(runner, batch, torch.float64, train=True)
+        energy_forces = out["E"].square().sum() + out["Fa"].square().sum()
+        vector = out["atom_vector_feature"].square().sum()
+        loss = {"energy_forces": energy_forces, "combined": energy_forces + vector, "vector": vector}[objective]
+        gradients = torch.autograd.grad(loss, (out["Ra"], *parameters), allow_unused=True)
+        assert len(calls) == 1
+        return {key: value for key, value in out.items() if torch.is_tensor(value)}, gradients
+
+    def compare(objective):
+        expected, reference = run(model, objective)
+        observed, gradients = run(compiled, objective)
+        torch.testing.assert_close(observed, expected, atol=1e-10, rtol=1e-8)
+        torch.testing.assert_close(gradients, reference, atol=1e-10, rtol=1e-8)
+
+    zeros = torch.zeros_like(batch["Za"])
+    singletons = torch.arange(len(zeros), dtype=torch.long)
+    try:
+        # Alternate the same compiled model between no long-range matches and
+        # one self-fragment per atom. Short-range neighbors stay unchanged.
+        for labels, targets in ((zeros, ("energy_forces", "combined", "vector")),
+                                (singletons, ("energy_forces", "combined")), (zeros, ("combined",))):
+            batch["cluster_ids"] = labels
+            for target in targets:
+                compare(target)
+
+        # A live geometry hook replaces the labels immediately before the
+        # fragment graph. The native path sees the new edges and runs it once.
+        hits = []
+
+        def replace_labels(_module, inputs):
+            hits.append(1)
+            inputs[1].inputs["cluster_ids"] = singletons
+
+        hook = graph.register_forward_pre_hook(replace_labels)
+        try:
+            compare("combined")
+            assert len(hits) == 2
+        finally:
+            hook.remove()
+
+        class ScaledCoordinates(BaseFFLayer):
+            def __init__(self):
+                super().__init__(input_fields={"Ra"}, output_fields={"Ra"})
+
+            def get_Ra(self, Ra):
+                return Ra * 0.8
+
+        graph.cutoff_lr = 9.0
+        model.pre_sequence.append(ScaledCoordinates())
+        compare("combined")
+    finally:
+        torch.compiler.reset()
+
+
+def test_compiled_fragment_dropout_preserves_random_draws_force_and_vector_gradients():
+    from torch._dynamo.backends.registry import lookup_backend
+    from torch._inductor import config
+    from scripts.core_harness import forward, make_batch, random_molecules
+
+    torch.manual_seed(42)
+    model = _build(dropout=0.25, long_layers=2).double().train()
+    batch = make_batch(random_molecules(107, [3, 2], density=0.12), torch.float64)
+    batch["cluster_ids"] = torch.tensor([0, 0, 1, 0, 1])
+    parameters = tuple(model.parameters())
+    learned_graphs = []
+
+    def lower(graph, example):
+        learned_graphs.append(any(node.target is torch.nn.functional.linear for node in graph.graph.nodes))
+        return lookup_backend("inductor")(graph, example)
+
+    def step(runner, seed, supervise_vectors):
+        torch.manual_seed(seed)
+        out = forward(runner, batch, torch.float64, train=True)
+        loss = out["E"].square().sum() + out["Fa"].square().sum()
+        vector = out["atom_vector_feature"]
+        if supervise_vectors:
+            loss = loss + vector.sin().sum()
+        gradients = torch.autograd.grad(loss, (out["Ra"], *parameters), allow_unused=True)
+        return (out["E"], out["Fa"], vector), gradients, torch.get_rng_state()
+
+    torch.compiler.reset()
+    try:
+        # A caller can leave Inductor's random policy at its default. The
+        # model selects matching dropout masks without leaking its setting.
+        with config.patch(fallback_random=False):
+            compiled = torch.compile(model, backend=lower)
+            for seed, with_vectors in ((71, False), (72, True)):
+                reference = step(model, seed, with_vectors)
+                observed = step(compiled, seed, with_vectors)
+                torch.testing.assert_close(observed, reference, atol=1e-10, rtol=1e-8)
+            assert sum(learned_graphs) >= 2
+            assert not config.fallback_random
+    finally:
+        torch.compiler.reset()

@@ -15,7 +15,7 @@ That map is not in the released class, so this block does not apply it.
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import NamedTuple, Optional, Tuple
 
 import torch
 from torch import Tensor
@@ -215,17 +215,37 @@ def _fragment_index_shapes(positions, batch, mode, center, numbers, labels, min_
     return torch.empty_like(batch), batch.new_empty((2, n_edges))
 
 
+class FragmentTopology(NamedTuple):
+    """Detached assignments and selected pairs, shared by the force and feature paths."""
+
+    ids: Tensor
+    edges: Tensor
+
+    def apply(self, ctx):
+        ctx.cache["lsrm_fragment_indices"] = self
+
+
+def select_fragment_topology(positions, batch, mode, center, numbers, labels, min_nodes, seed, cutoff):
+    ids, edges = _fragment_indices(positions.detach(), batch, mode, center, numbers, labels, min_nodes, seed, cutoff)
+    return FragmentTopology(ids, edges)
+
+
 def fragment_geometry(
     positions: Tensor, batch: Tensor, mode: str, center: str,
     numbers: Optional[Tensor], labels: Optional[Tensor],
-    min_nodes: int, seed: int, cutoff: float,
+    min_nodes: int, seed: int, cutoff: float, prepared: Optional[FragmentTopology] = None,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
     """Return the discrete indices and their differentiable distances and directions."""
-    if torch.compiler.is_compiling():
-        ids, edges = _fragment_indices(
-            positions.detach(), batch, mode, center, numbers, labels, min_nodes, seed, cutoff
-        )
+    if prepared is not None or torch.compiler.is_compiling():
+        if prepared is None:
+            ids, edges = _fragment_indices(
+                positions.detach(), batch, mode, center, numbers, labels, min_nodes, seed, cutoff
+            )
+        else:
+            ids, edges = prepared.ids, prepared.edges
         atoms, fragments = edges.unbind(0)
+        if not torch.compiler.is_compiling() and not atoms.numel():
+            return ids, atoms, fragments, positions.new_zeros(0), positions.new_zeros((0, 3))
         weights = numbers if center == "atomic_number" else None
         centers = weighted_fragment_centers(positions, ids, weights)
         delta = centers[fragments] - positions[atoms]

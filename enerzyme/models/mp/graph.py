@@ -469,6 +469,9 @@ class GraphContext:
     # step per derived selection, ``None`` when unknown. Graphs with a key can
     # be used as constant cache keys by their relatives.
     key: Optional[Tuple[Hashable, ...]] = None
+    # Selection paths are unique within a root. A zero-element tensor takes
+    # no device storage and lets Dynamo guard both shared and distinct roots.
+    _origin: Tensor = field(default_factory=lambda: torch.empty(0, dtype=torch.uint8, device="cpu"), repr=False)
 
     @classmethod
     def from_inputs(cls, inputs: Dict[str, Any], requires: GraphRequires, num_nodes: int,
@@ -589,7 +592,7 @@ class GraphContext:
             dist=self.dist[indices] if self.dist is not None else None,
             rbf=self.rbf[indices] if self.rbf is not None else None,
             cutoff_values=self.cutoff_values[indices] if self.cutoff_values is not None else None,
-            batch=self.batch, inputs=self.inputs,
+            batch=self.batch, inputs=self.inputs, _origin=self._origin,
             key=None if self.key is None or step is None else self.key + (step,))
         if csr_key is not None and csr_key in self.cache:
             graph.cache["csr"] = self.cache[csr_key]
@@ -643,7 +646,7 @@ class GraphContext:
         """A constant naming ``other`` for this graph's cache, or None."""
         if other is self:
             return "self"
-        if self.key is None or other.key is None:
+        if self._origin is not other._origin or self.key is None or other.key is None:
             return None
         return other.key
 
@@ -675,7 +678,7 @@ class GraphContext:
 
         if interaction is None:
             interaction = self
-        if "_prepared_cutoff" in interaction.cache:
+        if self._origin is interaction._origin and "_prepared_cutoff" in interaction.cache:
             key = ("_prepared_quads", interaction.cache["_prepared_cutoff"], images)
             if key in self.cache:
                 return self.cache[key]

@@ -63,6 +63,15 @@ class BaseFFModule(ABC, Module):
     def get_relevant_input_fields(self, net_input_fields: Optional[Set[str]]=None) -> Set[str]:
         return self._input_fields
 
+    @torch.compiler.assume_constant_result
+    def _compiled_input_fields(self, keys, _layer_id):
+        # Freeze the first schema on the actual layer, outside Dynamo's guards
+        # on the initialization flag. id(self) guards this trace against reuse
+        # on another, still uninitialized instance of the same layer type.
+        if not self.adapted_relevant_fields:
+            self._get_relevant_input_fields(dict.fromkeys(keys).keys())
+        return tuple(self._input_fields)
+
     @abstractmethod
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         ...
@@ -70,15 +79,12 @@ class BaseFFModule(ABC, Module):
     def _forward(self, net_input: Union[Dict[str, Tensor], Data], extra_inputs=None) -> Dict[str, Tensor]:
         relevant_input = dict()
         relevant_input_fields = self._input_fields
-        if not self.adapted_relevant_fields:
-            if torch.compiler.is_compiling():
-                # Adapting mutates this layer while it is traced, and the next
-                # call then fails the guard on the flag and recompiles every
-                # graph that inlines the layer. Resolve the same fields locally.
-                relevant_input_fields = relevant_input_fields | self.get_relevant_input_fields(net_input.keys())
-            else:
-                self._get_relevant_input_fields(net_input.keys())
-                relevant_input_fields = self._input_fields
+        if torch.compiler.is_compiling():
+            if type(self).get_relevant_input_fields is not BaseFFModule.get_relevant_input_fields:
+                relevant_input_fields = self._compiled_input_fields(tuple(net_input.keys()), id(self))
+        elif not self.adapted_relevant_fields:
+            self._get_relevant_input_fields(net_input.keys())
+            relevant_input_fields = self._input_fields
         if isinstance(net_input, Data):
             net_output = net_input
             for k in relevant_input_fields:
@@ -148,7 +154,7 @@ class BaseFFCore(BaseFFModule):
         if torch.compiler.is_compiling():
             from .compiled_grad import (
                 compiled_coordinate_vjp, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
-                uses_cpu_inductor_forces, native_forces,
+                inductor_force_device, uses_cpu_inductor_forces, native_forces,
                 compiled_cpu_forces_with_options, cpu_inductor_options,
             )
 
@@ -160,13 +166,20 @@ class BaseFFCore(BaseFFModule):
             partitioned = getattr(self, "_partitioned_cpu_inductor_force_inference", None)
             if not self.training and partitioned is not None and compiling_fullgraph():
                 native = partitioned
+            devices = ("cpu",)
+            norm_dtype = getattr(self, "_partitioned_norm_force_dtype", None)
+            if norm_dtype is not None and (self.training or compiling_fullgraph()):
+                # This model's norm uses FP32 even in a double-precision stack.
+                # Ordinary inference partitions the norm, training needs its
+                # native double backward through the full coordinate graph.
+                native, devices = norm_dtype, ("cpu", "cuda")
             dtype = native if isinstance(native, torch.dtype) else None
-            if (native is True or dtype is not None) and uses_cpu_inductor_forces(
-                self, net_input, include_eval=not self.training, dtype=dtype
-            ):
+            device = (inductor_force_device(self, net_input, devices=devices, include_eval=not self.training, dtype=dtype)
+                      if native is True or dtype is not None else None)
+            if device is not None:
                 if dtype is not None:
                     name = getattr(self, "architecture", type(self).__name__)
-                    message = (f"Fullgraph {dtype} CPU forces for {name} require native derivatives. "
+                    message = (f"Fullgraph {dtype} {device.upper()} forces for {name} require native derivatives. "
                                "Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'.")
                 else:
                     message = ("Fullgraph CPU force training requires an eager backend for this model"
@@ -195,7 +208,7 @@ class BaseFFCore(BaseFFModule):
             return retained_inference(self, net_input, joint=joint)
         return self._run_layers(net_input)
 
-    def _run_layers(self, net_input):
+    def _run_layers(self, net_input, *, prepared_topology=None):
         for layer in self.pre_sequence:
             if layer.test_only and not self.test_mode:
                 continue
@@ -203,7 +216,10 @@ class BaseFFCore(BaseFFModule):
                 continue
             else:
                 net_input = layer(net_input)
-        net_output = self._forward(net_input)
+        if prepared_topology is None:
+            net_output = self._forward(net_input)
+        else:
+            net_output = self._forward(net_input, extra_inputs={"_prepared_topology": prepared_topology})
         for layer in self.post_sequence:
             if layer.test_only and not self.test_mode:
                 continue

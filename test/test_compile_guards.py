@@ -1,7 +1,42 @@
 """Compiled pipelines must not recompile when called again on the same inputs."""
 
+import pytest
 import torch
 import torch._dynamo
+
+
+@pytest.mark.parametrize("fullgraph", [False, True])
+@pytest.mark.parametrize("use_pyg", [False, True])
+def test_compiled_energy_reduction_freezes_each_layers_first_fields(fullgraph, use_pyg):
+    from enerzyme.models.layers.reduce import EnergyReduceLayer
+    from torch_geometric.data import Data
+
+    @torch.compile(backend="eager", fullgraph=fullgraph)
+    def energy(layer, fields):
+        return layer(fields)["E"]
+
+    def fields(correction=None):
+        values = {"Ea": torch.tensor([1., 2.]), "Za": torch.ones(2, dtype=torch.long),
+                  "batch" if use_pyg else "batch_seg": torch.zeros(2, dtype=torch.long), "N": torch.tensor([2])}
+        if correction is not None:
+            values[correction] = torch.tensor([10., 20.])
+        return Data(**values) if use_pyg else values
+
+    torch._dynamo.reset()
+    try:
+        for layer in (EnergyReduceLayer(), EnergyReduceLayer()):
+            torch.testing.assert_close(energy(layer, fields()), torch.tensor([3.]))
+            with torch._dynamo.config.patch(error_on_recompile=True):
+                torch.testing.assert_close(energy(layer, fields()), torch.tensor([3.]))
+            torch.testing.assert_close(energy(layer, fields("Eextraa")), torch.tensor([3.]))
+            torch.testing.assert_close(layer(fields("Eextraa"))["E"], torch.tensor([3.]))
+
+        layer = EnergyReduceLayer()
+        torch.testing.assert_close(energy(layer, fields("Eextraa")), torch.tensor([33.]))
+        layer.reset_field_name(Eextraa="correction")
+        torch.testing.assert_close(energy(layer, fields("correction")), layer(fields("correction"))["E"])
+    finally:
+        torch._dynamo.reset()
 
 
 def test_compiled_pipeline_second_call_reuses_its_graphs():

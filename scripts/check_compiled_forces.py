@@ -29,7 +29,10 @@ class PreparedEnergyForces(torch.nn.Module):
         native = getattr(model, "_native_cpu_inductor_forces", False)
         if isinstance(native, torch.dtype):
             native = native == next(model.parameters()).dtype
-        if getattr(model, "_scripted_force_kernels", False) or (device.type == "cpu" and (
+        norm_dtype = getattr(model, "_partitioned_norm_force_dtype", None)
+        native_norm = (norm_dtype is not None and device.type in ("cpu", "cuda")
+                       and norm_dtype == next(model.parameters()).dtype)
+        if native_norm or getattr(model, "_scripted_force_kernels", False) or (device.type == "cpu" and (
             native
             or getattr(model, "_cpu_force_training_option", None)
         )):

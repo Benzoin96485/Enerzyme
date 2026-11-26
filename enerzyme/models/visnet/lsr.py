@@ -42,6 +42,7 @@ from .long_range import (
     normalize_center,
     normalize_fragment_mode,
     resolve_long_range_fragments as resolve_long_range_fragments,
+    select_fragment_topology,
 )
 
 
@@ -123,6 +124,7 @@ class FragmentEdges(Block):
     """Seed the long-range state and prepare the atom-to-fragment graph once."""
 
     input_fields = ("Ra", "Za", "batch_seg", "cluster_ids")
+    topology_fields = input_fields
 
     def __init__(self, num_rbf, width, cutoff_lr, trainable, mode, center, min_nodes, seed, active):
         super().__init__()
@@ -135,6 +137,15 @@ class FragmentEdges(Block):
         self.active = active
         self.long_rbf = ExpNormalSmearing(num_rbf=num_rbf, cutoff_sr=cutoff_lr, trainable=trainable)
         self.long_rbf_proj = Linear(num_rbf, width)
+
+    def prepare_force_topology(self, Ra, Za, batch_seg, cluster_ids):
+        if (not self.active or not self.training or Ra is None or not Ra.shape[0]
+                or torch.is_autocast_enabled(Ra.device.type)):
+            return None
+        batch = _batch_index(batch_seg, Ra.shape[0], Ra.device)
+        numbers = None if Za is None else Za.reshape(-1)
+        return select_fragment_topology(Ra, batch, self.mode, self.center, numbers, cluster_ids,
+                                        self.min_nodes_per_group, self.kmeans_random_state, self.cutoff_lr)
 
     def forward(self, state, ctx):
         scalar = state.scalar
@@ -159,7 +170,7 @@ class FragmentEdges(Block):
             cluster_ids,
             self.min_nodes_per_group,
             self.kmeans_random_state,
-            self.cutoff_lr,
+            self.cutoff_lr, ctx.cache.get("lsrm_fragment_indices"),
         )
         if not torch.compiler.is_compiling() and idx_atom.numel() == 0:
             edge_attr = scalar.new_zeros(0, self.dim_embedding)

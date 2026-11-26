@@ -618,3 +618,50 @@ def test_compiled_force_training_without_messages_keeps_disconnected_weights_unu
     observed = gradients(torch.compile(model, backend="aot_eager"))
     assert any(grad is None for grad in reference)
     torch.testing.assert_close(observed, reference)
+
+
+def test_compiled_vector_training_honors_internal_backward_hooks_and_wrapped_final_updates(monkeypatch):
+    model, batch = _force_fixture()
+    model.double()
+    batch["Ra"] = batch["Ra"].detach().double().requires_grad_()
+    query = model.blocks[0].module.q_proj
+    last = model.blocks[-1].module
+    weights = (batch["Ra"], query.weight)
+
+    def evaluate(runner):
+        out = runner(batch)
+        loss = out["E"].square().sum() + out["Fa"].square().sum()
+        return out["E"], out["Fa"], *torch.autograd.grad(loss, weights)
+
+    torch.compiler.reset()
+    try:
+        compiled = torch.compile(model, backend="aot_eager")
+
+        def compare():
+            reference = evaluate(model)
+            torch.testing.assert_close(evaluate(compiled), reference, atol=1e-10, rtol=1e-8)
+            return reference
+
+        baseline = compare()
+
+        def amplify(_layer, grad_output):
+            return (2 * grad_output[0],)
+
+        with query.register_full_backward_pre_hook(amplify):
+            hooked = compare()
+            assert not torch.allclose(hooked[-1], baseline[-1])
+        torch.testing.assert_close(compare(), baseline)
+
+        forward = last.forward
+
+        def amplify_update(*args, **kwargs):
+            scalar, vector, edge = forward(*args, **kwargs)
+            return 3 * scalar, vector, edge
+
+        with monkeypatch.context() as patched:
+            patched.setattr(last, "forward", amplify_update)
+            changed = compare()
+            assert not torch.allclose(changed[0], baseline[0])
+        torch.testing.assert_close(compare(), baseline)
+    finally:
+        torch.compiler.reset()

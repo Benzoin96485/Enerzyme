@@ -4,7 +4,9 @@ from functools import partial
 
 import torch
 
-from ..layers.compiled_grad import _input_fields, _restore_input_type, forward_with_coordinate_gradients, has_module_hooks
+from ..layers.compiled_grad import (
+    _input_fields, _restore_input_type, forward_with_coordinate_gradients, has_module_hooks, native_forces,
+)
 from ..layers.gradient import ForceLayer
 from ..layers.readout import SimpleReadout
 from ..layers.reduce import EnergyReduceLayer
@@ -34,29 +36,24 @@ def _active(layer, core):
 
 
 def has_training_hooks(core):
-    # These stages can change the force prefix, replace the last update or
-    # inspect its outputs. Dynamo can reuse a joint graph traced before a
-    # hook was installed. Read the active handles before preparing geometry.
-    if has_module_hooks(core.pre_sequence) or has_module_hooks(core.post_sequence):
-        return True
-    if type(core) is not ComposableCore or not core.schedule:
-        return False
-    return any(has_module_hooks(module) for module in (
-        core.embed, core.blocks[core.schedule[-1]], core.head,
-    ))
+    # A full backward hook inside any interaction installs a custom autograd
+    # function that cannot participate in the functional coordinate pullback.
+    # Inspect live handles so hooks added after compilation also work.
+    return has_module_hooks(core)
 
 
 def _supports_terminal_update(core):
     last = core.blocks[core.schedule[-1]]
-    if type(last) is not FnBlock:
+    if (type(last) is not FnBlock or "forward" in vars(last) or "forward" in vars(last.module)
+            or "forward" in vars(core.head)):
         return False
     if core.architecture == "visnet_lsrm":
         from ..mp.nonlocal_ import FragmentLR
         from ..visnet.lsr import FragmentFusionHead, fragment_step
 
-        return (last._fn is fragment_step and type(last.module) is FragmentLR and last.module.dropout_p == 0
+        return (last._fn is fragment_step and type(last.module) is FragmentLR
                 and type(core.head) is FragmentFusionHead and type(core.head.short) is AngularFeatureHead
-                and core.head.short.lmax == 1)
+                and core.head.short.lmax == 1 and "forward" not in vars(core.head.short))
     eligible = (ViSInteraction, QuinNetInteraction)
     if core.architecture == "freecg":
         # FreeCG loads e3nn's tensor-product kernels only for its own preset.
@@ -188,6 +185,16 @@ def _vector_outputs(core, state):
 @torch.compiler.disable(recursive=False)
 def train_with_vector_outputs(core, inputs, edges, topology, post_pairs):
     """Separate differentiable graphs so unused auxiliary outputs keep absent gradients."""
+    if core.architecture == "visnet_lsrm" and getattr(core, "_force_topology_block", None) is not None:
+        from ..visnet.long_range import FragmentTopology
+
+        if not isinstance(topology, FragmentTopology):
+            # A preprocessing layer or live hook may replace positions or fragment labels.
+            return native_forces(core, inputs)
+        if not topology.edges.numel() or (not core.embed.include_self and edges is not None and not edges.numel()):
+            # Empty fragment updates return disconnected zeros in eager mode.
+            # Reuse the selected topology so native autograd does not recluster.
+            return native_forces(core, inputs, topology)
     deferred = _deferred_layers(core, inputs)
     # With no messages, returning the last block's empty projection inputs
     # makes AOT send zero gradients to otherwise disconnected earlier layers.

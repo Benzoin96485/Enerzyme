@@ -219,7 +219,7 @@ class EquivariantDegreeRMSNorm(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if (torch.compiler.is_compiling() and not self.training
-                and x.device.type == "cpu" and x.dtype == torch.float64):
+                and x.device.type in ("cpu", "cuda") and x.dtype == torch.float64):
             from ....layers.compiled_grad import compiling_fullgraph
 
             if not compiling_fullgraph():

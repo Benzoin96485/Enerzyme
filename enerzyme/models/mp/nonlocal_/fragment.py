@@ -26,6 +26,15 @@ from ..nn.mlp import xavier_linear
 from ..ops import scatter_sum
 
 
+class _FragmentDropout(Dropout):
+    def forward(self, values: Tensor) -> Tensor:
+        # Functional dropout queries numel under a coordinate VJP. The native
+        # operator accepts a symbolic fragment count and saves the sampled mask.
+        if torch.compiler.is_compiling() and self.training and 0 < self.p < 1 and not self.inplace:
+            return torch.ops.aten.native_dropout.default(values, self.p, True)[0]
+        return super().forward(values)
+
+
 class FragmentLR(Module):
     """One pre-norm fragment→atom update. Returns residuals ``(dx, dvec)``."""
 
@@ -68,8 +77,8 @@ class FragmentLR(Module):
         self.mix = ModuleList(
             Linear(hidden_channels, hidden_channels, bias=False) for _ in range(6)
         )
-        self.drop_scalar = Dropout(self.dropout_p)
-        self.drop_vector = Dropout(self.dropout_p)
+        self.drop_scalar = _FragmentDropout(self.dropout_p)
+        self.drop_vector = _FragmentDropout(self.dropout_p)
         self.reset_parameters()
 
     def reset_parameters(self) -> None:

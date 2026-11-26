@@ -383,7 +383,6 @@ def test_compiled_force_training_with_dropout_accepts_new_edge_counts():
     # A second batch with a different edge count retraces with a symbolic
     # number of edges. The composite dropout called numel() on it inside the
     # coordinate VJP; the native operator accepts the symbolic size.
-    from torch._inductor import config
     from scripts.core_harness import build, forward, make_batch, random_molecules
 
     from enerzyme.models.ff import get_ff_core
@@ -405,8 +404,7 @@ def test_compiled_force_training_with_dropout_accepts_new_edge_counts():
                 name: p.grad.clone() for name, p in model.named_parameters() if p.grad is not None}
 
         energy, forces, grads = run(model)
-        with config.patch(fallback_random=True):
-            c_energy, c_forces, c_grads = run(compiled)
+        c_energy, c_forces, c_grads = run(compiled)
         torch.testing.assert_close(c_energy, energy, rtol=1e-10, atol=1e-10)
         torch.testing.assert_close(c_forces, forces, rtol=1e-10, atol=1e-10)
         assert c_grads.keys() == grads.keys()

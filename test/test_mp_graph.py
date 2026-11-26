@@ -264,3 +264,71 @@ def test_graph_context_reused_after_a_graph_break_does_not_recompile():
         for _ in range(3):
             torch.testing.assert_close(compiled(receiver.clone(), sender.clone(), vec.clone()), expected)
     torch._dynamo.reset()
+
+
+@pytest.mark.parametrize("prepared", [False, True])
+def test_cross_graph_tables_distinguish_independent_roots(prepared):
+    from enerzyme.models.mp.graph import PreparedTopology, QuadrupletRequest, cross_receiver_pairs
+    from enerzyme.models.mp.quadruplets import dihedral_quadruplets
+
+    receiver, sender, vec, dist, n = _graph(n_nodes=4, cutoff=10)
+    request = QuadrupletRequest(9., 10.)
+    requires = GraphRequires(rbf=False, topology=(request,))
+
+    def root(selection):
+        fields = {"idx_i_sr": receiver[selection], "idx_j_sr": sender[selection],
+                  "vij_sr": vec[selection], "Dij_sr": dist[selection]}
+        graph = GraphContext.from_inputs(fields, requires, n)
+        if prepared:
+            fields["_prepared_topology"] = PreparedTopology.build(graph, requires.topology)
+            graph = GraphContext.from_inputs(fields, requires, n)
+        return graph
+
+    first = root(slice(None))
+    query, local = first.within(9.), first.within(10.)
+    foreign = root(slice(0, 3)).within(10.)
+    assert local.key == foreign.key
+    query.cross_pairs(local)
+    local_quads = query.quadruplets(local)
+    expected_pairs = cross_receiver_pairs(query.receiver, foreign.receiver, n)
+    expected_quads = dihedral_quadruplets(query, foreign)
+    assert len(local_quads.int_local) > len(expected_quads.int_local) > 0
+    torch.testing.assert_close(query.cross_pairs(foreign), expected_pairs)
+    torch.testing.assert_close(query.quadruplets(foreign), expected_quads)
+    assert query.quadruplets(local) is local_quads
+
+
+def test_fullgraph_distinguishes_roots_sharing_the_same_input_tensors():
+    requires = GraphRequires(vectors=False, distances=False, rbf=False)
+
+    @torch.compile(backend="eager", fullgraph=True)
+    def roots(receiver, sender):
+        inputs = {"idx_i_sr": receiver, "idx_j_sr": sender}
+        first = GraphContext.from_inputs(inputs, requires, 3)
+        second = GraphContext.from_inputs(inputs, requires, 3)
+        child = first.subset(torch.tensor([0, 1]), key="first")
+        assert first._relative(second) is None
+        assert first._relative(child) == child.key
+        return child.receiver + child.sender
+
+    receiver, sender = torch.tensor([0, 1, 0]), torch.tensor([1, 2, 2])
+    torch.testing.assert_close(roots(receiver, sender), torch.tensor([1, 3]))
+    with torch._dynamo.config.patch(error_on_recompile=True):
+        torch.testing.assert_close(roots(receiver.clone(), sender.clone()), torch.tensor([1, 3]))
+
+
+def test_fullgraph_external_contexts_can_alternate_between_related_and_independent():
+    requires = GraphRequires(vectors=False, distances=False, rbf=False)
+    fields = {"idx_i_sr": torch.tensor([0, 1]), "idx_j_sr": torch.tensor([1, 0])}
+    first = GraphContext.from_inputs(fields, requires, 2)
+    other = GraphContext.from_inputs(fields, requires, 2)
+    local = first.subset(torch.tensor([0]), key="edge")
+    foreign = other.subset(torch.tensor([0]), key="edge")
+
+    @torch.compile(backend="eager", fullgraph=True)
+    def cacheable(graph, view, value):
+        return value if graph._relative(view) is None else value + 1
+
+    value = torch.tensor(0)
+    for view, expected in ((local, 1), (foreign, 0), (local, 1)):
+        assert cacheable(first, view, value).item() == expected

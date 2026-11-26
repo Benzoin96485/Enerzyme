@@ -257,18 +257,19 @@ def test_native_force_routing_uses_the_active_layers_mapped_coordinate_dtype_and
     layer = ForceLayer()
     layer._name_mapping["Ra"] = "xyz"
     core.post_sequence = torch.nn.Sequential(layer)
-    monkeypatch.setattr(compiled_grad, "_cpu_backend_may_use_inductor", lambda: True)
+    monkeypatch.setattr(compiled_grad, "_backend_may_use_inductor", lambda: True)
     with FakeTensorMode():
         coordinates = {device: {dtype: torch.empty(4, 3, dtype=dtype, device=device)
                                 for dtype in (torch.float32, torch.float64)}
                        for device in ("cpu", "cuda")}
 
     def uses_native(position):
-        return compiled_grad.uses_cpu_inductor_forces(core, {"xyz": position}, dtype=core._native_cpu_inductor_forces)
+        return compiled_grad.inductor_force_device(core, {"xyz": position}, devices=("cpu", "cuda"),
+                                                   dtype=core._partitioned_norm_force_dtype)
 
     assert uses_native(coordinates["cpu"][torch.float64])
     assert not uses_native(coordinates["cpu"][torch.float32])
-    assert not uses_native(coordinates["cuda"][torch.float64])
+    assert uses_native(coordinates["cuda"][torch.float64]) == "cuda"
     assert not uses_native(coordinates["cuda"][torch.float32])
     layer.eval_only = True
     assert not uses_native(coordinates["cpu"][torch.float64])

@@ -402,6 +402,56 @@ def _batch(distance):
     }
 
 
+def test_compiled_training_differentiates_replaced_coordinates():
+    from torch._dynamo.exc import TorchRuntimeError
+    from enerzyme.models.layers import BaseFFLayer
+
+    class ScaleCoordinates(BaseFFLayer):
+        def __init__(self):
+            super().__init__(input_fields={"Ra"}, output_fields={"Ra"})
+
+        def get_Ra(self, Ra):
+            return 0.8 * Ra
+
+    reference = _schnet(1)
+    reference.pre_sequence.insert(0, ScaleCoordinates())
+    target = copy.deepcopy(reference)
+
+    def values(run, model):
+        fields = _batch(0.9)
+        out = run(fields)
+        loss = out["E"].square().sum() + out["Fa"].square().sum()
+        gradients = torch.autograd.grad(loss, [fields["Ra"], *model.parameters()], allow_unused=True)
+        return out["E"], out["Fa"], gradients
+
+    expected = values(reference, reference)
+    assert expected[1].abs().max() > 0
+    torch.testing.assert_close(values(torch.compile(target, backend="aot_eager"), target), expected)
+    with pytest.raises((AssertionError, TorchRuntimeError), match="Replaced force coordinates"):
+        torch.compile(target, backend="eager", fullgraph=True)(_batch(0.9))
+
+
+def test_cuda_reduction_scope_uses_the_force_layers_coordinate_names():
+    from torch._inductor import config
+    from torch._subclasses.fake_tensor import FakeTensorMode
+    from enerzyme.models.layers.compiled_grad import float64_cuda_reduction_scope
+    from enerzyme.models.layers.gradient import ForceLayer
+
+    if not hasattr(config.triton, "mix_order_reduction"):
+        pytest.skip("Inductor has no mix-order reduction option")
+    core = _schnet(1)
+    force = next(layer for layer in core.post_sequence if type(layer) is ForceLayer)
+    force.reset_field_name(Ra="pos")
+    with FakeTensorMode(), config.patch({"triton.mix_order_reduction": True}):
+        cuda = torch.empty(3, 3, device="cuda", dtype=torch.float64)
+        cpu = torch.empty(3, 3, dtype=torch.float64)
+        with float64_cuda_reduction_scope(core, {"pos": cuda}):
+            assert not config.triton.mix_order_reduction
+        with float64_cuda_reduction_scope(core, {"pos": cpu, "Ra": cuda}):
+            assert config.triton.mix_order_reduction
+        assert config.triton.mix_order_reduction
+
+
 @pytest.mark.parametrize("ensemble, backend", [(1, "inductor"), (2, "aot_eager")])
 def test_compiled_energy_force_and_parameter_gradients(ensemble, backend):
     torch.manual_seed(37)

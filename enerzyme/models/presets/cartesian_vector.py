@@ -341,7 +341,9 @@ def visnet_lsrm(
     return ComposableCore(
         embed, blocks, head, GraphRequires(), builder=build_attention_stack,
         positional_fields=_ATTENTION_INPUTS + ("Ra", "batch_seg", "cluster_ids"),
-        architecture="visnet_lsrm", lmax=lmax, angular_dim=embed.angular_dim, num_heads=num_heads,
+        architecture="visnet_lsrm", _force_topology_block=len(layers) if long_layers else None,
+        _match_training_dropout=bool(long_layers and dropout),
+        lmax=lmax, angular_dim=embed.angular_dim, num_heads=num_heads,
         num_layers=num_layers, dim_embedding=dim_embedding, dim_feature_out=2*dim_embedding,
         feature_irreps=f"{2*dim_embedding}x0e", vector_feature_layout="cartesian_n3f",
     )
@@ -456,6 +458,7 @@ def alphanet(
         embed, blocks, QuantumHead(hidden, main_chi1), GraphRequires(),
         positional_fields=_VECTOR_INPUTS + ("Ra", "batch_seg", "cutoff_values_sr"),
         architecture="alphanet", fte_scalarization=fte_scalarization, num_layers=layers,
+        _match_training_dropout=has_dropout_flag,
         main_chi1=main_chi1, muon_head_names=(), **vector_metadata(hidden),
     )
 
@@ -513,5 +516,5 @@ def geodite(
         architecture="geodite", dim_embedding=dim_embedding, dim_feature_out=dim_embedding,
         num_layers=num_layers, num_output_blocks=num_layers, feature_irreps=f"{dim_embedding}x0e",
         steerable_layout="geodite_polynomial", emits_isolated_atom_feature=True, lmax=lmax,
-        attn_dropout=attn_dropout, angular_dim=embed.angular_dim,
+        attn_dropout=attn_dropout, angular_dim=embed.angular_dim, _match_training_dropout=0 < attn_dropout < 1,
     )
