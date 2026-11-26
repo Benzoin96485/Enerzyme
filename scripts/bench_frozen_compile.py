@@ -176,40 +176,44 @@ def compare_main_runs(paths, reference_paths):
     return result
 
 
+def _git_revision(directory):
+    try:
+        git = subprocess.run(["git", "-C", str(directory), "rev-parse", "HEAD"], capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+    return git.stdout.strip() if git.returncode == 0 else None
+
+
 def run(args):
     started = time.time_ns()
-    sys.path.insert(0, str(args.model_tree.resolve()))
-    from enerzyme.models.ff import get_ff_core
+    model_tree = args.model_tree.resolve()
+    sys.path.insert(0, str(model_tree))
+    from enerzyme.models import ff
+
+    if Path(ff.__file__).resolve() != (model_tree / "enerzyme/models/ff.py").resolve():
+        raise ValueError(f"Expected to load Enerzyme from {model_tree}, loaded {ff.__file__}")
 
     torch.set_num_threads(args.threads)
     dtype, device = getattr(torch, args.precision), torch.device(args.device)
     main_fixture = getattr(args, "main_fixture", None)
     source = main_fixture or args.snapshot
     atom_features = {}
+    driver_path = Path(__file__).resolve()
+    provenance = {
+        "model_revision": _git_revision(args.model_tree), "driver_revision": _git_revision(driver_path.parent),
+        "driver_sha256": hashlib.sha256(driver_path.read_bytes()).hexdigest(),
+        "slurm_job_id": os.environ.get("SLURM_JOB_ID"), "node": socket.gethostname(), "started_unix_ns": started,
+    }
     if main_fixture:
         config, digest, weights, atom_features = _fixture_configuration(source)
         arch, params = config["architecture"], config["build_params"]
-        driver_path = Path(__file__).resolve()
-
-        def revision(directory):
-            try:
-                git = subprocess.run(["git", "-C", str(directory), "rev-parse", "HEAD"],
-                                     capture_output=True, text=True)
-            except FileNotFoundError:
-                return None
-            return git.stdout.strip() if git.returncode == 0 else None
-
-        provenance = {"fixture_kind": "main_trained", "config_sha256": digest,
-                      "checkpoint_state": "model_state_dict", "tiled_atom_features": sorted(atom_features),
-                      "model_revision": revision(args.model_tree), "driver_revision": revision(driver_path.parent),
-                      "driver_sha256": hashlib.sha256(driver_path.read_bytes()).hexdigest(),
-                      "slurm_job_id": os.environ.get("SLURM_JOB_ID"), "node": socket.gethostname(),
-                      "started_unix_ns": started}
+        provenance.update(fixture_kind="main_trained", config_sha256=digest,
+                          checkpoint_state="model_state_dict", tiled_atom_features=sorted(atom_features))
     else:
         payload = torch.load(source, map_location="cpu", weights_only=False)
         arch = payload["architecture"]
-        _, params, _ = get_ff_core(arch)
-        provenance = {"snapshot_revision": payload["commit"]}
+        _, params, _ = ff.get_ff_core(arch)
+        provenance["snapshot_revision"] = payload["commit"]
     cutoff = max(float(params.get("cutoff_sr") or 0), float(params.get("cutoff_lr") or 0), 6.0)
 
     def load_model():
@@ -249,8 +253,9 @@ def run(args):
     }
     if device.type == "cuda":
         result["device_name"] = torch.cuda.get_device_name(device)
-        if main_fixture:
-            result["device_uuid"] = str(torch.cuda.get_device_properties(device).uuid)
+        uuid = getattr(torch.cuda.get_device_properties(device), "uuid", None)
+        if uuid is not None:
+            result["device_uuid"] = str(uuid)
     write()
     try:
         model, initial_state, original_names = load_model()
@@ -375,8 +380,7 @@ def run(args):
             )
         del batch
     result["finished"] = True
-    if main_fixture:
-        result["finished_unix_ns"] = time.time_ns()
+    result["finished_unix_ns"] = time.time_ns()
     write()
 
 

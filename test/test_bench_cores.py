@@ -15,6 +15,15 @@ def _timings():
     return {"device": "cpu", "mol_batch": {"infer_ms": 10.0, "train_ms": 20.0}}
 
 
+def test_frozen_benchmark_rejects_a_different_model_checkout(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from bench_frozen_compile import run
+
+    monkeypatch.setattr(sys, "path", sys.path.copy())
+    with pytest.raises(ValueError, match="Expected to load Enerzyme"):
+        run(SimpleNamespace(model_tree=tmp_path))
+
+
 def test_force_check_requires_matching_tensor_shapes_dtypes_and_finite_values():
     import torch
     from check_compiled_forces import compare_fields
