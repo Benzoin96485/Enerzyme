@@ -1,11 +1,11 @@
 {
   "cpu": {
-    "revision": "2a3b024",
-    "job": "6333817",
+    "revision": "2e21446",
+    "job": "6339216",
     "test_files_and_shards": 171,
     "results": {
-      "passed": 1643,
-      "skipped": 63,
+      "passed": 1663,
+      "skipped": 65,
       "errors": 0,
       "failures": 0
     },
@@ -14,6 +14,7 @@
       "CUDA + Triton required": 2,
       "CUDA and Triton required": 2,
       "CUDA-only local-frame fusion": 1,
+      "requires CUDA Inductor": 2,
       "set UMA_CHECKPOINT to a local uma-*.pt for live train smoke": 1,
       "compiled single-precision CUDA training": 1,
       "CUDA not available": 6,
@@ -22,27 +23,31 @@
     }
   },
   "cuda": {
-    "revision": "2a3b024",
-    "job": "6334531",
+    "revision": "da1e5ec",
+    "job": "6339171",
     "device": "Tesla V100-PCIE-32GB (sm70)",
     "pytest_files": [
       "test/test_e2former_triton_parity.py",
       "test/test_scatter.py",
       "test/test_local_frame_ops.py",
-      "test/test_dpa4_core.py::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles"
+      "test/test_dpa4_core.py::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles",
+      "test/test_alignn_ops.py::test_compiled_gate_preserves_live_hooks_and_force_gradients",
+      "test/test_gemnet_ops.py::test_compiled_bilinear_force_inference_retains_gradients"
     ],
     "results": {
-      "passed": 34,
+      "passed": 36,
       "skipped": 1,
       "errors": 0,
       "failures": 0
     },
     "cpu_skips_passed_on_cuda": [
+      "test.test_alignn_ops::test_compiled_gate_preserves_live_hooks_and_force_gradients",
       "test.test_dpa4_core::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles",
       "test.test_e2former_triton_parity::test_attention_triton_qk_matches_qk_alpha_module_on_cuda",
       "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype0]",
       "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype1]",
       "test.test_e2former_triton_parity::test_triton_sparse_qk_v_match_pytorch_on_cuda",
+      "test.test_gemnet_ops::test_compiled_bilinear_force_inference_retains_gradients",
       "test.test_local_frame_ops::test_compiled_local_frame_projection_honors_nested_hook",
       "test.test_scatter::test_scatter_sum_basic_equivalence[cuda]",
       "test.test_scatter::test_scatter_sum_empty_input_equivalence[cuda]",
@@ -57,10 +62,10 @@
   },
   "notes": "The runs use the recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run.",
   "wheel": {
-    "revision": "2a3b024",
-    "job": "6333818",
+    "revision": "2e21446",
+    "job": "6339217",
     "filename": "enerzyme-0.6.0-py3-none-any.whl",
-    "sha256": "e9b9d59391cc8d80399f4a460aab29fa1e91652ed8dea5a481f65a30f03e99c2",
+    "sha256": "5f5af67111f3b393a4ce493305a42b433a6180f5be0a224db1d8605e9b6c18fb",
     "results": {
       "passed": 58,
       "skipped": 0,
