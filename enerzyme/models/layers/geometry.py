@@ -21,8 +21,8 @@ class DistanceLayer(BaseFFLayer):
         '''
         Compute the distance with atom pair indices
 
-        Params:
-        -----
+        .. rubric:: Parameters
+
         Ra: Float tensor of atom positions, shape [N * batch_size]
 
         idx_i: Long tensor of the first pair indices, shape [N_pair * batch_size]
@@ -31,8 +31,8 @@ class DistanceLayer(BaseFFLayer):
 
         offsets: Float tensor of distance offsets, shape [N_pair * batch_size]
 
-        Returns:
-        -----
+        .. rubric:: Returns
+
         Dij: Float tensor of distances, shape [N_pair * batch_size]
         '''
         relevant_output = dict()

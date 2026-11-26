@@ -455,11 +455,8 @@ class NSEReadout(BaseReadout):
     """Readout head specialized for NSE intermediate variables.
 
     By default, this head predicts four per-atom scalar fields required by
-    Neural Spin-Charge Equilibration (NSE):
-      - Qa_alpha_tilde
-      - Qa_beta_tilde
-      - fa_alpha
-      - fa_beta
+    Neural Spin-Charge Equilibration (NSE): ``Qa_alpha_tilde``, ``Qa_beta_tilde``,
+    ``fa_alpha`` and ``fa_beta``.
 
     It remains fully compatible with UMAWrapperQS by consuming `atom_feature`
     in the same way as `SimpleReadout`, and it can optionally be configured

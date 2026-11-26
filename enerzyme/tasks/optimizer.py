@@ -24,7 +24,7 @@ def get_optimizer_config(**params) -> Tuple[str, Dict[str, Any]]:
 
     Params:
     ----------
-    **params: dict
+    ``**params``: dict
         The configuration for the :doc:`Trainer <enerzyme.tasks.trainer.Trainer>` class.
 
     Returns:

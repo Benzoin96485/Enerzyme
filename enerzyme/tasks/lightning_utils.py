@@ -213,6 +213,7 @@ class LightningModel(L.LightningModule):
         self.generator_config = generator_config
 
     def training_step(self, batch, batch_idx):
+        """Return the sum of the configured training loss terms under ``loss``."""
         net_input, net_target = batch      
         loss = 0
         with torch.set_grad_enabled(True):
@@ -241,12 +242,15 @@ class LightningModel(L.LightningModule):
         return result
 
     def validation_step(self, batch, batch_idx):
+        """Return the validation loss and raw model outputs for this batch."""
         return self._prediction_step(batch)
 
     def test_step(self, batch, batch_idx):
+        """Return the test loss and raw model outputs for this batch."""
         return self._prediction_step(batch)
 
     def configure_optimizers(self):
+        """Return the configured optimizer and its learning-rate scheduler, stepped after each optimizer step."""
         return {
             "optimizer": self.optimizer,
             "lr_scheduler": {

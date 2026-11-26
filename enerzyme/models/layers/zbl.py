@@ -35,10 +35,10 @@ class ZBLRepulsionEnergyLayer(BaseFFLayer):
         switch_off: Optional[float] = None,
     ) -> None:
         """
-        Args:
-            Bohr_in_R / Hartree_in_E: unit conversion; ``kehalf = 0.5 * Bohr * Hartree``.
-            switch_off: if set (SO3LR: 1.5), multiply by smooth switch on ``[0, switch_off]``.
-                ``None`` keeps SpookyNet behaviour (envelope only via ``cutoff_values_sr``).
+        The unit conversion uses ``kehalf = 0.5 * Bohr_in_R * Hartree_in_E``.
+        When ``switch_off`` is set (1.5 for SO3LR), multiply by a smooth switch
+        on ``[0, switch_off]``. With ``None``, the SpookyNet envelope comes
+        only from ``cutoff_values_sr``.
         """
         super().__init__(output_fields={"E_zbl_a"})
         self.a0 = Bohr_in_R

@@ -4,6 +4,8 @@
 
 {% if module == 'enerzyme.models.efa' %}
 {% set public_module = 'enerzyme.models.mp.nonlocal_' %}
+{% elif module in ('enerzyme.models.cutoff', 'enerzyme.models.mp.equivariant') and objname in ('Envelope', 'C3CutoffEnvelope', 'DimeNetEnvelope', 'PolynomialEnvelope') %}
+{% set public_module = 'enerzyme.models.mp.basis.envelope' %}
 {% elif module == 'enerzyme.models.mp.equivariant' and objname in ('GraphSoftmax', 'SoftCap') %}
 {% set public_module = 'enerzyme.models.mp.ops' %}
 {% endif %}

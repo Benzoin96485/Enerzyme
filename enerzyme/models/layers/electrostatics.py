@@ -12,10 +12,13 @@ class ChargeConservationLayer(BaseFFLayer):
         r"""
         Correct the atomic charges to make their summation equal to the total charge by [1]
 
-        q^{corrected}_i = q_i - 1 / N (\sum_{j=1}^N q_j - Q)
+        .. math::
 
-        References:
-        -----
+            q_i^{\mathrm{corrected}} = q_i -
+            \frac{1}{N}\left(\sum_{j=1}^N q_j - Q\right).
+
+        .. rubric:: References
+
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         """
         super().__init__()
@@ -27,8 +30,8 @@ class ChargeConservationLayer(BaseFFLayer):
         '''
         Correct the atomic charge
 
-        Params:
-        -----
+        .. rubric:: Parameters
+
         Za: Long tensor of atomic numbers, shape [N * batch_size]
 
         Qa: Float tensor of atomic charges, shape [N * batch_size]
@@ -37,8 +40,8 @@ class ChargeConservationLayer(BaseFFLayer):
 
         batch_seg: Long tensor of batch indices, shape [N * batch_size]
 
-        Returns:
-        -----
+        .. rubric:: Returns
+
         Qa_corrected: Float tensor of corrected atomic charge, shape [N * batch_size]
 
         raw_Q: Float tensor of total atomic charge before correction, shape [batch_size]
@@ -99,23 +102,23 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         Pairwise electrostatic energy.
 
         Flavors:
+
         - ``PhysNet`` / ``SpookyNet``: shielded Coulomb with smooth SR blend [1].
         - ``SO3LR``: erf-damped Coulomb ``erf(r/σ)/r`` (Kabylda et al., JACS 2025);
           ``electrostatic_energy_scale`` is σ (pretrained SO3LR: 4.0). With
           ``cutoff_lr``, blends energy- and force-shifted forms on
           ``[0.45·Rc, Rc]``.
 
-        Params:
-        -----
-        Bohr_in_R / Hartree_in_E: unit conversion
-            (``kehalf = 0.5 * Bohr * Hartree``).
+        .. rubric:: Parameters
+
+        Bohr_in_R / Hartree_in_E: unit conversion (``kehalf = 0.5 * Bohr * Hartree``).
 
         cutoff_sr: short-range blend cutoff (required for PhysNet/SpookyNet).
 
         cutoff_lr: long-range cutoff; ignored interactions beyond this distance.
 
-        References:
-        -----
+        .. rubric:: References
+
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         """
         super().__init__(input_fields={"Dij_lr", "Qa", "idx_i", "idx_j"}, output_fields={"E_ele_a"})
@@ -232,8 +235,8 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         '''
         Compute the atomic electrostatic energy
 
-        Params:
-        -----
+        .. rubric:: Parameters
+
         Dij: Float tensor of pair distances, shape [N_pair * batch_size]
 
         Qa: Float tensor of atomic charges, shape [N * batch_size]
@@ -242,8 +245,8 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
 
         idx_j: Long tensor of the second indices of pairs, shape [N_pair * batch_size]
 
-        Returns:
-        -----
+        .. rubric:: Returns
+
         Ea: Float tensor of atomic electrostatic energy, shape [N * batch_size]
         '''
         if self.flavor == "SO3LR":

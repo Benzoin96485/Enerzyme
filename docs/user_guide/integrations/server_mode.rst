@@ -50,9 +50,9 @@ JSON body (conceptual):
         "model_key": "FF02",
         "input_file": "/path/to/geometry",
         "features": {
-            "Ra": [[...]],
-            "Za": [...],
-            "N": 100,
+            "Ra": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.96]],
+            "Za": [8, 1],
+            "N": 2,
             "Q": -1
         }
     }

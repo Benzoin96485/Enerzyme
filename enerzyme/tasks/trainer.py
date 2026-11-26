@@ -162,7 +162,7 @@ class Trainer:
         metric_config: dict
             The configuration for the :doc:`Metrics <enerzyme.tasks.metrics.Metrics>` class.
 
-        **params: dict
+        ``**params``: dict
             The configuration for the trainer.
         
         '''

@@ -22,8 +22,8 @@ class SpinConservationLayer(BaseFFLayer):
         '''
         Correct the atomic spin
 
-        Params:
-        -----
+        .. rubric:: Parameters
+
         Za: Long tensor of atomic numbers, shape [N * batch_size]
 
         Sa: Float tensor of atomic spins, shape [N * batch_size]
@@ -32,8 +32,8 @@ class SpinConservationLayer(BaseFFLayer):
 
         batch_seg: Long tensor of batch indices, shape [N * batch_size]
 
-        Returns:
-        -----
+        .. rubric:: Returns
+
         Sa_corrected: Float tensor of corrected atomic spin, shape [N * batch_size]
 
         raw_S: Float tensor of total atomic spin before correction, shape [batch_size]

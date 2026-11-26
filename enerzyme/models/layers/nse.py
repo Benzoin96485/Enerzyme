@@ -9,21 +9,25 @@ from ..mp.ops import scatter_sum
 
 class NeuralSpinChargeEquilibrationLayer(BaseFFLayer):
     r"""
-    Neural spin–charge equilibration layer following an AIMNet2-NSE-style update:
+    Neural spin–charge equilibration following an AIMNet2-NSE-style update
+    for each spin channel :math:`s \in \{\alpha, \beta\}`.
 
-        q_i^s = \tilde{q}_i^s + f_i^s * (Q^s - \sum_j \tilde{q}_j^s) / \sum_j f_j^s
+    .. math::
 
-    for each spin channel \(s \in \{\alpha, \beta\}\).
+        q_i^s = \tilde{q}_i^s +
+        f_i^s \frac{Q^s - \sum_j \tilde{q}_j^s}{\sum_j f_j^s}.
 
-    Design notes:
-    - Inputs `Qa_alpha_tilde`, `Qa_beta_tilde`, `fa_alpha`, `fa_beta` are per-atom
-      NSE intermediate quantities predicted by a readout head from `atom_feature`.
-    - Graph-level `Q` and `S` follow the Enerzyme/UMA convention:
-        * `Q` is the total charge per graph.
-        * `S` is the spin multiplicity minus 1, i.e. \(S = 2 S_{\text{phys}}\).
-    - Within this layer we construct spin-resolved targets
-        Q^α = (Q + S) / 2,   Q^β = (Q - S) / 2,
-      so that Q^α + Q^β = Q and Q^α - Q^β = S.
+    The readout predicts the per-atom quantities ``Qa_alpha_tilde``,
+    ``Qa_beta_tilde``, ``fa_alpha`` and ``fa_beta`` from ``atom_feature``.
+    Following the Enerzyme/UMA convention, :math:`Q` is the total charge
+    per graph and :math:`S = 2 S_{\mathrm{phys}}` is its spin multiplicity
+    minus one. The spin-resolved targets satisfy
+
+    .. math::
+
+        Q^\alpha = (Q + S)/2, \qquad Q^\beta = (Q - S)/2,
+
+    so that :math:`Q^\alpha + Q^\beta = Q` and :math:`Q^\alpha - Q^\beta = S`.
     """
 
     def __init__(self) -> None:
