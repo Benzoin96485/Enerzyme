@@ -230,12 +230,20 @@ For ordinary :code:`torch.compile`, the paired V100 results are in
 counts comparable timings and peak allocations and identifies values over
 the 3% threshold. To reproduce a pair, run the same driver in two fresh
 processes on the same GPU. Set :code:`BASELINE_TREE` to a checkout of
-:code:`1aa0f8b` and use the original frozen snapshot for both runs.
+:code:`1aa0f8b` and use the same frozen snapshot for both runs. The archived
+results record the SHA-256 of each original local fixture. If the fixtures
+are available, set :code:`SNAPSHOT_DIR` to their absolute directory. For a
+fresh comparison, set it to a separate empty directory and generate the
+reference in the baseline checkout. This command freezes SchNet.
 
 .. code-block:: shell
 
-   python scripts/bench_frozen_compile.py --model-tree "$BASELINE_TREE" --snapshot test/fixtures/presnapshot/schnet.pt --precision float64 --out baseline.json
-   python scripts/bench_frozen_compile.py --model-tree . --snapshot test/fixtures/presnapshot/schnet.pt --precision float64 --out candidate.json
+   (cd "$BASELINE_TREE" && python scripts/snapshot_cores.py --only schnet --out "$SNAPSHOT_DIR")
+
+.. code-block:: shell
+
+   python scripts/bench_frozen_compile.py --model-tree "$BASELINE_TREE" --snapshot "$SNAPSHOT_DIR/schnet.pt" --precision float64 --out baseline.json
+   python scripts/bench_frozen_compile.py --model-tree . --snapshot "$SNAPSHOT_DIR/schnet.pt" --precision float64 --out candidate.json
 
 Each process runs the molecular batch, periodic cell and 2,000-atom cluster
 in order. It checks the first compiled run against its own eager energy,

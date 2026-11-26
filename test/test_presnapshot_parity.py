@@ -20,6 +20,7 @@ from presnapshot_maps import remap_snapshot  # noqa: E402
 
 SNAP_DIR = os.path.join(HERE, "fixtures", "presnapshot")
 SNAPSHOTS = sorted(glob.glob(os.path.join(SNAP_DIR, "*.pt")))
+BASELINE = "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c"
 ATOL = 1e-10
 ATOL_FP32 = 1e-5
 
@@ -32,7 +33,9 @@ def _arch_id(path):
 @pytest.mark.parametrize("path", SNAPSHOTS, ids=[_arch_id(p) for p in SNAPSHOTS])
 def test_presnapshot_parity(path):
     payload = torch.load(path, weights_only=False)
+    assert payload["commit"] == BASELINE, f"{path} records {payload['commit']}, expected {BASELINE}"
     arch = payload["architecture"]
+    assert arch.replace("+", "p") == _arch_id(path)
     torch.manual_seed(7)
     model = build(arch).float()
     state = remap_snapshot(arch, payload["state_dict"], payload["param_names"], model)
@@ -43,6 +46,9 @@ def test_presnapshot_parity(path):
     tol = ATOL if dtype == torch.float64 else ATOL_FP32
     assert set(out) == set(payload["outputs"]), (sorted(out), sorted(payload["outputs"]))
     for key, ref in payload["outputs"].items():
+        assert out[key].shape == ref.shape, (arch, key, out[key].shape, ref.shape)
+        assert out[key].dtype == ref.dtype, (arch, key, out[key].dtype, ref.dtype)
+        assert torch.isfinite(out[key]).all() and torch.isfinite(ref).all(), (arch, key)
         scale = max(1.0, float(ref.abs().max())) if ref.numel() else 1.0
         diff = float((out[key] - ref).abs().max()) if ref.numel() else 0.0
         assert diff <= tol * scale, f"{arch} {key}: max |diff| {diff:.3e} (scale {scale:.3e})"

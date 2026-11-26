@@ -9,11 +9,14 @@ are not committed.
 """
 import argparse
 import os
+from pathlib import Path
+import random
 import subprocess
 import sys
 import time
 import traceback
 
+import numpy as np
 import torch
 
 from core_harness import ARCHITECTURES, build, forward, make_batch, random_molecules, targets
@@ -21,6 +24,14 @@ from core_harness import ARCHITECTURES, build, forward, make_batch, random_molec
 
 def snapshot(arch: str, out_dir: str, seed: int = 7) -> str:
     """Float64 outputs, or float32 when the Core cannot run in float64."""
+    from enerzyme.models import ff
+
+    # Record the checkout providing the model even when launched from elsewhere.
+    commit = subprocess.check_output(
+        ["git", "-C", str(Path(ff.__file__).resolve().parent), "rev-parse", "HEAD"], text=True
+    ).strip()
+    random.seed(seed)
+    np.random.seed(seed)
     torch.manual_seed(seed)
     model = build(arch).float()
     state = {k: v.detach().clone() for k, v in model.state_dict().items()}
@@ -33,7 +44,6 @@ def snapshot(arch: str, out_dir: str, seed: int = 7) -> str:
         dtype = torch.float32
         model.load_state_dict(state)
         out = targets(forward(model.float(), batch, dtype))
-    commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     payload = dict(
         architecture=arch, state_dict=state, batch=batch, outputs=out, dtype=dtype,
         param_names=[k for k, _ in model.named_parameters()], commit=commit,
