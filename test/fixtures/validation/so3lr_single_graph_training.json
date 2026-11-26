@@ -1,0 +1,169 @@
+{
+  "scope": "Full So3LR and So3LR-EFA ordinary compiled single-graph force training with frozen pre-refactor weights.",
+  "method": "Use scripts/bench_cores.py acceptance geometries and scripts/bench_frozen_compile.py step. Reset seed 7 before each evaluation. Differentiate sum(E²) + sum(Fa²). Compare E, Fa, every active weight gradient, the full set of names, shapes, dtypes and finiteness. Reordered native shuffles directed edges and periodic offsets together with seed 73.",
+  "tolerance": {
+    "dtype": "float64",
+    "absolute": 1e-10,
+    "relative": 1e-08
+  },
+  "component_regression": "test/test_so3lr.py::test_compiled_single_graph_charge_attention_gradients",
+  "before": {
+    "model_revision": "c5d9b4c337eaa340695bc514c69050389a2f8512",
+    "device": "cpu",
+    "job": "6338921",
+    "cases": {
+      "so3lr/bulk_256": {
+        "completed_force_training": false,
+        "error": "CPU Inductor C++ store assertion during lowering of a singleton atomic_add."
+      },
+      "so3lr/large_2000": {
+        "completed_force_training": false,
+        "error": "CPU Inductor C++ store assertion during lowering of a singleton atomic_add."
+      },
+      "so3lr_efa/large_2000": {
+        "completed_force_training": false,
+        "error": "CPU Inductor C++ store assertion during lowering of a singleton atomic_add."
+      }
+    }
+  },
+  "after": {
+    "cpu": {
+      "model_revision": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+      "torch": "2.13.0+cu126",
+      "device": "CPU",
+      "job": "6338982",
+      "cases": {
+        "so3lr/bulk_256": {
+          "fixture_sha256": "3183adeb6ebb71a7de33ba700292bf08babe64d1ae4780bee20ee21fc7c74d06",
+          "completed_force_training": true,
+          "comparisons": {
+            "native_repeat": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            },
+            "reordered_native_vs_native": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            },
+            "eager_backend_vs_native": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            },
+            "inductor_vs_native": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            }
+          }
+        },
+        "so3lr/large_2000": {
+          "fixture_sha256": "3183adeb6ebb71a7de33ba700292bf08babe64d1ae4780bee20ee21fc7c74d06",
+          "completed_force_training": true,
+          "comparisons": {
+            "native_repeat": {
+              "passed": true,
+              "missing": [],
+              "tensors": 123,
+              "outside": {}
+            },
+            "reordered_native_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 123,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 4.547473460888166,
+                  "actual": -3.4924596548080444e-10,
+                  "reference": 1.0550138540565968e-10,
+                  "max_abs": 4.547473508864641e-10
+                }
+              }
+            },
+            "eager_backend_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 123,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 1.2369127813615812,
+                  "actual": 2.2919266484677792e-10,
+                  "reference": 1.0550138540565968e-10,
+                  "max_abs": 1.2369127944111824e-10
+                }
+              }
+            },
+            "inductor_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 123,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 5.966285180685274,
+                  "actual": -4.911271389573812e-10,
+                  "reference": 1.0550138540565968e-10,
+                  "max_abs": 1.3271346688270569e-08
+                }
+              }
+            }
+          }
+        },
+        "so3lr_efa/large_2000": {
+          "fixture_sha256": "14c86f7693f0b6935bd07855d5c9a9022b2a44478c45186bf3191a39dc804f5f",
+          "completed_force_training": true,
+          "comparisons": {
+            "native_repeat": {
+              "passed": true,
+              "missing": [],
+              "tensors": 141,
+              "outside": {}
+            },
+            "reordered_native_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 141,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 2.328306409433642,
+                  "actual": 3.4924596548080444e-10,
+                  "reference": 1.1641532182693481e-10,
+                  "max_abs": 2.3283064365386963e-10
+                }
+              }
+            },
+            "eager_backend_vs_native": {
+              "passed": true,
+              "missing": [],
+              "tensors": 141,
+              "outside": {}
+            },
+            "inductor_vs_native": {
+              "passed": false,
+              "missing": [],
+              "tensors": 141,
+              "outside": {
+                "post_sequence.0.head.bias": {
+                  "elements": 1,
+                  "ratio": 12.80568525188503,
+                  "actual": -1.1641532182693481e-09,
+                  "reference": 1.1641532182693481e-10,
+                  "max_abs": 1.862645149230957e-09
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
