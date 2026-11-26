@@ -11276,6 +11276,572 @@
   },
   "frozen_driver": "scripts/bench_frozen_compile.py",
   "frozen_gradient_controls": {
+    "dimenet++/large_2000/cpu": {
+      "job": "6338781",
+      "architecture": "dimenet++",
+      "system": "large_2000",
+      "device": "cpu",
+      "tree": "validated-81620f7",
+      "snapshot": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "comparisons": {
+        "native_fp32_repeat": {
+          "tensor_count": 149,
+          "changed_participation": [],
+          "outside": {},
+          "maximum_absolute_error": 0.0,
+          "maximum_relative_l2_error": 0.0,
+          "maximum_tolerance_ratio": 0.0,
+          "passed": true
+        },
+        "native_fp32_vs_native_cpu_fp64": {
+          "tensor_count": 149,
+          "changed_participation": [],
+          "outside": {
+            "blocks.0.interaction.layers_after_skip.0.dense1.weight": {
+              "outside_count": 5,
+              "numel": 16384,
+              "max_tol_ratio": 4.208373927197032,
+              "worst_actual": -4.19498348236084,
+              "worst_reference": -4.1744698903653195,
+              "relative_l2": 5.376616451944953e-07
+            },
+            "blocks.3.interaction.dense_ji.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 3.0866169709325777,
+              "worst_actual": -0.8075672388076782,
+              "worst_reference": -0.8029282748883135,
+              "relative_l2": 4.62351825200906e-07
+            },
+            "blocks.0.interaction.up.weight": {
+              "outside_count": 2,
+              "numel": 8192,
+              "max_tol_ratio": 17.548277294778025,
+              "worst_actual": -0.054996490478515625,
+              "worst_reference": -0.041976088334330086,
+              "relative_l2": 4.4232612988602595e-07
+            },
+            "blocks.1.interaction.layers_before_skip.0.dense1.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 2.539667406164183,
+              "worst_actual": -16.145849227905273,
+              "worst_reference": -16.103174752665847,
+              "relative_l2": 5.108944765885867e-07
+            },
+            "blocks.3.interaction.layers_before_skip.0.dense2.weight": {
+              "outside_count": 5,
+              "numel": 16384,
+              "max_tol_ratio": 3.28597054276029,
+              "worst_actual": -1.487487554550171,
+              "worst_reference": -1.4946992717072183,
+              "relative_l2": 5.058886028969166e-07
+            },
+            "blocks.1.interaction.final_before_skip.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 2.1867123841971994,
+              "worst_actual": -127.73240661621094,
+              "worst_reference": -128.0138668228103,
+              "relative_l2": 4.809372376653956e-07
+            },
+            "post_sequence.0.heads.1.0.weight": {
+              "outside_count": 12,
+              "numel": 65536,
+              "max_tol_ratio": 21.404226378037016,
+              "worst_actual": -2.9736480712890625,
+              "worst_reference": -3.0539995269877522,
+              "relative_l2": 4.408237293555775e-07
+            },
+            "post_sequence.0.heads.1.1.weight": {
+              "outside_count": 14,
+              "numel": 65536,
+              "max_tol_ratio": 6.846277758745842,
+              "worst_actual": -0.3851742744445801,
+              "worst_reference": -0.3926548933388305,
+              "relative_l2": 4.267784647700498e-07
+            },
+            "post_sequence.0.heads.0.1.weight": {
+              "outside_count": 13,
+              "numel": 65536,
+              "max_tol_ratio": 23.671291095566275,
+              "worst_actual": -0.5959610939025879,
+              "worst_reference": -0.5659933957077259,
+              "relative_l2": 3.941941607141193e-07
+            },
+            "head.readouts.2.up.weight": {
+              "outside_count": 8,
+              "numel": 32768,
+              "max_tol_ratio": 12.868287083790092,
+              "worst_actual": -5.232322692871094,
+              "worst_reference": -5.156953730826345,
+              "relative_l2": 4.4814257444047736e-07
+            },
+            "blocks.3.interaction.layers_after_skip.0.dense1.weight": {
+              "outside_count": 6,
+              "numel": 16384,
+              "max_tol_ratio": 3.1598888869484325,
+              "worst_actual": -9.242260932922363,
+              "worst_reference": -9.27377695989885,
+              "relative_l2": 5.121228982917441e-07
+            },
+            "post_sequence.0.heads.2.2.weight": {
+              "outside_count": 10,
+              "numel": 65536,
+              "max_tol_ratio": 14.75002820807819,
+              "worst_actual": 9.938766479492188,
+              "worst_reference": 9.784125335062981,
+              "relative_l2": 4.0755442883759117e-07
+            },
+            "blocks.2.interaction.up.weight": {
+              "outside_count": 1,
+              "numel": 8192,
+              "max_tol_ratio": 1.9615367952468477,
+              "worst_actual": -2.498086929321289,
+              "worst_reference": -2.504372423736122,
+              "relative_l2": 4.870430709010818e-07
+            },
+            "head.readouts.4.up.weight": {
+              "outside_count": 8,
+              "numel": 32768,
+              "max_tol_ratio": 5.078038308084183,
+              "worst_actual": -16.981658935546875,
+              "worst_reference": -16.892324438121847,
+              "relative_l2": 4.6586077388179535e-07
+            },
+            "blocks.0.interaction.layers_before_skip.0.dense2.weight": {
+              "outside_count": 5,
+              "numel": 16384,
+              "max_tol_ratio": 17.602531993037143,
+              "worst_actual": 0.03236055374145508,
+              "worst_reference": 0.0454829410617581,
+              "relative_l2": 5.003106148548495e-07
+            },
+            "blocks.2.interaction.layers_after_skip.0.dense1.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 5.7740919601737,
+              "worst_actual": 12.404437065124512,
+              "worst_reference": 12.480542730937946,
+              "relative_l2": 4.367234579457522e-07
+            },
+            "head.readouts.0.up.weight": {
+              "outside_count": 3,
+              "numel": 32768,
+              "max_tol_ratio": 2.9959074562413677,
+              "worst_actual": 8.241365432739258,
+              "worst_reference": 8.268233430141933,
+              "relative_l2": 4.13755515588276e-07
+            },
+            "blocks.1.interaction.down.weight": {
+              "outside_count": 2,
+              "numel": 8192,
+              "max_tol_ratio": 24.838063107068525,
+              "worst_actual": 0.09967231750488281,
+              "worst_reference": 0.0802913907007552,
+              "relative_l2": 5.155376148831587e-07
+            },
+            "head.readouts.2.dense_rbf.weight": {
+              "outside_count": 1,
+              "numel": 768,
+              "max_tol_ratio": 1.3819106759591935,
+              "worst_actual": -226.26080322265625,
+              "worst_reference": -226.57487680128526,
+              "relative_l2": 5.01122924869363e-07
+            },
+            "blocks.0.interaction.dense_rbf2.weight": {
+              "outside_count": 1,
+              "numel": 1024,
+              "max_tol_ratio": 1.6068419019999807,
+              "worst_actual": 26.568218231201172,
+              "worst_reference": 26.524472807534167,
+              "relative_l2": 4.7570140254400575e-07
+            },
+            "post_sequence.0.heads.3.0.weight": {
+              "outside_count": 15,
+              "numel": 65536,
+              "max_tol_ratio": 21.108833773046353,
+              "worst_actual": -1.608917236328125,
+              "worst_reference": -1.658706785788695,
+              "relative_l2": 4.331570219708162e-07
+            },
+            "blocks.1.interaction.dense_rbf2.weight": {
+              "outside_count": 1,
+              "numel": 1024,
+              "max_tol_ratio": 2.2385428252948008,
+              "worst_actual": -4.566301345825195,
+              "worst_reference": -4.578116635951674,
+              "relative_l2": 5.576757499137232e-07
+            },
+            "head.readouts.1.up.weight": {
+              "outside_count": 9,
+              "numel": 32768,
+              "max_tol_ratio": 10.207882442969622,
+              "worst_actual": 0.4820899963378906,
+              "worst_reference": 0.4942810771775825,
+              "relative_l2": 4.4457691201384544e-07
+            },
+            "blocks.3.interaction.final_before_skip.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 4.073167366578562,
+              "worst_actual": 3.0853195190429688,
+              "worst_reference": 3.1008008168972196,
+              "relative_l2": 4.7003683582858314e-07
+            },
+            "blocks.3.interaction.layers_before_skip.0.dense1.weight": {
+              "outside_count": 7,
+              "numel": 16384,
+              "max_tol_ratio": 22.141502463697392,
+              "worst_actual": -0.24048233032226562,
+              "worst_reference": -0.22010971871839047,
+              "relative_l2": 5.039114634341524e-07
+            },
+            "post_sequence.0.heads.2.1.weight": {
+              "outside_count": 6,
+              "numel": 65536,
+              "max_tol_ratio": 5.662047234212395,
+              "worst_actual": -0.6562776565551758,
+              "worst_reference": -0.6640006929059075,
+              "relative_l2": 4.130608787732964e-07
+            },
+            "head.readouts.3.up.weight": {
+              "outside_count": 4,
+              "numel": 32768,
+              "max_tol_ratio": 1.3154203010071572,
+              "worst_actual": 176.03701782226562,
+              "worst_reference": 176.26980749971608,
+              "relative_l2": 4.3424645626731234e-07
+            },
+            "blocks.2.interaction.layers_before_skip.0.dense2.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 7.268314858176208,
+              "worst_actual": 7.481196403503418,
+              "worst_reference": 7.541095278765717,
+              "relative_l2": 4.85866706209758e-07
+            },
+            "blocks.0.interaction.dense_kj.weight": {
+              "outside_count": 6,
+              "numel": 16384,
+              "max_tol_ratio": 4.208858059655312,
+              "worst_actual": 3.6439340114593506,
+              "worst_reference": 3.662294288935927,
+              "relative_l2": 4.822811315139199e-07
+            },
+            "blocks.2.interaction.layers_after_skip.1.dense1.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 6.543486679379784,
+              "worst_actual": -26.081741333007812,
+              "worst_reference": -26.258141573293493,
+              "relative_l2": 4.74003546882943e-07
+            },
+            "post_sequence.0.heads.3.2.weight": {
+              "outside_count": 7,
+              "numel": 65536,
+              "max_tol_ratio": 9.417649709614327,
+              "worst_actual": -2.114996910095215,
+              "worst_reference": -2.0887335939737364,
+              "relative_l2": 4.1937305639730647e-07
+            },
+            "blocks.1.interaction.layers_after_skip.0.dense2.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 2.0021240637824635,
+              "worst_actual": 30.13312339782715,
+              "worst_reference": 30.071515007152286,
+              "relative_l2": 4.874278114647267e-07
+            },
+            "post_sequence.0.heads.0.2.weight": {
+              "outside_count": 11,
+              "numel": 65536,
+              "max_tol_ratio": 6.456790412747059,
+              "worst_actual": -0.2099161148071289,
+              "worst_reference": -0.2040786683290925,
+              "relative_l2": 3.908715740447863e-07
+            },
+            "post_sequence.0.heads.4.1.weight": {
+              "outside_count": 11,
+              "numel": 65536,
+              "max_tol_ratio": 4.540213582866855,
+              "worst_actual": 4.950736999511719,
+              "worst_reference": 4.92519740186148,
+              "relative_l2": 4.3659214364698924e-07
+            },
+            "blocks.1.interaction.layers_after_skip.1.dense2.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 72.21437620088207,
+              "worst_actual": -0.23514366149902344,
+              "worst_reference": -0.3079307520090424,
+              "relative_l2": 4.3906079509239117e-07
+            },
+            "blocks.2.interaction.final_before_skip.weight": {
+              "outside_count": 8,
+              "numel": 16384,
+              "max_tol_ratio": 13.182534946320855,
+              "worst_actual": -0.5748567581176758,
+              "worst_reference": -0.5918871050263874,
+              "relative_l2": 4.454798891471652e-07
+            },
+            "blocks.3.interaction.down.weight": {
+              "outside_count": 1,
+              "numel": 8192,
+              "max_tol_ratio": 1.325608605625305,
+              "worst_actual": 0.13043516874313354,
+              "worst_reference": 0.12933579407755125,
+              "relative_l2": 4.725611099258789e-07
+            },
+            "blocks.2.interaction.layers_after_skip.1.dense2.weight": {
+              "outside_count": 7,
+              "numel": 16384,
+              "max_tol_ratio": 11.937858340237787,
+              "worst_actual": -0.49097251892089844,
+              "worst_reference": -0.4769225838376183,
+              "relative_l2": 4.440562730921971e-07
+            },
+            "blocks.1.interaction.layers_after_skip.0.dense1.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 7.838549709410362,
+              "worst_actual": -12.942535400390625,
+              "worst_reference": -12.8364294254513,
+              "relative_l2": 4.969042722034356e-07
+            },
+            "post_sequence.0.heads.4.2.weight": {
+              "outside_count": 13,
+              "numel": 65536,
+              "max_tol_ratio": 31.08817900961905,
+              "worst_actual": 0.9273452758789062,
+              "worst_reference": 0.8782794420570355,
+              "relative_l2": 4.2048533377261865e-07
+            },
+            "blocks.3.interaction.layers_after_skip.1.dense1.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 32.07755268950059,
+              "worst_actual": -0.6161117553710938,
+              "worst_reference": -0.5752062593953582,
+              "relative_l2": 4.766979797473295e-07
+            },
+            "blocks.1.interaction.dense_ji.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 6.311074340158358,
+              "worst_actual": 47.756492614746094,
+              "worst_reference": 47.452597989164715,
+              "relative_l2": 5.09624014813343e-07
+            },
+            "blocks.1.interaction.dense_kj.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 5.35960284420654,
+              "worst_actual": -1.4368720054626465,
+              "worst_reference": -1.4254802753336633,
+              "relative_l2": 5.415751869671899e-07
+            },
+            "blocks.3.interaction.layers_after_skip.0.dense2.weight": {
+              "outside_count": 8,
+              "numel": 16384,
+              "max_tol_ratio": 38.18760998832971,
+              "worst_actual": 0.23015105724334717,
+              "worst_reference": 0.2670815919017856,
+              "relative_l2": 4.813922616098539e-07
+            },
+            "blocks.2.interaction.layers_before_skip.0.dense1.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 5.010306713774005,
+              "worst_actual": -11.151786804199219,
+              "worst_reference": -11.092701751440442,
+              "relative_l2": 4.788252514181232e-07
+            },
+            "blocks.2.interaction.dense_ji.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 9.921696467876952,
+              "worst_actual": 2.436075448989868,
+              "worst_reference": 2.4675024468285587,
+              "relative_l2": 4.556349152723471e-07
+            },
+            "blocks.1.interaction.layers_before_skip.0.dense2.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 2.9271512027568134,
+              "worst_actual": -3.207829475402832,
+              "worst_reference": -3.1964240530494976,
+              "relative_l2": 5.066547971847122e-07
+            },
+            "blocks.1.interaction.layers_after_skip.1.dense1.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 4.175299824913309,
+              "worst_actual": -7.471041679382324,
+              "worst_reference": -7.50530127234812,
+              "relative_l2": 4.541718066243317e-07
+            },
+            "blocks.3.interaction.layers_after_skip.1.dense2.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 5.297412755438286,
+              "worst_actual": -4.072889804840088,
+              "worst_reference": -4.0477390713241626,
+              "relative_l2": 4.958561196808366e-07
+            },
+            "post_sequence.0.heads.1.2.weight": {
+              "outside_count": 7,
+              "numel": 65536,
+              "max_tol_ratio": 17.807869763060587,
+              "worst_actual": -0.5374755859375,
+              "worst_reference": -0.515824344358407,
+              "relative_l2": 4.0496563887313285e-07
+            },
+            "blocks.0.interaction.layers_before_skip.0.dense1.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 3.7872532934262226,
+              "worst_actual": -8.030536651611328,
+              "worst_reference": -7.99759665005352,
+              "relative_l2": 5.217184858649258e-07
+            },
+            "post_sequence.0.heads.2.0.weight": {
+              "outside_count": 10,
+              "numel": 65536,
+              "max_tol_ratio": 5.689168519858806,
+              "worst_actual": 0.7335357666015625,
+              "worst_reference": 0.7254262763030397,
+              "relative_l2": 4.4374213446128735e-07
+            },
+            "blocks.2.interaction.down.weight": {
+              "outside_count": 1,
+              "numel": 8192,
+              "max_tol_ratio": 1.2432589054604808,
+              "worst_actual": 0.8241462707519531,
+              "worst_reference": 0.8222537152640808,
+              "relative_l2": 4.307792449585722e-07
+            },
+            "blocks.2.interaction.dense_kj.weight": {
+              "outside_count": 6,
+              "numel": 16384,
+              "max_tol_ratio": 2.6360005126391903,
+              "worst_actual": 0.6187937259674072,
+              "worst_reference": 0.6153265245743413,
+              "relative_l2": 3.9521923141582126e-07
+            },
+            "blocks.0.interaction.layers_after_skip.1.dense2.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 10.495655395576485,
+              "worst_actual": -23.025190353393555,
+              "worst_reference": -22.778765323445064,
+              "relative_l2": 4.757052913537534e-07
+            },
+            "post_sequence.0.heads.4.0.weight": {
+              "outside_count": 17,
+              "numel": 65536,
+              "max_tol_ratio": 17.349909841569378,
+              "worst_actual": 9.059234619140625,
+              "worst_reference": 9.231546047654831,
+              "relative_l2": 4.7164408102924576e-07
+            },
+            "blocks.0.interaction.final_before_skip.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 1.4514020386148236,
+              "worst_actual": 13.120925903320312,
+              "worst_reference": 13.100895255811318,
+              "relative_l2": 5.080327042653505e-07
+            },
+            "blocks.2.interaction.layers_after_skip.0.dense2.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 2.399894070250264,
+              "worst_actual": -14.509023666381836,
+              "worst_reference": -14.472611007195454,
+              "relative_l2": 4.205926525206535e-07
+            },
+            "embed.embedding.dense.weight": {
+              "outside_count": 6,
+              "numel": 49152,
+              "max_tol_ratio": 3.857234202276147,
+              "worst_actual": -84.388671875,
+              "worst_reference": -84.06172604625044,
+              "relative_l2": 4.300672523473871e-07
+            },
+            "post_sequence.0.heads.3.1.weight": {
+              "outside_count": 11,
+              "numel": 65536,
+              "max_tol_ratio": 6.9531035159657,
+              "worst_actual": 5.06971549987793,
+              "worst_reference": 5.110113822726893,
+              "relative_l2": 4.2690916239774696e-07
+            },
+            "blocks.3.interaction.up.weight": {
+              "outside_count": 3,
+              "numel": 8192,
+              "max_tol_ratio": 3.7151825077008183,
+              "worst_actual": 3.4322471618652344,
+              "worst_reference": 3.4476564626030495,
+              "relative_l2": 5.196940395988408e-07
+            },
+            "blocks.0.interaction.layers_after_skip.0.dense2.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 4.900864436211525,
+              "worst_actual": -4.0426926612854,
+              "worst_reference": -4.019562724176017,
+              "relative_l2": 4.92767761977699e-07
+            },
+            "blocks.0.interaction.dense_ji.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 3.559449234377941,
+              "worst_actual": 18.811172485351562,
+              "worst_reference": 18.74196978090014,
+              "relative_l2": 5.174325688195541e-07
+            },
+            "blocks.0.interaction.layers_after_skip.1.dense1.weight": {
+              "outside_count": 6,
+              "numel": 16384,
+              "max_tol_ratio": 25.67939686935428,
+              "worst_actual": -2.5500717163085938,
+              "worst_reference": -2.468701376110971,
+              "relative_l2": 4.761614026127616e-07
+            },
+            "blocks.1.interaction.up.weight": {
+              "outside_count": 3,
+              "numel": 8192,
+              "max_tol_ratio": 5.716143401989752,
+              "worst_actual": -0.720855712890625,
+              "worst_reference": -0.7127800594751932,
+              "relative_l2": 4.588766392802165e-07
+            },
+            "blocks.3.interaction.dense_kj.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 1.643654895394337,
+              "worst_actual": -27.316822052001953,
+              "worst_reference": -27.362947853620753,
+              "relative_l2": 4.818098924955426e-07
+            },
+            "post_sequence.0.heads.0.0.weight": {
+              "outside_count": 16,
+              "numel": 65536,
+              "max_tol_ratio": 13.797462439145482,
+              "worst_actual": -2.0270156860351562,
+              "worst_reference": -1.9899018660730263,
+              "relative_l2": 4.08477471074154e-07
+            }
+          },
+          "maximum_absolute_error": 42.95207354426384,
+          "maximum_relative_l2_error": 3.9543054879128284e-06,
+          "maximum_tolerance_ratio": 72.21437620088207,
+          "passed": false
+        }
+      },
+      "finished": true
+    },
     "e2former/large_2000/cpu": {
       "job": "6318868",
       "architecture": "e2former",
@@ -11921,6 +12487,580 @@
       "ordinary_training_route": "explicit native scripted-kernel fallback",
       "finished": true
     },
+    "gemnet/large_2000/cpu": {
+      "job": "6338774",
+      "architecture": "gemnet",
+      "system": "large_2000",
+      "device": "cpu",
+      "tree": "validated-5d53f9c",
+      "snapshot": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "comparisons": {
+        "native_fp32_repeat": {
+          "tensor_count": 124,
+          "changed_participation": [],
+          "outside": {},
+          "maximum_absolute_error": 0.0,
+          "maximum_relative_l2_error": 0.0,
+          "maximum_tolerance_ratio": 0.0,
+          "passed": true
+        },
+        "native_fp32_vs_native_cpu_fp64": {
+          "tensor_count": 124,
+          "changed_participation": [],
+          "outside": {
+            "blocks.2.interaction.edges.concat.dense.linear.weight": {
+              "outside_count": 12,
+              "numel": 49152,
+              "max_tol_ratio": 15.405403810982223,
+              "worst_actual": 0.5806541442871094,
+              "worst_reference": 0.5612244719996617,
+              "relative_l2": 1.2061067706077357e-06
+            },
+            "blocks.0.interaction.edges.layers_after_skip.0.layers.1.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 3.8905562901855104,
+              "worst_actual": -8.720952033996582,
+              "worst_reference": -8.684441336724113,
+              "relative_l2": 1.1004114473716016e-06
+            },
+            "blocks.0.interaction.edges.atom_update.residuals.0.layers.1.linear.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 4.2096517771745745,
+              "worst_actual": -0.4509144425392151,
+              "worst_reference": -0.4460898035608535,
+              "relative_l2": 1.1990431199792765e-06
+            },
+            "head.readouts.4.residuals.1.layers.1.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.1789035083364903,
+              "worst_actual": 7.62813663482666,
+              "worst_reference": 7.6379662925413285,
+              "relative_l2": 1.2107210306355887e-06
+            },
+            "blocks.2.interaction.edges.residual_m.0.layers.1.linear.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 1.7413846868814187,
+              "worst_actual": 0.7540743350982666,
+              "worst_reference": 0.756610854935797,
+              "relative_l2": 1.0871990311197594e-06
+            },
+            "head.readouts.0.residuals.0.layers.0.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 2.503852703851559,
+              "worst_actual": 2.1307239532470703,
+              "worst_reference": 2.123653939695423,
+              "relative_l2": 7.373362394256397e-07
+            },
+            "blocks.1.interaction.edges.concat.dense.linear.weight": {
+              "outside_count": 8,
+              "numel": 49152,
+              "max_tol_ratio": 4.647792969611988,
+              "worst_actual": -0.7497820854187012,
+              "worst_reference": -0.7430749717105618,
+              "relative_l2": 1.1498249201452655e-06
+            },
+            "blocks.0.interaction.edges.atom_update.residuals.1.layers.1.linear.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 2.7936689542516726,
+              "worst_actual": 1.0080530643463135,
+              "worst_reference": 1.0032946230379884,
+              "relative_l2": 1.1662722788336915e-06
+            },
+            "blocks.2.interaction.edges.layers_after_skip.0.layers.0.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 3.630703698106702,
+              "worst_actual": -0.7537815570831299,
+              "worst_reference": -0.7485224014434189,
+              "relative_l2": 1.2411222331930159e-06
+            },
+            "blocks.3.interaction.edges.residual_m.0.layers.0.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 1.5082909857874847,
+              "worst_actual": 0.43343377113342285,
+              "worst_reference": 0.43172679780591805,
+              "relative_l2": 1.1102156964334252e-06
+            },
+            "head.readouts.3.residuals.0.layers.1.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 2.8657700004750915,
+              "worst_actual": 1.8740234375,
+              "worst_reference": 1.8814211969247374,
+              "relative_l2": 1.1877340911653747e-06
+            },
+            "head.readouts.3.residuals.0.layers.0.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 5.8496427797790735,
+              "worst_actual": -0.5726528167724609,
+              "worst_reference": -0.5652515471948085,
+              "relative_l2": 1.186303966863976e-06
+            },
+            "blocks.1.interaction.edges.atom_update.dense_rbf.linear.weight": {
+              "outside_count": 1,
+              "numel": 2048,
+              "max_tol_ratio": 1.7275657071514958,
+              "worst_actual": -3.076814651489258,
+              "worst_reference": -3.083350638310132,
+              "relative_l2": 1.4288658160547506e-06
+            },
+            "blocks.1.interaction.edges.layers_before_skip.0.layers.0.linear.weight": {
+              "outside_count": 8,
+              "numel": 16384,
+              "max_tol_ratio": 15.177086390976365,
+              "worst_actual": -0.3104979991912842,
+              "worst_reference": -0.32607076381698974,
+              "relative_l2": 1.3144167411639086e-06
+            },
+            "head.readouts.1.residuals.1.layers.1.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 2.1093187928635926,
+              "worst_actual": 1.4257121086120605,
+              "worst_reference": 1.430205390875694,
+              "relative_l2": 9.123710763454108e-07
+            },
+            "blocks.1.interaction.edges.dense_ca.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 3.436413140247095,
+              "worst_actual": 0.6822798252105713,
+              "worst_reference": 0.6870462893052709,
+              "relative_l2": 1.2266868992093608e-06
+            },
+            "head.readouts.2.residuals.1.layers.0.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 7.876667688270416,
+              "worst_actual": 0.8775752782821655,
+              "worst_reference": 0.8900999673158421,
+              "relative_l2": 1.1455685043685582e-06
+            },
+            "blocks.0.interaction.edges.atom_update.residuals.1.layers.0.linear.weight": {
+              "outside_count": 10,
+              "numel": 16384,
+              "max_tol_ratio": 2.921362295681783,
+              "worst_actual": -1.1234745979309082,
+              "worst_reference": -1.1181630848474344,
+              "relative_l2": 1.2031619362642164e-06
+            },
+            "blocks.3.interaction.edges.concat.dense.linear.weight": {
+              "outside_count": 5,
+              "numel": 49152,
+              "max_tol_ratio": 10.233373952615912,
+              "worst_actual": -1.7503852844238281,
+              "worst_reference": -1.7255635852105211,
+              "relative_l2": 1.2124844391039737e-06
+            },
+            "head.readouts.0.residuals.1.layers.0.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 1.1417606564563023,
+              "worst_actual": 3.119382858276367,
+              "worst_reference": 3.1237486640611696,
+              "relative_l2": 7.662867545940353e-07
+            },
+            "blocks.3.interaction.edges.layers_after_skip.0.layers.1.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.2326067763019186,
+              "worst_actual": 0.4563605785369873,
+              "worst_reference": 0.45778767547129207,
+              "relative_l2": 1.181280236879444e-06
+            },
+            "blocks.0.interaction.edges.residual_m.0.layers.0.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 2.093772778558736,
+              "worst_actual": -0.571439266204834,
+              "worst_reference": -0.5741069566676771,
+              "relative_l2": 1.0428525440737279e-06
+            },
+            "blocks.2.interaction.edges.dense_ca.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 3.312722177111084,
+              "worst_actual": -0.579077959060669,
+              "worst_reference": -0.5748547195585925,
+              "relative_l2": 1.2517715041556734e-06
+            },
+            "blocks.0.interaction.edges.atom_update.residuals.0.layers.0.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 1.7807860588055964,
+              "worst_actual": 1.6332836151123047,
+              "worst_reference": 1.637446106552062,
+              "relative_l2": 1.197978034513284e-06
+            },
+            "head.readouts.0.residuals.0.layers.1.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 1.9922316702221092,
+              "worst_actual": 6.940729141235352,
+              "worst_reference": 6.925537304315235,
+              "relative_l2": 7.394818288101456e-07
+            },
+            "head.readouts.0.dense.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.5880656009725966,
+              "worst_actual": -3.4888510704040527,
+              "worst_reference": -3.495513821582513,
+              "relative_l2": 7.474355223662616e-07
+            },
+            "blocks.0.interaction.edges.concat.dense.linear.weight": {
+              "outside_count": 12,
+              "numel": 49152,
+              "max_tol_ratio": 4.960930176339264,
+              "worst_actual": 3.626894950866699,
+              "worst_reference": 3.6055354899294088,
+              "relative_l2": 1.029231393402042e-06
+            },
+            "blocks.1.interaction.edges.layers_after_skip.0.layers.0.linear.weight": {
+              "outside_count": 5,
+              "numel": 16384,
+              "max_tol_ratio": 3.009290483298124,
+              "worst_actual": -1.5655667781829834,
+              "worst_reference": -1.5724051052403814,
+              "relative_l2": 1.1922409295622631e-06
+            },
+            "blocks.0.interaction.edges.layers_before_skip.0.layers.0.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 10.437751629141053,
+              "worst_actual": -1.1325829029083252,
+              "worst_reference": -1.1136524491030046,
+              "relative_l2": 1.188222539948591e-06
+            },
+            "head.readouts.2.residuals.1.layers.1.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 2.701065276610685,
+              "worst_actual": -5.157463073730469,
+              "worst_reference": -5.141684303102437,
+              "relative_l2": 1.1102979919871805e-06
+            },
+            "head.readouts.4.residuals.0.layers.1.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.8034110699383918,
+              "worst_actual": -4.07591438293457,
+              "worst_reference": -4.084542880529913,
+              "relative_l2": 1.2306599550337102e-06
+            },
+            "blocks.1.interaction.edges.layers_after_skip.0.layers.1.linear.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 4.378813809128533,
+              "worst_actual": 2.056861400604248,
+              "worst_reference": 2.0689862759466506,
+              "relative_l2": 1.197050577171509e-06
+            },
+            "blocks.3.interaction.edges.atom_update.residuals.1.layers.0.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.0108220906215146,
+              "worst_actual": -0.19118225574493408,
+              "worst_reference": -0.19028233869009595,
+              "relative_l2": 1.480321844450886e-06
+            },
+            "blocks.1.interaction.edges.atom_update.residuals.1.layers.0.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 9.952383090583854,
+              "worst_actual": 0.27692604064941406,
+              "worst_reference": 0.28674652003005363,
+              "relative_l2": 1.4590649034103567e-06
+            },
+            "blocks.2.interaction.edges.layers_before_skip.0.layers.1.linear.weight": {
+              "outside_count": 5,
+              "numel": 16384,
+              "max_tol_ratio": 1.5448489684585378,
+              "worst_actual": 0.21894842386245728,
+              "worst_reference": 0.220370256904436,
+              "relative_l2": 1.2987956305362106e-06
+            },
+            "head.readouts.0.residuals.1.layers.1.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 3.1195674830513194,
+              "worst_actual": 12.909809112548828,
+              "worst_reference": 12.95239869157271,
+              "relative_l2": 7.817979193488883e-07
+            },
+            "head.readouts.0.dense_rbf.linear.weight": {
+              "outside_count": 1,
+              "numel": 2048,
+              "max_tol_ratio": 1.7849916223769244,
+              "worst_actual": -7.8063273429870605,
+              "worst_reference": -7.791170674468961,
+              "relative_l2": 7.781579252230432e-07
+            },
+            "blocks.0.interaction.edges.residual_m.0.layers.1.linear.weight": {
+              "outside_count": 5,
+              "numel": 16384,
+              "max_tol_ratio": 7.8266069835647825,
+              "worst_actual": -0.7031340599060059,
+              "worst_reference": -0.6922375636674252,
+              "relative_l2": 1.0348915496374088e-06
+            },
+            "blocks.3.interaction.edges.dense_ca.linear.weight": {
+              "outside_count": 6,
+              "numel": 16384,
+              "max_tol_ratio": 3.9953149860300115,
+              "worst_actual": -0.5275151133537292,
+              "worst_reference": -0.5226303201134055,
+              "relative_l2": 1.2597045012035013e-06
+            },
+            "head.readouts.3.dense.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 6.2950364108736485,
+              "worst_actual": -0.7756827473640442,
+              "worst_reference": -0.7850310720337755,
+              "relative_l2": 1.1215054738211934e-06
+            },
+            "blocks.1.interaction.edges.atom_update.dense.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 8.61678948027685,
+              "worst_actual": -0.3177318572998047,
+              "worst_reference": -0.30903719620236014,
+              "relative_l2": 1.3837580013509912e-06
+            },
+            "blocks.1.interaction.edges.atom_update.residuals.1.layers.1.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 2.5629443212820613,
+              "worst_actual": 0.35723698139190674,
+              "worst_reference": 0.3545342687761496,
+              "relative_l2": 1.4400733613144947e-06
+            },
+            "blocks.2.interaction.edges.residual_m.0.layers.0.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 1.9459871350825422,
+              "worst_actual": -2.330171823501587,
+              "worst_reference": -2.3242866006838536,
+              "relative_l2": 1.1248320614919842e-06
+            },
+            "head.readouts.1.residuals.1.layers.0.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 12.260548656056855,
+              "worst_actual": -1.0397100448608398,
+              "worst_reference": -1.0186385927719819,
+              "relative_l2": 9.457698819066365e-07
+            },
+            "blocks.1.interaction.edges.layers_before_skip.0.layers.1.linear.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 2.2810632490067624,
+              "worst_actual": 1.608035922050476,
+              "worst_reference": 1.602783128086565,
+              "relative_l2": 1.2945296906235805e-06
+            },
+            "head.readouts.3.residuals.1.layers.0.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 1.5189794678217214,
+              "worst_actual": -1.9676704406738281,
+              "worst_reference": -1.9717287417761753,
+              "relative_l2": 1.1518093500817196e-06
+            },
+            "blocks.0.interaction.edges.atom_update.dense_rbf.linear.weight": {
+              "outside_count": 1,
+              "numel": 2048,
+              "max_tol_ratio": 1.1230858953817358,
+              "worst_actual": -1.178095817565918,
+              "worst_reference": -1.1802074520356909,
+              "relative_l2": 1.1565538103394652e-06
+            },
+            "embed.edge_emb.dense.linear.weight": {
+              "outside_count": 5,
+              "numel": 33536,
+              "max_tol_ratio": 1.29604062735077,
+              "worst_actual": -5.0584716796875,
+              "worst_reference": -5.0510181265468646,
+              "relative_l2": 8.433864638396158e-07
+            },
+            "head.readouts.4.residuals.0.layers.0.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 4.75923644419995,
+              "worst_actual": 0.25112664699554443,
+              "worst_reference": 0.25567492995097535,
+              "relative_l2": 1.2488372253257503e-06
+            },
+            "blocks.2.interaction.edges.layers_after_skip.0.layers.1.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 2.1372623972595446,
+              "worst_actual": -0.22014141082763672,
+              "worst_reference": -0.2221122065727988,
+              "relative_l2": 1.2062316209231773e-06
+            },
+            "blocks.0.interaction.edges.atom_update.dense.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 3.6356554200865205,
+              "worst_actual": -1.8740441799163818,
+              "worst_reference": -1.8647197426828939,
+              "relative_l2": 1.1260861306791855e-06
+            },
+            "head.readouts.2.residuals.0.layers.0.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.7167892492476053,
+              "worst_actual": 0.8805760145187378,
+              "worst_reference": 0.8832941969744997,
+              "relative_l2": 1.1467203200477508e-06
+            },
+            "head.readouts.1.dense_rbf.linear.weight": {
+              "outside_count": 1,
+              "numel": 2048,
+              "max_tol_ratio": 1.0231581768081208,
+              "worst_actual": 14.192745208740234,
+              "worst_reference": 14.20799844925343,
+              "relative_l2": 8.80004777796662e-07
+            },
+            "blocks.1.interaction.edges.atom_update.residuals.0.layers.0.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.1959768636194235,
+              "worst_actual": -0.810826301574707,
+              "worst_reference": -0.8126353784904738,
+              "relative_l2": 1.4181291022394146e-06
+            },
+            "head.readouts.4.dense.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 19.26423101971112,
+              "worst_actual": 0.12868118286132812,
+              "worst_reference": 0.11301899707819985,
+              "relative_l2": 1.20515607953955e-06
+            },
+            "head.readouts.1.dense.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.2967903245080046,
+              "worst_actual": 2.390507698059082,
+              "worst_reference": 2.386505148046551,
+              "relative_l2": 8.91814224940896e-07
+            },
+            "blocks.3.interaction.edges.residual_m.0.layers.1.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 3.2010950010130794,
+              "worst_actual": 0.06518709659576416,
+              "worst_reference": 0.06764439924474219,
+              "relative_l2": 1.1079409954818565e-06
+            },
+            "blocks.1.interaction.edges.residual_m.0.layers.0.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 2.3530138715878994,
+              "worst_actual": -1.7822660207748413,
+              "worst_reference": -1.776438925630692,
+              "relative_l2": 1.1504711489512813e-06
+            },
+            "blocks.2.interaction.edges.atom_update.residuals.0.layers.0.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.0475338248156125,
+              "worst_actual": 2.9623231887817383,
+              "worst_reference": 2.95849079592523,
+              "relative_l2": 1.3770294440328077e-06
+            },
+            "blocks.0.interaction.edges.layers_after_skip.0.layers.0.linear.weight": {
+              "outside_count": 6,
+              "numel": 16384,
+              "max_tol_ratio": 2.7819093305941087,
+              "worst_actual": 7.016446590423584,
+              "worst_reference": 6.995039687717032,
+              "relative_l2": 1.1027243366891676e-06
+            },
+            "blocks.3.interaction.edges.layers_before_skip.0.layers.1.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 2.067044203453368,
+              "worst_actual": -1.034679651260376,
+              "worst_reference": -1.0311013881703683,
+              "relative_l2": 1.228415220485985e-06
+            },
+            "head.readouts.1.residuals.0.layers.0.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.1684954569003807,
+              "worst_actual": 2.134795665740967,
+              "worst_reference": 2.1381119867036045,
+              "relative_l2": 9.526383766202256e-07
+            },
+            "blocks.1.interaction.edges.residual_m.0.layers.1.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 2.4252093386524525,
+              "worst_actual": -0.0779150128364563,
+              "worst_reference": -0.07603297042946855,
+              "relative_l2": 1.1305520638244363e-06
+            },
+            "blocks.0.interaction.edges.dense_ca.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 7.073279860264745,
+              "worst_actual": 1.4011969566345215,
+              "worst_reference": 1.4161651852201325,
+              "relative_l2": 1.1156619225791271e-06
+            },
+            "blocks.1.interaction.edges.atom_update.residuals.0.layers.1.linear.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 1.749036905057232,
+              "worst_actual": 2.650522232055664,
+              "worst_reference": 2.6446722768082047,
+              "relative_l2": 1.4342617764378028e-06
+            },
+            "head.readouts.2.residuals.0.layers.1.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.033618843746797,
+              "worst_actual": 1.3732595443725586,
+              "worst_reference": 1.3711187969563863,
+              "relative_l2": 1.127637953816131e-06
+            },
+            "blocks.3.interaction.edges.layers_after_skip.0.layers.0.linear.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 1.9481116731313883,
+              "worst_actual": -0.8373561501502991,
+              "worst_reference": -0.8403569374809947,
+              "relative_l2": 1.262648285125538e-06
+            },
+            "blocks.2.interaction.edges.layers_before_skip.0.layers.0.linear.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.6689143618112852,
+              "worst_actual": -0.2606804370880127,
+              "worst_reference": -0.25907981501061816,
+              "relative_l2": 1.2938375970007697e-06
+            }
+          },
+          "maximum_absolute_error": 4.029977468308061,
+          "maximum_relative_l2_error": 3.3641915426563116e-06,
+          "maximum_tolerance_ratio": 19.26423101971112,
+          "passed": false
+        }
+      },
+      "finished": true
+    },
     "painn/bulk_256/cpu": {
       "job": "6320113",
       "architecture": "painn",
@@ -12072,6 +13212,427 @@
           "maximum_absolute_error": 8.220444635488093,
           "maximum_relative_l2_error": 8.525446654896344e-06,
           "maximum_tolerance_ratio": 4.28716138665983,
+          "passed": false
+        }
+      },
+      "finished": true
+    },
+    "schnet/large_2000/cpu": {
+      "job": "6338775",
+      "architecture": "schnet",
+      "system": "large_2000",
+      "device": "cpu",
+      "tree": "validated-c32ede3",
+      "snapshot": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "comparisons": {
+        "native_fp32_repeat": {
+          "tensor_count": 50,
+          "changed_participation": [],
+          "outside": {},
+          "maximum_absolute_error": 0.000244140625,
+          "maximum_relative_l2_error": 4.902128235892281e-07,
+          "maximum_tolerance_ratio": 0.0005299988069726856,
+          "passed": true
+        },
+        "native_fp32_vs_native_cpu_fp64": {
+          "tensor_count": 50,
+          "changed_participation": [],
+          "outside": {
+            "blocks.0.message.pre.weight": {
+              "outside_count": 14,
+              "numel": 16384,
+              "max_tol_ratio": 3.5612099634646146,
+              "worst_actual": -0.0660400390625,
+              "worst_reference": -0.06877781828868024,
+              "relative_l2": 9.702773605398038e-07
+            },
+            "blocks.1.message.filter.2.weight": {
+              "outside_count": 14,
+              "numel": 16384,
+              "max_tol_ratio": 3.7189652517836755,
+              "worst_actual": 1.7169723510742188,
+              "worst_reference": 1.7259945404712482,
+              "relative_l2": 9.513167865067062e-07
+            },
+            "blocks.3.message.filter.0.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 1.5485062580074898,
+              "worst_actual": 3.4759111404418945,
+              "worst_reference": 3.4823875938043134,
+              "relative_l2": 7.964680733443524e-07
+            },
+            "blocks.2.message.filter.0.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 10.5322864409774,
+              "worst_actual": -0.023456573486328125,
+              "worst_reference": -0.031157331939738242,
+              "relative_l2": 9.830735433855103e-07
+            },
+            "blocks.2.update.net.2.weight": {
+              "outside_count": 10,
+              "numel": 16384,
+              "max_tol_ratio": 6.715060336424018,
+              "worst_actual": -0.09674072265625,
+              "worst_reference": -0.09142624765144092,
+              "relative_l2": 1.1302733538546514e-06
+            },
+            "blocks.2.message.filter.2.weight": {
+              "outside_count": 29,
+              "numel": 16384,
+              "max_tol_ratio": 11.511806379666185,
+              "worst_actual": 0.10003662109375,
+              "worst_reference": 0.10935374469534054,
+              "relative_l2": 1.0436403207757663e-06
+            },
+            "blocks.0.update.net.2.weight": {
+              "outside_count": 14,
+              "numel": 16384,
+              "max_tol_ratio": 2.4693564644796426,
+              "worst_actual": 2.319474220275879,
+              "worst_reference": 2.326948835951585,
+              "relative_l2": 9.981052599692047e-07
+            },
+            "head.readout.0.weight": {
+              "outside_count": 3,
+              "numel": 8192,
+              "max_tol_ratio": 4.729621124656501,
+              "worst_actual": 5.725502014160156,
+              "worst_reference": 5.695254881574698,
+              "relative_l2": 2.391106694228918e-07
+            },
+            "blocks.3.message.pre.weight": {
+              "outside_count": 14,
+              "numel": 16384,
+              "max_tol_ratio": 52.11150813902197,
+              "worst_actual": 0.09287834167480469,
+              "worst_reference": 0.05360675702259954,
+              "relative_l2": 1.151682226669793e-06
+            },
+            "blocks.3.update.net.2.weight": {
+              "outside_count": 9,
+              "numel": 16384,
+              "max_tol_ratio": 3.401112307925101,
+              "worst_actual": 0.4210243225097656,
+              "worst_reference": 0.424850063906689,
+              "relative_l2": 1.0225375064274866e-06
+            },
+            "blocks.3.update.net.0.weight": {
+              "outside_count": 23,
+              "numel": 16384,
+              "max_tol_ratio": 6.412820479691717,
+              "worst_actual": -5.041751861572266,
+              "worst_reference": -5.0788103348357545,
+              "relative_l2": 1.0398068005475988e-06
+            },
+            "blocks.2.message.pre.weight": {
+              "outside_count": 26,
+              "numel": 16384,
+              "max_tol_ratio": 6.074105507610131,
+              "worst_actual": 0.12094759941101074,
+              "worst_reference": 0.11599118287296079,
+              "relative_l2": 1.220305159084048e-06
+            },
+            "blocks.1.update.net.2.weight": {
+              "outside_count": 13,
+              "numel": 16384,
+              "max_tol_ratio": 4.487386741811814,
+              "worst_actual": 1.439239501953125,
+              "worst_reference": 1.4488823682019074,
+              "relative_l2": 1.0197986877148727e-06
+            },
+            "blocks.1.message.pre.weight": {
+              "outside_count": 21,
+              "numel": 16384,
+              "max_tol_ratio": 4.35793964183467,
+              "worst_actual": -2.9555726051330566,
+              "worst_reference": -2.9715730990894724,
+              "relative_l2": 1.1579070805932494e-06
+            },
+            "Fa": {
+              "outside_count": 1,
+              "numel": 6000,
+              "max_tol_ratio": 1.0128446683240586,
+              "worst_actual": 0.010738998651504517,
+              "worst_reference": 0.010431975459789938,
+              "relative_l2": 2.4255569651439223e-05
+            },
+            "blocks.1.update.net.0.weight": {
+              "outside_count": 20,
+              "numel": 16384,
+              "max_tol_ratio": 5.034238022969613,
+              "worst_actual": 0.3161964416503906,
+              "worst_reference": 0.3111062919103915,
+              "relative_l2": 1.107437294841691e-06
+            },
+            "blocks.0.message.filter.2.weight": {
+              "outside_count": 20,
+              "numel": 16384,
+              "max_tol_ratio": 5.473333367326104,
+              "worst_actual": 1.0602607727050781,
+              "worst_reference": 1.0699482897377415,
+              "relative_l2": 9.822885444312355e-07
+            },
+            "blocks.1.message.filter.0.weight": {
+              "outside_count": 5,
+              "numel": 16384,
+              "max_tol_ratio": 1.7319475466181236,
+              "worst_actual": 3.9535598754882812,
+              "worst_reference": 3.961633580330968,
+              "relative_l2": 9.576153934467135e-07
+            },
+            "head.readout.2.bias": {
+              "outside_count": 1,
+              "numel": 2,
+              "max_tol_ratio": 25.111607163123562,
+              "worst_actual": 0.017578125,
+              "worst_reference": -1.4551915228366852e-11,
+              "relative_l2": 4.8523333150824395e-08
+            },
+            "blocks.0.update.net.0.weight": {
+              "outside_count": 32,
+              "numel": 16384,
+              "max_tol_ratio": 6.400513011750272,
+              "worst_actual": 3.1047325134277344,
+              "worst_reference": 3.080535149015084,
+              "relative_l2": 1.071611541064002e-06
+            },
+            "blocks.0.message.filter.0.weight": {
+              "outside_count": 5,
+              "numel": 16384,
+              "max_tol_ratio": 3.416323571536357,
+              "worst_actual": -1.9521942138671875,
+              "worst_reference": -1.943164309333767,
+              "relative_l2": 9.22505342029504e-07
+            },
+            "blocks.2.update.net.0.weight": {
+              "outside_count": 15,
+              "numel": 16384,
+              "max_tol_ratio": 6.395188651545306,
+              "worst_actual": 0.23897266387939453,
+              "worst_reference": 0.24501622089076136,
+              "relative_l2": 1.2166658166427869e-06
+            },
+            "blocks.3.message.filter.2.weight": {
+              "outside_count": 25,
+              "numel": 16384,
+              "max_tol_ratio": 7.851200058061336,
+              "worst_actual": -0.14202880859375,
+              "worst_reference": -0.13546937141637727,
+              "relative_l2": 8.413272656408971e-07
+            }
+          },
+          "maximum_absolute_error": 1.277902816887945,
+          "maximum_relative_l2_error": 2.4255569651439223e-05,
+          "maximum_tolerance_ratio": 52.11150813902197,
+          "passed": false
+        }
+      },
+      "finished": true
+    },
+    "so3lr/large_2000/cpu": {
+      "job": "6338773",
+      "architecture": "so3lr",
+      "system": "large_2000",
+      "device": "cpu",
+      "tree": "validated-c32ede3",
+      "snapshot": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "comparisons": {
+        "native_fp32_repeat": {
+          "tensor_count": 123,
+          "changed_participation": [],
+          "outside": {
+            "blocks.1.mlp_1.1.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.2714832911592735,
+              "worst_actual": 0.5226166248321533,
+              "worst_reference": 0.5241731405258179,
+              "relative_l2": 2.756236028553591e-07
+            },
+            "blocks.2.mlp_1.1.bias": {
+              "outside_count": 1,
+              "numel": 128,
+              "max_tol_ratio": 1.0557837754827812,
+              "worst_actual": 9.4853515625,
+              "worst_reference": 9.474609375,
+              "relative_l2": 1.9504138526497957e-07
+            },
+            "blocks.0.mlp_1.3.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 1.2252564220510613,
+              "worst_actual": -3.8772902488708496,
+              "worst_reference": -3.8829054832458496,
+              "relative_l2": 3.1748077523052665e-07
+            },
+            "blocks.0.interaction_block.linear_layer.weight": {
+              "outside_count": 3,
+              "numel": 17424,
+              "max_tol_ratio": 1.6175074388078843,
+              "worst_actual": 3.5192339420318604,
+              "worst_reference": 3.5260696411132812,
+              "relative_l2": 2.9295476281078253e-07
+            },
+            "blocks.2.interaction_block.linear_layer.weight": {
+              "outside_count": 2,
+              "numel": 17424,
+              "max_tol_ratio": 8.674042066639807,
+              "worst_actual": -0.5276870727539062,
+              "worst_reference": -0.5384292602539062,
+              "relative_l2": 2.3082370392934706e-07
+            },
+            "blocks.0.mlp_1.1.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 1.6308171730821481,
+              "worst_actual": -0.49568265676498413,
+              "worst_reference": -0.49763578176498413,
+              "relative_l2": 3.3210980503592003e-07
+            },
+            "blocks.2.mlp_1.3.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 1.3510478735223335,
+              "worst_actual": 2.5570781230926514,
+              "worst_reference": 2.5526835918426514,
+              "relative_l2": 2.3641072360880132e-07
+            },
+            "post_sequence.0.head.bias": {
+              "outside_count": 1,
+              "numel": 2,
+              "max_tol_ratio": 391.80072651790346,
+              "worst_actual": 0.2421875,
+              "worst_reference": -0.052734375,
+              "relative_l2": 1.7366221303825893e-07
+            }
+          },
+          "maximum_absolute_error": 0.6875,
+          "maximum_relative_l2_error": 6.720086793392647e-07,
+          "maximum_tolerance_ratio": 391.80072651790346,
+          "passed": false
+        },
+        "native_fp32_vs_native_cpu_fp64": {
+          "tensor_count": 123,
+          "changed_participation": [],
+          "outside": {
+            "blocks.1.mlp_1.1.weight": {
+              "outside_count": 2,
+              "numel": 16384,
+              "max_tol_ratio": 2.3973723135058327,
+              "worst_actual": 8.60142707824707,
+              "worst_reference": 8.623779649435857,
+              "relative_l2": 4.4247658586710596e-07
+            },
+            "blocks.2.mlp_1.1.bias": {
+              "outside_count": 1,
+              "numel": 128,
+              "max_tol_ratio": 1.707488111234403,
+              "worst_actual": 9.474609375,
+              "worst_reference": 9.492012114515092,
+              "relative_l2": 3.1811569437826473e-07
+            },
+            "blocks.0.mlp_1.3.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.4921737352059836,
+              "worst_actual": -0.8698166012763977,
+              "worst_reference": -0.8674776522931236,
+              "relative_l2": 4.602149202026142e-07
+            },
+            "blocks.0.interaction_block.linear_layer.weight": {
+              "outside_count": 2,
+              "numel": 17424,
+              "max_tol_ratio": 1.5088322573363082,
+              "worst_actual": 3.5260696411132812,
+              "worst_reference": 3.5197028173860363,
+              "relative_l2": 4.750867100447535e-07
+            },
+            "blocks.2.interaction_block.linear_layer.weight": {
+              "outside_count": 5,
+              "numel": 17424,
+              "max_tol_ratio": 15.08491976163081,
+              "worst_actual": -0.5384292602539062,
+              "worst_reference": -0.52002527684553,
+              "relative_l2": 4.1606439084444523e-07
+            },
+            "blocks.0.mlp_1.1.weight": {
+              "outside_count": 3,
+              "numel": 16384,
+              "max_tol_ratio": 1.9637803838953618,
+              "worst_actual": 3.4498519897460938,
+              "worst_reference": 3.4580174227968774,
+              "relative_l2": 4.805333948276281e-07
+            },
+            "blocks.2.mlp_1.3.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.820050301158398,
+              "worst_actual": 2.5526835918426514,
+              "worst_reference": 2.558614434024657,
+              "relative_l2": 4.344386510416901e-07
+            },
+            "blocks.1.mlp_1.3.weight": {
+              "outside_count": 4,
+              "numel": 16384,
+              "max_tol_ratio": 2.590974620186938,
+              "worst_actual": 4.175418853759766,
+              "worst_reference": 4.162819412080513,
+              "relative_l2": 4.322638885481466e-07
+            },
+            "blocks.1.filter_net_inv.mlp_rbf.mlp_rbf_layer_1.0.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.177707794179274,
+              "worst_actual": 0.164093017578125,
+              "worst_reference": 0.165111866566217,
+              "relative_l2": 8.223369681311729e-07
+            },
+            "blocks.1.interaction_block.linear_layer.weight": {
+              "outside_count": 4,
+              "numel": 17424,
+              "max_tol_ratio": 1.6038449197032087,
+              "worst_actual": -16.708742141723633,
+              "worst_reference": -16.68086592820464,
+              "relative_l2": 4.252948631982326e-07
+            },
+            "blocks.2.euclidean_attention_block.W_v_inv": {
+              "outside_count": 1,
+              "numel": 4096,
+              "max_tol_ratio": 1.113230304733995,
+              "worst_actual": 0.11204451322555542,
+              "worst_reference": 0.11294951325993513,
+              "relative_l2": 7.15742830737672e-07
+            },
+            "blocks.1.filter_net_inv.mlp_rbf.0.weight": {
+              "outside_count": 1,
+              "numel": 4096,
+              "max_tol_ratio": 1.0434359007663367,
+              "worst_actual": -0.5424256324768066,
+              "worst_reference": -0.5437233781001387,
+              "relative_l2": 8.908829960307305e-07
+            },
+            "post_sequence.0.head.bias": {
+              "outside_count": 1,
+              "numel": 2,
+              "max_tol_ratio": 75.3348215679335,
+              "worst_actual": -0.052734375,
+              "worst_reference": 1.0550138540565968e-10,
+              "relative_l2": 1.4516659599655097e-07
+            },
+            "blocks.2.mlp_1.1.weight": {
+              "outside_count": 1,
+              "numel": 16384,
+              "max_tol_ratio": 1.1775108480522571,
+              "worst_actual": -2.090928077697754,
+              "worst_reference": -2.094218300057898,
+              "relative_l2": 4.189850152040343e-07
+            }
+          },
+          "maximum_absolute_error": 0.7198235068935901,
+          "maximum_relative_l2_error": 2.924163943504235e-06,
+          "maximum_tolerance_ratio": 75.3348215679335,
           "passed": false
         }
       },
