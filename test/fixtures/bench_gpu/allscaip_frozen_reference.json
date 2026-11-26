@@ -1,0 +1,171 @@
+{
+  "purpose": "Independent references for AllScAIP cells missing old eager E/F on the V100.",
+  "method": "Unmodified frozen baseline on CPU using the same model state, seed and geometry as the GPU acceptance driver. Both forward modes return E and Fa. Each output was compared elementwise with the archived GPU candidate eager result. A second run wraps the old forward in torch.autograd.graph.allow_mutation_on_saved_tensors() to preserve Amax backward inputs.",
+  "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+  "candidate": "2a3b024",
+  "fixture_sha256": "f23267a3de77f15f42d9f5fa070ab5193b76d754deb5733e7d44170303b07b46",
+  "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+  "torch": "2.13.0+cu126",
+  "slurm_job": "6338737",
+  "results": {
+    "float32/bulk_256": {
+      "candidate_gpu_job": "6318325",
+      "candidate_gpu_uuid": "GPU-985a1720-89a9-55c2-7b34-429ade146d97",
+      "original": {
+        "infer": "missing_periodic_cell",
+        "train": "missing_periodic_cell"
+      },
+      "clone_on_mutation": {
+        "infer": "missing_periodic_cell",
+        "train": "missing_periodic_cell"
+      }
+    },
+    "float32/large_2000": {
+      "candidate_gpu_job": "6318325",
+      "candidate_gpu_uuid": "GPU-985a1720-89a9-55c2-7b34-429ade146d97",
+      "original": {
+        "infer": "amax_modified_in_place",
+        "train": "amax_modified_in_place"
+      },
+      "clone_on_mutation": {
+        "infer": {
+          "E": {
+            "shape": [
+              1
+            ],
+            "dtype": "torch.float32",
+            "finite": true,
+            "max_abs": 0.0,
+            "outside": 0
+          },
+          "Fa": {
+            "shape": [
+              2000,
+              3
+            ],
+            "dtype": "torch.float32",
+            "finite": true,
+            "max_abs": 0.0,
+            "outside": 0
+          }
+        },
+        "train": {
+          "E": {
+            "shape": [
+              1
+            ],
+            "dtype": "torch.float32",
+            "finite": true,
+            "max_abs": 0.0,
+            "outside": 0
+          },
+          "Fa": {
+            "shape": [
+              2000,
+              3
+            ],
+            "dtype": "torch.float32",
+            "finite": true,
+            "max_abs": 0.0,
+            "outside": 0
+          }
+        }
+      }
+    },
+    "float32/mol_batch_32x20": {
+      "candidate_gpu_job": "6318325",
+      "candidate_gpu_uuid": "GPU-985a1720-89a9-55c2-7b34-429ade146d97",
+      "original": {
+        "infer": "amax_modified_in_place",
+        "train": "amax_modified_in_place"
+      },
+      "clone_on_mutation": {
+        "infer": {
+          "E": {
+            "shape": [
+              32
+            ],
+            "dtype": "torch.float32",
+            "finite": true,
+            "max_abs": 0.0,
+            "outside": 0
+          },
+          "Fa": {
+            "shape": [
+              640,
+              3
+            ],
+            "dtype": "torch.float32",
+            "finite": true,
+            "max_abs": 0.0,
+            "outside": 0
+          }
+        },
+        "train": {
+          "E": {
+            "shape": [
+              32
+            ],
+            "dtype": "torch.float32",
+            "finite": true,
+            "max_abs": 0.0,
+            "outside": 0
+          },
+          "Fa": {
+            "shape": [
+              640,
+              3
+            ],
+            "dtype": "torch.float32",
+            "finite": true,
+            "max_abs": 0.0,
+            "outside": 0
+          }
+        }
+      }
+    },
+    "float64/bulk_256": {
+      "candidate_gpu_job": "6333819",
+      "candidate_gpu_uuid": "GPU-34f059c2-96ad-b500-81b4-48607e7bcca1",
+      "original": {
+        "infer": "missing_periodic_cell",
+        "train": "missing_periodic_cell"
+      },
+      "clone_on_mutation": {
+        "infer": "missing_periodic_cell",
+        "train": "missing_periodic_cell"
+      }
+    },
+    "float64/large_2000": {
+      "candidate_gpu_job": "6333819",
+      "candidate_gpu_uuid": "GPU-34f059c2-96ad-b500-81b4-48607e7bcca1",
+      "original": {
+        "infer": "mixed_float_double",
+        "train": "candidate_eager_missing"
+      },
+      "clone_on_mutation": {
+        "infer": "mixed_float_double",
+        "train": "candidate_eager_missing"
+      }
+    },
+    "float64/mol_batch_32x20": {
+      "candidate_gpu_job": "6333819",
+      "candidate_gpu_uuid": "GPU-34f059c2-96ad-b500-81b4-48607e7bcca1",
+      "original": {
+        "infer": "mixed_float_double",
+        "train": "mixed_float_double"
+      },
+      "clone_on_mutation": {
+        "infer": "mixed_float_double",
+        "train": "mixed_float_double"
+      }
+    }
+  },
+  "errors": {
+    "amax_modified_in_place": "The old hard-neighbour envelope modifies the output of amax in place before force differentiation.",
+    "missing_periodic_cell": "Old get_output calls build_graph_attention_data with cell=None even with pbc=True.",
+    "mixed_float_double": "Old graph preprocessing casts positions to float32 in a float64 model, leading to a Float/Double matmul error.",
+    "candidate_eager_missing": "The candidate eager worker did not return this output."
+  },
+  "interpretation": "No default baseline invocation produced a matched reference. Clone-on-write enabled both nonperiodic float32 shapes in inference and training-forward mode. All four matching E and Fa tensors are zero on these initialized weights. The comparison does not measure trained nonzero outputs, weight gradients or performance. It does not change default acceptance counts."
+}
