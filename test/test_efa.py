@@ -494,3 +494,52 @@ def test_spookynet_default_checkpoint_layout_matches_pre_efa():
     build_model("spookynet", verbose=0).load_state_dict(
         model.state_dict(), strict=True
     )
+
+
+def test_grouped_efa_matches_pairwise_attention_and_mixed_second_derivatives():
+    from enerzyme.models.mp.nonlocal_.rope import _grouped_efa
+
+    torch.manual_seed(93)
+    counts = (2, 0, 31, 3, 0, 1, 0)
+    batch = torch.repeat_interleave(torch.arange(len(counts)), torch.tensor(counts))
+    batch = batch[torch.randperm(batch.numel())]
+    for device in (("cpu", "cuda") if torch.cuda.is_available() else ("cpu",)):
+        for dtype in (torch.float32, torch.float64):
+            index = batch.to(device)
+            n = len(index)
+            operands = tuple(
+                (0.25 * torch.randn(shape, dtype=dtype, device=device)).requires_grad_()
+                for shape in ((n, 6, 8), (n, 6, 8), (n, 5), (6,))
+            )
+            target = torch.randn_like(operands[2])
+            directions = [torch.randn_like(value) for value in operands]
+
+            def pairwise(q, k, v, weights):
+                scores = torch.einsum("imk,jmk,m->ij", q, k, weights)
+                return scores.masked_fill(index[:, None] != index[None, :], 0) @ v
+
+            def evaluate(call):
+                y = call(*operands)
+                first = torch.autograd.grad((y * target).sum(), operands, create_graph=True)
+                directional = sum((g * d).sum() for g, d in zip(first, directions))
+                return y, first, torch.autograd.grad(directional, operands)
+
+            def tiled(q, k, v, weights):
+                return _grouped_efa(q, k, v, weights, index, len(counts))
+
+            compiled = torch.compile(tiled, backend="eager", fullgraph=True)
+            torch.testing.assert_close(evaluate(compiled), evaluate(pairwise))
+
+
+def test_efa_empty_atom_batch_preserves_output_and_derivative_shapes():
+    from enerzyme.models.mp.nonlocal_.rope import linear_efa_aggregate
+
+    operands = [torch.randn(shape, dtype=torch.float64, requires_grad=True) for shape in
+                ((0, 8), (0, 8), (0, 5), (0, 3), (4,), (6, 3), (6,))]
+    batch = torch.empty(0, dtype=torch.long)
+    for graphs in (0, 1, 4):
+        out = linear_efa_aggregate(*operands, batch, num_graphs=graphs)
+        assert out.shape == (0, 5)
+        for grad, operand in zip(torch.autograd.grad(out.sum(), operands), operands):
+            assert grad.shape == operand.shape
+            assert not torch.count_nonzero(grad)

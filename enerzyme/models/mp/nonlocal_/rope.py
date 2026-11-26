@@ -83,6 +83,39 @@ def apply_rotary_position_embedding(
     return x_g * cos + y * sin
 
 
+def _grouped_efa(q: Tensor, k: Tensor, v: Tensor, weights: Tensor,
+                 batch: Tensor, num_graphs: int) -> Tensor:
+    """Evaluate Q(KᵀV) within each molecule using bounded row tiles."""
+    n, directions, channels = q.shape
+    features = directions * channels
+    tile_size = torch.sym_min(32, torch.sym_max(1, n // num_graphs))
+    # Sum of ceil(count / tile_size) over the nonempty groups is at most
+    # ceil(n / tile_size) + num_graphs - 1. No device read is needed to size
+    # the buffers, including for unequal sizes, missing or interleaved IDs.
+    num_tiles = torch.sym_min(n, (n + tile_size - 1) // tile_size + num_graphs - 1)
+    counts = batch.new_zeros(num_graphs).index_add(0, batch, torch.ones_like(batch))
+    group_tiles = (counts + tile_size - 1) // tile_size
+    tile_ends = group_tiles.cumsum(0)
+    starts = counts.cumsum(0) - counts
+    padding = (tile_ends - group_tiles) * tile_size - starts
+    order = torch.argsort(batch, stable=True)
+    rows = torch.arange(n, device=batch.device) + padding[batch[order]]
+    slots = torch.empty_like(order).scatter(0, order, rows)
+    tile_ids = torch.arange(num_tiles, device=batch.device)
+    owners = torch.searchsorted(tile_ends, tile_ids, right=True).clamp_max(num_graphs - 1)
+
+    def pack(x):
+        rows = x.new_zeros((num_tiles * tile_size, x.shape[1])).index_copy(0, slots, x)
+        return rows.reshape(num_tiles, tile_size, x.shape[1])
+
+    keys = pack(k.reshape(n, features))
+    tile_kv = torch.bmm(keys.transpose(1, 2), pack(v))
+    group_kv = v.new_zeros((num_graphs, features, v.shape[1])).index_add(0, owners, tile_kv)
+    queries = pack((q * weights.reshape(1, directions, 1)).reshape(n, features))
+    output = torch.bmm(queries, group_kv[owners])
+    return output.reshape(num_tiles * tile_size, v.shape[1])[slots]
+
+
 def linear_efa_aggregate(
     q: Tensor,
     k: Tensor,
@@ -135,6 +168,16 @@ def linear_efa_aggregate(
     n_atoms = positions.shape[0]
     m_grid = grid_u.shape[0]
     f_v = v.shape[-1]
+
+    if n_atoms == 0:
+        # Keep the empty sum connected to every differentiable input.
+        queries = (q_r * grid_w.reshape(1, m_grid, 1)).flatten(1)
+        return (queries @ k_r.flatten(1).T) @ v
+    if (num_graphs > 1 and torch.compiler.is_compiling() and q_r.is_cuda
+            and q_r.dtype in (torch.float32, torch.float64) and q_r.dtype == k_r.dtype == v.dtype == grid_w.dtype
+            and not torch.is_autocast_enabled("cuda")):
+        # The retained CUDA backward otherwise saves [atoms, grid, key, value].
+        return _grouped_efa(q_r, k_r, v, grid_w, batch_seg, num_graphs)
 
     if num_graphs > 1:
         # (N, M, Fqk, Fv)
