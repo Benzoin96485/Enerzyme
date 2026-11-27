@@ -1,0 +1,165 @@
+{
+  "tool_revision": "c5e5454084fb14a0614034a54bcb977f038e4b4a",
+  "job": "6341024",
+  "device": {"name": "Tesla V100-PCIE-32GB", "uuid": "4163ef98-d563-542a-eccc-2939797f3efc", "torch": "2.13.0+cu126", "cuda": "12.6", "triton": "3.7.1", "total_memory_bytes": 34072559616, "compute_capability": [7, 0], "driver_version": "580.178.04"},
+  "system": "bulk_256",
+  "workload": "256 atoms in the 8 x 8 x 4 periodic cell from bench_cores._batch, with directed image edges.",
+  "baseline_selection": {"painn": "Pre-refactor source 1aa0f8b with its frozen weights.", "schnet": "Earlier refactor 455e150 supports the same ordinary compiled force-training path and uses the tracked trained SchNet checkpoint."},
+  "method": "Two warmups per process, then median elapsed time and peak allocated MiB. Reported metrics are the median of the two per-side process medians in an ABBA run. Time and memory use a 3 percent upper relative limit after numerical parity.",
+  "precision_gates": {
+    "float32": {"energy_force": [0.0003, 0.0003], "weight_gradients": [0.0007, 0.001]},
+    "float64": {"energy_force_and_gradients": [1e-10, 1e-08]},
+    "order": "[atol, rtol], finite values, identical tensor shapes, dtypes and participating weight names required"
+  },
+  "cases": {
+    "painn": {
+      "execution": "eager",
+      "baseline_revision": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+      "candidate_revision": "c5e5454084fb14a0614034a54bcb977f038e4b4a",
+      "precision": "float32",
+      "fixture": "painn.pt",
+      "fixture_sha256": "22103fe029132de54791932d5d707425f6c913004af7ef30b8090bdd33b5e40b",
+      "timed_repetitions_per_process": 13,
+      "driver_sha256": "310301b49f88add23e84f01130f5d026bd33fc87fd6e8c41b80cea91a009e7eb",
+      "raw_sha256": "6cd0cab82eef50ca42f118de2586d28cd5a75605111d33d82563ab7c04e32d9b",
+      "passed": true,
+      "measurements": {
+        "infer": {
+          "pair_status": ["both_validated", "both_validated"],
+          "numerically_valid": true,
+          "ms": {"baseline": 7.283095852471888, "candidate": 6.806492572650313, "delta_percent": -6.543965498680282},
+          "peak_MiB": {"baseline": 273.44775390625, "candidate": 273.48779296875, "delta_percent": 0.014642308056300735},
+          "passed": true,
+          "round_medians_ms": {"baseline": [7.281863829120994, 7.2843278758227825], "candidate": [6.9132710341364145, 6.699714111164212]},
+          "all_leg_numerics_passed": true,
+          "all_cross_native_passed": true,
+          "active_parameter_gradients": 0,
+          "maximum_cross_native_abs": {"energy": 3.0517578125e-05, "force": 2.980232238769531e-07, "gradient": 0.0}
+        },
+        "train": {
+          "pair_status": ["both_validated", "both_validated"],
+          "numerically_valid": true,
+          "ms": {"baseline": 18.554760492406785, "candidate": 17.42323092184961, "delta_percent": -6.098324853183823},
+          "peak_MiB": {"baseline": 378.916015625, "candidate": 378.9560546875, "delta_percent": 0.010566737970663098},
+          "passed": true,
+          "round_medians_ms": {"baseline": [18.545605009421706, 18.563915975391865], "candidate": [17.554549034684896, 17.29191280901432]},
+          "all_leg_numerics_passed": true,
+          "all_cross_native_passed": true,
+          "active_parameter_gradients": 34,
+          "maximum_cross_native_abs": {"energy": 4.57763671875e-05, "force": 3.203749656677246e-07, "gradient": 0.03125}
+        }
+      }
+    },
+    "schnet": {
+      "execution": "compile",
+      "baseline_revision": "455e150edc3fedc03646df3b12cd65377ed91bad",
+      "candidate_revision": "c5e5454084fb14a0614034a54bcb977f038e4b4a",
+      "precision": "float64",
+      "fixture": "schnet_default.pt.gz",
+      "fixture_sha256": "e0ec083cfe71c322d4758fe5ae65c8aa20f692ea2a2fc4ea7a6d11870c04ab10",
+      "timed_repetitions_per_process": 11,
+      "driver_sha256": "310301b49f88add23e84f01130f5d026bd33fc87fd6e8c41b80cea91a009e7eb",
+      "raw_sha256": "5cabe430e1e555a10ba7488c65663baa7783216d6cc1905e2fd685382e4b92ea",
+      "passed": false,
+      "measurements": {
+        "infer": {
+          "pair_status": ["both_validated", "both_validated"],
+          "numerically_valid": true,
+          "ms": {"baseline": 6.720705074258149, "candidate": 6.927734008058906, "delta_percent": 3.0804644975975126},
+          "peak_MiB": {"baseline": 60.751953125, "candidate": 60.75390625, "delta_percent": 0.003214917215887958},
+          "passed": false,
+          "round_medians_ms": {"baseline": [6.744546117261052, 6.696864031255245], "candidate": [6.897687911987305, 6.9577801041305065]},
+          "all_leg_numerics_passed": true,
+          "all_cross_native_passed": true,
+          "active_parameter_gradients": 0,
+          "maximum_cross_native_abs": {"energy": 1.4210854715202004e-14, "force": 6.661338147750939e-16, "gradient": 0.0},
+          "maximum_compiled_vs_native_abs": {
+            "baseline": {"energy": 7.105427357601002e-15, "force": 1.1102230246251565e-15, "gradient": 0.0},
+            "candidate": {"energy": 1.4210854715202004e-14, "force": 8.881784197001252e-16, "gradient": 0.0}
+          },
+          "new_captured_calls": {"baseline": [159, 159], "candidate": [159, 159]}
+        },
+        "train": {
+          "pair_status": ["both_validated", "both_validated"],
+          "numerically_valid": true,
+          "ms": {"baseline": 5.732592078857124, "candidate": 5.183061002753675, "delta_percent": -9.586083721711558},
+          "peak_MiB": {"baseline": 69.13427734375, "candidate": 69.13427734375, "delta_percent": 0.0},
+          "passed": true,
+          "round_medians_ms": {"baseline": [6.1228659469634295, 5.342318210750818], "candidate": [5.1000339444726706, 5.266088061034679]},
+          "all_leg_numerics_passed": true,
+          "all_cross_native_passed": true,
+          "active_parameter_gradients": 30,
+          "maximum_cross_native_abs": {"energy": 7.105427357601002e-15, "force": 8.881784197001252e-16, "gradient": 5.4569682106375694e-12},
+          "maximum_compiled_vs_native_abs": {
+            "baseline": {"energy": 1.4210854715202004e-14, "force": 9.992007221626409e-16, "gradient": 9.094947017729282e-12},
+            "candidate": {"energy": 2.842170943040401e-14, "force": 1.1102230246251565e-15, "gradient": 1.8189894035458565e-11}
+          },
+          "new_captured_calls": {"baseline": [276, 276], "candidate": [276, 276]}
+        }
+      },
+      "inference_long_sample": {
+        "job": "6341038",
+        "device_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
+        "timed_repetitions_per_process": 101,
+        "order": ["baseline", "candidate", "candidate", "baseline"],
+        "scope": "One additional inference-only run on the same physical card with the same source revisions, fixture and 3 percent gate, after the 11-repetition inference exceeded that gate. Both results are retained independently.",
+        "raw_sha256": "c713d273d9a97debfd6acd0b03ade9603a69992234a54e7ad7af1b8adca6b238",
+        "measurements": {
+          "pair_status": ["both_validated", "both_validated"],
+          "numerically_valid": true,
+          "ms": {"baseline": 6.659923936240375, "candidate": 6.762995035387576, "delta_percent": 1.5476317767885162},
+          "peak_MiB": {"baseline": 60.75390625, "candidate": 60.751953125, "delta_percent": -0.0032148138622734024},
+          "passed": true,
+          "round_medians_ms": {"baseline": [6.694877054542303, 6.624970817938447], "candidate": [6.698366021737456, 6.827624049037695]},
+          "maximum_cross_native_abs": {"energy": 1.4210854715202004e-14, "force": 6.106226635438361e-16},
+          "maximum_compiled_vs_native_abs": {
+            "baseline": {"energy": 0.0, "force": 1.1102230246251565e-15},
+            "candidate": {"energy": 2.1316282072803006e-14, "force": 1.1102230246251565e-15}
+          },
+          "new_captured_calls": {"baseline": [159, 159], "candidate": [159, 159]}
+        }
+      }
+    }
+  },
+  "periodic_equivalence": {
+    "job": "6340994",
+    "GPU_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
+    "test": "test_schnet_force_training_across_cell_boundary",
+    "device_and_dtype_cases": ["cpu float32", "cpu float64", "cuda float32", "cuda float64"],
+    "passed": true,
+    "checked": "energy, forces and gradients from the mixed energy/force loss, using wrapped coordinates with image shifts and the equivalent unwrapped positions"
+  },
+  "triton": {
+    "job": "6340994",
+    "GPU_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
+    "test_file": "test/test_e2former_triton_parity.py",
+    "initial_one_card_result": "10 passed, 1 skipped",
+    "dispatch": {"float16": "Triton", "bfloat16": "Triton", "float32": "Triton", "float64": "PyTorch fallback"},
+    "numeric_types": {
+      "device": "Tesla V100-PCIE-32GB",
+      "bf16_native": false,
+      "cases": {
+        "torch.float16": {"max_abs": [0.0009765625, 0.001953125, 0.001953125, 0.001953125, 0.001953125, 0.001953125], "pass": [true, true, true, true, true, true]},
+        "torch.bfloat16": {"max_abs": [0.0078125, 0.0625, 0.0078125, 0.0078125, 0.015625, 0.015625], "pass": [true, true, true, true, true, true]},
+        "torch.float32": {"max_abs": [2.384185791015625e-07, 7.152557373046875e-07, 2.384185791015625e-07, 2.384185791015625e-07, 7.152557373046875e-07, 3.5762786865234375e-07], "pass": [true, true, true, true, true, true]},
+        "torch.float64": {"max_abs": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "pass": [true, true, true, true, true, true]}
+      }
+    },
+    "native_thresholds": {
+      "float16_float32_float64": {"atol": 0.003, "rtol": 0.002},
+      "bfloat16": {"atol": 0.05, "rtol": 0.02}
+    },
+    "numeric_types_outputs": ["sparse QK", "sparse value aggregate", "dQ", "dK", "dGate", "dValue"],
+    "noncurrent_device": {
+      "job": "6341001",
+      "original_source": "b1a11134cbc3df77e52783c3bd9f7757bf47d635",
+      "fixed_source": "c5e5454084fb14a0614034a54bcb977f038e4b4a",
+      "devices": [{"name": "Tesla V100-PCIE-32GB", "uuid": "e467a8b3-89c5-5e53-1e72-90bfeffd8766", "cc": [7, 0]}, {"name": "Tesla V100-PCIE-32GB", "uuid": "a15dc796-f172-2e06-2283-cea8159bf118", "cc": [7, 0]}],
+      "baseline_device_check_passed": false,
+      "fixed_device_check_passed": true,
+      "test": "test_triton_uses_input_device_and_restores_current_device",
+      "mode": "Input tensors on visible cuda:1 with cuda:0 selected. Both forward and backward check the active device, then numerically compare output and four input gradients to PyTorch."
+    }
+  },
+  "hardware_coverage": "The configured Slurm GPU partitions advertise Volta. These results cover Tesla V100-PCIE-32GB on the stated stack. Other CUDA architectures can run the same paired command."
+}
