@@ -22,9 +22,8 @@ class SmoothLeakyReLU(Module):
         self.alpha = negative_slope
 
     def forward(self, x: Tensor) -> Tensor:
-        x1 = ((1 + self.alpha) / 2) * x
-        x2 = ((1 - self.alpha) / 2) * x * (2 * torch.sigmoid(x) - 1)
-        return x1 + x2
+        # f(x) = alpha*x + (1-alpha)*x*sigmoid(x).
+        return torch.addcmul(self.alpha * x, x, torch.sigmoid(x), value=1 - self.alpha)
 
     def extra_repr(self) -> str:
         return "negative_slope={}".format(self.alpha)

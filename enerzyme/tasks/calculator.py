@@ -54,6 +54,8 @@ class ASECalculator(Calculator):
         )
         self.model = model
         self.positions = None
+        self._full_input_key = None
+        self._full_static_input = {}
         self.device = device
         self.pbc = np.array([False])
         self.cell = None
@@ -130,11 +132,27 @@ class ASECalculator(Calculator):
             results["polarizability"] = output["polarizability"][0]
         return results, biases
 
-    def _calculate_internal(self, atoms: ase.Atoms) -> None:
-        results = dict()
+    def _prepare_input(self, atoms: ase.Atoms) -> Dict[str, Any]:
+        charge = atoms.info.get("charge", 0)
+        spin = atoms.info.get("spin", 0) - 1
+        cache_key = None
+        if (self.neighbor_list_type == "full" and not atoms.pbc.any()
+                and np.isscalar(charge) and np.isscalar(spin)):
+            # Only a molecular all-pairs graph is independent of the coordinates.
+            # Each step still owns its position tensor and autograd graph.
+            positions = torch.tensor(
+                atoms.positions, dtype=self.dtype, device=self.device, requires_grad=True
+            )
+            cache_key = (positions.device, self.dtype, atoms.numbers.tobytes(),
+                         type(charge), charge, type(spin), spin)
+            if self._full_input_key == cache_key:
+                return {**self._full_static_input, "N": [len(atoms)], "Ra": positions}
+        # Drop the previous device-resident pair list before allocating its replacement.
+        self._full_input_key = None
+        self._full_static_input = {}
         features = {
-            "Q": atoms.info.get("charge", 0),
-            "S": atoms.info.get("spin", 0) - 1,
+            "Q": charge,
+            "S": spin,
             "Ra": atoms.positions,
             "Za": atoms.numbers,
             "N": len(atoms)
@@ -163,6 +181,15 @@ class ASECalculator(Calculator):
             dtype=self.dtype
         )
         net_input, _ = _to_device((net_input, {}), self.device)
+        if cache_key is not None:
+            self._full_input_key = cache_key
+            # Keep the collator's key order for compiled models, without retaining Ra's graph.
+            self._full_static_input = {**net_input, "Ra": None, "N": None}
+        return net_input
+
+    def _calculate_internal(self, atoms: ase.Atoms) -> None:
+        results = dict()
+        net_input = self._prepare_input(atoms)
         net_output = self.model(net_input)
         output, _ = _decorate_batch_output(
             output=net_output,

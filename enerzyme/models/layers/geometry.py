@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Literal
-from torch import Tensor
+from torch import Tensor, linalg
 import torch.nn.functional as F
 from . import BaseFFLayer
 from ..mp.basis.envelope import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
@@ -46,9 +46,13 @@ class DistanceLayer(BaseFFLayer):
             Rj_ = Rj + offsets
         else:
             Rj_ = Rj
-        relevant_output["Dij"] = F.pairwise_distance(Ri, Rj_, eps=1e-15)
         if self._with_vector:
-            relevant_output["vij"] = Rj_ - Ri
+            vij = Rj_ - Ri
+            relevant_output["vij"] = vij
+            # pairwise_distance(Ri, Rj_) adds epsilon to Ri - Rj_.
+            relevant_output["Dij"] = linalg.vector_norm(vij - 1e-15, dim=-1)
+        else:
+            relevant_output["Dij"] = F.pairwise_distance(Ri, Rj_, eps=1e-15)
         return relevant_output
 
 
