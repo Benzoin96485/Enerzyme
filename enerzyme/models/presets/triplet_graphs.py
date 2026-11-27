@@ -645,8 +645,9 @@ def spinconv(
         cutoff_sr,
         sphere_size_lat,
         sphere_size_long,
+        num_interactions,
     )
-    blocks = [SpinMessage(layer, residual_first or i > 0) for i, layer in enumerate(interactions)]
+    blocks = [SpinMessage(layer, residual_first or i > 0, i) for i, layer in enumerate(interactions)]
     head = SpinHead(energy_mix, hidden_channels, message_divisor)
     return ComposableCore(
         embed,

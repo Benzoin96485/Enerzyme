@@ -467,3 +467,55 @@ def test_compiled_spin_force_training_uses_live_pruned_edges_and_preserves_empty
         else:
             assert not torch.count_nonzero(actual_forces)
     assert "conv1d" in calls and "linear" in calls
+
+
+def test_each_spin_block_consumes_its_own_nondeterministic_projection(monkeypatch):
+    from enerzyme.models.spinconv import geometry
+
+    torch.manual_seed(53)
+    core = _tiny(num_interactions=3).double()
+    positions = torch.randn(5, 3, dtype=torch.float64, requires_grad=True)
+    embedding = torch.randn(5, 8, dtype=torch.float64, requires_grad=True)
+    inputs = _pack(positions, embedding)
+    project = geometry.bilinear_sphere_index
+    tables = []
+
+    def distinct_projection(local, query, n_lat, n_long):
+        indices, weights = project(local, query, n_lat, n_long)
+        # Use a distinguishable valid longitude for each invocation, independent
+        # of the test machine's atomic-add scheduling.
+        indices = (indices // n_long) * n_long + ((indices + len(tables)) % n_long)
+        tables.append((indices, weights))
+        return indices, weights
+
+    monkeypatch.setattr(geometry, "_independent_frames", lambda _: True, raising=False)
+    monkeypatch.setattr(geometry, "bilinear_sphere_index", distinct_projection)
+    actual = _forward(core, inputs)
+    assert len(tables) == 3
+    expected_tables = tuple(tables)
+    monkeypatch.setattr(geometry, "_independent_frames", lambda _: False)
+    monkeypatch.setattr(geometry, "bilinear_sphere_index", project)
+
+    # Replay each recorded table at the original message-module entry point.
+    def replay(table):
+        def replace_projection(module, args):
+            source = args[-1][2]
+            return (*args[:-1], (*table, source))
+        return replace_projection
+
+    handles = [block.message.spin.register_forward_pre_hook(replay(table))
+               for block, table in zip(core.blocks, expected_tables)]
+    try:
+        expected = _forward(core, inputs)
+    finally:
+        for handle in handles:
+            handle.remove()
+    variables = [positions, embedding, *core.parameters()]
+    da = torch.autograd.grad(actual.square().sum(), variables, allow_unused=True, retain_graph=True)
+    db = torch.autograd.grad(expected.square().sum(), variables, allow_unused=True)
+    torch.testing.assert_close(actual, expected, atol=0, rtol=0)
+    for a, b in zip(da, db):
+        if a is None or b is None:
+            assert a is b
+        else:
+            torch.testing.assert_close(a, b, atol=0, rtol=0)

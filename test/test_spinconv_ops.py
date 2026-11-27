@@ -321,3 +321,28 @@ def test_pair_scale_starts_near_identity():
         assert "max_Za" in str(exc)
     else:
         raise AssertionError("a negative target atomic number must be rejected")
+
+
+def test_compiled_spin_frame_sums_preserve_separate_reductions(monkeypatch):
+    from enerzyme.models.spinconv import geometry
+
+    receiver = torch.tensor([0, 0, 1, 1])
+    vec = torch.arange(12, dtype=torch.float64).reshape(4, 3) / 10
+    distance = vec.norm(dim=1)
+    reduce = geometry._receiver_sum
+    calls = []
+
+    def observed(v, i, n):
+        calls.append(len(calls))
+        return reduce(v, i, n) + calls[-1]
+
+    monkeypatch.setattr(geometry, "_receiver_sum", observed)
+
+    def frames(v, d, i):
+        return geometry._frame_sums(v, d, i, 5.0, 2, 3)
+
+    run = torch.compile(frames, fullgraph=True, backend="aot_eager")
+    out = run(vec, distance, receiver)
+    assert calls == [0, 1, 2]
+    for block, sample in enumerate(out):
+        torch.testing.assert_close(sample, out[0] + block, atol=0, rtol=0)

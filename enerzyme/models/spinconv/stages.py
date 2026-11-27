@@ -30,7 +30,7 @@ from torch.nn import Module
 from ..mp.ops import scatter_sum
 from ..layers.atom_embedding import BaseAtomEmbedding
 from ..layers.rbf import GaussianRBFLayer, gaussian_expansion
-from .geometry import SpinProjectionRequest
+from .geometry import _SpinFrameSamples, SpinProjectionRequest, sphere_projection
 
 
 class SpinConvEmbed(Embed):
@@ -50,11 +50,12 @@ class SpinConvEmbed(Embed):
         cutoff,
         n_lat,
         n_long,
+        num_blocks=1,
     ):
         super().__init__()
         self.dim_embedding = dim_embedding
         self.num_rbf = num_rbf
-        self.projection = SpinProjectionRequest(max_num_neighbors, cutoff, n_lat, n_long)
+        self.projection = SpinProjectionRequest(max_num_neighbors, cutoff, n_lat, n_long, num_blocks)
         self.act = act
         self.distance_map = distance_map
         self.init_fc1 = init_fc1
@@ -178,13 +179,24 @@ def build_stack(core, built_layers: List[Module]) -> None:
 
 
 class SpinMessage(Block):
-    def __init__(self, message, residual):
+    def __init__(self, message, residual, index=0):
         super().__init__()
         self.message = message
         self.residual = residual
+        self.index = index
 
     def forward(self, state, ctx):
-        messages = self.message(state.edge, *ctx.cache["spin_graph"])
+        graph = ctx.cache["spin_graph"]
+        projection = graph[-1]
+        if isinstance(projection, _SpinFrameSamples):
+            _, _, receiver, sender, vij, distance, num_nodes, _ = graph
+            spin = self.message.spin
+            projection = sphere_projection(
+                vij, receiver, sender, distance, spin.cutoff, num_nodes, spin.n_lat, spin.n_long,
+                pairs=projection.pairs, averaged=projection.receiver_sums[self.index],
+            )
+            graph = (*graph[:-1], projection)
+        messages = self.message(state.edge, *graph)
         if self.residual:
             messages = messages + state.edge
         return BlockState(scalar=state.scalar, edge=messages)

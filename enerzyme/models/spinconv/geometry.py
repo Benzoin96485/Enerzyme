@@ -10,13 +10,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from typing import NamedTuple, Optional
 
 import torch
 import torch.nn.functional as F
 from torch import Tensor
 
 from ..mp.basis.envelope import cosine_transition
-from ..mp.graph import path_pairs, receiver_csr, receiver_rank
+from ..mp.graph import EdgePairs, path_pairs, receiver_csr, receiver_rank
 
 
 def symmetric_neighbor_mask(
@@ -117,12 +118,47 @@ def _fallback_normal(polar: Tensor) -> Tensor:
     return torch.where(along_z, crossed_x, crossed)
 
 
+def _receiver_sum(vectors: Tensor, receiver: Tensor, num_nodes: int) -> Tensor:
+    averaged = vectors.new_zeros((num_nodes, 3))
+    if vectors.numel():
+        averaged.index_add_(0, receiver, vectors)
+    return averaged
+
+
+@torch.library.custom_op("enerzyme::spinconv_frame_sums", mutates_args=())
+def _frame_sums(vij: Tensor, distance: Tensor, receiver: Tensor, cutoff: float,
+                num_nodes: int, num_blocks: int) -> Tensor:
+    """Independently sample the detached receiver reduction for each spin block.
+
+    The CUDA reduction order affects longitude at the poles. Keeping the calls
+    together inside this operator prevents a compiler from reusing one sample.
+    """
+    weighted = vij * cosine_transition(distance, cutoff).unsqueeze(-1)
+    return torch.stack([_receiver_sum(weighted, receiver, num_nodes) for _ in range(num_blocks)])
+
+
+@_frame_sums.register_fake
+def _frame_sums_shape(vij, distance, receiver, cutoff, num_nodes, num_blocks):
+    return vij.new_empty((num_blocks, num_nodes, 3))
+
+
+class _SpinFrameSamples(NamedTuple):
+    pairs: EdgePairs
+    receiver_sums: Tensor
+
+
+def _independent_frames(vij: Tensor) -> bool:
+    return vij.is_cuda and not torch.are_deterministic_algorithms_enabled()
+
+
 def edge_spin_frames(
     vij: Tensor,
     idx_i: Tensor,
     distance: Tensor,
     cutoff: float,
     num_nodes: int,
+    *,
+    averaged: Optional[Tensor] = None,
 ) -> Tensor:
     """Rotation whose rows are the local SpinConv axes.
 
@@ -144,10 +180,9 @@ def edge_spin_frames(
         raise ValueError(
             f"distance shape {tuple(distance.shape)} != idx_i shape {tuple(idx_i.shape)}"
         )
-    weight = cosine_transition(distance, float(cutoff)).unsqueeze(-1)
-    averaged = vij.new_zeros((int(num_nodes), 3))
-    if vij.numel():
-        averaged.index_add_(0, idx_i, vij * weight)
+    if averaged is None:
+        weight = cosine_transition(distance, float(cutoff)).unsqueeze(-1)
+        averaged = _receiver_sum(vij * weight, idx_i, int(num_nodes))
     polar = _unit(vij)
     second = _unit(averaged[idx_i])
     raw_normal = torch.cross(polar, second, dim=-1)
@@ -232,12 +267,12 @@ def bilinear_sphere_index(
 
 
 @torch.no_grad()
-def sphere_projection(vij, receiver, sender, distance, cutoff, num_nodes, n_lat, n_long, *, pairs=None):
+def sphere_projection(vij, receiver, sender, distance, cutoff, num_nodes, n_lat, n_long, *, pairs=None, averaged=None):
     """Graph-dependent interpolation indices and fixed-coordinate weights for all spin blocks."""
     source, query = source_neighbor_pairs(receiver, sender, num_nodes) if pairs is None else pairs
     if source.numel() == 0:
         return source.new_empty(4, 0), vij.new_empty(4, 0), source
-    frames = edge_spin_frames(vij, receiver, distance, cutoff, num_nodes)
+    frames = edge_spin_frames(vij, receiver, distance, cutoff, num_nodes, averaged=averaged)
     local = project_neighbors(vij, frames, source, query)
     index, weight = bilinear_sphere_index(local, query, n_lat, n_long)
     return index, weight, source
@@ -251,10 +286,11 @@ class SpinProjectionRequest:
     cutoff: float
     n_lat: int
     n_long: int
+    num_blocks: int = 1
 
     @property
     def force_cache_key(self):
-        return ("spin_projection", self.max_neighbors, self.cutoff, self.n_lat, self.n_long)
+        return ("spin_projection", self.max_neighbors, self.cutoff, self.n_lat, self.n_long, self.num_blocks)
 
     def prepare(self, ctx):
         return ctx.cached(self.force_cache_key, lambda: self._projection(ctx))
@@ -280,9 +316,14 @@ class SpinProjectionRequest:
             if not bool(mask.all()):
                 selected = torch.where(mask)[0]
         edges = self.selected_graph(ctx, selected)
+        pairs = edges.triplets("path")
+        if self.num_blocks > 1 and _independent_frames(edges.vec):
+            sums = _frame_sums(edges.vec.detach(), edges.dist.detach(), edges.receiver,
+                               self.cutoff, ctx.num_nodes, self.num_blocks)
+            return selected, _SpinFrameSamples(pairs, sums)
         projection = sphere_projection(
             edges.vec, edges.receiver, edges.sender, edges.dist, self.cutoff, ctx.num_nodes,
-            self.n_lat, self.n_long, pairs=edges.triplets("path"),
+            self.n_lat, self.n_long, pairs=pairs,
         )
         return selected, projection
 
