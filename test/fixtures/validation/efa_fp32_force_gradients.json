@@ -1,0 +1,258 @@
+{
+  "architecture": "efa",
+  "source": {
+    "original": "1aa0f8b",
+    "candidate": "455e150",
+    "snapshot_sha256": "04efb9f20b0352eb03d582d1413a4a3fde0fce4add01dd6e034d709fefae9d6d",
+    "torch": "2.13.0+cu126",
+    "formal_V100_job": "6339213",
+    "formal_V100_uuid": "GPU-e7d358e7-783a-3a6f-9e59-ddd2825dcbd8",
+    "control_V100_job": "6339724",
+    "cpu_job_arrays_or_controls": ["6339704", "6339751", "6339759"],
+    "frozen_candidate_cpu_fp64_jobs": ["6339706", "6339707"],
+    "control_V100_uuid": "GPU-e7d358e7-783a-3a6f-9e59-ddd2825dcbd8"
+  },
+  "scope": "FP32 training with the frozen original weights and the acceptance energy-plus-force loss.",
+  "gates": {
+    "E_and_Fa": {"atol": 0.0003, "rtol": 0.0003},
+    "active_weight_gradient": {"atol": 0.0007, "rtol": 0.001},
+    "max_gate_ratio": "Maximum elementwise |actual-reference| / (atol + rtol*|reference|). Values greater than one fail."
+  },
+  "systems": {
+    "bulk_256": {
+      "formal": {"passed": false, "active_parameters": 90, "reference_active_parameters": 90, "energy_max_abs": 9.1552734375e-05, "force_max_abs": 1.2516975402832031e-06, "gradient_max_abs": 1.0, "new_graphs": 1, "new_calls": 501, "median_train_ms": 13.67416582070291, "peak_mib": 392.43310546875},
+      "same_weight_new_vs_original_cpu_fp64": {"passed": true, "active_parameters": 90, "reference_active_parameters": 90, "energy_max_abs": 1.1368683772161603e-13, "force_max_abs": 3.885780586188048e-16, "gradient_max_abs": 2.7939677238464355e-09},
+      "same_weight_new_vs_original_cpu_fp32": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.161776628, "energy_force_max_abs": [0.0, 2.682209014892578e-07]},
+      "original_fp32_cpu_controls": {
+        "vs_cpu_fp64": {"n_groups": 2, "n_elements": 2, "max_gate_ratio": 1.544981997},
+        "repeat": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.0},
+        "second_model": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.0},
+        "permuted_edges": {"n_groups": 2, "n_elements": 2, "max_gate_ratio": 9.495586896},
+        "permuted_atoms": {"n_groups": 3, "n_elements": 4, "max_gate_ratio": 9.426553397}
+      },
+      "compiled_fp32_v100_controls": {
+        "native_fp32_repeat": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 5.0354653},
+        "native_fp32_vs_native_cpu_fp64": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 8.462506831},
+        "compiled_fp32_vs_native_fp32": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.432588871},
+        "compiled_fp32_vs_native_cpu_fp64": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 8.462506831},
+        "compiled_fp32_repeat": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 4.692186382}
+      },
+      "compiled_vs_eager_outside": {},
+      "original_fp32_v100_controls": {
+        "vs_cpu_fp64": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 7.668337961},
+        "repeat": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.121354952},
+        "second_model": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.571710875},
+        "permuted_edges": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.698789665},
+        "permuted_atoms": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 6.804023866},
+        "existing_native_vs_this_native": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.800305886},
+        "existing_ordinary_vs_this_native": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.800305886}
+      },
+      "candidate_fp32_v100_controls": {
+        "vs_cpu_fp64": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 3.356205452},
+        "repeat": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 4.668173777},
+        "second_model": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 8.880941051},
+        "permuted_edges": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 4.668201574},
+        "permuted_atoms": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 8.994883019},
+        "existing_native_vs_this_native": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 5.123496887},
+        "existing_ordinary_vs_this_native": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 5.123496887}
+      },
+      "same_order_fp32_cuda_native_intervals": {
+        "candidate_repeat": {"disjoint_elements": 1, "max_minimax_gate_ratio": 2.511409592136492},
+        "candidate_vs_original": {"disjoint_elements": 0, "max_minimax_gate_ratio": null},
+        "base_independent_reference": {"disjoint_elements": 0, "max_minimax_gate_ratio": null},
+        "base_same_instance": {"disjoint_elements": 0, "max_minimax_gate_ratio": null},
+        "new_independent_reference": {"disjoint_elements": 1, "max_minimax_gate_ratio": 4.46027625090438},
+        "new_same_instance": {"disjoint_elements": 1, "max_minimax_gate_ratio": 2.3395475958156364},
+        "most_separated_entry": {"measurements": "new_independent_reference", "parameter": "blocks.1.nonlocal_update.mlp_2.weight", "elements": 1, "worst_index": [131, 43], "first": -0.37212225794792175, "second": -0.36260080337524414, "minimax_gate_ratio": 4.46027625090438}
+      },
+      "original_fp32_cuda_eight_identical_training_steps": {
+        "n": 8,
+        "all_names_match": true,
+        "weights": 90,
+        "disjoint_element_counts": {"blocks.1.nonlocal_update.mlp_2.weight": 1},
+        "energy_force_max_minimax_gate_ratio": {"E": 0.0005557106914569208, "Fa": 0.0010103985382073583},
+        "most_separated_entry": {"name": "blocks.1.nonlocal_update.mlp_2.weight", "elements": 1, "idx": [131, 43], "max_minimax_gate_ratio": 4.519799466080809, "min": -0.37163400650024414, "max": -0.36199045181274414}
+      },
+      "original_weight_gradient_contributions": {
+        "cpu": {
+          "blocks.0.interaction_block.linear_layer.weight [68, 106]": {"rows": 256, "fp32_sum_abs_contributions": 940.4583887401968, "fp32_weight_grad": 2.250645399093628, "same_fp32_row_terms_summed_in_fp64": 2.2506520431488752, "native_fp64_weight_grad": 2.246093737315353, "fp64_row_terms_sum": 2.2460937373153342},
+          "blocks.1.nonlocal_update.mlp_2.weight [131, 43]": {"rows": 256, "fp32_sum_abs_contributions": 7096.644196229055, "fp32_weight_grad": -0.37452152371406555, "same_fp32_row_terms_summed_in_fp64": -0.3740151928752198, "native_fp64_weight_grad": -0.37573263769190796, "fp64_row_terms_sum": -0.3757326376917689}
+        },
+        "cuda": {
+          "blocks.1.nonlocal_update.mlp_2.weight [131, 43]": {"rows": 256, "fp32_sum_abs_contributions": 7096.645386869055, "fp32_weight_grad": -0.36235663294792175, "same_fp32_row_terms_summed_in_fp64": -0.3621658732277524, "native_fp64_weight_grad": -0.37573263768297793, "fp64_row_terms_sum": -0.37573263768295817}
+        }
+      },
+      "compiled_vs_three_elementwise_native_intervals": {
+        "base": {},
+        "new": {}
+      },
+      "isolated_cpu_eager_precision_controls": {
+        "dot64": {
+          "vs_original_native_fp32": {"n_groups": 2, "n_elements": 2, "max_gate_ratio": 9.502881315},
+          "vs_original_checked_fp64": {"n_groups": 2, "n_elements": 2, "max_gate_ratio": 10.618032853}
+        },
+        "kv64": {
+          "vs_original_native_fp32": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.936653391},
+          "vs_original_checked_fp64": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 1.542958822}
+        },
+        "scatter64": {
+          "vs_original_native_fp32": {"n_groups": 2, "n_elements": 2, "max_gate_ratio": 10.590748301},
+          "vs_original_checked_fp64": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 11.704675063}
+        }
+      },
+      "isolated_candidates": {
+        "aot_eager": {
+          "eager_vs_prechange": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.346138702},
+          "compiled_vs_local_eager": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 1.029650999},
+          "compiled_vs_prechange_eager": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 1.373227436},
+          "compiled_vs_double": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 7.100900341},
+          "new_graphs_and_calls": [1, 490]
+        },
+        "eager": {
+          "eager_vs_prechange": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 4.463380337},
+          "compiled_vs_local_eager": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 1.494342187},
+          "compiled_vs_prechange_eager": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 2.975707968},
+          "compiled_vs_double": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 11.41303285},
+          "new_graphs_and_calls": [1, 490]
+        },
+        "ordered": {
+          "eager_vs_prechange": {"n_groups": 2, "n_elements": 2, "max_gate_ratio": 4.349047167},
+          "compiled_vs_local_eager": {"n_groups": 2, "n_elements": 2, "max_gate_ratio": 11.609596585},
+          "compiled_vs_prechange_eager": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 7.210058735},
+          "compiled_vs_double": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 1.313463267},
+          "new_graphs_and_calls": [1, 472]
+        }
+      }
+    },
+    "large_2000": {
+      "formal": {"passed": false, "active_parameters": 90, "reference_active_parameters": 90, "energy_max_abs": 0.002685546875, "force_max_abs": 1.430511474609375e-06, "gradient_max_abs": 1024.0, "new_graphs": 1, "new_calls": 498, "median_train_ms": 45.28034711256623, "peak_mib": 2536.25927734375},
+      "same_weight_new_vs_original_cpu_fp64": {"passed": true, "active_parameters": 90, "reference_active_parameters": 90, "energy_max_abs": 0.0, "force_max_abs": 6.106226635438361e-16, "gradient_max_abs": 2.384185791015625e-07},
+      "same_weight_new_vs_original_cpu_fp32": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.311575837, "energy_force_max_abs": [0.0, 5.513429641723633e-07]},
+      "original_fp32_cpu_controls": {
+        "vs_cpu_fp64": {"n_groups": 5, "n_elements": 11, "max_gate_ratio": 8.158107061},
+        "repeat": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.0},
+        "second_model": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.0},
+        "permuted_edges": {"n_groups": 2, "n_elements": 4, "max_gate_ratio": 5.794744682},
+        "permuted_atoms": {"n_groups": 3, "n_elements": 6, "max_gate_ratio": 6.085425062}
+      },
+      "compiled_fp32_v100_controls": {
+        "native_fp32_repeat": {"n_groups": 1, "n_elements": 1, "max_gate_ratio": 4.208434975},
+        "native_fp32_vs_native_cpu_fp64": {"n_groups": 7, "n_elements": 17, "max_gate_ratio": 5.334854526},
+        "compiled_fp32_vs_native_fp32": {"n_groups": 5, "n_elements": 8, "max_gate_ratio": 8.788202447},
+        "compiled_fp32_vs_native_cpu_fp64": {"n_groups": 6, "n_elements": 15, "max_gate_ratio": 7.353943657},
+        "compiled_fp32_repeat": {"n_groups": 4, "n_elements": 10, "max_gate_ratio": 4.171802549}
+      },
+      "compiled_vs_eager_outside": {
+        "blocks.0.euclidean_attention_block.W_k_inv": {"elements": 1, "max_gate_ratio": 1.123198979, "worst_compiled": 0.9376592040061951, "worst_eager": 0.9395006895065308},
+        "blocks.0.interaction_block.linear_layer.weight": {"elements": 3, "max_gate_ratio": 8.788202447, "worst_compiled": -0.2948746085166931, "worst_eager": -0.2862076163291931},
+        "blocks.0.nonlocal_update.mlp_2.weight": {"elements": 1, "max_gate_ratio": 1.224243089, "worst_compiled": -117.30250549316406, "worst_eager": -117.15821838378906},
+        "blocks.2.euclidean_attention_block.W_q_inv": {"elements": 1, "max_gate_ratio": 2.466980373, "worst_compiled": 0.056052375584840775, "worst_eager": 0.057922154664993286},
+        "blocks.2.filter_net_inv.mlp_rbf.mlp_rbf_layer_1.0.weight": {"elements": 2, "max_gate_ratio": 1.44376066, "worst_compiled": -1.6428817510604858, "worst_eager": -1.6462692022323608}
+      },
+      "original_fp32_v100_controls": {
+        "vs_cpu_fp64": {"n_groups": 7, "n_elements": 11, "max_gate_ratio": 3.522989826},
+        "repeat": {"n_groups": 2, "n_elements": 4, "max_gate_ratio": 5.457694143},
+        "second_model": {"n_groups": 3, "n_elements": 5, "max_gate_ratio": 13.520227137},
+        "permuted_edges": {"n_groups": 2, "n_elements": 4, "max_gate_ratio": 12.403850325},
+        "permuted_atoms": {"n_groups": 3, "n_elements": 10, "max_gate_ratio": 10.303275266},
+        "existing_native_vs_this_native": {"n_groups": 3, "n_elements": 7, "max_gate_ratio": 3.000187434},
+        "existing_ordinary_vs_this_native": {"n_groups": 4, "n_elements": 7, "max_gate_ratio": 10.915388286}
+      },
+      "candidate_fp32_v100_controls": {
+        "vs_cpu_fp64": {"n_groups": 7, "n_elements": 13, "max_gate_ratio": 3.948158691},
+        "repeat": {"n_groups": 4, "n_elements": 7, "max_gate_ratio": 5.939482029},
+        "second_model": {"n_groups": 3, "n_elements": 6, "max_gate_ratio": 4.330872313},
+        "permuted_edges": {"n_groups": 3, "n_elements": 6, "max_gate_ratio": 6.620047678},
+        "permuted_atoms": {"n_groups": 4, "n_elements": 9, "max_gate_ratio": 7.806781938},
+        "existing_native_vs_this_native": {"n_groups": 3, "n_elements": 10, "max_gate_ratio": 8.753375144},
+        "existing_ordinary_vs_this_native": {"n_groups": 6, "n_elements": 16, "max_gate_ratio": 9.988334493}
+      },
+      "same_order_fp32_cuda_native_intervals": {
+        "candidate_repeat": {"disjoint_elements": 1, "max_minimax_gate_ratio": 2.0997990535247437},
+        "candidate_vs_original": {"disjoint_elements": 3, "max_minimax_gate_ratio": 1.497846806317542},
+        "base_independent_reference": {"disjoint_elements": 3, "max_minimax_gate_ratio": 6.714721289894011},
+        "base_same_instance": {"disjoint_elements": 1, "max_minimax_gate_ratio": 2.7363140540323156},
+        "new_independent_reference": {"disjoint_elements": 3, "max_minimax_gate_ratio": 2.1701354461216584},
+        "new_same_instance": {"disjoint_elements": 3, "max_minimax_gate_ratio": 2.9785866453656995},
+        "most_separated_entry": {"measurements": "base_independent_reference", "parameter": "blocks.0.interaction_block.linear_layer.weight", "elements": 2, "worst_index": [91, 49], "first": -0.2841324210166931, "second": -0.2974381148815155, "minimax_gate_ratio": 6.714721289894011}
+      },
+      "original_fp32_cuda_eight_identical_training_steps": {
+        "n": 8,
+        "all_names_match": true,
+        "weights": 90,
+        "disjoint_element_counts": {"blocks.0.interaction_block.linear_layer.weight": 3, "blocks.0.nonlocal_update.mlp_2.weight": 2, "blocks.2.filter_net_inv.mlp_rbf.mlp_rbf_layer_1.0.weight": 1},
+        "energy_force_max_minimax_gate_ratio": {"E": 0.0006859268054365187, "Fa": 0.0008478986122408085},
+        "most_separated_entry": {"name": "blocks.0.interaction_block.linear_layer.weight", "elements": 3, "idx": [91, 49], "max_minimax_gate_ratio": 11.809669627117945, "min": -0.3014053702354431, "max": -0.2780289053916931}
+      },
+      "original_weight_gradient_contributions": {
+        "cpu": {
+          "blocks.0.interaction_block.linear_layer.weight [91, 49]": {"rows": 2000, "fp32_sum_abs_contributions": 225376.01555633545, "fp32_weight_grad": -0.27955472469329834, "same_fp32_row_terms_summed_in_fp64": -0.28122711181640625, "native_fp64_weight_grad": -0.2876117672243669, "fp64_row_terms_sum": -0.2876117672261671},
+          "blocks.0.nonlocal_update.mlp_2.weight [106, 107]": {"rows": 2000, "fp32_sum_abs_contributions": 241025.97443635028, "fp32_weight_grad": -116.96876525878906, "same_fp32_row_terms_summed_in_fp64": -116.96530043652274, "native_fp64_weight_grad": -116.53279845837332, "fp64_row_terms_sum": -116.53279845838188}
+        },
+        "cuda": {
+          "blocks.0.nonlocal_update.mlp_2.weight [106, 107]": {"rows": 2000, "fp32_sum_abs_contributions": 241025.84629019297, "fp32_weight_grad": -117.17872619628906, "same_fp32_row_terms_summed_in_fp64": -117.17877825111646, "native_fp64_weight_grad": -116.5327984572717, "fp64_row_terms_sum": -116.53279845726865},
+          "blocks.2.filter_net_inv.mlp_rbf.mlp_rbf_layer_1.0.weight [108, 16]": {"rows": 45006, "fp32_sum_abs_contributions": 67440.1505196192, "fp32_weight_grad": -0.04212188720703125, "same_fp32_row_terms_summed_in_fp64": -0.04231891299292556, "native_fp64_weight_grad": -0.04431574423971796, "fp64_row_terms_sum": -0.044315744240918775},
+          "blocks.0.interaction_block.linear_layer.weight [91, 49]": {"rows": 2000, "fp32_sum_abs_contributions": 225376.06918525696, "fp32_weight_grad": -0.2898697257041931, "same_fp32_row_terms_summed_in_fp64": -0.2894268035888672, "native_fp64_weight_grad": -0.2876117672246333, "fp64_row_terms_sum": -0.2876117672251439}
+        }
+      },
+      "compiled_vs_three_elementwise_native_intervals": {
+        "base": {"blocks.0.interaction_block.linear_layer.weight": 1, "blocks.0.nonlocal_update.mlp_2.weight": 2, "blocks.2.euclidean_attention_block.W_q_inv": 1},
+        "new": {"blocks.0.euclidean_attention_block.W_k_inv": 1, "blocks.0.interaction_block.linear_layer.weight": 2, "blocks.0.nonlocal_update.mlp_2.weight": 2, "blocks.2.filter_net_inv.mlp_rbf.mlp_rbf_layer_1.0.weight": 1, "blocks.2.euclidean_attention_block.W_q_inv": 1}
+      },
+      "isolated_cpu_eager_precision_controls": {
+        "dot64": {
+          "vs_original_native_fp32": {"n_groups": 2, "n_elements": 3, "max_gate_ratio": 5.607787009},
+          "vs_original_checked_fp64": {"n_groups": 7, "n_elements": 13, "max_gate_ratio": 13.720145144}
+        },
+        "kv64": {
+          "vs_original_native_fp32": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.338554876},
+          "vs_original_checked_fp64": {"n_groups": 5, "n_elements": 11, "max_gate_ratio": 7.849073093}
+        },
+        "scatter64": {
+          "vs_original_native_fp32": {"n_groups": 0, "n_elements": 0, "max_gate_ratio": 0.319208451},
+          "vs_original_checked_fp64": {"n_groups": 6, "n_elements": 13, "max_gate_ratio": 8.281708578}
+        }
+      },
+      "isolated_candidates": {
+        "aot_eager": {
+          "eager_vs_prechange": {"n_groups": 2, "n_elements": 3, "max_gate_ratio": 15.286521159},
+          "compiled_vs_local_eager": {"n_groups": 3, "n_elements": 5, "max_gate_ratio": 4.023157395},
+          "compiled_vs_prechange_eager": {"n_groups": 3, "n_elements": 5, "max_gate_ratio": 11.201863683},
+          "compiled_vs_double": {"n_groups": 6, "n_elements": 15, "max_gate_ratio": 9.764173236},
+          "new_graphs_and_calls": [1, 498]
+        },
+        "eager": {
+          "eager_vs_prechange": {"n_groups": 3, "n_elements": 6, "max_gate_ratio": 13.924968667},
+          "compiled_vs_local_eager": {"n_groups": 3, "n_elements": 6, "max_gate_ratio": 3.296094468},
+          "compiled_vs_prechange_eager": {"n_groups": 4, "n_elements": 6, "max_gate_ratio": 10.582976187},
+          "compiled_vs_double": {"n_groups": 5, "n_elements": 14, "max_gate_ratio": 9.146165652},
+          "new_graphs_and_calls": [1, 498]
+        },
+        "ordered": {
+          "eager_vs_prechange": {"n_groups": 2, "n_elements": 6, "max_gate_ratio": 5.012958501},
+          "compiled_vs_local_eager": {"n_groups": 4, "n_elements": 10, "max_gate_ratio": 9.881881833},
+          "compiled_vs_prechange_eager": {"n_groups": 5, "n_elements": 9, "max_gate_ratio": 6.18750272},
+          "compiled_vs_double": {"n_groups": 5, "n_elements": 15, "max_gate_ratio": 11.555366673},
+          "new_graphs_and_calls": [1, 478]
+        }
+      }
+    }
+  },
+  "controls": {
+    "permuted_edges": "Seed 147 permutes directed edges with their corresponding periodic offsets.",
+    "permuted_atoms": "Seed 147 relabels atom rows and both edge indices, then restores the force ordering.",
+    "contributions": "A zero-valued, differentiable scalar perturbation per input row at one dense weight entry gives per-row mixed derivatives of the full energy-plus-force loss. Summing these terms reconstructs that weight gradient in FP64.",
+    "native_intervals": "For two same-order eager results x and y with tolerances tx=atol+rtol*abs(x) and ty for y, the smallest possible maximum error ratio of any fixed value against both is abs(x-y)/(tx+ty). A value above one proves their two permitted intervals do not intersect.",
+    "precision_reference": "The FP64 CPU oracle on the frozen refactor is checked independently against original-source FP64. The per-row reconstruction on the original is also evaluated directly in FP64.",
+    "EFA_topology": "Both failing systems contain one graph. The optimized grouped ERoPE path is used only for multiple graphs. Both frozen nonlocal MLP output weights and biases are zero. Preceding nonlocal features can affect the output projection weight gradient.",
+    "three_elementwise_native_intervals": "For each element of the formal-order compiled result, count failures against every one of three separately saved same-order eager runs (two forwards on the same module plus one rebuilt model). Measured on the original and candidate independently.",
+    "isolated_candidates": "The eager and aot_eager entries run torch.compile with those backends. The ordered entry replaces two local EuclideanAttentionBlock receiver scatter sums with indexed accumulation in both eager and ordinary Inductor. Training is run directly in these isolated probes. Formal-order controls warm all preceding systems and modes first.",
+    "precision_probes": "On the CPU eager refactor, scatter64 accumulates the two receiver sums in FP64, dot64 computes the two per-edge attention dot products in FP64, and kv64 accumulates single-graph ERoPE K-transpose V in FP64 and uses explicit matrix products for the readout. Each casts the corresponding output back to FP32. These are numerical probes, with no CUDA timing implication."
+  },
+  "result": {
+    "formal_cells_passing": 0,
+    "formal_cells_tested": 2,
+    "interpretation": "Single-precision native gradients vary across identical original runs before compilation. Both systems have original eager gradient intervals with empty intersection. The bulk compiled control passed against its concurrent eager result but changed on repetition. The 2000-atom compiled result also falls outside all three separately saved original references for four gradient elements, so original variability alone cannot certify its numerics.",
+    "implementation": "The ordered local CUDA receiver sums do not satisfy the gradient gate for either size. Both compile graph capture backends show differences even without Inductor. The frozen mixed derivatives exhibit strong cancellation before terminal weight accumulation. The release retains the existing EFA implementation, grouped ERoPE memory optimization, and original tolerances."
+  }
+}
