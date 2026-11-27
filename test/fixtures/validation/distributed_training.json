@@ -377,5 +377,44 @@
       "errors": 0,
       "passed": 1795
     }
+  },
+  "gpu_gradient_reference": {
+    "job": 6343856,
+    "world_size": 2,
+    "backend": "nccl",
+    "model": "frozen SchNet",
+    "atoms_by_structure": [
+      2,
+      5,
+      3,
+      8
+    ],
+    "single_gpu_reference": "same four structures, sum of energy and force MSE, SGD",
+    "precisions": {
+      "torch.float32": {
+        "compared_parameter_tensors": 30,
+        "atol": 2e-05,
+        "rtol": 2e-05,
+        "max_absolute_error": {
+          "E": 7.152557373046875e-07,
+          "Fa": 2.086162567138672e-07,
+          "loss": 2.384185791015625e-07,
+          "gradient": 4.76837158203125e-07,
+          "updated_parameter": 2.3283064365386963e-10
+        }
+      },
+      "torch.float64": {
+        "compared_parameter_tensors": 30,
+        "atol": 1e-10,
+        "rtol": 1e-10,
+        "max_absolute_error": {
+          "E": 2.220446049250313e-16,
+          "Fa": 5.551115123125783e-16,
+          "loss": 2.220446049250313e-16,
+          "gradient": 6.661338147750939e-16,
+          "updated_parameter": 4.336808689942018e-19
+        }
+      }
+    }
   }
 }
