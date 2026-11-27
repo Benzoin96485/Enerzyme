@@ -206,3 +206,22 @@ def test_compare_checks_declared_workload_against_historical_measurements(tmp_pa
     new.write_text(json.dumps({"schnet": dict(_timings(), system_set="default")}))
     with pytest.raises(ValueError, match="incomplete default"):
         compare(old, new, 0.03)
+
+
+def test_cuda_pair_assesses_mirrored_timings_only_after_numerical_parity():
+    from bench_cuda_pair import assess
+
+    def comparison(base, candidate, status="both_validated"):
+        return {"requested_systems": ["bulk_256"], "modes": ["train"], "comparisons": {
+            "bulk_256": {"train": {"status": status, "baseline": {"ms": base, "peak_MiB": 100},
+                                    "candidate": {"ms": candidate, "peak_MiB": 103}}}}}
+
+    a = comparison(8.0, 8.24)
+    b = comparison(12.0, 12.36)
+    result = assess([a, b], 3)
+    assert result["passed"]
+    assert result["cells"]["bulk_256"]["train"]["ms"]["baseline"] == 10.0
+    assert not assess([a, b], 2.9)["passed"]
+    result = assess([a, comparison(12, 12, "cross_native_mismatch")], 3)
+    cell = result["cells"]["bulk_256"]["train"]
+    assert not result["passed"] and not cell["numerically_valid"] and "ms" not in cell

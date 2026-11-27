@@ -18,12 +18,14 @@ import json
 import math
 import os
 import random
+import re
 import socket
 import statistics
 import subprocess
 import sys
 import time
 from pathlib import Path
+from importlib import metadata
 
 import numpy as np
 import torch
@@ -97,7 +99,12 @@ def compare_step(actual, reference, dtype):
 
 
 def compare_main_runs(paths, reference_paths):
-    """Classify each compiled mode and require same-weight native numerical parity."""
+    """Classify each compiled main-checkpoint mode and require native parity."""
+    return compare_frozen_runs(paths, reference_paths, compiled_main=True)
+
+
+def compare_frozen_runs(paths, reference_paths, *, compiled_main=False):
+    """Compare matched measurements from the same fixture and physical GPU."""
     raw = [json.loads(path.read_text()) for path in paths]
     if len(raw[0]) != 1 or raw[0].keys() != raw[1].keys():
         raise ValueError("expected both files to contain the same single architecture")
@@ -105,8 +112,12 @@ def compare_main_runs(paths, reference_paths):
     base, candidate = (result[arch] for result in raw)
     fields = ("fixture_kind", "snapshot", "snapshot_sha256", "config_sha256", "checkpoint_state", "torch",
               "tiled_atom_features", "compile", "device", "device_name", "device_uuid", "precision", "params",
-              "reps", "threads", "requested_systems", "modes")
-    if base.get("fixture_kind") != "main_trained" or not base.get("config_sha256") or not base.get("snapshot_sha256"):
+              "reps", "threads", "requested_systems", "modes", "snapshot_revision", "cuda_environment")
+    if not base.get("snapshot_sha256"):
+        raise ValueError("expected a frozen fixture hash")
+    if (compiled_main or base.get("fixture_kind") == "main_trained") and (
+        base.get("fixture_kind") != "main_trained" or not base.get("config_sha256")
+    ):
         raise ValueError("expected a trained main checkpoint with configuration and fixture hashes")
     for field in fields:
         if field == "params" and (field not in base or field not in candidate):
@@ -114,10 +125,10 @@ def compare_main_runs(paths, reference_paths):
             continue
         if base.get(field) != candidate.get(field):
             raise ValueError(f"cannot compare different {field}")
-    if not base.get("compile") or not base.get("torch"):
+    if (compiled_main and not base.get("compile")) or not base.get("torch"):
         raise ValueError("expected ordinary compiled measurements with a PyTorch version")
     if base.get("device") == "cuda" and not base.get("device_uuid"):
-        raise ValueError("a paired GPU comparison requires a physical device UUID")
+        raise ValueError("a paired GPU comparison requires a physical device UUID; on older PyTorch, set CUDA_VISIBLE_DEVICES to the full GPU UUID")
 
     refs = [torch.load(path, map_location="cpu", weights_only=True) if path.is_file() else {}
             for path in reference_paths]
@@ -176,6 +187,37 @@ def compare_main_runs(paths, reference_paths):
     return result
 
 
+def _cuda_provenance(device):
+    properties = torch.cuda.get_device_properties(device)
+    uuid = getattr(properties, "uuid", None)
+    # Older torch builds omit the UUID. CUDA_VISIBLE_DEVICES supports full physical
+    # UUIDs, which remain unambiguous even when the runtime remaps card ordinals.
+    if uuid is None:
+        names = os.environ.get("CUDA_VISIBLE_DEVICES", "").split(",")
+        index = torch.cuda.current_device()
+        if index < len(names) and re.fullmatch(r"(?:GPU|MIG)-[0-9a-fA-F-]{36}", names[index].strip()):
+            uuid = names[index].strip()
+    environment = {"runtime": torch.version.cuda, "compute_capability": list(torch.cuda.get_device_capability(device)),
+                   "total_memory_bytes": properties.total_memory}
+    try:
+        environment["triton_version"] = metadata.version("triton")
+    except metadata.PackageNotFoundError:
+        environment["triton_version"] = None
+    # Every visible GPU uses the same installed CUDA driver.
+    try:
+        driver = subprocess.run(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+                                capture_output=True, text=True, timeout=5, check=False)
+        versions = set(driver.stdout.splitlines())
+        if driver.returncode == 0 and len(versions) == 1:
+            environment["driver_version"] = versions.pop().strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    result = {"device_name": properties.name, "cuda_environment": environment}
+    if uuid is not None:
+        result["device_uuid"] = str(uuid)
+    return result
+
+
 def _git_revision(directory):
     try:
         git = subprocess.run(["git", "-C", str(directory), "rev-parse", "HEAD"], capture_output=True, text=True)
@@ -213,7 +255,7 @@ def run(args):
         payload = torch.load(source, map_location="cpu", weights_only=False)
         arch = payload["architecture"]
         _, params, _ = ff.get_ff_core(arch)
-        provenance["snapshot_revision"] = payload["commit"]
+        provenance.update(fixture_kind="presnapshot", snapshot_revision=payload["commit"])
     cutoff = max(float(params.get("cutoff_sr") or 0), float(params.get("cutoff_lr") or 0), 6.0)
 
     def load_model():
@@ -228,8 +270,14 @@ def run(args):
             from presnapshot_maps import remap_snapshot
 
             state = remap_snapshot(arch, state, payload["param_names"], model)
+        original_names = {}
+        if getattr(args, "eager_grad_out", None) is not None:
+            source_names = {id(payload["state_dict"][key]): key for key in payload["param_names"]}
+            original_names = {key: source_names[id(state[key])] for key, _ in model.named_parameters()}
+            if set(original_names.values()) != set(payload["param_names"]):
+                raise ValueError("missing original parameter names in frozen gradient comparison")
         model.load_state_dict(state, strict=True)
-        return model.to(device=device, dtype=dtype), state, {}
+        return model.to(device=device, dtype=dtype), state, original_names
 
     def write():
         temp = args.out.with_suffix(".tmp")
@@ -240,7 +288,7 @@ def run(args):
         "device": device.type,
         "torch": str(torch.__version__),
         "precision": args.precision,
-        "compile": True,
+        "compile": not getattr(args, "eager", False),
         "reps": args.reps,
         "threads": args.threads,
         "snapshot": source.name,
@@ -252,10 +300,7 @@ def run(args):
         "modes": args.modes,
     }
     if device.type == "cuda":
-        result["device_name"] = torch.cuda.get_device_name(device)
-        uuid = getattr(torch.cuda.get_device_properties(device), "uuid", None)
-        if uuid is not None:
-            result["device_uuid"] = str(uuid)
+        result.update(_cuda_provenance(device))
     write()
     try:
         model, initial_state, original_names = load_model()
@@ -316,7 +361,7 @@ def run(args):
     del model, initial_state
     clean()
     model, initial_state, _ = load_model()
-    runner = torch.compile(model)
+    runner = torch.compile(model) if result["compile"] else model
     from torch._dynamo.utils import counters
 
     for name in args.systems:
@@ -365,10 +410,11 @@ def run(args):
                 entry[mode + "_error"] = f"{type(exc).__name__}: {exc}"[:2500]
                 model.zero_grad(set_to_none=True)
                 clean()
-            result["compile_capture"][name][mode] = {
-                "new_graphs": stats["unique_graphs"] - old_graphs,
-                "new_calls": stats["calls_captured"] - old_calls,
-            }
+            if result["compile"]:
+                result["compile_capture"][name][mode] = {
+                    "new_graphs": stats["unique_graphs"] - old_graphs,
+                    "new_calls": stats["calls_captured"] - old_calls,
+                }
             write()
             print(
                 arch,
@@ -399,6 +445,7 @@ if __name__ == "__main__":
         "--systems", nargs="+", choices=SYSTEM_SETS["acceptance"], default=list(SYSTEM_SETS["acceptance"])
     )
     parser.add_argument("--modes", nargs="+", choices=("infer", "train"), default=["infer", "train"])
+    parser.add_argument("--eager", action="store_true", help="measure ordinary eager execution against the frozen native reference")
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cuda")
     parser.add_argument("--reps", type=int, default=5)
     parser.add_argument("--threads", type=int, default=2)
