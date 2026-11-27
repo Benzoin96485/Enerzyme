@@ -671,8 +671,8 @@ class EwaldElectrostaticEnergyLayer(BaseFFLayer):
     def _reciprocal_graph(self, positions, charges, volume, k):
         k2 = k.square().sum(dim=1)
         phase = positions @ k.T
-        real = torch.cos(phase).T @ charges
-        imag = torch.sin(phase).T @ charges
+        real = torch.cos(phase).T.to(charges.dtype) @ charges
+        imag = torch.sin(phase).T.to(charges.dtype) @ charges
         kernel = torch.exp(-k2 / (4 * self.alpha2)) / k2
         reciprocal = (2 * math.pi / volume) * (kernel[:, None] * (real.square() + imag.square())).sum(0)
         background = -math.pi * charges.sum(0).square() / (2 * volume * self.alpha2)
@@ -690,7 +690,7 @@ class EwaldElectrostaticEnergyLayer(BaseFFLayer):
             with torch.no_grad():
                 _pair_indices = self._sites_and_modes(Ra, batch_seg, pbc, cell, volumes, lattices)
         charges = Qa[:, None] if Qa.ndim == 1 else Qa
-        charges = charges.to(Ra.dtype)
+        charges = charges.to(torch.promote_types(Ra.dtype, Qa.dtype))
         r = Dij_lr.clamp_min(1e-12)
         kernel = torch.where(Dij_lr < self.cutoff_real, torch.erfc(self.alpha * r) / r, 0.0)
         pairs = 0.5 * kernel[:, None] * charges[idx_i] * charges[idx_j]

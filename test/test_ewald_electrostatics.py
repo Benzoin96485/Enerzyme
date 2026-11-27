@@ -243,3 +243,15 @@ def test_partial_periodicity_and_singular_cell_are_rejected():
         layer.get_E_ele_a(*args[:5], cell=args[-1], pbc=torch.tensor([True, True, False]))
     with pytest.raises(ValueError, match="nonsingular"):
         layer.get_E_ele_a(*args[:5], cell=torch.zeros_like(args[-1]))
+
+
+def test_external_double_charges_retain_precision_with_single_positions():
+    layer = EwaldElectrostaticEnergyLayer(3., 6.)
+    positions, charges, i, j, distance, cell = _build_inputs(
+        np.array([[.3, .5, .7], [1.1, 1.2, .8]]), np.array([1., -1.]), np.eye(3) * 4, 3.)
+    positions, distance, cell = positions.float(), distance.float(), cell.float()
+    scale = 1 + 2 ** -30
+    reference = layer.get_E_ele_a(positions, charges, i, j, distance, cell=cell)
+    actual = layer.get_E_ele_a(positions, charges * scale, i, j, distance, cell=cell)
+    assert actual.dtype == torch.float64
+    torch.testing.assert_close(actual, reference * scale ** 2, rtol=2e-14, atol=2e-14)
