@@ -266,15 +266,43 @@ def bilinear_sphere_index(
     return index, weight.detach()
 
 
+def _projection_table(vij, receiver, distance, cutoff, num_nodes, n_lat, n_long,
+                      source, query, averaged):
+    frames = edge_spin_frames(vij, receiver, distance, cutoff, num_nodes, averaged=averaged)
+    local = project_neighbors(vij, frames, source, query)
+    return bilinear_sphere_index(local, query, n_lat, n_long)
+
+
+@torch.library.custom_op("enerzyme::spinconv_cuda_double_table", mutates_args=(), device_types="cuda")
+def _cuda_double_table(vij: Tensor, receiver: Tensor, distance: Tensor, cutoff: float,
+                       num_nodes: int, n_lat: int, n_long: int, source: Tensor, query: Tensor,
+                       averaged: Optional[Tensor]) -> tuple[Tensor, Tensor]:
+    """Preserve native FP64 frame and coordinate arithmetic at the polar grid singularity."""
+    return _projection_table(vij, receiver, distance, cutoff, num_nodes, n_lat, n_long,
+                             source, query, averaged)
+
+
+@_cuda_double_table.register_fake
+def _cuda_double_table_shape(vij, receiver, distance, cutoff, num_nodes, n_lat, n_long,
+                             source, query, averaged):
+    return query.new_empty((4, query.numel())), vij.new_empty((4, query.numel()))
+
+
 @torch.no_grad()
 def sphere_projection(vij, receiver, sender, distance, cutoff, num_nodes, n_lat, n_long, *, pairs=None, averaged=None):
-    """Graph-dependent interpolation indices and fixed-coordinate weights for all spin blocks."""
+    """Graph-dependent interpolation indices and fixed-coordinate weights for the given frame."""
     source, query = source_neighbor_pairs(receiver, sender, num_nodes) if pairs is None else pairs
     if source.numel() == 0:
         return source.new_empty(4, 0), vij.new_empty(4, 0), source
-    frames = edge_spin_frames(vij, receiver, distance, cutoff, num_nodes, averaged=averaged)
-    local = project_neighbors(vij, frames, source, query)
-    index, weight = bilinear_sphere_index(local, query, n_lat, n_long)
+    if torch.compiler.is_compiling() and vij.is_cuda and vij.dtype == torch.float64:
+        # Even with identical receiver sums, fusing the frame and dot products
+        # changes longitude at the pole. Only the detached lookup needs native
+        # arithmetic; the splat, convolution and force path still compile.
+        index, weight = _cuda_double_table(vij.detach(), receiver, distance.detach(), cutoff, num_nodes,
+                                           n_lat, n_long, source, query, averaged)
+    else:
+        index, weight = _projection_table(vij, receiver, distance, cutoff, num_nodes, n_lat, n_long,
+                                          source, query, averaged)
     return index, weight, source
 
 

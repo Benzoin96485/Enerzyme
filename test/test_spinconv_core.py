@@ -519,3 +519,55 @@ def test_each_spin_block_consumes_its_own_nondeterministic_projection(monkeypatc
             assert a is b
         else:
             torch.testing.assert_close(a, b, atol=0, rtol=0)
+
+
+def test_cuda_double_compiled_polar_tables_and_forces_with_fixed_frame_sums(monkeypatch):
+    import pytest
+
+    if not torch.cuda.is_available():
+        pytest.skip("requires CUDA Inductor")
+    from enerzyme.models.ff import build_model, get_ff_core
+    from enerzyme.models.spinconv import geometry
+
+    torch.manual_seed(3109)
+    n, blocks = 8, 3
+    pos = torch.randn(n, 3, dtype=torch.float64).cuda() * 0.5
+    receiver, sender = (idx.cuda() for idx in _edges(n))
+    vij = pos[sender] - pos[receiver]
+    distance = vij.norm(dim=1)
+    sums = torch.randn(blocks, n, 3, dtype=torch.float64).cuda()
+    pairs = geometry.source_neighbor_pairs(receiver, sender, n)
+
+    def table(averaged):
+        return geometry.sphere_projection(vij, receiver, sender, distance, 6.0, n, 16, 12,
+                                          pairs=pairs, averaged=averaged)
+
+    compiled_table = torch.compile(table, fullgraph=True)
+    for draw in sums:
+        native = table(draw)
+        actual = compiled_table(draw)
+        for name, got, want in zip(("index", "weight", "source"), actual, native):
+            assert torch.equal(got, want), name
+
+    # Hold the still-independent frame draws fixed between the two complete
+    # potential evaluations, as a same-seed CUDA atomic reduction can vary.
+    monkeypatch.setattr(geometry, "_frame_sums", lambda *args: sums)
+    _, defaults, layers = get_ff_core("spinconv")
+    layers = copy.deepcopy(layers)
+    core = next(layer["params"] for layer in layers if layer["name"] == "Core")
+    core.update(num_interactions=blocks, sphere_size_lat=16, sphere_size_long=12,
+                max_num_neighbors=n, num_embedding_basis=4)
+    dimensions = dict(defaults, dim_embedding=8, num_rbf=4, hidden_channels=8, mid_hidden_channels=16)
+    model = build_model("spinconv", layers, dimensions, verbose=0).double().cuda().eval()
+
+    def energy_and_force(runner):
+        batch = {"Ra": pos.clone().requires_grad_(), "Za": torch.arange(1, n + 1, device=pos.device),
+                 "N": receiver.new_tensor([n]), "batch_seg": receiver.new_zeros(n),
+                 "idx_i": receiver, "idx_j": sender}
+        out = runner(batch)
+        return out["E"], out["Fa"]
+
+    expected = energy_and_force(model)
+    assert expected[1].abs().max() > 0
+    actual = energy_and_force(torch.compile(model))
+    torch.testing.assert_close(actual, expected, atol=1e-10, rtol=1e-8)
