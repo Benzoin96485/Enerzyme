@@ -95,24 +95,20 @@ def test_channel_aligned_product_is_rotation_equivariant():
     assert torch.allclose(original[0], rotated[0], atol=1e-5, rtol=1e-5)
 
 
-def test_outer_first_cg_keeps_the_inputs_and_preserves_first_and_second_derivatives():
+def test_joint_cg_contraction_preserves_values_and_first_and_second_derivatives():
     from enerzyme.models.mp.equivariant.product_ladder import _couple_channels
 
     generator = torch.Generator().manual_seed(8)
-    for li, lj in ((7, 9), (9, 7)):
-        left = torch.randn(4, 2, li, dtype=torch.float64, generator=generator, requires_grad=True)
-        right = torch.randn(4, 2, lj, dtype=torch.float64, generator=generator, requires_grad=True)
-        coefficients = torch.randn(li, lj, 3, dtype=torch.float64, generator=generator)
+    shapes = (
+        (4, 1, 3, 3), (4, 3, 1, 3), (4, 3, 3, 1), (4, 3, 3, 5),
+        (4, 7, 9, 3), (4, 9, 7, 3), (0, 7, 9, 3),
+    )
+    for n, li, lj, lm in shapes:
+        left = torch.randn(n, 2, li, dtype=torch.float64, generator=generator, requires_grad=True)
+        right = torch.randn(n, 2, lj, dtype=torch.float64, generator=generator, requires_grad=True)
+        coefficients = torch.randn(li, lj, lm, dtype=torch.float64, generator=generator)
         reference = _couple_channels(left, right, coefficients)
-        saved = []
-
-        def pack(tensor):
-            saved.append(tensor.untyped_storage().data_ptr())
-            return tensor
-
-        with torch.autograd.graph.saved_tensors_hooks(pack, lambda tensor: tensor):
-            actual = _couple_channels(left, right, coefficients, outer_first=True)
-        assert set(saved) == {tensor.untyped_storage().data_ptr() for tensor in (left, right, coefficients)}
+        actual = _couple_channels(left, right, coefficients, joint_contraction=True)
 
         def derivatives(output):
             first = torch.autograd.grad(output.square().sum(), (left, right), create_graph=True)

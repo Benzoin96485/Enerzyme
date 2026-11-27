@@ -94,8 +94,12 @@ class DegreeMix(Module):
         return mixed
 
 
-def _couple_channels(left: Tensor, right: Tensor, coefficients: Tensor, *, outer_first: bool = False) -> Tensor:
+def _couple_channels(
+    left: Tensor, right: Tensor, coefficients: Tensor, *, joint_contraction: bool = False
+) -> Tensor:
     """Contract each (atom, channel) pair with its Clebsch–Gordan coefficients."""
+    if joint_contraction:
+        return torch.einsum("nci,ncj,ijm->ncm", left, right, coefficients)
     li, lj, lm = coefficients.shape
     if li == 1:
         return left * (right @ coefficients[0])
@@ -103,7 +107,7 @@ def _couple_channels(left: Tensor, right: Tensor, coefficients: Tensor, *, outer
         return (left @ coefficients[:, 0]) * right
     if lm == 1:
         return ((left @ coefficients[..., 0]) * right).sum(dim=-1, keepdim=True)
-    if lm >= max(li, lj) or outer_first:
+    if lm >= max(li, lj):
         pairs = left.unsqueeze(-1) * right.unsqueeze(-2)
         return pairs.flatten(-2) @ coefficients.flatten(0, 1)
     if li >= lj:
@@ -169,15 +173,18 @@ class SparseCGProduct(Module):
         weight = self.path_weight * self.path_norm.to(
             dtype=self.path_weight.dtype, device=self.path_weight.device
         )
-        # In compiled CUDA inference the force pullback retains each projected
-        # operand until backward. Applying the fixed CG matrix last only saves
-        # the two inputs, which are already shared by the other coupling paths.
-        outer_first = torch.compiler.is_compiling() and left[0].is_cuda and not self.training
+        # Pass all three operands to einsum so it can select a contraction
+        # order for the compiled CUDA force calculation.
+        joint_contraction = (
+            torch.compiler.is_compiling() and left[0].is_cuda and not self.training
+        )
         for index, (l1, l2, out) in enumerate(self.paths):
             coefficients = getattr(self, f"cg_{index}").to(
                 dtype=left[l1].dtype, device=left[l1].device
             )
-            coupled = _couple_channels(left[l1], right[l2], coefficients, outer_first=outer_first)
+            coupled = _couple_channels(
+                left[l1], right[l2], coefficients, joint_contraction=joint_contraction
+            )
             coupled = coupled * weight[index].to(dtype=coupled.dtype)
             if accumulated[out] is None:
                 accumulated[out] = coupled
