@@ -36,6 +36,47 @@ def test_density_sum_empty_graph():
     assert result.shape == (0, 3)
 
 
+def test_ordered_denominator_preserves_nonleading_axis_and_second_derivatives():
+    from enerzyme.models.mp.ops import segment_softmax
+
+    index = torch.tensor([2, 0, 2, 0, 1])
+    scores = torch.tensor([[.2, -.3, .5, .8, -.1], [.7, .4, .1, -.6, -.2]],
+                          dtype=torch.float64, requires_grad=True)
+
+    def derivatives(ordered):
+        weights = segment_softmax(scores, index, 4, dim=-1, ordered_sum=ordered)
+        gradient, = torch.autograd.grad(weights.square().sum(), scores, create_graph=True)
+        curvature, = torch.autograd.grad(gradient.square().sum(), scores)
+        return weights, gradient, curvature
+
+    torch.testing.assert_close(derivatives(True), derivatives(False), rtol=1e-12, atol=1e-14)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA receiver reductions")
+def test_double_cuda_envelope_training_uses_the_ordered_fp32_denominator():
+    from enerzyme.models.mp.ops import segment_envelope_gated_softmax
+
+    device = torch.device("cuda")
+    gen = torch.Generator(device=device).manual_seed(11)
+    edges, nodes = 8192, 31
+    index = torch.randint(nodes - 1, (edges,), generator=gen, device=device)
+    logits = torch.randn(edges, 1, 1, dtype=torch.float64, generator=gen, device=device)
+    envelope = torch.rand(edges, dtype=torch.float64, generator=gen, device=device)
+    bias = logits.new_zeros(1, 1)
+    values = logits.new_ones(edges, 1, 1, 1, requires_grad=True)
+    deterministic = torch.are_deterministic_algorithms_enabled()
+    warn_only = torch.is_deterministic_algorithms_warn_only_enabled()
+    try:
+        torch.use_deterministic_algorithms(True)
+        reference = segment_envelope_gated_softmax(logits, envelope, index, nodes, bias)
+        torch.use_deterministic_algorithms(False)
+        result = EnvelopeGated()(values, logits, envelope, index, nodes, bias)
+        weights, = torch.autograd.grad(result.sum(), values)
+    finally:
+        torch.use_deterministic_algorithms(deterministic, warn_only=warn_only)
+    torch.testing.assert_close(weights.flatten(), reference.flatten(), rtol=0, atol=0)
+
+
 def test_gated_softmax_value_and_score_gradients():
     # Node 2 is isolated. One edge has a closed value gate but still
     # contributes to the softmax denominator, as in MatterSim.

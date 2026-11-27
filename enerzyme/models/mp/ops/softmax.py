@@ -30,6 +30,8 @@ def segment_softmax(
     floor: Optional[float] = None,
     envelope: Optional[Tensor] = None,
     null_logit: Optional[Tensor] = None,
+    *,
+    ordered_sum: bool = False,
 ) -> Tensor:
     """Softmax of ``logits`` along ``dim`` within segments given by ``index``.
 
@@ -41,6 +43,7 @@ def segment_softmax(
     ``envelope`` is a nonnegative weight per edge or per logit. Zero weights
     exclude edges. ``null_logit`` adds a competing logit per segment, broadcast
     over the non-edge dimensions. The output contains only the edge weights.
+    ``ordered_sum`` uses indexed accumulation for the denominator.
     """
     if logits.numel() == 0 and null_logit is None and envelope is None:
         return logits
@@ -80,7 +83,16 @@ def segment_softmax(
         out = out * exp_rescale
     if dropout is not None:
         out = dropout(out)
-    denominator = scatter_sum(out, index, num_segments, dim)
+    if ordered_sum:
+        # CUDA indexed accumulation orders duplicate receivers. DPA4 needs
+        # that FP32 sum to reproduce its double-precision force gradients.
+        rows = out.movedim(dim, 0) if dim else out
+        denominator = rows.new_zeros((num_segments, *rows.shape[1:]))
+        denominator.index_put_((index,), rows, accumulate=True)
+        if dim:
+            denominator = denominator.movedim(0, dim)
+    else:
+        denominator = scatter_sum(out, index, num_segments, dim)
     if null_logit is not None:
         denominator = denominator + (null - maxima).exp()
     elif envelope is not None:
@@ -137,6 +149,8 @@ def segment_envelope_gated_softmax(
     eps: float = 1e-6,
     src_weight: Optional[Tensor] = None,
     edge_mask: Optional[Tensor] = None,
+    *,
+    ordered_sum: bool = False,
 ) -> Tensor:
     """Destination softmax with envelope-weighted logits and a learned null mass (DPA4 EMFA A3).
 
@@ -172,5 +186,6 @@ def segment_envelope_gated_softmax(
     alpha = segment_softmax(
         effective_logits, dst, n_nodes, null_logit=null_logit,
         exp_rescale=source_ratio[:, None] if source_ratio is not None else None,
+        ordered_sum=ordered_sum,
     )
     return alpha.reshape(n_edge, n_focus, n_head).to(dtype=logits.dtype)
