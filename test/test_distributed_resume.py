@@ -2,6 +2,7 @@
 from datetime import timedelta
 import os
 import random
+import socket
 
 import numpy as np
 import pytest
@@ -128,7 +129,13 @@ def test_single_process_epoch_resume(tmp_path):
 
 
 @pytest.mark.skipif(not dist.is_available() or not dist.is_gloo_available(), reason="requires CPU Gloo")
-def test_two_process_epoch_resume(tmp_path):
+def test_two_process_epoch_resume(tmp_path, monkeypatch):
+    # This test launches both participants on one host, including on clusters
+    # where compute interfaces disallow connecting back to the originating host.
+    for _, name in socket.if_nameindex():
+        if name in ("lo", "lo0"):
+            monkeypatch.setenv("GLOO_SOCKET_IFNAME", name)
+            break
     mp.start_processes(_run_resume, args=(2, tmp_path), nprocs=2, start_method="fork")
 
 
