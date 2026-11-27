@@ -85,11 +85,11 @@
       "-E",
       "-a"
     ],
-    "source_documents": 999,
+    "source_documents": 997,
     "generated_api_documents": 956,
     "warnings": 0,
     "exit_code": 0,
-    "method": "Copy docs to a fresh source directory and build into an empty output directory with the repository source available for autodoc."
+    "method": "Copy docs to a fresh source directory and build into an empty output directory with the repository source available for autodoc. Count the source documents reported by Sphinx. The two autosummary templates are excluded."
   },
   "targeted_force_training": {
     "revision": "244415d",
