@@ -285,7 +285,7 @@ def _cuda_double_table(vij: Tensor, receiver: Tensor, distance: Tensor, cutoff: 
 @_cuda_double_table.register_fake
 def _cuda_double_table_shape(vij, receiver, distance, cutoff, num_nodes, n_lat, n_long,
                              source, query, averaged):
-    return query.new_empty((4, query.numel())), vij.new_empty((4, query.numel()))
+    return query.new_empty((4, query.numel()), dtype=torch.long), vij.new_empty((4, query.numel()))
 
 
 @torch.no_grad()

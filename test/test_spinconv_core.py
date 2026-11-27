@@ -536,7 +536,8 @@ def test_cuda_double_compiled_polar_tables_and_forces_with_fixed_frame_sums(monk
     vij = pos[sender] - pos[receiver]
     distance = vij.norm(dim=1)
     sums = torch.randn(blocks, n, 3, dtype=torch.float64).cuda()
-    pairs = geometry.source_neighbor_pairs(receiver, sender, n)
+    # Explicit neighbor maps may use either supported integer index dtype.
+    pairs = tuple(x.int() for x in geometry.source_neighbor_pairs(receiver, sender, n))
 
     def table(averaged):
         return geometry.sphere_projection(vij, receiver, sender, distance, 6.0, n, 16, 12,
