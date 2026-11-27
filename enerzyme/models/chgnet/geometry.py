@@ -79,7 +79,10 @@ class BondGraphRequest:
     """CHGNet's undirected bond and ordered angle indices at its bond cutoff."""
 
     cutoff: float
-    force_cache_key = "chgnet_bonds"
+
+    @property
+    def force_cache_key(self):
+        return ("chgnet_bonds", self.cutoff)
 
     def prepare(self, ctx):
         def indices():

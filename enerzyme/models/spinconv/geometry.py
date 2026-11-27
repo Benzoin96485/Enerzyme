@@ -251,10 +251,18 @@ class SpinProjectionRequest:
     cutoff: float
     n_lat: int
     n_long: int
-    force_cache_key = "spin_projection"
+
+    @property
+    def force_cache_key(self):
+        return ("spin_projection", self.max_neighbors, self.cutoff, self.n_lat, self.n_long)
 
     def prepare(self, ctx):
         return ctx.cached(self.force_cache_key, lambda: self._projection(ctx))
+
+    def selected_graph(self, ctx, selected):
+        if selected is None:
+            return ctx
+        return ctx.subset(selected, key=("spinconv_selected", self.max_neighbors))
 
     def _projection(self, ctx):
         i, j = ctx.receiver, ctx.sender
@@ -267,12 +275,11 @@ class SpinProjectionRequest:
             raise ValueError("edge indices are outside the atom range")
 
         selected = None
-        edges = ctx
         if i.numel():
             mask = symmetric_neighbor_mask(i, j, ctx.dist, ctx.num_nodes, self.max_neighbors)
             if not bool(mask.all()):
                 selected = torch.where(mask)[0]
-                edges = ctx.subset(selected, key="spinconv_selected")
+        edges = self.selected_graph(ctx, selected)
         projection = sphere_projection(
             edges.vec, edges.receiver, edges.sender, edges.dist, self.cutoff, ctx.num_nodes,
             self.n_lat, self.n_long, pairs=edges.triplets("path"),

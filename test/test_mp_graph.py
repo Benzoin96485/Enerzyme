@@ -212,6 +212,42 @@ def _holds_runtime_object(key):
     return isinstance(key, tuple) and any(_holds_runtime_object(k) for k in key)
 
 
+@pytest.mark.parametrize("prepared", [False, True])
+@pytest.mark.parametrize("model", ["chgnet", "spinconv", "gemnet_oc"])
+def test_merged_topology_requests_keep_their_own_configuration(model, prepared):
+    from enerzyme.models.chgnet.geometry import BondGraphRequest
+    from enerzyme.models.gemnet.stages_oc import GemNetOCGraphRequest
+    from enerzyme.models.mp.graph import PreparedTopology
+    from enerzyme.models.spinconv.geometry import SpinProjectionRequest
+
+    requests = {
+        "chgnet": (BondGraphRequest(1.0), BondGraphRequest(4.0)),
+        "spinconv": (SpinProjectionRequest(1, 4.0, 4, 8), SpinProjectionRequest(3, 4.0, 6, 12)),
+        "gemnet_oc": (
+            GemNetOCGraphRequest((4.0, 1), None, None, None, False, False),
+            GemNetOCGraphRequest((4.0, 3), (4.0, 2), None, (4.0, 2), True, True),
+        ),
+    }[model]
+    receiver, sender, vec, dist, n = _graph(n_nodes=6, cutoff=10)
+    fields = dict(idx_i_sr=receiver, idx_j_sr=sender, vij_sr=vec, Dij_sr=dist)
+    base = GraphRequires(rbf=False)
+
+    def fresh():
+        return GraphContext.from_inputs(fields, base, num_nodes=n)
+
+    expected = [request.prepare(fresh()) for request in requests]
+    req = GraphRequires(rbf=False, topology=(requests[0],)).merge(
+        GraphRequires(rbf=False, topology=(requests[1],))
+    )
+    inputs = fields.copy()
+    if prepared:
+        inputs["_prepared_topology"] = PreparedTopology.build(fresh(), req.topology)
+    graph = GraphContext.from_inputs(inputs, req, num_nodes=n)
+    for request, reference in zip(requests, expected):
+        torch.testing.assert_close(request.prepare(graph), reference)
+    assert not any(_holds_runtime_object(key) for key in _cache_keys(graph))
+
+
 def test_graph_cache_keys_are_constants():
     # The context crosses compiler graph breaks and Dynamo guards on its cache
     # keys. A tensor or context in a key changes on every call and recompiles.

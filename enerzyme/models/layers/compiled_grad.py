@@ -250,7 +250,7 @@ def _topology_indices(core, ranges, fields, geometry, edges):
     if requires is None or requires.edge_set != "sr" or not requires.topology:
         return None
     if any(type(r) not in (TripletRequest, QuadrupletRequest, ReverseEdgeRequest)
-           and not isinstance(getattr(r, "force_cache_key", None), str) for r in requires.topology):
+           and not isinstance(getattr(r, "force_cache_key", None), (str, tuple)) for r in requires.topology):
         return None
     # A user-defined preprocessing layer can replace the original geometry.
     # Only reuse indices when the Core consumes these exact distance-layer edges.
