@@ -9,6 +9,7 @@ import numpy as np
 from tqdm import tqdm
 import ase.units
 from ..utils import logger
+from ..utils.util import atomic_output
 from . import PERIODIC_TABLE_PATH
 
 
@@ -738,7 +739,7 @@ class UniformSplitQSTransform(BaseTransform):
 
 
 class TotalEnergyNormalization(BaseTransform):
-    def __init__(self, preload_path=".", scale=None, shift=None):
+    def __init__(self, preload_path=".", scale=None, shift=None, *, read_only=False):
         super().__init__(major_key="E")
         self.transform_type = "normalization"
         self.scale = 1
@@ -756,8 +757,12 @@ class TotalEnergyNormalization(BaseTransform):
                 self.scale = stat["scale"]
                 self.shift = stat["shift"]
                 self.loaded = True
-        else:
-            joblib.dump({"shift": self.shift, "scale": self.scale}, self.statistics)
+        elif not read_only:
+            self._save()
+
+    def _save(self):
+        with atomic_output(self.statistics) as path:
+            joblib.dump({"shift": self.shift, "scale": self.scale}, path)
 
     def transform(self, new_input):
         if "E" not in new_input:
@@ -766,7 +771,7 @@ class TotalEnergyNormalization(BaseTransform):
             logger.info("Calculating total energy normalization statistics")    
             self.shift = np.mean(new_input["E"])
             self.scale = np.std(new_input["E"])
-            joblib.dump({"shift": self.shift, "scale": self.scale}, self.statistics)
+            self._save()
             self.loaded = True
         logger.info(f"Total energy normalization: mean {self.shift}, std {self.scale}")
         for i in range(len(new_input["E"])):
@@ -777,12 +782,14 @@ class TotalEnergyNormalization(BaseTransform):
     def single_inverse_transform(self, new_output: Dict[str, Iterable], idx: int) -> None:
         if not self.loaded:
             raise RuntimeError("Shift and scale parameters not loaded")
-        new_output["E"][idx] = new_output["E"][idx] * self.scale + self.shift
-        new_output["Fa"][idx] *= self.scale
+        if "E" in new_output:
+            new_output["E"][idx] = new_output["E"][idx] * self.scale + self.shift
+        if "Fa" in new_output:
+            new_output["Fa"][idx] *= self.scale
 
 
 class Transform:
-    def __init__(self, transform_args: Optional[Dict]=None, preload_path: Optional[str]=None, simulation_mode: bool=False) -> None:
+    def __init__(self, transform_args: Optional[Dict]=None, preload_path: Optional[str]=None, simulation_mode: bool=False, *, read_only=False) -> None:
         self.transform_args = transform_args
         self.backup_keys = set()
         self.shifts = []
@@ -809,9 +816,9 @@ class Transform:
                 if v is None:
                     v = preload_path
                 if isinstance(v, str):
-                    self.normalizations.append(TotalEnergyNormalization(v))
+                    self.normalizations.append(TotalEnergyNormalization(v, read_only=read_only))
                 elif isinstance(v, dict):
-                    self.normalizations.append(TotalEnergyNormalization(**v))
+                    self.normalizations.append(TotalEnergyNormalization(**v, read_only=read_only))
                 else:
                     raise ValueError(f"Invalid total energy normalization: {v}")
                 self.backup_keys.add("E")

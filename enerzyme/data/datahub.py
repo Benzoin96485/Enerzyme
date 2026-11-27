@@ -1,4 +1,5 @@
 import pickle, os
+import json
 from bisect import bisect
 from glob import glob
 from hashlib import md5
@@ -26,6 +27,7 @@ from .transform import (
     wants_xtb_qs_prior,
 )
 from ..utils import YamlHandler, logger
+from ..utils.util import atomic_output
 
 
 def _atomic_charges_from_atoms(atoms: Atoms) -> Any:
@@ -456,6 +458,25 @@ class FieldDataset(Dataset):
             if len(v) == 1:
                 self.compressed_keys.add(k)
 
+    def __getstate__(self):
+        """Pass HDF5 paths to spawn/forkserver workers instead of HDF5 handles."""
+        arrays = {}
+        datasets = {}
+        for key, value in self.data.items():
+            if isinstance(value, h5py.Dataset):
+                datasets[key] = (os.path.abspath(value.file.filename), value.name)
+            else:
+                arrays[key] = value
+        return arrays, datasets, self.compressed_keys
+
+    def __setstate__(self, state):
+        self.data, datasets, self.compressed_keys = state
+        files = {}
+        for key, (path, name) in datasets.items():
+            if path not in files:
+                files[path] = h5py.File(path, "r")
+            self.data[key] = files[path][name]
+
     def __getitem__(self, k) -> Iterable:
         return self.data[k]
 
@@ -600,18 +621,58 @@ class SingleDataHub:
                 "(uniform_qs_init, xtb_qs_prior, or pyscf_nao_qs_prior) in the same "
                 "global_transforms block so Q_init_a / S_init_a exist before delta targets."
             )
-        self.preprocessing = Transform(preprocessings, self.preload_path)
-        self.global_transform = Transform(global_transforms, self.preload_path)
         self.preprocessings = preprocessings
         self.global_transforms = global_transforms
-        if not self.preload or not self.preload_data():
-            self.get_handle("w")
-            self._init_data()
-            self._init_neighbor_list()
-            self.preprocessing.transform(self.data)
-            self.global_transform.transform(self.data)
-            self._save_config()
-            self.reset_handle()
+        from ..tasks.distributed import is_global_zero, run_rank0_exclusive
+
+        run_rank0_exclusive(
+            self._prepare_cache, sync_dir=os.path.abspath(dump_dir),
+            name=f"datahub_{self.hash}",
+        )
+        if not is_global_zero():
+            self._init_transforms(read_only=True)
+            if not self.preload_data():
+                raise RuntimeError(f"Published dataset is unavailable at {self.preload_path}")
+
+    def _init_transforms(self, read_only=False):
+        self.preprocessing = Transform(self.preprocessings, self.preload_path, read_only=read_only)
+        self.global_transform = Transform(self.global_transforms, self.preload_path, read_only=read_only)
+        if self.data_format == "aselmdb" or self.data_path.endswith(".aselmdb"):
+            # ASE supplies physical forces and applies conversion at the source.
+            # Use the same inverse transforms for freshly built and preloaded data.
+            for transform in (self.preprocessing, self.global_transform):
+                transform.scales = [s for s in transform.scales if not isinstance(
+                    s, (NegativeGradientTransform, EnergyUnitConversionTransform)
+                )]
+
+    def _prepare_cache(self):
+        path = os.path.join(self.preload_path, "pre_transformed.hdf5")
+        if self.preload and os.path.isfile(path):
+            self._init_transforms(read_only=True)
+            if self.preload_data():
+                return
+        self._init_transforms()
+        # Publish the HDF5 file first so a legacy file is never paired with a
+        # newer field mapping. New files carry their own authoritative mapping.
+        config_path = os.path.join(self.preload_path, "datahub.yaml")
+        with atomic_output(config_path) as config, atomic_output(path) as staging:
+            self.get_handle("w", path=staging)
+            try:
+                self._init_data()
+                self._init_neighbor_list()
+                self.preprocessing.transform(self.data)
+                self.global_transform.transform(self.data)
+                # The data, schema and fitted inverse state become visible together.
+                self.data.attrs["field_mapping"] = json.dumps(self.data_types)
+                for name, transform in (("preprocessing", self.preprocessing), ("global", self.global_transform)):
+                    self.data.attrs[name + "_normalizations"] = json.dumps([
+                        [float(norm.shift), float(norm.scale)] if norm.loaded else None
+                        for norm in transform.normalizations
+                    ])
+                self._save_config(config)
+            finally:
+                self.file.close()
+        self.get_handle()
 
     def _preload_data(self, hdf5_path):
         loaded_file = h5py.File(hdf5_path, mode="r")
@@ -634,11 +695,22 @@ class SingleDataHub:
             os.path.isfile(hdf5_path) and
             os.path.isfile(config_path)
         ):
-            handler = YamlHandler(config_path)
-            datahub_config = handler.read_yaml()
-            preload_data_types = _collect_types(datahub_config.feature) | _collect_types(datahub_config.target)
-            if self.data_types.items() <= preload_data_types.items():
+            try:
                 self.get_handle()
+                if "field_mapping" in self.data.attrs:
+                    preload_data_types = json.loads(self.data.attrs["field_mapping"])
+                else:
+                    datahub_config = YamlHandler(config_path).read_yaml()
+                    preload_data_types = _collect_types(datahub_config.feature) | _collect_types(datahub_config.target)
+                required_fields = set(self.data_types)
+                if self.neighbor_list_type in ("full", "cutoff"):
+                    required_fields.update(("idx_i", "idx_j", "N_pair"))
+                if self.neighbor_list_type == "cutoff":
+                    required_fields.add("offsets")
+                if (not self.data_types.items() <= preload_data_types.items()
+                        or not required_fields.issubset(self.data)):
+                    self.file.close()
+                    return False
                 if self.neighbor_list_type == "full":
                     self._check_full_boundaries()
                 if self.neighbor_list_type == "cutoff" and not self.data.attrs.get("cutoff_neighbor_list_complete", False):
@@ -646,8 +718,23 @@ class SingleDataHub:
                     return False
                 self.n_datapoint = len(self.data["Ra"])
                 self.max_N = self.data["Ra"].shape[1]
+                for name, transform in (("preprocessing", self.preprocessing), ("global", self.global_transform)):
+                    key = name + "_normalizations"
+                    if key in self.data.attrs:
+                        for norm, state in zip(transform.normalizations, json.loads(self.data.attrs[key])):
+                            norm.loaded = state is not None
+                            if state is not None:
+                                norm.shift, norm.scale = state
                 logger.info(f"Data matched and preloaded from {self.preload_path}")
                 return True
+            except (OSError, KeyError, json.JSONDecodeError):
+                if hasattr(self, "file"):
+                    self.file.close()
+                logger.warning(f"Incomplete dataset cache at {self.preload_path}, rebuilding")
+            except BaseException:
+                if hasattr(self, "file"):
+                    self.file.close()
+                raise
         return False
 
     def _expand(self, k: str, values: Iterable) -> np.ndarray:
@@ -783,26 +870,6 @@ class SingleDataHub:
                 transforms=aselmdb_transforms or None,
                 declared_properties=self.data_types.keys(),
             )
-            # Unit conversion is already applied in ASELMDBDataset; drop the transform so it is not applied twice.
-            if aselmdb_transforms.get("energy_unit_conversion"):
-                self.preprocessing.scales = [
-                    s for s in self.preprocessing.scales
-                    if not isinstance(s, EnergyUnitConversionTransform)
-                ]
-                self.global_transform.scales = [
-                    s for s in self.global_transform.scales
-                    if not isinstance(s, EnergyUnitConversionTransform)
-                ]
-            # ASELMDB Fa is already physical forces (get_forces); do not flip as if Fa were ∇E.
-            if aselmdb_transforms.get("negative_gradient"):
-                self.preprocessing.scales = [
-                    s for s in self.preprocessing.scales
-                    if not isinstance(s, NegativeGradientTransform)
-                ]
-                self.global_transform.scales = [
-                    s for s in self.global_transform.scales
-                    if not isinstance(s, NegativeGradientTransform)
-                ]
         elif not os.path.isfile(self.data_path):
             raise ValueError(f"Data path {self.data_path} doesn't exist.")
         elif self.data_format == "hdf5" or suffix == "hdf5":
@@ -944,12 +1011,12 @@ class SingleDataHub:
                 idx_j[i, :n_pair] = senders
                 offsets[i, :n_pair] = shifts
 
-    def get_handle(self, mode: Literal["r", "w"]="r") -> None:
-        if mode == "w" and os.path.exists(self.preload_path):
-            logger.warning(f"Preload path {self.preload_path} exists and will be overwritten")
-        else:
+    def get_handle(self, mode: Literal["r", "w"]="r", path=None) -> None:
+        if path is None:
+            path = os.path.join(self.preload_path, "pre_transformed.hdf5")
+        if mode == "w":
             os.makedirs(self.preload_path, exist_ok=True)
-        self.file = h5py.File(os.path.join(self.preload_path, "pre_transformed.hdf5"), mode=mode, rdcc_nbytes=1024 ** 3 * self.max_memory)
+        self.file = h5py.File(path, mode=mode, rdcc_nbytes=1024 ** 3 * self.max_memory)
         if mode == "r":
             self.data = self.file["data"]
         else:
@@ -960,7 +1027,7 @@ class SingleDataHub:
         self.file.close()
         self.get_handle()
 
-    def _save_config(self):
+    def _save_config(self, path):
         handler = YamlHandler(os.path.join(self.preload_path, "datahub.yaml"))
         datahub_config = Dict({
             "feature": self.feature_types,
@@ -970,7 +1037,7 @@ class SingleDataHub:
             "neighbor_list": self.neighbor_list_type,
             "neighbor_list_cutoff": self.neighbor_list_cutoff,
         })
-        handler.write_yaml(datahub_config)
+        handler.write_yaml(datahub_config, path)
         if self.neighbor_list_type == "cutoff":
             self.data.attrs["cutoff_neighbor_list_complete"] = True
         logger.info(f"Save preloaded dataset at {self.preload_path}")
