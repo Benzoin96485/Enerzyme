@@ -1,11 +1,11 @@
 {
   "cpu": {
-    "revision": "d2329fd",
-    "job": "6339860",
+    "revision": "67ccb68",
+    "job": "6340317",
     "test_files_and_shards": 171,
     "results": {
-      "passed": 1673,
-      "skipped": 67,
+      "passed": 1676,
+      "skipped": 68,
       "errors": 0,
       "failures": 0
     },
@@ -14,7 +14,7 @@
       "CUDA + Triton required": 2,
       "CUDA and Triton required": 2,
       "CUDA-only local-frame fusion": 1,
-      "requires CUDA Inductor": 3,
+      "requires CUDA Inductor": 4,
       "set UMA_CHECKPOINT to a local uma-*.pt for live train smoke": 1,
       "compiled single-precision CUDA training": 1,
       "CUDA receiver reductions": 1,
@@ -24,8 +24,8 @@
     }
   },
   "cuda": {
-    "revision": "d2329fd",
-    "job": "6339868",
+    "revision": "59bd0d4",
+    "job": "6340211",
     "device": "Tesla V100-PCIE-32GB (sm70)",
     "pytest_files": [
       "test/test_e2former_triton_parity.py",
@@ -34,10 +34,12 @@
       "test/test_local_frame_ops.py",
       "test/test_dpa4_core.py::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles",
       "test/test_alignn_ops.py::test_compiled_gate_preserves_live_hooks_and_force_gradients",
-      "test/test_gemnet_ops.py::test_compiled_bilinear_force_inference_retains_gradients"
+      "test/test_gemnet_ops.py::test_compiled_bilinear_force_inference_retains_gradients",
+      "test/test_spinconv_core.py",
+      "test/test_spinconv_ops.py"
     ],
     "results": {
-      "passed": 45,
+      "passed": 62,
       "skipped": 1,
       "errors": 0,
       "failures": 0
@@ -58,18 +60,19 @@
       "test.test_scatter::test_scatter_sum_grad_equivalence[cuda]",
       "test.test_scatter::test_scatter_sum_infer_dim_size_equivalence[cuda]",
       "test.test_scatter::test_scatter_sum_negative_dim_equivalence[cuda]",
-      "test.test_scatter::test_scatter_sum_rank_broadcast_equivalence[cuda]"
+      "test.test_scatter::test_scatter_sum_rank_broadcast_equivalence[cuda]",
+      "test.test_spinconv_core::test_cuda_double_compiled_polar_tables_and_forces_with_fixed_frame_sums"
     ],
     "gpu_skips_passed_on_cpu": {
       "test.test_e2former_triton_parity::test_want_triton_cpu_fallback_matches_pytorch_sparse_ops": "CUDA Triton available; CPU fallback path not exercised here"
     }
   },
-  "notes": "The runs use the recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run.",
+  "notes": "The CPU suite includes the DimeNet++ rotation test fix. The installed package sources, documentation and CUDA test files are identical to their measured revision. Every CUDA-only test skipped on the CPU passed on the V100. The GPU suite skipped one CPU fallback test that passed on the CPU.",
   "wheel": {
-    "revision": "d2329fd",
-    "job": "6339867",
+    "revision": "59bd0d4",
+    "job": "6340213",
     "filename": "enerzyme-0.6.0-py3-none-any.whl",
-    "sha256": "88decf092a5fec57ece0bfca4a8d56f9d7664a4fb2c1229d8c27744280e6930b",
+    "sha256": "8319aeec97a694aba617aa1ab3ecf5cc2aebf810389e1e864329b5c99421e40f",
     "results": {
       "passed": 58,
       "skipped": 0,
@@ -79,7 +82,7 @@
     "method": "Build from git archive with no index, install into a fresh target directory, load the registry and bundled Jd, CG and Lebedev data, and run the 58 frozen-weight checks outside the source checkout. The isolated test directory contains only the test harness and the frozen-weight symlink."
   },
   "documentation": {
-    "revision": "d2329fd",
+    "revision": "59bd0d4",
     "sphinx": "8.2.3",
     "builder": "html",
     "options": [
@@ -178,5 +181,43 @@
         "force_max_abs": 7.792703114739563e-20
       }
     }
+  },
+  "dimenetpp_rotation_invariance": {
+    "previous_suite": {
+      "revision": "59bd0d4",
+      "job": "6340212",
+      "results": {
+        "passed": 1674,
+        "skipped": 68,
+        "failures": 1,
+        "errors": 0
+      },
+      "failed_test": "test/test_dimenetpp_core.py::test_dimenetpp_rotation_invariance"
+    },
+    "controls": {
+      "sources": [
+        "1aa0f8b",
+        "59bd0d4"
+      ],
+      "torch_seed": 1,
+      "numpy_weight_seeds": [
+        0,
+        99
+      ],
+      "seed_interval_inclusive": true,
+      "failing_seed_for_fp32_qr": 96,
+      "matching_parameter_tensors_at_seed_96": 50,
+      "parameter_multiset_sha256_at_seed_96": "df129bb3dfbf5a47b421da2b6afe91a981903a21e50caeab78a3034e25e8cdfa",
+      "input_generation": "Build the tiny DimeNet++ core, five atom coordinates, atom embeddings and radial inputs as in the original invariance test. Apply a proper rotation estimated by QR in the indicated precision. For float32 model inputs also check an exactly representable quarter-turn about z.",
+      "failed_seed_counts_out_of_100_per_source": {
+        "float32_QR_float32_model": 1,
+        "float64_QR_rotated_then_cast_float32_model": 0,
+        "exact_quarter_turn_float32_model": 0,
+        "float64_QR_float64_model": 0
+      },
+      "matching_source_results": "Both sources gave identical counts of elements outside tolerance and maximum absolute differences at every seed for all four controls."
+    },
+    "test_revision": "67ccb68",
+    "new_test": "Use the reproducing weight seed 96, construct the same proper rotation in double precision for both model dtypes and also check float64 features. Absolute and relative tolerances are both 1e-5 for float32 and 1e-10 for float64."
   }
 }
