@@ -27413,6 +27413,23 @@
           }
         }
       },
+      "tracked_model_specific_float32_training_controls": {
+        "efa/float32/bulk_256/train": {
+          "source": "455e150",
+          "formal_job": "6339213",
+          "evidence": "test/fixtures/validation/efa_fp32_force_gradients.json"
+        },
+        "efa/float32/large_2000/train": {
+          "source": "455e150",
+          "formal_job": "6339213",
+          "evidence": "test/fixtures/validation/efa_fp32_force_gradients.json"
+        },
+        "gemnet/float32/large_2000/train": {
+          "source": "4428e68",
+          "formal_job": "6339555",
+          "evidence": "test/fixtures/validation/gemnet_fp32_force_gradients.json"
+        }
+      },
       "interpretation": "Native precision and repeat comparisons characterize numerical sensitivity. Only measured matching sources and systems are included here. These controls do not change the acceptance result of the original compiled call."
     }
   }
