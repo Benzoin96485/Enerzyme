@@ -191,3 +191,18 @@ def test_split_legacy_preload_and_partial_refresh(tmp_path):
     # The archive stays consumable by ordinary readers of the previous format.
     with np.load(b) as archive:
         assert set(archive.files) == {"training", "test"}
+
+
+def test_single_process_cpu_lightning_committee_on_multigpu_host(monkeypatch):
+    import torch
+
+    monkeypatch.setattr("enerzyme.train.detect_launch_env", lambda: distributed.LaunchEnv("single"))
+    monkeypatch.setattr("enerzyme.train.is_lightning_subprocess", lambda: False)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 4)
+    config = Dict(Trainer={"lightning": True, "committee_size": 2, "cuda": False},
+                  Modelhub={"internal_FFs": {"model": {"active": True}}})
+    validate_parallel_config(config, training=True)
+    del config.Trainer["cuda"]
+    with pytest.raises(ValueError, match="single process"):
+        validate_parallel_config(config, training=True)

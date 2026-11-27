@@ -22,7 +22,7 @@ def validate_parallel_config(config, *, training):
         active_learning = training and (settings.get("active_learning_params") or {}).get("active", False)
         if committee or active_learning:
             distributed = launch.world_size > 1 or is_lightning_subprocess()
-            if lightning and not distributed:
+            if lightning and settings.get("cuda", True) and not distributed:
                 import torch
                 distributed = torch.cuda.is_available() and torch.cuda.device_count() > 1
             if distributed:
