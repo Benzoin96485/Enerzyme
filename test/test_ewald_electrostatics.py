@@ -15,6 +15,7 @@ the surface-term correction before comparing to a brute-force replica sum.
 """
 import math
 import numpy as np
+import pytest
 import torch
 
 from enerzyme.data.neighbor_list import cutoff_neighbor_list
@@ -26,17 +27,17 @@ from enerzyme.models.layers.electrostatics import EwaldElectrostaticEnergyLayer
 # pytest session).
 
 
-def _build_inputs(positions, charges, cell, cutoff_real, requires_grad=False):
+def _build_inputs(positions, charges, cell, cutoff_real, requires_grad=False, device="cpu"):
     idx_i, idx_j, offsets = cutoff_neighbor_list(
         positions, cutoff_real, cell=cell, pbc=(True, True, True)
     )
-    Ra = torch.tensor(positions, dtype=torch.float64, requires_grad=requires_grad)
-    Qa = torch.tensor(charges, dtype=torch.float64)
-    idx_i_t = torch.tensor(idx_i, dtype=torch.long)
-    idx_j_t = torch.tensor(idx_j, dtype=torch.long)
-    offsets_t = torch.tensor(offsets, dtype=torch.float64)
+    Ra = torch.tensor(positions, dtype=torch.float64, requires_grad=requires_grad, device=device)
+    Qa = torch.tensor(charges, dtype=torch.float64, device=device)
+    idx_i_t = torch.tensor(idx_i, dtype=torch.long, device=device)
+    idx_j_t = torch.tensor(idx_j, dtype=torch.long, device=device)
+    offsets_t = torch.tensor(offsets, dtype=torch.float64, device=device)
     Dij = torch.norm(Ra[idx_j_t] + offsets_t - Ra[idx_i_t], dim=-1)
-    cell_t = torch.tensor(cell, dtype=torch.float64).unsqueeze(0)
+    cell_t = torch.tensor(cell, dtype=torch.float64, device=device).unsqueeze(0)
     return Ra, Qa, idx_i_t, idx_j_t, Dij, cell_t
 
 
@@ -195,3 +196,50 @@ def test_requires_cell():
         pass
     else:
         raise AssertionError("expected ValueError when cell is None")
+
+
+@pytest.mark.parametrize("device", ["cpu", pytest.param("cuda", marks=pytest.mark.skipif(
+    not torch.cuda.is_available(), reason="requires a CUDA device"))])
+def test_skewed_and_left_handed_representations_of_the_same_lattice(device):
+    # An integer shear with determinant ±1 preserves all translations.
+    positions = np.array([[.1, .3, .4], [1.25, 1.08, .9]])
+    charges = np.array([1., -1.])
+    cell = np.diag([3.2, 3.7, 4.1])
+    layer = EwaldElectrostaticEnergyLayer(4.5, 7.1, Bohr_in_R=1.)
+    positions_t, charges_t, i, j, distances, _ = _build_inputs(
+        positions, charges, cell, 4.5, requires_grad=True, device=device)
+    energies_forces = []
+    for transform in (np.eye(3), np.array([[1, 4, 0], [0, 1, 0], [0, 0, -1]])):
+        lattice = torch.tensor(transform @ cell, dtype=positions_t.dtype)
+        # A constant input lattice can stay on the host while positions live on CUDA.
+        energy = layer.get_E_ele_a(positions_t, charges_t, i, j, distances, cell=lattice)
+        force = -torch.autograd.grad(energy.sum(), positions_t, retain_graph=True)[0]
+        energies_forces.append((energy, force))
+    torch.testing.assert_close(*energies_forces, atol=1e-12, rtol=1e-12)
+
+
+def test_charged_periodic_cell_split_invariance_and_ensemble_channels():
+    positions = np.array([[.15, .2, .45]])
+    cell = np.eye(3) * 3.0
+    args = _build_inputs(positions, np.ones(1), cell, cutoff_real=8.)
+    # A cubic array of point charges in a uniform neutralizing background.
+    # Changing the Ewald split or the charge channel must preserve its Madelung energy.
+    charges = torch.tensor([[1., -2.]], dtype=torch.float64, requires_grad=True)
+    for alpha in (.75, 1.3):
+        layer = EwaldElectrostaticEnergyLayer(8., 13., alpha=alpha, Bohr_in_R=1.)
+        scale = torch.tensor(1., dtype=torch.float64, requires_grad=True)
+        energy = layer.get_E_ele_a(args[0] * scale, charges, *args[2:4], args[4] * scale, cell=args[-1] * scale)
+        expected = -(2.837297479480619 / (2 * 3.)) * charges.square()
+        torch.testing.assert_close(energy, expected, atol=3e-11, rtol=3e-11)
+        grad, strain = torch.autograd.grad(energy.sum(), (charges, scale))
+        torch.testing.assert_close(strain, -expected.sum(), atol=2e-9, rtol=2e-9)
+        torch.testing.assert_close(grad, 2 * expected / charges, atol=1e-10, rtol=1e-10)
+
+
+def test_partial_periodicity_and_singular_cell_are_rejected():
+    layer = EwaldElectrostaticEnergyLayer(4., 6.)
+    args = _build_inputs(np.array([[.1, .2, .3]]), np.ones(1), np.eye(3) * 4, 4.)
+    with pytest.raises(ValueError, match="all three axes"):
+        layer.get_E_ele_a(*args[:5], cell=args[-1], pbc=torch.tensor([True, True, False]))
+    with pytest.raises(ValueError, match="nonsingular"):
+        layer.get_E_ele_a(*args[:5], cell=torch.zeros_like(args[-1]))
