@@ -722,7 +722,7 @@
     "mattersim/float64": "5d53f9c",
     "chgnet/float32": "81620f7",
     "chgnet/float64": "81620f7",
-    "alignn/float32": "c5d9b4c",
+    "alignn/float32": "da1e5ec",
     "alignn/float64": "c5d9b4c",
     "spinconv/float32": "81620f7",
     "spinconv/float64": "81620f7",
@@ -10374,7 +10374,7 @@
       "cuda_visible_devices": "GPU-4163ef98-d563-542a-eccc-2939797f3efc",
       "allocated_gpu_uuid": "GPU-4163ef98-d563-542a-eccc-2939797f3efc",
       "selected_candidate": true,
-      "matches_current_source": true,
+      "matches_current_source": false,
       "attempt_started_unix": 1795731241,
       "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
       "modes": ["infer", "train"],
@@ -10520,6 +10520,39 @@
         }
       },
       "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "e6edb981f1b98a12585517b9e885028b78d58569e43a64f275f77fb6a897e668", "cache_had_prior_completed_process": true, "process_started_unix": 1795737881.884074, "process_finished_unix": 1795737961.0986037, "cuda_visible_devices": "GPU-4163ef98-d563-542a-eccc-2939797f3efc", "reps": 5, "timings": {"mol_batch_32x20": ["err3", "err3"], "bulk_256": [[20.367672201246023, 261.85791015625, 2, 840], "err1"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.1316282072803006e-14, "force_max_abs": 1.021405182655144e-14, "gradient_max_abs": 0.0}}, "large_2000": {}}}, {"side": "new", "exit": 0, "process_started_unix": 1795737961.1112673, "process_finished_unix": 1795738593.484987, "cuda_visible_devices": "GPU-4163ef98-d563-542a-eccc-2939797f3efc", "reps": 5, "timings": {"mol_batch_32x20": [[19.438881194218993, 327.96044921875, 10, 518], [21.694989874958992, 687.88330078125, 1, 861]], "bulk_256": [[19.056570017710328, 261.41796875, 1, 394], [21.326123969629407, 634.3876953125, 1, 861]], "large_2000": [[39.957534056156874, 1456.1572265625, 1, 394], [70.58050017803907, 3827.19970703125, 1, 858]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.554312234475219e-14, "force_max_abs": 2.4868995751603507e-14, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 121, "reference_active_parameters": 121, "energy_max_abs": 1.9539925233402755e-14, "force_max_abs": 2.842170943040401e-14, "gradient_max_abs": 1.4551915228366852e-11}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 1.0969003483296547e-13, "force_max_abs": 7.549516567451064e-15, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 121, "reference_active_parameters": 121, "energy_max_abs": 2.5757174171303632e-14, "force_max_abs": 1.0658141036401503e-14, "gradient_max_abs": 7.772328972217213e-05}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 2.2737367544323206e-13, "force_max_abs": 9.769962616701378e-15, "gradient_max_abs": 0.0}, "train": {"passed": false, "active_parameters": 121, "reference_active_parameters": 121, "energy_max_abs": 3.979039320256561e-13, "force_max_abs": 1.2212453270876722e-14, "gradient_max_abs": 0.00036635886233452335}}}}]
+    },
+    "alignn/float32/da1e5ec/pair": {
+      "job": "6339176",
+      "host": "d-8-15-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "6b6ba488ad5d904d47c9f70bf2d451e81811ca5d00ea4071e358c37e742f6c47",
+      "node_gpu_inventory": ["GPU-4163ef98-d563-542a-eccc-2939797f3efc, Tesla V100-PCIE-32GB", "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "0",
+      "cuda_visible_devices": "GPU-4163ef98-d563-542a-eccc-2939797f3efc",
+      "allocated_gpu_uuid": "GPU-4163ef98-d563-542a-eccc-2939797f3efc",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795738620,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {
+        "mol_batch_32x20/infer": {
+          "passed": true,
+          "E_max_abs": 2.86102294921875e-06,
+          "Fa_max_abs": 1.862645149230957e-07
+        },
+        "mol_batch_32x20/train": {
+          "passed": true,
+          "E_max_abs": 3.814697265625e-06,
+          "Fa_max_abs": 2.2351741790771484e-07
+        },
+        "bulk_256/infer": {
+          "passed": true,
+          "E_max_abs": 1.52587890625e-05,
+          "Fa_max_abs": 9.685754776000977e-08
+        }
+      },
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "d6ca869159bc903443ae856e3d8a00eac4dce57354167db52a1d1503b6930db2", "cache_had_prior_completed_process": true, "process_started_unix": 1795738620.1786268, "process_finished_unix": 1795738658.2367241, "cuda_visible_devices": "GPU-4163ef98-d563-542a-eccc-2939797f3efc", "reps": 5, "timings": {"mol_batch_32x20": [[17.82959303818643, 781.9267578125, 27, 277], "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.76837158203125e-06, "force_max_abs": 8.977949619293213e-07, "gradient_max_abs": 0.0}}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "ab6c1f40b792aecd13fbbd1f5b4a487a65a195130fca7575c520c9810e29c182", "cache_had_prior_completed_process": false, "process_started_unix": 1795738658.254927, "process_finished_unix": 1795738995.5849907, "cuda_visible_devices": "GPU-4163ef98-d563-542a-eccc-2939797f3efc", "reps": 5, "timings": {"mol_batch_32x20": [[16.51170803233981, 710.00048828125, 17, 263], [30.942555982619524, 2427.0849609375, 1, 291]], "bulk_256": [[168.56917785480618, 10054.35791015625, 10, 243], "err7"], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 3.337860107421875e-06, "force_max_abs": 9.629875421524048e-07, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 103, "reference_active_parameters": 103, "energy_max_abs": 6.198883056640625e-06, "force_max_abs": 8.456408977508545e-07, "gradient_max_abs": 0.01171875}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.62939453125e-06, "force_max_abs": 1.8440186977386475e-07, "gradient_max_abs": 0.0}}, "large_2000": {}}}]
     },
     "leftnet/float32/f12974b/abba": {
       "job": "6318510",
@@ -25933,7 +25966,7 @@
     "terminal_partial_frozen_attempts": 48,
     "selected_partial_cells": 0,
     "historical_architecture_precision_pairs": 46,
-    "completed_frozen_attempts": 235,
+    "completed_frozen_attempts": 236,
     "comparable_mode_system_cells": 81,
     "comparable_metrics": 162,
     "above_3_percent": 6,
