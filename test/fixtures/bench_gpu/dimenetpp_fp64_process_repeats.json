@@ -316,5 +316,390 @@
    }
   ]
  },
- "conclusion": "The float64 scope does not slow DimeNet++; across processes 2a3b024 is within 3% of the pre-refactor compile and faster than 5d53f9c. The +4.2% of the single-process balanced recheck reflects process-to-process variation of about 2 ms in each checkout."
+ "conclusion": "The float64 scope does not slow DimeNet++; across processes 2a3b024 is within 3% of the pre-refactor compile and faster than 5d53f9c. The +4.2% of the single-process balanced recheck reflects process-to-process variation of about 2 ms in each checkout.",
+ "frozen_2e21446_interleaved": {
+  "frozen_original": "1aa0f8b",
+  "candidate": "2e21446",
+  "fixture_sha256": "d10d74cba66b440860a96b9da37c8897fc28e7dadb5f5a01740a997197f845df",
+  "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+  "system": "mol_batch_32x20",
+  "mode": "ordinary torch.compile energy and force inference",
+  "acceptance_protocol": {
+   "precision": "float64",
+   "device": "one physical Tesla V100-PCIE-32GB per original/candidate comparison",
+   "cpu_threads_per_process": 2,
+   "batch": "32 molecules, 20 atoms per molecule",
+   "loss_or_output": "Inference returns energy and forces using torch.compile(model).",
+   "full_row_source_preserving_result": "Each version runs 2 warmups followed by the timed-call count in each process receipt for each supported shape/mode; process median wall time and median peak allocated memory are retained.",
+   "interleaved_processes": 4,
+   "source_order": [
+    "original",
+    "candidate",
+    "candidate",
+    "original"
+   ],
+   "warmups_per_interleaved_process": 2,
+   "timed_calls_per_interleaved_process": 21,
+   "interleaved_statistic": "Median of the two process medians for each source and metric; percent change uses the frozen original as denominator.",
+   "acceptance": "Original and candidate compiled E/F match their own native E/F, and all four cross-source original/candidate native E/F comparisons pass shape, dtype, finite and elementwise checks (atol 1e-10, rtol 1e-8). Each time and peak-memory metric must increase by at most 3%.",
+   "dedicated_profiles_per_source": {
+    "warmup_steps": 5,
+    "timed_unprofiled_steps": 15,
+    "torch_profiler_steps": 6
+   }
+  },
+  "interleaving": "Independent processes in original/candidate/candidate/original order on one V100, two source-specific caches, one cold and one warm process per source.",
+  "incomplete_initial": {
+   "job": "6339215",
+   "source_receipt": ".refactor/bench/raw-frozen-2e21446/pair_83-dimenet++-float64_6339215_1795740926/partial.json",
+   "receipt_sha256": "dfdb977d72755afb54ab6637f80f84f1971e71faff0f3bd1435d6aced4ea3fbf",
+   "allocated_gpu": "GPU-d27cd600-162e-ffdb-c1ad-0ddb9d50e7e1",
+   "cross_eager": {
+    "passed": true,
+    "E_max_abs": 2.842170943040401e-14,
+    "Fa_max_abs": 5.115907697472721e-13
+   },
+   "processes": [
+    {
+     "side": "base",
+     "exit": 0,
+     "passed": true,
+     "median_ms": 30.00372718088329,
+     "peak_mib": 1394.0048828125,
+     "timed_reps": 5,
+     "process_start": 1795740926.2937963,
+     "process_end": 1795740990.5940824,
+     "source_cache_warm": true
+    },
+    {
+     "side": "new",
+     "exit": "timeout",
+     "passed": true,
+     "median_ms": 31.825999030843377,
+     "peak_mib": 1388.20556640625,
+     "timed_reps": 5,
+     "process_start": 1795740990.6141534,
+     "process_end": 1795741347.7774343,
+     "source_cache_warm": false
+    }
+   ],
+   "change_percent": {
+    "median_ms": 6.073484933968931,
+    "peak_mib": -0.4160183710798404
+   }
+  },
+  "full_six_cell_repeat": {
+   "job": "6340022",
+   "source_receipt": ".refactor/bench/raw-frozen-2e21446/pair_83-dimenet++-float64.complete.json",
+   "receipt_sha256": "1af2ba5527eb5b3eb35bd17b07d8043cf34a662422adef40dd0083656a0bc6aa",
+   "allocated_gpu": "GPU-d27cd600-162e-ffdb-c1ad-0ddb9d50e7e1",
+   "cross_eager": {
+    "passed": true,
+    "E_max_abs": 1.1368683772161603e-13,
+    "Fa_max_abs": 2.2737367544323206e-13
+   },
+   "processes": [
+    {
+     "side": "base",
+     "exit": 0,
+     "passed": true,
+     "median_ms": 31.97243087925017,
+     "peak_mib": 1394.0048828125,
+     "timed_reps": 5,
+     "process_start": 1795741568.7324803,
+     "process_end": 1795741606.170986,
+     "source_cache_warm": true
+    },
+    {
+     "side": "new",
+     "exit": 0,
+     "passed": true,
+     "median_ms": 28.93933793529868,
+     "peak_mib": 1388.20556640625,
+     "timed_reps": 5,
+     "process_start": 1795741607.6885562,
+     "process_end": 1795742286.105324,
+     "source_cache_warm": false
+    }
+   ],
+   "change_percent": {
+    "median_ms": -9.486588478075152,
+    "peak_mib": -0.4160183710798404
+   }
+  },
+  "interleaved": {
+   "job": "6339979",
+   "source_receipt": ".refactor/bench/raw-frozen-2e21446/abba_83-dimenet++-float64.complete.json",
+   "receipt_sha256": "49734fdc1b024c5aa1a688169045cf2b5c62748bd1d51f7153191f4e1aea6a58",
+   "allocated_gpu": "GPU-9a19f472-727c-1aec-eb16-7d4406811551",
+   "cross_eager": {
+    "passed": true,
+    "E_max_abs": 5.684341886080802e-14,
+    "Fa_max_abs": 1.1937117960769683e-12
+   },
+   "processes": [
+    {
+     "side": "base",
+     "exit": 0,
+     "passed": true,
+     "median_ms": 29.752102913334966,
+     "peak_mib": 1394.0048828125,
+     "timed_reps": 21,
+     "process_start": 1795742942.988522,
+     "process_end": 1795743083.21847,
+     "source_cache_warm": false
+    },
+    {
+     "side": "new",
+     "exit": 0,
+     "passed": true,
+     "median_ms": 28.65952206775546,
+     "peak_mib": 1388.20556640625,
+     "timed_reps": 21,
+     "process_start": 1795743083.3117034,
+     "process_end": 1795743226.56646,
+     "source_cache_warm": false
+    },
+    {
+     "side": "new",
+     "exit": 0,
+     "passed": true,
+     "median_ms": 28.584429062902927,
+     "peak_mib": 1388.20556640625,
+     "timed_reps": 21,
+     "process_start": 1795743226.6546311,
+     "process_end": 1795743256.2707036,
+     "source_cache_warm": true
+    },
+    {
+     "side": "base",
+     "exit": 0,
+     "passed": true,
+     "median_ms": 29.925473034381866,
+     "peak_mib": 1394.0048828125,
+     "timed_reps": 21,
+     "process_start": 1795743256.295082,
+     "process_end": 1795743281.4157684,
+     "source_cache_warm": true
+    }
+   ],
+   "change_percent": {
+    "median_ms": -4.077955209156836,
+    "peak_mib": -0.4160183710798404
+   }
+  },
+  "standalone_warm_profiles": {
+   "original": {
+    "source": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+    "raw_file": ".refactor/bench/dimenetpp-interleaved-6339979/baseline-profile.json",
+    "sha256": "5ec7783ad235b8852beac33f99aaeaf92bee4fb428f5879a42950b598a607f2a",
+    "torch": "2.13.0+cu126",
+    "torch_profiler_steps": 6,
+    "independent_unprofiled_median_ms": 29.732972,
+    "independent_unprofiled_samples_ms": [
+     29.784655,
+     30.137622,
+     29.732972,
+     29.733466,
+     29.662131,
+     29.764023,
+     29.746309,
+     29.721431,
+     29.693856,
+     29.73836,
+     29.7166,
+     29.695238,
+     29.719079,
+     29.752237,
+     29.685786
+    ],
+    "gpu_activity_counts_per_step": 941.0,
+    "gpu_activity_ms_per_step": 24.83843316666682,
+    "activity_groups": {
+     "memory copy": {
+      "calls_per_step": 39.0,
+      "ms_per_step": 0.06717316666668194
+     },
+     "other generated Triton kernels": {
+      "calls_per_step": 236.0,
+      "ms_per_step": 5.749973666666562
+     },
+     "other GPU activity": {
+      "calls_per_step": 320.0,
+      "ms_per_step": 1.94092333333357
+     },
+     "memory set": {
+      "calls_per_step": 52.0,
+      "ms_per_step": 0.05798499999991327
+     },
+     "indexed accumulation": {
+      "calls_per_step": 38.0,
+      "ms_per_step": 2.147160666666668
+     },
+     "cuBLAS or CUTLASS matrix multiplications": {
+      "calls_per_step": 256.0,
+      "ms_per_step": 14.87521733333342
+     }
+    },
+    "largest_gpu_events": [
+     {
+      "name": "volta_dgemm_128x64_nn",
+      "calls_per_step": 61.0,
+      "ms_per_step": 5.33053316666669
+     },
+     {
+      "name": "volta_dgemm_128x64_tn",
+      "calls_per_step": 65.0,
+      "ms_per_step": 3.0712891666665962
+     },
+     {
+      "name": "volta_dgemm_128x64_nt",
+      "calls_per_step": 56.0,
+      "ms_per_step": 2.5749616666667667
+     },
+     {
+      "name": "volta_dgemm_64x64_nt",
+      "calls_per_step": 12.0,
+      "ms_per_step": 1.2772361666666838
+     },
+     {
+      "name": "volta_dgemm_64x64_nn",
+      "calls_per_step": 21.0,
+      "ms_per_step": 1.0793116666666707
+     },
+     {
+      "name": "volta_dgemm_64x64_tn",
+      "calls_per_step": 12.0,
+      "ms_per_step": 0.992223833333342
+     },
+     {
+      "name": "triton_poi_fused_expand_gather_index_index_put_mul_silu_unsqueeze_10",
+      "calls_per_step": 4.0,
+      "ms_per_step": 0.8457335000000069
+     },
+     {
+      "name": "void cublasLt::splitKreduce_kernel<32, 16, int, double, double, double, double, false, double, double, double, true, false, false, false>(cublasLt::cublasSplitKParams<double>, double const*, double const*, double*, double*, double const*, double const*, double const*, double const*, double*, void*, long, double*, int*, double*, double*, double const*, double const*, double const*, double const*, double const*)",
+      "calls_per_step": 88.0,
+      "ms_per_step": 0.8394595000001136
+     },
+     {
+      "name": "triton_poi_fused__to_copy_abs_add_clamp_cos_div_lt_mul_ones_like_pow_reciprocal_select_sin_sub_where_1",
+      "calls_per_step": 1.0,
+      "ms_per_step": 0.7377348333333357
+     },
+     {
+      "name": "triton_poi_fused_expand_index_mul_scatter_add_silu_unsqueeze_19",
+      "calls_per_step": 4.0,
+      "ms_per_step": 0.6634633333333332
+     }
+    ]
+   },
+   "candidate": {
+    "source": "2e21446c2d1267dcef4e55a1885dab1b9a97444a",
+    "raw_file": ".refactor/bench/dimenetpp-interleaved-6339979/validated-2e21446-profile.json",
+    "sha256": "05b51fd53361e389dfaa8053c48748928155e2333d442fdd017dc4a0a5a019bc",
+    "torch": "2.13.0+cu126",
+    "torch_profiler_steps": 6,
+    "independent_unprofiled_median_ms": 28.559645,
+    "independent_unprofiled_samples_ms": [
+     28.59107,
+     28.559645,
+     28.56431,
+     28.569794,
+     28.631933,
+     28.540484,
+     28.538098,
+     28.5527,
+     28.539036,
+     28.851642,
+     28.540171,
+     28.631495,
+     28.604952,
+     28.533389,
+     28.535622
+    ],
+    "gpu_activity_counts_per_step": 838.0,
+    "gpu_activity_ms_per_step": 24.861879666666702,
+    "activity_groups": {
+     "memory copy": {
+      "calls_per_step": 33.0,
+      "ms_per_step": 0.060911333333322625
+     },
+     "other generated Triton kernels": {
+      "calls_per_step": 279.0,
+      "ms_per_step": 6.2998049999999814
+     },
+     "other GPU activity": {
+      "calls_per_step": 173.0,
+      "ms_per_step": 1.1845626666667108
+     },
+     "memory set": {
+      "calls_per_step": 44.0,
+      "ms_per_step": 0.054794500000007094
+     },
+     "indexed accumulation": {
+      "calls_per_step": 38.0,
+      "ms_per_step": 2.071824666666671
+     },
+     "cuBLAS or CUTLASS matrix multiplications": {
+      "calls_per_step": 271.0,
+      "ms_per_step": 15.18998150000001
+     }
+    },
+    "largest_gpu_events": [
+     {
+      "name": "volta_dgemm_128x64_nn",
+      "calls_per_step": 61.0,
+      "ms_per_step": 5.327827666666641
+     },
+     {
+      "name": "volta_dgemm_128x64_tn",
+      "calls_per_step": 65.0,
+      "ms_per_step": 3.0356096666666743
+     },
+     {
+      "name": "volta_dgemm_128x64_nt",
+      "calls_per_step": 71.0,
+      "ms_per_step": 2.9087571666666845
+     },
+     {
+      "name": "volta_dgemm_64x64_nt",
+      "calls_per_step": 12.0,
+      "ms_per_step": 1.272153500000001
+     },
+     {
+      "name": "volta_dgemm_64x64_nn",
+      "calls_per_step": 21.0,
+      "ms_per_step": 1.0794503333333456
+     },
+     {
+      "name": "volta_dgemm_64x64_tn",
+      "calls_per_step": 12.0,
+      "ms_per_step": 0.9894666666666629
+     },
+     {
+      "name": "void cublasLt::splitKreduce_kernel<32, 16, int, double, double, double, double, false, double, double, double, true, false, false, false>(cublasLt::cublasSplitKParams<double>, double const*, double const*, double*, double*, double const*, double const*, double const*, double const*, double*, void*, long, double*, int*, double*, double*, double const*, double const*, double const*, double const*, double const*)",
+      "calls_per_step": 103.0,
+      "ms_per_step": 0.898281000000016
+     },
+     {
+      "name": "triton_poi_fused_expand_gather_index_index_put_mul_silu_view_14",
+      "calls_per_step": 4.0,
+      "ms_per_step": 0.8433609999999978
+     },
+     {
+      "name": "triton_red_fused_sum_6",
+      "calls_per_step": 38.0,
+      "ms_per_step": 0.6145086666666417
+     },
+     {
+      "name": "triton_poi_fused_expand_index_mul_scatter_add_silu_view_13",
+      "calls_per_step": 4.0,
+      "ms_per_step": 0.6017729999999998
+     }
+    ]
+   }
+  },
+  "profile_interpretation": "Counts and durations describe raw CUDA activity during profiled steps. Independent unprofiled medians and four-process timed medians retain wall-clock synchronization and launch costs."
+ }
 }
