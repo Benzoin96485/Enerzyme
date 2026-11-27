@@ -327,7 +327,18 @@
       "force_component_rmse": 0.0255664291280856,
       "ranks_observing_injected_failure": 2,
       "checkpoint_epoch_zero_based": 1,
-      "optimizer_steps": 8
+      "optimizer_steps": 8,
+      "comparison_to_serial_cpu": {
+        "rows": 24,
+        "atol": 1e-10,
+        "rtol": 1e-10,
+        "max_abs_difference": {
+          "E": 0,
+          "Fa": 0,
+          "predict_E": 4.440892098500626e-16,
+          "predict_Fa": 8.326672684688674e-17
+        }
+      }
     },
     "torchrun_two_gpu": {
       "job": 6343709,
