@@ -1,10 +1,10 @@
 {
   "cpu": {
-    "revision": "244415d",
-    "job": "6339352",
+    "revision": "610b65f",
+    "job": "6339659",
     "test_files_and_shards": 171,
     "results": {
-      "passed": 1665,
+      "passed": 1671,
       "skipped": 65,
       "errors": 0,
       "failures": 0
@@ -62,10 +62,10 @@
   },
   "notes": "The runs use the recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run.",
   "wheel": {
-    "revision": "244415d",
-    "job": "6339353",
+    "revision": "610b65f",
+    "job": "6339660",
     "filename": "enerzyme-0.6.0-py3-none-any.whl",
-    "sha256": "28fd957aabbb1be5c7dbc4b4c07a5afe4369ac8dbd8057b723fdf6d8c1d10399",
+    "sha256": "cae2df3a42b07fac7786c0761cbebbbf2cfefdfae76a2a13c6a0527cbd4a76b4",
     "results": {
       "passed": 58,
       "skipped": 0,
@@ -116,6 +116,62 @@
         "passed": true,
         "parameter_gradients_compared": 34,
         "graphs_with_learned_operators": 0
+      }
+    }
+  },
+  "topology_force_training": {
+    "revision": "610b65f",
+    "job": "6339646",
+    "device": "CPU",
+    "command": "scripts/check_compiled_forces.py <architecture> --dtype <precision>",
+    "cases": {
+      "chgnet/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 127,
+        "graphs_with_learned_operators": 1,
+        "captured_operations": 344,
+        "energy_max_abs": 8.940696716308594e-08,
+        "force_max_abs": 1.1920928955078125e-07
+      },
+      "chgnet/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 127,
+        "graphs_with_learned_operators": 2,
+        "captured_operations": 688,
+        "energy_max_abs": 5.551115123125783e-16,
+        "force_max_abs": 6.106226635438361e-16
+      },
+      "gemnet-oc/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 293,
+        "graphs_with_learned_operators": 1,
+        "captured_operations": 2198,
+        "energy_max_abs": 2.980232238769531e-07,
+        "force_max_abs": 7.152557373046875e-07
+      },
+      "gemnet-oc/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 293,
+        "graphs_with_learned_operators": 2,
+        "captured_operations": 4396,
+        "energy_max_abs": 6.661338147750939e-16,
+        "force_max_abs": 9.159339953157541e-16
+      },
+      "spinconv/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 113,
+        "graphs_with_learned_operators": 1,
+        "captured_operations": 345,
+        "energy_max_abs": 7.450580596923828e-09,
+        "force_max_abs": 1.6370904631912708e-11
+      },
+      "spinconv/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 113,
+        "graphs_with_learned_operators": 2,
+        "captured_operations": 690,
+        "energy_max_abs": 0.0,
+        "force_max_abs": 7.792703114739563e-20
       }
     }
   }
