@@ -67,8 +67,8 @@ def cutoff_neighbor_list(
     the same additive convention as Enerzyme's own
     :class:`enerzyme.models.layers.geometry.DistanceLayer` (``Rj + offsets``).
 
-    Params
-    -----
+    Parameters
+    ----------
     positions: ``(N, 3)`` Cartesian atomic positions.
 
     cutoff: neighbor search radius.
@@ -84,7 +84,7 @@ def cutoff_neighbor_list(
         to an atom's nonzero periodic images are kept in both modes.
 
     Returns
-    -----
+    -------
     idx_i, idx_j: ``int64`` arrays of pair indices, shape ``(N_pair,)``.
 
     offsets: ``float64`` array of Cartesian shift vectors, shape ``(N_pair, 3)``,
