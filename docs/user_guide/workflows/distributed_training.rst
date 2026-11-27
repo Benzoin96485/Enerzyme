@@ -65,6 +65,9 @@ For energy and force objectives, the reduction weights each term by its own
 number of observations. An energy counts once per structure and a force
 component counts once per atom and direction. Force RMSE for reporting applies
 the square root per component and then averages the component scores.
+A custom distributed loss supplies ``components(output, target)``, yielding
+:class:`~enerzyme.models.loss.LossComponent` entries with each term's local
+mean, observation count, weight and optional RMSE epsilon.
 
 Prediction and recovery
 -----------------------
@@ -103,11 +106,15 @@ environment for each checkout. For example, inside a two-GPU Slurm allocation:
 .. code-block:: bash
 
    srun -n2 --gpu-bind=none python scripts/bench_distributed_training.py \
-     --source-tree /path/to/baseline --lightning --system crystals --output runs/A1
+     --source-tree /path/to/baseline --lightning --system crystals --output runs/crystals-A1
    srun -n2 --gpu-bind=none python scripts/bench_distributed_training.py \
-     --source-tree . --system crystals --output runs/B1
+     --source-tree . --system crystals --output runs/crystals-B1
 
 Repeat these commands in reverse order with fresh output directories (B2, A2).
+Repeat the four runs with ``--system molecules`` and directories
+``runs/molecules-A1`` through ``runs/molecules-A2``. Run
+``python scripts/bench_distributed_training.py --compare runs`` to verify
+all ranks and hardware assignments and print the paired comparisons.
 For the old single-GPU baseline omit ``--lightning``. Each process records
 its measured wall time per optimizer step and peak allocated CUDA memory
 after ten warm-up steps. Use the maximum across ranks for each run, then

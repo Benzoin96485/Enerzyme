@@ -10,20 +10,59 @@ import json
 import os
 from pathlib import Path
 import socket
+from statistics import median
 import subprocess
 import sys
 import time
 
 
+def compare_runs(directory):
+    """Summarize complete ABBA runs, checking that their workloads and GPUs match."""
+    report = {}
+    for system in ("molecules", "crystals"):
+        legs = {}
+        identity = None
+        for leg in ("A1", "B1", "B2", "A2"):
+            ranks = sorted((directory / f"{system}-{leg}").glob("rank-*.json"))
+            if not ranks:
+                raise ValueError(f"Missing measurements for {system}-{leg}")
+            rows = [json.loads(path.read_text()) for path in ranks]
+            if {row["rank"] for row in rows} != set(range(rows[0]["world_size"])):
+                raise ValueError(f"Incomplete rank set for {system}-{leg}")
+            fields = ("fixture_sha256", "config_sha256", "system", "atoms", "edges",
+                      "world_size", "global_batch", "warmup", "steps", "torch", "cuda")
+            hardware = sorted((r["host"], r["device"], r["device_uuid"]) for r in rows)
+            trial = (tuple(rows[0][k] for k in fields), hardware)
+            if any(tuple(row[k] for k in fields) != trial[0] for row in rows):
+                raise ValueError(f"Ranks disagree about the workload in {system}-{leg}")
+            if identity is not None and trial != identity:
+                raise ValueError(f"Hardware or workload changed in {system}-{leg}")
+            identity = trial
+            legs[leg] = {key: max(row[key] for row in rows) for key in ("step_ms", "peak_bytes")}
+        changes = {}
+        for metric in ("step_ms", "peak_bytes"):
+            before = median(legs[leg][metric] for leg in ("A1", "A2"))
+            after = median(legs[leg][metric] for leg in ("B1", "B2"))
+            changes[metric] = dict(baseline=before, candidate=after, change_percent=100*(after/before-1))
+        report[system] = dict(legs=legs, comparison=changes)
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-tree", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--system", choices=["molecules", "crystals"], required=True)
+    parser.add_argument("--compare", type=Path, help="directory with molecules-A1 through crystals-A2")
+    parser.add_argument("--source-tree", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--system", choices=["molecules", "crystals"])
     parser.add_argument("--lightning", action="store_true")
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--steps", type=int, default=50)
     args = parser.parse_args()
+    if args.compare:
+        print(json.dumps(compare_runs(args.compare), indent=2))
+        return
+    if not (args.source_tree and args.output and args.system):
+        parser.error("measurement requires --source-tree, --output and --system")
     if min(args.warmup, args.steps) < 1:
         parser.error("warmup and measured steps must both be positive")
     tree = args.source_tree.resolve()
@@ -85,8 +124,10 @@ def main():
     if steps != args.warmup + args.steps:
         raise RuntimeError(f"Observed {steps} updates, expected {args.warmup + args.steps}")
     revision = subprocess.check_output(["git", "-C", str(tree), "rev-parse", "HEAD"], text=True).strip()
+    gpu = torch.cuda.get_device_properties(torch.cuda.current_device())
     record = dict(revision=revision, rank=rank, world_size=world, host=socket.gethostname(),
-                  device=torch.cuda.get_device_name(), torch=str(torch.__version__), cuda=torch.version.cuda,
+                  device=gpu.name, device_uuid=str(gpu.uuid), capability=[gpu.major, gpu.minor],
+                  torch=str(torch.__version__), cuda=torch.version.cuda,
                   lightning=args.lightning, fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),
                   config_sha256=config_digest, system=args.system, atoms=atoms, edges=features["N_pair"],
                   global_batch=global_batch, warmup=args.warmup, steps=args.steps,

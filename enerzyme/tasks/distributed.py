@@ -302,7 +302,8 @@ def _file_rank0(fn, launch, directory, name, handshake, work, interval):
     call while another rank is still leaving the previous one.
     """
     job = (os.getenv("TORCHELASTIC_RUN_ID"), os.getenv("TORCHELASTIC_RESTART_COUNT"),
-           os.getenv("SLURM_JOB_ID"), os.getenv("SLURM_STEP_ID"))
+           os.getenv("SLURM_JOB_ID"), os.getenv("SLURM_STEP_ID"),
+           os.getenv("MASTER_ADDR"), os.getenv("MASTER_PORT"))
     key = (str(directory.resolve()), name, job, launch.world_size, launch.global_rank)
     sequence = _round_numbers.get(key, 0)
     _round_numbers[key] = sequence + 1

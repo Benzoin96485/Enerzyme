@@ -27,7 +27,6 @@ class Logger(object):
         cwd_path = os.path.abspath(os.getcwd())
         self.log_path = os.path.join(cwd_path, "logs")
 
-        os.makedirs(self.log_path, exist_ok=True)
         self.backup_count = 5
 
         self.console_output_level = 'INFO'
@@ -45,6 +44,7 @@ class Logger(object):
             self.logger.addHandler(console_handler)
 
             if rank0:
+                os.makedirs(self.log_path, exist_ok=True)
                 file_handler = TimedRotatingFileHandler(filename=os.path.join(self.log_path, self.log_file_name), when='D',
                             interval=1, backupCount=self.backup_count, delay=True, encoding='utf-8')
                 file_handler.setFormatter(self.formatter)

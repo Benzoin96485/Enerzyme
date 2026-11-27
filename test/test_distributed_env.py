@@ -518,3 +518,20 @@ def test_restart_after_abandoned_file_round(tmp_path, monkeypatch):
         call(a)
         future.result()
     assert ran == [1]
+
+
+def test_missing_root_times_out_before_long_work(tmp_path):
+    peer = LaunchEnv("torchrun", global_rank=1, world_size=2, local_world_size=2)
+    with pytest.raises(TimeoutError):
+        run_rank0_exclusive(lambda: None, peer, sync_dir=tmp_path,
+                            handshake_timeout_seconds=0.05, poll_interval=0.01)
+
+
+def test_slurm_batch_shell_and_smaller_step():
+    allocation = {"SLURM_JOB_ID": "42", "SLURM_NTASKS_PER_NODE": "4", "SLURM_NNODES": "2",
+                  "SLURM_PROCID": "0", "SLURM_STEP_ID": "batch"}
+    assert detect_launch_env(allocation).mode == "slurm_unlaunched"
+    step = {**allocation, "SLURM_STEP_ID": "1", "SLURM_STEP_NUM_TASKS": "1", "SLURM_STEP_NUM_NODES": "1"}
+    launch = detect_launch_env(step)
+    assert launch.local_world_size == launch.world_size == launch.num_nodes == 1
+    assert resolve_master_addr(step) == "127.0.0.1"
