@@ -22,54 +22,12 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from ..functional import segment_sum_coo
+from ..mp.nn.field_norm import CoupledRMSNorm
+from ..mp.ops import scatter_sum
 from .geometry import FACTOEdgeGeometry
 
 RESIDUAL_SCALE = 40.0 ** -0.5
 
-
-def scatter_neighbors(src: Tensor, index: Tensor, dim_size: int) -> Tensor:
-    """Sum ``src`` onto receivers. An empty neighbor list yields zeros."""
-    if index.numel() == 0:
-        return src.new_zeros((dim_size,) + tuple(src.shape[1:]))
-    return segment_sum_coo(src, index, dim_size=dim_size)
-
-
-class CoupledRMSNorm(nn.Module):
-    """Per-channel RMS norm that keeps a finite tensor scale when ``T = 0``.
-
-    The scalar mean square ``ν`` is added to every tensor-channel denominator
-    (Eq. 4), so a symmetric environment with vanishing angular features still
-    has a normalization scale.
-    """
-
-    def __init__(
-        self,
-        scalar_dim: int,
-        channels: Sequence[int],
-        epsilon: float = 1e-6,
-    ) -> None:
-        super().__init__()
-        if epsilon <= 0.0:
-            raise ValueError(f"rms epsilon must be positive, got {epsilon}")
-        self.epsilon = float(epsilon)
-        self.scalar_gain = nn.Parameter(torch.ones(scalar_dim))
-        self.tensor_gain = nn.ParameterList(
-            [nn.Parameter(torch.ones(int(width))) for width in channels]
-        )
-
-    def forward(
-        self, scalars: Tensor, tensors: Sequence[Tensor]
-    ) -> Tuple[Tensor, List[Tensor]]:
-        variance = scalars.square().mean(dim=-1, keepdim=True)
-        scalar_out = self.scalar_gain * scalars / torch.sqrt(variance + self.epsilon)
-        tensor_out: List[Tensor] = []
-        for features, gain in zip(tensors, self.tensor_gain):
-            # features: [N, 2ℓ+1, C]; ω is the mean square over m.
-            angular = features.square().mean(dim=1)
-            denom = torch.sqrt(variance + angular + self.epsilon)
-            tensor_out.append(gain * features / denom.unsqueeze(1))
-        return scalar_out, tensor_out
 
 
 class FactorizedScalarAttention(nn.Module):
@@ -103,7 +61,7 @@ class FactorizedScalarAttention(nn.Module):
         else:
             radial = rho.view(-1, self.num_groups, self.group_dim)
             messages = radial * source[idx_j].unsqueeze(1)
-            aggregated = scatter_neighbors(messages, idx_i, n_atom)
+            aggregated = scatter_sum(messages, idx_i, n_atom)
         mixed = (F.silu(query) * aggregated).reshape(n_atom, -1)
         return F.silu(self.mix(mixed))
 
@@ -168,7 +126,7 @@ class GeometricTensorInjection(nn.Module):
                 continue
             message = source[idx_j] * radial
             weighted = message.unsqueeze(1) * angular.unsqueeze(-1)
-            injected.append(scatter_neighbors(weighted, idx_i, n_atom))
+            injected.append(scatter_sum(weighted, idx_i, n_atom))
         return injected
 
 
@@ -218,7 +176,7 @@ class TensorTransport(nn.Module):
             payload = message(features)
             gated = chi.unsqueeze(-1) * gate(scalar_intermediate)[idx_j] * score
             weighted = gated.unsqueeze(1) * payload[idx_j]
-            transported.append(scatter_neighbors(weighted, idx_i, n_atom))
+            transported.append(scatter_sum(weighted, idx_i, n_atom))
         return transported
 
 
@@ -281,6 +239,13 @@ class FACTOInteraction(nn.Module):
                 idx_i,
                 idx_j,
             )
+        if torch.compiler.is_compiling() and scalars.device.type == "cpu":
+            # CPU Inductor can fuse the next atom sum into the previous block's
+            # accumulator. Reduce the residual components along a separate axis.
+            return scalars_out, [
+                torch.stack((stored, self.residual_scale * (new + carried))).sum(0)
+                for stored, new, carried in zip(tensors, injected, transported)
+            ]
         tensors_out = [
             stored + self.residual_scale * (new + carried)
             for stored, new, carried in zip(tensors, injected, transported)

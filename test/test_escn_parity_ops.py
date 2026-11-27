@@ -19,7 +19,7 @@ from escn_parity_utils import (  # noqa: E402
 
 
 def test_coefficient_mapping_matches_upstream():
-    from enerzyme.models.so3 import CoefficientMapping as EZMap
+    from enerzyme.models.mp.equivariant import CoefficientMapping as EZMap
     from so3 import CoefficientMapping as OffMap
 
     device = torch.device("cpu")
@@ -34,12 +34,12 @@ def test_coefficient_mapping_matches_upstream():
 
 
 def test_wigner_rotate_inverse_matches_upstream():
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
-    from enerzyme.models.so3 import SO3_Rotation as EZRot
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_Rotation as EZRot
     from so3 import SO3_Embedding as OffEmb
     from so3 import SO3_Rotation as OffRot
     from so3 import CoefficientMapping as OffMap
-    from enerzyme.models.so3 import CoefficientMapping as EZMap
+    from enerzyme.models.mp.equivariant import CoefficientMapping as EZMap
 
     torch.manual_seed(0)
     device = torch.device("cpu")
@@ -74,10 +74,10 @@ def test_wigner_rotate_inverse_matches_upstream():
 
 
 def test_so2_block_matches_upstream():
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
     from so3 import SO3_Embedding as OffEmb
     from so3 import CoefficientMapping as OffMap
-    from enerzyme.models.so3 import CoefficientMapping as EZMap
+    from enerzyme.models.mp.equivariant import CoefficientMapping as EZMap
 
     torch.manual_seed(1)
     device = torch.device("cpu")
@@ -130,10 +130,10 @@ def test_so3_grid_roundtrip_matches_upstream():
     channels = PARITY_HPARAMS["sphere_channels"]
     ez_grids, off_grids = build_so3_grids(lmax)
 
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
     from so3 import SO3_Embedding as OffEmb
     from so3 import CoefficientMapping as OffMap
-    from enerzyme.models.so3 import CoefficientMapping as EZMap
+    from enerzyme.models.mp.equivariant import CoefficientMapping as EZMap
 
     num = 4
     emb = torch.randn(num, (lmax + 1) ** 2, channels, dtype=dtype)

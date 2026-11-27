@@ -5,10 +5,9 @@ stack. The species embedding, radial basis, energy head, and conservative
 forces stay in the shared layer stack.
 """
 
-from .core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS, LEFTNetCore
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
 __all__ = [
-    "LEFTNetCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
 ]

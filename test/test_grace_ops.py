@@ -67,7 +67,7 @@ def test_channel_aligned_product_is_rotation_equivariant():
 
     from enerzyme.models.grace.coupling import SparseCGProduct
     from enerzyme.models.grace.features import pack_features
-    from enerzyme.models.so3.spherical_harmonics import spherical_harmonics
+    from enerzyme.models.mp.basis.angular import spherical_harmonics
 
     torch.manual_seed(0)
     product = SparseCGProduct(channels=2, lmax_left=1, lmax_right=1, Lmax=1)
@@ -93,6 +93,30 @@ def test_channel_aligned_product_is_rotation_equivariant():
     expected = pack_features(original) @ matrix
     assert torch.allclose(pack_features(rotated), expected, atol=1e-5, rtol=1e-5)
     assert torch.allclose(original[0], rotated[0], atol=1e-5, rtol=1e-5)
+
+
+def test_joint_cg_contraction_preserves_values_and_first_and_second_derivatives():
+    from enerzyme.models.mp.equivariant.product_ladder import _couple_channels
+
+    generator = torch.Generator().manual_seed(8)
+    shapes = (
+        (4, 1, 3, 3), (4, 3, 1, 3), (4, 3, 3, 1), (4, 3, 3, 5),
+        (4, 7, 9, 3), (4, 9, 7, 3), (0, 7, 9, 3),
+    )
+    for n, li, lj, lm in shapes:
+        left = torch.randn(n, 2, li, dtype=torch.float64, generator=generator, requires_grad=True)
+        right = torch.randn(n, 2, lj, dtype=torch.float64, generator=generator, requires_grad=True)
+        coefficients = torch.randn(li, lj, lm, dtype=torch.float64, generator=generator)
+        reference = _couple_channels(left, right, coefficients)
+        actual = _couple_channels(left, right, coefficients, joint_contraction=True)
+
+        def derivatives(output):
+            first = torch.autograd.grad(output.square().sum(), (left, right), create_graph=True)
+            second = torch.autograd.grad(sum(value.square().sum() for value in first), (left, right))
+            return first, second
+
+        torch.testing.assert_close(actual, reference)
+        torch.testing.assert_close(derivatives(actual), derivatives(reference))
 
 
 def test_density_powers_match_the_finnis_sinclair_cases():

@@ -9,20 +9,19 @@ from __future__ import annotations
 
 import itertools
 import math
-from functools import lru_cache
 from typing import List, Sequence, Tuple
 
 import numpy as np
 import torch
 from torch import Tensor
 
-from ..so3.lebedev import load_lebedev_rule
+from ..mp.basis.angular import spherical_harmonics
+from ..mp.equivariant.cartesian import packed_l2_to_stf
+from ..mp.equivariant.gaunt import DegreeTriple, cached_couplings, coupling_tables, enumerate_degree_triples
 
 
 SUPPORTED_CHANNELS = (8, 16, 32, 64, 128)
 SUPPORTED_LMAX = (2, 3, 4)
-MAX_ANGULAR_DEGREE = 4
-DegreeTriple = Tuple[int, int, int]
 
 
 def require_profile(channels: int, lmax: int) -> Tuple[int, int]:
@@ -69,22 +68,6 @@ def degree_offsets(degree_channels: Sequence[int]) -> Tuple[int, ...]:
     return tuple(offsets)
 
 
-def enumerate_degree_triples(lmax: int) -> Tuple[DegreeTriple, ...]:
-    """Non-scalar O(3)-even triples in lexicographic order."""
-    if lmax < 0 or lmax > MAX_ANGULAR_DEGREE:
-        raise ValueError(f"lmax must be in [0, {MAX_ANGULAR_DEGREE}], got {lmax}")
-    triples = []
-    for degree_1 in range(1, lmax + 1):
-        for degree_2 in range(degree_1, lmax + 1):
-            for degree_3 in range(degree_2, lmax + 1):
-                if degree_3 > degree_1 + degree_2:
-                    continue
-                if (degree_1 + degree_2 + degree_3) % 2 != 0:
-                    continue
-                triples.append((degree_1, degree_2, degree_3))
-    return tuple(triples)
-
-
 def bispectrum_feature_count(lmax: int, ranks: Sequence[int]) -> int:
     """Number of independent cubic probe contractions."""
     total = 0
@@ -118,164 +101,8 @@ def invariant_width(channels: int, lmax: int) -> int:
 
 
 def cartesian_harmonics(direction: Tensor, lmax: int) -> Tensor:
-    """Real solid harmonics through degree ``lmax``, shape ``(E, (lmax+1)^2)``.
-
-    Degree blocks obey the addition theorem with Legendre polynomials. Degree
-    one is Cartesian ``(x, y, z)`` and degree two is increasing-``m`` order.
-    """
-    if lmax < 0 or lmax > MAX_ANGULAR_DEGREE:
-        raise ValueError(f"lmax must be in [0, {MAX_ANGULAR_DEGREE}], got {lmax}")
-    x, y, z = direction.unbind(dim=-1)
-    squared = x * x + y * y + z * z
-    blocks = [torch.ones_like(x).unsqueeze(-1)]
-    if lmax >= 1:
-        blocks.append(torch.stack((x, y, z), dim=-1))
-    if lmax >= 2:
-        sqrt_three = math.sqrt(3.0)
-        blocks.append(
-            torch.stack(
-                (
-                    sqrt_three * x * y,
-                    sqrt_three * y * z,
-                    0.5 * (3.0 * z * z - squared),
-                    sqrt_three * x * z,
-                    0.5 * sqrt_three * (x * x - y * y),
-                ),
-                dim=-1,
-            )
-        )
-    if lmax >= 3:
-        blocks.append(
-            torch.stack(
-                (
-                    math.sqrt(5.0 / 8.0) * y * (3.0 * x * x - y * y),
-                    math.sqrt(15.0) * x * y * z,
-                    math.sqrt(3.0 / 8.0) * y * (5.0 * z * z - squared),
-                    0.5 * z * (5.0 * z * z - 3.0 * squared),
-                    math.sqrt(3.0 / 8.0) * x * (5.0 * z * z - squared),
-                    0.5 * math.sqrt(15.0) * z * (x * x - y * y),
-                    math.sqrt(5.0 / 8.0) * x * (x * x - 3.0 * y * y),
-                ),
-                dim=-1,
-            )
-        )
-    if lmax >= 4:
-        z_squared = z * z
-        x2_minus_y2 = x * x - y * y
-        blocks.append(
-            torch.stack(
-                (
-                    0.5 * math.sqrt(35.0) * x * y * x2_minus_y2,
-                    0.25 * math.sqrt(70.0) * y * z * (3.0 * x * x - y * y),
-                    0.5 * math.sqrt(5.0) * x * y * (7.0 * z_squared - squared),
-                    0.25 * math.sqrt(10.0) * y * z * (7.0 * z_squared - 3.0 * squared),
-                    0.125
-                    * (
-                        35.0 * z_squared * z_squared
-                        - 30.0 * z_squared * squared
-                        + 3.0 * squared * squared
-                    ),
-                    0.25 * math.sqrt(10.0) * x * z * (7.0 * z_squared - 3.0 * squared),
-                    0.25 * math.sqrt(5.0) * x2_minus_y2 * (7.0 * z_squared - squared),
-                    0.25 * math.sqrt(70.0) * x * z * (x * x - 3.0 * y * y),
-                    0.125 * math.sqrt(35.0) * (x**4 - 6.0 * x * x * y * y + y**4),
-                ),
-                dim=-1,
-            )
-        )
-    return torch.cat(blocks, dim=-1)
-
-
-def packed_l2_to_stf(packed: Tensor) -> Tensor:
-    """Map normalized degree-two coefficients to symmetric traceless matrices.
-
-    The map is an isometry from the Euclidean product on ``R^5`` to the
-    Frobenius product.
-    """
-    inv_sqrt_two = 1.0 / math.sqrt(2.0)
-    inv_sqrt_six = 1.0 / math.sqrt(6.0)
-    q0, q1, q2, q3, q4 = packed.unbind(dim=-1)
-    qxy = q0 * inv_sqrt_two
-    qyz = q1 * inv_sqrt_two
-    qxz = q3 * inv_sqrt_two
-    qxx = -q2 * inv_sqrt_six + q4 * inv_sqrt_two
-    qyy = -q2 * inv_sqrt_six - q4 * inv_sqrt_two
-    qzz = 2.0 * q2 * inv_sqrt_six
-    row0 = torch.stack((qxx, qxy, qxz), dim=-1)
-    row1 = torch.stack((qxy, qyy, qyz), dim=-1)
-    row2 = torch.stack((qxz, qyz, qzz), dim=-1)
-    return torch.stack((row0, row1, row2), dim=-2)
-
-
-def _symmetrize_equal_degrees(coupling: np.ndarray, degrees: DegreeTriple) -> np.ndarray:
-    if degrees[0] == degrees[2]:
-        permutations = tuple(itertools.permutations((0, 1, 2)))
-    elif degrees[0] == degrees[1]:
-        permutations = ((0, 1, 2), (1, 0, 2))
-    elif degrees[1] == degrees[2]:
-        permutations = ((0, 1, 2), (0, 2, 1))
-    else:
-        return coupling
-    total = sum(np.transpose(coupling, axes) for axes in permutations)
-    return total / len(permutations)
-
-
-@lru_cache(maxsize=4)
-def coupling_tables(lmax: int) -> Tuple[DegreeTriple, ...]:
-    """Unit-Frobenius real Cartesian Gaunt tensors, one per admissible triple.
-
-    Lebedev weights in this repository sum to 1. The overall scale is removed
-    by the Frobenius normalization, and the sign is chosen so the first
-    significant entry is positive. The ``(1, 1, 2)`` block is not read by the
-    readout; that triple uses the closed form ``-v^T Q v / sqrt(5)``.
-    """
-    triples = enumerate_degree_triples(lmax)
-    if not triples:
-        return triples
-    points, weights = load_lebedev_rule(13)
-    basis = cartesian_harmonics(
-        torch.as_tensor(points, dtype=torch.float64),
-        lmax,
-    ).numpy()
-    stored = []
-    for degree_1, degree_2, degree_3 in triples:
-        block_1 = basis[:, degree_1**2 : (degree_1 + 1) ** 2]
-        block_2 = basis[:, degree_2**2 : (degree_2 + 1) ** 2]
-        block_3 = basis[:, degree_3**2 : (degree_3 + 1) ** 2]
-        coupling = np.einsum(
-            "n,ni,nj,nk->ijk",
-            weights,
-            block_1,
-            block_2,
-            block_3,
-            optimize=True,
-        )
-        coupling = _symmetrize_equal_degrees(coupling, (degree_1, degree_2, degree_3))
-        norm = float(np.linalg.norm(coupling))
-        if not math.isfinite(norm) or norm <= 1.0e-14:
-            raise ValueError(
-                f"degenerate bispectrum coupling for {(degree_1, degree_2, degree_3)}"
-            )
-        coupling = coupling / norm
-        significant = np.flatnonzero(np.abs(coupling) > 1.0e-14)
-        if significant.size > 0 and coupling.flat[significant[0]] < 0.0:
-            coupling = -coupling
-        stored.append(np.ascontiguousarray(coupling))
-    coupling_tables._cache[lmax] = stored  # type: ignore[attr-defined]
-    return triples
-
-
-def cached_couplings(lmax: int) -> Tuple[np.ndarray, ...]:
-    """Return the tensors built alongside :func:`coupling_tables`."""
-    triples = coupling_tables(lmax)
-    stored = getattr(coupling_tables, "_cache", {}).get(lmax)
-    if stored is None or len(stored) != len(triples):
-        raise RuntimeError(f"missing Gaunt cache for lmax={lmax}")
-    return tuple(stored)
-
-
-# Attach a side cache without a second quadrature pass.
-coupling_tables._cache = {}  # type: ignore[attr-defined]
+    """DPA4C solid harmonics with Cartesian degree one and increasing m above it."""
+    return spherical_harmonics(direction, lmax=lmax, layout="dpa4c", normalize_input=False)
 
 
 def probe_entries(

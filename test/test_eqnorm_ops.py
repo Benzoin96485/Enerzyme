@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from enerzyme.models.eqnorm.interaction import EqnormConv, eqnorm_tp_paths
 from enerzyme.models.eqnorm.layernorm import EqnormRMSNorm
 
 
-UPSTREAM = Path("/tmp/eqnorm-src")
+UPSTREAM = Path(os.environ.get("EQNORM_SRC", "/tmp/eqnorm-src"))
 
 
 def _reference_channel_norm(irreps: o3.Irreps, features: torch.Tensor, centering: bool) -> torch.Tensor:
@@ -81,7 +82,7 @@ def test_rms_rejects_a_missing_degree():
 
 def _load_upstream(which: str):
     if not (UPSTREAM / "eqnorm" / "layernorm.py").is_file():
-        pytest.skip("yzchen08/eqnorm checkout is not at /tmp/eqnorm-src")
+        pytest.skip(f"yzchen08/eqnorm checkout not found at {UPSTREAM}")
     root = str(UPSTREAM)
     if root not in sys.path:
         sys.path.insert(0, root)
@@ -104,7 +105,7 @@ def _load_upstream(which: str):
 
 def test_rms_matches_upstream_module():
     if not (UPSTREAM / "eqnorm" / "layernorm.py").is_file():
-        pytest.skip("yzchen08/eqnorm checkout is not at /tmp/eqnorm-src")
+        pytest.skip(f"yzchen08/eqnorm checkout not found at {UPSTREAM}")
     root = str(UPSTREAM)
     if root not in sys.path:
         sys.path.insert(0, root)

@@ -7,6 +7,7 @@ import torch
 from enerzyme.models.visnet.long_range import (
     FragmentBipartiteBlock,
     bipartite_radius_edges,
+    fragment_geometry,
     resolve_long_range_fragments,
 )
 
@@ -65,6 +66,40 @@ def test_zero_separation_direction_is_zero():
     )
     assert distance.item() == 0.0
     assert torch.count_nonzero(direction) == 0
+
+
+def test_singleton_fragment_distance_keeps_energy_force_and_hessian_finite():
+    positions = torch.tensor([
+        [1.0, 0.5, 0.0], [0.4, -0.2, 0.1], [-0.6, 0.3, 0.5],
+    ], dtype=torch.float64, requires_grad=True)
+    labels = torch.tensor([0, 1, 1])
+    batch = torch.zeros_like(labels)
+
+    def energy(x):
+        _, _, _, distances, directions = fragment_geometry(
+            x, batch, "precomputed", "geometric", None, labels, 24, 0, 5.0
+        )
+        return (distances + directions @ x.new_tensor([0.2, -0.3, 0.4])).sum()
+
+    def reference(x):
+        # The singleton's self pair contributes a constant zero. All five
+        # other displacements are nonzero and use the ordinary Euclidean norm.
+        centers = torch.stack((x[0], (x[1] + x[2]) * 0.5))
+        delta = (centers[None, :, :] - x[:, None, :]).reshape(-1, 3)[1:]
+        distance = torch.linalg.vector_norm(delta, dim=-1)
+        return (distance + (delta / distance[:, None]) @ x.new_tensor([0.2, -0.3, 0.4])).sum()
+
+    def derivatives(fn):
+        e = fn(positions)
+        grad, = torch.autograd.grad(e, positions, create_graph=True)
+        hessian_vector, = torch.autograd.grad(grad.square().sum(), positions)
+        return e, grad, hessian_vector
+
+    expected = derivatives(reference)
+    torch.testing.assert_close(derivatives(energy), expected)
+    with torch._dynamo.config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+        compiled = torch.compile(energy, backend="eager", fullgraph=True)
+        torch.testing.assert_close(derivatives(compiled), expected)
 
 
 def test_atomic_number_center_matches_z_weighted_mean():
@@ -156,16 +191,16 @@ def test_block_rotation_and_empty_edges():
 
 
 def test_precomputed_requires_labels_and_unknown_mode_fails():
-    from enerzyme.models.visnet.lsr import ViSNetLSRMCore
+    from enerzyme.models.presets.cartesian_vector import visnet_lsrm
 
     try:
-        ViSNetLSRMCore(dim_embedding=4, num_rbf=2, num_heads=2, num_layers=1, fragment_mode="nope")
+        visnet_lsrm(dim_embedding=4, num_rbf=2, num_heads=2, num_layers=1, fragment_mode="nope")
     except ValueError as exc:
         assert "fragment_mode" in str(exc)
     else:
         raise AssertionError("expected an unknown fragment mode to fail")
 
-    core = ViSNetLSRMCore(
+    core = visnet_lsrm(
         dim_embedding=4,
         num_rbf=2,
         num_heads=2,
@@ -190,3 +225,30 @@ def test_precomputed_requires_labels_and_unknown_mode_fails():
         assert "cluster_ids" in str(exc)
     else:
         raise AssertionError("expected missing cluster_ids to fail")
+
+
+def test_compiled_fragment_geometry_preserves_indices_and_center_force_derivatives():
+    positions = torch.tensor([
+        [0., 0., 0.], [0.3, 0.1, -0.2], [1., 0., 0.], [1.3, 0.2, 0.],
+        [0., 0.1, 0.1], [0.4, 0.2, 0.], [1., 0.1, 0.], [1.3, 0.1, -0.1],
+    ], dtype=torch.double, requires_grad=True)
+    batch = torch.tensor([0, 0, 0, 0, 2, 2, 2, 2])
+    numbers = torch.tensor([1, 6, 6, 8, 1, 8, 6, 7])
+    labels = torch.tensor([7, 7, 3, 3, 3, 3, 8, 8])
+
+    def geometry(x, mode):
+        return fragment_geometry(x, batch, mode, "atomic_number", numbers, labels, 24, 7, 0.9)
+
+    def evaluate(fn, mode):
+        result = fn(positions, mode)
+        # An anisotropic probe checks displacement directions as well as distances.
+        projection = result[4] @ positions.new_tensor([0.1, -0.2, 0.3])
+        loss = (result[3].square() + projection).sum()
+        gradient, = torch.autograd.grad(loss, positions, create_graph=True)
+        hessian, = torch.autograd.grad(gradient.square().sum(), positions)
+        return (*result, gradient, hessian)
+
+    with torch._dynamo.config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+        compiled = torch.compile(geometry, backend="eager", fullgraph=True)
+        for mode in ("precomputed", "kmeans", "spectral"):
+            torch.testing.assert_close(evaluate(compiled, mode), evaluate(geometry, mode))

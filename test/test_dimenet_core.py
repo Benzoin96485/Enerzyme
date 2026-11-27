@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+import pytest
 import torch
 import yaml
 from numpy.testing import assert_allclose
@@ -23,7 +25,7 @@ def _complete_graph_edges(num_nodes: int):
 
 
 def _tiny_core(**kwargs):
-    from enerzyme.models.dimenet import DimeNetCore
+    from enerzyme.models.presets.triplet import dimenet
 
     params = dict(
         dim_embedding=8,
@@ -37,7 +39,7 @@ def _tiny_core(**kwargs):
         envelope_exponent=5,
     )
     params.update(kwargs)
-    return DimeNetCore(**params)
+    return dimenet(**params)
 
 
 def _core_inputs(n=4, dim_embedding=8, num_rbf=4, requires_grad=False):
@@ -60,7 +62,7 @@ def test_dimenet_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, _, _ = get_ff_core("dimenet")
-    assert core_cls.__name__ == "DimeNetCore"
+    assert core_cls.__name__ == "dimenet"
     with EXAMPLE.open() as stream:
         ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
     layers = []
@@ -84,7 +86,7 @@ def test_dimenet_registration_and_yaml_build():
     model = build_model(
         ff["architecture"], layer_params=layers, build_params=bp, verbose=0
     )
-    assert model.__class__.__name__ == "DimeNetCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.num_output_blocks == 3
     assert model.dim_feature_out == 8
 
@@ -116,20 +118,23 @@ def test_dimenet_feature_shape_hierarchical_and_last():
     assert out_last["atom_feature"].shape == (n, 8)
 
 
-def test_dimenet_rotation_invariance():
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_dimenet_rotation_invariance(dtype):
     torch.manual_seed(1)
+    np.random.seed(14)
     n = 5
-    core = _tiny_core()
+    core = _tiny_core().to(dtype)
     core.eval()
     idx_i, idx_j = _complete_graph_edges(n)
-    pos = torch.randn(n, 3)
-    q, _ = torch.linalg.qr(torch.randn(3, 3))
+    pos = torch.randn(n, 3).to(dtype)
+    # Construct the same orthogonal transformation in both tests. A QR
+    # computed in float32 can change distances before the model sees them.
+    q, _ = torch.linalg.qr(torch.randn(3, 3).double())
     if torch.det(q) < 0:
-        q = q.clone()
         q[:, 0] *= -1
-    pos_r = pos @ q
-    atom_embedding = torch.randn(n, 8)
-    rbf = torch.randn(idx_i.numel(), 4)
+    pos_r = (pos.double() @ q).to(dtype)
+    atom_embedding = torch.randn(n, 8).to(dtype)
+    rbf = torch.randn(idx_i.numel(), 4).to(dtype)
 
     def _feat(p):
         vij = p[idx_j] - p[idx_i]
@@ -145,12 +150,16 @@ def test_dimenet_rotation_invariance():
 
     f0 = _feat(pos)
     f1 = _feat(pos_r)
-    assert torch.allclose(f0, f1, atol=1e-5, rtol=1e-5)
+    tolerance = 1e-10 if dtype == torch.float64 else 1e-5
+    torch.testing.assert_close(f0, f1, atol=tolerance, rtol=tolerance)
 
 
-def test_dimenet_layer_stack_energy_and_force():
+@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
+def test_dimenet_layer_stack_energy_and_force(dtype):
     from enerzyme.models.ff import build_model
 
+    torch.manual_seed(42)
+    np.random.seed(42)  # The semi-orthogonal initializer uses NumPy.
     layers = [
         {"name": "RangeSeparation"},
         {
@@ -200,10 +209,11 @@ def test_dimenet_layer_stack_energy_and_force():
             "cutoff_fn": "polynomial",
         },
         verbose=0,
-    )
+    ).to(dtype)
     n = 4
     idx_i, idx_j = _complete_graph_edges(n)
-    positions = torch.randn(n, 3, requires_grad=True)
+    positions = torch.tensor([[0.0, 0.0, 0.0], [1.1, -0.2, 0.1],
+                              [-0.3, 1.3, 0.2], [0.1, -0.4, 1.5]], dtype=dtype, requires_grad=True)
     out = model(
         {
             "Ra": positions,

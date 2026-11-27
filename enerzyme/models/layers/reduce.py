@@ -3,12 +3,12 @@ from typing import Dict, List, Set
 import torch
 from torch import Tensor
 from . import BaseFFLayer
-from ..functional import segment_sum_coo
+from ..mp.ops import batch_size_from_counts, scatter_sum
 
 
 class EnergyReduceLayer(BaseFFLayer):
     def __init__(self) -> None:
-        super().__init__(input_fields={"Ea", "batch_seg", "Za"}, output_fields={"E", "Ea"})
+        super().__init__(input_fields={"Ea", "batch_seg", "Za", "N"}, output_fields={"E", "Ea"})
 
     def get_relevant_input_fields(self, net_input_fields: Set[str]) -> Set[str]:
         relevant_input_fields = set()
@@ -26,7 +26,8 @@ class EnergyReduceLayer(BaseFFLayer):
             batch_seg = relevant_input["batch_seg"]
         else:
             batch_seg = torch.zeros_like(relevant_input["Za"])
-        return {"E": segment_sum_coo(Ea, batch_seg), "Ea": Ea}
+        size = batch_size_from_counts(relevant_input.get("N"))
+        return {"E": scatter_sum(Ea, batch_seg, size), "Ea": Ea}
 
 
 class EdgeEnergyReduceLayer(BaseFFLayer):
@@ -65,7 +66,9 @@ class EdgeEnergyReduceLayer(BaseFFLayer):
         out = Eij.new_zeros((n_atoms,) + tuple(Eij.shape[1:]))
         if idx_i_sr.numel():
             centers = idx_i_sr.long()
-            if int(centers.max()) >= n_atoms or int(centers.min()) < 0:
+            if torch.compiler.is_compiling():
+                torch._assert_async(((centers >= 0) & (centers < n_atoms)).all(), "idx_i_sr is outside the atom axis")
+            elif int(centers.max()) >= n_atoms or int(centers.min()) < 0:
                 raise ValueError(
                     f"idx_i_sr must lie in 0..{n_atoms - 1}, "
                     f"got {int(centers.min())}..{int(centers.max())}"

@@ -132,3 +132,6 @@ experiments/
 references/
 paper/
 So3krates-torch/
+
+# Local pre-refactor numeric snapshots (scripts/snapshot_cores.py)
+test/fixtures/presnapshot/

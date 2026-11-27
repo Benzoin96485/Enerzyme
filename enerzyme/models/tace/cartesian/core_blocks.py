@@ -12,10 +12,12 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 from torch import Tensor, nn
-from torch_scatter import scatter_sum
+from ...mp.ops import scatter_sum
+from ...mp.block import Block
+from ...mp.head import Head
 
 from ..cartnn import ICTD, CartesianHarmonics
-from ...blocks.radial_mlp import RadialMLP
+from ...mp.nn.radial_mlp import RadialMLP
 from ..interaction import EDGE_UPDATE
 
 
@@ -402,15 +404,35 @@ def _broadcast_node_div(tensor: Tensor, density: Tensor) -> Tensor:
     return tensor / view
 
 
-class CartesianLayerStack(nn.Module):
+class CartesianTACEHarmonics(nn.Module):
+    """Traceless Cartesian harmonics grouped by tensor rank."""
+
+    def __init__(self, lmax):
+        super().__init__()
+        self.lmax = lmax
+        self.harmonics = CartesianHarmonics(
+            list(range(lmax + 1)), normalize=True, normalization="component", norm=True, traceless=True,
+        )
+
+    def forward(self, edge_vec):
+        return _split_cartesian_harmonics(self.harmonics(edge_vec), self.lmax)
+
+
+class CartesianTACEHead(Head):
+    def forward(self, state, ctx, taps, inputs):
+        return {"atom_feature": dict_to_scalar(state.equi)}
+
+
+class CartesianTACEBlock(Block):
     def __init__(
         self,
+        layer: int,
         num_layers: int,
         num_elements: int,
         num_channel: int,
         Lmax: int,
         lmax: int,
-        correlation: List[int],
+        correlation: int,
         avg_num_neighbors: float,
         edge_embedding_channel: int,
         edge_update: str,
@@ -428,138 +450,96 @@ class CartesianLayerStack(nn.Module):
             raise ValueError(
                 f"Unknown scatter_norm={scatter_norm!r}; expected one of {_SCATTER_NORMS}"
             )
-        self.num_layers = num_layers
-        self.num_channel = num_channel
-        self.lmax = lmax
         self.scatter_norm = scatter_norm
-        self.resnet_type = resnet_type
         self.apply_density_cutoff = scatter_norm != "no_cutoff_density"
         self.register_buffer(
             "_avg", torch.tensor(float(avg_num_neighbors), dtype=torch.get_default_dtype())
         )
 
-        self.harmonics = CartesianHarmonics(
-            list(range(lmax + 1)),
-            normalize=True,
-            normalization="component",
-            norm=True,
-            traceless=True,
-        )
-
-        self.edge_updates = nn.ModuleList()
-        self.radial_nets = nn.ModuleList()
-        self.linear_ups = nn.ModuleList()
-        self.contractions = nn.ModuleList()
-        self.products = nn.ModuleList()
-        # Optional per-layer residuals: plain list + add_module (avoid None in ModuleList).
-        self.resnets: List[Optional[nn.Module]] = []
-        self.edge_densities = nn.ModuleList()
-        self.density_alphas = nn.ParameterList()
-        self.density_betas = nn.ParameterList()
         use_density = scatter_norm in ("density", "no_cutoff_density")
 
-        for layer in range(num_layers):
-            eu = EDGE_UPDATE[edge_update](
-                num_elements=num_elements,
-                num_channel=num_channel,
-                edge_embedding_channel=edge_embedding_channel,
-                bias=False,
-            )
-            self.edge_updates.append(eu)
-            lmax_in = 0 if layer == 0 else Lmax
-            ls_in = list(range(lmax_in + 1))
-            ls_out = list(range(Lmax + 1)) if layer < num_layers - 1 else [0]
+        eu = EDGE_UPDATE[edge_update](
+            num_elements=num_elements,
+            num_channel=num_channel,
+            edge_embedding_channel=edge_embedding_channel,
+            bias=False,
+        )
+        self.edge_update = eu
+        lmax_in = 0 if layer == 0 else Lmax
+        ls_in = list(range(lmax_in + 1))
+        ls_out = list(range(Lmax + 1)) if layer < num_layers - 1 else [0]
 
-            self.linear_ups.append(
-                SelfInteraction(num_channel, num_channel, ls=ls_in, bias=bias)
+        self.linear_up = SelfInteraction(num_channel, num_channel, ls=ls_in, bias=bias)
+
+        ctr = CartesianContraction(num_channel, lmax_in, lmax, l1l2=l1l2)
+        self.contraction = ctr
+        self.radial_net = RadialMLP(
+            [eu.out_dim] + list(radial_mlp) + [ctr.weight_numel],
+            use_layer_norm=False,
+            use_offset=False,
+            bias=radial_bias,
+        )
+        if use_density:
+            self.edge_density = RadialMLP(
+                [eu.out_dim, 64, 1],
+                use_layer_norm=False,
+                use_offset=False,
+                bias=radial_bias,
             )
-            ctr = CartesianContraction(num_channel, lmax_in, lmax, l1l2=l1l2)
-            self.contractions.append(ctr)
-            self.radial_nets.append(
-                RadialMLP(
-                    [eu.out_dim] + list(radial_mlp) + [ctr.weight_numel],
-                    use_layer_norm=False,
-                    use_offset=False,
-                    bias=radial_bias,
-                )
-            )
-            if use_density:
-                self.edge_densities.append(
-                    RadialMLP(
-                        [eu.out_dim, 64, 1],
-                        use_layer_norm=False,
-                        use_offset=False,
-                        bias=radial_bias,
-                    )
-                )
-                self.density_alphas.append(
-                    nn.Parameter(torch.tensor(float(avg_num_neighbors)))
-                )
-                self.density_betas.append(nn.Parameter(torch.tensor(0.0)))
-            # Match spherical CgtpInteraction: only BB residuals are wired.
-            if (use_first_resnet or layer > 0) and resnet_type == "BB":
-                if resnet_linear_type == "identity":
-                    resnet = DictSkipIdentity(ls_out, num_channel)
-                else:
-                    resnet = SelfInteraction(
-                        num_channel,
-                        num_channel,
-                        ls=ls_out,
-                        bias=bias,
-                        element_aware=(resnet_linear_type == "aware"),
-                        num_elements=num_elements,
-                    )
-                self.add_module(f"resnet_{layer}", resnet)
-                self.resnets.append(resnet)
+            self.density_alpha = nn.Parameter(torch.tensor(float(avg_num_neighbors)))
+            self.density_beta = nn.Parameter(torch.tensor(0.0))
+        # Match spherical CgtpInteraction: only BB residuals are wired.
+        if (use_first_resnet or layer > 0) and resnet_type == "BB":
+            if resnet_linear_type == "identity":
+                resnet = DictSkipIdentity(ls_out, num_channel)
             else:
-                self.resnets.append(None)
-            self.products.append(
-                CartesianProduct(
-                    num_channel=num_channel,
-                    lmax_in=lmax,
-                    ls_out=ls_out,
-                    correlation=correlation[layer],
-                    num_elements=num_elements,
+                resnet = SelfInteraction(
+                    num_channel,
+                    num_channel,
+                    ls=ls_out,
                     bias=bias,
+                    element_aware=(resnet_linear_type == "aware"),
+                    num_elements=num_elements,
                 )
+            self.resnet = resnet
+        else:
+            self.resnet = None
+        self.product = CartesianProduct(
+            num_channel=num_channel,
+            lmax_in=lmax,
+            ls_out=ls_out,
+            correlation=correlation,
+            num_elements=num_elements,
+            bias=bias,
+        )
+
+    def forward(self, state, ctx):
+        feats = state.equi
+        node_attrs, edge_index = state.aux["node_attrs"], state.aux["edge_index"]
+        edge_emb, edge_attrs, cutoff = state.edge, state.aux["edge_attrs"], state.aux["cutoff"]
+        edge_feats = self.edge_update(node_attrs, edge_emb, edge_index)
+        ws = self.radial_net(edge_feats)
+        if cutoff is not None:
+            ws = ws * cutoff
+        res = self.resnet
+        sc = None
+        if res is not None:
+            sc = res(feats, node_attrs) if res.element_aware else res(feats)
+
+        up = self.linear_up(feats)
+        msg = self.contraction(up, edge_attrs, ws, edge_index)
+        if self.scatter_norm in ("density", "no_cutoff_density"):
+            density = torch.tanh(self.edge_density(edge_feats) ** 2)
+            if cutoff is not None and self.apply_density_cutoff:
+                density = density * cutoff
+            density = scatter_sum(
+                density, edge_index[1], dim=0, dim_size=node_attrs.size(0)
             )
+            density = density * self.density_beta + self.density_alpha
+            density = density.masked_fill(density == 0, 1e-9)
+            msg = {l: _broadcast_node_div(t, density) for l, t in msg.items()}
+        elif self.scatter_norm == "avg_num_neighbors":
+            msg = {l: t / self._avg for l, t in msg.items()}
+        feats = self.product(msg, node_attrs, sc=sc)
 
-    def forward(
-        self,
-        node_feats: Tensor,
-        node_attrs: Tensor,
-        edge_emb: Tensor,
-        edge_index: Tensor,
-        edge_vec: Tensor,
-        cutoff: Optional[Tensor] = None,
-    ) -> Tensor:
-        feats: Dict[int, Tensor] = {0: node_feats}
-        edge_attrs = _split_cartesian_harmonics(self.harmonics(edge_vec), self.lmax)
-
-        for layer in range(self.num_layers):
-            edge_feats = self.edge_updates[layer](node_attrs, edge_emb, edge_index)
-            ws = self.radial_nets[layer](edge_feats)
-            if cutoff is not None:
-                ws = ws * cutoff
-            res = self.resnets[layer]
-            sc = None
-            if res is not None:
-                sc = res(feats, node_attrs) if res.element_aware else res(feats)
-
-            up = self.linear_ups[layer](feats)
-            msg = self.contractions[layer](up, edge_attrs, ws, edge_index)
-            if self.scatter_norm in ("density", "no_cutoff_density"):
-                density = torch.tanh(self.edge_densities[layer](edge_feats) ** 2)
-                if cutoff is not None and self.apply_density_cutoff:
-                    density = density * cutoff
-                density = scatter_sum(
-                    density, edge_index[1], dim=0, dim_size=node_attrs.size(0)
-                )
-                density = density * self.density_betas[layer] + self.density_alphas[layer]
-                density = density.masked_fill(density == 0, 1e-9)
-                msg = {l: _broadcast_node_div(t, density) for l, t in msg.items()}
-            elif self.scatter_norm == "avg_num_neighbors":
-                msg = {l: t / self._avg for l, t in msg.items()}
-            feats = self.products[layer](msg, node_attrs, sc=sc)
-
-        return dict_to_scalar(feats)
+        return state._replace(equi=feats)

@@ -7,12 +7,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from .base_attention import BaseAttention
+from ..mp.nonlocal_ import GlobalAttention
 from .nn_utils import get_normalization
 from .types import GraphAttentionData
 
 
-class NodeAttention(BaseAttention):
+class NodeAttention(GlobalAttention):
     """All-to-all node self-attention with optional sinc radial bias (fairchem AllScAIP)."""
 
     def __init__(
@@ -49,15 +49,8 @@ class NodeAttention(BaseAttention):
         node_reps_normalized = self.node_norm(node_reps)
         node_attn_mask = self.get_node_attention_mask(data, self.radial_weight)
 
-        q, k, v = self.qkv_projection(
-            node_reps_normalized.unsqueeze(0),
-            node_reps_normalized.unsqueeze(0),
-            node_reps_normalized.unsqueeze(0),
-        )
-
-        if node_attn_mask is not None:
-            node_attn_mask = node_attn_mask[None, :, :, :].to(q.dtype)
-        attn_output = self.scaled_dot_product_attention(q, k, v, node_attn_mask)
+        features = node_reps_normalized.unsqueeze(0)
+        attn_output = super().forward(features, features, features, node_attn_mask)
         return self.node_attn_res_scale * attn_output.squeeze(0) + node_reps
 
     def get_node_attention_mask(

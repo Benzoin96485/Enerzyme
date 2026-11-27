@@ -18,7 +18,7 @@ def _edges(n):
 
 
 def _tiny_core(**kwargs):
-    from enerzyme.models.tece import TECECore
+    from enerzyme.models.presets.so2 import tece
 
     params = dict(
         max_Za=10,
@@ -44,14 +44,14 @@ def _tiny_core(**kwargs):
         gate_m0=False,
     )
     params.update(kwargs)
-    return TECECore(**params)
+    return tece(**params)
 
 
 def test_tece_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, _, _ = get_ff_core("tece")
-    assert core_cls.__name__ == "TECECore"
+    assert core_cls.__name__ == "tece"
     with EXAMPLE.open() as stream:
         ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
     layers = []
@@ -80,7 +80,7 @@ def test_tece_registration_and_yaml_build():
     model = build_model(
         ff["architecture"], layer_params=layers, build_params=bp, verbose=0
     )
-    assert model.__class__.__name__ == "TECECore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.dim_feature_out == 8
 
 

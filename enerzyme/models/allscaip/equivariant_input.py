@@ -20,16 +20,17 @@ def _irreps_mid_from_sh(lmax: int, mul_per_l: int) -> o3.Irreps:
 
 def scalarize_irreps(x: Tensor, irreps: o3.Irreps) -> Tensor:
     """Rotation-invariant scalars: 0e channels plus L2 norm of each (mul, ir.dim) steerable block."""
+    return _scalarize_blocks(x, tuple((mul, ir.dim) for mul, ir in irreps))
+
+
+def _scalarize_blocks(x: Tensor, blocks: tuple[tuple[int, int], ...]) -> Tensor:
     parts: list[Tensor] = []
     i = 0
-    for mul, ir in irreps:
-        d = mul * ir.dim
-        chunk = x[:, i : i + d].reshape(-1, mul, ir.dim)
-        if ir.l == 0:
-            parts.append(chunk.squeeze(-1))
-        else:
-            parts.append(chunk.norm(dim=-1))
-        i += d
+    for mul, dim in blocks:
+        width = mul * dim
+        chunk = x[:, i : i + width].reshape(-1, mul, dim)
+        parts.append(chunk.squeeze(-1) if dim == 1 else chunk.norm(dim=-1))
+        i += width
     return torch.cat(parts, dim=-1)
 
 
@@ -65,6 +66,7 @@ class EquivariantInputBlock(nn.Module):
             self.irreps_mid,
             internal_weights=True,
         )
+        self.scalar_blocks = tuple((mul, ir.dim) for mul, ir in self.irreps_mid)
         self.inv_dim = sum(mul for mul, _ in self.irreps_mid)
         self.node_to_tp = nn.Linear(hidden_size, tp_hidden, bias=True)
         self.node_inv_linear = nn.Linear(self.inv_dim, hidden_size, bias=True)
@@ -95,7 +97,7 @@ class EquivariantInputBlock(nn.Module):
             dtype=h_flat.dtype, device=h_flat.device
         )
         tp_out = self.tp(h_flat, sh)
-        inv = scalarize_irreps(tp_out, self.irreps_mid)
+        inv = _scalarize_blocks(tp_out, self.scalar_blocks)
         inv = inv.to(dtype=node_init.dtype, device=node_init.device)
         inv_nk = inv.view(num_nodes, knn_k, -1)
         mask = (data.neighbor_index[0] >= 0).to(inv.dtype).unsqueeze(-1)

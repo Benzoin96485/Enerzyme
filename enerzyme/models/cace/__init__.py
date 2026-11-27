@@ -8,11 +8,10 @@ cluster features. ``RandomAtomEmbedding``, ``BesselRBF``, and
 and is not a dependency.
 """
 
-from .core import CACECore, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 from .presets import PAPER_PRESETS
 
 __all__ = [
-    "CACECore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "PAPER_PRESETS",

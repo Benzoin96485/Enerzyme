@@ -43,7 +43,7 @@ Modelhub:
           learnable_shape: true
           init_width_flavor: PhysNet
       - name: RandomAtomEmbedding
-      - name: Core
+      - name: Core  # Configure the physnet message-passing blocks here.
         params:
           num_blocks: 1
           num_residual_atomic: 1

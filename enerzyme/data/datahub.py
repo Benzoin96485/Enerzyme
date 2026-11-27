@@ -92,7 +92,8 @@ ASELMDB_METADATA_PROPERTIES_KEY = "enerzyme_properties"
 _ASE_INFO_STANDARD_KEYS = frozenset({"charge", "spin"})
 
 # Always available geometry / charge fields (no calculator required).
-_ASELMDB_GEOMETRY_KEYS = frozenset({"Ra", "Za", "N", "Q", "S"})
+# ASE provides the cell and the three periodicity flags even for isolated structures.
+_ASELMDB_GEOMETRY_KEYS = frozenset({"Ra", "Za", "N", "Q", "S", "cell", "pbc"})
 
 # ASELMDBDataset exposes these under standard Enerzyme names only (not pickle aliases
 # like energy/coord/grad). Custom row-data fields may still use non-identity maps.
@@ -405,6 +406,10 @@ class ASELMDBDataset:
             get_property_method = lambda atoms: atoms.info.get("charge", 0)
         elif k == "S":
             get_property_method = lambda atoms: atoms.info.get("spin", 1) - 1
+        elif k == "cell":
+            get_property_method = lambda atoms: np.asarray(atoms.get_cell()[:], dtype=float)
+        elif k == "pbc":
+            get_property_method = lambda atoms: np.asarray(atoms.pbc, dtype=int)
         elif k in ASE_PROPERTY_METHODS and k in self.unique_properties_from_calculator:
             if k in {"E", "Fa"}:
                 get_property_method = lambda atoms, p=k: ASE_PROPERTY_METHODS[p](atoms) * self.energy_unit_conversion_factor
@@ -507,6 +512,7 @@ class SingleDataHub:
         max_memory: int=10,
         connect_args: Dict[str, Any]=dict(),
         select_args: Dict[str, Any]=dict(),
+        neighbor_list_cutoff: Optional[float]=None,
         **params
     ):
         self.data_path = os.path.abspath(data_path)
@@ -540,6 +546,7 @@ class SingleDataHub:
                 self.feature_types.setdefault(_k, _k)
             self.data_types = self.feature_types | self.target_types
         self.neighbor_list_type = neighbor_list
+        self.neighbor_list_cutoff = neighbor_list_cutoff
         self.compressed = compressed
         self.max_memory = max_memory
         self.connect_args = connect_args or {}
@@ -549,6 +556,12 @@ class SingleDataHub:
         datahub_str = data_path + str(neighbor_list) + \
             str(sorted(preprocessings.items()) if preprocessings is not None else '') + \
             str(sorted(global_transforms.items()) if global_transforms is not None else '')
+        if neighbor_list == "cutoff":
+            if neighbor_list_cutoff is None or not np.isfinite(neighbor_list_cutoff) or neighbor_list_cutoff <= 0:
+                raise ValueError("Datahub neighbor_list='cutoff' requires a finite, positive neighbor_list_cutoff")
+            # Boundaries and mapped coordinates determine which edges are cached.
+            # Older open-boundary/all-pairs datasets retain their existing keys.
+            datahub_str += repr((float(neighbor_list_cutoff), sorted(self.data_types.items())))
         if data_format:
             datahub_str += str(data_format)
         if self.connect_args:
@@ -624,9 +637,15 @@ class SingleDataHub:
             handler = YamlHandler(config_path)
             datahub_config = handler.read_yaml()
             preload_data_types = _collect_types(datahub_config.feature) | _collect_types(datahub_config.target)
-            if preload_data_types.keys() <= self.data_types.keys():
-                # all kinds of features and targets are contained in the processed dataset
+            if self.data_types.items() <= preload_data_types.items():
                 self.get_handle()
+                if self.neighbor_list_type == "full":
+                    self._check_full_boundaries()
+                if self.neighbor_list_type == "cutoff" and not self.data.attrs.get("cutoff_neighbor_list_complete", False):
+                    self.file.close()
+                    return False
+                self.n_datapoint = len(self.data["Ra"])
+                self.max_N = self.data["Ra"].shape[1]
                 logger.info(f"Data matched and preloaded from {self.preload_path}")
                 return True
         return False
@@ -869,11 +888,18 @@ class SingleDataHub:
             else:
                 self._load_molecular_data(k, raw_data)
         
-        if self.data_format in ["hdf5", "npz"]:
+        if self.data_format == "hdf5":
+            raw_data.file.close()
+        elif self.data_format == "npz":
             raw_data.close()
+
+    def _check_full_boundaries(self):
+        if "pbc" in self.data_types and "pbc" in self.data and np.asarray(self.data["pbc"]).any():
+            raise ValueError("Periodic samples need neighbor_list='cutoff' with Cartesian offsets")
 
     def _init_neighbor_list(self) -> None:
         if self.neighbor_list_type == "full":
+            self._check_full_boundaries()
             from .neighbor_list import full_neighbor_list
             logger.info("producing neighbor list")
             if self.compressed and len(self.data["N"]) == 1:
@@ -891,6 +917,32 @@ class SingleDataHub:
                     self.data["N_pair"][i] = len(idx_i)
                     self.data["idx_i"][i] = array_padding([idx_i], max_N_pairs, pad_value=-1)
                     self.data["idx_j"][i] = array_padding([idx_j], max_N_pairs, pad_value=-1)
+        elif self.neighbor_list_type == "cutoff":
+            from .neighbor_list import cutoff_neighbor_list
+            logger.info(f"Producing cutoff neighbor list (cutoff={self.neighbor_list_cutoff})")
+            # Resize on demand. Padding belongs to the HDF5 dataset; holding
+            # every frame's image vectors in memory scales with the trajectory.
+            shape = (self.n_datapoint, 1)
+            maxshape = (self.n_datapoint, None)
+            idx_i = self.data.create_dataset("idx_i", shape=shape, maxshape=maxshape, dtype=int, fillvalue=-1)
+            idx_j = self.data.create_dataset("idx_j", shape=shape, maxshape=maxshape, dtype=int, fillvalue=-1)
+            offsets = self.data.create_dataset("offsets", shape=(*shape, 3), maxshape=(*maxshape, 3), dtype=float)
+            counts = self.data.create_dataset("N_pair", shape=self.n_datapoint, dtype=int)
+            frames = FieldDataset({k: self.data[k] for k in ("Ra", "N", "cell", "pbc") if k in self.data})
+            for i in tqdm(range(self.n_datapoint)):
+                frame = frames.loc(i)
+                receivers, senders, shifts = cutoff_neighbor_list(
+                    frame["Ra"][:int(frame["N"])], self.neighbor_list_cutoff,
+                    cell=frame.get("cell"), pbc=frame.get("pbc"),
+                )
+                n_pair = len(receivers)
+                counts[i] = n_pair
+                if n_pair > idx_i.shape[1]:
+                    for field in (idx_i, idx_j, offsets):
+                        field.resize(n_pair, axis=1)
+                idx_i[i, :n_pair] = receivers
+                idx_j[i, :n_pair] = senders
+                offsets[i, :n_pair] = shifts
 
     def get_handle(self, mode: Literal["r", "w"]="r") -> None:
         if mode == "w" and os.path.exists(self.preload_path):
@@ -915,14 +967,17 @@ class SingleDataHub:
             "target": self.target_types,
             "preprocessings": self.preprocessings,
             "global_transforms": self.global_transforms,
-            "neighbor_list": self.neighbor_list_type
+            "neighbor_list": self.neighbor_list_type,
+            "neighbor_list_cutoff": self.neighbor_list_cutoff,
         })
         handler.write_yaml(datahub_config)
+        if self.neighbor_list_type == "cutoff":
+            self.data.attrs["cutoff_neighbor_list_complete"] = True
         logger.info(f"Save preloaded dataset at {self.preload_path}")
 
     @property
     def features(self) -> FieldDataset:
-        return FieldDataset({k: v for k, v in self.data.items() if k in self.feature_types.keys() | {"idx_i", "idx_j", "N_pair"}})
+        return FieldDataset({k: v for k, v in self.data.items() if k in self.feature_types.keys() | {"idx_i", "idx_j", "N_pair", "offsets"}})
     
     @property
     def targets(self) -> FieldDataset:

@@ -1,8 +1,8 @@
 from typing import Optional, Dict
 from torch import Tensor
 from . import BaseFFLayer
-from ..activation import ACTIVATION_PARAM_TYPE, ACTIVATION_KEY_TYPE
-from ..blocks.mlp import DenseLayer, ResidualMLP, INITIAL_WEIGHT_TYPE, INITIAL_BIAS_TYPE
+from ..mp.nn.activation import ACTIVATION_PARAM_TYPE, ACTIVATION_KEY_TYPE
+from ..mp.nn.mlp import DenseLayer, ResidualMLP, INITIAL_WEIGHT_TYPE, INITIAL_BIAS_TYPE
 
 
 class ScalarEmbedding(BaseFFLayer):

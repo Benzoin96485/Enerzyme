@@ -15,7 +15,7 @@ from typing import Optional, Sequence
 import torch
 from torch import Tensor, nn
 
-from ..activation import get_activation_fn
+from ..mp.nn.activation import get_activation_fn
 
 
 _ACTIVATION_ALIAS = {

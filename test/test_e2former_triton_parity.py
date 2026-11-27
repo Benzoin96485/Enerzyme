@@ -46,6 +46,22 @@ def test_euler_singularity_mask_stays_bool_and_includes_pole():
     assert float(beta[1].abs()) < 1e-4
 
 
+def test_euler_derivatives_at_degenerate_directions():
+    from enerzyme.models.e2former.wigner_otf import init_edge_rot_euler_angles
+
+    vec = torch.tensor(
+        [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -1.0, 0.0], [0.2, 0.3, 0.4]],
+        dtype=torch.float64,
+        requires_grad=True,
+    )
+    angles = init_edge_rot_euler_angles(vec, training=False)
+    gradient = torch.autograd.grad(sum(angles).sum(), vec, create_graph=True)[0]
+    hessian_product = torch.autograd.grad(gradient.sum(), vec)[0]
+    for value in (gradient, hessian_product):
+        assert torch.isfinite(value).all()
+        torch.testing.assert_close(value[:3], torch.zeros_like(value[:3]))
+
+
 def test_euler_acos_clamps_float32_overshoot():
     """float32 normalize can yield |y| > 1; acos must stay finite."""
     from enerzyme.models.e2former.wigner_otf import init_edge_rot_euler_angles
@@ -231,3 +247,76 @@ def test_attention_triton_qk_matches_qk_alpha_module_on_cuda():
         atol=5e-4,
         rtol=5e-4,
     )
+
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("cuda", marks=pytest.mark.skipif(
+    not _cuda_triton_ready(), reason="CUDA and Triton required",
+))])
+def test_sparse_dispatch_values_and_double_gradients(device, dtype):
+    from enerzyme.models.e2former import triton_sparse as sparse
+
+    generator = torch.Generator(device=device).manual_seed(401)
+    def field(*shape):
+        return torch.randn(*shape, device=device, dtype=dtype, generator=generator).requires_grad_()
+
+    n, k, heads, width = 5, 4, 2, 8
+    indices = torch.randint(n, (n, k), generator=generator, device=device)
+    query = field(n, width, heads).transpose(1, 2)
+    key = field(n, heads, width)
+    gate = field(n, k, heads)
+    value = field(n, width, heads)
+    fields = (query, key, gate, value)
+
+    def evaluate(enabled):
+        weights = sparse.sparse_qk(query, key, indices, gate, 0.25, use_triton=enabled)
+        aggregate = sparse.make_sparse_v_kernel(indices, use_triton=enabled)
+        result = aggregate(value, weights)
+        first = torch.autograd.grad(result.square().sum(), fields, create_graph=True)
+        second = torch.autograd.grad(sum(item.square().mean() for item in first), fields)
+        return (result, *first, *second)
+
+    actual, expected = evaluate(True), evaluate(False)
+    for got, want in zip(actual, expected):
+        torch.testing.assert_close(got, want, rtol=2e-4 if dtype == torch.float32 else 1e-12,
+                                   atol=2e-4 if dtype == torch.float32 else 1e-12)
+    assert callable(sparse.sparse_qk) and callable(sparse.sparse_v_agg)
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 2 or not _cuda_triton_ready(),
+                    reason="two visible CUDA devices and Triton required")
+def test_triton_uses_input_device_and_restores_current_device(monkeypatch):
+    from enerzyme.models.mp.equivariant import kernels
+    from enerzyme.models.mp.equivariant.kernels import _e2former_qk, _e2former_value
+
+    first = torch.cuda.current_device()
+    target = (first + 1) % torch.cuda.device_count()
+    # Record the selected device inside each real kernel's forward and backward.
+    calls = []
+    for cls in (_e2former_qk.SparseQK_N_Tiled_Fn, _e2former_value.SparseVAgg_N_Tiled_Fn):
+        for method in ("forward", "backward"):
+            implementation = getattr(cls, method)
+
+            def checked(*args, fn=implementation):
+                assert torch.cuda.current_device() == target
+                calls.append(fn.__name__)
+                return fn(*args)
+
+            monkeypatch.setattr(cls, method, staticmethod(checked))
+
+    options = {"device": torch.device("cuda", target), "requires_grad": True}
+    q, k = (torch.randn(7, 2, 8, **options) for _ in range(2))
+    idx = torch.tensor([[0, 2], [5, 4], [6, 6], [3, 2], [3, 4], [2, 1], [0, 5]], device=q.device)
+    gate, value = torch.randn(7, 2, 2, **options), torch.randn(7, 4, 2, **options)
+
+    def outputs(use_triton):
+        scores = kernels.sparse_qk(q, k, idx, gate, 0.125, use_triton=use_triton)
+        out = kernels.sparse_v_agg(value, scores, idx, use_triton=use_triton)
+        return (out, *torch.autograd.grad(out.square().sum(), (q, k, gate, value)))
+
+    expected, actual = outputs(False), outputs(True)
+    assert torch.cuda.current_device() == first
+    assert calls == ["forward", "forward", "backward", "backward"]
+    for a, b in zip(actual, expected):
+        torch.testing.assert_close(a, b, atol=2e-4, rtol=2e-4)

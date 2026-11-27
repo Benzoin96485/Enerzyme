@@ -1,11 +1,11 @@
 """Geodite edge spherical harmonics.
 
-The basis itself lives in :mod:`enerzyme.models.layers.polynomial_harmonics`
+The basis itself lives in :mod:`enerzyme.models.mp.basis.angular`
 so ViSNet can use the same ``l <= 2`` prefix. This module re-exports the
 names Geodite already imported.
 """
 
-from ..layers.polynomial_harmonics import (
+from ..mp.basis.angular import (
     angular_dim,
     degree_widths,
     geodite_spherical_harmonics,

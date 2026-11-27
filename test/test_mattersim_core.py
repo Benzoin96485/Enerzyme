@@ -50,7 +50,7 @@ def _gaussian(dist: torch.Tensor, num_rbf: int = 4, cutoff: float = 5.0):
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.mattersim import MatterSimCore
+    from enerzyme.models.presets.triplet import mattersim
 
     params = dict(
         dim_embedding=8,
@@ -68,7 +68,7 @@ def _tiny(**kwargs):
         use_centrality=True,
     )
     params.update(kwargs)
-    return MatterSimCore(**params)
+    return mattersim(**params)
 
 
 def _m3gnet_kwargs():
@@ -121,7 +121,7 @@ def test_registration_aliases_and_example_yaml():
 
     for name in ("mattersim", "m3gnet-graphormer", "m3gnet_graphormer"):
         core_cls, defaults, layers = get_ff_core(name)
-        assert core_cls.__name__ == "MatterSimCore"
+        assert core_cls.__name__ == "mattersim"
         assert defaults["cutoff_sr"] == 5.0
         assert defaults["threebody_cutoff"] == 4.0
         assert any(layer["name"] == "GaussianRBF" for layer in layers)
@@ -134,7 +134,7 @@ def test_registration_aliases_and_example_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "MatterSimCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.degree == 9
     assert model.num_attn_layers == 2
     assert model.num_heads == 4
@@ -145,10 +145,10 @@ def test_registration_aliases_and_example_yaml():
 
 
 def test_disabled_graphormer_matches_m3gnet():
-    from enerzyme.models.m3gnet import M3GNetCore
+    from enerzyme.models.presets.triplet import m3gnet
 
     torch.manual_seed(0)
-    base = M3GNetCore(**_m3gnet_kwargs())
+    base = m3gnet(**_m3gnet_kwargs())
     torch.manual_seed(0)
     extended = _tiny(num_attn_layers=0, use_centrality=False)
     assert not extended.uses_graphormer_basis

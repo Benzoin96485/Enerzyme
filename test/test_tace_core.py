@@ -19,7 +19,7 @@ def _edges(n):
 
 
 def _tiny_core(tensor_basis: str, **kwargs):
-    from enerzyme.models.tace import TACECore
+    from enerzyme.models.presets.cartesian_tensor import tace
 
     params = dict(
         max_Za=10,
@@ -41,14 +41,14 @@ def _tiny_core(tensor_basis: str, **kwargs):
         params["nonlinear"] = "sigmoid_gate"
         params["parity"] = False
     params.update(kwargs)
-    return TACECore(**params)
+    return tace(**params)
 
 
 def test_tace_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, _, _ = get_ff_core("tace")
-    assert core_cls.__name__ == "TACECore"
+    assert core_cls.__name__ == "tace"
     for path in (EXAMPLE_SPH, EXAMPLE_CART):
         with path.open() as stream:
             ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
@@ -77,7 +77,7 @@ def test_tace_registration_and_yaml_build():
         model = build_model(
             ff["architecture"], layer_params=layers, build_params=bp, verbose=0
         )
-        assert model.__class__.__name__ == "TACECore"
+        assert model.__class__.__name__ == "ComposableCore"
         assert model.dim_feature_out == 8
 
 
@@ -264,7 +264,8 @@ def test_tace_spherical_parity_true_bb_residual():
         resnet_type="BB",
         resnet_linear_type="aware",
     )
-    for inter, prod in zip(core.interactions, core.products):
+    for block in core.blocks:
+        inter, prod = block.interaction, block.product
         if hasattr(inter, "resnetBB"):
             assert inter.irreps_sc == prod.irreps_out
     out = core.get_output(
@@ -291,7 +292,7 @@ def test_tace_cartesian_identity_resnet():
         use_first_resnet=True,
         resnet_linear_type="identity",
     )
-    resnets = [r for r in core.cartesian_stack.resnets if r is not None]
+    resnets = [block.resnet for block in core.blocks if block.resnet is not None]
     assert resnets, "expected residual modules"
     assert all(isinstance(r, DictSkipIdentity) for r in resnets)
     out = core.get_output(
@@ -320,7 +321,7 @@ def test_tace_cartesian_first_resnet_emits_all_skip_ranks():
             resnet_type="BB",
             resnet_linear_type=linear_type,
         )
-        res0 = core.cartesian_stack.resnets[0]
+        res0 = core.blocks[0].resnet
         assert res0 is not None
         feats0 = {0: torch.randn(n, 8)}
         attrs = torch.nn.functional.one_hot(
@@ -368,9 +369,9 @@ def test_tace_shared_knobs_honored_on_both_backends():
     ):
         core = _tiny_core(basis, scatter_norm=mode, num_layers=1)
         if basis == "spherical":
-            assert hasattr(core.interactions[0], "edge_density")
+            assert hasattr(core.blocks[0].interaction, "edge_density")
         else:
-            assert len(core.cartesian_stack.edge_densities) == 1
+            assert core.blocks[0].edge_density is not None
         feat = _forward_core(core)["atom_feature"]
         assert torch.isfinite(feat).all()
 
@@ -383,9 +384,9 @@ def test_tace_shared_knobs_honored_on_both_backends():
             num_layers=2,
         )
         if basis == "spherical":
-            assert all(not hasattr(inter, "resnetBB") for inter in core.interactions)
+            assert all(not hasattr(block.interaction, "resnetBB") for block in core.blocks)
         else:
-            assert all(r is None for r in core.cartesian_stack.resnets)
+            assert all(block.resnet is None for block in core.blocks)
         assert torch.isfinite(_forward_core(core)["atom_feature"]).all()
 
     # BB + use_first_resnet enables residuals on both backends
@@ -397,14 +398,15 @@ def test_tace_shared_knobs_honored_on_both_backends():
             num_layers=2,
         )
         if basis == "spherical":
-            assert hasattr(core.interactions[0], "resnetBB")
-            assert hasattr(core.interactions[1], "resnetBB")
+            assert hasattr(core.blocks[0].interaction, "resnetBB")
+            assert hasattr(core.blocks[1].interaction, "resnetBB")
         else:
-            assert core.cartesian_stack.resnets[0] is not None
-            assert core.cartesian_stack.resnets[1] is not None
-            # Optional slots are registered modules, not None entries in ModuleList.
-            assert "resnet_0" in dict(core.cartesian_stack.named_children())
-            assert not isinstance(core.cartesian_stack.resnets, torch.nn.ModuleList)
+            assert core.blocks[0].resnet is not None
+            assert core.blocks[1].resnet is not None
+            # Each residual has a single registration on its layer.
+            for i, block in enumerate(core.blocks):
+                paths = [p for p, m in core.named_modules(remove_duplicate=False) if m is block.resnet]
+                assert paths == [f"blocks.{i}.resnet"]
         assert torch.isfinite(_forward_core(core)["atom_feature"]).all()
 
 
@@ -426,9 +428,9 @@ def test_tace_cartesian_density_changes_features_vs_avg():
     dens.load_state_dict(avg.state_dict(), strict=False)
     # Force density MLP away from zero so normalization differs from constant avg.
     with torch.no_grad():
-        for p in dens.cartesian_stack.edge_densities[0].parameters():
+        for p in dens.blocks[0].edge_density.parameters():
             p.fill_(0.2)
-        dens.cartesian_stack.density_betas[0].fill_(1.0)
+        dens.blocks[0].density_beta.fill_(1.0)
     out_avg = avg.get_output(**kwargs)["atom_feature"]
     out_dens = dens.get_output(**kwargs)["atom_feature"]
     assert torch.isfinite(out_dens).all()

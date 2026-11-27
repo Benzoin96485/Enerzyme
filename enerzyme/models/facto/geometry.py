@@ -12,8 +12,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from ..cutoff import facto_pair_window
-from ..so3.spherical_harmonics import spherical_harmonics
+from ..mp.basis.envelope import facto_pair_window
+from ..mp.basis.angular import spherical_harmonics
 
 # Paper: s_r = 2.5 / (N_r - 1), centers μ_n = (n - 1) / (N_r - 1).
 GAUSSIAN_WIDTH_NUMERATOR = 2.5

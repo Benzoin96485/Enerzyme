@@ -18,20 +18,11 @@ from typing import Optional
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import BatchNorm1d, LayerNorm, Linear, Module, Sequential
+from torch.nn import Linear, Module, Sequential
+from torch.utils.checkpoint import checkpoint
 
-from ..functional import segment_sum_coo
-
-
-def normalization(name: Optional[str], features: int) -> Optional[Module]:
-    """``layer`` and ``batch`` match the force field and the property model."""
-    if name in (None, "none", "null"):
-        return None
-    if name == "layer":
-        return LayerNorm(int(features))
-    if name == "batch":
-        return BatchNorm1d(int(features))
-    raise ValueError(f"norm must be 'layer', 'batch', or null, got {name!r}")
+from ..mp.nn.norm import feature_norm as normalization
+from ..mp.ops import scatter_sum
 
 
 def _apply_norm(norm: Optional[Module], features: Tensor) -> Tensor:
@@ -102,6 +93,21 @@ class EdgeGatedGraphConv(Module):
         self.norm_nodes = normalization(norm, width)
         self.norm_edges = normalization(norm, width)
 
+    def _gate_message(self, node, edge, src, dst):
+        return self.src_gate(node)[src] + self.dst_gate(node)[dst] + self.edge_gate(edge)
+
+    def _can_recompute_gates(self):
+        from torch.nn.modules import module
+
+        if (module._global_forward_pre_hooks or module._global_forward_hooks
+                or module._global_backward_pre_hooks or module._global_backward_hooks):
+            return False
+        return all(
+            type(layer) is Linear and "forward" not in layer.__dict__
+            and not (layer._forward_pre_hooks or layer._forward_hooks or layer._backward_pre_hooks or layer._backward_hooks)
+            for layer in (self.src_gate, self.dst_gate, self.edge_gate)
+        )
+
     def forward(
         self,
         node: Tensor,
@@ -109,17 +115,45 @@ class EdgeGatedGraphConv(Module):
         src: Tensor,
         dst: Tensor,
     ) -> tuple[Tensor, Tensor]:
+        if (torch.compiler.is_compiling() and node.is_cuda and not self.training
+                and not torch._C._are_functorch_transforms_active()):
+            from torch._dynamo import config
+            from ..layers.compiled_grad import compiling_fullgraph
+
+            if getattr(config, "skip_nnmodule_hook_guards", False) and not compiling_fullgraph():
+                return self._with_live_gate_hooks(node, edge, src, dst)
+        return self._convolve(node, edge, src, dst)
+
+    @torch.compiler.disable(recursive=False)
+    def _with_live_gate_hooks(self, node, edge, src, dst):
+        from torch._dynamo import config
+
+        # A standalone compiled convolution also needs to retrace when a gate
+        # acquires a hook after warmup, before it chooses whether to checkpoint.
+        with config.patch(skip_nnmodule_hook_guards=False):
+            return self._convolve(node, edge, src, dst)
+
+    def _convolve(self, node, edge, src, dst):
         updated = self.src_update(node)
         if edge.shape[0] == 0:
             updated = F.silu(_apply_norm(self.norm_nodes, updated))
             if self.residual:
                 updated = node + updated
             return updated, edge
-        message = self.src_gate(node)[src] + self.dst_gate(node)[dst] + self.edge_gate(edge)
+        if (torch.compiler.is_compiling() and node.is_cuda and not self.training
+                and not torch._C._are_functorch_transforms_active() and self._can_recompute_gates()):
+            # Rebuild the edge projections during the force backward instead of
+            # retaining the hidden state of every line-graph edge.
+            message = checkpoint(
+                self._gate_message, node, edge, src, dst,
+                use_reentrant=False, preserve_rng_state=False,
+            )
+        else:
+            message = self._gate_message(node, edge, src, dst)
         gate = torch.sigmoid(message)
         neighbor = self.dst_update(node)[src] * gate
-        summed = segment_sum_coo(neighbor, dst, dim_size=node.shape[0])
-        gate_sum = segment_sum_coo(gate, dst, dim_size=node.shape[0])
+        summed = scatter_sum(neighbor, dst, node.shape[0])
+        gate_sum = scatter_sum(gate, dst, node.shape[0])
         updated = updated + summed / (gate_sum + self.gate_eps)
         updated = F.silu(_apply_norm(self.norm_nodes, updated))
         updated_edge = F.silu(_apply_norm(self.norm_edges, message))

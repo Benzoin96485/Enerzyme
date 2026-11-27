@@ -14,9 +14,9 @@ import torch
 from torch import Tensor
 from torch.nn import Module, ModuleList, Parameter
 
-from ..activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
-from ..blocks.mlp import DenseLayer
-from ..functional import segment_sum_coo
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE, ACTIVATION_PARAM_TYPE
+from ..mp.nn.mlp import DenseLayer
+from ..mp.ops import scatter_sum
 
 
 _SWISH_PARAMS: ACTIVATION_PARAM_TYPE = {
@@ -189,7 +189,7 @@ class DimeNetInteractionBlock(Module):
             x_kj_sum = x.new_zeros(x.shape)
         else:
             x_kj = torch.einsum("wj,wl,ijl->wi", sbf_h, x_kj[idx_kj], self.W)
-            x_kj_sum = segment_sum_coo(x_kj, idx_ji, dim_size=x.shape[0])
+            x_kj_sum = scatter_sum(x_kj, idx_ji, x.shape[0])
         hidden = x_ji + x_kj_sum
         for layer in self.layers_before_skip:
             hidden = layer(hidden)
@@ -219,7 +219,7 @@ class DimeNetAtomReadout(Module):
         num_nodes: int,
     ) -> Tensor:
         gated = self.dense_rbf(rbf) * messages
-        return segment_sum_coo(gated, idx_i, dim_size=num_nodes)
+        return scatter_sum(gated, idx_i, num_nodes)
 
 
 class DimeNetPPInteractionBlock(Module):
@@ -292,9 +292,7 @@ class DimeNetPPInteractionBlock(Module):
             x_kj_sum = x.new_zeros(x.shape[0], x_kj.shape[-1])
         else:
             sbf_h = self.dense_sbf2(self.dense_sbf1(sbf))
-            x_kj_sum = segment_sum_coo(
-                x_kj[idx_kj] * sbf_h, idx_ji, dim_size=x.shape[0]
-            )
+            x_kj_sum = scatter_sum(x_kj[idx_kj] * sbf_h, idx_ji, x.shape[0])
         hidden = x_ji + self.up(x_kj_sum)
         for layer in self.layers_before_skip:
             hidden = layer(hidden)
@@ -341,7 +339,5 @@ class DimeNetPPAtomReadout(Module):
         if messages.shape[0] == 0:
             hidden = messages.new_zeros(num_nodes, self.dim_embedding)
         else:
-            hidden = segment_sum_coo(
-                self.dense_rbf(rbf) * messages, idx_i, dim_size=num_nodes
-            )
+            hidden = scatter_sum(self.dense_rbf(rbf) * messages, idx_i, num_nodes)
         return self.up(hidden)

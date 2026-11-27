@@ -14,7 +14,7 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 
 
 def dp_symmetrize(
@@ -53,7 +53,7 @@ def dp_symmetrize(
     scaled = invariant * scale
     pair = vector.unsqueeze(-1) * scaled.unsqueeze(-2)
     flat = pair.reshape(pair.shape[0], 3 * feat_dim)
-    gathered = reduce_edge(flat, owner, (num_nodes, 3 * feat_dim))
+    gathered = scatter_sum(flat, owner, num_nodes)
     matrix = gathered.view(num_nodes, 3, feat_dim)
     leading = matrix[:, :, :axis_neuron]
     gram = torch.matmul(leading.transpose(1, 2), matrix) / 3.0

@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
-from enerzyme.models.functional import reduce_edge
+from enerzyme.models.mp.ops import scatter_sum
 from enerzyme.models.layers.rejection import vector_rejection
 from enerzyme.models.quinnet.interaction import BODY_TERMS, QuinNetInteraction
 
@@ -114,9 +114,9 @@ def _reference(layer, scalar, vector, edge, idx_i, idx_j, window, direction):
         * vector_rejection(F.linear(vector[idx_j], layer.src_proj.weight, None), -direction)
     ).sum(dim=1)
     node = (n_atoms, hidden)
-    five_iii = reduce_edge(five_iii_edge, idx_j, node)
-    five_ii = reduce_edge(five_ii_edge, idx_j, node)
-    torsion = reduce_edge(torsion_edge, idx_j, node)
+    five_iii = scatter_sum(five_iii_edge, idx_j, node[0])
+    five_ii = scatter_sum(five_ii_edge, idx_j, node[0])
+    torsion = scatter_sum(torsion_edge, idx_j, node[0])
 
     filter_key = None
     if layer.dk_proj is not None:
@@ -141,10 +141,8 @@ def _reference(layer, scalar, vector, edge, idx_i, idx_j, window, direction):
     )
     vector_message = vector[idx_j] * gate.unsqueeze(1)
     vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
-    aggregated_scalar = reduce_edge(scalar_message, idx_i, node)
-    aggregated_vector = reduce_edge(
-        vector_message, idx_i, (n_atoms, vector.shape[1], hidden)
-    )
+    aggregated_scalar = scatter_sum(scalar_message, idx_i, node[0])
+    aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
     out_scale, out_gate, out_bias = torch.split(
         F.linear(aggregated_scalar, layer.o_proj.weight, layer.o_proj.bias),
         hidden,

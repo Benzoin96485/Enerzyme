@@ -47,15 +47,20 @@ def make_parity_graph(
     seed: int = 0,
     dtype: torch.dtype = torch.float64,
 ) -> Dict[str, Tensor]:
-    """Build a shared radius graph for Enerzyme / PyG SchNet parity."""
-    from torch_geometric.nn.models.schnet import RadiusInteractionGraph
+    """Build a shared radius graph for Enerzyme / PyG SchNet parity.
 
+    Dense all-pairs search, so no ``torch-cluster``; ``num_atoms`` stays below
+    PyG's ``max_num_neighbors``, so the edge set equals ``RadiusInteractionGraph``'s.
+    """
     torch.manual_seed(seed)
     z = torch.randint(1, 10, (num_atoms,), dtype=torch.long)
     pos = torch.randn(num_atoms, 3, dtype=dtype)
     batch = torch.zeros(num_atoms, dtype=torch.long)
-    graph = RadiusInteractionGraph(cutoff=cutoff, max_num_neighbors=32)
-    edge_index, edge_weight = graph(pos, batch)
+    dist = torch.cdist(pos, pos)
+    mask = (dist < cutoff) & ~torch.eye(num_atoms, dtype=torch.bool)
+    row, col = mask.nonzero(as_tuple=True)
+    edge_index = torch.stack([row, col])
+    edge_weight = (pos[row] - pos[col]).norm(dim=-1)
     return {
         "z": z,
         "pos": pos,

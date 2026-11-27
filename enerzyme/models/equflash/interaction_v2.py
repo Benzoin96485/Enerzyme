@@ -12,12 +12,12 @@ from typing import Dict, List, Optional, Sequence
 
 import torch
 import torch.nn.functional as F
+from ..mp.message.irreps import irreps_convolution
 from e3nn import o3
 from torch import Tensor, nn
 
-from ..blocks.radial_mlp import RadialMLP
-from ..e3nn_nn.rms_norm import EquivariantRMSNormSH
-from ..functional import segment_sum_coo
+from ..mp.nn.radial_mlp import RadialMLP
+from ..mp.equivariant.e3nn.rms_norm import EquivariantRMSNormSH
 from .irreps import scale_irreps
 
 
@@ -53,11 +53,13 @@ class IrrepsEmbed(nn.Module):
             _, src = choices.pop(match)
             pairs.append((src.start, src.stop, sl.start, sl.stop))
         self._pairs = tuple(pairs)
+        self.output_width = self.irreps_out.dim
+        self.is_identity = not self._pairs and self.irreps_in == self.irreps_out
 
     def forward(self, features: Tensor) -> Tensor:
-        if not self._pairs and self.irreps_in == self.irreps_out:
+        if self.is_identity:
             return features
-        out = features.new_zeros(features.shape[0], self.irreps_out.dim)
+        out = features.new_zeros(features.shape[0], self.output_width)
         for src_start, src_stop, dst_start, dst_stop in self._pairs:
             out[:, dst_start:dst_stop] = features[:, src_start:src_stop]
         return out
@@ -74,7 +76,7 @@ def _skip(kind: str, irreps_in, irreps_out) -> nn.Module:
 def _uvu_instructions(irreps_x, irreps_filter, irreps_out):
     """Channelwise paths whose multiplicity already matches the output.
 
-    Distinct from :func:`enerzyme.models.e3nn_nn.tp_out_irreps_with_instructions`,
+    Distinct from :func:`enerzyme.models.mp.equivariant.e3nn.tp_out_irreps_with_instructions`,
     which emits one output slot per path for a following linear (EquFlash and
     Nequix). Here an output irrep is kept only when its multiplicity equals
     the input multiplicity. A mismatch or a missing path raises.
@@ -173,12 +175,9 @@ class ChannelwiseConv(nn.Module):
         rbf: Tensor,
         edge_sh: Tensor,
     ) -> Tensor:
-        if idx_i.numel() == 0:
-            return features.new_zeros(features.shape[0], self.irreps_out.dim)
-        weight = self.radial(rbf)
-        message = self.tp(features[idx_j], edge_sh, weight)
-        aggregated = segment_sum_coo(message, idx_i, dim_size=features.shape[0])
-        return aggregated / self.denominator
+        return irreps_convolution(
+            self.tp, self.radial, features, idx_j, idx_i, edge_sh, rbf, denominator=self.denominator
+        )
 
 
 class ScalarGate(nn.Module):
@@ -186,7 +185,7 @@ class ScalarGate(nn.Module):
 
     def __init__(self, irreps) -> None:
         super().__init__()
-        from ..e3nn_nn.activation import Gate
+        from ..mp.equivariant.e3nn.activation import Gate
 
         irreps = o3.Irreps(irreps).simplify()
         odd, even, gated = [], [], []
@@ -250,7 +249,7 @@ class BiLinearGate(nn.Module):
     ones, so the product contains both a gated linear term and a bilinear term.
     """
 
-    def __init__(self, irreps) -> None:
+    def __init__(self, irreps, *, copy_major=False) -> None:
         super().__init__()
         irreps = o3.Irreps(irreps).simplify()
         for _, ir in irreps:
@@ -258,6 +257,7 @@ class BiLinearGate(nn.Module):
                 raise NotImplementedError("BiLinearGate does not support 0o features")
         if len(irreps) == 0 or irreps[0].ir != o3.Irrep("0e"):
             raise ValueError(f"BiLinearGate expects a leading 0e block, got {irreps}")
+        self.copy_major = bool(copy_major)
         self.scalar = o3.Irreps([irreps[0]])
         self.higher = o3.Irreps(list(irreps)[1:]).simplify()
         self.dim_act = self.scalar.dim
@@ -296,19 +296,24 @@ class BiLinearGate(nn.Module):
             return act
         weights = F.silu(features[:, :gate_dim])
         rest = features[:, gate_dim + self.dim_act :]
-        first_parts = []
-        second_parts = []
-        offset = 0
-        batch = features.shape[0]
-        for mul, dim in self._higher_layout:
-            width = 2 * mul * dim
-            block = rest[:, offset : offset + width].reshape(batch, 2 * mul, dim)
-            first_parts.append(block[:, :mul].reshape(batch, mul * dim))
-            second_parts.append(block[:, mul:].reshape(batch, mul * dim))
-            offset += width
-        left = torch.cat(first_parts, dim=-1)
-        ones = features.new_ones(batch, self.dim_act)
-        right = torch.cat([ones, torch.cat(second_parts, dim=-1)], dim=-1)
+        if self.copy_major:
+            # irreps_in contains higher + higher in this order.
+            left, right = rest.split(self.higher.dim, dim=-1)
+        else:
+            first_parts = []
+            second_parts = []
+            offset = 0
+            batch = features.shape[0]
+            for mul, dim in self._higher_layout:
+                width = 2 * mul * dim
+                block = rest[:, offset : offset + width].reshape(batch, 2 * mul, dim)
+                first_parts.append(block[:, :mul].reshape(batch, mul * dim))
+                second_parts.append(block[:, mul:].reshape(batch, mul * dim))
+                offset += width
+            left = torch.cat(first_parts, dim=-1)
+            right = torch.cat(second_parts, dim=-1)
+        ones = features.new_ones(features.shape[0], self.dim_act)
+        right = torch.cat((ones, right), dim=-1)
         mixed = self.tp(left, right, weights)
         return torch.cat([act, mixed], dim=-1)
 
@@ -367,7 +372,7 @@ def make_nonlinear(kind: str, irreps, scale: float = 1.0, kwargs: Optional[dict]
     if kind == "gate":
         return ScalarGate(target)
     if kind == "bilinear_gate":
-        return BiLinearGate(target)
+        return BiLinearGate(target, copy_major=kwargs.get("copy_major", False))
     if kind == "symmetric_contraction":
         return SymmetricContraction(
             target, contraction_degree=int(kwargs.get("contraction_degree", 3))

@@ -32,6 +32,35 @@ def center_positions_by_batch(Ra: Tensor, batch_seg: Tensor) -> Tensor:
     return Ra - com[batch_seg.long()]
 
 
+def _topk_slots(dst: Tensor, dist: Tensor, max_neighbors: int, num_nodes: int):
+    """Return original edge IDs and their flattened slots in the padded neighborhood."""
+    if max_neighbors <= 0 or (not torch.compiler.is_compiling() and not dst.numel()):
+        return dst[:0], dst[:0]
+    # Preserve the original distance sort and tie order; keep its span on-device.
+    if torch.compiler.is_compiling():
+        # A cutoff can remove every edge at runtime. Add the existing lower
+        # bound to the reduction so the compiled empty list also has a span.
+        span = torch.cat((dist.detach(), dist.new_ones(1))).amax() + 1.0
+    else:
+        span = dist.detach().max().clamp_min(1.0) + 1.0
+    order = torch.argsort(dst.double() * span.double() + dist.double())
+    grouped = dst[order]
+    centers = torch.arange(num_nodes, device=dst.device)
+    starts = torch.searchsorted(grouped, centers)
+    rank = torch.arange(dst.numel(), device=dst.device) - starts[grouped]
+    kept = (rank < max_neighbors).nonzero().flatten()
+    return order[kept], grouped[kept] * max_neighbors + rank[kept]
+
+
+def packed_neighbors(src, dst, dist, max_neighbors, num_nodes):
+    """Build source indices, occupancy and scatter locations from the same distance sort."""
+    selected, slots = _topk_slots(dst, dist, max_neighbors, num_nodes)
+    neighbors = src.new_full((num_nodes * max_neighbors,), -1)
+    neighbors.index_copy_(0, slots, src[selected])
+    neighbors = neighbors.view(num_nodes, max_neighbors)
+    return selected, slots, neighbors.clamp_min(0), neighbors >= 0
+
+
 def select_closest_neighbors(
     src: Tensor,
     dst: Tensor,
@@ -46,26 +75,8 @@ def select_closest_neighbors(
     neighborhood is denser than ``max_neighbors``, retain nearest neighbors
     instead of aborting.
     """
-    if src.numel() == 0 or max_neighbors <= 0:
-        empty = (src[:0], dst[:0], dist[:0]) + tuple(a[:0] for a in edge_attrs)
-        return empty
-
-    # Sort by destination, then by distance within each destination block.
-    dist_span = dist.detach().max().clamp_min(1.0) + 1.0
-    sort_key = dst.to(dtype=torch.float64) * float(dist_span) + dist.to(dtype=torch.float64)
-    order = torch.argsort(sort_key)
-    src = src[order]
-    dst = dst[order]
-    dist = dist[order]
-    edge_attrs = tuple(a[order] for a in edge_attrs)
-
-    deg = torch.bincount(dst, minlength=num_nodes)
-    starts = torch.zeros(num_nodes + 1, dtype=torch.long, device=dst.device)
-    starts[1:] = torch.cumsum(deg, dim=0)
-    local_rank = torch.arange(dst.shape[0], device=dst.device) - starts[dst]
-    keep = local_rank < max_neighbors
-
-    return (src[keep], dst[keep], dist[keep]) + tuple(a[keep] for a in edge_attrs)
+    selected, _ = _topk_slots(dst, dist, max_neighbors, num_nodes)
+    return (src[selected], dst[selected], dist[selected]) + tuple(a[selected] for a in edge_attrs)
 
 
 def pad_neighbor_list(
@@ -127,7 +138,7 @@ def map_neighbor_list(
     else:
         squeeze = False
     out = x.new_zeros((num_nodes * max_neighbors, x.shape[-1]))
-    if index_mapping.numel() > 0:
+    if torch.compiler.is_compiling() or index_mapping.numel() > 0:
         out.scatter_(0, index_mapping.unsqueeze(1).expand(-1, x.shape[-1]), x)
     out = out.view(num_nodes, max_neighbors, x.shape[-1])
     return out.squeeze(-1) if squeeze else out
@@ -175,24 +186,13 @@ def build_topk_neighborhood(
         max_neighbors = int(deg.max().item()) if deg.numel() else 1
         max_neighbors = max(max_neighbors, 1)
 
-    src, dst, dist, vij, rbf = select_closest_neighbors(
-        src, dst, dist, max_neighbors, num_nodes, vij, rbf
+    selected, index_mapping, safe_neighbors, present = packed_neighbors(
+        src, dst, dist, max_neighbors, num_nodes
     )
-
-    neighbor_list, present, index_mapping = pad_neighbor_list(
-        src, dst, max_neighbors, num_nodes
-    )
-    # Attention mask: True = padded / invalid (matches upstream)
     attn_mask = (~present).unsqueeze(-1)
-
-    edge_vec = map_neighbor_list(vij, index_mapping, max_neighbors, num_nodes)
-    edge_dis = map_neighbor_list(dist, index_mapping, max_neighbors, num_nodes)
-    edge_dis = edge_dis.masked_fill(~present, 0.0)
-    attn_weight = map_neighbor_list(rbf, index_mapping, max_neighbors, num_nodes)
-    attn_weight = attn_weight.masked_fill(attn_mask, 0.0)
-
-    # Safe neighbor gather index (unused slots → 0; masked later)
-    safe_neighbors = neighbor_list.clamp(min=0)
+    edge_vec = map_neighbor_list(vij[selected], index_mapping, max_neighbors, num_nodes)
+    edge_dis = map_neighbor_list(dist[selected], index_mapping, max_neighbors, num_nodes)
+    attn_weight = map_neighbor_list(rbf[selected], index_mapping, max_neighbors, num_nodes)
 
     return {
         "f_sparse_idx_node": safe_neighbors,

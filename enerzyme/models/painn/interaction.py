@@ -3,7 +3,7 @@
 Residual continuous-filter convolution on scalar features ``[N, F]`` and
 Cartesian vector features ``[N, 3, F]``. Adapted from SchNetPack 2.0.4
 ``schnetpack.representation.painn`` (MIT). The radial filter itself is owned
-by :class:`~enerzyme.models.painn.core.PaiNNCore`.
+by the input embedding.
 """
 
 from __future__ import annotations
@@ -12,8 +12,11 @@ import torch
 from torch import Tensor
 from torch.nn import Module, Sequential
 
-from ..functional import segment_sum_coo
-from ..layers.gated_equivariant import cartesian_dense
+from ..mp.basis.envelope import cosine_transition
+from ..mp.block import Block, BlockState
+from ..mp.core import FieldEmbed
+from ..mp.ops import scatter_sum
+from ..mp.nn.gate import cartesian_dense
 
 
 class PaiNNInteraction(Module):
@@ -46,11 +49,11 @@ class PaiNNInteraction(Module):
         x = self.interatomic_context_net(q)[idx_j]
         x = wij * x
         dq, dmu_r, dmu_mu = torch.split(x, self.n_atom_basis, dim=-1)
-        dq = segment_sum_coo(dq, idx_i, dim_size=n_atoms)
+        dq = scatter_sum(dq, idx_i, n_atoms)
         dmu = dmu_r.unsqueeze(-2) * dir_ij.unsqueeze(-1)
         if self.propagate_vectors:
             dmu = dmu + dmu_mu.unsqueeze(-2) * mu[idx_j]
-        dmu = segment_sum_coo(dmu, idx_i, dim_size=n_atoms)
+        dmu = scatter_sum(dmu, idx_i, n_atoms)
         return q + dq, mu + dmu
 
 
@@ -89,3 +92,39 @@ class PaiNNMixing(Module):
         if self.use_vector_scalar_product:
             dq = dq + dq_prod * torch.sum(mu_v * mu_w, dim=-2)
         return q + dq, mu + dmu
+
+
+class PaiNNEmbed(FieldEmbed):
+    """Project all radial filters once and initialize the zero vector state."""
+
+    def __init__(self, width, num_rbf, cutoff, steps, shared_filters):
+        super().__init__(width=width, vector_channels=width)
+        self.num_rbf = num_rbf
+        self.cutoff = cutoff
+        self.shared_filters = shared_filters
+        self.filter_net = cartesian_dense(num_rbf, 3 * width * (1 if shared_filters else steps),
+                                          activation=False)
+
+    def forward(self, inputs, ctx):
+        state = super().forward(inputs, ctx)
+        if ctx.rbf.shape[-1] != self.num_rbf:
+            raise ValueError(f"rbf width {ctx.rbf.shape[-1]} != num_rbf {self.num_rbf}")
+        window = ctx.cutoff_values
+        if window is None:
+            window = cosine_transition(ctx.dist, self.cutoff)
+        filters = self.filter_net(ctx.rbf) * window.reshape(-1, 1)
+        slices = filters.split(3 * self.width, dim=-1)
+        return BlockState(state.scalar, state.equi, slices)
+
+
+class PaiNNBlock(Block):
+    def __init__(self, message, update):
+        super().__init__()
+        self.message = message
+        self.update = update
+
+    def forward(self, state, ctx):
+        scalar, vector = self.message(state.scalar, state.equi, state.edge[0], ctx.unit(),
+                                      ctx.receiver, ctx.sender, ctx.num_nodes)
+        scalar, vector = self.update(scalar, vector)
+        return BlockState(scalar, vector, state.edge[1:] if len(state.edge) > 1 else state.edge)

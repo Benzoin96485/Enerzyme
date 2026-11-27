@@ -17,9 +17,9 @@ from typing import Literal, Optional
 
 import torch
 from torch import Tensor
-from torch_scatter import segment_sum_coo
+from ...mp.ops import scatter_sum
 
-from ...cutoff import CUTOFF_REGISTER
+from ...mp.basis.envelope import CUTOFF_REGISTER
 from .. import BaseFFLayer
 
 _FINE_STRUCTURE = 0.0072973525693
@@ -104,6 +104,10 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
         """Reject Z outside free-atom table (avoids silent CUDA OOB)."""
         if Za.numel() == 0:
             return
+        if torch.compiler.is_compiling():
+            torch._assert_async(((Za >= 1) & (Za <= MAX_ZA_TSQDO)).all(),
+                                f"TS–QDO free-atom tables cover Z=1..{MAX_ZA_TSQDO}")
+            return
         z_min = int(Za.min().item())
         z_max = int(Za.max().item())
         if z_min < 1 or z_max > MAX_ZA_TSQDO:
@@ -174,4 +178,4 @@ class TSQDODispersionEnergyLayer(BaseFFLayer):
                 float(self.cutoff_lr) - float(self.cutoff_lr_damping),
             )
             edge = edge * torch.where(r > 0, w, torch.zeros_like(w))
-        return segment_sum_coo(edge, idx_i, dim_size=len(Za))
+        return scatter_sum(edge, idx_i, len(Za))

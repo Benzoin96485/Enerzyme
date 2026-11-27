@@ -65,7 +65,7 @@ Modelhub:
         params:
           num_residual: 1
           attribute: spin
-      - name: Core
+      - name: Core  # Configure the spookynet message-passing blocks here.
         params: # dim_embedding, num_rbf, activation_fn in build_params
           num_modules: 6
           num_residual_pre: 1

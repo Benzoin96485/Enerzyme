@@ -5,14 +5,14 @@
 import math
 import torch
 import torch_geometric
-from torch_scatter import scatter
+from ..mp.ops import scatter_sum as scatter, segment_softmax
 from e3nn import o3
 from e3nn.util.jit import compile_mode
 from e3nn.nn.models.v2106.gate_points_message_passing import tp_path_exists
 
-from ..e3nn_nn import EquivariantLayerNormV2
-from ..blocks.radial_mlp import RadialProfile
-from ..e3nn_nn import (
+from ..mp.equivariant.e3nn import EquivariantLayerNormV2
+from ..mp.nn.radial_mlp import RadialProfile
+from ..mp.equivariant.e3nn import (
     TensorProductRescale,
     LinearRS,
     FullyConnectedTensorProductRescale,
@@ -22,8 +22,8 @@ from ..e3nn_nn import (
     Gate,
     EquivariantDropout,
 )
-from ..blocks.drop import GraphDropPath
-from ..activation import SmoothLeakyReLU
+from ..mp.nn.drop import GraphDropPath
+from ..mp.nn.activation import SmoothLeakyReLU
 
 _RESCALE = True
 _USE_BIAS = True
@@ -473,7 +473,7 @@ class GraphAttention(torch.nn.Module):
         # inner product
         alpha = self.alpha_act(alpha)
         alpha = torch.einsum('bik, aik -> bi', alpha, self.alpha_dot)
-        alpha = torch_geometric.utils.softmax(alpha, edge_dst)
+        alpha = segment_softmax(alpha, edge_dst, node_input.shape[0], eps=1e-16, detach_max=True)
         alpha = alpha.unsqueeze(-1)
         if self.alpha_dropout is not None:
             alpha = self.alpha_dropout(alpha)
@@ -642,7 +642,8 @@ from torch import Tensor
 from torch.nn import Module
 
 from ..layers._base_layer import BaseFFLayer
-from ..layers.readout import _resolve_feature_irreps, split_readout_field_outputs
+from ..layers.readout import split_readout_field_outputs
+from ..mp.repr import IrrepsSpec
 
 
 class EquiformerGraphAttentionReadout(BaseFFLayer):
@@ -697,7 +698,7 @@ class EquiformerGraphAttentionReadout(BaseFFLayer):
         irreps_str = (
             feature_irreps
             if feature_irreps is not None
-            else _resolve_feature_irreps(built_layers)
+            else IrrepsSpec.from_layers(built_layers, 0).irreps
         )
         if irreps_str is None:
             raise ValueError(

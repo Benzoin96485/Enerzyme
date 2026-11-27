@@ -14,13 +14,7 @@ HYPER_PARAM_KEYS = {
     },
 }
 MODEL_HEAD_NAMES = {
-    "PhysNetCore": {"output_block"},
-    "SchNetCore": {"lin1", "lin2"},
-    "SpookyNetCore": {"output"},
-    "AlphaNetCore": set(),
-    "LEFTNetCore": set(),
-    "MACECore": {"readouts"},
-    "BOTNetCore": set(),
+    "ComposableCore": {"head"},
 }
 
 
@@ -30,7 +24,7 @@ def get_optimizer_config(**params) -> Tuple[str, Dict[str, Any]]:
 
     Params:
     ----------
-    **params: dict
+    ``**params``: dict
         The configuration for the :doc:`Trainer <enerzyme.tasks.trainer.Trainer>` class.
 
     Returns:
@@ -79,7 +73,7 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
     model: torch.nn.Module
         The model to optimize.
 
-        Now Muon optimizer only supports the following internal models: PhysNet, SpookyNet, AlphaNet, LEFTNet, MACE, and SchNet. Readouts that live in ``post_sequence`` (SimpleReadout on AlphaNet and LEFTNet) are auxiliary parameters.
+        Now Muon optimizer only supports Cores built on ``ComposableCore`` (SchNet, PhysNet, SpookyNet, MACE, ...), whose readouts live under ``head``, and AlphaNet, LEFTNet and BOTNet. Readouts that live in ``post_sequence`` (SimpleReadout on AlphaNet and LEFTNet) are auxiliary parameters.
         
     hyper_params: dict
         The hyperparameters for the optimizer, depending on the optimizer `name`.
@@ -253,7 +247,7 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
             raise TypeError(f"Muon optimizer is not supported for {core_name}.")
         
         # get the param groups
-        head_names = MODEL_HEAD_NAMES[core_name]
+        head_names = getattr(model, "muon_head_names", MODEL_HEAD_NAMES[core_name])
         hidden_weights = []
         hidden_gains_biases = []
         nonhidden_params = []

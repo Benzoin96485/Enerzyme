@@ -60,7 +60,7 @@ def _inputs(positions, embedding, cutoff, rbf=None, window=None):
 
 
 def _tiny(**overrides):
-    from enerzyme.models.cace import CACECore
+    from enerzyme.models.presets.cartesian_tensor import cace
 
     params = dict(
         dim_embedding=2,
@@ -73,7 +73,7 @@ def _tiny(**overrides):
         num_message_passing=0,
     )
     params.update(overrides)
-    return CACECore(**params)
+    return cace(**params)
 
 
 def test_registration_presets_and_yaml():
@@ -83,7 +83,7 @@ def test_registration_presets_and_yaml():
 
     for name in ("cace", "CACE"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "CACECore"
+        assert core_cls.__name__ == "cace"
         assert build_params["cutoff_sr"] == 5.5
         assert build_params["dim_embedding"] == 3
         assert build_params["num_rbf"] == 6
@@ -145,7 +145,7 @@ def test_registration_presets_and_yaml():
         build_params=dict(ff["build_params"]),
         verbose=0,
     )
-    assert model.__class__.__name__ == "CACECore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.lmax == 2 and model.max_nu == 3 and model.n_radial == 2
     assert model.num_message_passing == 1
     assert model.dim_feature_out == 64
@@ -173,7 +173,7 @@ def test_local_features_match_the_pair_contraction_and_ignore_distant_edges():
         preset=None,
     ).double()
     with torch.no_grad():
-        core.mix.weight.fill_(1.0)
+        core.embed.mix.weight.fill_(1.0)
     positions = torch.tensor(
         [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
         dtype=torch.float64,
@@ -260,13 +260,13 @@ def test_scalar_message_changes_the_second_block():
     baseline = core.get_output(**kwargs)["atom_feature"]
     width = baseline.shape[-1] // 2
     with torch.no_grad():
-        core.layers[0].gate.h.weight.zero_()
-        core.layers[0].gate.h.bias.zero_()
+        core.blocks[0].gate.h.weight.zero_()
+        core.blocks[0].gate.h.bias.zero_()
     silenced = core.get_output(**kwargs)["atom_feature"]
     assert torch.allclose(silenced[:, width:], torch.zeros_like(silenced[:, width:]))
     assert not torch.allclose(baseline[:, width:], silenced[:, width:], atol=1e-6)
     with torch.no_grad():
-        core.layers[0].gate.h.bias.fill_(1.0)
+        core.blocks[0].gate.h.bias.fill_(1.0)
     repeated = core.get_output(**kwargs)["atom_feature"]
     assert torch.isfinite(repeated).all()
     assert not torch.allclose(repeated[:, width:], silenced[:, width:], atol=1e-6)
@@ -446,3 +446,20 @@ def test_two_molecules_keep_separate_energies_and_simple_readout_fits():
     assert output["E"].shape == (1,)
     assert output["Fa"].shape == (3, 3)
     assert torch.isfinite(output["E"]).all()
+
+
+def test_compiled_inference_accepts_a_third_atom_count():
+    # The second size recompiles with a symbolic atom count. The radial mix
+    # used to keep the channel axis outermost, so the compiled backward fixed
+    # the atom-dependent stride of the second size and rejected the third.
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(1)
+    model = build("cace").double()
+    compiled = torch.compile(model)
+    for seed, sizes in ((11, [4, 5]), (12, [7, 9]), (13, [12, 10, 9])):
+        batch = make_batch(random_molecules(seed, sizes, density=0.12), torch.float64)
+        expected = forward(model, batch, torch.float64)
+        actual = forward(compiled, batch, torch.float64)
+        for key in ("E", "Fa"):
+            torch.testing.assert_close(actual[key].detach(), expected[key].detach(), rtol=1e-10, atol=1e-10)

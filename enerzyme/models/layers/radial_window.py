@@ -14,7 +14,7 @@ import torch
 from torch import Tensor
 from torch.nn import Parameter
 
-from ..cutoff import polynomial_envelope
+from ..mp.basis.envelope import polynomial_envelope
 from . import BaseFFLayer
 from .covalent import (
     constrained_attenuation_exponents,

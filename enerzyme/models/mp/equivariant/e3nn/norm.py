@@ -1,0 +1,80 @@
+# Copyright (c) Equiformer authors (Liao & Smidt, ICLR 2023).
+# Ported from https://github.com/atomicarchitects/equiformer (MIT License)
+# into Enerzyme with package-local imports.
+"""Equivariant layer norm for flat e3nn irreps features."""
+
+import torch
+import torch.nn as nn
+from e3nn.o3 import Irreps
+
+
+from ...nn.norm import degree_rms_scale
+
+
+class EquivariantLayerNormV2(nn.Module):
+    def __init__(self, irreps, eps=1e-5, affine=True, normalization="component"):
+        super().__init__()
+
+        self.irreps = Irreps(irreps)
+        self.blocks = tuple((mul, ir.dim, ir.l == 0 and ir.p == 1) for mul, ir in self.irreps)
+        self.eps = eps
+        self.affine = affine
+
+        num_scalar = sum(mul for mul, ir in self.irreps if ir.l == 0 and ir.p == 1)
+        num_features = self.irreps.num_irreps
+
+        if affine:
+            self.affine_weight = nn.Parameter(torch.ones(num_features))
+            self.affine_bias = nn.Parameter(torch.zeros(num_scalar))
+        else:
+            self.register_parameter("affine_weight", None)
+            self.register_parameter("affine_bias", None)
+
+        assert normalization in ["norm", "component"], (
+            "normalization needs to be 'norm' or 'component'"
+        )
+        self.normalization = normalization
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.irreps}, eps={self.eps})"
+
+    @torch.cuda.amp.autocast(enabled=False)
+    def forward(self, node_input, **kwargs):
+        dim = node_input.shape[-1]
+
+        fields = []
+        ix = 0
+        iw = 0
+        ib = 0
+
+        for mul, d, even_scalar in self.blocks:
+            field = node_input.narrow(1, ix, mul * d)
+            ix += mul * d
+
+            field = field.reshape(-1, mul, d)
+
+            if even_scalar:
+                field_mean = torch.mean(field, dim=1, keepdim=True)
+                field = field - field_mean
+
+            field_norm = degree_rms_scale(field, -1, -2, self.normalization, self.eps).squeeze(-1)
+
+            if self.affine:
+                weight = self.affine_weight[None, iw : iw + mul]
+                iw += mul
+                field_norm = field_norm * weight
+
+            field = field * field_norm.unsqueeze(-1)
+
+            if self.affine and even_scalar:
+                bias = self.affine_bias[ib : ib + mul]
+                ib += mul
+                field += bias.reshape(mul, 1)
+
+            fields.append(field.reshape(-1, mul * d))
+
+        if ix != dim:
+            fmt = "`ix` should have reached node_input.size(-1) ({}), but it ended at {}"
+            raise AssertionError(fmt.format(dim, ix))
+
+        return torch.cat(fields, dim=-1)

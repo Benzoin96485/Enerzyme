@@ -11,12 +11,12 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from ..activation import SwiGLU
-from ..so3.gated import SO3GatedActivation
-from ..so3.layer_norm import EquivariantDegreeRMSNorm
-from ..so3.lebedev import S2LebedevProjector
-from ..so3.linear import SO3FocusLinear
-from ..so3.s2_projector import S2GridProjector
+from ..mp.nn.activation import SwiGLU
+from ..mp.equivariant.sph.gated import SO3GatedActivation
+from ..mp.equivariant.sph.layer_norm import EquivariantDegreeRMSNorm
+from ..mp.equivariant.s2.lebedev import S2LebedevProjector
+from ..mp.equivariant.sph.linear import SO3FocusLinear
+from ..mp.equivariant.s2.projector import S2GridProjector
 from .so2 import EdgeCache, SO2Convolution
 
 

@@ -22,7 +22,7 @@ def test_feedforward_network_matches_upstream():
     from enerzyme.models.equiformer_v2.interaction import (
         FeedForwardNetwork as EZFFN,
     )
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
     from eqv2_so3 import SO3_Embedding as OffEmb
     from transformer_block import FeedForwardNetwork as OffFFN
 
@@ -60,9 +60,9 @@ def test_feedforward_network_matches_upstream():
 
 def test_transblock_v2_matches_upstream():
     from enerzyme.models.equiformer_v2.interaction import TransBlockV2 as EZBlock
-    from enerzyme.models.so3 import CoefficientMapping as EZMap
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
-    from enerzyme.models.so3 import SO3_Rotation as EZRot
+    from enerzyme.models.mp.equivariant import CoefficientMapping as EZMap
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_Rotation as EZRot
     from eqv2_so3 import CoefficientMappingModule as OffMap
     from eqv2_so3 import SO3_Embedding as OffEmb
     from eqv2_so3 import SO3_Rotation as OffRot

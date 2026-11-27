@@ -2,7 +2,6 @@ from typing import Dict, List
 import numpy as np
 import torch
 from torch import Tensor
-from torch_scatter import segment_sum_coo
 from ..utils import logger
 
 
@@ -15,12 +14,15 @@ class Monitor:
         self.collection = {k: [] for k in self.terms}
 
     def collect(self, output: Dict[str, Tensor]) -> None:
+        # Deferred: enerzyme.models imports the trainer, which imports this module.
+        from ..models.mp.ops import scatter_sum
+
         with torch.no_grad():
             for k in self.terms:
                 if k in output:
                     self.collection[k].extend(output[k].detach().cpu().numpy())
                 elif k + "_a" in output:
-                    self.collection[k].extend(segment_sum_coo(output[k + "_a"].detach(), output["batch_seg"]).cpu().numpy())
+                    self.collection[k].extend(scatter_sum(output[k + "_a"].detach(), output["batch_seg"]).cpu().numpy())
 
 
     def _summary(self) -> Dict[str, Dict[str, float]]:

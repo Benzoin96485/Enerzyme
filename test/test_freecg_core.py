@@ -122,7 +122,7 @@ def _attach(core, num_rbf: int):
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
     radial = ExpNormalSmearing(num_rbf=num_rbf, cutoff_sr=5.0, trainable=False)
-    core._radial_holder = [radial]
+    core.embed._radial_holder = [radial]
     core.eval()
     return core
 
@@ -138,7 +138,7 @@ def test_registration_and_yaml_build():
 
     for name in ("freecg", "FreeCG", "free-cg", "free_cg"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "FreeCGCore"
+        assert core_cls.__name__ == "freecg"
         assert build_params["num_rbf"] == 32
         assert build_params["dim_embedding"] == 256
         assert build_params["cutoff_sr"] == 5.0
@@ -161,37 +161,37 @@ def test_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "FreeCGCore"
+    assert model.architecture == "freecg"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.vector_feature_layout == "cartesian_n3f"
     assert model.lmax == 2
     assert model.num_groups == 2
     assert model.channels_per_group == 4
-    assert model.vis_layers[0].__class__.__name__ == "FreeCGInteraction"
-    assert model.vis_layers[0].group_cg.n_paths == 4
+    assert model.blocks[0].module.__class__.__name__ == "FreeCGInteraction"
+    assert model.blocks[0].module.group_cg.n_paths == 4
     assert "atom_l2_feature" in model._output_fields
     readout = next(layer for layer in model.post_sequence if isinstance(layer, SimpleReadout))
     assert readout.head_type == "two_layer"
 
 
 def test_unknown_width_lmax_and_groups_raise():
-    from enerzyme.models.freecg import FreeCGCore
+    from enerzyme.models.presets.cartesian_vector import freecg
 
     try:
-        FreeCGCore(dim_embedding=8, num_rbf=4, num_heads=2, num_layers=1, num_groups=3)
+        freecg(dim_embedding=8, num_rbf=4, num_heads=2, num_layers=1, num_groups=3)
     except ValueError as exc:
         assert "num_groups" in str(exc)
     else:
         raise AssertionError("expected a bad group count to fail")
     try:
-        FreeCGCore(dim_embedding=8, num_rbf=4, num_heads=2, num_layers=1, lmax=1)
+        freecg(dim_embedding=8, num_rbf=4, num_heads=2, num_layers=1, lmax=1)
     except ValueError as exc:
         assert "lmax" in str(exc)
     else:
         raise AssertionError("expected lmax 1 to fail")
     try:
-        FreeCGCore(
+        freecg(
             dim_embedding=8, num_rbf=4, num_heads=2, num_layers=1, attention_enhancer="softmax"
         )
     except ValueError as exc:
@@ -201,12 +201,12 @@ def test_unknown_width_lmax_and_groups_raise():
 
 
 def test_features_rotation_parity_translation_and_batch():
-    from enerzyme.models.freecg import FreeCGCore
+    from enerzyme.models.presets.cartesian_vector import freecg
 
     torch.manual_seed(3)
     n, features, num_rbf = 4, 8, 4
     core = _attach(
-        FreeCGCore(
+        freecg(
             dim_embedding=features,
             num_rbf=num_rbf,
             num_layers=2,

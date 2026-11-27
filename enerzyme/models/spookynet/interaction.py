@@ -1,12 +1,16 @@
+import math
 from typing import Optional, Tuple
 import torch
 from torch.nn import Module, Linear, init
-from ..functional import segment_sum_coo
-from ..activation import ACTIVATION_KEY_TYPE
+from torch.utils.checkpoint import checkpoint
+from ..mp.block import BlockState
+from ..mp.graph import GraphContext
+from ..mp.ops import scatter_sum
+from ..mp.nn.activation import ACTIVATION_KEY_TYPE
 from ..layers.electron_embedding import ResidualMLP
-from ..blocks.mlp import ResidualStack as _ResidualStack
-from ..blocks.attention import Attention
-from ..efa import EFABlock
+from ..mp.nn.mlp import ResidualStack as _ResidualStack
+from ..mp.nonlocal_ import Performer
+from ..mp.nonlocal_ import EFABlock
 
 
 def ResidualStack(
@@ -112,8 +116,8 @@ class LocalInteraction(Module):
         """
         # interaction functions
         gs = self.radial_s(rbf)
-        gp = self.radial_p(rbf).unsqueeze(-2) * pij.unsqueeze(-1)
-        gd = self.radial_d(rbf).unsqueeze(-2) * dij.unsqueeze(-1)
+        gp = self.radial_p(rbf)
+        gd = self.radial_d(rbf)
         # atom featurizations
         xx = self.resblock_x(x)
         xs = self.resblock_s(x)
@@ -131,9 +135,11 @@ class LocalInteraction(Module):
             xd = torch.gather(xd, 0, j)  # L=2
         # sum over neighbors
         N = len(x)
-        s = xx + segment_sum_coo(gs * xs, idx_i, dim_size=N)
-        p = segment_sum_coo(gp * xp.unsqueeze(-2), idx_i, dim_size=N)
-        d = segment_sum_coo(gd * xd.unsqueeze(-2), idx_i, dim_size=N)
+        s = xx + scatter_sum(gs * xs, idx_i, N)
+        # Contract the two scalar channels before expanding them over the
+        # angular basis, so the backward saves only one edge-by-channel product.
+        p = scatter_sum((gp * xp).unsqueeze(-2) * pij.unsqueeze(-1), idx_i, N)
+        d = scatter_sum((gd * xd).unsqueeze(-2) * dij.unsqueeze(-1), idx_i, N)
         # project tensorial features to scalars
         pa, pb = torch.split(self.projection_p(p), p.shape[-1], dim=-1)
         da, db = torch.split(self.projection_d(d), d.shape[-1], dim=-1)
@@ -182,7 +188,7 @@ class NonlocalInteraction(Module):
         self.resblock_v = ResidualMLP(
             dim_embedding, num_residual_v, activation_fn, zero_init=True
         )
-        self.attention = Attention(dim_embedding, dim_embedding)
+        self.attention = Performer(dim_embedding, dim_embedding)
 
     def forward(
         self,
@@ -202,6 +208,56 @@ class NonlocalInteraction(Module):
         k = self.resblock_k(x)  # keys
         v = self.resblock_v(x)  # values
         return self.attention(q, k, v, num_batch, batch_seg, mask)
+
+
+_SQRT2 = math.sqrt(2.0)
+
+
+def edge_orbitals(ctx: GraphContext, use_irreps: bool) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Unit vectors ``pij`` (p channel) and the d-channel angular functions.
+
+    ``use_irreps`` gives the five real d harmonics in chemistry order; otherwise
+    the six reducible Cartesian products ``x², y², z², √2xy, √2xz, √2yz``.
+    """
+    def build() -> Tuple[torch.Tensor, torch.Tensor]:
+        pij = ctx.vec / ctx.dist.unsqueeze(-1)
+        if use_irreps:
+            from ..mp.basis.angular import spherical_harmonics
+
+            dij = spherical_harmonics(pij, degrees=[2], layout="spookynet_d", normalize_input=False)
+        else:
+            dij = torch.stack(
+                [
+                    pij[:, 0] * pij[:, 0],
+                    pij[:, 1] * pij[:, 1],
+                    pij[:, 2] * pij[:, 2],
+                    _SQRT2 * pij[:, 0] * pij[:, 1],
+                    _SQRT2 * pij[:, 0] * pij[:, 2],
+                    _SQRT2 * pij[:, 1] * pij[:, 2],
+                ],
+                dim=-1,
+            )
+        return pij, dij
+
+    return ctx.cached(("spookynet_orbitals", bool(use_irreps)), build)
+
+
+def molecule_mask(ctx: GraphContext, dtype: torch.dtype):
+    """``(num_batch, mask)`` for batch-restricted attention; ``mask`` is None for one molecule."""
+    def build():
+        batch_seg = ctx.batch
+        if batch_seg is None or not batch_seg.numel():
+            return 1, None
+        sizes = ctx.inputs.get("N")
+        if isinstance(sizes, (list, tuple)) or (torch.is_tensor(sizes) and sizes.ndim > 0):
+            num_batch = len(sizes)
+        else:
+            num_batch = int(batch_seg.max()) + 1
+        if num_batch > 1:
+            return num_batch, (batch_seg[:, None] == batch_seg).to(dtype)
+        return num_batch, None
+
+    return ctx.cached("spookynet_molecule_mask", build)
 
 
 class InteractionModule(Module):
@@ -252,6 +308,7 @@ class InteractionModule(Module):
         num_residual_post: int,
         num_residual_output: int,
         activation_fn: ACTIVATION_KEY_TYPE="swish",
+        use_irreps: bool = True,
         use_efa: bool = False,
         efa_lebedev_num: int = 146,
         efa_max_frequency: Optional[float] = None,
@@ -261,6 +318,7 @@ class InteractionModule(Module):
     ) -> None:
         """ Initializes the InteractionModule class. """
         super().__init__()
+        self.use_irreps = bool(use_irreps)
         self.use_efa = bool(use_efa)
         # initialize modules
         self.local_interaction = LocalInteraction(
@@ -303,58 +361,30 @@ class InteractionModule(Module):
             dim_embedding, num_residual_output, activation_fn=activation_fn
         )
 
-    def forward(
-        self,
-        x: torch.Tensor,
-        rbf: torch.Tensor,
-        pij: torch.Tensor,
-        dij: torch.Tensor,
-        idx_i: torch.Tensor,
-        idx_j: torch.Tensor,
-        num_batch: int,
-        batch_seg: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        Ra: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Evaluate all modules in the block.
-        N: Number of atoms.
-        P: Number of atom pairs.
-        B: Batch size (number of different molecules).
-
-        Arguments:
-            x (FloatTensor [N, num_features]):
-                Latent atomic feature vectors.
-            rbf (FloatTensor [P, num_basis_functions]):
-                Values of the radial basis functions for the pairwise distances.
-            idx_i (LongTensor [P]):
-                Index of atom i for all atomic pairs ij. Each pair must be
-                specified as both ij and ji.
-            idx_j (LongTensor [P]):
-                Same as idx_i, but for atom j.
-            num_batch (int):
-                Batch size (number of different molecules).
-            batch_seg (LongTensor [N]):
-                Index for each atom that specifies to which molecule in the
-                batch it belongs.
-            Ra (FloatTensor [N, 3], optional):
-                Absolute positions; required when ``use_efa=True``.
-        Returns:
-            x (FloatTensor [N, num_features]):
-                Updated latent atomic feature vectors.
-            y (FloatTensor [N, num_features]):
-                Contribution to output atomic features (environment
-                descriptors).
-        """
-        x = self.residual_pre(x)
-        l = self.local_interaction(x, rbf, pij, dij, idx_i, idx_j)
+    def forward(self, state: BlockState, ctx: GraphContext) -> BlockState:
+        """One SpookyNet module: ``x`` is updated in place; ``aux["y"]`` is its output contribution."""
+        x = self.residual_pre(state.scalar)
+        pij, dij = edge_orbitals(ctx, self.use_irreps)
+        if (torch.compiler.is_compiling() and x.is_cuda and not self.training
+                and not torch._C._are_functorch_transforms_active()):
+            # Rebuild private edge features during the force pullback. The
+            # returned energy can be differentiated again using the same inputs.
+            l = checkpoint(
+                self.local_interaction, x, ctx.rbf, pij, dij, ctx.receiver, ctx.sender,
+                use_reentrant=False, preserve_rng_state=False,
+            )
+        else:
+            l = self.local_interaction(x, ctx.rbf, pij, dij, ctx.receiver, ctx.sender)
         if self.use_efa:
+            Ra = ctx.inputs.get("Ra")
             if Ra is None:
                 raise ValueError("Ra (absolute positions) is required when use_efa=True")
+            batch_seg = ctx.batch
             if batch_seg is None:
                 batch_seg = torch.zeros(x.shape[0], dtype=torch.long, device=x.device)
             n = self.efa_nonlocal(x, Ra, batch_seg)
         else:
-            n = self.nonlocal_interaction(x, num_batch, batch_seg, mask)
+            num_batch, mask = molecule_mask(ctx, x.dtype)
+            n = self.nonlocal_interaction(x, num_batch, ctx.batch, mask)
         x = self.residual_post(x + l + n)
-        return x, self.resblock(x)
+        return state._replace(scalar=x).with_aux(y=self.resblock(x))

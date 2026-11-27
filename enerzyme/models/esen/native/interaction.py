@@ -1,7 +1,7 @@
 """eSEN edgewise / nodewise blocks (Fu et al., 2025).
 
 The edgewise path is two fairchem-style SO(2) convolutions
-(:class:`~enerzyme.models.so3.SO2_Convolution`) with a SiLU gate between
+(:class:`~enerzyme.models.mp.equivariant.SO2_Convolution`) with a SiLU gate between
 them and a polynomial envelope on the message. The nodewise path is an
 equivariant linear pair plus the same gate (:class:`SO3Linear`,
 :class:`GateActivation`). Neither path samples an S² grid unless the
@@ -18,9 +18,10 @@ from typing import List, Optional
 import torch
 from torch import Tensor, nn
 
-from ...blocks.radial_mlp import RadialFunction
-from ...cutoff import polynomial_envelope
-from ...so3 import (
+from ...mp.aggregate import Aggregate
+from ...mp.nn.radial_mlp import RadialFunction
+from ...mp.basis.envelope import polynomial_envelope
+from ...mp.equivariant import (
     CoefficientMapping,
     GateActivation,
     SO2_Convolution,
@@ -75,6 +76,7 @@ class EdgeDegreeEmbedding(nn.Module):
         self.lmax_list = list(lmax_list)
         self.mmax_list = list(mmax_list)
         self.mapping = mapping
+        self.aggregate = Aggregate(divisor=rescale_factor)
         self.rescale_factor = float(rescale_factor)
         self.cutoff = float(cutoff)
         self.use_envelope = bool(use_envelope)
@@ -108,8 +110,7 @@ class EdgeDegreeEmbedding(nn.Module):
         if self.use_envelope:
             env = polynomial_envelope(edge_distance, self.cutoff, 5)
             emb.embedding = emb.embedding * env.view(-1, 1, 1)
-        emb._reduce_edge(edge_index[1], num_nodes)
-        return emb.embedding / self.rescale_factor
+        return self.aggregate.reduce(emb.embedding, edge_index[1], num_nodes)
 
 
 class Edgewise(nn.Module):
@@ -276,7 +277,7 @@ class eSENBlock(nn.Module):
         SO3_grid=None,
     ) -> None:
         super().__init__()
-        from ...so3 import get_normalization_layer
+        from ...mp.equivariant import get_normalization_layer
 
         self.norm_1 = get_normalization_layer(
             norm_type, lmax=lmax, num_channels=sphere_channels

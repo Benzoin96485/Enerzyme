@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import math
 
+import pytest
 import torch
 from numpy.testing import assert_allclose
 
-from enerzyme.models.cutoff import polynomial_envelope
+from enerzyme.models.mp.basis.envelope import polynomial_envelope
 from enerzyme.models.dimenet.basis import real_sph_harm_l0
 from enerzyme.models.gemnet.basis import (
     SphericalBesselRadial,
@@ -266,3 +267,30 @@ def test_bilinear_empty_neighbors_are_zero():
     )
     assert got.shape == (3, 2)
     assert torch.count_nonzero(got) == 0
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA Inductor")
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_compiled_bilinear_force_inference_retains_gradients(dtype):
+    from torch._functorch import config
+
+    torch.manual_seed(7)
+    module = BilinearAggregate(8, 4, 5).to(device="cuda", dtype=dtype).eval()
+    module.recompute_force_inference = True
+    msg = torch.randn(5, 8, dtype=dtype, device="cuda", requires_grad=True)
+    angular = torch.randn(7, 3, dtype=dtype, device="cuda", requires_grad=True)
+    radial = torch.randn(5, 4, 3, dtype=dtype, device="cuda", requires_grad=True)
+    src = torch.tensor([0, 1, 2, 0, 3, 4, 2], device="cuda")
+    dst = torch.tensor([1, 1, 0, 2, 0, 3, 3], device="cuda")
+    inputs = (msg, src, dst, angular, radial, 5)
+    variables = (msg, angular, radial, module.weight)
+    native = module(*inputs)
+    # The public force-inference entry point uses this same AOT setting.
+    with config.patch(donated_buffer=False):
+        compiled = torch.compile(module)(*inputs)
+        torch.testing.assert_close(compiled, native)
+        for cotangent in (torch.ones_like(native), native.detach()):
+            expected = torch.autograd.grad(native, variables, cotangent, retain_graph=True)
+            actual = torch.autograd.grad(compiled, variables, cotangent, retain_graph=True)
+            for lhs, rhs in zip(actual, expected):
+                torch.testing.assert_close(lhs, rhs)

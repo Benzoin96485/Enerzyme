@@ -3,8 +3,10 @@
 
 """So3krates package — Core exports are lazy to avoid import cycles."""
 
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+
 __all__ = [
-    "So3kratesCore",
+
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "SO3LR_DEFAULT_BUILD_PARAMS",
@@ -13,15 +15,6 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    if name in {"So3kratesCore", "DEFAULT_BUILD_PARAMS", "DEFAULT_LAYER_PARAMS"}:
-        from .core import So3kratesCore, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
-
-        mapping = {
-            "So3kratesCore": So3kratesCore,
-            "DEFAULT_BUILD_PARAMS": DEFAULT_BUILD_PARAMS,
-            "DEFAULT_LAYER_PARAMS": DEFAULT_LAYER_PARAMS,
-        }
-        return mapping[name]
     if name == "SO3LR_DEFAULT_BUILD_PARAMS":
         from .so3lr import DEFAULT_BUILD_PARAMS as SO3LR_DEFAULT_BUILD_PARAMS
 

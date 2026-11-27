@@ -1,0 +1,35 @@
+"""SchNet defaults. The Core is :func:`enerzyme.models.presets.scalar.schnet`."""
+
+DEFAULT_BUILD_PARAMS = {
+    'dim_embedding': 128,
+    'num_rbf': 128,
+    'max_Za': 94,
+    'cutoff_sr': 5.0,
+    'Hartree_in_E': 1,
+    'Bohr_in_R': 0.5291772108
+}
+DEFAULT_LAYER_PARAMS = [{'name': 'RangeSeparation'},
+ {'name': 'GaussianRBF',
+  'params': {'flavor': 'SchNet', 'apply_cutoff_fn': False}},
+ {'name': 'RandomAtomEmbedding'},
+ {'name': 'Core',
+  'params': {'hidden_channels': 128,
+   'num_interactions': 4,
+   'activation_fn': 'shifted_softplus',
+   'activation_params': {'dim_feature': 1,
+    'initial_alpha': 1,
+    'initial_beta': 1,
+    'learnable': False},
+}},
+ {'name': 'AtomicAffine',
+  'params': {'shifts': {'Ea': {'values': 0, 'learnable': True},
+    'Qa': {'values': 0, 'learnable': True}},
+   'scales': {'Ea': {'values': 1, 'learnable': True},
+    'Qa': {'values': 1, 'learnable': True}}}},
+ {'name': 'ChargeConservation'},
+ {'name': 'AtomicCharge2Dipole'},
+ {'name': 'ElectrostaticEnergy',
+  'params': {'cutoff_lr': None, 'flavor': 'PhysNet'}},
+ {'name': 'GrimmeD3Energy', 'params': {'learnable': True}},
+ {'name': 'EnergyReduce'},
+ {'name': 'Force'}]

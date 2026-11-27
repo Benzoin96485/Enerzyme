@@ -7,11 +7,10 @@ shared layer stack. ``EquivariantDipole`` and ``EquivariantPolarizability``
 read the Cartesian latent pair.
 """
 
-from .core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS, NewtonNetCore
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 from .loss import LOSS_REGISTER
 
 __all__ = [
-    "NewtonNetCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
     "LOSS_REGISTER",

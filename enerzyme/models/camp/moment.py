@@ -15,95 +15,12 @@ from torch import Tensor, nn
 
 from .radial import SpeciesPairChebyshev, resolve_hidden_layers, silu_mlp
 from .rules import atomic_paths, hyper_moment_rules
-
-
-def cartesian_dyads(vectors: Tensor, max_rank: int, eps: float = 1e-12) -> Dict[int, Tensor]:
-    """Polyadic products of the unit vector, rank 0 through ``max_rank``.
-
-    A zero vector contributes a zero dyad of rank 1 and above. Rank 0 is 1,
-    including on an empty edge list.
-    """
-    if max_rank < 0:
-        raise ValueError(f"max_rank must be >= 0, got {max_rank}")
-    norm = torch.linalg.vector_norm(vectors, dim=-1, keepdim=True)
-    hat = torch.where(norm > eps, vectors / norm.clamp_min(eps), torch.zeros_like(vectors))
-    dyads = {0: vectors.new_ones(vectors.shape[0])}
-    if max_rank == 0:
-        return dyads
-    dyads[1] = hat
-    current = hat
-    for rank in range(2, max_rank + 1):
-        current = current.unsqueeze(-1) * hat.reshape(
-            *hat.shape[:-1], *([1] * (rank - 1)), 3
-        )
-        dyads[rank] = current
-    return dyads
-
-
-def contract_feature_dyad(
-    feature: Tensor, dyad: Tensor, feature_rank: int, dyad_rank: int
-) -> Tensor:
-    """Fully contract ``feature`` into the leading axes of ``dyad``.
-
-    ``feature`` is ``(C, E, 3^v1)`` and ``dyad`` is ``(E, 3^v2)``. The result
-    has rank ``v2 - v1``. Symmetric inputs make the choice of axes irrelevant.
-    """
-    if feature_rank > dyad_rank:
-        raise ValueError(f"feature rank {feature_rank} exceeds dyad rank {dyad_rank}")
-    out_rank = dyad_rank - feature_rank
-    channels, edges = feature.shape[:2]
-    if feature_rank == 0:
-        if dyad_rank == 0:
-            return feature * dyad.unsqueeze(0)
-        return feature.reshape(channels, edges, *([1] * dyad_rank)) * dyad.unsqueeze(0)
-    flat_feature = feature.reshape(channels, edges, 3 ** feature_rank)
-    flat_dyad = dyad.reshape(edges, 3 ** feature_rank, 3 ** out_rank if out_rank else 1)
-    mixed = torch.einsum("cej,ejk->cek", flat_feature, flat_dyad)
-    if out_rank == 0:
-        return mixed.squeeze(-1)
-    return mixed.reshape(channels, edges, *([3] * out_rank))
-
-
-def contract_moments(moments: Dict[int, Tensor], ranks: Sequence[int]) -> Tensor:
-    """Contract every factor but one copy of the highest rank into that copy."""
-    if len(ranks) == 1:
-        return moments[int(ranks[0])]
-    sink = max(range(len(ranks)), key=lambda index: ranks[index])
-    sink_rank = int(ranks[sink])
-    others = [int(ranks[index]) for index in range(len(ranks)) if index != sink]
-    acc_rank = sum(others)
-    out_rank = sink_rank - acc_rank
-    if out_rank < 0:
-        raise RuntimeError(f"hyper-moment ranks {tuple(ranks)} do not contract")
-    sink_tensor = moments[sink_rank]
-    channels, nodes = sink_tensor.shape[:2]
-    spatial_out = 3 ** out_rank if out_rank else 1
-    reduced = sink_tensor.reshape(channels, nodes, 3 ** acc_rank, spatial_out)
-    consumed = 0
-    for rank in others:
-        width = 3 ** rank
-        remaining = acc_rank - consumed
-        reduced = reduced.reshape(
-            channels, nodes, width, 3 ** (remaining - rank), spatial_out
-        )
-        other = moments[rank].reshape(channels, nodes, width)
-        reduced = torch.einsum("cnabk,cna->cnbk", reduced, other)
-        consumed += rank
-    reduced = reduced.reshape(channels, nodes, spatial_out)
-    if out_rank == 0:
-        return reduced.squeeze(-1)
-    return reduced.reshape(channels, nodes, *([3] * out_rank))
-
-
-def scatter_sum(src: Tensor, index: Tensor, n_nodes: int) -> Tensor:
-    """Sum ``src`` of shape ``(C, E, ...)`` onto nodes along the edge axis."""
-    channels, edges = src.shape[:2]
-    rest = src.shape[2:]
-    out = src.new_zeros(n_nodes, channels, *rest)
-    if edges:
-        message = src.movedim(1, 0).contiguous()
-        out.index_add_(0, index.long(), message)
-    return out.movedim(0, 1)
+from ..mp.ops import scatter_sum
+from ..mp.basis.cartesian import cartesian_dyads
+from ..mp.equivariant.body_order import contract_feature_dyad, contract_moments
+from ..mp.core import Embed
+from ..mp.graph import GraphContext
+from ..mp.block import Block, BlockState
 
 
 class ChannelMix(nn.Module):
@@ -185,22 +102,30 @@ class AtomicMoment(nn.Module):
         senders: Tensor,
         features: Dict[int, Tensor],
         n_atoms: int,
+        dyads: Dict[int, Tensor] | None = None,
     ) -> Dict[int, Tensor]:
         radial = self.radial(distance, zi, zj)
-        dyads = cartesian_dyads(vectors, self.max_v)
+        if dyads is None:
+            dyads = cartesian_dyads(vectors, self.max_v)
+        # All output ranks read the same sender features for an input rank.
+        edge_features = {
+            rank: features[rank].index_select(1, senders)
+            for rank in range(min(self.max_feature_rank, self.max_v) + 1)
+        }
         moments: Dict[int, Tensor] = {}
         for rank, paths in self.paths.items():
             pieces = []
             for feature_rank, dyad_rank in paths:
                 weight = self.radial_mlp[f"{rank}_{feature_rank}_{dyad_rank}"](radial)
                 weight = weight.transpose(0, 1)
-                feature = features[feature_rank].index_select(1, senders)
                 contracted = contract_feature_dyad(
-                    feature, dyads[dyad_rank], feature_rank, dyad_rank
+                    edge_features[feature_rank], dyads[dyad_rank], feature_rank, dyad_rank
                 )
                 view = weight.reshape(weight.shape + (1,) * rank)
-                pieces.append(scatter_sum(view * contracted, receivers, n_atoms) / self.norm)
+                pieces.append(scatter_sum(view * contracted, receivers, n_atoms, dim=1))
             combined = pieces[0] if len(pieces) == 1 else self.path_mix[str(rank)](torch.stack(pieces))
+            if self.norm != 1.0:
+                combined = combined / self.norm
             moments[rank] = self.channel_mix[str(rank)](combined)
         return moments
 
@@ -236,7 +161,96 @@ class HyperMoment(nn.Module):
         return output
 
 
-class CAMPLayer(nn.Module):
+class CAMPEmbed(Embed):
+    """Prepare the chemical species pairs and dyads shared by every CAMP layer."""
+
+    input_fields = ("atom_embedding", "Za")
+
+    def __init__(self, width: int, lookup: Tensor, max_rank: int) -> None:
+        super().__init__()
+        self.dim_embedding = width
+        self.max_Za = lookup.numel() - 1
+        self.max_rank = max_rank
+        self.register_buffer("index_of_z", lookup)
+
+    def _species_index(self, atomic_numbers: Tensor) -> Tensor:
+        species = atomic_numbers.long()
+        if torch.compiler.is_compiling():
+            torch._assert_async(((species >= 0) & (species <= self.max_Za)).all(),
+                                "atomic numbers exceed the CAMP species table")
+            index = self.index_of_z[species]
+            torch._assert_async((index >= 0).all(), "atomic numbers are outside the CAMP species table")
+            return index
+        if species.numel() and (
+            int(species.min()) < 0 or int(species.max()) > self.max_Za
+        ):
+            raise ValueError(
+                f"atomic numbers must lie in 0..max_Za ({self.max_Za}), "
+                f"got {int(species.min())}..{int(species.max())}"
+            )
+        index = self.index_of_z[species.clamp(min=0)]
+        if torch.any(index < 0):
+            missing = species[index < 0].unique().tolist()
+            raise ValueError(
+                f"atomic numbers {missing} are outside the CAMP species table"
+            )
+        return index
+
+    def forward(self, inputs, ctx: GraphContext) -> BlockState:
+        atom_embedding = inputs["atom_embedding"]
+        Za = inputs["Za"]
+        Dij_sr, vij_sr = ctx.dist, ctx.vec
+        receivers, senders = ctx.receiver, ctx.sender
+        if atom_embedding.ndim != 2 or atom_embedding.shape[-1] != self.dim_embedding:
+            raise ValueError(
+                f"atom_embedding must be [N, {self.dim_embedding}], "
+                f"got {tuple(atom_embedding.shape)}"
+            )
+        if Za.shape[0] != atom_embedding.shape[0]:
+            raise ValueError(
+                f"Za and atom_embedding must share the atom count, "
+                f"got {Za.shape[0]} and {atom_embedding.shape[0]}"
+            )
+        n_atoms = int(atom_embedding.shape[0])
+        n_edges = int(receivers.shape[0])
+        if senders.shape[0] != n_edges or Dij_sr.shape[0] != n_edges or vij_sr.shape[0] != n_edges:
+            raise ValueError(
+                "Dij_sr, vij_sr, receivers, and senders must share the edge count, "
+                f"got {tuple(Dij_sr.shape)}, {tuple(vij_sr.shape)}, "
+                f"{tuple(receivers.shape)}, {tuple(senders.shape)}"
+            )
+        if vij_sr.shape[-1] != 3 and n_edges:
+            raise ValueError(f"vij_sr must be [E, 3], got {tuple(vij_sr.shape)}")
+        species = self._species_index(Za)
+        dtype = atom_embedding.dtype
+        if n_edges == 0:
+            distance = atom_embedding.new_zeros(0)
+            vectors = atom_embedding.new_zeros(0, 3)
+            receivers = receivers.new_zeros(0)
+            senders = senders.new_zeros(0)
+            zi = species.new_zeros(0)
+            zj = species.new_zeros(0)
+        else:
+            if torch.compiler.is_compiling():
+                valid = (receivers >= 0) & (receivers < n_atoms) & (senders >= 0) & (senders < n_atoms)
+                torch._assert_async(valid.all(), "neighbor indices exceed the atom count")
+            elif (
+                int(receivers.min()) < 0
+                or int(senders.min()) < 0
+                or int(receivers.max()) >= n_atoms
+                or int(senders.max()) >= n_atoms
+            ):
+                raise ValueError("neighbor indices exceed the atom count")
+            distance = Dij_sr.reshape(-1).to(dtype=dtype)
+            vectors = vij_sr.to(dtype=dtype)
+            zi = species.index_select(0, receivers)
+            zj = species.index_select(0, senders)
+        dyads = cartesian_dyads(vectors, self.max_rank)
+        features = {0: atom_embedding.transpose(0, 1).contiguous()}
+        return BlockState(scalar=atom_embedding, equi=features, edge=(distance, vectors, zi, zj, dyads))
+
+
+class CAMPLayer(Block):
     """One message-passing step: channel mix, atomic moment, hyper moment, residual.
 
     The first layer receives scalars only and has no residual. The last layer
@@ -288,20 +302,12 @@ class CAMPLayer(nn.Module):
             else {}
         )
 
-    def forward(
-        self,
-        distance: Tensor,
-        vectors: Tensor,
-        zi: Tensor,
-        zj: Tensor,
-        receivers: Tensor,
-        senders: Tensor,
-        features: Dict[int, Tensor],
-        n_atoms: int,
-    ) -> Dict[int, Tensor]:
+    def forward(self, state: BlockState, ctx: GraphContext) -> BlockState:
+        distance, vectors, zi, zj, dyads = state.edge
+        features = state.equi
         mixed = {rank: self.pre_mix[str(rank)](value) for rank, value in features.items()}
         moments = self.atomic(
-            distance, vectors, zi, zj, receivers, senders, mixed, n_atoms
+            distance, vectors, zi, zj, ctx.receiver, ctx.sender, mixed, ctx.num_nodes, dyads
         )
         updated = {
             rank: self.post_mix[str(rank)](value)
@@ -311,4 +317,4 @@ class CAMPLayer(nn.Module):
             limit = min(self.max_in_rank, self.max_out_rank)
             for rank in range(limit + 1):
                 updated[rank] = updated[rank] + self.residual_mix[str(rank)](mixed[rank])
-        return updated
+        return BlockState(scalar=updated[0].transpose(0, 1), equi=updated, edge=state.edge)

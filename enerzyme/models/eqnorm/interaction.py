@@ -7,7 +7,7 @@ tensor product with real spherical harmonics, a residual linear, and
 Receivers are ``idx_i`` and senders are ``idx_j``. ``edge_sh`` is ``Y(R_j - R_i)``.
 
 Path instructions stay in creation order. That is the radial-weight layout
-of the reference ``get_path``. :func:`enerzyme.models.e3nn_nn.tp_out_irreps_with_instructions`
+of the reference ``get_path``. :func:`enerzyme.models.mp.equivariant.e3nn.tp_out_irreps_with_instructions`
 sorts the same paths, which would move those weights; Nequix wants the
 sorted layout, so this module keeps its own enumeration.
 
@@ -24,11 +24,13 @@ from typing import List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
+from ..mp.message.irreps import weighted_messages
 from e3nn import o3
-from e3nn.nn import FullyConnectedNet, Gate
+from ..mp.nn.radial_mlp import e3nn_radial_mlp
+from e3nn.nn import Gate
 from torch import Tensor, nn
 
-from ..functional import reduce_edge
+from ..mp.ops import scatter_sum
 from ..nequip.interaction import tp_path_exists
 from .layernorm import EqnormRMSNorm, one_irrep_per_degree
 
@@ -135,7 +137,8 @@ class EqnormConv(nn.Module):
             internal_weights=False,
         )
         hidden = [int(invariant_neurons)] * int(invariant_layers)
-        self.fc = FullyConnectedNet(
+        self.tp_width = self.tp.irreps_out.dim
+        self.fc = e3nn_radial_mlp(
             [int(num_rbf), *hidden, self.tp.weight_numel],
             F.silu,
         )
@@ -167,17 +170,15 @@ class EqnormConv(nn.Module):
         mixed = self.linear_1(features)
         n_atoms = features.shape[0]
         if idx_i.numel() == 0:
-            aggregated = features.new_zeros(n_atoms, self.tp.irreps_out.dim)
+            aggregated = features.new_zeros(n_atoms, self.tp_width)
         else:
-            messages = self.tp(mixed[idx_j], edge_sh, self.fc(radial_basis))
-            if self.normalization == "constant":
-                messages = messages / math.sqrt(self.avg_num_neighbors)
+            messages = weighted_messages(self.tp, mixed, idx_j, edge_sh, self.fc(radial_basis))
             if envelope is not None:
                 window = envelope.reshape(-1, 1).to(dtype=messages.dtype)
                 messages = messages * window
-            aggregated = reduce_edge(
-                messages, idx_i, (n_atoms, messages.shape[-1])
-            )
+            aggregated = scatter_sum(messages, idx_i, n_atoms)
+            if self.normalization == "constant":
+                aggregated = aggregated / math.sqrt(self.avg_num_neighbors)
         if self.normalization == "degree":
             degree = features.new_zeros(n_atoms)
             if idx_i.numel():

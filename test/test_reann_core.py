@@ -36,7 +36,7 @@ def _pairs(n: int):
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.reann import REANNCore
+    from enerzyme.models.presets.cartesian_tensor import reann
 
     params = dict(
         dim_embedding=4,
@@ -53,7 +53,7 @@ def _tiny(**kwargs):
         coeff_init=0.1,
     )
     params.update(kwargs)
-    return REANNCore(**params).double()
+    return reann(**params).double()
 
 
 def _run(core, pos, embedding, species):
@@ -80,7 +80,7 @@ def test_registration_presets_and_example_yaml():
 
     for name in ("reann", "REANN"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "REANNCore"
+        assert core_cls.__name__ == "reann"
         assert build_params["cutoff_sr"] == 5.0
         assert build_params["dim_embedding"] == 32
         assert layers[2]["params"]["nwave"] == 8
@@ -108,7 +108,7 @@ def test_registration_presets_and_example_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "REANNCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.n_orbit == 108
     assert model.dim_feature_out == 108
     assert model.feature_irreps == "108x0e"
@@ -151,10 +151,10 @@ def test_coefficient_update_starts_at_zero_and_then_moves_the_density():
     torch.manual_seed(0)
     updated = _tiny(num_iterations=1)
     plain = _tiny(num_iterations=0)
-    plain.rs.data.copy_(updated.rs)
-    plain.inta.data.copy_(updated.inta)
-    plain.hyper.data.copy_(updated.hyper)
-    plain.coeff.load_state_dict(updated.coeff.state_dict())
+    plain.embed.rs.data.copy_(updated.embed.rs)
+    plain.embed.inta.data.copy_(updated.embed.inta)
+    plain.embed.hyper.data.copy_(updated.embed.hyper)
+    plain.embed.coeff.load_state_dict(updated.embed.coeff.state_dict())
     pos = torch.tensor(
         [[0.0, 0.0, 0.0], [0.8, 0.1, 0.0], [0.2, 0.9, 0.3]],
         dtype=torch.float64,
@@ -164,7 +164,7 @@ def test_coefficient_update_starts_at_zero_and_then_moves_the_density():
     before = _run(updated, pos, embedding, species)
     assert_allclose(before.detach().numpy(), _run(plain, pos, embedding, species).detach().numpy())
     with torch.no_grad():
-        updated.updates[0].shared.out.bias.fill_(0.4)
+        updated.blocks[0].shared.out.bias.fill_(0.4)
     after = _run(updated, pos, embedding, species)
     assert not torch.allclose(before, after)
 
@@ -180,13 +180,13 @@ def test_elemental_networks_follow_the_receiver_species():
     species = torch.tensor([1, 6, 8])
     base = _run(core, pos, embedding, species).detach()
     with torch.no_grad():
-        core.updates[0].by_species["1"].out.bias.fill_(0.5)
+        core.blocks[0].by_species["1"].out.bias.fill_(0.5)
     changed = _run(core, pos, embedding, species)
     assert not torch.allclose(base, changed.detach())
     changed.sum().backward()
-    assert core.rs.grad is not None
-    assert float(core.rs.grad[1].abs().sum()) > 0.0
-    species_net = core.updates[0].by_species["1"]
+    assert core.embed.rs.grad is not None
+    assert float(core.embed.rs.grad[1].abs().sum()) > 0.0
+    species_net = core.blocks[0].by_species["1"]
     assert species_net.out.bias.grad is not None
     assert float(species_net.out.bias.grad.abs().sum()) > 0.0
     try:
@@ -214,7 +214,7 @@ def test_core_density_is_invariant_and_species_dependent():
     shifted = _run(core, pos + torch.tensor([2.0, -1.0, 0.5]), embedding, species)
     assert_allclose(base.detach().numpy(), shifted.detach().numpy(), atol=1e-10)
 
-    core.rs.data[6].add_(1.0)
+    core.embed.rs.data[6].add_(1.0)
     moved = _run(core, pos, embedding, species)
     assert not torch.allclose(base, moved)
 
@@ -333,8 +333,8 @@ def test_layer_stack_forces_offsets_and_isolated_atom():
     pos2 = pos.detach().requires_grad_(True)
     loss = model({**batch, "Ra": pos2})["E"].sum()
     loss.backward()
-    assert model.rs.grad is not None
-    assert float(model.rs.grad.abs().sum()) > 0.0
+    assert model.embed.rs.grad is not None
+    assert float(model.embed.rs.grad.abs().sum()) > 0.0
 
 
 def test_response_stack_rotates_dipole_and_polarizability():
@@ -406,5 +406,5 @@ def test_response_stack_rotates_dipole_and_polarizability():
     pos2 = pos.detach().requires_grad_(True)
     loss = model({**batch, "Ra": pos2})["polarizability"].sum()
     loss.backward()
-    assert model.hyper.grad is not None
-    assert float(model.hyper.grad.abs().sum()) > 0.0
+    assert model.embed.hyper.grad is not None
+    assert float(model.embed.hyper.grad.abs().sum()) > 0.0

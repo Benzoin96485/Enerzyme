@@ -114,4 +114,4 @@ def _find_grace_core(built_layers: List[Module]) -> Module:
     for layer in reversed(built_layers):
         if getattr(layer, "is_grace_core", False):
             return layer
-    raise TypeError("GRACEEnergyReadout must follow a GRACECore in the layer list")
+    raise TypeError("GRACEEnergyReadout must follow the GRACE preset in the layer list")

@@ -14,34 +14,16 @@ import torch
 from torch import Tensor
 from torch.nn import Dropout, GELU, LayerNorm, Linear, Module, Sequential
 
-from ..cutoff import polynomial_envelope
-from ..functional import segment_sum_coo
+from ..mp.basis.envelope import polynomial_envelope
+from ..mp.aggregate import SoftmaxAttention
+from ..mp.message.attention import dot_product_attention_logits
+from ..mp.ops import scatter_sum
+from ..mp.ops import segment_softmax as receiver_softmax
 
 
 def segment_softmax(logits: Tensor, index: Tensor, dim_size: int) -> Tensor:
-    """Softmax over edges that share a receiver.
-
-    ``logits`` is ``(E, H)``. ``index`` is the receiver of each edge.
-    Rows that belong to one receiver sum to one along the edge axis.
-    """
-    if logits.numel() == 0:
-        return logits
-    if logits.ndim != 2:
-        raise ValueError(f"logits must be (E, H), got {tuple(logits.shape)}")
-    if index.shape[0] != logits.shape[0]:
-        raise ValueError(
-            f"index rows {index.shape[0]} != logit rows {logits.shape[0]}"
-        )
-    heads = int(logits.shape[-1])
-    floor = torch.finfo(logits.dtype).min
-    maxima = logits.new_full((dim_size, heads), floor)
-    expanded = index.view(-1, 1).expand_as(logits)
-    maxima = maxima.scatter_reduce(
-        0, expanded, logits, reduce="amax", include_self=True
-    )
-    weights = (logits - maxima.index_select(0, index)).exp()
-    normalizer = segment_sum_coo(weights, index, dim_size=dim_size).clamp_min(1e-12)
-    return weights / normalizer.index_select(0, index)
+    """MatterSim receiver weights with its original denominator floor."""
+    return receiver_softmax(logits, index, dim_size, clamp_min=1e-12)
 
 
 class CentralityEncoding(Module):
@@ -66,8 +48,15 @@ class CentralityEncoding(Module):
         mask = polynomial_envelope(dist, cutoff, 3)
         if idx_i.numel() == 0:
             return basis.new_zeros(n_atoms, self.linear.out_features)
+        if torch.compiler.is_compiling() and basis.device.type == "cpu":
+            # Pool the masked basis and its neighbor count together. Each edge
+            # contributes the linear bias once, including periodic images.
+            features = torch.cat((basis * mask.unsqueeze(-1), torch.ones_like(mask[:, None])), dim=-1)
+            pooled = scatter_sum(features, idx_i, n_atoms)
+            weight = torch.cat((self.linear.weight, self.linear.bias[:, None]), dim=-1)
+            return torch.nn.functional.linear(pooled, weight)
         mapped = self.linear(basis * mask.unsqueeze(-1))
-        return segment_sum_coo(mapped, idx_i, dim_size=n_atoms)
+        return scatter_sum(mapped, idx_i, n_atoms)
 
 
 class GraphormerBlock(Module):
@@ -94,6 +83,7 @@ class GraphormerBlock(Module):
         self.num_heads = int(num_heads)
         self.head_dim = self.dim // self.num_heads
         self.scale = self.head_dim ** -0.5
+        self.aggregate = SoftmaxAttention(clamp_min=1e-12)
         self.qkv = Linear(self.dim, 3 * self.dim, bias=True)
         self.distance_bias = Linear(int(num_basis), self.num_heads, bias=False)
         # No bias: a zero aggregate (every mask is zero, or there is no edge)
@@ -123,12 +113,10 @@ class GraphormerBlock(Module):
             return node.new_zeros(n_atoms, self.dim)
         qkv = self.qkv(node).view(n_atoms, 3, self.num_heads, self.head_dim)
         query, key, value = qkv.unbind(dim=1)
-        logits = (query[idx_i] * key[idx_j]).sum(dim=-1) * self.scale
+        logits = dot_product_attention_logits(query[idx_i], key[idx_j], scale=self.scale)
         logits = logits + self.distance_bias(basis)
-        weights = segment_softmax(logits, idx_i, n_atoms) * mask.unsqueeze(-1)
-        message = weights.unsqueeze(-1) * value[idx_j]
-        flat = message.reshape(message.shape[0], self.dim)
-        return self.out(segment_sum_coo(flat, idx_i, dim_size=n_atoms))
+        message = self.aggregate(value[idx_j], logits, idx_i, n_atoms, mask.unsqueeze(-1))
+        return self.out(message.reshape(n_atoms, self.dim))
 
     def forward(
         self,
@@ -146,3 +134,11 @@ class GraphormerBlock(Module):
         if self.dropout is not None:
             hidden = self.dropout(hidden)
         return self.norm_ffn(node + hidden)
+
+
+class GraphormerMessage(GraphormerBlock):
+    def forward(self, state, ctx):
+        node = super().forward(
+            state.scalar, ctx.inputs["graphormer_rbf"], state.aux["attention_mask"], ctx.receiver, ctx.sender
+        )
+        return state._replace(scalar=node)

@@ -8,6 +8,12 @@ from torch.nn import Embedding, Parameter, Linear, init
 from . import BaseFFLayer
 
 
+def one_hot_species(indices: Tensor, width: int, dtype: torch.dtype) -> Tensor:
+    """Encode species directly in the model dtype, including empty batches."""
+    rows = indices.new_zeros((*indices.shape, width), dtype=dtype)
+    return rows.scatter_(-1, indices.unsqueeze(-1), 1)
+
+
 class BaseAtomEmbedding(BaseFFLayer):
     def __init__(self, max_Za, dim_embedding) -> None:
         super().__init__(input_fields={"Za"}, output_fields={"atom_embedding"})
@@ -66,18 +72,19 @@ class OneHotAtomEmbedding(BaseAtomEmbedding):
 
     def get_embedding(self, Za: Tensor) -> Tensor:
         species = Za.long()
-        if species.numel() and int(species.max()) > self.max_Za:
+        if not torch.compiler.is_compiling() and species.numel() and int(species.max()) > self.max_Za:
             raise ValueError(
                 f"atomic number {int(species.max())} exceeds max_Za {self.max_Za}"
             )
         index = self.index_of_z[species.clamp(min=0)]
-        if torch.any(index < 0):
+        if torch.compiler.is_compiling():
+            torch._assert_async((index >= 0).all(), "atomic number is outside the one-hot vocabulary")
+        elif torch.any(index < 0):
             missing = species[index < 0].unique().tolist()
             raise ValueError(
                 f"atomic numbers {missing} are outside the one-hot vocabulary"
             )
-        encoded = torch.nn.functional.one_hot(index, num_classes=self.dim_embedding)
-        return encoded.to(dtype=self._dtype_probe.dtype)
+        return one_hot_species(index, self.dim_embedding, self._dtype_probe.dtype)
 
 
 class RandomAtomEmbedding(BaseAtomEmbedding):
@@ -258,14 +265,20 @@ class NuclearEmbedding(BaseAtomEmbedding):
         """
         if self.training:  # during training, the embedding needs to be recomputed
             if self.use_electron_config:
-                self.embedding = self.element_embedding + self.config_linear(
+                embedding = self.element_embedding + self.config_linear(
                     self.electron_config
                 )
             else:
-                self.embedding = self.element_embedding
-        if self.embedding.device.type == "cpu":  # indexing is faster on CPUs
-            return self.embedding[Za]
+                embedding = self.element_embedding
+            # A functional coordinate VJP wraps its tensors for the duration
+            # of the transform. Its temporary table must not escape as a buffer.
+            if not torch.compiler.is_compiling():
+                self.embedding = embedding
+        else:
+            embedding = self.embedding
+        if embedding.device.type == "cpu":  # indexing is faster on CPUs
+            return embedding[Za]
         else:  # gathering is faster on GPUs
             return torch.gather(
-                self.embedding, 0, Za.view(-1, 1).expand(-1, self.dim_embedding)
+                embedding, 0, Za.view(-1, 1).expand(-1, self.dim_embedding)
             )

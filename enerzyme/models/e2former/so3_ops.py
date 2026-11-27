@@ -8,7 +8,7 @@ import math
 import torch
 from torch import nn
 
-from ..so3.linear import SO3Linear
+from ..mp.equivariant.sph.linear import SO3Linear
 
 
 class SO3Linear2Scalar(torch.nn.Module):

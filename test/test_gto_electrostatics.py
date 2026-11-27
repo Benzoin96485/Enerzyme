@@ -182,3 +182,44 @@ def test_potential_feature_shape_axis_and_empty_pair():
         pass
     else:
         raise AssertionError("l > 1 should be rejected")
+
+
+def test_analytic_charge_and_dipole_interaction_matches_gaussian_derivatives():
+    from torch.func import jacrev
+    from enerzyme.models.layers.gto_electrostatics import GaussianMultipoleEnergy, GaussianPotentialFeatures
+
+    torch.manual_seed(73)
+    xyz = torch.randn(2, 3, dtype=torch.float64, requires_grad=True)
+    multipoles = torch.randn(2, 4, dtype=xyz.dtype)
+    batch = torch.zeros(2, dtype=torch.long)
+    sigma = 1.5
+    energy = GaussianMultipoleEnergy(sigma=sigma, include_self=False).double()
+    projection = GaussianPotentialFeatures(projection_sigmas=[sigma], include_self=False).double()
+
+    def kernel(x):
+        r = x.norm()
+        return coulomb_prefactor() * torch.erf(r / (2 * sigma)) / r
+
+    total = xyz.new_zeros(())
+    projected = []
+    for i, j in ((0, 1), (1, 0)):
+        r = xyz[i] - xyz[j]
+        grad = jacrev(kernel)(r)
+        hessian = jacrev(jacrev(kernel))(r)
+        scalar = multipoles[j, 0] * kernel(r) - multipoles[j, 1:] @ grad
+        vector = multipoles[j, 0] * grad - hessian @ multipoles[j, 1:]
+        projected.append(torch.cat((projection.l0_factors * scalar,
+                                    projection.l1_factors * projection.offset * vector)))
+        total = total + 0.5 * (multipoles[i, 0] * scalar + multipoles[i, 1:] @ vector)
+    actual = energy.analytic_energy(multipoles, xyz, batch).sum()
+    torch.testing.assert_close(actual, total, atol=2e-12, rtol=1e-12)
+    torch.testing.assert_close(projection.analytic_features(multipoles, xyz, batch), torch.stack(projected),
+                               atol=2e-12, rtol=1e-12)
+    torch.testing.assert_close(torch.autograd.grad(actual, xyz)[0], torch.autograd.grad(total, xyz)[0],
+                               atol=2e-11, rtol=1e-11)
+
+    coincident = torch.zeros_like(xyz, requires_grad=True)
+    values = energy.analytic_energy(multipoles, coincident, batch)
+    gradient = torch.autograd.grad(values.sum(), coincident, create_graph=True)[0]
+    curvature = torch.autograd.grad(gradient[0, 1], coincident)[0]
+    assert torch.isfinite(values).all() and torch.isfinite(gradient).all() and torch.isfinite(curvature).all()

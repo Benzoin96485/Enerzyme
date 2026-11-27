@@ -3,7 +3,7 @@
 Zhang, Xia, and Jiang, J. Chem. Phys. 156, 114801 (2022), Eqs. 1–4, and the
 contraction in https://github.com/zhangylch/REANN ``src/density.py``. The
 printed cutoff ``[cos(pi r / rc) + 1]^2`` is four times
-:func:`enerzyme.models.cutoff.cosine_transition` squared. The repository uses
+:func:`enerzyme.models.mp.basis.envelope.cosine_transition` squared. The repository uses
 the squared cosine, which is 1 at the origin, and this module follows that.
 Higher angular channels are ordered Cartesian products of the raw displacement,
 not unique monomials and not divided by the multinomial ``l! / (lx! ly! lz!)``.
@@ -21,7 +21,10 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from ..cutoff import cosine_transition
+from ..mp.ops import scatter_sum
+
+from ..mp.basis.cartesian import cartesian_powers
+from ..mp.basis.envelope import cosine_transition
 
 
 def default_n_orbit(nwave: int, lmax: int) -> int:
@@ -70,13 +73,18 @@ def cartesian_angular(vectors: Tensor, window: Tensor, lmax: int) -> Tensor:
     n_edges = vectors.shape[0]
     if n_edges == 0:
         return vectors.new_zeros((n_angular, 0))
-    current = window.reshape(1, n_edges)
-    parts = [current]
-    direction = vectors.transpose(0, 1)
-    for _ in range(int(lmax)):
-        current = (current.unsqueeze(1) * direction.unsqueeze(0)).reshape(-1, n_edges)
-        parts.append(current)
-    return torch.cat(parts, dim=0)
+    powers = cartesian_powers(vectors, lmax, weight=window)
+    return torch.cat([part.reshape(n_edges, -1) for part in powers.values()], dim=1).transpose(0, 1)
+
+
+def validate_species(species: Tensor, maximum: int, field: str) -> None:
+    message = f"{field} must lie in 0..{maximum}"
+    if species.is_cuda or torch.compiler.is_compiling():
+        torch._assert_async(((species >= 0) & (species <= maximum)).all(), message)
+    elif species.numel():
+        low, high = torch.aminmax(species)
+        if bool((low < 0) | (high > maximum)):
+            raise ValueError(f"{message}, got {int(low)}..{int(high)}")
 
 
 def pair_gaussian_orbitals(
@@ -89,6 +97,9 @@ def pair_gaussian_orbitals(
     inta: Tensor,
     lmax: int,
     cutoff: float,
+    *,
+    species_checked: bool = False,
+    symmetric_channels: tuple[Tensor, Tensor] | None = None,
 ) -> tuple[Tensor, Tensor]:
     """Geometric orbitals ``[E, n_angular, nwave]`` and the squared-cosine window.
 
@@ -99,7 +110,8 @@ def pair_gaussian_orbitals(
     if int(lmax) < 0:
         raise ValueError(f"lmax must be >= 0, got {lmax}")
     nwave = int(rs.shape[-1])
-    n_angular = angular_channel_count(int(lmax))
+    n_angular = (angular_channel_count(int(lmax)) if symmetric_channels is None
+                 else symmetric_channels[0].numel())
     if idx_i.numel() == 0:
         empty = vij.new_zeros((0, n_angular, nwave))
         return empty, vij.new_zeros((0,))
@@ -122,17 +134,17 @@ def pair_gaussian_orbitals(
             f"rs and inta must share nwave, got {tuple(rs.shape)} and {tuple(inta.shape)}"
         )
     neighbor = species.reshape(-1).long().index_select(0, idx_j.long())
-    if neighbor.numel() and (int(neighbor.min()) < 0 or int(neighbor.max()) >= rs.shape[0]):
-        raise ValueError(
-            f"neighbor atomic numbers must lie in 0..{rs.shape[0] - 1}, "
-            f"got {int(neighbor.min())}..{int(neighbor.max())}"
-        )
+    if not species_checked:
+        validate_species(neighbor, rs.shape[0] - 1, "neighbor atomic numbers")
     dtype = vij.dtype
     centers = rs.index_select(0, neighbor).to(dtype=dtype)
     exponents = inta.index_select(0, neighbor).to(dtype=dtype)
     radial = torch.exp(exponents * (distance.to(dtype=dtype).unsqueeze(-1) - centers).square())
     window = squared_cosine_window(distance, cutoff).to(dtype=dtype)
     angular = cartesian_angular(vij.to(dtype=dtype), window, int(lmax))
+    if symmetric_channels is not None:
+        representatives, multiplicities = symmetric_channels
+        angular = angular.index_select(0, representatives) * multiplicities.to(dtype).sqrt()[:, None]
     orbital = angular.transpose(0, 1).unsqueeze(-1) * radial.unsqueeze(1)
     return orbital, window
 
@@ -159,17 +171,16 @@ def aggregate_weighted_orbitals(
         raise ValueError(
             f"pair has {pair.shape[0]} edges but idx_i has {idx_i.shape[0]}"
         )
-    weighted = pair * coeff.to(dtype=pair.dtype).index_select(0, idx_j.long()).unsqueeze(1)
-    accumulated = weighted.new_zeros((int(n_atoms), pair.shape[1], pair.shape[2]))
-    if weighted.shape[0] == 0:
-        return accumulated
-    return accumulated.index_add(0, idx_i.long(), weighted)
+    weighted = pair * coeff.to(dtype=pair.dtype)[idx_j.long()].unsqueeze(1)
+    return scatter_sum(weighted, idx_i, int(n_atoms))
 
 
 def invariant_orbital_density(
     accumulated: Tensor,
     hyper: Tensor,
     l_of_channel: Tensor,
+    *,
+    ordered_shells: bool = False,
 ) -> Tensor:
     """Square of the shell-shared contraction. Shape ``[N, n_orbit]``.
 
@@ -199,6 +210,21 @@ def invariant_orbital_density(
             f"orbitals have {accumulated.shape[1]} angular channels, "
             f"l_of_channel has {int(l_of_channel.numel())}"
         )
+    if ordered_shells:
+        # All 3**degree Cartesian components use exactly the same radial
+        # weights. One GEMM per shell also accumulates their weight gradients
+        # directly, without duplicating the hyper matrix for each component.
+        result = None
+        offset = 0
+        for degree in range(n_shell):
+            width = 3 ** degree
+            block = accumulated.narrow(1, offset, width)
+            projected = block.flatten(0, 1) @ hyper[degree].to(accumulated)
+            density = projected.view(block.shape[0], width, hyper.shape[-1]).square().sum(dim=1)
+            result = density if result is None else result + density
+            offset += width
+        return result
+
     shell = hyper.to(dtype=accumulated.dtype, device=accumulated.device).index_select(
         0, l_of_channel.to(device=accumulated.device)
     )

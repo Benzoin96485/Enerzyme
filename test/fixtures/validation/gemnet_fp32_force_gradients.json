@@ -1,0 +1,199 @@
+{
+  "architecture": "gemnet",
+  "system": "large_2000",
+  "mode": "FP32 training",
+  "source": {
+    "original": "1aa0f8b",
+    "candidate": "4428e68",
+    "closure_jobs": {"formal": "6339555", "matched_V100": "6340048", "CPU_native": "6340069", "CPU_row_derivatives": "6340084"},
+    "formal_GPU_uuid": "GPU-9a19f472-727c-1aec-eb16-7d4406811551",
+    "matching_GPU_uuid": "GPU-4081123a-eb84-086b-44c7-05b874d413ce",
+    "torch": "2.13.0+cu126",
+    "fixture_sha256": "39566781242ab4a660c1a90d96906a36420d0e85e44da5b44e1bc93b93d7ee2e",
+    "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+    "tensor_sha256": {
+      "new-native-1": "e954b5c49055cf026208f24113394e1d32b054b5ef77f168610248b9f674c105",
+      "new-native-0": "710f088227e35fb370011026d10c4db2725763b4bcbc5fd25b17253bdb7cd769",
+      "base-native-0": "ce2041c38b322505aa00c284a0f3f0bd6fdbed88ce727ff5c61349804a234377",
+      "compiled-1": "621c9565aca9d3e6c3d05a37678bccb6df504485a12ae429fe61996a3062f70f",
+      "compiled-0": "52293b037d3c94db14cb47dfeb5355b1b7f68113ec53be7217b22c3f9a64d97a",
+      "base-native-1": "e73b5fbd4aabe57e61030870c8c0bef893e77487da82a9b41a26f009ba7b884d"
+    },
+    "reused_verified_compiler_cache": true
+  },
+  "method": {
+    "model": "GemNet-T with the published Enerzyme defaults, the strictly-loaded pre-refactor fixture and the unmodified 2000-atom acceptance batch.",
+    "loss": "Sum of squares of energies plus sum of squares of forces, including coordinate-weight mixed derivatives.",
+    "names": "The three freshly initialized GPU processes run original native, candidate native and ordinary candidate torch.compile respectively. Strict remapping identifies every parameter by its original snapshot name. Both repetitions restore weights and seed.",
+    "gates": "FP32 energy and force use atol=3e-4 and rtol=3e-4. Gradients use atol=7e-4 and rtol=1e-3. Exact FP64 source comparisons use atol=1e-10 and rtol=1e-8. A tolerance ratio above one fails.",
+    "repeat_intervals": "For two values x and y with admissible radii tx and ty, the best possible maximum tolerance ratio of a single result is |x-y|/(tx+ty). Bounds above one have disjoint intervals.",
+    "terms": "At three dense entries with the largest mismatches, a differentiable zero perturbation per input row yields the signed contributions of the full mixed loss to that weight. Contributions computed in FP32 are also summed in FP64 on the CPU. FP64 rowwise reconstructions on the original check this measurement.",
+    "local_controls": "The ordered native control uses index_put with accumulate=True for GemNet message and atom receiver sums. The deterministic control enables PyTorch deterministic algorithms and the documented deterministic cuBLAS workspace for that single native process.",
+    "cpu_readout": "The CPU native precision control promotes frozen readout linear inputs, weights and bias to FP64 inside each matrix product, then rounds its output back to FP32. All other layers use the published FP32 path."
+  },
+  "formal": {"job": "6339555", "passed": false, "active_parameters": 122, "reference_active_parameters": 122, "energy_max_abs": 0.0003662109375, "force_max_abs": 3.6954879760742188e-06, "gradient_max_abs": 1.25, "new_graphs": 1, "new_calls": 966, "median_ms": 233.2684479188174, "peak_MiB": 17098.88330078125},
+  "cpu": {
+    "new-float64 vs base-float64": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.0, 1.887379141862766e-15], "E_Fa_outside": [0, 0], "weight_groups_outside": 0, "weight_elements_outside": 0, "maximum_gate_ratio": 0.0023970519794750127, "maximum_weight_abs": 2.3283064365386963e-10},
+    "previous-float64 vs base-float64": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.0, 1.887379141862766e-15], "E_Fa_outside": [0, 0], "weight_groups_outside": 0, "weight_elements_outside": 0, "maximum_gate_ratio": 0.0023970519794750127, "maximum_weight_abs": 2.3283064365386963e-10},
+    "new-float32 vs base-float32": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.0, 1.0132789611816406e-06], "E_Fa_outside": [0, 0], "weight_groups_outside": 0, "weight_elements_outside": 0, "maximum_gate_ratio": 0.6281503738479922},
+    "base-float32 vs base-float64": {
+      "active": 122,
+      "changed_names": 0,
+      "E_Fa_max_abs": [0.0006441498446747573, 1.8484589078049396e-05],
+      "E_Fa_outside": [0, 0],
+      "weight_groups_outside": 68,
+      "weight_elements_outside": 204,
+      "maximum_gate_ratio": 19.189158781040913,
+      "worst": [["readouts.4.dense.linear.weight", {"elements": 1, "ratio": 19.189158781040913, "index": [50, 30], "actual": 0.12862014770507812, "reference": 0.113018997078143, "max_abs": 0.46152877080021426, "relative_l2": 1.2068288371017798e-06}], ["interactions.2.edges.concat.dense.linear.weight", {"elements": 10, "ratio": 15.685179144259312, "index": [98, 115], "actual": 0.5810070037841797, "reference": 0.5612244719997399, "max_abs": 0.4153078706585802, "relative_l2": 1.2066885008142452e-06}]]
+    },
+    "new-float32 vs new-float64": {
+      "active": 122,
+      "changed_names": 0,
+      "E_Fa_max_abs": [0.0006441498446747573, 1.836537978827657e-05],
+      "E_Fa_outside": [0, 0],
+      "weight_groups_outside": 68,
+      "weight_elements_outside": 205,
+      "maximum_gate_ratio": 19.26423101971112,
+      "worst": [["readouts.4.dense.linear.weight", {"elements": 1, "ratio": 19.26423101971112, "index": [50, 30], "actual": 0.12868118286132812, "reference": 0.11301899707819985, "max_abs": 0.46152877080021426, "relative_l2": 1.20515607953955e-06}], ["interactions.2.edges.concat.dense.linear.weight", {"elements": 12, "ratio": 15.405403810982223, "index": [98, 115], "actual": 0.5806541442871094, "reference": 0.5612244719996617, "max_abs": 0.4060051606502384, "relative_l2": 1.2061067706077357e-06}]]
+    }
+  },
+  "cpu_fp32_repeats": {
+    "base": {"different_tensor_count": 0},
+    "new": {"different_tensor_count": 0}
+  },
+  "same_card": {
+    "comparisons": {
+      "base-native-1 vs base-native-0": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.000244140625, 1.7881393432617188e-06], "E_Fa_outside": [0, 0], "weight_groups_outside": 19, "weight_elements_outside": 20, "maximum_gate_ratio": 3.9378475343042925},
+      "new-native-1 vs new-native-0": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.0003662109375, 1.8477439880371094e-06], "E_Fa_outside": [0, 0], "weight_groups_outside": 16, "weight_elements_outside": 20, "maximum_gate_ratio": 7.399020370631129},
+      "new-native-0 vs base-native-0": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.000244140625, 1.7881393432617188e-06], "E_Fa_outside": [0, 0], "weight_groups_outside": 20, "weight_elements_outside": 23, "maximum_gate_ratio": 3.8819135941721554},
+      "compiled-1 vs compiled-0": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.0008544921875, 2.086162567138672e-06], "E_Fa_outside": [0, 0], "weight_groups_outside": 9, "weight_elements_outside": 9, "maximum_gate_ratio": 6.75416666157554},
+      "compiled-0 vs new-native-0": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.0001220703125, 3.6954879760742188e-06], "E_Fa_outside": [0, 0], "weight_groups_outside": 24, "weight_elements_outside": 30, "maximum_gate_ratio": 6.399779915508672},
+      "compiled-0 vs base-native-0": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.0001220703125, 3.56137752532959e-06], "E_Fa_outside": [0, 0], "weight_groups_outside": 26, "weight_elements_outside": 31, "maximum_gate_ratio": 5.267800968501921},
+      "base-native-0 vs original CPU FP64": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [0.00015586859467475733, 1.5742775418381427e-05], "E_Fa_outside": [0, 0], "weight_groups_outside": 65, "weight_elements_outside": 222, "maximum_gate_ratio": 20.465386839645884},
+      "new-native-0 vs original CPU FP64": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [8.827203032524267e-05, 1.6335519801957687e-05], "E_Fa_outside": [0, 0], "weight_groups_outside": 67, "weight_elements_outside": 222, "maximum_gate_ratio": 21.59147042076792},
+      "compiled-0 vs original CPU FP64": {"active": 122, "changed_names": 0, "E_Fa_max_abs": [3.379828217475733e-05, 1.6725163035413715e-05], "E_Fa_outside": [0, 0], "weight_groups_outside": 67, "weight_elements_outside": 212, "maximum_gate_ratio": 19.03432228863663}
+    },
+    "intervals": {
+      "base-native-1 vs base-native-0": {
+        "disjoint_groups": 4,
+        "disjoint_elements": 4,
+        "worst": [["readouts.2.residuals.1.layers.0.linear.weight", {"elements": 1, "minimax_gate_ratio": 1.972808075860738, "index": [20, 99], "first": -1.214324712753296, "second": -1.2218928337097168}], ["interactions.0.edges.layers_after_skip.0.layers.1.linear.weight", {"elements": 1, "minimax_gate_ratio": 1.276034371629671, "index": [9, 121], "first": -8.687016487121582, "second": -8.663090705871582}], ["readouts.3.dense.linear.weight", {"elements": 1, "minimax_gate_ratio": 1.2577575643266774, "index": [104, 89], "first": -0.7657867074012756, "second": -0.7694785594940186}]]
+      },
+      "new-native-1 vs new-native-0": {
+        "disjoint_groups": 6,
+        "disjoint_elements": 6,
+        "worst": [["readouts.3.dense.linear.weight", {"elements": 1, "minimax_gate_ratio": 3.685874255963834, "index": [104, 89], "first": -0.7749410271644592, "second": -0.7641080617904663}], ["readouts.1.residuals.1.layers.0.linear.weight", {"elements": 1, "minimax_gate_ratio": 2.569594878906215, "index": [40, 88], "first": -1.0178403854370117, "second": -1.0266914367675781}], ["readouts.2.residuals.1.layers.0.linear.weight", {"elements": 1, "minimax_gate_ratio": 2.417204547556913, "index": [20, 99], "first": -1.2191076278686523, "second": -1.228407859802246}]]
+      },
+      "compiled-1 vs compiled-0": {
+        "disjoint_groups": 3,
+        "disjoint_elements": 3,
+        "worst": [["readouts.1.residuals.1.layers.0.linear.weight", {"elements": 1, "minimax_gate_ratio": 3.365717023930107, "index": [40, 88], "first": -1.0287055969238281, "second": -1.0171079635620117}], ["interactions.1.edges.layers_before_skip.0.layers.0.linear.weight", {"elements": 1, "minimax_gate_ratio": 1.7664826784779066, "index": [93, 100], "first": -0.313507080078125, "second": -0.3099327087402344}], ["readouts.3.dense.linear.weight", {"elements": 1, "minimax_gate_ratio": 1.7637642561893903, "index": [104, 89], "first": -0.7682894468307495, "second": -0.7734780311584473}]]
+      }
+    },
+    "compiled_elements_exceeding_both_native_references": {
+      "base": {"groups": 18, "elements": 20},
+      "new": {"groups": 15, "elements": 17}
+    }
+  },
+  "compiled_vs_candidate_native_failed_original_weights": {
+    "interactions.0.edges.concat.dense.linear.weight": 1,
+    "interactions.0.edges.dense_ca.linear.weight": 1,
+    "interactions.0.edges.layers_after_skip.0.layers.1.linear.weight": 1,
+    "interactions.0.edges.residual_m.0.layers.0.linear.weight": 1,
+    "interactions.0.edges.residual_m.0.layers.1.linear.weight": 2,
+    "interactions.1.edges.atom_update.residuals.1.layers.0.linear.weight": 1,
+    "interactions.1.edges.atom_update.residuals.1.layers.1.linear.weight": 1,
+    "interactions.1.edges.concat.dense.linear.weight": 1,
+    "interactions.1.edges.layers_after_skip.0.layers.0.linear.weight": 1,
+    "interactions.1.edges.layers_before_skip.0.layers.0.linear.weight": 2,
+    "interactions.1.edges.residual_m.0.layers.1.linear.weight": 1,
+    "interactions.2.edges.layers_after_skip.0.layers.0.linear.weight": 1,
+    "interactions.2.edges.layers_after_skip.0.layers.1.linear.weight": 2,
+    "interactions.2.edges.residual_m.0.layers.1.linear.weight": 2,
+    "interactions.3.edges.concat.dense.linear.weight": 1,
+    "readouts.0.dense.linear.weight": 1,
+    "readouts.0.residuals.0.layers.0.linear.weight": 1,
+    "readouts.1.residuals.0.layers.1.linear.weight": 1,
+    "readouts.1.residuals.1.layers.0.linear.weight": 2,
+    "readouts.2.residuals.0.layers.0.linear.weight": 1,
+    "readouts.2.residuals.1.layers.0.linear.weight": 2,
+    "readouts.2.residuals.1.layers.1.linear.weight": 1,
+    "readouts.3.dense.linear.weight": 1,
+    "readouts.4.dense.linear.weight": 1
+  },
+  "compiled_vs_native_worst_entries": {
+    "readouts.3.dense.linear.weight": {"elements": 1, "ratio": 6.399779915508672, "index": [104, 89], "actual": -0.7734780311584473, "reference": -0.7641080617904663, "max_abs": 0.09375, "relative_l2": 1.2984735701102467e-07},
+    "readouts.1.residuals.1.layers.0.linear.weight": {"elements": 2, "ratio": 5.550194436307032, "index": [40, 88], "actual": -1.0171079635620117, "reference": -1.0266914367675781, "max_abs": 0.125, "relative_l2": 1.5519306884028264e-07},
+    "readouts.0.residuals.0.layers.0.linear.weight": {"elements": 1, "ratio": 4.2869839546430635, "index": [94, 66], "actual": 2.1210803985595703, "reference": 2.1332263946533203, "max_abs": 0.09375, "relative_l2": 1.30728425150598e-07},
+    "interactions.0.edges.dense_ca.linear.weight": {"elements": 1, "ratio": 4.113678364805493, "index": [23, 60], "actual": 1.4056215286254883, "reference": 1.4143191576004028, "max_abs": 0.09375, "relative_l2": 1.315499963609781e-07},
+    "interactions.0.edges.residual_m.0.layers.1.linear.weight": {"elements": 2, "ratio": 3.4037545258545543, "index": [46, 55], "actual": 0.2556891441345215, "reference": 0.252447247505188, "max_abs": 0.0625, "relative_l2": 1.3934441239392688e-07},
+    "interactions.1.edges.concat.dense.linear.weight": {"elements": 1, "ratio": 2.7805119198124015, "index": [85, 342], "actual": -0.4139748811721802, "reference": -0.4108860492706299, "max_abs": 0.125, "relative_l2": 1.3777434361864489e-07}
+  },
+  "mixed_weight_derivative_terms": {
+    "base-cpu-float32-terms": {
+      "readouts.3.dense.linear.weight": {"index": [104, 89], "rows": 2000, "absolute_row_sum": 10041.102587800066, "signed_row_sum": -0.7753150044591166, "weight_grad": -0.7755683660507202},
+      "readouts.1.residuals.1.layers.0.linear.weight": {"index": [40, 88], "rows": 2000, "absolute_row_sum": 19011.247835750924, "signed_row_sum": -1.0398005470633507, "weight_grad": -1.0395746231079102},
+      "readouts.0.residuals.0.layers.0.linear.weight": {"index": [94, 66], "rows": 2000, "absolute_row_sum": 24946.116147828754, "signed_row_sum": 2.131516838911921, "weight_grad": 2.1313018798828125}
+    },
+    "base-cpu-float64-terms": {
+      "readouts.3.dense.linear.weight": {"index": [104, 89], "rows": 2000, "absolute_row_sum": 10041.113420397965, "signed_row_sum": -0.7850310720342009, "weight_grad": -0.7850310720338466},
+      "readouts.1.residuals.1.layers.0.linear.weight": {"index": [40, 88], "rows": 2000, "absolute_row_sum": 19011.269659998834, "signed_row_sum": -1.0186385927711399, "weight_grad": -1.018638592772179},
+      "readouts.0.residuals.0.layers.0.linear.weight": {"index": [94, 66], "rows": 2000, "absolute_row_sum": 24946.131940075662, "signed_row_sum": 2.12365393969651, "weight_grad": 2.1236539396958207}
+    },
+    "base-cuda-float32-terms": {
+      "readouts.3.dense.linear.weight": {"index": [104, 89], "rows": 2000, "absolute_row_sum": 10041.107618565613, "signed_row_sum": -0.7733080286416225, "weight_grad": -0.7734158635139465},
+      "readouts.1.residuals.1.layers.0.linear.weight": {"index": [40, 88], "rows": 2000, "absolute_row_sum": 19011.258968648464, "signed_row_sum": -1.0165141134420992, "weight_grad": -1.0166797637939453},
+      "readouts.0.residuals.0.layers.0.linear.weight": {"index": [94, 66], "rows": 2000, "absolute_row_sum": 24946.13040212961, "signed_row_sum": 2.1213319203816354, "weight_grad": 2.1213245391845703}
+    },
+    "new-cuda-float32-terms": {
+      "readouts.3.dense.linear.weight": {"index": [104, 89], "rows": 2000, "absolute_row_sum": 10041.102962281497, "signed_row_sum": -0.7664135423838161, "weight_grad": -0.7664889693260193},
+      "readouts.1.residuals.1.layers.0.linear.weight": {"index": [40, 88], "rows": 2000, "absolute_row_sum": 19011.253361841, "signed_row_sum": -1.0218781977528124, "weight_grad": -1.021928310394287},
+      "readouts.0.residuals.0.layers.0.linear.weight": {"index": [94, 66], "rows": 2000, "absolute_row_sum": 24946.12233056361, "signed_row_sum": 2.123516889754683, "weight_grad": 2.1236724853515625}
+    }
+  },
+  "local_controls": {
+    "ordered": {
+      "repeat": {"groups_outside": 14, "elements_outside": 15, "max_gate_ratio": 10.896163823209365},
+      "vs_old_eager": {"groups_outside": 16, "elements_outside": 20, "max_gate_ratio": 4.985212589331629},
+      "vs_new_eager": {"groups_outside": 18, "elements_outside": 21, "max_gate_ratio": 7.024157624215664},
+      "vs_double": {"groups_outside": 68, "elements_outside": 217, "max_gate_ratio": 21.96683161447526}
+    },
+    "deterministic": {
+      "repeat": {"groups_outside": 0, "elements_outside": 0, "max_gate_ratio": 0.5056560222085931},
+      "vs_old_eager": {"groups_outside": 14, "elements_outside": 19, "max_gate_ratio": 5.868888273560136},
+      "vs_new_eager": {"groups_outside": 16, "elements_outside": 18, "max_gate_ratio": 6.565593986550178},
+      "vs_double": {"groups_outside": 67, "elements_outside": 223, "max_gate_ratio": 22.04190385321673}
+    },
+    "cpu_higher_precision_readout": {
+      "higher_precision_linear_weights": 30,
+      "case": "large_2000",
+      "weights": 122,
+      "job": "6340084",
+      "base-float64": {
+        "groups": 66,
+        "elements": 203,
+        "max_gate_ratio": 19.447256258081282,
+        "field_elements_outside": {"E": 0, "Fa": 0}
+      },
+      "base-float32": {
+        "groups": 3,
+        "elements": 4,
+        "max_gate_ratio": 1.7353290161578463,
+        "field_elements_outside": {"E": 0, "Fa": 0}
+      },
+      "new-float32": {
+        "groups": 3,
+        "elements": 3,
+        "max_gate_ratio": 1.5758433382970278,
+        "field_elements_outside": {"E": 0, "Fa": 0}
+      }
+    }
+  },
+  "interpretation": {
+    "status": "The FP32 large_2000 formal training cell at 4428e68 retains its numerical failure.",
+    "observed": "E, Fa and participation of all 122 original weights passed. In the matched same-card repeat, compiled versus native failed at 30 elements in 24 weights. Even choosing the closer of the two original native results for each element still leaves 20 elements outside both original reference tolerances.",
+    "source_control": "CPU original and candidate agree under both the FP32 and FP64 gates. Repeated original FP32 CUDA training already exceeds its own tolerance at 20 elements, with four disjoint reference intervals. Native FP32 and compiled FP32 both also differ from the source-checked CPU FP64 gradients.",
+    "mechanism": "The three largest mismatches are in different readout weights. Their FP64 per-atom contributions have absolute sums of approximately 10041, 19011 and 24946, with signed sums near minus 0.79, minus 1.02 and plus 2.12. FP64 accumulation of the original FP32 V100 rows at the first entry still misses the original FP64 derivative by 7.89 gradient tolerances.",
+    "contraction": "The 4428e68 recomputation condition requires CUDA inference and the absence of a live functorch transform. Force training retains the two existing einsums. The local indexed-sum control still exceeds the repeat and original-reference gates. The deterministic process control passes its repeat gate and exceeds the original native and FP64 gradient gates. Promoting 30 readout matrix products to FP64 in a CPU control moves four gradients outside the original FP32 gate and leaves 203 elements outside the original FP64 gate. The existing contraction and acceptance tolerances are retained."
+  }
+}

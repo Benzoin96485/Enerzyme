@@ -201,6 +201,7 @@ class QMDriver(ABC):
         Base class for QM drivers.
 
         Output format (mutually exclusive):
+
         - pickle when ``pickle_name`` is set, or ``output_file`` ends with ``.pkl`` / ``.pickle``
         - ASE DB (default) otherwise (``output_file`` defaults to ``dataset.aselmdb``)
 
@@ -208,6 +209,7 @@ class QMDriver(ABC):
         unless ``pickle_fields`` renames them (e.g. :data:`ENERZYMETTE_PICKLE_FIELDS`).
 
         Resume / skip completed structures:
+
         - pickle: when ``dump_single_run`` is True (default), each success is cached under
           ``output_dir/<supplier>/single_run/<index>.pkl`` and reloaded on later runs
         - aselmdb: rows keyed by structure ``index``; completed rows are skipped (incomplete

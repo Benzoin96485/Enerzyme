@@ -13,18 +13,20 @@ path (``Irreps.num_irreps``). With ``mul(Y) = 1`` that is exactly the e3nn
 
 from __future__ import annotations
 
+from ..mp.nn.radial_mlp import NequixRadialMLP
+
 import math
 from typing import List, Optional, Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
+from ..mp.message.irreps import irreps_convolution
 from e3nn import o3
 from torch import Tensor, nn
-from torch_scatter import scatter_sum
 
-from ..e3nn_nn import tp_out_irreps_with_instructions
-from ..e3nn_nn.activation import Activation
-from ..e3nn_nn.rms_norm import RMSLayerNorm
+from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions
+from ..mp.equivariant.e3nn.activation import Activation
+from ..mp.equivariant.e3nn.rms_norm import RMSLayerNorm
 
 
 def _keep(irreps: o3.Irreps, keep: Sequence[str]) -> o3.Irreps:
@@ -145,49 +147,6 @@ class NequixGate(nn.Module):
         return torch.cat(parts, dim=-1)
 
 
-class _BiasFreeLinear(nn.Module):
-    """``y = x W`` with ``W_ij ~ N(0, init_scale / fan_in)``."""
-
-    def __init__(self, in_size: int, out_size: int, init_scale: float) -> None:
-        super().__init__()
-        if in_size < 1 or out_size < 1:
-            raise ValueError(f"linear size must be positive, got {in_size} -> {out_size}")
-        scale = math.sqrt(float(init_scale) / float(in_size))
-        self.weights = nn.Parameter(torch.randn(in_size, out_size) * scale)
-
-    def forward(self, features: Tensor) -> Tensor:
-        return features @ self.weights
-
-
-class NequixRadialMLP(nn.Module):
-    """Bias-free SiLU MLP. Hidden layers use ``init_scale``; the last does not."""
-
-    def __init__(self, sizes: Sequence[int], init_scale: float = 4.0) -> None:
-        super().__init__()
-        widths = [int(size) for size in sizes]
-        if len(widths) < 2:
-            raise ValueError(f"radial MLP needs at least two widths, got {widths}")
-        self.layers = nn.ModuleList(
-            [
-                _BiasFreeLinear(
-                    widths[i],
-                    widths[i + 1],
-                    init_scale if i < len(widths) - 2 else 1.0,
-                )
-                for i in range(len(widths) - 1)
-            ]
-        )
-
-    def forward(self, radial: Tensor) -> Tensor:
-        hidden = radial
-        last = len(self.layers) - 1
-        for index, layer in enumerate(self.layers):
-            hidden = layer(hidden)
-            if index < last:
-                hidden = F.silu(hidden)
-        return hidden
-
-
 def pre_gate_irreps(irreps_out: o3.Irreps) -> o3.Irreps:
     """Block output plus one even scalar gate per non-scalar channel."""
     irreps_out = o3.Irreps(irreps_out).simplify()
@@ -303,14 +262,16 @@ class NequixConvolution(nn.Module):
         edge_sh: Tensor,
     ) -> Tensor:
         messages = self.linear_1(features)
-        weights = self.radial_mlp(radial_basis)
-        if idx_i.numel() == 0:
-            aggregated = features.new_zeros(features.shape[0], self.tp.irreps_out.dim)
-        else:
-            sent = self.tp(messages[idx_j], edge_sh, weights)
-            aggregated = scatter_sum(sent, idx_i, dim=0, dim_size=features.shape[0])
+        aggregated = irreps_convolution(self.tp, self.radial_mlp, messages, idx_j, idx_i, edge_sh, radial_basis)
         aggregated = aggregated * self.inv_sqrt_neighbors
         hidden = self.linear_2(aggregated) + self.skip(features)
         if self.layer_norm is not None:
             hidden = self.layer_norm(hidden)
         return self.gate(hidden)
+
+
+def _keep_even_scalars(irreps: o3.Irreps) -> o3.Irreps:
+    kept = [(mul, ir) for mul, ir in irreps if ir.l == 0 and ir.p == 1]
+    if not kept:
+        raise ValueError(f"{irreps} has no even scalars for the final Nequix layer")
+    return o3.Irreps(kept)

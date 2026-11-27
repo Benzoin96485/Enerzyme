@@ -1,7 +1,7 @@
 """TACE spherical interaction stack: edge embed/update, CgtpInteraction, CgtpACE.
 
 Adapted from https://github.com/xvzemin/tace (MIT). Shared e3nn helpers live in
-``enerzyme.models.e3nn_nn``; radial MLP in ``enerzyme.models.blocks.radial_mlp``.
+``enerzyme.models.mp.equivariant.e3nn``; radial MLP in ``enerzyme.models.mp.nn.radial_mlp``.
 """
 
 from __future__ import annotations
@@ -13,10 +13,10 @@ from typing import List, Optional, Tuple
 import torch
 from e3nn import o3
 from torch import Tensor, nn
-from torch_scatter import scatter_sum
+from ..mp.ops import scatter_sum
 
-from ..blocks.radial_mlp import RadialMLP
-from ..e3nn_nn import (
+from ..mp.nn.radial_mlp import RadialMLP
+from ..mp.equivariant.e3nn import (
     Activation,
     ElementIrrepsLinear,
     IrrepsLinear,

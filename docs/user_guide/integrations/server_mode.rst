@@ -50,14 +50,19 @@ JSON body (conceptual):
         "model_key": "FF02",
         "input_file": "/path/to/geometry",
         "features": {
-            "Ra": [[...]],
-            "Za": [...],
-            "N": 100,
+            "Ra": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.96]],
+            "Za": [8, 1],
+            "N": 2,
             "Q": -1
         }
     }
 
 Exact schema follows what :code:`Server.calculate` expects for your model's active features.
+
+For a periodic request, include :code:`features.cell` (three lattice vectors
+as rows) and :code:`features.pbc` (three booleans). For an internal model,
+configure :code:`Server.neighbor_list: cutoff` and
+:code:`Server.neighbor_list_cutoff` with the training search radius.
 
 Response
 --------

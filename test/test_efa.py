@@ -169,11 +169,11 @@ def test_build_efa_blocks_rejects_out_of_range_iterations():
 
 
 def test_so3krates_rejects_out_of_range_era_iterations():
-    from enerzyme.models.so3krates import So3kratesCore
+    from enerzyme.models.presets.hybrid import so3krates
     import pytest
 
     with pytest.raises(ValueError, match="era_use_in_iterations"):
-        So3kratesCore(
+        so3krates(
             dim_embedding=12,
             num_rbf=8,
             degrees=[1, 2, 3],
@@ -191,11 +191,11 @@ def test_so3krates_rejects_out_of_range_era_iterations():
 
 
 def test_so3krates_with_efa_get_output():
-    from enerzyme.models.so3krates import So3kratesCore
+    from enerzyme.models.presets.hybrid import so3krates
 
     torch.manual_seed(0)
     N, F = 5, 12
-    core = So3kratesCore(
+    core = so3krates(
         dim_embedding=F,
         num_rbf=8,
         degrees=[1, 2, 3],
@@ -350,11 +350,11 @@ def test_build_model_so3lr_efa_smoke():
 
 
 def test_spookynet_use_efa_smoke():
-    from enerzyme.models.spookynet.core import SpookyNetCore
+    from enerzyme.models.presets.scalar import spookynet
 
     torch.manual_seed(0)
     F = 16
-    core = SpookyNetCore(
+    core = spookynet(
         dim_embedding=F,
         num_rbf=8,
         num_modules=1,
@@ -408,7 +408,7 @@ def test_spookynet_default_checkpoint_layout_matches_pre_efa():
         ResidualMLP,
         ResidualStack,
     )
-    from enerzyme.models.spookynet.core import SpookyNetCore
+    from enerzyme.models.presets.scalar import spookynet
     from enerzyme.models.ff import build_model
 
     class PreEFAInteractionModule(Module):
@@ -483,10 +483,10 @@ def test_spookynet_default_checkpoint_layout_matches_pre_efa():
         activation_fn="swish",
         use_irreps=True,
     )
-    core = SpookyNetCore(**core_kwargs)  # default use_efa=False
+    core = spookynet(**core_kwargs)  # default use_efa=False
     assert all("efa" not in k.lower() for k in core.state_dict())
     assert any("nonlocal_interaction" in k for k in core.state_dict())
-    SpookyNetCore(**core_kwargs).load_state_dict(core.state_dict(), strict=True)
+    spookynet(**core_kwargs).load_state_dict(core.state_dict(), strict=True)
 
     model = build_model("spookynet", verbose=0)
     assert all("efa" not in k.lower() for k in model.state_dict())
@@ -494,3 +494,52 @@ def test_spookynet_default_checkpoint_layout_matches_pre_efa():
     build_model("spookynet", verbose=0).load_state_dict(
         model.state_dict(), strict=True
     )
+
+
+def test_grouped_efa_matches_pairwise_attention_and_mixed_second_derivatives():
+    from enerzyme.models.mp.nonlocal_.rope import _grouped_efa
+
+    torch.manual_seed(93)
+    counts = (2, 0, 31, 3, 0, 1, 0)
+    batch = torch.repeat_interleave(torch.arange(len(counts)), torch.tensor(counts))
+    batch = batch[torch.randperm(batch.numel())]
+    for device in (("cpu", "cuda") if torch.cuda.is_available() else ("cpu",)):
+        for dtype in (torch.float32, torch.float64):
+            index = batch.to(device)
+            n = len(index)
+            operands = tuple(
+                (0.25 * torch.randn(shape, dtype=dtype, device=device)).requires_grad_()
+                for shape in ((n, 6, 8), (n, 6, 8), (n, 5), (6,))
+            )
+            target = torch.randn_like(operands[2])
+            directions = [torch.randn_like(value) for value in operands]
+
+            def pairwise(q, k, v, weights):
+                scores = torch.einsum("imk,jmk,m->ij", q, k, weights)
+                return scores.masked_fill(index[:, None] != index[None, :], 0) @ v
+
+            def evaluate(call):
+                y = call(*operands)
+                first = torch.autograd.grad((y * target).sum(), operands, create_graph=True)
+                directional = sum((g * d).sum() for g, d in zip(first, directions))
+                return y, first, torch.autograd.grad(directional, operands)
+
+            def tiled(q, k, v, weights):
+                return _grouped_efa(q, k, v, weights, index, len(counts))
+
+            compiled = torch.compile(tiled, backend="eager", fullgraph=True)
+            torch.testing.assert_close(evaluate(compiled), evaluate(pairwise))
+
+
+def test_efa_empty_atom_batch_preserves_output_and_derivative_shapes():
+    from enerzyme.models.mp.nonlocal_.rope import linear_efa_aggregate
+
+    operands = [torch.randn(shape, dtype=torch.float64, requires_grad=True) for shape in
+                ((0, 8), (0, 8), (0, 5), (0, 3), (4,), (6, 3), (6,))]
+    batch = torch.empty(0, dtype=torch.long)
+    for graphs in (0, 1, 4):
+        out = linear_efa_aggregate(*operands, batch, num_graphs=graphs)
+        assert out.shape == (0, 5)
+        for grad, operand in zip(torch.autograd.grad(out.sum(), operands), operands):
+            assert grad.shape == operand.shape
+            assert not torch.count_nonzero(grad)

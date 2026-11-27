@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import pytest
 import torch
 import torch.nn.functional as F
 from numpy.testing import assert_allclose
 
-from enerzyme.models.activation import ReluLike, Swish, TanhLike
+from enerzyme.models.mp.nn.activation import ReluLike, Swish, TanhLike
 from enerzyme.models.layers.response import (
     DerivativePolarizabilityLayer,
     assemble_polarizability,
@@ -17,7 +18,9 @@ from enerzyme.models.reann.density import (
     cartesian_angular,
     default_n_orbit,
     embedded_atom_density,
+    invariant_orbital_density,
     squared_cosine_window,
+    validate_species,
 )
 
 
@@ -68,6 +71,21 @@ def test_activation_formulas_match_the_paper_and_the_repository():
     assert_allclose(swish(features).detach().numpy(), expected_swish.numpy())
 
 
+def test_compiled_orbital_species_bounds():
+    def check(species):
+        validate_species(species, 8, "Za")
+        return species + 1
+
+    compiled = torch.compile(check, backend="eager", fullgraph=True)
+    for species in (torch.tensor([0, 1, 8]), torch.empty(0, dtype=torch.long)):
+        torch.testing.assert_close(compiled(species), check(species))
+    for species in (torch.tensor([-1]), torch.tensor([9])):
+        with pytest.raises(ValueError, match="Za must lie in"):
+            check(species)
+        with pytest.raises(RuntimeError, match="Za must lie in"):
+            compiled(species)
+
+
 def test_orbit_width_and_cartesian_channel_order():
     assert default_n_orbit(8, 2) == 108
     assert angular_channel_count(0) == 1
@@ -86,6 +104,21 @@ def test_orbit_width_and_cartesian_channel_order():
             torch.einsum("ji,ki->jki", released[-1], direction).reshape(-1, vectors.shape[0])
         )
     assert_allclose(angular.numpy(), torch.cat(released, dim=0).numpy())
+
+
+def test_shellwise_density_matches_channel_contraction_and_gradients():
+    generator = torch.Generator().manual_seed(18)
+    angular = angular_momentum_index(3)
+    orbitals = torch.randn(3, angular.numel(), 4, generator=generator, dtype=torch.float64, requires_grad=True)
+    weights = torch.randn(4, 4, 7, generator=generator, dtype=torch.float64, requires_grad=True)
+    gradients = []
+    for ordered in (False, True):
+        out = invariant_orbital_density(orbitals, weights, angular, ordered_shells=ordered)
+        first = torch.autograd.grad(out.square().mean(), (orbitals, weights), create_graph=True)
+        mixed = torch.autograd.grad(first[0].sum(), weights)[0]
+        gradients.append((out, *first, mixed))
+    for reference, actual in zip(*gradients):
+        torch.testing.assert_close(actual, reference, atol=1e-10, rtol=1e-12)
 
 
 def test_density_is_a_coherent_square_of_neighbor_orbitals():

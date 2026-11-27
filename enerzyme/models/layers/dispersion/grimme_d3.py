@@ -6,8 +6,9 @@ from torch import Tensor
 from torch.nn import Parameter
 from torch.nn.functional import softmax
 from .. import BaseFFLayer
-from ...cutoff import polynomial_transition
-from ...functional import gather_nd, segment_sum_coo
+from ...mp.basis.envelope import polynomial_transition
+from ...functional import gather_nd
+from ...mp.ops import scatter_sum
 
 # parameters
 # grimme_d3_tables from https://github.com/MMunibas/PhysNet/commit/e243e2c383b4ac0a9d7062e654d9b4feb76ca859
@@ -77,7 +78,7 @@ def _ncoord(Zi: Tensor, Zj: Tensor, Dij: Tensor, idx_i: Tensor, N: int, cutoff: 
     damp = 1.0 / (1.0 + torch.exp(-k1 * (rr - 1.0)))
     if cutoff is not None:
         damp *= polynomial_transition(Dij, cutoff, cutoff-1)
-    return segment_sum_coo(damp, idx_i, dim_size=N)
+    return scatter_sum(damp, idx_i, N)
 
 
 def _getc6(Zi: Tensor, Zj: Tensor, nci: Tensor, ncj: Tensor, c6ab: Tensor=d3_c6ab, k3: float=d3_k3) -> Tensor:
@@ -145,31 +146,39 @@ def edisp(Za: Tensor, Dij: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: Optiona
     r'''
     Compute DFT-D3(BJ) energy [1] with a cutoff [2]
 
-    E_{disp}^{BJ} = -1 / 2 * \sum_{A != B} (
-        s_6 * C_6^{AB} / (R_{AB} ** 6 + f(R_{AB}^0) ** 6) +
-        s_8 * C_8^{AB} / (R_{AB} ** 8 + f(R_{AB}^0) ** 8)
-    )
+    .. math::
 
-    where s_6 is set to 1.0 for GGA and hybrid functionals, also as default here.
-    s_8 is used to adapt the correction to the repulsive character of the short/medium-range behavior of the exchange correlation functional.
-        Optimized value for Hartree-Fock is used as default here.
+        E_{\mathrm{disp}}^{\mathrm{BJ}} = -\frac{1}{2}\sum_{A \ne B}
+        \left(\frac{s_6 C_6^{AB}}{R_{AB}^6 + f(R_{AB}^0)^6}
+        + \frac{s_8 C_8^{AB}}{R_{AB}^8 + f(R_{AB}^0)^8}\right).
 
-    C_8^{AB} = 3 * C_6^{AB} * \sqrt{Q^A * Q^B}
+    For GGA and hybrid functionals, :math:`s_6` is set to 1.0, the default
+    here. The parameter :math:`s_8` adapts the correction to the repulsive
+    short- and medium-range behavior of the exchange-correlation functional.
+    Its default is the value optimized for Hartree–Fock.
 
-    Q^A = s_{42} * \sqrt{Z_A} * \frac{\expval{r ** 4}^A}{\expval{r ** 2}^A}
+    .. math::
 
-    s_{42} is a redundant factor, collectively fitted with s_8 for different functionals
-    Z_A is the nuclear charge for an ad hoc factor to get consistent interaction energies also for the heavier elements
-    \expval{r ** 4}^A and \expval{r ** 2}^A are simple multipole-type expectation values derived from atomic densities 
+        C_8^{AB} = 3 C_6^{AB} \sqrt{Q^A Q^B}, \qquad
+        Q^A = s_{42} \sqrt{Z_A}
+              \frac{\langle r^4 \rangle^A}{\langle r^2 \rangle^A}.
 
-    f(R_{AB}^0) = a_1 * R_{AB}^0 + a_2
+    The redundant factor :math:`s_{42}` is fitted jointly with :math:`s_8`
+    for different functionals. The nuclear charge :math:`Z_A` provides an
+    ad hoc factor for consistent interaction energies for heavier elements.
+    The multipole-type expectation values :math:`\langle r^4 \rangle^A`
+    and :math:`\langle r^2 \rangle^A` are derived from atomic densities.
 
-    a_1, a_2 are free fit parameters introduced by BJ. Optimized value for Hartree-Fock are used as default here.
+    .. math::
 
-    R_{AB}^0 = \sqrt{C_8^{AB} / C_6^{AB}}
+        f(R_{AB}^0) = a_1 R_{AB}^0 + a_2, \qquad
+        R_{AB}^0 = \sqrt{C_8^{AB} / C_6^{AB}}.
 
-    Params:
-    -----
+    Becke–Johnson damping introduces the fit parameters :math:`a_1` and
+    :math:`a_2`. Their defaults are the values optimized for Hartree–Fock.
+
+    .. rubric:: Parameters
+
     Za: Long tensor of the first atomic number in the pair, shape [N * batch_size]
 
     Dij: Float tensor of distances in Bohr, shape [N_pair * batch_size]
@@ -196,12 +205,12 @@ def edisp(Za: Tensor, Dij: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: Optiona
 
     r2r4: Float tensor of \sqrt{Q_A}, shape [max_Za + 1]
 
-    Returns:
-    -----
+    .. rubric:: Returns
+
     edisp: Float tensor of atomic dispersion energy, shape [N * batch_size]
 
-    References:
-    -----
+    .. rubric:: References
+
     [1]: J. Comput. Chem. 2011, 32(7), 1456−1465.
 
     [2]: J. Chem. Theory Comput. 2019, 15, 3678−3693.
@@ -244,7 +253,7 @@ def edisp(Za: Tensor, Dij: Tensor, idx_i: Tensor, idx_j: Tensor, cutoff: Optiona
 
     e6 = -0.5 * s6 * c6 * e6
     e8 = -0.5 * s8 * c8 * e8
-    return segment_sum_coo(e6 + e8, idx_i, dim_size=N)
+    return scatter_sum(e6 + e8, idx_i, N)
 
 
 class GrimmeD3EnergyLayer(BaseFFLayer):
@@ -255,16 +264,16 @@ class GrimmeD3EnergyLayer(BaseFFLayer):
         '''
         DFT-D3 dispersion correction [1] with Becke-Johnson damping [2].
 
-        Params:
-        -----
+        .. rubric:: Parameters
+
         learnable: If `True`, covalent radii,  are learnable.
 
         Hartree_in_E: The numerical value of one Hartree in the unit of energy targets
 
         Bohr_in_R: The numerical value of one Bohr in the unit of position features
 
-        References:
-        -----
+        .. rubric:: References
+
         [1]: J. Chem. Phys. 2010, 132, 154104
 
         [2]: J. Comput. Chem. 2011, 32(7), 1456−1465
@@ -281,8 +290,8 @@ class GrimmeD3EnergyLayer(BaseFFLayer):
         r'''
         Compute DFT-D3(BJ) energy with a cutoff with the model's parameters.
 
-        Params:
-        -----
+        .. rubric:: Parameters
+
         Za: Long tensor of the first atomic number in the pair, shape [N * batch_size]
 
         Dij: Float tensor of distances shape [N_pair * batch_size]
@@ -293,8 +302,8 @@ class GrimmeD3EnergyLayer(BaseFFLayer):
 
         cutoff: Cutoff for the damping function
 
-        Returns:
-        -----
+        .. rubric:: Returns
+
         edisp: Float tensor of atomic dispersion energy, shape [N * batch_size]
         '''
         return self.Hartree_in_E * edisp(

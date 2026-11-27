@@ -55,7 +55,7 @@ def _inputs(positions, embedding, atomic_numbers, cutoff):
 
 
 def _tiny(**overrides):
-    from enerzyme.models.camp import CAMPCore
+    from enerzyme.models.presets.cartesian_tensor import camp
 
     params = dict(
         dim_embedding=2,
@@ -71,7 +71,7 @@ def _tiny(**overrides):
         atomic_numbers=[1, 6, 8],
     )
     params.update(overrides)
-    return CAMPCore(**params)
+    return camp(**params)
 
 
 def test_registration_presets_and_yaml():
@@ -82,7 +82,7 @@ def test_registration_presets_and_yaml():
 
     for name in ("camp", "CAMP"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "CAMPCore"
+        assert core_cls.__name__ == "camp"
         assert build_params["dim_embedding"] == 33
         assert build_params["cutoff_sr"] == 5.0
         assert layers[0]["name"] == "RangeSeparation"
@@ -114,8 +114,8 @@ def test_registration_presets_and_yaml():
     assert published.max_chebyshev_degree == 8 and published.n_species == 2
     assert published.dim_feature_out == 33 and published.num_output_blocks == 3
     assert published.feature_irreps == "33x0e"
-    assert published.layers[0].atomic.radial.coeff.shape == (2, 2, 33, 9)
-    assert published.layers[0].atomic.radial.coeff is not published.layers[1].atomic.radial.coeff
+    assert published.blocks[0].atomic.radial.coeff.shape == (2, 2, 33, 9)
+    assert published.blocks[0].atomic.radial.coeff is not published.blocks[1].atomic.radial.coeff
 
     with EXAMPLE.open() as stream:
         ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
@@ -125,7 +125,7 @@ def test_registration_presets_and_yaml():
         build_params=dict(ff["build_params"]),
         verbose=0,
     )
-    assert model.__class__.__name__ == "CAMPCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.max_v == 2 and model.num_layers == 2 and model.n_species == 3
     assert any(isinstance(layer, RandomAtomEmbedding) for layer in model.pre_sequence)
     readout = next(layer for layer in model.post_sequence if isinstance(layer, CAMPEnergyReadout))

@@ -14,32 +14,11 @@ import torch.nn.functional as F
 from e3nn.o3._spherical_harmonics import _spherical_harmonics
 from torch import Tensor
 
-from .radius_utils import envelope_fn, safe_normalize
-from .radius_graph import biknn_radius_graph_from_batch
+from ..mp.ops import safe_normalize, scatter_sum
+from .radius_utils import envelope_fn
+from .radius_graph import PreparedBiKNN, biknn_radius_graph_from_batch
 from .smearing import GaussianSmearing, LinearSigmoidSmearing, SigmoidSmearing, SiLUSmearing
 from .types import GraphAttentionData
-
-
-def _broadcast_scatter_index(index: Tensor, ref: Tensor, dim: int) -> Tensor:
-    dim = ref.dim() + dim if dim < 0 else dim
-    size = ((1,) * dim) + (-1,) + ((1,) * (ref.dim() - dim - 1))
-    return index.view(size).expand_as(ref).to(torch.long)
-
-
-def compilable_scatter(
-    src: Tensor,
-    index: Tensor,
-    dim_size: int,
-    dim: int = 0,
-    reduce: str = "sum",
-) -> Tensor:
-    """Scatter-reduce matching fairchem ``compilable_scatter`` (sum along ``dim``)."""
-    dim = src.dim() + dim if dim < 0 else dim
-    size = src.size()[:dim] + (dim_size,) + src.size()[dim + 1 :]
-    if reduce not in ("sum", "add"):
-        raise ValueError(f"reduce={reduce} not supported")
-    idx = _broadcast_scatter_index(index.long(), src, dim)
-    return src.new_zeros(size).scatter_add_(dim, idx, src)
 
 
 def get_edge_distance_expansion(
@@ -82,7 +61,6 @@ def get_frequency_vectors(
     )
     lmax = len(freequency_list) - 1
     repeat_dims = list(freequency_list)
-    edge_direction = edge_direction.to(torch.float32)
     harmonics = _spherical_harmonics(
         lmax, edge_direction[..., 0], edge_direction[..., 1], edge_direction[..., 2]
     )
@@ -101,7 +79,7 @@ def get_frequency_vectors(
         return torch.cat(components, dim=-1)
     return torch.zeros(
         (edge_direction.shape[0], edge_direction.shape[1], 0),
-        device=edge_direction.device,
+        device=edge_direction.device, dtype=edge_direction.dtype,
     )
 
 
@@ -111,7 +89,7 @@ def get_node_direction_expansion_neighbor(
     lmax: int,
 ) -> Tensor:
     """BOO-style node scalars per angular momentum block, shape ``(N, lmax + 1)``."""
-    neighbor_mask = neighbor_mask.float().unsqueeze(-1)
+    neighbor_mask = neighbor_mask.to(direction_vec.dtype).unsqueeze(-1)
     edge_sh = _spherical_harmonics(
         lmax=lmax,
         x=direction_vec[:, :, 0],
@@ -119,16 +97,14 @@ def get_node_direction_expansion_neighbor(
         z=direction_vec[:, :, 2],
     )
     sh_index = torch.arange(lmax + 1, device=edge_sh.device)
-    sh_index = torch.repeat_interleave(sh_index, 2 * sh_index + 1)
+    sh_index = torch.repeat_interleave(sh_index, 2 * sh_index + 1, output_size=(lmax + 1) ** 2)
     edge_sh = edge_sh / torch.clamp(torch.sqrt(2 * sh_index + 1), min=1e-6).unsqueeze(0).unsqueeze(0)
     masked_sh = edge_sh * neighbor_mask
     neighbor_count = neighbor_mask.sum(dim=1)
     neighbor_count = torch.clamp(neighbor_count, min=1)
     node_boo = masked_sh.sum(dim=1) / neighbor_count
     node_boo_squared = node_boo**2
-    node_boo = compilable_scatter(
-        node_boo_squared, sh_index, dim_size=lmax + 1, dim=-1, reduce="sum"
-    )
+    node_boo = scatter_sum(node_boo_squared, sh_index, lmax + 1, dim=-1)
     return torch.clamp(node_boo, min=1e-6).sqrt()
 
 
@@ -140,7 +116,10 @@ def get_node_attention_mask(
     r_max: float = 30.0,
     use_sincx_mask: bool = True,
     single_system_no_padding: bool = False,
+    dtype: torch.dtype | None = None,
 ) -> tuple[Tensor | None, Tensor | None, Tensor | None]:
+    if dtype is None:
+        dtype = dist_pairwise.dtype if dist_pairwise is not None else torch.get_default_dtype()
     N_pad = node_batch.size(0)
     if single_system_no_padding:
         if not use_sincx_mask:
@@ -152,7 +131,7 @@ def get_node_attention_mask(
         real = node_batch.unsqueeze(0) != -1
         real2 = node_batch.unsqueeze(1) != -1
         valid_mask = same_graph & real & real2
-        base_mask = torch.zeros((N_pad, N_pad), dtype=torch.float32, device=node_batch.device)
+        base_mask = torch.zeros((N_pad, N_pad), dtype=dtype, device=node_batch.device)
         neg_inf = torch.finfo(base_mask.dtype).min
         base_mask = base_mask.masked_fill(~valid_mask, neg_inf)
         base_mask = base_mask.unsqueeze(0)
@@ -167,11 +146,15 @@ def get_node_attention_mask(
         math.log10(omega_max),
         n_freq,
         device=node_batch.device,
-        dtype=torch.float32,
+        dtype=dtype,
     )
     x = dist_pairwise.unsqueeze(-1) * omega.view(1, 1, -1)
-    sincx = torch.empty_like(x)
     small = x.abs() < 1e-4
+    if torch.compiler.is_compiling():
+        x2 = x.square()
+        denom = torch.where(small, 1.0, x)
+        return torch.where(small, 1 - x2 / 6 + x2.square() / 120, torch.sin(x) / denom), base_mask, valid_mask
+    sincx = torch.empty_like(x)
     x_small = x[small]
     x2 = x_small * x_small
     sincx[small] = 1 - x2 / 6 + (x2 * x2) / 120
@@ -229,11 +212,11 @@ def pad_batch(
     if charge is not None:
         charge = F.pad(charge, (0, max_batch_size - num_graphs), value=0)
     else:
-        charge = torch.zeros(max_batch_size, dtype=torch.float, device=device)
+        charge = edge_distance.new_zeros(max_batch_size)
     if spin is not None:
         spin = F.pad(spin, (0, max_batch_size - num_graphs), value=0)
     else:
-        spin = torch.zeros(max_batch_size, dtype=torch.float, device=device)
+        spin = edge_distance.new_zeros(max_batch_size)
     return (
         atomic_numbers,
         charge,
@@ -297,6 +280,7 @@ def build_graph_attention_data(
     charge: Tensor | None = None,
     spin: Tensor | None = None,
     cell: Tensor | None = None,
+    prepared: PreparedBiKNN | None = None,
 ) -> GraphAttentionData:
     """
     Build ``GraphAttentionData`` from Enerzyme fields (positions, species, batch).
@@ -319,10 +303,11 @@ def build_graph_attention_data(
     else:
         work_device = original_device
 
-    Ra = Ra.to(device=work_device, dtype=torch.float32)
+    if Ra.dtype in (torch.float16, torch.bfloat16):
+        Ra = Ra.float()
     Za = Za.to(device=work_device)
     batch_seg = batch_seg.to(device=work_device)
-    num_graphs = int(batch_seg.max().item()) + 1
+    num_graphs = len(prepared.sizes) if prepared is not None else int(batch_seg.max().item()) + 1
     num_nodes = Za.shape[0]
 
     head_dim = hp.hidden_size // hp.atten_num_heads
@@ -356,6 +341,7 @@ def build_graph_attention_data(
         compute_dist_pairwise=need_dist_pairwise,
         cell=cell,
         pbc=hp.pbc,
+        prepared=prepared,
     )
 
     edge_direction = safe_normalize(disp, dim=-1)
@@ -459,6 +445,7 @@ def build_graph_attention_data(
             hp.attn_num_freq,
             use_sincx_mask=hp.use_sincx_mask,
             single_system_no_padding=hp.single_system_no_padding,
+            dtype=Ra.dtype,
         )
     else:
         sincx = None
@@ -468,7 +455,7 @@ def build_graph_attention_data(
     node_batch = node_batch.masked_fill(node_batch == -1, 0)
 
     node_indices = torch.arange(max_num_nodes, device=work_device)
-    node_padding_mask = (node_indices < num_nodes).to(torch.float32)
+    node_padding_mask = (node_indices < num_nodes).to(Ra.dtype)
 
     x = GraphAttentionData(
         atomic_numbers=atomic_numbers,

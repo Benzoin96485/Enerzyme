@@ -1,0 +1,916 @@
+{
+  "model": "alphanet",
+  "device": "CPU",
+  "dtype": "float32",
+  "torch": "2.13.0+cu126",
+  "method": "Ordinary force training. Reset the random seed before the native and compiled calls. Differentiate sum(E²) + sum(Fa²). Compare each component with the same native weights and coordinates. Frozen trials additionally compare the modified native operator with the original native operator.",
+  "tolerances": {
+    "energy_and_force_frozen": {
+      "atol": 0.0003,
+      "rtol": 0.0003
+    },
+    "weight_gradients": {
+      "atol": 0.0007,
+      "rtol": 0.001
+    }
+  },
+  "small_checks": {
+    "source": "3927c589b7617fcb22ff399fbb56dbaf780c3ba1",
+    "model_seed": 142,
+    "sizes": [
+      5,
+      4
+    ],
+    "method": "scripts/check_compiled_forces.py, including its training dropout seed 22. Graph capture followed by the eager backend is a diagnostic control. The remaining cases use real Inductor. The default row at 882b187 used the same model arithmetic.",
+    "cases": {
+      "default/107": {
+        "job": "6338792",
+        "source": "882b187",
+        "native_weights_compared": 121,
+        "operations": 568,
+        "outside": [
+          "embed.radial.net.0.bias",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": null
+      },
+      "aten/107": {
+        "job": "6338985",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 568,
+        "outside": [],
+        "native_vs_original_outside": null
+      },
+      "both/107": {
+        "job": "6338985",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 568,
+        "outside": [
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": null
+      },
+      "horizontal/107": {
+        "job": "6338985",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 568,
+        "outside": [
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": null
+      },
+      "no-fusion/107": {
+        "job": "6338985",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 568,
+        "outside": [
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": null
+      },
+      "scalar/107": {
+        "job": "6338985",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 568,
+        "outside": [
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": null
+      },
+      "angle-scalar/107": {
+        "job": "6339011",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 577,
+        "outside": [],
+        "native_vs_original_outside": []
+      },
+      "angle/107": {
+        "job": "6339011",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 577,
+        "outside": [
+          "embed.radial.net.0.bias",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": []
+      },
+      "norm-scalar/107": {
+        "job": "6339011",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 596,
+        "outside": [
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": [
+          "blocks.0.transition.mix.2.weight",
+          "blocks.1.message.norm_before.bias"
+        ]
+      },
+      "norm/107": {
+        "job": "6339011",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 596,
+        "outside": [
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": [
+          "blocks.0.transition.mix.2.weight",
+          "blocks.1.message.norm_before.bias"
+        ]
+      },
+      "quantum-scalar/107": {
+        "job": "6339011",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 583,
+        "outside": [
+          "embed.radial.net.2.bias",
+          "blocks.0.message.scale.bias",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": []
+      },
+      "quantum/107": {
+        "job": "6339011",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 583,
+        "outside": [],
+        "native_vs_original_outside": []
+      },
+      "quantum/301": {
+        "job": "6339053",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 583,
+        "outside": [
+          "pre_sequence.3.embedding.weight",
+          "embed.radial.net.0.weight",
+          "embed.radial.net.0.bias",
+          "embed.radial.net.2.weight",
+          "embed.radial.net.2.bias",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.1.transition.mix.0.weight",
+          "blocks.1.transition.mix.2.weight"
+        ],
+        "native_vs_original_outside": [
+          "pre_sequence.3.embedding.weight",
+          "embed.radial.net.0.weight",
+          "embed.radial.net.0.bias",
+          "embed.radial.net.2.weight",
+          "embed.radial.net.2.bias",
+          "blocks.0.message.norm_before.weight",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias",
+          "blocks.1.transition.mix.0.weight",
+          "blocks.1.transition.mix.2.weight",
+          "blocks.2.message.norm_before.bias"
+        ]
+      },
+      "quantum/48": {
+        "job": "6339053",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 583,
+        "outside": [
+          "pre_sequence.3.embedding.weight",
+          "embed.kernel1",
+          "embed.kernels_real",
+          "embed.kernels_imag",
+          "embed.radial.net.0.weight",
+          "embed.radial.net.0.bias",
+          "embed.radial.net.2.weight",
+          "blocks.0.message.scale.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.0.bias",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.scale.bias",
+          "blocks.1.message.norm_before.bias",
+          "blocks.1.transition.mix.0.weight",
+          "blocks.1.transition.mix.2.weight",
+          "blocks.2.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": [
+          "pre_sequence.2.bessel_weights",
+          "pre_sequence.3.embedding.weight",
+          "post_sequence.0.head.weight",
+          "embed.kernel1",
+          "embed.kernels_real",
+          "embed.kernels_imag",
+          "embed.radial.net.0.weight",
+          "embed.radial.net.0.bias",
+          "embed.radial.net.2.weight",
+          "blocks.0.message.scale.bias",
+          "blocks.0.message.norm_before.weight",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.0.bias",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.scale.bias",
+          "blocks.1.message.norm_before.weight",
+          "blocks.1.message.norm_before.bias",
+          "blocks.1.transition.mix.0.weight",
+          "blocks.1.transition.mix.2.weight",
+          "blocks.2.message.scale.bias"
+        ]
+      },
+      "quantum-einsum/107": {
+        "job": "6339053",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 580,
+        "outside": [],
+        "native_vs_original_outside": []
+      },
+      "quantum-einsum/301": {
+        "job": "6339053",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 580,
+        "outside": [
+          "pre_sequence.3.embedding.weight",
+          "embed.radial.net.0.bias",
+          "embed.radial.net.2.weight",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.1.transition.mix.0.weight",
+          "blocks.1.transition.mix.2.weight"
+        ],
+        "native_vs_original_outside": [
+          "pre_sequence.3.embedding.weight",
+          "embed.radial.net.0.weight",
+          "embed.radial.net.0.bias",
+          "embed.radial.net.2.weight",
+          "embed.radial.net.2.bias",
+          "blocks.0.message.norm_before.weight",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias",
+          "blocks.1.transition.mix.0.weight",
+          "blocks.1.transition.mix.2.weight",
+          "blocks.2.message.norm_before.bias"
+        ]
+      },
+      "quantum-einsum/48": {
+        "job": "6339053",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 580,
+        "outside": [
+          "pre_sequence.2.bessel_weights",
+          "pre_sequence.3.embedding.weight",
+          "embed.kernel1",
+          "embed.kernels_real",
+          "embed.kernels_imag",
+          "embed.radial.net.0.weight",
+          "embed.radial.net.0.bias",
+          "embed.radial.net.2.weight",
+          "blocks.0.message.scale.bias",
+          "blocks.0.message.norm_before.weight",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias",
+          "blocks.1.transition.mix.0.weight"
+        ],
+        "native_vs_original_outside": [
+          "pre_sequence.2.bessel_weights",
+          "pre_sequence.3.embedding.weight",
+          "post_sequence.0.head.weight",
+          "embed.kernel1",
+          "embed.kernels_real",
+          "embed.kernels_imag",
+          "embed.radial.net.0.weight",
+          "embed.radial.net.0.bias",
+          "embed.radial.net.2.weight",
+          "blocks.0.message.scale.bias",
+          "blocks.0.message.norm_before.weight",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.0.bias",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.scale.bias",
+          "blocks.1.message.norm_before.weight",
+          "blocks.1.message.norm_before.bias",
+          "blocks.1.transition.mix.0.weight",
+          "blocks.1.transition.mix.2.weight"
+        ]
+      },
+      "quantum-normalize/107": {
+        "job": "6339053",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 580,
+        "outside": [
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.bias"
+        ],
+        "native_vs_original_outside": []
+      },
+      "quantum-normalize/301": {
+        "job": "6339053",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 580,
+        "outside": [],
+        "native_vs_original_outside": []
+      },
+      "quantum-normalize/48": {
+        "job": "6339053",
+        "source": "3927c58",
+        "native_weights_compared": 121,
+        "operations": 580,
+        "outside": [
+          "pre_sequence.3.embedding.weight",
+          "embed.kernel1",
+          "embed.kernels_real",
+          "embed.kernels_imag",
+          "embed.radial.net.0.weight",
+          "embed.radial.net.0.bias",
+          "embed.radial.net.2.weight",
+          "blocks.0.message.scale.bias",
+          "blocks.0.message.norm_before.weight",
+          "blocks.0.message.norm_before.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.2.weight",
+          "blocks.0.transition.mix.2.bias",
+          "blocks.1.message.norm_before.weight",
+          "blocks.1.message.norm_before.bias",
+          "blocks.1.transition.mix.0.weight",
+          "blocks.1.transition.mix.2.weight"
+        ],
+        "native_vs_original_outside": [
+          "pre_sequence.3.embedding.weight",
+          "embed.kernel1",
+          "embed.kernels_imag",
+          "embed.radial.net.2.weight",
+          "blocks.0.message.scale.bias",
+          "blocks.0.transition.mix.0.weight",
+          "blocks.0.transition.mix.0.bias",
+          "blocks.0.transition.mix.2.weight"
+        ]
+      }
+    }
+  },
+  "frozen_checks": {
+    "source": "d173ef1096a0dcf53d737593df49d8d85653ef6e",
+    "fixture_sha256": "da8271aa2e58500db558ddbe27c16738b32e44da6ceea6596cf481e64b4419b6",
+    "systems": {
+      "bulk_256": {
+        "default": {
+          "job": "6339059",
+          "median_ms": 2123.7124369945377,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 0,
+            "elements_outside": 0,
+            "worst": {}
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 21,
+            "elements_outside": 9368,
+            "worst": {
+              "pre_sequence.3.embedding.weight": {
+                "elements": 7,
+                "worst_ratio": 121.77997748807256
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 21,
+            "elements_outside": 9368,
+            "worst": {
+              "pre_sequence.3.embedding.weight": {
+                "elements": 7,
+                "worst_ratio": 121.77997748807256
+              }
+            }
+          }
+        },
+        "quantum-einsum": {
+          "job": "6339059",
+          "median_ms": 2086.334998952225,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 18,
+            "elements_outside": 6643,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 326,
+                "worst_ratio": 103.99931466122784
+              }
+            }
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 20,
+            "elements_outside": 8892,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 500,
+                "worst_ratio": 132.75137808293405
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 23,
+            "elements_outside": 16067,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 732,
+                "worst_ratio": 238.10198556393215
+              }
+            }
+          }
+        },
+        "quantum": {
+          "job": "6339059",
+          "median_ms": 2210.637091193348,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 18,
+            "elements_outside": 7540,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 404,
+                "worst_ratio": 136.43133596620024
+              }
+            }
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 21,
+            "elements_outside": 7209,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 422,
+                "worst_ratio": 88.77104717601254
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 23,
+            "elements_outside": 16469,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 746,
+                "worst_ratio": 228.98501918653156
+              }
+            }
+          }
+        },
+        "quantum-normalize": {
+          "job": "6339059",
+          "median_ms": 2110.8528680633754,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 16,
+            "elements_outside": 605,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 100,
+                "worst_ratio": 28.42847683879895
+              }
+            }
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 23,
+            "elements_outside": 10777,
+            "worst": {
+              "pre_sequence.3.embedding.weight": {
+                "elements": 9,
+                "worst_ratio": 134.46128858740715
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 22,
+            "elements_outside": 10866,
+            "worst": {
+              "pre_sequence.3.embedding.weight": {
+                "elements": 8,
+                "worst_ratio": 139.41001759950228
+              }
+            }
+          }
+        },
+        "angle-scalar": {
+          "job": "6339091",
+          "median_ms": 2930.8303350117058,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 0,
+            "elements_outside": 0,
+            "worst": {}
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 23,
+            "elements_outside": 13425,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 770,
+                "worst_ratio": 125.6343494402413
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 23,
+            "elements_outside": 13455,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 766,
+                "worst_ratio": 125.4279999388415
+              }
+            }
+          }
+        },
+        "native": {
+          "job": "6339167",
+          "median_ms": 2635.7366340234876,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 0,
+            "elements_outside": 0,
+            "worst": {}
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 0,
+            "elements_outside": 0,
+            "worst": {}
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 0,
+            "elements_outside": 0,
+            "worst": {}
+          }
+        }
+      },
+      "mol_batch_32x20": {
+        "default": {
+          "job": "6339059",
+          "median_ms": 2580.9201968368143,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 0,
+            "elements_outside": 0,
+            "worst": {}
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 50,
+            "elements_outside": 22080,
+            "worst": {
+              "embed.kernels_real": {
+                "elements": 6536,
+                "worst_ratio": 260.4497682810861
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 50,
+            "elements_outside": 22080,
+            "worst": {
+              "embed.kernels_real": {
+                "elements": 6536,
+                "worst_ratio": 260.4497682810861
+              }
+            }
+          }
+        },
+        "quantum-einsum": {
+          "job": "6339059",
+          "median_ms": 2638.633601134643,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 58,
+            "elements_outside": 34693,
+            "worst": {
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 3548,
+                "worst_ratio": 266.89520078354553
+              }
+            }
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 61,
+            "elements_outside": 37406,
+            "worst": {
+              "embed.kernels_real": {
+                "elements": 10709,
+                "worst_ratio": 345.92346737621034
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 48,
+            "elements_outside": 20802,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 1638,
+                "worst_ratio": 279.6180409989425
+              }
+            }
+          }
+        },
+        "quantum": {
+          "job": "6339059",
+          "median_ms": 2655.80553910695,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 57,
+            "elements_outside": 33267,
+            "worst": {
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 3502,
+                "worst_ratio": 275.10009106998643
+              }
+            }
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 57,
+            "elements_outside": 28535,
+            "worst": {
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 2988,
+                "worst_ratio": 320.5422337515942
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 48,
+            "elements_outside": 18660,
+            "worst": {
+              "blocks.0.transition.mix.2.weight": {
+                "elements": 1484,
+                "worst_ratio": 270.0927302802643
+              }
+            }
+          }
+        },
+        "quantum-normalize": {
+          "job": "6339059",
+          "median_ms": 2569.949886063114,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 29,
+            "elements_outside": 3639,
+            "worst": {
+              "blocks.0.transition.mix.0.weight": {
+                "elements": 210,
+                "worst_ratio": 62.968766116713255
+              }
+            }
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 50,
+            "elements_outside": 17035,
+            "worst": {
+              "embed.radial.net.0.weight": {
+                "elements": 561,
+                "worst_ratio": 174.47353818812545
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 51,
+            "elements_outside": 18226,
+            "worst": {
+              "embed.kernels_real": {
+                "elements": 5368,
+                "worst_ratio": 207.17493787144667
+              }
+            }
+          }
+        },
+        "angle-scalar": {
+          "job": "6339091",
+          "median_ms": 3596.9268521294,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 39,
+            "elements_outside": 7931,
+            "worst": {
+              "blocks.1.transition.mix.2.weight": {
+                "elements": 1156,
+                "worst_ratio": 121.9478965997368
+              }
+            }
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 66,
+            "elements_outside": 81882,
+            "worst": {
+              "blocks.0.transition.mix.0.weight": {
+                "elements": 2626,
+                "worst_ratio": 913.2152194901936
+              }
+            }
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 66,
+            "elements_outside": 87296,
+            "worst": {
+              "blocks.0.transition.mix.0.weight": {
+                "elements": 2726,
+                "worst_ratio": 1000.163316027565
+              }
+            }
+          }
+        },
+        "native": {
+          "job": "6339167",
+          "median_ms": 3285.611813189462,
+          "native_against_original": {
+            "tensors": 123,
+            "tensors_outside": 0,
+            "elements_outside": 0,
+            "worst": {}
+          },
+          "compiled_against_native": {
+            "tensors": 123,
+            "tensors_outside": 0,
+            "elements_outside": 0,
+            "worst": {}
+          },
+          "compiled_against_original": {
+            "tensors": 123,
+            "tensors_outside": 0,
+            "elements_outside": 0,
+            "worst": {}
+          }
+        }
+      }
+    }
+  },
+  "arithmetic": {
+    "angle": "Compute the complex phase angle in complex128, then return the original real dtype.",
+    "norm": "Compute LayerNorm in float64, then return the original real dtype (small checks only).",
+    "quantum": "Compute the complete matrix-product-state contraction and its unit-modulus normalization in complex128, then return complex64.",
+    "quantum-einsum": "Accumulate the matrix-product-state contraction in complex128 and convert to complex64 before normalization.",
+    "quantum-normalize": "Keep the contraction at complex64 and normalize its result in complex128, then return complex64.",
+    "scalar": "Inductor cpp.simdlen=1.",
+    "horizontal": "Inductor cpp.max_horizontal_fusion_size=1.",
+    "both": "Apply both CPU compiler options.",
+    "no-fusion": "Inductor max_fusion_size=1."
+  },
+  "balanced_frozen_timings": {
+    "method": "Same node, weights and inputs. Alternate ABBA and BAAB starting with ordinary compiled training and native force fallback. Discard the first four calls; each median uses six timed steps. This compares the candidate paths on CPU.",
+    "cases": {
+      "bulk_256": {
+        "node": "d-3-10-2",
+        "job": "6339187",
+        "native": {
+          "tensors": 123,
+          "tensors_outside": 0,
+          "elements_outside": 0,
+          "worst": {}
+        },
+        "ordinary": {
+          "tensors": 123,
+          "tensors_outside": 21,
+          "elements_outside": 9368,
+          "worst": {
+            "pre_sequence.3.embedding.weight": {
+              "elements": 7,
+              "worst_ratio": 121.76332049402978
+            }
+          }
+        },
+        "median_ms": {
+          "ordinary": 2077.457103994675,
+          "native": 2768.8095349585637
+        },
+        "times_ms": {
+          "ordinary": [
+            2074.8036839067936,
+            2081.722842063755,
+            2119.114415952936,
+            2020.4967220779508,
+            2073.204407002777,
+            2080.1105240825564
+          ],
+          "native": [
+            2751.965771894902,
+            2803.389391861856,
+            2785.6532980222255,
+            2727.3520519956946,
+            2785.7943419367075,
+            2748.9174408838153
+          ]
+        }
+      },
+      "mol_batch_32x20": {
+        "node": "d-3-10-2",
+        "job": "6339187",
+        "native": {
+          "tensors": 123,
+          "tensors_outside": 0,
+          "elements_outside": 0,
+          "worst": {}
+        },
+        "ordinary": {
+          "tensors": 123,
+          "tensors_outside": 50,
+          "elements_outside": 22080,
+          "worst": {
+            "embed.kernels_real": {
+              "elements": 6536,
+              "worst_ratio": 260.4497682810861
+            }
+          }
+        },
+        "median_ms": {
+          "ordinary": 2563.9451020397246,
+          "native": 3373.608933063224
+        },
+        "times_ms": {
+          "ordinary": [
+            2591.5915458463132,
+            2603.8302469532937,
+            2565.070850076154,
+            2562.8193540032953,
+            2540.3554851654917,
+            2527.5851089973003
+          ],
+          "native": [
+            3375.414288137108,
+            3391.0664920695126,
+            3357.22861206159,
+            3371.80357798934,
+            3419.7329580783844,
+            3307.4710089713335
+          ]
+        }
+      }
+    }
+  },
+  "interpretation": "Some local arithmetic variants satisfy the small fixed example. The accepted numerical threshold is exceeded on other geometries, including in native arithmetic after promoting the contraction. The native fallback and ordinary compilation are both recorded with their actual timings and numerical results."
+}

@@ -13,8 +13,7 @@ From :code:`enerzyme/models/layers/`:
 
 **Cutoff / envelopes**
     Transition functions and :code:`PolynomialEnvelope` / :code:`DimeNetEnvelope` /
-    :code:`C3CutoffEnvelope` in :code:`enerzyme/models/cutoff.py` (also re-exported
-    from :code:`enerzyme.models.so3` for equivariant cores).
+    :code:`C3CutoffEnvelope` in :code:`enerzyme/models/mp/basis/envelope.py` and the registered layers in :code:`enerzyme.models.layers`.
 
 **Radial basis**
     :code:`GaussianRBFLayer` (``flavor``: PhysNet / SchNet / esen / alignn / spinconv / gemnet-oc; optional ``apply_cutoff_fn``; ``basis_width_scalar`` for spinconv; ``envelope_exponent`` for gemnet-oc), :code:`ExponentialGaussianRBFLayer`, :code:`ExponentialBernsteinRBFLayer`, :code:`BesselRBFLayer` (``flavor``: default / dimenet / painn / equflash / nequip / esen / gemnet), :code:`SphericalBesselRBFLayer` (M3GNet ``j_l`` stack, width ``max_l * num_rbf``, no envelope), :code:`BernsteinRBFLayer`, :code:`SincRBFLayer`. Cutoff key :code:`nequip` is the polynomial envelope (``p = 6``) that Nequix and EQNorm multiply onto the equflash Bessel basis. Bessel flavor :code:`nequip` is the separate mir-group basis, with that envelope already inside the layer.
@@ -26,7 +25,7 @@ From :code:`enerzyme/models/layers/`:
     Architecture-specific message passing (:code:`Core` with :code:`architecture` in Modelhub)
 
 **Physics / post-processing**
-    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy` (flavors: SpookyNet / PhysNet / SO3LR), :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`TSQDODispersionEnergy` (SO3LR; not Grimme), :code:`ZBLRepulsionEnergy` (optional :code:`switch_off` for SO3LR)
+    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy` (flavors: SpookyNet / PhysNet / SO3LR), :code:`EwaldElectrostaticEnergy`, :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`TSQDODispersionEnergy` (SO3LR; not Grimme), :code:`ZBLRepulsionEnergy` (optional :code:`switch_off` for SO3LR)
 
 **Output**
     :code:`EnergyReduce`, :code:`Force`, :code:`ShallowEnsembleReduce`
@@ -49,6 +48,45 @@ From :code:`enerzyme/models/layers/`:
     Equiformer-series external readouts (including LinearRS / GraphAttention /
     :code:`EquiformerV2FeedForwardReadout`) accept :code:`shallow_ensemble_size`
     by widening the last linear layer.
+
+Periodic electrostatics
+-----------------------
+
+Use ``EwaldElectrostaticEnergy`` for a cell that is periodic in all three
+directions. It uses conducting boundary conditions and includes a uniform
+neutralizing background when the cell carries net charge. Provide the three
+lattice vectors as rows of ``cell`` and set all three ``pbc`` flags to true.
+
+Set the neighbor search radius to cover both the model's short-range cutoff
+and the Ewald real-space cutoff (``cutoff_real``). The directed neighbor list
+must include periodic images, including images of the same atom.
+``k_cutoff`` sets the reciprocal-space radius in inverse position units.
+See :doc:`../data/datahub_reference` for the cutoff neighbor list settings.
+
+Compiling energy and force predictions
+--------------------------------------
+
+For inference, call ``model.eval()`` and then ``torch.compile(model)``. The
+compiled model evaluates the energy and computes conservative forces through
+the captured operations. A pipeline with data-dependent topology can compile
+in several pieces. The returned energy supports a subsequent
+``out["E"].sum().backward()``.
+
+In PyTorch 2.13, an additional external backward with ``retain_graph=True``
+can reject dynamically shaped Inductor partitions after force evaluation.
+Use the reusable-buffer setting around that extra backward when available.
+
+.. code-block:: python
+
+    from torch._functorch import config
+
+    with config.patch(donated_buffer=False):
+        grad_R, = torch.autograd.grad(out["E"].sum(), out["Ra"], retain_graph=True)
+
+To fit forces, call ``model.train()`` before evaluating the compiled model.
+Enerzyme uses a functional coordinate derivative so that gradients of the
+force loss can reach the model parameters. A fully traceable pipeline also
+supports ``torch.compile(model, fullgraph=True)``.
 
 Typical charge-aware stack
 --------------------------
@@ -136,7 +174,7 @@ as spherical :code:`l=0` scalars (advertised as :code:`feature_irreps: "Cx0e"`) 
 not e3nn-flat; reduced :code:`mmax` applies only inside edge SO(2) messages). Default
 stacks use :code:`SimpleReadout` → :code:`EnergyReduce` → :code:`Force` for
 energy-conserving forces, which needs differentiable edge frames / Wigner-D in
-:code:`enerzyme.models.so3.rotation` (unlike fairchem v1, which detached frames for a
+:code:`enerzyme.models.mp.equivariant.rotation` (unlike fairchem v1, which detached frames for a
 direct force head). Opt-in :code:`SphereSampleReadout` integrates
 :code:`atom_sphere_feature` over fixed S² samples (Passaro & Zitnick energy-head
 pattern) into any named atomic scalar fields (:code:`Ea`, :code:`Qa`, …); use
@@ -150,7 +188,7 @@ eSEN
 With :code:`architecture: esen`, pre-core layers are :code:`RangeSeparation` (no neighbor cap), :code:`GaussianRBF` (``flavor: esen``, ``apply_cutoff_fn: false``) or :code:`BesselRBF` (``flavor: esen``), and :code:`RandomAtomEmbedding`. The Core returns :code:`atom_feature` (``l=0``) and :code:`atom_sphere_feature`. Energy uses :code:`SimpleReadout` (``head_type: mlp``, ``num_hidden_layers: 2``, ``use_bias_out: true``, SiLU / ``swish``) → :code:`EnergyReduce` → :code:`Force`. The message envelope and the SO(2) blocks stay inside the Core. Example: :code:`enerzyme/config/esen_layers_example.yaml`. :code:`uma_qs` is unchanged and still needs fairchem.
 
 EquiformerV2 / EquiformerV3 and modular readouts
------------------------------------------------
+------------------------------------------------
 
 With :code:`architecture: equiformer_v2`, :code:`equiformer_v3`, :code:`dpa4`,
 :code:`e2former`, :code:`e2former_v2`, or :code:`e2former_lsr`, the Core returns the same latent pair as eSCN
@@ -206,6 +244,11 @@ EquFlashV2
 
 With :code:`architecture: equflashv2`, pre-core layers are :code:`BesselRBF` (``flavor: equflash``, prefactor ``2/cutoff``) and :code:`RandomAtomEmbedding`. :code:`RangeSeparation` with :code:`cutoff_fn: xplor` and :code:`cuton` supplies the same radial window as EquFlash. The Core returns flat :code:`atom_feature`. Energy uses :code:`SimpleReadout` (two bias-free linears when ``activate_hidden: false`` and ``use_bias: false``) → :code:`AtomicAffine` (``order: scale_then_shift``) → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/equflashv2_layers_example.yaml`.
 
+For bilinear gates spanning multiple non-scalar degrees, set ``copy_major: true``
+in both Core mappings ``nonlinear_kwargs`` and ``ff_nonlinear_kwargs``.
+Each factor then follows its declared e3nn irrep order under rotation and
+reflection. Existing configurations retain their original gate layout.
+
 Nequix
 ------
 
@@ -225,11 +268,11 @@ With :code:`architecture: et` (aliases :code:`torchmd-et` and :code:`equivariant
 
 With :code:`architecture: visnet` (aliases :code:`vis-net` and :code:`vis_net`), the pre-core layers are the same :code:`ExpNormalSmearing` and :code:`RandomAtomEmbedding`. :code:`cutoff_fn: cosine` is the attention-score window. The basis already contains one cosine window. ``lmax: 2`` is the MD17 setting. The Core still returns Cartesian :code:`atom_vector_feature` ``[N, 3, F]``, the ``l = 1`` slice, plus :code:`atom_l2_feature` ``[N, 5, F]``. :code:`EquivariantDipole` and :code:`EquivariantPolarizability` apply. ``lmax: 1`` omits the ``l = 2`` field. Energy uses :code:`SimpleReadout` (``head_type: two_layer``, ``pyramidal: true``) → :code:`EnergyReduce` → :code:`Force`. The MD17 widths are 9 layers, 8 heads, 256 channels, 32 radial functions, and 5 Å, with ``vertex_type: none`` and ``vecnorm_type: none``. QM9 uses 512 channels, 64 radial functions, and ``vecnorm_type: max_min``. Example: :code:`enerzyme/config/visnet_layers_example.yaml`.
 
-With :code:`architecture: freecg` (aliases :code:`free-cg` and :code:`free_cg`), the pre-core layers are the same :code:`ExpNormalSmearing` and :code:`RandomAtomEmbedding`. The Core subclasses ViSNet and keeps ``lmax: 2``. ``num_groups: 8`` splits the 256 channels into groups before the sparse ``1o`` / ``2e`` product. ``shuffle_scale: 1.5`` rolls channels forward by ``1.5 * F / G``. ``attention_enhancer: linear`` is the released head projection; ``max`` is the channel maximum in Eq. 8. Energy still uses :code:`SimpleReadout` (``head_type: two_layer``, ``pyramidal: true``) → :code:`EnergyReduce` → :code:`Force`. The Cartesian ``l = 1`` slice stays in :code:`atom_vector_feature`, so :code:`EquivariantDipole` and :code:`EquivariantPolarizability` apply. Example: :code:`enerzyme/config/freecg_layers_example.yaml`.
+With :code:`architecture: freecg` (aliases :code:`free-cg` and :code:`free_cg`), the pre-core layers are the same :code:`ExpNormalSmearing` and :code:`RandomAtomEmbedding`. The preset uses the ViSNet embedding and keeps ``lmax: 2``. ``num_groups: 8`` splits the 256 channels into groups before the sparse ``1o`` / ``2e`` product. ``shuffle_scale: 1.5`` rolls channels forward by ``1.5 * F / G``. ``attention_enhancer: linear`` is the released head projection; ``max`` is the channel maximum in Eq. 8. Energy still uses :code:`SimpleReadout` (``head_type: two_layer``, ``pyramidal: true``) → :code:`EnergyReduce` → :code:`Force`. The Cartesian ``l = 1`` slice stays in :code:`atom_vector_feature`, so :code:`EquivariantDipole` and :code:`EquivariantPolarizability` apply. Example: :code:`enerzyme/config/freecg_layers_example.yaml`.
 
 With :code:`architecture: quinnet` (aliases :code:`quin-net` and :code:`quin_net`), the pre-core layers are the same :code:`ExpNormalSmearing` (``trainable: false``) and :code:`RandomAtomEmbedding`. :code:`cutoff_fn: cosine` is the attention-score window. The basis already contains one cosine window. The angular state is fixed at ``l = 2``. The Core returns Cartesian :code:`atom_vector_feature` ``[N, 3, F]`` and :code:`atom_l2_feature` ``[N, 5, F]``. :code:`EquivariantDipole` and :code:`EquivariantPolarizability` apply. Energy uses :code:`SimpleReadout` (``head_type: two_layer``, ``pyramidal: true``) → :code:`EnergyReduce` → :code:`Force`. The aspirin example is 5 layers, 8 heads, 256 channels, 32 radial functions, and 5 Å, with ``distance_influence: both``. Example: :code:`enerzyme/config/quinnet_layers_example.yaml`.
 
-With :code:`architecture: visnet_lsrm` (aliases :code:`visnet-lsrm`, :code:`visnet_lsr`, and :code:`visnet-lsr`), the pre-core layers are the same :code:`ExpNormalSmearing` and :code:`RandomAtomEmbedding`. The Core subclasses ViSNet. It returns :code:`atom_feature` ``[N, 2F]`` and :code:`atom_vector_feature` ``[N, 3, 2F]`` after concatenating the short-range state with the fragment long-range state. ``cutoff_lr`` is the atom–fragment cutoff (9 Å in the MD22 script) and is not a second :code:`RangeSeparation`. ``fragment_mode: precomputed`` reads :code:`cluster_ids`. ``kmeans`` and ``spectral`` assign fragments online. Energy still uses :code:`SimpleReadout` (``head_type: two_layer``, ``pyramidal: true``) on the concatenated invariant → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/visnet_lsrm_layers_example.yaml`.
+With :code:`architecture: visnet_lsrm` (aliases :code:`visnet-lsrm`, :code:`visnet_lsr`, and :code:`visnet-lsr`), the pre-core layers are the same :code:`ExpNormalSmearing` and :code:`RandomAtomEmbedding`. The preset uses the ViSNet short-range blocks. It returns :code:`atom_feature` ``[N, 2F]`` and :code:`atom_vector_feature` ``[N, 3, 2F]`` after concatenating the short-range state with the fragment long-range state. ``cutoff_lr`` is the atom–fragment cutoff (9 Å in the MD22 script) and is not a second :code:`RangeSeparation`. ``fragment_mode: precomputed`` reads :code:`cluster_ids`. ``kmeans`` and ``spectral`` assign fragments online. Energy still uses :code:`SimpleReadout` (``head_type: two_layer``, ``pyramidal: true``) on the concatenated invariant → :code:`EnergyReduce` → :code:`Force`. Example: :code:`enerzyme/config/visnet_lsrm_layers_example.yaml`.
 
 With :code:`architecture: tensornet2`, the pre-core layers are the same :code:`ExpNormalSmearing` and :code:`RandomAtomEmbedding` used by TensorNet. The Core returns the TensorNet latents plus ``charge_channels`` ``[N, (L+1) q]``. Every channel sums to the molecular total charge ``Q``. Energy is :code:`SimpleReadout` plus :code:`WeightedCoulombEnergy` (AIMNet-damped, weighted over charge channels), then :code:`EnergyReduce` and :code:`Force`. ``layer_weights: [1, 2, 3]`` is the default for two interaction layers. Its length must divide ``(L+1) q``; a mismatch fails when the model is built. A channel whose weights are all zero is still shifted so that it sums to ``Q``. A length-``N`` ``Q`` has to repeat the same molecular total on every atom of that molecule. ``pairs: all_to_all`` ignores periodic images. A periodic reaction field uses ``pairs: directed``, ``cutoff``, and ``reaction_field: true``. AceFF-2-OMOL adds :code:`StandardZBLRepulsionEnergy` on the short-range list. Set ``Hartree_in_E: 27.211386245988`` on those pair layers when energies are in eV. Example: :code:`enerzyme/config/tensornet2_layers_example.yaml`.
 
@@ -243,7 +286,7 @@ With :code:`architecture: reann`, the only pre-core layers are :code:`RangeSepar
 EquiREANN
 ---------
 
-With :code:`architecture: equireann`, the pre-core layers are the same :code:`RangeSeparation` and :code:`RandomAtomEmbedding`. The Core subclasses the REANN Core. It returns the same invariant :code:`atom_feature` ``[N, n_orbit]``. Each iteration updates the orbital coefficients and adds the neighbor's aggregated Cartesian orbital, scaled by the squared cosine window, before rebuilding the density. ``num_iterations: 0`` leaves that orbital unpassed. Energy uses :code:`SimpleReadout` (``head_type: mlp``, ``hidden_dims: [32, 32]``, ``relu_like``) → :code:`EnergyReduce` → :code:`Force`. The coefficient network in the checked-in stack is ``tanh_like`` without LayerNorm. Dipoles and polarizabilities reuse the REANN response layers. ``Ra`` has to require grad for the polarizability. Example: :code:`enerzyme/config/equireann_layers_example.yaml`.
+With :code:`architecture: equireann`, the pre-core layers are the same :code:`RangeSeparation` and :code:`RandomAtomEmbedding`. The preset shares REANN orbital-density components. It returns the same invariant :code:`atom_feature` ``[N, n_orbit]``. Each iteration updates the orbital coefficients and adds the neighbor's aggregated Cartesian orbital, scaled by the squared cosine window, before rebuilding the density. ``num_iterations: 0`` leaves that orbital unpassed. Energy uses :code:`SimpleReadout` (``head_type: mlp``, ``hidden_dims: [32, 32]``, ``relu_like``) → :code:`EnergyReduce` → :code:`Force`. The coefficient network in the checked-in stack is ``tanh_like`` without LayerNorm. Dipoles and polarizabilities reuse the REANN response layers. ``Ra`` has to require grad for the polarizability. Example: :code:`enerzyme/config/equireann_layers_example.yaml`.
 
 NewtonNet
 ---------
@@ -294,8 +337,7 @@ block. Charge/dipole use the same readout fields plus post-core physics layers.
 Example: :code:`enerzyme/config/dimenet_layers_example.yaml`.
 
 With :code:`architecture: dimenet++` (alias :code:`dimenetpp`), the same pre-core
-Bessel flavor and post-core :code:`HierachicalReadout` are used. The Core is
-:class:`~enerzyme.models.dimenet.core_pp.DimeNetPPCore`: Hadamard interaction
+Bessel flavor and post-core :code:`HierachicalReadout` are used. The :func:`~enerzyme.models.presets.triplet.dimenetpp` preset uses a Hadamard interaction
 and a bias-free map to :code:`out_emb_size`, which becomes
 :code:`dim_feature_out`. Example:
 :code:`enerzyme/config/dimenetpp_layers_example.yaml`.

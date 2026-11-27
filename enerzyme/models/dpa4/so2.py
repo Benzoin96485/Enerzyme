@@ -1,7 +1,7 @@
 """SO(2)-equivariant convolution for DPA4 EMFA.
 
 EdgeCache, DynamicRadialDegreeMixer, and SO2Convolution stay local.
-Focus-major SO(2) linear lives in ``enerzyme.models.so3.so2_focus``.
+Focus-major SO(2) linear lives in ``enerzyme.models.mp.equivariant.so2.focus``.
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from ..so3.gated import SO3GatedActivation
-from ..so3.indexing import (
+from ..mp.equivariant.sph.gated import SO3GatedActivation
+from ..mp.equivariant.indexing import (
     build_m_major_index,
     build_m_major_l_index,
     build_rotate_inv_rescale,
@@ -24,9 +24,12 @@ from ..so3.indexing import (
     project_D_to_m,
     project_Dt_from_m,
 )
-from ..so3.so2_focus import FocusSO2Linear
-from ..so3.softmax import segment_envelope_gated_softmax
-from ..so3.wigner_quaternion import (
+from ..mp.equivariant.so2.focus import FocusSO2Linear
+from ..mp.aggregate import EnvelopeGated
+from ..mp.ops import scatter_sum
+from ..mp.equivariant.rotation import edge_rotation
+from ..mp.equivariant.rotation.wigner_cg import wigner_from_cg
+from ..mp.equivariant.rotation.wigner_quaternion import (
     WignerDCalculator,
     build_edge_quaternion,
     quaternion_multiply,
@@ -77,7 +80,17 @@ def build_edge_cache(
     if random_gamma and wigner_calc.training:
         gamma = torch.rand(src.shape[0], device=device, dtype=dtype) * (2 * math.pi)
         edge_quat = quaternion_multiply(quaternion_z_rotation(gamma), edge_quat)
-    D_full, Dt_full = wigner_calc(edge_quat)
+    frame = wigner_calc.cartesian_frame(edge_quat)
+    if (torch.compiler.is_compiling() and wigner_calc.training and vij.is_cuda
+            and dtype == torch.float32 and wigner_calc.lmax == 2 and not torch.is_autocast_enabled()):
+        # Rounding near an Euler pole can make acos singular in force training.
+        # Couple two copies of the same Cartesian l=1 rotation for the l=2 block.
+        quadrupole = getattr(wigner_calc, "_quadrupole_cg", None)
+        coefficients = (lambda _: quadrupole.to(frame)) if quadrupole is not None else None
+        D_full = wigner_from_cg(frame, 2, coefficients=coefficients)
+        Dt_full = D_full.transpose(-1, -2)
+    else:
+        D_full, Dt_full = edge_rotation(vij, wigner_calc.lmax, wigner_calc, frame=frame)
 
     deg = torch.zeros(n_nodes, device=device, dtype=dtype)
     deg.scatter_add_(0, dst, (edge_env.squeeze(-1) ** 2))
@@ -305,6 +318,7 @@ class SO2Convolution(nn.Module):
         self.mixing_layers = mixing_layers
         self.n_atten_head = n_atten_head
         self.eps = eps
+        self.aggregate = EnvelopeGated(ordered_sum=True)
         self.message_node_so3 = message_node_so3
         # n_radial kept for API compatibility with interaction/core builders.
         del n_radial
@@ -384,7 +398,6 @@ class SO2Convolution(nn.Module):
             (N, D, C) updated features
         """
         N, D, C = x.shape
-        device = x.device
         src = edge_cache.src
         dst = edge_cache.dst
         E = src.shape[0]
@@ -447,18 +460,7 @@ class SO2Convolution(nn.Module):
             logits = self.attn_radial_bias(rad_m[:, 0, :]).reshape(
                 E, self.n_focus, self.n_atten_head
             )
-            attn_w = segment_envelope_gated_softmax(
-                logits,
-                edge_cache.edge_env,
-                dst,
-                N,
-                self.z_bias,
-                self.eps,
-            )
-            attn_w = attn_w.mean(dim=-1)  # (E, F)
-            msg = msg * attn_w.unsqueeze(1).unsqueeze(-1)
-
-        msg_flat = msg.reshape(E, D, H)
-        out = torch.zeros(N, D, H, device=device, dtype=msg_flat.dtype)
-        out.index_add_(0, dst, msg_flat)
-        return self.post_mix(out)
+            out = self.aggregate(msg, logits, edge_cache.edge_env, dst, N, self.z_bias, self.eps)
+        else:
+            out = scatter_sum(msg, dst, N)
+        return self.post_mix(out.reshape(N, D, H))

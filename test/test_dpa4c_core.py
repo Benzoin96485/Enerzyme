@@ -29,11 +29,11 @@ def _rotation(dtype=torch.float64):
 
 
 def _core(**kwargs):
-    from enerzyme.models.dpa4c import DPA4CCore
+    from enerzyme.models.presets.cartesian_tensor import dpa4c
 
     params = dict(dim_embedding=8, channels=8, lmax=2, radial_modes=0, n_radial=4)
     params.update(kwargs)
-    return DPA4CCore(**params).double()
+    return dpa4c(**params).double()
 
 
 def _forward(core, embedding, positions, idx_i, idx_j):
@@ -45,7 +45,7 @@ def test_dpa4c_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, _, _ = get_ff_core("dpa4c")
-    assert core_cls.__name__ == "DPA4CCore"
+    assert core_cls.__name__ == "dpa4c"
     with EXAMPLE.open() as stream:
         ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
     model = build_model(
@@ -54,7 +54,9 @@ def test_dpa4c_registration_and_yaml_build():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "DPA4CCore"
+    from enerzyme.models.mp.core import ComposableCore
+
+    assert isinstance(model, ComposableCore)
     assert model.dim_feature_out == 70
 
 
@@ -357,3 +359,20 @@ def test_dpa4c_layer_stack_energy_force_and_finite_difference():
             energy_minus = model({**batch, "Ra": minus})["E"]
             finite[atom, axis] = -(energy_plus - energy_minus) / (2 * step)
     torch.testing.assert_close(forces, finite, atol=2e-4, rtol=2e-4)
+
+
+def test_calibration_aliases_after_copy_and_save():
+    import copy
+    from io import BytesIO
+
+    core = _core()
+    buffer = BytesIO()
+    torch.save(core, buffer)
+    buffer.seek(0)
+    for clone in (copy.deepcopy(core), torch.load(buffer, weights_only=False)):
+        clone.calib_mean = torch.ones_like(clone.calib_mean)
+        assert clone.calib_mean is clone.head.calib_mean
+        assert clone.calib_mean is not core.calib_mean
+        assert [k for k in clone.state_dict() if k.endswith("calib_mean")] == ["head.calib_mean"]
+        clone.reset_output_calibration()
+        assert torch.count_nonzero(clone.head.calib_mean) == 0

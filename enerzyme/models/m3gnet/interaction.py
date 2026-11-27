@@ -16,8 +16,8 @@ import torch
 from torch import Tensor
 from torch.nn import Dropout, Linear, Module, Sigmoid
 
-from ..blocks.mlp import GatedMLP
-from ..functional import segment_sum_coo
+from ..mp.nn.mlp import GatedMLP
+from ..mp.ops import scatter_sum
 
 
 class M3GNetBlock(Module):
@@ -78,7 +78,7 @@ class M3GNetBlock(Module):
             neighbor = end_atom[idx_j[idx_ik]]
             weight = envelope[idx_ij] * envelope[idx_ik]
             basis = joint * neighbor * weight.unsqueeze(-1)
-            aggregated = segment_sum_coo(basis, idx_ij, dim_size=edge.shape[0])
+            aggregated = scatter_sum(basis, idx_ij, edge.shape[0])
         edge = edge + self.bond_update(aggregated)
 
         center = node[idx_i]
@@ -89,7 +89,7 @@ class M3GNetBlock(Module):
 
         packed = torch.cat((center, neighbor_state, edge), dim=-1)
         message = self.node_mlp(packed) * self.node_weight(rbf)
-        node = node + segment_sum_coo(message, idx_i, dim_size=node.shape[0])
+        node = node + scatter_sum(message, idx_i, node.shape[0])
         if self.dropout is not None:
             edge = self.dropout(edge)
             node = self.dropout(node)

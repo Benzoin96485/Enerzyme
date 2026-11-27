@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import math
 from pathlib import Path
 
@@ -27,7 +28,7 @@ def _basis(dist: torch.Tensor, num_rbf: int, cutoff: float, scalar: float = 3.0)
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.spinconv import SpinConvCore
+    from enerzyme.models.presets.triplet_graphs import spinconv
 
     params = dict(
         dim_embedding=8,
@@ -47,7 +48,7 @@ def _tiny(**kwargs):
         residual_first=False,
     )
     params.update(kwargs)
-    return SpinConvCore(**params)
+    return spinconv(**params)
 
 
 def _edges(n: int):
@@ -99,10 +100,10 @@ def _rotate(pos: torch.Tensor) -> torch.Tensor:
 
 def test_registration_and_example_yaml():
     from enerzyme.models.ff import build_model, get_ff_core
-    from enerzyme.models.spinconv import SpinConvCore
+    from enerzyme.models.presets.triplet_graphs import spinconv
 
     core_cls, defaults, layers = get_ff_core("SpinConv")
-    assert core_cls is SpinConvCore
+    assert core_cls is spinconv
     assert defaults["cutoff_sr"] == 6.0
     assert defaults["num_rbf"] == 512
     assert defaults["hidden_channels"] == 32
@@ -120,7 +121,7 @@ def test_registration_and_example_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert isinstance(model, SpinConvCore)
+    assert model.architecture == "spinconv"
     assert model.num_interactions == 3
     assert model.hidden_channels == 32
     assert model.mid_hidden_channels == 256
@@ -179,10 +180,10 @@ def test_angles_change_features_when_bond_lengths_stay_fixed():
     # initialization its gain is well below 1, so the atomic latent barely
     # moves. The spin convolution itself is where the angle enters.
     messages = torch.randn(4, core.hidden_channels)
-    spun_wide = core.interactions[0].spin(
+    spun_wide = core.blocks[0].message.spin(
         messages, wide["idx_i_sr"], wide["idx_j_sr"], wide["vij_sr"], wide["Dij_sr"], 3
     )
-    spun_narrow = core.interactions[0].spin(
+    spun_narrow = core.blocks[0].message.spin(
         messages, narrow["idx_i_sr"], narrow["idx_j_sr"], narrow["vij_sr"], narrow["Dij_sr"], 3
     )
     assert float((spun_wide - spun_narrow).abs().max()) > 1e-2
@@ -209,7 +210,7 @@ def test_rotation_translation_order_and_inversion():
     packed_inv = _pack(-pos, embedding)
 
     def _spin(packed):
-        return core.interactions[0].spin(
+        return core.blocks[0].message.spin(
             messages,
             packed["idx_i_sr"],
             packed["idx_j_sr"],
@@ -259,12 +260,12 @@ def test_batch_isolation_scale_and_isolated_atom():
 
     za_source = left["Za"][left["idx_j_sr"]]
     za_target = left["Za"][left["idx_i_sr"]]
-    unscaled = core.pair_scale(left["Dij_sr"], za_source, za_target)
+    unscaled = core.embed.pair_scale(left["Dij_sr"], za_source, za_target)
     with torch.no_grad():
-        core.pair_scale.gain.weight.fill_(4.0)
-    stretched = core.pair_scale(left["Dij_sr"], za_source, za_target)
+        core.embed.pair_scale.gain.weight.fill_(4.0)
+    stretched = core.embed.pair_scale(left["Dij_sr"], za_source, za_target)
     assert float((stretched - unscaled).abs().max()) > 0.1
-    painted = gaussian_expansion(stretched, core.gaussian_center, core.gaussian_coeff)
+    painted = gaussian_expansion(stretched, core.embed.gaussian_center, core.embed.gaussian_coeff)
     assert float((painted - left["rbf"]).abs().max()) > 1e-3
     assert torch.isfinite(_forward(core, left)).all()
 
@@ -423,3 +424,151 @@ def test_layer_stack_energy_forces_and_wrong_basis():
         assert "SimpleReadout" in str(exc)
     else:
         raise AssertionError("HierachicalReadout must be rejected")
+
+
+def test_compiled_spin_force_training_uses_live_pruned_edges_and_preserves_empty_gradients():
+    from enerzyme.models.ff import build_model, get_ff_core
+
+    torch.manual_seed(31)
+    _, defaults, layers = get_ff_core("spinconv")
+    layers = copy.deepcopy(layers)
+    core = next(layer["params"] for layer in layers if layer["name"] == "Core")
+    core.update(num_interactions=1, sphere_size_lat=4, sphere_size_long=4,
+                max_num_neighbors=1, num_embedding_basis=4, scale_distances=True)
+    dimensions = dict(defaults, dim_embedding=8, num_rbf=4, hidden_channels=8, mid_hidden_channels=16)
+    model = build_model("spinconv", layers, dimensions, verbose=0).double().train()
+    calls = []
+    def capture(graph, _):
+        calls.extend(getattr(n.target, "__name__", str(n.target)) for n in graph.graph.nodes)
+        return graph.forward
+    compiled = torch.compile(model, backend=capture)
+
+    pos = torch.tensor([[0., 0., 0.], [0.7, 0.1, 0.], [1.9, 0., 0.1], [0.1, 2.2, 0.3]], dtype=torch.double)
+    i, j = _edges(len(pos))
+    def step(runner, edges):
+        model.zero_grad(set_to_none=True)
+        output = runner({"Ra": pos.clone().requires_grad_(), "Za": torch.tensor([1, 6, 7, 8]),
+                         "batch_seg": torch.zeros(4, dtype=torch.long), "N": torch.tensor([4]),
+                         "idx_i": i[:edges], "idx_j": j[:edges]})
+        (output["E"].square().sum() + output["Fa"].square().sum()).backward()
+        grads = {name: p.grad.clone() for name, p in model.named_parameters() if p.grad is not None}
+        return output["E"], output["Fa"], grads
+
+    for count in (len(i), 0):
+        energy, forces, grads = step(model, count)
+        actual_energy, actual_forces, actual_grads = step(compiled, count)
+        torch.testing.assert_close((actual_energy, actual_forces), (energy, forces))
+        assert set(actual_grads) == set(grads)
+        for name, gradient in grads.items():
+            torch.testing.assert_close(actual_grads[name], gradient)
+        if count:
+            gain = next(gradient for name, gradient in grads.items() if "pair_scale.gain" in name)
+            assert torch.count_nonzero(gain)
+        else:
+            assert not torch.count_nonzero(actual_forces)
+    assert "conv1d" in calls and "linear" in calls
+
+
+def test_each_spin_block_consumes_its_own_nondeterministic_projection(monkeypatch):
+    from enerzyme.models.spinconv import geometry
+
+    torch.manual_seed(53)
+    core = _tiny(num_interactions=3).double()
+    positions = torch.randn(5, 3, dtype=torch.float64, requires_grad=True)
+    embedding = torch.randn(5, 8, dtype=torch.float64, requires_grad=True)
+    inputs = _pack(positions, embedding)
+    project = geometry.bilinear_sphere_index
+    tables = []
+
+    def distinct_projection(local, query, n_lat, n_long):
+        indices, weights = project(local, query, n_lat, n_long)
+        # Use a distinguishable valid longitude for each invocation, independent
+        # of the test machine's atomic-add scheduling.
+        indices = (indices // n_long) * n_long + ((indices + len(tables)) % n_long)
+        tables.append((indices, weights))
+        return indices, weights
+
+    monkeypatch.setattr(geometry, "_independent_frames", lambda _: True, raising=False)
+    monkeypatch.setattr(geometry, "bilinear_sphere_index", distinct_projection)
+    actual = _forward(core, inputs)
+    assert len(tables) == 3
+    expected_tables = tuple(tables)
+    monkeypatch.setattr(geometry, "_independent_frames", lambda _: False)
+    monkeypatch.setattr(geometry, "bilinear_sphere_index", project)
+
+    # Replay each recorded table at the original message-module entry point.
+    def replay(table):
+        def replace_projection(module, args):
+            source = args[-1][2]
+            return (*args[:-1], (*table, source))
+        return replace_projection
+
+    handles = [block.message.spin.register_forward_pre_hook(replay(table))
+               for block, table in zip(core.blocks, expected_tables)]
+    try:
+        expected = _forward(core, inputs)
+    finally:
+        for handle in handles:
+            handle.remove()
+    variables = [positions, embedding, *core.parameters()]
+    da = torch.autograd.grad(actual.square().sum(), variables, allow_unused=True, retain_graph=True)
+    db = torch.autograd.grad(expected.square().sum(), variables, allow_unused=True)
+    torch.testing.assert_close(actual, expected, atol=0, rtol=0)
+    for a, b in zip(da, db):
+        if a is None or b is None:
+            assert a is b
+        else:
+            torch.testing.assert_close(a, b, atol=0, rtol=0)
+
+
+def test_cuda_double_compiled_polar_tables_and_forces_with_fixed_frame_sums(monkeypatch):
+    import pytest
+
+    if not torch.cuda.is_available():
+        pytest.skip("requires CUDA Inductor")
+    from enerzyme.models.ff import build_model, get_ff_core
+    from enerzyme.models.spinconv import geometry
+
+    torch.manual_seed(3109)
+    n, blocks = 8, 3
+    pos = torch.randn(n, 3, dtype=torch.float64).cuda() * 0.5
+    receiver, sender = (idx.cuda() for idx in _edges(n))
+    vij = pos[sender] - pos[receiver]
+    distance = vij.norm(dim=1)
+    sums = torch.randn(blocks, n, 3, dtype=torch.float64).cuda()
+    # Explicit neighbor maps may use either supported integer index dtype.
+    pairs = tuple(x.int() for x in geometry.source_neighbor_pairs(receiver, sender, n))
+
+    def table(averaged):
+        return geometry.sphere_projection(vij, receiver, sender, distance, 6.0, n, 16, 12,
+                                          pairs=pairs, averaged=averaged)
+
+    compiled_table = torch.compile(table, fullgraph=True)
+    for draw in sums:
+        native = table(draw)
+        actual = compiled_table(draw)
+        for name, got, want in zip(("index", "weight", "source"), actual, native):
+            assert torch.equal(got, want), name
+
+    # Hold the still-independent frame draws fixed between the two complete
+    # potential evaluations, as a same-seed CUDA atomic reduction can vary.
+    monkeypatch.setattr(geometry, "_frame_sums", lambda *args: sums)
+    _, defaults, layers = get_ff_core("spinconv")
+    layers = copy.deepcopy(layers)
+    core = next(layer["params"] for layer in layers if layer["name"] == "Core")
+    core.update(num_interactions=blocks, sphere_size_lat=16, sphere_size_long=12,
+                max_num_neighbors=n, num_embedding_basis=4)
+    dimensions = dict(defaults, dim_embedding=8, num_rbf=4, hidden_channels=8, mid_hidden_channels=16)
+    model = build_model("spinconv", layers, dimensions, verbose=0).double().cuda().eval()
+
+    def energy_and_force(runner):
+        batch = {"Ra": pos.clone().requires_grad_(), "Za": torch.arange(1, n + 1, device=pos.device),
+                 "N": receiver.new_tensor([n]), "batch_seg": receiver.new_zeros(n),
+                 "idx_i": receiver, "idx_j": sender}
+        out = runner(batch)
+        return out["E"], out["Fa"]
+
+    expected = energy_and_force(model)
+    assert expected[1].abs().max() > 0
+    actual = energy_and_force(torch.compile(model))
+    torch.testing.assert_close(actual, expected, atol=1e-10, rtol=1e-8)

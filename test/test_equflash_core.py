@@ -33,7 +33,7 @@ def _rotation(seed: int = 0) -> torch.Tensor:
 
 
 def _tiny_core(**overrides):
-    from enerzyme.models.equflash import EquFlashCore
+    from enerzyme.models.presets.irreps import equflash
 
     params = dict(
         dim_embedding=4,
@@ -44,7 +44,7 @@ def _tiny_core(**overrides):
         conv_denominator=1.0,
     )
     params.update(overrides)
-    core = EquFlashCore(**params)
+    core = equflash(**params)
     core.eval()
     return core
 
@@ -58,6 +58,27 @@ def _run(core, pos, embedding, rbf, idx_i, idx_j):
         idx_j_sr=idx_j,
         vij_sr=vij,
     )["atom_feature"]
+
+
+def test_equflash_empty_neighborhood_leaves_trainable_denominators_unused():
+    core = _tiny_core(train_denominator=True)
+    embedding = torch.randn(2, 4, requires_grad=True)
+    pos = torch.randn(2, 3)
+    empty = torch.empty(0, dtype=torch.long)
+    denominators = [block.module.conv.denominator for block in core.blocks]
+
+    isolated = _run(core, pos, embedding, torch.empty(0, 3), empty, empty)
+    isolated.sum().backward()
+    assert all(denominator.grad is None for denominator in denominators)
+
+    i, j = _edges(2)
+    _run(core, pos, embedding, torch.ones(len(i), 3), i, j).sum().backward()
+    assert all(denominator.grad is not None for denominator in denominators)
+
+    with torch.no_grad():
+        for denominator in denominators:
+            denominator.zero_()
+    torch.testing.assert_close(_run(core, pos, embedding, torch.empty(0, 3), empty, empty), isolated)
 
 
 def test_equflash_irreps_match_published_natural_parity():
@@ -80,7 +101,7 @@ def test_equflash_irreps_match_published_natural_parity():
 
 
 def test_xplor_window_and_equflash_bessel():
-    from enerzyme.models.cutoff import xplor_transition
+    from enerzyme.models.mp.basis.envelope import xplor_transition
     from enerzyme.models.layers.rbf import BesselRBFLayer
 
     cutoff, cuton = 6.0, 5.5
@@ -134,7 +155,7 @@ def test_equflash_registration_and_yaml_metadata():
 
     for name in ("equflash", "EquFlash"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "EquFlashCore"
+        assert core_cls.__name__ == "equflash"
         assert build_params["cutoff_fn"] == "xplor"
         assert build_params["cuton"] == 5.5
         assert layers[1]["params"]["flavor"] == "equflash"

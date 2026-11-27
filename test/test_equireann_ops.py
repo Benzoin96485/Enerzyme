@@ -31,6 +31,39 @@ def _rotation(seed: int = 0, improper: bool = False) -> torch.Tensor:
     return matrix
 
 
+def test_packed_orbitals_preserve_recursive_density_and_force_loss_gradients():
+    from enerzyme.models.reann.blocks import OrbitalEmbed, _project_orbitals
+
+    torch.manual_seed(560)
+    embed = OrbitalEmbed(4, 3, 5., 3, 2, 5, 0.1)
+    embed.enable_orbital_messages(2)
+    embed.double()
+    receiver = torch.tensor([0, 0, 1, 1, 2, 2])
+    sender = torch.tensor([1, 2, 0, 2, 0, 1])
+    species = torch.tensor([1, 3, 2])
+    vec = torch.randn(6, 3, dtype=torch.float64, requires_grad=True)
+    coeff = torch.randn(3, 2, dtype=torch.float64, requires_grad=True)
+
+    def run(packed):
+        shell = embed.packed_shells if packed else embed.l_of_channel
+        layout = (embed.representatives, embed.multiplicities) if packed else None
+        pair, cutoff = pair_gaussian_orbitals(receiver, sender, vec, vec.norm(dim=1), species,
+                                              embed.rs, embed.inta, 3, 5., symmetric_channels=layout)
+        for i in range(3):
+            psi = aggregate_weighted_orbitals(pair, coeff, receiver, sender, 3)
+            density = _project_orbitals(psi, embed.hyper[i], shell, packed)
+            if i < 2:
+                pair = add_neighbor_orbital(pair, psi, sender, cutoff)
+        force, = torch.autograd.grad(density.sum(), vec, create_graph=True)
+        gradient = torch.autograd.grad(force.square().sum(), (coeff, embed.rs, embed.inta, embed.hyper))
+        return (density, force, *gradient)
+
+    assert embed.representatives.numel() == 20
+    assert embed.multiplicities.sum().item() == 40
+    for a, b in zip(run(True), run(False)):
+        torch.testing.assert_close(a, b, rtol=1e-10, atol=1e-10)
+
+
 def test_neighbor_orbital_is_windowed_and_indexed_by_the_sender():
     pair = torch.ones(2, 4, 1, dtype=torch.float64)
     psi = torch.tensor(
@@ -161,8 +194,8 @@ def _neighbor_counts(pos: torch.Tensor, cutoff: float) -> list[int]:
 
 
 def test_a_terminal_dihedral_changes_equireann_and_not_reann():
-    from enerzyme.models.equireann import EquiREANNCore
-    from enerzyme.models.reann import REANNCore
+    from enerzyme.models.presets.cartesian_tensor import equireann
+    from enerzyme.models.presets.cartesian_tensor import reann
 
     cutoff = 1.8
     pos_flat = _ethene(0.0)
@@ -190,19 +223,19 @@ def test_a_terminal_dihedral_changes_equireann_and_not_reann():
         layer_norm=False,
         coeff_init=1.0,
     )
-    equi = EquiREANNCore(**kwargs).double()
-    plain = REANNCore(**kwargs).double()
+    equi = equireann(**kwargs).double()
+    plain = reann(**kwargs).double()
     with torch.no_grad():
-        equi.rs.zero_()
-        equi.inta.fill_(-1.0)
-        equi.hyper.fill_(1.0)
-        equi.coeff.weight.zero_()
-        equi.coeff.bias.fill_(1.0)
-        plain.rs.copy_(equi.rs)
-        plain.inta.copy_(equi.inta)
-        plain.hyper.copy_(equi.hyper[0])
-        plain.coeff.load_state_dict(equi.coeff.state_dict())
-        plain.updates.load_state_dict(equi.updates.state_dict())
+        equi.embed.rs.zero_()
+        equi.embed.inta.fill_(-1.0)
+        equi.embed.hyper.fill_(1.0)
+        equi.embed.coeff.weight.zero_()
+        equi.embed.coeff.bias.fill_(1.0)
+        plain.embed.rs.copy_(equi.embed.rs)
+        plain.embed.inta.copy_(equi.embed.inta)
+        plain.embed.hyper.copy_(equi.embed.hyper[0])
+        plain.embed.coeff.load_state_dict(equi.embed.coeff.state_dict())
+        plain.blocks.load_state_dict(equi.blocks.state_dict())
     species = torch.tensor([6, 6, 1, 1, 1, 1])
     embedding = torch.zeros(6, 4, dtype=torch.float64)
 
@@ -233,12 +266,12 @@ def test_a_terminal_dihedral_changes_equireann_and_not_reann():
     assert not torch.allclose(equi_flat, equi_twist, atol=1e-6)
     # The first carbon never sees the far hydrogens directly. Its density still moves.
     assert not torch.allclose(equi_flat[0], equi_twist[0], atol=1e-6)
-    quiet = EquiREANNCore(**{**kwargs, "num_iterations": 0}).double()
+    quiet = equireann(**{**kwargs, "num_iterations": 0}).double()
     with torch.no_grad():
-        quiet.rs.copy_(equi.rs)
-        quiet.inta.copy_(equi.inta)
-        quiet.hyper.copy_(equi.hyper[:1])
-        quiet.coeff.load_state_dict(equi.coeff.state_dict())
+        quiet.embed.rs.copy_(equi.embed.rs)
+        quiet.embed.inta.copy_(equi.embed.inta)
+        quiet.embed.hyper.copy_(equi.embed.hyper[:1])
+        quiet.embed.coeff.load_state_dict(equi.embed.coeff.state_dict())
     assert_allclose(
         reann_flat.detach().numpy(),
         run(quiet, pos_flat).detach().numpy(),

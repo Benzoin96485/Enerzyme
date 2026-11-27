@@ -33,7 +33,7 @@ def test_fourier_matches_the_reference_order():
 
 
 def test_gemnet_bessel_is_the_chgnet_smooth_radial_basis():
-    from enerzyme.models.cutoff import polynomial_envelope
+    from enerzyme.models.mp.basis.envelope import polynomial_envelope
     from enerzyme.models.layers.rbf import BesselRBFLayer
 
     cutoff = 5.0
@@ -142,7 +142,7 @@ def test_missing_reverse_edge_is_rejected():
 
 
 def test_layer_norm_sits_before_the_final_activation():
-    from enerzyme.models.blocks.mlp import GatedMLP
+    from enerzyme.models.mp.nn.mlp import GatedMLP
 
     torch.manual_seed(0)
     layer = GatedMLP(4, [5], 3, activate_last=True, use_bias=True, norm="layer")

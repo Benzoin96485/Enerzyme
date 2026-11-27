@@ -1,0 +1,261 @@
+{
+  "cpu": {
+    "revision": "c5e5454",
+    "job": "6341026",
+    "test_files_and_shards": 177,
+    "results": {
+      "passed": 1726,
+      "skipped": 74,
+      "errors": 0,
+      "failures": 0
+    },
+    "skip_reasons": {
+      "preset does not declare inversion symmetry": 42,
+      "CUDA device required": 2,
+      "CUDA + Triton required": 2,
+      "CUDA and Triton required": 2,
+      "two visible CUDA devices and Triton required": 1,
+      "CUDA-only local-frame fusion": 1,
+      "requires CUDA Inductor": 4,
+      "set UMA_CHECKPOINT to a local uma-*.pt for live train smoke": 1,
+      "requires a CUDA device": 3,
+      "compiled single-precision CUDA training": 1,
+      "CUDA receiver reductions": 1,
+      "CUDA not available": 6,
+      "set UMA_CHECKPOINT to a local uma-*.pt for live flow train smoke": 1,
+      "fixture has no Muon trajectory": 7
+    }
+  },
+  "cuda": {
+    "revision": "c5e5454",
+    "job": "6341025",
+    "device": "Tesla V100-PCIE-32GB (sm70)",
+    "pytest_files": [
+      "test/test_e2former_triton_parity.py",
+      "test/test_scatter.py",
+      "test/test_mp_aggregate.py",
+      "test/test_local_frame_ops.py",
+      "test/test_dpa4_core.py::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles",
+      "test/test_alignn_ops.py::test_compiled_gate_preserves_live_hooks_and_force_gradients",
+      "test/test_gemnet_ops.py::test_compiled_bilinear_force_inference_retains_gradients",
+      "test/test_spinconv_core.py",
+      "test/test_spinconv_ops.py",
+      "test/test_ewald_electrostatics.py",
+      "test/test_pbc_ewald_end_to_end_smoke.py",
+      "test/test_cuda_periodic_forces.py"
+    ],
+    "results": {
+      "passed": 81,
+      "skipped": 1,
+      "errors": 0,
+      "failures": 0
+    },
+    "cpu_skips_passed_on_cuda": [
+      "test.test_alignn_ops::test_compiled_gate_preserves_live_hooks_and_force_gradients",
+      "test.test_cuda_periodic_forces::test_schnet_force_training_across_cell_boundary[dtype0-cuda]",
+      "test.test_cuda_periodic_forces::test_schnet_force_training_across_cell_boundary[dtype1-cuda]",
+      "test.test_dpa4_core::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles",
+      "test.test_e2former_triton_parity::test_attention_triton_qk_matches_qk_alpha_module_on_cuda",
+      "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype0]",
+      "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype1]",
+      "test.test_e2former_triton_parity::test_triton_sparse_qk_v_match_pytorch_on_cuda",
+      "test.test_e2former_triton_parity::test_triton_uses_input_device_and_restores_current_device",
+      "test.test_ewald_electrostatics::test_skewed_and_left_handed_representations_of_the_same_lattice[cuda]",
+      "test.test_gemnet_ops::test_compiled_bilinear_force_inference_retains_gradients[dtype0]",
+      "test.test_gemnet_ops::test_compiled_bilinear_force_inference_retains_gradients[dtype1]",
+      "test.test_local_frame_ops::test_compiled_local_frame_projection_honors_nested_hook",
+      "test.test_mp_aggregate::test_double_cuda_envelope_training_uses_the_ordered_fp32_denominator",
+      "test.test_pbc_ewald_end_to_end_smoke::test_pbc_physnet_ewald_forward_finite[dtype0-cuda]",
+      "test.test_pbc_ewald_end_to_end_smoke::test_pbc_physnet_ewald_forward_finite[dtype1-cuda]",
+      "test.test_scatter::test_scatter_sum_basic_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_empty_input_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_grad_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_infer_dim_size_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_negative_dim_equivalence[cuda]",
+      "test.test_scatter::test_scatter_sum_rank_broadcast_equivalence[cuda]",
+      "test.test_spinconv_core::test_cuda_double_compiled_polar_tables_and_forces_with_fixed_frame_sums"
+    ],
+    "gpu_skips_passed_on_cpu": {
+      "test.test_e2former_triton_parity::test_want_triton_cpu_fallback_matches_pytorch_sparse_ops": "CUDA Triton available; CPU fallback path not exercised here"
+    }
+  },
+  "notes": "The CPU suite, two-GPU CUDA regression suite, installed wheel and strict documentation build use the same product revision. Every CUDA-only test skipped on the CPU passed on the available Tesla V100 GPUs. The CUDA suite's CPU-only fallback case passed on the CPU.",
+  "wheel": {
+    "revision": "c5e5454",
+    "job": "6341023",
+    "filename": "enerzyme-0.6.0-py3-none-any.whl",
+    "sha256": "2644ee15b09e675727997ccb3eff2d21a7cfc4229352b50daa028b2103a627d1",
+    "results": {
+      "passed": 58,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0
+    },
+    "method": "Build from git archive with no index, install into a fresh target directory, load the registry and bundled Jd, CG and Lebedev data, and run the 58 frozen-weight checks outside the source checkout. The isolated test directory contains only the test harness and the frozen-weight symlink."
+  },
+  "documentation": {
+    "revision": "c5e5454",
+    "sphinx": "8.2.3",
+    "builder": "html",
+    "options": [
+      "-j4",
+      "-W",
+      "--keep-going",
+      "-E",
+      "-a"
+    ],
+    "source_documents": 999,
+    "generated_api_documents": 958,
+    "warnings": 0,
+    "exit_code": 0,
+    "method": "Copy docs to a fresh source directory and build into an empty output directory with the repository source available for autodoc. Count the source documents reported by Sphinx. The two autosummary templates are excluded."
+  },
+  "targeted_force_training": {
+    "revision": "244415d",
+    "job": "6339354",
+    "device": "CPU",
+    "command": "scripts/check_compiled_forces.py <architecture> --dtype <precision>",
+    "cases": {
+      "equflash/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 66,
+        "graphs_with_learned_operators": 0
+      },
+      "equflash/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 66,
+        "graphs_with_learned_operators": 0
+      },
+      "equflashv2/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 34,
+        "graphs_with_learned_operators": 0
+      },
+      "equflashv2/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 34,
+        "graphs_with_learned_operators": 0
+      }
+    }
+  },
+  "topology_force_training": {
+    "revision": "610b65f",
+    "job": "6339646",
+    "device": "CPU",
+    "command": "scripts/check_compiled_forces.py <architecture> --dtype <precision>",
+    "cases": {
+      "chgnet/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 127,
+        "graphs_with_learned_operators": 1,
+        "captured_operations": 344,
+        "energy_max_abs": 8.940696716308594e-08,
+        "force_max_abs": 1.1920928955078125e-07
+      },
+      "chgnet/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 127,
+        "graphs_with_learned_operators": 2,
+        "captured_operations": 688,
+        "energy_max_abs": 5.551115123125783e-16,
+        "force_max_abs": 6.106226635438361e-16
+      },
+      "gemnet-oc/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 293,
+        "graphs_with_learned_operators": 1,
+        "captured_operations": 2198,
+        "energy_max_abs": 2.980232238769531e-07,
+        "force_max_abs": 7.152557373046875e-07
+      },
+      "gemnet-oc/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 293,
+        "graphs_with_learned_operators": 2,
+        "captured_operations": 4396,
+        "energy_max_abs": 6.661338147750939e-16,
+        "force_max_abs": 9.159339953157541e-16
+      },
+      "spinconv/float32": {
+        "passed": true,
+        "parameter_gradients_compared": 113,
+        "graphs_with_learned_operators": 1,
+        "captured_operations": 345,
+        "energy_max_abs": 7.450580596923828e-09,
+        "force_max_abs": 1.6370904631912708e-11
+      },
+      "spinconv/float64": {
+        "passed": true,
+        "parameter_gradients_compared": 113,
+        "graphs_with_learned_operators": 2,
+        "captured_operations": 690,
+        "energy_max_abs": 0.0,
+        "force_max_abs": 7.792703114739563e-20
+      }
+    }
+  },
+  "dimenetpp_rotation_invariance": {
+    "previous_suite": {
+      "revision": "59bd0d4",
+      "job": "6340212",
+      "results": {
+        "passed": 1674,
+        "skipped": 68,
+        "failures": 1,
+        "errors": 0
+      },
+      "failed_test": "test/test_dimenetpp_core.py::test_dimenetpp_rotation_invariance"
+    },
+    "controls": {
+      "sources": [
+        "1aa0f8b",
+        "59bd0d4"
+      ],
+      "torch_seed": 1,
+      "numpy_weight_seeds": [
+        0,
+        99
+      ],
+      "seed_interval_inclusive": true,
+      "failing_seed_for_fp32_qr": 96,
+      "matching_parameter_tensors_at_seed_96": 50,
+      "parameter_multiset_sha256_at_seed_96": "df129bb3dfbf5a47b421da2b6afe91a981903a21e50caeab78a3034e25e8cdfa",
+      "input_generation": "Build the tiny DimeNet++ core, five atom coordinates, atom embeddings and radial inputs as in the original invariance test. Apply a proper rotation estimated by QR in the indicated precision. For float32 model inputs also check an exactly representable quarter-turn about z.",
+      "failed_seed_counts_out_of_100_per_source": {
+        "float32_QR_float32_model": 1,
+        "float64_QR_rotated_then_cast_float32_model": 0,
+        "exact_quarter_turn_float32_model": 0,
+        "float64_QR_float64_model": 0
+      },
+      "matching_source_results": "Both sources gave identical counts of elements outside tolerance and maximum absolute differences at every seed for all four controls."
+    },
+    "test_revision": "67ccb68",
+    "new_test": "Use the reproducing weight seed 96, construct the same proper rotation in double precision for both model dtypes and also check float64 features. Absolute and relative tolerances are both 1e-5 for float32 and 1e-10 for float64."
+  },
+  "periodic_force_training": {
+    "revision": "c5e5454",
+    "job": "6341031",
+    "device": "Tesla V100-PCIE-32GB (sm70)",
+    "method": "Default CUDA Inductor versus eager PhysNet with three-dimensional Ewald summation. Compare energies and forces and differentiate a loss using both through every participating parameter.",
+    "results": {
+      "float32": {
+        "energy_force_max_abs": 2.9802322387695312e-08,
+        "weight_max_abs": 1.1920928955078125e-07,
+        "parameters": 44,
+        "graphs": {
+          "calls_captured": 360,
+          "unique_graphs": 1
+        }
+      },
+      "float64": {
+        "energy_force_max_abs": 1.1102230246251565e-16,
+        "weight_max_abs": 8.881784197001252e-16,
+        "parameters": 44,
+        "graphs": {
+          "calls_captured": 360,
+          "unique_graphs": 1
+        }
+      }
+    }
+  }
+}

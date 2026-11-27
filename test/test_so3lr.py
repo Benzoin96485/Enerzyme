@@ -241,6 +241,46 @@ def test_charge_spin_embedding_shapes():
     assert emb.Wq.in_features == 118
 
 
+def test_compiled_single_graph_charge_attention_gradients():
+    from enerzyme.models.layers import ChargeSpinEmbeddingLayer
+
+    torch.manual_seed(39)
+    layer = ChargeSpinEmbeddingLayer(dim_embedding=8, max_Za=8)
+    species = torch.randint(1, 9, (256,))
+    batch = torch.zeros_like(species)
+
+    def evaluate(run, totals):
+        result = run(Za=species, batch_seg=batch, Q=totals)["charge_embedding"]
+        gradients = torch.autograd.grad(result.square().sum(), (totals, *layer.parameters()))
+        return result, gradients
+
+    # An empty second graph exercises the indexed, multi-graph reference.
+    expected, expected_grads = evaluate(layer.get_output, torch.tensor([1.5, 0.0], requires_grad=True))
+    actual, actual_grads = evaluate(torch.compile(layer.get_output, fullgraph=True),
+                                    torch.tensor([1.5], requires_grad=True))
+    torch.testing.assert_close(actual, expected)
+    torch.testing.assert_close(actual_grads[0], expected_grads[0][:1])
+    for measured, reference in zip(actual_grads[1:], expected_grads[1:]):
+        torch.testing.assert_close(measured, reference)
+
+
+def test_charge_spin_embedding_uses_module_precision():
+    from enerzyme.models.layers import ChargeSpinEmbeddingLayer
+
+    dtype = torch.float64 if torch.get_default_dtype() == torch.float32 else torch.float32
+    layer = ChargeSpinEmbeddingLayer(dim_embedding=4, max_Za=8, attribute="spin").to(dtype)
+    species = torch.tensor([1, 6, 8])
+    batch = torch.tensor([0, 1, 1])
+    neutral = layer.get_output(species, batch)["spin_embedding"]
+    totals = torch.tensor([1.0, -2.0], requires_grad=True)
+    charged = layer.get_output(species, batch, S=totals)["spin_embedding"]
+    assert neutral.dtype == charged.dtype == dtype
+    assert torch.count_nonzero(neutral) == 0
+    torch.testing.assert_close(charged, layer.get_output(species, batch, S=totals.to(dtype))["spin_embedding"])
+    gradient, = torch.autograd.grad(charged.square().sum(), totals)
+    assert torch.isfinite(gradient).all()
+
+
 def test_charge_spin_one_hot_matches_z_table_convention():
     from enerzyme.models.layers import ChargeSpinEmbeddingLayer
 

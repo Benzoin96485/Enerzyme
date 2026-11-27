@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 import torch
 import yaml
 from numpy.testing import assert_allclose
@@ -25,28 +26,28 @@ def _random_so3(dtype=torch.float64):
 
 
 def _core(**kwargs):
-    from enerzyme.models.dpa4 import DPA4Core
+    from enerzyme.models.presets.so2 import dpa4
 
     params = dict(
         dim_embedding=8, channels=8, lmax=2, mmax=1, n_blocks=1,
         mixing_layers=1, n_radial=8, ffn_neurons=16,
     )
     params.update(kwargs)
-    return DPA4Core(**params)
+    return dpa4(**params)
 
 
 def test_dpa4_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, _, _ = get_ff_core("DPA4")
-    assert core_cls.__name__ == "DPA4Core"
+    assert core_cls.__name__ == "dpa4"
     with EXAMPLE.open() as stream:
         ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
     model = build_model(
         ff["architecture"], layer_params=ff["layers"],
         build_params=ff["build_params"], verbose=0,
     )
-    assert model.__class__.__name__ == "DPA4Core"
+    assert model.__class__.__name__ == "ComposableCore"
 
 
 def test_dpa4_shapes_and_geometry_autograd():
@@ -67,7 +68,7 @@ def test_dpa4_shapes_and_geometry_autograd():
 
 
 def test_dpa4_wigner_blocks_are_orthogonal_and_differentiable():
-    from enerzyme.models.so3.wigner_quaternion import (
+    from enerzyme.models.mp.equivariant.rotation.wigner_quaternion import (
         WignerDCalculator,
         quaternion_normalize,
     )
@@ -215,3 +216,98 @@ def test_dpa4_force_finite_difference_conservation():
             )["E"]
             fd[i, d] = -(ep - em) / (2 * eps)
     torch.testing.assert_close(fa, fd, atol=5e-3, rtol=5e-3)
+
+def test_cpu_double_force_training_preserves_native_weight_gradients():
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(142)
+    model = build("dpa4").double()
+    weights = tuple(model.parameters())
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
+
+    def step(runner):
+        out = forward(runner, batch, torch.float64, train=True)
+        gradients = torch.autograd.grad(out["E"].square().sum() + out["Fa"].square().sum(),
+                                        weights, allow_unused=True)
+        return out["E"], out["Fa"], gradients
+
+    reference = step(model)
+    torch.compiler.reset()
+    torch.testing.assert_close(step(torch.compile(model)), reference, rtol=1e-12, atol=1e-13)
+
+
+@pytest.mark.parametrize("training", [True, False])
+def test_cpu_double_force_fullgraph_explains_the_required_native_derivatives(training):
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    model = build("dpa4").double()
+    batch = make_batch(random_molecules(107, [5, 4], density=0.12), torch.float32)
+    torch.compiler.reset()
+    with pytest.raises((AssertionError, torch._dynamo.exc.TorchRuntimeError),
+                       match="Fullgraph torch.float64 CPU forces for dpa4"):
+        forward(torch.compile(model, fullgraph=True), batch, torch.float64, train=training)
+
+
+def test_native_force_routing_uses_the_active_layers_mapped_coordinate_dtype_and_device(monkeypatch):
+    from torch._subclasses.fake_tensor import FakeTensorMode
+    from enerzyme.models.layers import compiled_grad
+    from enerzyme.models.layers.gradient import ForceLayer
+
+    core = _core()
+    layer = ForceLayer()
+    layer._name_mapping["Ra"] = "xyz"
+    core.post_sequence = torch.nn.Sequential(layer)
+    monkeypatch.setattr(compiled_grad, "_backend_may_use_inductor", lambda: True)
+    with FakeTensorMode():
+        coordinates = {device: {dtype: torch.empty(4, 3, dtype=dtype, device=device)
+                                for dtype in (torch.float32, torch.float64)}
+                       for device in ("cpu", "cuda")}
+
+    def uses_native(position):
+        return compiled_grad.inductor_force_device(core, {"xyz": position}, devices=("cpu", "cuda"),
+                                                   dtype=core._partitioned_norm_force_dtype)
+
+    assert uses_native(coordinates["cpu"][torch.float64])
+    assert not uses_native(coordinates["cpu"][torch.float32])
+    assert uses_native(coordinates["cuda"][torch.float64]) == "cuda"
+    assert not uses_native(coordinates["cuda"][torch.float32])
+    layer.eval_only = True
+    assert not uses_native(coordinates["cpu"][torch.float64])
+    core.post_sequence = torch.nn.Sequential()
+    assert not uses_native(coordinates["cpu"][torch.float64])
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="compiled single-precision CUDA training")
+def test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles():
+    from enerzyme.models.dpa4.so2 import build_edge_cache
+    from enerzyme.models.mp.equivariant.rotation.wigner_cg import wigner_from_cg
+    from enerzyme.models.mp.equivariant.rotation.wigner_quaternion import WignerDCalculator, build_edge_quaternion, safe_norm
+
+    vectors = torch.tensor([[0., 0., 1.], [0., 0., -1.], [1e-5, 0., 1.], [0.1, 0.3, -0.8]], device="cuda")
+    indices = torch.arange(len(vectors), device="cuda")
+    calculator = WignerDCalculator(2).float().cuda()
+    identity = torch.nn.Identity()
+
+    def compiled_frame(v):
+        return build_edge_cache(idx_i=indices, idx_j=indices, vij=v, n_nodes=len(v),
+                                radial_basis=identity, envelope=identity, wigner_calc=calculator).D_full
+
+    reference = WignerDCalculator(2).double().cuda()
+
+    def reference_frame(v):
+        q = build_edge_quaternion(v, safe_norm(v))
+        return wigner_from_cg(reference.cartesian_frame(q), 2)
+
+    def derivatives(frame, v):
+        v = v.detach().requires_grad_()
+        matrix = frame(v)
+        weights = torch.linspace(-1, 1, matrix.numel(), device=v.device, dtype=v.dtype).reshape_as(matrix)
+        gradient, = torch.autograd.grad((matrix * weights).sum(), v, create_graph=True)
+        tangent = torch.linspace(0.2, 1, v.numel(), device=v.device, dtype=v.dtype).reshape_as(v)
+        hessian, = torch.autograd.grad((gradient * tangent).sum(), v)
+        return matrix, gradient, hessian
+
+    expected = derivatives(reference_frame, vectors.double())
+    actual = derivatives(torch.compile(compiled_frame, backend="eager", fullgraph=True), vectors)
+    for a, b in zip(actual, expected):
+        torch.testing.assert_close(a.double(), b, atol=3e-5, rtol=3e-5)

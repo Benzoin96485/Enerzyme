@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+import pytest
 import torch
 import yaml
 from numpy.testing import assert_allclose
@@ -23,7 +25,7 @@ def _complete_graph_edges(num_nodes: int):
 
 
 def _tiny_core(**kwargs):
-    from enerzyme.models.dimenet import DimeNetPPCore
+    from enerzyme.models.presets.triplet import dimenetpp
 
     params = dict(
         dim_embedding=8,
@@ -39,7 +41,7 @@ def _tiny_core(**kwargs):
         envelope_exponent=5,
     )
     params.update(kwargs)
-    return DimeNetPPCore(**params)
+    return dimenetpp(**params)
 
 
 def _core_inputs(n=4, dim_embedding=8, num_rbf=4, requires_grad=False):
@@ -63,7 +65,7 @@ def test_dimenetpp_registration_and_yaml_build():
 
     for name in ("dimenet++", "dimenetpp", "DimeNet++"):
         core_cls, _, _ = get_ff_core(name)
-        assert core_cls.__name__ == "DimeNetPPCore"
+        assert core_cls.__name__ == "dimenetpp"
     with EXAMPLE.open() as stream:
         ff = yaml.safe_load(stream)["Modelhub"]["internal_FFs"]["FF01"]
     layers = []
@@ -89,12 +91,12 @@ def test_dimenetpp_registration_and_yaml_build():
     model = build_model(
         ff["architecture"], layer_params=layers, build_params=bp, verbose=0
     )
-    assert model.__class__.__name__ == "DimeNetPPCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.num_output_blocks == 3
     assert model.dim_feature_out == 6
-    assert not hasattr(model.interactions[0], "W")
-    assert model.interactions[0].down.bias is None
-    assert model.atom_readouts[0].up.bias is None
+    assert not hasattr(model.blocks[0].interaction, "W")
+    assert model.blocks[0].interaction.down.bias is None
+    assert model.head.readouts[0].up.bias is None
 
 
 def test_dimenetpp_feature_shape_hierarchical_and_last():
@@ -124,20 +126,22 @@ def test_dimenetpp_feature_shape_hierarchical_and_last():
     assert out_last["atom_feature"].shape == (n, 6)
 
 
-def test_dimenetpp_rotation_invariance():
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_dimenetpp_rotation_invariance(dtype):
     torch.manual_seed(1)
+    # These weights exposed the error from generating the rotation in float32.
+    np.random.seed(96)
     n = 5
-    core = _tiny_core()
+    core = _tiny_core().to(dtype)
     core.eval()
     idx_i, idx_j = _complete_graph_edges(n)
-    pos = torch.randn(n, 3)
-    q, _ = torch.linalg.qr(torch.randn(3, 3))
+    pos = torch.randn(n, 3).to(dtype)
+    q, _ = torch.linalg.qr(torch.randn(3, 3).double())
     if torch.det(q) < 0:
-        q = q.clone()
         q[:, 0] *= -1
-    pos_r = pos @ q
-    atom_embedding = torch.randn(n, 8)
-    rbf = torch.randn(idx_i.numel(), 4)
+    pos_r = (pos.double() @ q).to(dtype)
+    atom_embedding = torch.randn(n, 8).to(dtype)
+    rbf = torch.randn(idx_i.numel(), 4).to(dtype)
 
     def _feat(p):
         vij = p[idx_j] - p[idx_i]
@@ -153,7 +157,8 @@ def test_dimenetpp_rotation_invariance():
 
     f0 = _feat(pos)
     f1 = _feat(pos_r)
-    assert torch.allclose(f0, f1, atol=1e-5, rtol=1e-5)
+    tolerance = 1e-10 if dtype == torch.float64 else 1e-5
+    torch.testing.assert_close(f0, f1, atol=tolerance, rtol=tolerance)
 
 
 def test_dimenetpp_layer_stack_energy_and_force():
@@ -296,11 +301,12 @@ def test_dimenetpp_pair_graph_has_no_triplets():
 
 
 def test_dimenet_defaults_unchanged():
-    from enerzyme.models.dimenet import DEFAULT_LAYER_PARAMS, DimeNetCore
+    from enerzyme.models.dimenet import DEFAULT_LAYER_PARAMS
+    from enerzyme.models.presets.triplet import dimenet
     from enerzyme.models.ff import get_ff_core
 
     core_cls, _, layers = get_ff_core("dimenet")
-    assert core_cls is DimeNetCore
+    assert core_cls is dimenet
     core = next(layer for layer in layers if layer["name"] == "Core")
     assert core["params"]["num_bilinear"] == 8
     assert "out_emb_size" not in core["params"]

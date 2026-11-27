@@ -33,7 +33,7 @@ def _basis(dist: torch.Tensor, num_rbf: int, cutoff: float) -> torch.Tensor:
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.alignn import ALIGNNCore
+    from enerzyme.models.presets.triplet_graphs import alignn
 
     params = dict(
         dim_embedding=8,
@@ -48,7 +48,7 @@ def _tiny(**kwargs):
         update_order="code",
     )
     params.update(kwargs)
-    return ALIGNNCore(**params)
+    return alignn(**params)
 
 
 def _star(theta: float, n_feat: int = 8, num_rbf: int = 4):
@@ -90,7 +90,7 @@ def test_registration_and_example_yaml():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, defaults, layers = get_ff_core("alignn")
-    assert core_cls.__name__ == "ALIGNNCore"
+    assert core_cls.__name__ == "alignn"
     assert defaults["cutoff_sr"] == 8.0
     assert defaults["num_rbf"] == 80
     assert defaults["num_angle_rbf"] == 40
@@ -108,7 +108,7 @@ def test_registration_and_example_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "ALIGNNCore"
+    assert model.architecture == "alignn"
     assert model.alignn_layers == 2
     assert model.gcn_layers == 2
     assert model.hidden_features == 64
@@ -118,7 +118,7 @@ def test_registration_and_example_yaml():
     assert model.norm == "layer"
     assert model.radial_basis_function.flavor == "alignn"
     assert model.radial_basis_function.apply_cutoff_fn is False
-    assert abs(float(model.angle_coeff) - (-1.0 / (2.0 / 39.0))) < 1e-4
+    assert abs(float(model.embed.angle_coeff) - (-1.0 / (2.0 / 39.0))) < 1e-4
 
 
 def _angle_carrier(theta: float, n_feat: int = 8, num_rbf: int = 4):

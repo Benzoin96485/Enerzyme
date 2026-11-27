@@ -7,7 +7,7 @@ import math
 import torch
 import torch.nn.functional as F
 
-from enerzyme.models.functional import reduce_edge
+from enerzyme.models.mp.ops import scatter_sum
 from enerzyme.models.layers.polynomial_harmonics import polynomial_spherical_harmonics
 from enerzyme.models.layers.rejection import vector_rejection
 from enerzyme.models.visnet.interaction import (
@@ -90,6 +90,31 @@ def test_vector_norm_is_channel_scale_and_rotates():
         raise AssertionError("expected a bad angular width to fail")
 
 
+def test_compiled_vector_norm_preserves_zero_field_force_derivatives():
+    torch.manual_seed(29)
+    field = torch.randn(4, 8, 5, dtype=torch.double)
+    probe = torch.randn_like(field)
+    for kind in ("rms", "max_min"):
+        norm = VecLayerNorm(5, trainable=True, norm_type=kind).double()
+        compiled = torch.compile(norm, backend="eager", fullgraph=True)
+        for only_degree_two in (False, True):
+            x = field.clone()
+            if only_degree_two:
+                x[:, :3].zero_()
+            else:
+                x.zero_()
+            x.requires_grad_()
+            def derivatives(layer):
+                output = layer(x)
+                # Connect all-zero reference fields to x with exact zero derivatives.
+                loss = (output * probe).sum() + 0 * x.square().sum()
+                gradient, = torch.autograd.grad(loss, x, create_graph=True)
+                hessian, = torch.autograd.grad((gradient * probe).sum(), x)
+                return output, gradient, hessian
+
+            torch.testing.assert_close(derivatives(compiled), derivatives(norm))
+
+
 def test_edge_embedding_is_sum_of_endpoints():
     torch.manual_seed(1)
     block = EdgeEmbedding(3, 4)
@@ -139,17 +164,13 @@ def _reference(layer, scalar, vector, edge, idx_i, idx_j, window, direction):
     gate, coeff = torch.split(gates, layer.hidden_channels, dim=-1)
     vector_message = vector_n[idx_j] * gate.unsqueeze(1)
     vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
-    aggregated_scalar = reduce_edge(
-        scalar_message, idx_i, (n_atoms, layer.hidden_channels)
-    )
+    aggregated_scalar = scatter_sum(scalar_message, idx_i, n_atoms)
     angular = vector.shape[1]
-    aggregated_vector = reduce_edge(
-        vector_message, idx_i, (n_atoms, angular, layer.hidden_channels)
-    )
+    aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
     mixed = F.linear(aggregated_scalar, layer.o_proj.weight, layer.o_proj.bias)
     if layer.vertex_type == "node":
         angle = _angle(layer, vector_n[idx_i], direction)
-        aggregated_angle = reduce_edge(angle, idx_i, (n_atoms, layer.hidden_channels))
+        aggregated_angle = scatter_sum(angle, idx_i, n_atoms)
         out_scale, out_dot, out_angle, out_bias = torch.split(
             mixed, layer.hidden_channels, dim=-1
         )
@@ -231,3 +252,34 @@ def test_block_matches_the_reference_for_each_vertex():
         assert "divisible" in str(exc)
     else:
         raise AssertionError("expected a bad head count to fail")
+
+
+def test_compiled_edge_embedding_preserves_node_and_endpoint_derivatives():
+    from enerzyme.models.visnet.interaction import EdgeEmbedding
+
+    torch.manual_seed(31)
+    embedding = EdgeEmbedding(3, 5).double()
+    scalar = torch.randn(4, 5, dtype=torch.float64, requires_grad=True)
+    rbf = torch.randn(6, 3, dtype=torch.float64, requires_grad=True)
+    receiver = torch.tensor([1, 1, 1, 0, 2, 0])
+    sender = torch.tensor([0, 2, 1, 1, 0, 1])
+    parameters = (scalar, rbf, embedding.edge_proj.weight, embedding.edge_proj.bias)
+    direction = torch.randn_like(scalar)
+
+    def derivatives(nodes, edges):
+        loss = nodes.square().sum() + edges.sin().sum()
+        first = torch.autograd.grad(loss, parameters, create_graph=True)
+        second = torch.autograd.grad((first[0] * direction).sum(), parameters)
+        return (*first, *second)
+
+    compiled = torch.compile(embedding, backend="eager", fullgraph=True)
+    for count in (6, 0):
+        i, j, basis = receiver[:count], sender[:count], rbf[:count]
+        edges = compiled(i, j, basis, scalar)
+        original = embedding(i, j, basis, scalar)
+        torch.testing.assert_close(edges, original)
+        if count:
+            actual = derivatives(scalar, edges)
+            expected = derivatives(scalar, original)
+            for result, reference in zip(actual, expected):
+                torch.testing.assert_close(result, reference, atol=1e-13, rtol=1e-13)

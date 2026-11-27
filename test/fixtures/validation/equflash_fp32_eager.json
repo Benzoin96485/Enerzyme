@@ -1,0 +1,237 @@
+{
+ "model": "equflash",
+ "original": "1aa0f8b",
+ "candidate": "0f94be0",
+ "dtype": "float32",
+ "pytorch": "2.13.0+cu126",
+ "setup": "The original EquFlash v1 frozen state_dict was loaded strictly on each side. Each run used seed 7, the full acceptance input, identical edge ordering and offsets. Each CPU pair ran on the same Xeon node. Energy and force use absolute and relative tolerances of 3e-4.",
+ "fixture_sha256": "793c79eb06d2b86790c33f1cebcd1e7dcf798eca7312834b384e68c93dea60a5",
+ "tolerances": {"energy_and_force": {"atol": 0.0003,"rtol": 0.0003}},
+ "current_cpu": {
+  "mol_batch_32x20": {
+   "job": "6339292",
+   "input_rows": 10590,
+   "forward_fields_measured": [
+    "Dij_lr",
+    "Dij_sr",
+    "E",
+    "Ea",
+    "atom_embedding",
+    "block00",
+    "block01",
+    "block02",
+    "block03",
+    "block04",
+    "block05",
+    "block06",
+    "block07",
+    "block08",
+    "block09",
+    "cutoff_values_sr",
+    "idx_i_sr",
+    "idx_j_sr",
+    "rbf",
+    "sph",
+    "vij_lr",
+    "vij_sr"
+   ],
+   "different_forward_fields": [],
+   "fields_compared_including_derivatives": 40,
+   "different_fields_including_derivatives": 0,
+   "maximum_abs_short_feature_by_block": [6.618188858032227,8.024651527404785,13.017553329467773,19.908906936645508,50.90605926513672,93.73123931884766,274.2548522949219,1750.2635498046875,38324.12109375,3832.716064453125],
+   "maximum_abs_energy_gradient_difference_by_block": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+   "maximum_abs_reference_force": 12855.466796875,
+   "energy": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0},
+   "force": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0},
+   "ablations": {
+    "oldscatter": {"energy": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0,"changed": 0,"worst_index": 0},"force": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0}},
+    "oldrange": {"energy": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0,"changed": 0,"worst_index": 0},"force": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0}}
+   }
+  },
+  "bulk_256": {
+   "job": "6339292",
+   "input_rows": 13360,
+   "forward_fields_measured": [
+    "Dij_lr",
+    "Dij_sr",
+    "E",
+    "Ea",
+    "atom_embedding",
+    "block00",
+    "block01",
+    "block02",
+    "block03",
+    "block04",
+    "block05",
+    "block06",
+    "block07",
+    "block08",
+    "block09",
+    "cutoff_values_sr",
+    "idx_i_sr",
+    "idx_j_sr",
+    "rbf",
+    "sph",
+    "vij_lr",
+    "vij_sr"
+   ],
+   "different_forward_fields": [],
+   "fields_compared_including_derivatives": 40,
+   "different_fields_including_derivatives": 17,
+   "maximum_abs_short_feature_by_block": [7.210097312927246,8.367085456848145,15.389183044433594,37.09954833984375,78.9100112915039,234.28248596191406,1037.1197509765625,10203.826171875,1397055.875,72986.1484375],
+   "maximum_abs_energy_gradient_difference_by_block": [0.0126953125,0.0087890625,0.00518798828125,0.002685546875,0.001708984375,0.000732421875,0.000152587890625,5.7220458984375e-06,1.4901161193847656e-08,0.0],
+   "maximum_abs_reference_force": 317151.3125,
+   "energy": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0},
+   "force": {"outside": 1,"max_abs": 0.203125,"max_tolerance_ratio": 3.604479715125147,"relative_l2": 6.847610729971545e-07},
+   "ablations": {
+    "oldscatter": {
+     "energy": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0,"changed": 0,"worst_index": 0},
+     "force": {"outside": 1,"max_abs": 0.26171875,"max_tolerance_ratio": 4.064111356651172,"relative_l2": 7.12491040507263e-07}
+    },
+    "oldrange": {
+     "energy": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0,"changed": 0,"worst_index": 0},
+     "force": {"outside": 0,"max_abs": 0.1484375,"max_tolerance_ratio": 0.9293853045595645,"relative_l2": 6.099406622821876e-07}
+    }
+   }
+  }
+ },
+ "ablations": "The oldscatter control uses the original torch_scatter.scatter_sum for every convolution. The oldrange control selects radius edges with the original boolean mask.",
+ "force_cancellation": {
+  "bulk_256": {
+   "base": {
+    "atom_index": 223,
+    "coordinate_axis": 2,
+    "incident_pair_rows": 106,
+    "radial_sum": 822.5205339579411,
+    "vector_sum": -829.9317397177219,
+    "sum_absolute_joint_edge_terms": 88795.04377602218,
+    "sum_absolute_radial_and_vector_terms": 100596.79835852688,
+    "sum_double": -7.411205759780842,
+    "force_float32": -7.410125732421875
+   },
+   "new": {
+    "atom_index": 223,
+    "coordinate_axis": 2,
+    "incident_pair_rows": 106,
+    "radial_sum": 822.5267944698571,
+    "vector_sum": -829.9295680820942,
+    "sum_absolute_joint_edge_terms": 88795.04713261177,
+    "sum_absolute_radial_and_vector_terms": 100596.79696082728,
+    "sum_double": -7.402773612235933,
+    "force_float32": -7.401031494140625
+   }
+  },
+  "mol_batch_32x20": {
+   "base": {
+    "atom_index": 578,
+    "coordinate_axis": 1,
+    "incident_pair_rows": 38,
+    "radial_sum": 41.56176539718575,
+    "vector_sum": -452.90318298339844,
+    "sum_absolute_joint_edge_terms": 29136.135171716505,
+    "sum_absolute_radial_and_vector_terms": 32531.06861626754,
+    "sum_double": -411.3414175862124,
+    "force_float32": -411.341552734375
+   },
+   "new": {
+    "atom_index": 578,
+    "coordinate_axis": 1,
+    "incident_pair_rows": 38,
+    "radial_sum": 41.56176539718575,
+    "vector_sum": -452.90318298339844,
+    "sum_absolute_joint_edge_terms": 29136.135171716505,
+    "sum_absolute_radial_and_vector_terms": 32531.06861626754,
+    "sum_double": -411.3414175862124,
+    "force_float32": -411.341552734375
+   }
+  }
+ },
+ "v100": {
+  "report": "test/fixtures/bench_gpu/raw_compile_v100.json",
+  "pair_job": "6317929",
+  "same_process_repeats_job": "6318510",
+  "candidate_revision": "c32ede3",
+  "cross_tree": {
+   "mol_batch_32x20": {
+    "E": {"outside": 0,"max_abs": 0.00146484375,"max_tolerance_ratio": 0.3873640589733078,"relative_l2": 4.882397584617721e-07},
+    "Fa": {"outside": 17,"max_abs": 1.057861328125,"max_tolerance_ratio": 8.534387792102866,"relative_l2": 5.6587972845045365e-05}
+   },
+   "bulk_256": {
+    "E": {"outside": 0,"max_abs": 0.0859375,"max_tolerance_ratio": 0.0030283058500812413,"relative_l2": 9.085013592832155e-07},
+    "Fa": {"outside": 166,"max_abs": 45.6875,"max_tolerance_ratio": 424.47775833285755,"relative_l2": 0.0001100598592295424}
+   }
+  },
+  "original_repeat": {
+   "mol_batch_32x20": {
+    "E": {"outside": 0,"max_abs": 0.001953125,"max_tolerance_ratio": 0.09845579709119974,"relative_l2": 6.3461320220276e-07},
+    "Fa": {"outside": 11,"max_abs": 0.28271484375,"max_tolerance_ratio": 13.428602204588705,"relative_l2": 2.5142879345752458e-05}
+   },
+   "bulk_256": {
+    "E": {"outside": 0,"max_abs": 0.015625,"max_tolerance_ratio": 0.0005506013364966482,"relative_l2": 1.651821471796057e-07},
+    "Fa": {"outside": 196,"max_abs": 33.2890625,"max_tolerance_ratio": 1627.7710011391475,"relative_l2": 0.0001208132114161088}
+   }
+  },
+  "candidate_repeat": {
+   "mol_batch_32x20": {
+    "E": {"outside": 0,"max_abs": 0.005126953125,"max_tolerance_ratio": 0.02144679720990223,"relative_l2": 1.6408237571483827e-06},
+    "Fa": {"outside": 13,"max_abs": 0.484619140625,"max_tolerance_ratio": 26.588676393998657,"relative_l2": 4.726593639217262e-05}
+   },
+   "bulk_256": {
+    "E": {"outside": 0,"max_abs": 0.03125,"max_tolerance_ratio": 0.0011012022182507366,"relative_l2": 3.30364157933559e-07},
+    "Fa": {"outside": 317,"max_abs": 125.5390625,"max_tolerance_ratio": 1966.5134194831014,"relative_l2": 0.0002829291141210527}
+   }
+  },
+  "worst_cross_tree_force_component": {
+   "mol_batch_32x20": {"index": 1735,"atom": 578,"axis": 1,"reference": -412.176025390625,"candidate": -411.1181640625},
+   "bulk_256": {"index": 671,"atom": 223,"axis": 2,"reference": -8.085296630859375,"candidate": -6.9283447265625}
+  }
+ },
+ "original_gpu_vs_original_cpu": {
+  "mol_batch_32x20": {
+   "Fa": {"outside": 12,"max_abs": 0.83447265625,"max_tolerance_ratio": 15.501977072443827,"relative_l2": 4.960561628231039e-05},
+   "E": {"outside": 0,"max_abs": 0.0009765625,"max_tolerance_ratio": 0.4168423411081667,"relative_l2": 3.65446071184794e-07}
+  },
+  "bulk_256": {
+   "Fa": {"outside": 518,"max_abs": 260.3515625,"max_tolerance_ratio": 916.7198812658369,"relative_l2": 0.0005782158845796634},
+   "E": {"outside": 0,"max_abs": 0.3125,"max_tolerance_ratio": 0.011011984893759125,"relative_l2": 3.3036303924745944e-06}
+  }
+ },
+ "prior_periodic_cpu_check": {
+  "job": "6318835",
+  "candidate": "c32ede3",
+  "source_document": "test/fixtures/bench_gpu/raw_compile_v100.json",
+  "force_comparisons": {
+   "cpu_new_float64_versus_cpu_base_float64": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0},
+   "cpu_new_float32_versus_cpu_base_float32": {"outside": 1,"max_abs": 0.125,"max_tolerance_ratio": 5.780046264554411,"relative_l2": 6.357236331690485e-07},
+   "cpu_base_float32_versus_cpu_base_float64": {"outside": 434,"max_abs": 97.57524271101283,"max_tolerance_ratio": 886.3266235387064,"relative_l2": 0.00032876158287416214},
+   "cpu_new_float32_versus_cpu_new_float64": {"outside": 434,"max_abs": 97.54399271101283,"max_tolerance_ratio": 890.5697671363928,"relative_l2": 0.0003287178443170147}
+  }
+ },
+ "cpu_repeat_job": "6339341",
+ "cpu_repeat_control": {
+  "base-standard-1threads-repeat1": {"energy_max_abs": 0.0,"force": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0,"changed": 0}},
+  "base-standard-2threads-repeat1": {"energy_max_abs": 0.0,"force": {"outside": 0,"max_abs": 0.171875,"max_tolerance_ratio": 0.9295667289476375,"relative_l2": 6.72965400626894e-07,"changed": 740,"worst_index": 505}},
+  "base-standard-2threads-repeat2": {"energy_max_abs": 0.0,"force": {"outside": 2,"max_abs": 0.12890625,"max_tolerance_ratio": 4.983537392255196,"relative_l2": 6.515822174719473e-07,"changed": 749,"worst_index": 671}},
+  "new-standard-1threads-repeat1": {"energy_max_abs": 0.0,"force": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0,"changed": 0}},
+  "new-standard-vs-base-1threads": {"energy_max_abs": 0.0,"force": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0,"changed": 0}},
+  "new-standard-2threads-repeat1": {"energy_max_abs": 0.0,"force": {"outside": 2,"max_abs": 0.17578125,"max_tolerance_ratio": 9.265079370846612,"relative_l2": 7.43949389972093e-07,"changed": 744,"worst_index": 671}},
+  "new-standard-2threads-repeat2": {"energy_max_abs": 0.0,"force": {"outside": 1,"max_abs": 0.17578125,"max_tolerance_ratio": 6.649056960254628,"relative_l2": 7.374435165534343e-07,"changed": 737,"worst_index": 671}},
+  "new-standard-vs-base-2threads": {"energy_max_abs": 0.0,"force": {"outside": 2,"max_abs": 0.2109375,"max_tolerance_ratio": 4.197299696875129,"relative_l2": 7.146056249676479e-07,"changed": 742,"worst_index": 671}},
+  "new-oldscatter-vs-base-1threads": {"energy_max_abs": 0.0,"force": {"outside": 0,"max_abs": 0.0,"max_tolerance_ratio": 0.0,"relative_l2": 0.0,"changed": 0}},
+  "new-oldscatter-vs-base-2threads": {"energy_max_abs": 0.0,"force": {"outside": 0,"max_abs": 0.171875,"max_tolerance_ratio": 0.8164115040545036,"relative_l2": 6.412018894584269e-07,"changed": 737,"worst_index": 583}}
+ },
+ "method": "CPU inputs use scripts/bench_cores.py _batch with the acceptance system set and cutoff 6. The fixture test/fixtures/presnapshot/equflash.pt is mapped with test/presnapshot_maps.py for the candidate. The model runs in eval mode with coordinate gradients enabled. The stage and ablation measurements use two CPU threads. The same-process controls reseed and reload the fixed weights for every call, with three two-thread evaluations followed by two one-thread evaluations for each unmodified tree.",
+ "interpretation": "The fixed CPU forward fields and the final interaction energy adjoint agree bitwise in both systems. Only one periodic force component exceeds tolerance in the default CPU pair. Its 106 signed contributions sum to about -7.41 from absolute terms totaling about 88795. The original and candidate V100 each exceed the same force threshold on consecutive evaluations in a single process with the identical atom and edge order.",
+ "thread_control": "With one Xeon thread the unmodified original and candidate produce bitwise identical periodic energy and all 768 forces. With two threads the third original evaluation exceeds tolerance on two force components relative to its first evaluation. Its largest tolerance ratio (4.98) occurs at atom 223, z, also the worst component in both the cross-tree CPU stage comparison and the V100 comparison.",
+ "acceptance": {"v100_fp32_cross_tree_forces": {"mol_batch_32x20": "outside tolerance","bulk_256": "outside tolerance"},"energy": "Both V100 cross-tree energy comparisons pass."},
+ "empty_graph": {
+  "fix_revision": "041cdbc",
+  "shared_convolution_revision": "0b890c3",
+  "context": "A separate empty-message regression occurred with trainable EquFlash v1 convolution denominators. An empty neighborhood now returns disconnected zeros, matching the original. Populated graphs retain the normalization and gradients.",
+  "checks": [
+   "test/test_equflash_core.py (7 passed at 041cdbc)",
+   "test/test_presnapshot_parity.py::test_presnapshot_parity[equflash] (1 passed at 041cdbc)",
+   "Both selections passed again after consolidation at 0b890c3 (8 cases)."
+  ]
+ }
+}

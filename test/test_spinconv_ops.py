@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import pytest
 import torch
 from numpy.testing import assert_allclose
 
@@ -266,6 +267,28 @@ def test_spin_pool_is_invariant_to_a_longitude_roll():
     assert empty.shape == (0, 16)
 
 
+@pytest.mark.parametrize("longitude", [5, 6])
+def test_compiled_spin_pool_matches_grouped_circular_convolution_derivatives(longitude):
+    from enerzyme.models.spinconv.interaction import SpinConvolution
+
+    torch.manual_seed(17)
+    block = SpinConvolution(4, 8, n_lat=3, n_long=longitude, group_channels=2, cutoff=6.0).double()
+    grid = torch.randn(3, 4, 3, longitude, dtype=torch.float64, requires_grad=True)
+    target = torch.randn(3, 8, dtype=torch.float64)
+    direction = torch.randn_like(grid)
+
+    def values(run):
+        pooled = run(grid)
+        gradient = torch.autograd.grad((pooled * target).sum(), grid, create_graph=True)[0]
+        mixed = torch.autograd.grad((gradient * direction).sum(), (grid, block.conv.weight, block.conv.bias))
+        return (pooled, gradient, *mixed)
+
+    expected = values(block.pool_grid)
+    compiled = torch.compile(block.pool_grid, backend="eager", fullgraph=True)
+    for actual, reference in zip(values(compiled), expected):
+        torch.testing.assert_close(actual, reference, atol=2e-13, rtol=2e-12)
+
+
 def test_pair_scale_starts_near_identity():
     from enerzyme.models.spinconv.interaction import PairDistanceScale
 
@@ -298,3 +321,28 @@ def test_pair_scale_starts_near_identity():
         assert "max_Za" in str(exc)
     else:
         raise AssertionError("a negative target atomic number must be rejected")
+
+
+def test_compiled_spin_frame_sums_preserve_separate_reductions(monkeypatch):
+    from enerzyme.models.spinconv import geometry
+
+    receiver = torch.tensor([0, 0, 1, 1])
+    vec = torch.arange(12, dtype=torch.float64).reshape(4, 3) / 10
+    distance = vec.norm(dim=1)
+    reduce = geometry._receiver_sum
+    calls = []
+
+    def observed(v, i, n):
+        calls.append(len(calls))
+        return reduce(v, i, n) + calls[-1]
+
+    monkeypatch.setattr(geometry, "_receiver_sum", observed)
+
+    def frames(v, d, i):
+        return geometry._frame_sums(v, d, i, 5.0, 2, 3)
+
+    run = torch.compile(frames, fullgraph=True, backend="aot_eager")
+    out = run(vec, distance, receiver)
+    assert calls == [0, 1, 2]
+    for block, sample in enumerate(out):
+        torch.testing.assert_close(sample, out[0] + block, atol=0, rtol=0)

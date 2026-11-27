@@ -643,11 +643,12 @@ def test_aselmdb_resume_recomputes_incomplete_reservation(tmp_path: Path):
         assert row.toatoms().calc.results.get("energy") is not None
 
 
-def test_warn_unused_qm_kwargs_and_legacy_keys(caplog):
+def test_warn_unused_qm_kwargs_and_legacy_keys(caplog, monkeypatch):
     import logging
 
-    from enerzyme.qm.qm_driver import _warn_unused_qm_kwargs
+    from enerzyme.qm.qm_driver import _warn_unused_qm_kwargs, logger
 
+    monkeypatch.setattr(logger, "propagate", True)
     kwargs = {"engine": "TeraChem", "bs": "6-31gs", "xc": "b3lyp", "mystery": 1}
     with caplog.at_level(logging.WARNING):
         _warn_unused_qm_kwargs(kwargs)

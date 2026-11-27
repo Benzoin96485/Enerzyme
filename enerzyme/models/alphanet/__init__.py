@@ -5,10 +5,9 @@ is the interaction stack. The species embedding, Bessel basis, energy head,
 and conservative forces stay in the shared layer stack.
 """
 
-from .core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS, AlphaNetCore
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
 __all__ = [
-    "AlphaNetCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
 ]

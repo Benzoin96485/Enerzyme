@@ -6,7 +6,7 @@ import math
 
 import torch
 
-from enerzyme.models.cutoff import polynomial_envelope
+from enerzyme.models.mp.basis.envelope import polynomial_envelope
 
 
 def test_polynomial_envelope_is_flat_at_the_cutoff_and_accepts_per_edge_radii():
@@ -150,10 +150,10 @@ def test_geodite_harmonics_match_the_polynomial_basis():
 
 
 def test_zero_radial_basis_matches_the_isolated_atom():
-    from enerzyme.models.geodite import GeoditeCore
+    from enerzyme.models.presets.cartesian_vector import geodite
 
     torch.manual_seed(0)
-    core = GeoditeCore(
+    core = geodite(
         dim_embedding=16,
         num_rbf=4,
         max_Za=10,

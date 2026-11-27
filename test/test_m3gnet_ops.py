@@ -104,7 +104,7 @@ def test_receiver_triplets_count_images_and_cutoff():
 
 
 def test_gated_mlp_branches_and_zero_bias_free():
-    from enerzyme.models.blocks.mlp import GatedMLP
+    from enerzyme.models.mp.nn.mlp import GatedMLP
 
     torch.manual_seed(0)
     layer = GatedMLP(4, [5], 3, activate_last=False, use_bias=True)

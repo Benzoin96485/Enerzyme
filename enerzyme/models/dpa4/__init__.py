@@ -1,8 +1,8 @@
 """DPA4 EMFA SO(2) descriptor for Enerzyme (arXiv:2606.02419).
 
-Native PyTorch reimplementation. See core.py for the main Core class.
+Native PyTorch reimplementation. The DPA4 preset assembles the interaction blocks.
 """
 
-from .core import DPA4Core, DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
-__all__ = ["DPA4Core", "DEFAULT_BUILD_PARAMS", "DEFAULT_LAYER_PARAMS"]
+__all__ = ["DEFAULT_BUILD_PARAMS", "DEFAULT_LAYER_PARAMS"]

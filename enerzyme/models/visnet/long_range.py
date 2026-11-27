@@ -15,15 +15,12 @@ That map is not in the released class, so this block does not apply it.
 
 from __future__ import annotations
 
-import math
-from typing import Optional, Tuple
+from typing import NamedTuple, Optional, Tuple
 
 import torch
-import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Dropout, LayerNorm, Linear, Module, ModuleList, Sequential, SiLU
 
-from ..functional import reduce_edge
+from ..mp.nonlocal_ import FragmentLR as FragmentBipartiteBlock  # noqa: F401
 from ..layers.fragments import (
     build_kmeans_fragments,
     build_spectral_fragments,
@@ -31,7 +28,6 @@ from ..layers.fragments import (
     flatten_cluster_ids,
     weighted_fragment_centers,
 )
-from .interaction import VecLayerNorm, _xavier_linear
 
 
 _CENTERS = {
@@ -69,6 +65,20 @@ def normalize_fragment_mode(value: object) -> str:
     return key
 
 
+def _fragment_distance(delta: Tensor) -> Tensor:
+    # A singleton's center follows its atom, so its own distance is constant.
+    # Differentiating the Euclidean norm at zero would introduce 0/0 in a Hessian.
+    coincident = (delta == 0).all(dim=-1)
+    safe = torch.where(coincident.unsqueeze(-1), torch.ones_like(delta), delta)
+    distance = torch.linalg.vector_norm(safe, dim=-1)
+    return torch.where(coincident, torch.zeros_like(distance), distance)
+
+
+def _fragment_direction(delta: Tensor, distance: Tensor) -> Tensor:
+    unit = delta / distance.clamp_min(1e-12).unsqueeze(-1)
+    return torch.where((distance < 1e-8).unsqueeze(-1), torch.zeros_like(unit), unit)
+
+
 def bipartite_radius_edges(
     atom_pos: Tensor,
     cluster_pos: Tensor,
@@ -104,17 +114,14 @@ def bipartite_radius_edges(
             continue
         # [Na, Nc, 3], fragment minus atom, matching the released ``u_ij``.
         delta = cluster_pos[fragments].unsqueeze(0) - atom_pos[atoms].unsqueeze(1)
-        dist = torch.linalg.vector_norm(delta, dim=-1)
+        dist = _fragment_distance(delta)
         within = dist <= limit
         if not bool(within.any()):
             continue
         local_atom, local_fragment = torch.where(within)
         chosen = dist[local_atom, local_fragment]
         vec = delta[local_atom, local_fragment]
-        direction = vec / chosen.clamp_min(1e-12).unsqueeze(-1)
-        direction = torch.where(
-            (chosen < 1e-8).unsqueeze(-1), torch.zeros_like(direction), direction
-        )
+        direction = _fragment_direction(vec, chosen)
         idx_atom.append(atoms[local_atom])
         idx_fragment.append(fragments[local_fragment])
         distances.append(chosen)
@@ -186,111 +193,69 @@ def resolve_long_range_fragments(
     return flat_ids, centers, cluster_batch
 
 
-class FragmentBipartiteBlock(Module):
-    """One pre-norm fragment→atom update. Returns residuals ``(dx, dvec)``."""
+@torch.library.custom_op("enerzyme::lsrm_fragment_indices", mutates_args=())
+def _fragment_indices(
+    positions: Tensor, batch: Tensor, mode: str, center: str,
+    numbers: Optional[Tensor], labels: Optional[Tensor],
+    min_nodes: int, seed: int, cutoff: float,
+) -> Tuple[Tensor, Tensor]:
+    """Discrete clustering and radius selection, independent of the force pullback."""
+    ids, centers, cluster_batch = resolve_long_range_fragments(
+        positions, batch, mode, center, numbers, labels, min_nodes, seed
+    )
+    atoms, fragments, _, _ = bipartite_radius_edges(
+        positions, centers, batch, cluster_batch, cutoff
+    )
+    return ids, torch.stack((atoms, fragments))
 
-    def __init__(self, hidden_channels: int, num_heads: int, dropout: float) -> None:
-        super().__init__()
-        hidden_channels = int(hidden_channels)
-        num_heads = int(num_heads)
-        if hidden_channels % num_heads != 0:
-            raise ValueError(
-                f"dim_embedding ({hidden_channels}) must be divisible by "
-                f"num_heads ({num_heads})"
+
+@_fragment_indices.register_fake
+def _fragment_index_shapes(positions, batch, mode, center, numbers, labels, min_nodes, seed, cutoff):
+    n_edges = torch.library.get_ctx().new_dynamic_size()
+    return torch.empty_like(batch), batch.new_empty((2, n_edges))
+
+
+class FragmentTopology(NamedTuple):
+    """Detached assignments and selected pairs, shared by the force and feature paths."""
+
+    ids: Tensor
+    edges: Tensor
+
+    def apply(self, ctx):
+        ctx.cache["lsrm_fragment_indices"] = self
+
+
+def select_fragment_topology(positions, batch, mode, center, numbers, labels, min_nodes, seed, cutoff):
+    ids, edges = _fragment_indices(positions.detach(), batch, mode, center, numbers, labels, min_nodes, seed, cutoff)
+    return FragmentTopology(ids, edges)
+
+
+def fragment_geometry(
+    positions: Tensor, batch: Tensor, mode: str, center: str,
+    numbers: Optional[Tensor], labels: Optional[Tensor],
+    min_nodes: int, seed: int, cutoff: float, prepared: Optional[FragmentTopology] = None,
+) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    """Return the discrete indices and their differentiable distances and directions."""
+    if prepared is not None or torch.compiler.is_compiling():
+        if prepared is None:
+            ids, edges = _fragment_indices(
+                positions.detach(), batch, mode, center, numbers, labels, min_nodes, seed, cutoff
             )
-        if not 0.0 <= float(dropout) < 1.0:
-            raise ValueError(f"dropout must lie in [0, 1), got {dropout}")
-        self.hidden_channels = hidden_channels
-        self.num_heads = num_heads
-        self.head_dim = hidden_channels // num_heads
-        self.dropout_p = float(dropout)
-        self.norm_node = LayerNorm(hidden_channels)
-        self.norm_group = LayerNorm(hidden_channels)
-        self.norm_node_vec = VecLayerNorm(
-            hidden_channels, trainable=False, norm_type="max_min"
+        else:
+            ids, edges = prepared.ids, prepared.edges
+        atoms, fragments = edges.unbind(0)
+        if not torch.compiler.is_compiling() and not atoms.numel():
+            return ids, atoms, fragments, positions.new_zeros(0), positions.new_zeros((0, 3))
+        weights = numbers if center == "atomic_number" else None
+        centers = weighted_fragment_centers(positions, ids, weights)
+        delta = centers[fragments] - positions[atoms]
+        distance = _fragment_distance(delta)
+        direction = _fragment_direction(delta, distance)
+    else:
+        ids, centers, cluster_batch = resolve_long_range_fragments(
+            positions, batch, mode, center, numbers, labels, min_nodes, seed
         )
-        self.norm_group_vec = VecLayerNorm(
-            hidden_channels, trainable=False, norm_type="max_min"
+        atoms, fragments, distance, direction = bipartite_radius_edges(
+            positions, centers, batch, cluster_batch, cutoff
         )
-        self.q_proj = Linear(hidden_channels, hidden_channels)
-        self.k_proj = Linear(hidden_channels, hidden_channels)
-        self.v_proj = Linear(hidden_channels, hidden_channels)
-        self.mlp_pos = Sequential(
-            Linear(hidden_channels, hidden_channels),
-            SiLU(),
-            Linear(hidden_channels, hidden_channels),
-        )
-        self.mlp_vec = Sequential(
-            Linear(hidden_channels, hidden_channels),
-            SiLU(),
-            Linear(hidden_channels, hidden_channels),
-        )
-        self.mix = ModuleList(
-            Linear(hidden_channels, hidden_channels, bias=False) for _ in range(6)
-        )
-        self.drop_scalar = Dropout(self.dropout_p)
-        self.drop_vector = Dropout(self.dropout_p)
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        self.norm_node.reset_parameters()
-        self.norm_group.reset_parameters()
-        self.norm_node_vec.reset_parameters()
-        self.norm_group_vec.reset_parameters()
-        for module in self.modules():
-            if isinstance(module, Linear):
-                _xavier_linear(module)
-
-    def forward(
-        self,
-        node_scalar: Tensor,
-        node_vector: Tensor,
-        group_scalar: Tensor,
-        group_vector: Tensor,
-        idx_atom: Tensor,
-        idx_fragment: Tensor,
-        edge_attr: Tensor,
-        direction: Tensor,
-    ) -> tuple[Tensor, Tensor]:
-        n_atoms = int(node_scalar.shape[0])
-        scalar = self.norm_node(node_scalar)
-        vector = self.norm_node_vec(node_vector)
-        group_scalar = self.norm_group(group_scalar)
-        group_vector = self.norm_group_vec(group_vector)
-        if self.dropout_p > 0.0:
-            group_scalar = self.drop_scalar(group_scalar)
-            group_vector = self.drop_vector(group_vector)
-
-        n_edges = int(idx_atom.shape[0])
-        if n_edges == 0:
-            return node_scalar.new_zeros(n_atoms, self.hidden_channels), node_vector.new_zeros(
-                n_atoms, 3, self.hidden_channels
-            )
-
-        query = self.q_proj(scalar).reshape(n_atoms, self.num_heads, self.head_dim)
-        key = self.k_proj(group_scalar).reshape(-1, self.num_heads, self.head_dim)
-        value = self.v_proj(group_scalar).reshape(-1, self.num_heads, self.head_dim)
-        query_i = query.index_select(0, idx_atom)
-        key_j = key.index_select(0, idx_fragment)
-        value_j = value.index_select(0, idx_fragment)
-        filt = edge_attr.reshape(n_edges, self.num_heads, self.head_dim)
-        attention = (query_i * key_j * filt).sum(dim=-1) / math.sqrt(self.head_dim)
-        attention = F.silu(attention)
-        scalar_message = (value_j * attention.unsqueeze(-1)).reshape(
-            n_edges, self.hidden_channels
-        )
-        fragment_vector = group_vector.index_select(0, idx_fragment)
-        vector_message = self.mlp_pos(scalar_message).unsqueeze(1) * direction.unsqueeze(-1)
-        vector_message = vector_message + self.mlp_vec(scalar_message).unsqueeze(1) * fragment_vector
-        aggregated_scalar = reduce_edge(
-            scalar_message, idx_atom, (n_atoms, self.hidden_channels)
-        )
-        aggregated_vector = reduce_edge(
-            vector_message, idx_atom, (n_atoms, 3, self.hidden_channels)
-        )
-        left = self.mix[2](vector)
-        right = self.mix[3](vector)
-        dot = (left * right).sum(dim=1)
-        delta_scalar = dot * self.mix[4](aggregated_scalar) + self.mix[5](aggregated_scalar)
-        delta_vector = aggregated_vector + self.mix[0](aggregated_scalar).unsqueeze(1) * self.mix[1](vector)
-        return delta_scalar, delta_vector
+    return ids, atoms, fragments, distance, direction

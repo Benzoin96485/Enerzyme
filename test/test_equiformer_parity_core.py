@@ -10,6 +10,7 @@ import torch
 from e3nn import o3
 
 from equiformer_parity_utils import (
+    encode_irreps,
     assert_close,
     build_enerzyme_parts,
     build_official_md17,
@@ -21,7 +22,7 @@ from equiformer_parity_utils import (
     official_node_features_after_norm,
     to_enerzyme_edges,
 )
-from enerzyme.models.e3nn_nn import extract_scalar_0e, scalar_0e_dim
+from enerzyme.models.mp.equivariant.e3nn import extract_scalar_0e, scalar_0e_dim
 
 
 def _run_latent_parity(hp: dict, *, dtype: torch.dtype = torch.float64) -> None:
@@ -55,7 +56,7 @@ def _run_latent_parity(hp: dict, *, dtype: torch.dtype = torch.float64) -> None:
         err_msg="rbf_on_graph",
     )
 
-    ours_encode = core.encode_irreps(
+    ours_encode = encode_irreps(core,
         vij_sr=ez["vij_sr"],
         idx_i_sr=ez["idx_i_sr"],
         idx_j_sr=ez["idx_j_sr"],

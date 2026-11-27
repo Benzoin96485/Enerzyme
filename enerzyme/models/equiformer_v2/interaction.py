@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-import torch_geometric
+from ..mp.ops import segment_softmax
 import copy
 
-from ..activation import SmoothLeakyReLU
-from ..so3 import (
+from ..mp.nn.activation import SmoothLeakyReLU
+from ..mp.equivariant import (
     GateActivation,
     SeparableS2Activation,
     S2Activation,
@@ -16,8 +16,8 @@ from ..so3 import (
     SO3_LinearV2,
     EquivariantDropoutArraySphericalHarmonics,
 )
-from ..blocks.radial_mlp import RadialFunction
-from ..blocks.drop import GraphDropPath
+from ..mp.nn.radial_mlp import RadialFunction
+from ..mp.nn.drop import GraphDropPath
 
 
 class SO2EquivariantGraphAttention(torch.nn.Module):
@@ -216,11 +216,13 @@ class SO2EquivariantGraphAttention(torch.nn.Module):
         x,
         atomic_numbers,
         edge_distance,
-        edge_index
+        edge_index,
+        rotation=None,
     ):
         
         # Compute edge scalar features (invariant to rotations)
         # Uses atomic numbers and edge distance as inputs
+        rotation = self.SO3_rotation if rotation is None else rotation
         if self.use_atom_edge_embedding:
             source_element = atomic_numbers[edge_index[0]]  # Source atom atomic number
             target_element = atomic_numbers[edge_index[1]]  # Target atom atomic number
@@ -254,7 +256,7 @@ class SO2EquivariantGraphAttention(torch.nn.Module):
             x_message.embedding = x_message.embedding * x_edge_weight
 
         # Rotate the irreps to align with the edge
-        x_message._rotate(self.SO3_rotation, self.lmax_list, self.mmax_list)
+        x_message._rotate(rotation, self.lmax_list, self.mmax_list)
 
         # First SO(2)-convolution
         if self.use_s2_act_attn:
@@ -293,7 +295,7 @@ class SO2EquivariantGraphAttention(torch.nn.Module):
             x_0_alpha = self.alpha_norm(x_0_alpha)
             x_0_alpha = self.alpha_act(x_0_alpha)
             alpha = torch.einsum('bik, ik -> bi', x_0_alpha, self.alpha_dot)
-        alpha = torch_geometric.utils.softmax(alpha, edge_index[1]) 
+        alpha = segment_softmax(alpha, edge_index[1], x.embedding.shape[0], eps=1e-16, detach_max=True)
         alpha = alpha.reshape(alpha.shape[0], 1, self.num_heads, 1)
         if self.alpha_dropout is not None:
             alpha = self.alpha_dropout(alpha)
@@ -306,7 +308,7 @@ class SO2EquivariantGraphAttention(torch.nn.Module):
         x_message.embedding = attn
 
         # Rotate back the irreps
-        x_message._rotate_inv(self.SO3_rotation, self.mappingReduced)
+        x_message._rotate_inv(rotation, self.mappingReduced)
 
         # Compute the sum of the incoming neighboring messages for each target node
         x_message._reduce_edge(edge_index[1], len(x.embedding))
@@ -569,7 +571,8 @@ class TransBlockV2(torch.nn.Module):
         atomic_numbers,
         edge_distance,
         edge_index,
-        batch           # for GraphDropPath
+        batch,          # for GraphDropPath
+        rotation=None,
     ):
 
         output_embedding = x
@@ -579,7 +582,7 @@ class TransBlockV2(torch.nn.Module):
         output_embedding = self.ga(output_embedding, 
             atomic_numbers,
             edge_distance,
-            edge_index)
+            edge_index, rotation=rotation)
         
         if self.drop_path is not None:
             output_embedding.embedding = self.drop_path(output_embedding.embedding, batch)
@@ -666,7 +669,7 @@ class EquiformerV2FeedForwardReadout(BaseFFLayer):
                 "EquiformerV2FeedForwardReadout requires a preceding EquiformerV2 Core"
             )
 
-        from ..so3 import SO3_Embedding
+        from ..mp.equivariant import SO3_Embedding
 
         self._SO3_Embedding = SO3_Embedding
         n_out = self.dim_feature_out * self.shallow_ensemble_size

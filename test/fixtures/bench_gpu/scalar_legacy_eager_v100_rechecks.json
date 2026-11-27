@@ -1,0 +1,752 @@
+{
+  "device": "Tesla V100-PCIE-32GB",
+  "torch": "2.13.0+cu126",
+  "precision_in_case_name": true,
+  "mode": "eager",
+  "timing": "Each process measures two warmups followed by the specified number of timed repetitions and reports their median. Cohorts use candidate, baseline, baseline, candidate unless they specify an order.",
+  "memory": "PyTorch peak allocated MiB",
+  "metric_columns": ["infer_ms", "train_ms", "infer_peak_mb", "train_peak_mb"],
+  "samples": "Rows follow the cohort run order; columns follow metric_columns. Experiments list their own run order.",
+  "delta_percent": "100 * (median(candidate rounds) / median(baseline rounds) - 1); null means a measurement was unavailable.",
+  "cohorts": {
+    "6317150": {
+      "baseline": "1aa0f8b",
+      "candidate": "5f459ca",
+      "weights": "devel defaults with separate seed-0 initializations",
+      "repetitions": 11,
+      "cases": {
+        "gemnet-float32": {
+          "precision": "float32",
+          "params": 1892550,
+          "mol_batch_32x20": {
+            "samples": [[40.881468, 125.80551, 1448.190918, 3749.258301], [40.323483, 128.044591, 1440.82959, 3728.230469], [39.981703, 126.104386, 1440.82959, 3728.230469], [40.882342, 126.993228, 1448.190918, 3749.258301]],
+            "delta_percent": [1.8164, -0.5313, 0.5109, 0.564]
+          },
+          "bulk_256": {
+            "samples": [[48.165512, 148.306445, 1772.854492, 4328.086914], [47.905925, 145.609576, 1766.768555, 4315.813965], [47.603142, 144.633834, 1766.768555, 4315.813965], [48.374799, 145.91326, 1772.854492, 4328.086914]],
+            "delta_percent": [1.0797, 1.37, 0.3445, 0.2844]
+          },
+          "large_2000": {
+            "samples": [[207.061342, 639.4042, 10462.858887, 26020.57666], [205.784195, 637.317408, 10422.927734, 25933.683105], [205.961093, 637.34381, 10422.927734, 25933.683105], [205.979128, 637.37982, 10462.858887, 26020.57666]],
+            "delta_percent": [0.3146, 0.1665, 0.3831, 0.3351]
+          }
+        },
+        "physnet-float64": {
+          "precision": "float64",
+          "params": 1971014,
+          "mol_batch_32x20": {
+            "samples": [[18.999549, 53.723892, 342.378906, 584.125], [22.530848, 54.913966, 341.138672, 582.580078], [23.242077, 57.581607, 341.138672, 582.580078], [18.120153, 50.303806, 342.378906, 584.125]],
+            "delta_percent": [-18.9047, -7.5273, 0.3636, 0.2652]
+          },
+          "bulk_256": {
+            "samples": [[24.127448, 73.640875, 1164.410645, 1981.041504], [40.974257, 90.619093, 1163.915039, 1980.575195], [41.46302, 90.993718, 1163.915039, 1980.575195], [22.368327, 72.284247, 1164.410645, 1981.041504]],
+            "delta_percent": [-43.5986, -19.6504, 0.0426, 0.0235]
+          },
+          "large_2000": {
+            "samples": [[72.397789, 276.344478, 6068.536133, 10433.911133], [176.330189, 380.947716, 6063.506348, 10428.550293], [170.648774, 380.273553, 6063.506348, 10428.550293], [72.96544, 275.22378, 6068.536133, 10433.911133]],
+            "delta_percent": [-58.106, -27.5417, 0.083, 0.0514]
+          }
+        },
+        "spookynet-float64": {
+          "precision": "float64",
+          "params": 498540,
+          "mol_batch_32x20": {
+            "samples": [[32.619408, 96.53675, 518.160156, 926.607422], [35.766273, 97.179732, 518.424316, 926.467773], [34.949979, 107.269634, 518.424316, 926.467773], [33.997447, 96.040673, 518.160156, 926.607422]],
+            "delta_percent": [-5.797, -5.8068, -0.051, 0.0151]
+          },
+          "bulk_256": {
+            "samples": [[35.455044, 96.103545, 335.850098, 609.896973], [30.9805, 95.722871, 335.791504, 609.779785], [33.593147, 98.285891, 335.791504, 609.779785], [32.581152, 97.670372, 335.850098, 609.896973]],
+            "delta_percent": [5.3622, -0.121, 0.0174, 0.0192]
+          },
+          "large_2000": {
+            "samples": [[41.76417, 136.051778, 2144.741211, 4006.580566], [43.117184, 136.968506, 2144.358398, 4005.413086], [44.086705, 136.140259, 2144.358398, 4005.413086], [41.398472, 133.192833, 2144.741211, 4006.580566]],
+            "delta_percent": [-4.6343, -1.4149, 0.0179, 0.0291]
+          }
+        }
+      }
+    },
+    "6317461": {
+      "baseline": "b05ea1a",
+      "candidate": "5970ac5",
+      "weights": "identical main checkpoints and external atomic features",
+      "repetitions": 9,
+      "cases": {
+        "mace_ff04-float32": {
+          "precision": "float32",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[21.944482, 57.181229, 190.447754, 313.415039], [22.753576, 59.346799, 190.319824, 313.641602], [21.841478, 56.831152, 190.319824, 313.641602], [22.932862, 60.08536, 190.447754, 313.415039]],
+            "delta_percent": [0.633, 0.937, 0.0672, -0.0722]
+          },
+          "bulk_256": {
+            "samples": [[22.36035, 60.208104, 124.594238, 191.222656], [22.618046, 58.646735, 124.427246, 191.349609], [22.13748, 56.691633, 124.427246, 191.349609], [26.031748, 60.070525, 124.594238, 191.222656]],
+            "delta_percent": [8.1254, 4.2833, 0.1342, -0.0663]
+          },
+          "large_2000": {
+            "samples": [[32.509065, 89.099104, 701.581543, 1153.274902], [34.803998, 91.525254, 700.421875, 1153.990723], [34.51287, 91.344448, 700.421875, 1153.990723], [32.628393, 89.680464, 701.581543, 1153.274902]],
+            "delta_percent": [-6.0294, -2.2366, 0.1656, -0.062]
+          }
+        },
+        "mace_ff04-float64": {
+          "precision": "float64",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[23.064162, 59.015488, 367.567383, 617.798828], [24.865613, 59.227335, 367.3125, 618.247559], [24.145538, 59.905043, 367.3125, 618.247559], [22.550602, 57.477355, 367.567383, 617.798828]],
+            "delta_percent": [-6.9298, -2.2156, 0.0694, -0.0726]
+          },
+          "bulk_256": {
+            "samples": [[24.431659, 59.381679, 229.191406, 357.544922], [22.469785, 58.448519, 228.858398, 357.793945], [22.659158, 59.039581, 228.858398, 357.793945], [22.331035, 56.998632, 229.191406, 357.544922]],
+            "delta_percent": [3.6202, -0.9429, 0.1455, -0.0696]
+          },
+          "large_2000": {
+            "samples": [[53.884019, 149.1429, 1374.603516, 2265.62793], [55.617741, 150.776561, 1370.980957, 2267.163574], [55.707809, 152.71349, 1370.980957, 2267.163574], [53.516169, 148.956117, 1374.603516, 2265.62793]],
+            "delta_percent": [-3.526, -1.7763, 0.2642, -0.0677]
+          }
+        },
+        "physnet_ff01-float32": {
+          "precision": "float32",
+          "params": 9509,
+          "fixture": "physnet_ff01.pt.gz",
+          "fixture_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+          "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+          "tiled_atom_features": ["Qa_xTB"],
+          "mol_batch_32x20": {
+            "samples": [[8.275718, 21.203208, 28.442383, 36.678711], [8.096, 20.19508, 28.447266, 36.688477], [8.218479, 20.514702, 28.447266, 36.688477], [7.939247, 19.913837, 28.442383, 36.678711]],
+            "delta_percent": [-0.61, 1.0004, -0.0172, -0.0266]
+          },
+          "bulk_256": {
+            "samples": [[9.001673, 20.769948, 71.82373, 106.536621], [8.941658, 20.279232, 71.82373, 106.540527], [8.235049, 20.071537, 71.82373, 106.540527], [8.655134, 19.685985, 71.82373, 106.536621]],
+            "delta_percent": [2.7951, 0.2606, 0.0, -0.0037]
+          },
+          "large_2000": {
+            "samples": [[10.251487, 23.983519, 296.028809, 479.988281], [10.86329, 24.154065, 296.028809, 480.019531], [11.081207, 23.958293, 296.028809, 480.019531], [9.61168, 22.757816, 296.028809, 479.988281]],
+            "delta_percent": [-9.4845, -2.8496, 0.0, -0.0065]
+          }
+        },
+        "physnet_ff01-float64": {
+          "precision": "float64",
+          "params": 9509,
+          "fixture": "physnet_ff01.pt.gz",
+          "fixture_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+          "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+          "tiled_atom_features": ["Qa_xTB"],
+          "mol_batch_32x20": {
+            "samples": [[8.041074, 20.923415, 40.347168, 57.191406], [8.243593, 20.909658, 40.356934, 57.210938], [8.165923, 20.777812, 40.356934, 57.210938], [7.89091, 20.271613, 40.347168, 57.191406]],
+            "delta_percent": [-2.9101, -1.1813, -0.0242, -0.0341]
+          },
+          "bulk_256": {
+            "samples": [[8.710766, 20.545808, 119.972656, 187.473145], [8.259469, 20.492925, 119.972656, 187.480957], [8.94306, 20.392969, 119.972656, 187.480957], [8.561738, 20.143198, 119.972656, 187.473145]],
+            "delta_percent": [0.4068, -0.4816, 0.0, -0.0042]
+          },
+          "large_2000": {
+            "samples": [[10.613056, 29.209373, 548.996582, 900.911133], [11.75641, 30.650155, 548.996582, 900.972656], [11.774268, 31.106703, 548.996582, 900.972656], [10.928922, 29.469374, 548.996582, 900.911133]],
+            "delta_percent": [-8.4515, -4.9842, 0.0, -0.0068]
+          }
+        },
+        "schnet_default-float32": {
+          "precision": "float32",
+          "params": 681679,
+          "fixture": "schnet_default.pt.gz",
+          "fixture_sha256": "e0ec083cfe71c322d4758fe5ae65c8aa20f692ea2a2fc4ea7a6d11870c04ab10",
+          "config_sha256": "832ecba15c2957b1a5d8af950c29a71cb6b873c02b7dc372b709670bfa872317",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[7.335443, 18.930548, 41.176758, 53.370605], [11.10126, 22.267931, 41.335449, 53.625977], [10.816123, 21.690572, 41.335449, 53.625977], [7.108744, 18.063311, 41.176758, 53.370605]],
+            "delta_percent": [-34.0971, -15.8437, -0.3839, -0.4762]
+          },
+          "bulk_256": {
+            "samples": [[7.185209, 18.656877, 42.113281, 52.29248], [12.36812, 22.820589, 42.245605, 52.505371], [12.066052, 22.20576, 42.245605, 52.505371], [6.932644, 17.797835, 42.113281, 52.29248]],
+            "delta_percent": [-42.2209, -19.0369, -0.3132, -0.4055]
+          },
+          "large_2000": {
+            "samples": [[7.237549, 30.424541, 162.70166, 230.370605], [32.613025, 55.810621, 163.560547, 232.109863], [32.550387, 55.447949, 163.560547, 232.109863], [6.96454, 29.65856, 162.70166, 230.370605]],
+            "delta_percent": [-78.2054, -45.9969, -0.5251, -0.7493]
+          }
+        },
+        "schnet_default-float64": {
+          "precision": "float64",
+          "params": 681679,
+          "fixture": "schnet_default.pt.gz",
+          "fixture_sha256": "e0ec083cfe71c322d4758fe5ae65c8aa20f692ea2a2fc4ea7a6d11870c04ab10",
+          "config_sha256": "832ecba15c2957b1a5d8af950c29a71cb6b873c02b7dc372b709670bfa872317",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[7.068202, 18.455798, 66.249023, 91.500488], [10.911809, 22.582589, 66.471191, 91.914551], [11.049949, 22.592703, 66.471191, 91.914551], [7.224014, 18.715571, 66.249023, 91.500488]],
+            "delta_percent": [-34.9223, -17.7175, -0.3342, -0.4505]
+          },
+          "bulk_256": {
+            "samples": [[7.677426, 19.03538, 66.442383, 86.663574], [11.434777, 22.885254, 66.627441, 87.008301], [11.687214, 22.948275, 66.627441, 87.008301], [7.102933, 18.494231, 66.442383, 86.663574]],
+            "delta_percent": [-36.0766, -18.1176, -0.2778, -0.3962]
+          },
+          "large_2000": {
+            "samples": [[7.672092, 32.285597, 300.066406, 434.491211], [32.912719, 57.951959, 300.691895, 436.147949], [32.695899, 58.048396, 300.691895, 436.147949], [7.148322, 32.185151, 300.066406, 434.491211]],
+            "delta_percent": [-77.4109, -44.4219, -0.208, -0.3799]
+          }
+        },
+        "spookynet_ff02-float32": {
+          "precision": "float32",
+          "params": 26167,
+          "fixture": "spookynet_ff02.pt.gz",
+          "fixture_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+          "config_sha256": "d345661a5b40ea8dcf53990985e0daec06e46949ad9c99023faef167f035d583",
+          "tiled_atom_features": ["Qa_xTB"],
+          "mol_batch_32x20": {
+            "samples": [[20.686834, 59.081912, 69.288574, 102.95166], [21.955846, 63.92644, 69.498535, 103.440918], [22.645058, 64.998036, 69.498535, 103.440918], [20.510103, 58.690554, 69.288574, 102.95166]],
+            "delta_percent": [-7.6321, -8.65, -0.3021, -0.473]
+          },
+          "bulk_256": {
+            "samples": [[22.247929, 58.336388, 49.905762, 72.76416], [21.945884, 62.217271, 50.08252, 73.175293], [21.404948, 60.720078, 50.08252, 73.175293], [22.032438, 59.182642, 49.905762, 72.76416]],
+            "delta_percent": [2.1442, -4.4074, -0.3529, -0.5618]
+          },
+          "large_2000": {
+            "samples": [[22.68735, 59.855027, 232.476074, 390.980957], [21.422546, 62.867971, 233.625488, 393.661621], [21.453044, 62.719435, 233.625488, 393.661621], [22.356343, 59.43439, 232.476074, 390.980957]],
+            "delta_percent": [5.0567, -5.0148, -0.492, -0.681]
+          }
+        },
+        "spookynet_ff02-float64": {
+          "precision": "float64",
+          "params": 26167,
+          "fixture": "spookynet_ff02.pt.gz",
+          "fixture_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+          "config_sha256": "d345661a5b40ea8dcf53990985e0daec06e46949ad9c99023faef167f035d583",
+          "tiled_atom_features": ["Qa_xTB"],
+          "mol_batch_32x20": {
+            "samples": [[20.505763, 59.47765, 121.79834, 188.992188], [21.820609, 63.367812, 122.216309, 189.966797], [21.799394, 61.915861, 122.216309, 189.966797], [21.875407, 62.668206, 121.79834, 188.992188]],
+            "delta_percent": [-2.8401, -2.5046, -0.342, -0.513]
+          },
+          "bulk_256": {
+            "samples": [[20.156213, 57.613007, 79.633301, 126.457031], [21.052755, 60.769216, 79.98584, 127.27832], [20.796421, 59.931795, 79.98584, 127.27832], [22.605935, 60.623932, 79.633301, 126.457031]],
+            "delta_percent": [2.1816, -2.0415, -0.4408, -0.6453]
+          },
+          "large_2000": {
+            "samples": [[20.990212, 59.355197, 438.740234, 749.253906], [21.746051, 62.449011, 442.01709, 755.916992], [21.453154, 61.700606, 442.01709, 755.916992], [21.721418, 61.787778, 438.740234, 749.253906]],
+            "delta_percent": [-1.1287, -2.4218, -0.7413, -0.8815]
+          }
+        }
+      }
+    },
+    "6317504": {
+      "baseline": "1aa0f8b",
+      "candidate": "8eafafc",
+      "weights": "identical pre-refactor SpookyNet weights",
+      "repetitions": 15,
+      "cases": {
+        "spookynet-float32": {
+          "precision": "float32",
+          "params": 498540,
+          "fixture": "spookynet_devel_reference.pt.gz",
+          "fixture_sha256": "189f9f819964571a3c19a26370a99f4efca277ae6505e4635bb9690cc542e983",
+          "config_sha256": "5ee5ca8e50103ea49a7f4ca9c9139bcd5913934b570accbb9f697495b2c09214",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[31.873919, 96.908321, 220.022461, 386.310059], [32.799932, 95.429722, 269.930664, 475.07959], [34.247162, 99.868739, 269.930664, 475.07959], [31.641058, 94.67153, 220.022461, 386.310059]],
+            "delta_percent": [-5.2681, -1.9041, -18.4893, -18.6852]
+          },
+          "bulk_256": {
+            "samples": [[31.030036, 92.569833, 138.449219, 244.539551], [32.215979, 93.188123, 181.53125, 320.052246], [33.042906, 96.799276, 181.53125, 320.052246], [30.871312, 91.02462, 138.449219, 244.539551]],
+            "delta_percent": [-5.1449, -3.3649, -23.7326, -23.5939]
+          },
+          "large_2000": {
+            "samples": [[32.514952, 98.223929, 818.520996, 1531.808105], [34.306509, 100.692281, 1086.823242, 2024.702148], [34.88183, 102.253302, 1086.823242, 2024.702148], [32.129004, 97.130942, 818.520996, 1531.808105]],
+            "delta_percent": [-6.5681, -3.7403, -24.6868, -24.344]
+          }
+        },
+        "spookynet-float64": {
+          "precision": "float64",
+          "params": 498540,
+          "fixture": "spookynet_devel_reference.pt.gz",
+          "fixture_sha256": "189f9f819964571a3c19a26370a99f4efca277ae6505e4635bb9690cc542e983",
+          "config_sha256": "5ee5ca8e50103ea49a7f4ca9c9139bcd5913934b570accbb9f697495b2c09214",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[32.363629, 95.80557, 422.187012, 745.15625], [33.204066, 96.726099, 518.424316, 926.467773], [34.630872, 101.194024, 518.424316, 926.467773], [32.010308, 94.414239, 422.187012, 745.15625]],
+            "delta_percent": [-5.1021, -3.8906, -18.5634, -19.5702]
+          },
+          "bulk_256": {
+            "samples": [[31.242617, 93.881364, 255.1875, 461.460449], [31.603699, 93.977996, 335.791504, 609.779785], [33.243118, 99.259102, 335.791504, 609.779785], [30.469245, 91.616102, 255.1875, 461.460449]],
+            "delta_percent": [-4.8344, -4.0053, -24.0042, -24.3234]
+          },
+          "large_2000": {
+            "samples": [[37.17846, 117.933901, 1608.475586, 3026.862793], [42.432049, 135.548348, 2144.358398, 4005.413086], [43.410113, 136.553812, 2144.358398, 4005.413086], [37.212385, 117.539576, 1608.475586, 3026.862793]],
+            "delta_percent": [-13.34, -13.4614, -24.9904, -24.4307]
+          }
+        }
+      }
+    },
+    "6317602": {
+      "baseline": "b05ea1a",
+      "candidate": "3e65250",
+      "weights": "identical main checkpoints and external atomic features",
+      "repetitions": 17,
+      "cases": {
+        "mace_ff04-float32": {
+          "precision": "float32",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[24.402711, 64.278638, 190.5, 313.467285], [22.253232, 64.945438, 190.319824, 313.641602], [24.139915, 62.121678, 190.319824, 313.641602], [23.572221, 62.437241, 190.5, 313.467285]],
+            "delta_percent": [3.4095, -0.2764, 0.0947, -0.0556]
+          },
+          "bulk_256": {
+            "samples": [[24.554385, 64.781468, 124.634277, 191.262695], [24.988994, 63.085108, 124.427246, 191.349609], [24.166009, 64.350537, 124.427246, 191.349609], [23.512426, 62.62447, 124.634277, 191.262695]],
+            "delta_percent": [-2.2138, -0.0233, 0.1664, -0.0454]
+          },
+          "large_2000": {
+            "samples": [[32.452592, 85.31611, 701.845215, 1153.538574], [35.690205, 95.089047, 700.421875, 1153.990723], [36.162998, 93.760203, 700.421875, 1153.990723], [32.678079, 85.31581, 701.845215, 1153.538574]],
+            "delta_percent": [-9.3559, -9.6465, 0.2032, -0.0392]
+          }
+        },
+        "mace_ff04-float64": {
+          "precision": "float64",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[22.686492, 59.092941, 367.619629, 617.851074], [24.119212, 57.602635, 367.3125, 618.247559], [23.94517, 57.284531, 367.3125, 618.247559], [24.249372, 63.664685, 367.619629, 617.851074]],
+            "delta_percent": [-2.3479, 6.8506, 0.0836, -0.0641]
+          },
+          "bulk_256": {
+            "samples": [[21.812099, 59.276402, 229.231445, 357.584961], [21.749484, 56.317402, 228.858398, 357.793945], [21.957558, 56.863125, 228.858398, 357.793945], [24.111627, 63.308377, 229.231445, 357.584961]],
+            "delta_percent": [5.0717, 8.3091, 0.163, -0.0584]
+          },
+          "large_2000": {
+            "samples": [[52.675313, 145.070908, 1374.867188, 2265.891602], [55.594466, 150.68483, 1370.980957, 2267.163574], [56.467806, 152.841816, 1370.980957, 2267.163574], [53.156821, 145.352472, 1374.867188, 2265.891602]],
+            "delta_percent": [-5.5595, -4.317, 0.2835, -0.0561]
+          }
+        },
+        "spookynet_ff02-float32": {
+          "precision": "float32",
+          "params": 26167,
+          "fixture": "spookynet_ff02.pt.gz",
+          "fixture_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+          "config_sha256": "d345661a5b40ea8dcf53990985e0daec06e46949ad9c99023faef167f035d583",
+          "tiled_atom_features": ["Qa_xTB"],
+          "mol_batch_32x20": {
+            "samples": [[22.382897, 64.998814, 59.772949, 86.45166], [22.940022, 64.592119, 69.498535, 103.440918], [22.388505, 62.984039, 69.498535, 103.440918], [20.117844, 57.912423, 59.772949, 86.45166]],
+            "delta_percent": [-6.2384, -3.6566, -13.9939, -16.4241]
+          },
+          "bulk_256": {
+            "samples": [[21.065141, 61.406781, 40.947266, 58.067383], [22.803657, 66.619698, 50.08252, 73.175293], [21.598562, 61.603388, 50.08252, 73.175293], [19.402688, 56.626219, 40.947266, 58.067383]],
+            "delta_percent": [-8.8608, -7.9472, -18.2404, -20.6462]
+          },
+          "large_2000": {
+            "samples": [[21.446772, 63.032007, 183.274414, 302.874512], [21.915633, 65.172183, 233.625488, 393.661621], [21.85735, 65.130554, 233.625488, 393.661621], [19.813823, 57.667011, 183.274414, 302.874512]],
+            "delta_percent": [-5.7396, -7.3703, -21.552, -23.0622]
+          }
+        }
+      }
+    },
+    "6317546": {
+      "baseline": "1aa0f8b",
+      "candidate": "8eafafc",
+      "weights": "identical pre-refactor AllScAIP weights",
+      "repetitions": 9,
+      "cases": {
+        "allscaip-math-float32": {
+          "precision": "float32",
+          "params": 1608690,
+          "attention_backend": "math",
+          "fixture_sha256": "f23267a3de77f15f42d9f5fa070ab5193b76d754deb5733e7d44170303b07b46",
+          "mol_batch_32x20": {
+            "samples": [[117.974243, 290.953732, 2361.005371, 3942.49707], [null, null, null, null], [null, null, null, null], [119.696111, 297.371047, 2361.005371, 3942.49707]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [20, 20, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its "], [1, "infer_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [20, 20, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its "], [2, "train_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [20, 20, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its "], [2, "infer_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [20, 20, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its "]]
+          },
+          "bulk_256": {
+            "samples": [[50.673671, 133.942097, 1063.238281, 1975.748535], [null, null, null, null], [null, null, null, null], [52.446087, 141.383222, 1063.238281, 1975.748535]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [1, "infer_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [2, "train_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [2, "infer_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"]]
+          },
+          "large_2000": {
+            "samples": [[610.719575, 1626.603214, 17592.897949, 28250.73291], [null, null, null, null], [null, null, null, null], [610.557271, 1625.967926, 17592.897949, 28250.73291]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [2000, 2000, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute "], [1, "infer_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [2000, 2000, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute "], [2, "train_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [2000, 2000, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute "], [2, "infer_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [2000, 2000, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute "]]
+          }
+        },
+        "allscaip-math-float64": {
+          "precision": "float64",
+          "params": 1608690,
+          "attention_backend": "math",
+          "fixture_sha256": "f23267a3de77f15f42d9f5fa070ab5193b76d754deb5733e7d44170303b07b46",
+          "mol_batch_32x20": {
+            "samples": [[157.205143, 419.775639, 4061.595215, 7208.848145], [null, null, null, null], [null, null, null, null], [160.118107, 424.643448, 4061.595215, 7208.848145]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [1, "infer_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [2, "train_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [2, "infer_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"]]
+          },
+          "bulk_256": {
+            "samples": [[70.713534, 201.186206, 2008.739746, 3889.966309], [null, null, null, null], [null, null, null, null], [72.185029, 203.829552, 2008.739746, 3889.966309]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [1, "infer_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [2, "train_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [2, "infer_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"]]
+          },
+          "large_2000": {
+            "samples": [[799.988186, null, 28712.944824, null], [null, null, null, null], [null, null, null, null], [799.985096, null, 28712.944824, null]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[0, "train_error", "CUDA out of memory"], [1, "train_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [1, "infer_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [2, "train_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [2, "infer_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [3, "train_error", "CUDA out of memory"]]
+          }
+        },
+        "allscaip-native-float32": {
+          "precision": "float32",
+          "params": 1608690,
+          "attention_backend": "native",
+          "fixture_sha256": "f23267a3de77f15f42d9f5fa070ab5193b76d754deb5733e7d44170303b07b46",
+          "mol_batch_32x20": {
+            "samples": [[123.117575, 299.001611, 2495.692871, 3947.012695], [null, null, null, null], [null, null, null, null], [123.880738, 297.358456, 2495.692871, 3947.012695]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [20, 20, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its "], [1, "infer_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [20, 20, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its "], [2, "train_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [20, 20, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its "], [2, "infer_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [20, 20, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute its "]]
+          },
+          "bulk_256": {
+            "samples": [[50.952783, 143.969586, 1137.917969, 1979.342285], [null, null, null, null], [null, null, null, null], [51.111615, 145.125545, 1137.917969, 1979.342285]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [1, "infer_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [2, "train_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [2, "infer_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"]]
+          },
+          "large_2000": {
+            "samples": [[617.628519, 1627.656507, 18145.22168, 28253.824219], [null, null, null, null], [null, null, null, null], [617.978924, 1627.181565, 18145.22168, 28253.824219]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [2000, 2000, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute "], [1, "infer_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [2000, 2000, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute "], [2, "train_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [2000, 2000, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute "], [2, "infer_error", "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [2000, 2000, 1]], which is output 0 of Amax, is at version 1; expected version 0 instead. Hint: enable anomaly detection to find the operation that failed to compute "]]
+          }
+        },
+        "allscaip-native-float64": {
+          "precision": "float64",
+          "params": 1608690,
+          "attention_backend": "native",
+          "fixture_sha256": "f23267a3de77f15f42d9f5fa070ab5193b76d754deb5733e7d44170303b07b46",
+          "mol_batch_32x20": {
+            "samples": [[157.21394, 423.177459, 4061.595215, 7208.848145], [null, null, null, null], [null, null, null, null], [160.800792, 423.471706, 4061.595215, 7208.848145]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [1, "infer_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [2, "train_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [2, "infer_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"]]
+          },
+          "bulk_256": {
+            "samples": [[71.608101, 202.961426, 2008.739746, 3889.966309], [null, null, null, null], [null, null, null, null], [71.097735, 201.632557, 2008.739746, 3889.966309]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[1, "train_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [1, "infer_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [2, "train_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"], [2, "infer_error", "ValueError: pbc=True requires cell of shape (num_graphs, 3, 3)"]]
+          },
+          "large_2000": {
+            "samples": [[799.975176, null, 28712.944824, null], [null, null, null, null], [null, null, null, null], [800.184973, null, 28712.944824, null]],
+            "delta_percent": [null, null, null, null],
+            "errors": [[0, "train_error", "CUDA out of memory"], [1, "train_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [1, "infer_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [2, "train_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [2, "infer_error", "RuntimeError: mat1 and mat2 must have the same dtype, but got Float and Double"], [3, "train_error", "CUDA out of memory"]]
+          }
+        }
+      }
+    },
+    "6317837": {
+      "baseline": "b05ea1a",
+      "candidate": "72b2738",
+      "weights": "identical main checkpoints and external atomic features",
+      "repetitions": 17,
+      "cases": {
+        "mace_ff04-float32": {
+          "precision": "float32",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[21.490256, 55.655077, 187.882324, 310.748535], [22.520734, 58.124067, 190.319824, 313.641602], [23.981264, 63.707637, 190.319824, 313.641602], [21.44665, 57.625214, 187.882324, 310.748535]],
+            "delta_percent": [-7.6665, -7.019, -1.2807, -0.9224]
+          },
+          "bulk_256": {
+            "samples": [[20.724762, 55.360517, 119.460938, 184.07959], [24.755245, 65.921974, 124.427246, 191.349609], [23.642673, 63.288539, 124.427246, 191.349609], [21.371402, 57.450024, 119.460938, 184.07959]],
+            "delta_percent": [-13.0207, -12.6924, -3.9913, -3.7993]
+          },
+          "large_2000": {
+            "samples": [[30.975135, 85.044339, 696.858398, 1143.490723], [35.979297, 93.7505, 700.421875, 1153.990723], [35.846484, 92.5521, 700.421875, 1153.990723], [30.997194, 84.814291, 696.858398, 1143.490723]],
+            "delta_percent": [-13.7185, -8.8265, -0.5088, -0.9099]
+          }
+        },
+        "mace_ff04-float64": {
+          "precision": "float64",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[21.049202, 56.223562, 362.333496, 610.222656], [25.203639, 61.147379, 367.3125, 618.247559], [24.243989, 57.895863, 367.3125, 618.247559], [20.969464, 55.852006, 362.333496, 610.222656]],
+            "delta_percent": [-15.0239, -5.8531, -1.3555, -1.298]
+          },
+          "bulk_256": {
+            "samples": [[20.804777, 57.905674, 221.690918, 351.673828], [22.915095, 60.364975, 228.858398, 357.793945], [22.200295, 59.546314, 228.858398, 357.793945], [20.777834, 56.312034, 221.690918, 351.673828]],
+            "delta_percent": [-7.8305, -4.7482, -3.1318, -1.7105]
+          },
+          "large_2000": {
+            "samples": [[52.002877, 147.935891, 1370.566895, 2256.373535], [56.156766, 153.056045, 1370.980957, 2267.163574], [55.859364, 151.818907, 1370.980957, 2267.163574], [51.065642, 147.090245, 1370.566895, 2256.373535]],
+            "delta_percent": [-7.9878, -3.2304, -0.0302, -0.4759]
+          }
+        }
+      },
+      "trained_checkpoint_gradient_parity": {
+        "loss": "sum(E^2) + sum(F^2), CPU, checkpoint training batch",
+        "columns": ["precision", "energy_max_absolute_error", "force_max_absolute_error", "active_parameter_gradients", "parameter_gradient_max_absolute_error"],
+        "results": [["torch.float32", 2.9802322387695312e-08, 4.470348358154297e-08, 60, 2.384185791015625e-07], ["torch.float64", 5.551115123125783e-17, 9.367506770274758e-17, 60, 4.440892098500626e-16]]
+      },
+      "gpu_profile": {
+        "configuration": "One profiled periodic fp64 training iteration including energy, forces and loss backward, after three warmups.",
+        "columns": ["operator", "calls", "total_device_ms"],
+        "revisions": {
+          "b05ea1a": [["MACE_LEGACY_Contraction", 3, 2.8018], ["MACE_LEGACY_ForceLayer", 1, 22.7762], ["aten::mm", 241, 8.727], ["aten::bmm", 90, 4.1602], ["aten::copy_", 321, 1.5154]],
+          "3e65250": [["MACE_LEGACY_Contraction", 3, 2.8279], ["MACE_LEGACY_ForceLayer", 1, 22.8104], ["aten::mm", 241, 9.6537], ["aten::bmm", 90, 4.5576], ["aten::copy_", 319, 1.6023]],
+          "72b2738": [["MACE_LEGACY_Contraction", 3, 2.2623], ["MACE_LEGACY_ForceLayer", 1, 22.0053], ["aten::mm", 217, 8.6503], ["aten::bmm", 96, 4.9231], ["aten::copy_", 310, 1.2431]]
+        }
+      }
+    },
+    "6317925": {
+      "baseline": "b05ea1a",
+      "candidate": "c32ede3",
+      "weights": "identical main checkpoints and external atomic features",
+      "repetitions": 17,
+      "cases": {
+        "physnet_ff01-float32": {
+          "precision": "float32",
+          "params": 9509,
+          "fixture": "physnet_ff01.pt.gz",
+          "fixture_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+          "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+          "tiled_atom_features": ["Qa_xTB"],
+          "mol_batch_32x20": {
+            "samples": [[7.73187, 19.02986, 28.523438, 36.759766], [8.293869, 20.890081, 28.447266, 36.688477], [8.662964, 21.791079, 28.447266, 36.688477], [8.052226, 20.521386, 28.523438, 36.759766]],
+            "delta_percent": [-6.916, -7.3332, 0.2678, 0.1943]
+          },
+          "bulk_256": {
+            "samples": [[8.267802, 18.922395, 72.242676, 106.955566], [8.365696, 20.71199, 71.82373, 106.540527], [9.244622, 21.424395, 71.82373, 106.540527], [7.809631, 20.10032, 72.242676, 106.955566]],
+            "delta_percent": [-8.7045, -7.3895, 0.5833, 0.3896]
+          },
+          "large_2000": {
+            "samples": [[9.407794, 20.439976, 297.42627, 479.592773], [10.588887, 24.147549, 296.028809, 480.019531], [10.930279, 24.633815, 296.028809, 480.019531], [9.368286, 21.821093, 297.42627, 479.592773]],
+            "delta_percent": [-12.7472, -13.3664, 0.4721, -0.0889]
+          }
+        },
+        "physnet_ff01-float64": {
+          "precision": "float64",
+          "params": 9509,
+          "fixture": "physnet_ff01.pt.gz",
+          "fixture_sha256": "31c923e058f1bcc824dad5b65b679a952f6e331f6d17cd51663cb7b8f0fea6aa",
+          "config_sha256": "47630ce9ef86a3ce931a9f784eb1b4413683cb4f303fb808b97649ec0c9f3367",
+          "tiled_atom_features": ["Qa_xTB"],
+          "mol_batch_32x20": {
+            "samples": [[7.720074, 20.057296, 40.428223, 57.272461], [8.389697, 22.777128, 40.356934, 57.210938], [7.968048, 21.182884, 40.356934, 57.210938], [7.793503, 20.207396, 40.428223, 57.272461]],
+            "delta_percent": [-5.1607, -8.4061, 0.1766, 0.1075]
+          },
+          "bulk_256": {
+            "samples": [[8.291248, 19.953086, 120.391602, 187.89209], [8.499106, 21.067194, 119.972656, 187.480957], [8.468852, 21.239719, 119.972656, 187.480957], [7.551482, 19.807834, 120.391602, 187.89209]],
+            "delta_percent": [-6.6315, -6.0179, 0.3492, 0.2193]
+          },
+          "large_2000": {
+            "samples": [[10.333378, 28.055429, 551.210938, 903.125488], [11.8281, 30.988217, 548.996582, 900.972656], [11.802702, 31.349525, 548.996582, 900.972656], [10.197238, 28.472709, 551.210938, 903.125488]],
+            "delta_percent": [-13.1193, -9.3196, 0.4033, 0.2389]
+          }
+        },
+        "spookynet_ff02-float64": {
+          "precision": "float64",
+          "params": 26167,
+          "fixture": "spookynet_ff02.pt.gz",
+          "fixture_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+          "config_sha256": "d345661a5b40ea8dcf53990985e0daec06e46949ad9c99023faef167f035d583",
+          "tiled_atom_features": ["Qa_xTB"],
+          "mol_batch_32x20": {
+            "samples": [[20.981707, 61.563964, 103.279785, 156.904297], [22.903757, 64.07265, 122.216309, 189.966797], [21.408449, 61.115543, 122.216309, 189.966797], [22.016721, 65.50158, 103.279785, 156.904297]],
+            "delta_percent": [-2.9648, 1.4996, -15.4943, -17.4044]
+          },
+          "bulk_256": {
+            "samples": [[20.885421, 62.934483, 65.776367, 99.993652], [20.673618, 59.402769, 79.98584, 127.27832], [20.368568, 60.216212, 79.98584, 127.27832], [20.598844, 62.834684, 65.776367, 99.993652]],
+            "delta_percent": [1.0771, 5.1415, -17.765, -21.437]
+          },
+          "large_2000": {
+            "samples": [[20.734292, 62.200058, 342.405273, 576.55957], [21.230559, 61.825852, 442.01709, 755.916992], [21.042297, 60.998236, 442.01709, 755.916992], [20.725756, 62.574631, 342.405273, 576.55957]],
+            "delta_percent": [-1.9228, 1.5881, -22.5357, -23.7271]
+          }
+        }
+      }
+    },
+    "6318324": {
+      "baseline": "b05ea1a",
+      "candidate": "2fa0e3d",
+      "weights": "identical trained main weights and external atomic features",
+      "repetitions": 17,
+      "order": ["new", "main", "main", "new", "main", "new", "new", "main", "new", "main", "main", "new"],
+      "cases": {
+        "spookynet_ff02-float64": {
+          "precision": "float64",
+          "params": 26167,
+          "fixture": "spookynet_ff02.pt.gz",
+          "fixture_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+          "config_sha256": "d345661a5b40ea8dcf53990985e0daec06e46949ad9c99023faef167f035d583",
+          "tiled_atom_features": ["Qa_xTB"],
+          "mol_batch_32x20": {
+            "samples": [[21.781869, 62.803283, 103.279785, 156.904297], [22.196593, 65.089591, 122.216309, 189.966797], [22.701601, 65.461491, 122.216309, 189.966797], [20.046163, 62.374922, 103.279785, 156.904297], [22.769342, 65.014265, 122.216309, 189.966797], [19.455665, 59.572077, 103.279785, 156.904297], [20.066806, 61.351377, 103.279785, 156.904297], [22.590506, 63.778128, 122.216309, 189.966797], [20.509792, 58.608899, 103.279785, 156.904297], [22.426599, 64.638365, 122.216309, 189.966797], [22.510233, 65.054942, 122.216309, 189.966797], [20.663267, 61.930562, 103.279785, 156.904297]],
+            "delta_percent": [-10.0312, -5.2182, -15.4943, -17.4044]
+          },
+          "bulk_256": {
+            "samples": [[20.170861, 58.65968, 65.776367, 99.993652], [21.869215, 64.121698, 79.98584, 127.27832], [21.922926, 63.62, 79.98584, 127.27832], [20.408286, 61.336214, 65.776367, 99.993652], [21.491886, 63.465122, 79.98584, 127.27832], [19.510088, 57.467918, 65.776367, 99.993652], [19.457489, 59.358078, 65.776367, 99.993652], [22.385537, 65.776779, 79.98584, 127.27832], [19.72058, 58.131755, 65.776367, 99.993652], [21.420708, 62.082885, 79.98584, 127.27832], [20.647449, 62.596033, 79.98584, 127.27832], [20.013609, 59.273923, 65.776367, 99.993652]],
+            "delta_percent": [-8.3644, -7.2011, -17.765, -21.437]
+          },
+          "large_2000": {
+            "samples": [[20.515076, 60.211979, 342.405273, 576.55957], [22.009837, 64.446572, 442.01709, 755.916992], [22.054266, 63.340056, 442.01709, 755.916992], [21.037285, 62.164437, 342.405273, 576.55957], [21.989616, 65.222443, 442.01709, 755.916992], [20.210378, 58.532622, 342.405273, 576.55957], [20.150855, 59.739186, 342.405273, 576.55957], [22.742573, 64.486101, 442.01709, 755.916992], [19.927611, 59.493236, 342.405273, 576.55957], [22.117529, 64.844021, 442.01709, 755.916992], [22.099234, 63.270321, 442.01709, 755.916992], [20.413253, 61.231816, 342.405273, 576.55957]],
+            "delta_percent": [-7.9945, -6.966, -22.5357, -23.7271]
+          }
+        }
+      }
+    }
+  },
+  "rejected_experiments": {
+    "6317857": {
+      "baseline": "b05ea1a",
+      "candidate": "baaea1b",
+      "weights": "identical main checkpoints and external atomic features",
+      "repetitions": 17,
+      "cases": {
+        "mace_ff04-float32": {
+          "precision": "float32",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[22.080038, 60.155866, 205.361328, 319.390137], [22.998651, 60.998591, 190.319824, 313.641602], [23.457684, 62.631685, 190.319824, 313.641602], [21.751712, 57.930589, 205.361328, 319.390137]],
+            "delta_percent": [-5.6496, -4.4842, 7.9033, 1.8328]
+          },
+          "bulk_256": {
+            "samples": [[22.728148, 60.30431, 134.931641, 202.489258], [23.795304, 61.452513, 124.427246, 191.349609], [23.980709, 62.985314, 124.427246, 191.349609], [22.025714, 57.41643, 134.931641, 202.489258]],
+            "delta_percent": [-6.3257, -5.3979, 8.4422, 5.8216]
+          },
+          "large_2000": {
+            "samples": [[25.645832, 75.029345, 792.14209, 1251.104492], [35.547325, 93.601303, 700.421875, 1153.990723], [35.921059, 93.446136, 700.421875, 1153.990723], [25.015535, 72.783469, 792.14209, 1251.104492]],
+            "delta_percent": [-29.1136, -20.9758, 13.095, 8.4155]
+          }
+        },
+        "mace_ff04-float64": {
+          "precision": "float64",
+          "params": 217748,
+          "fixture": "mace_ff04.pt.gz",
+          "fixture_sha256": "e35147d63f674905173a7514fc317efa0355e24d50f7ea90f1ac4b19baca4973",
+          "config_sha256": "0be3a2106be59e7d35422cd59b61bf1d7af74dac341541367e40ef0a6395bd02",
+          "tiled_atom_features": [],
+          "mol_batch_32x20": {
+            "samples": [[23.450595, 62.331293, 398.792969, 628.540527], [25.857089, 63.213246, 367.3125, 618.247559], [23.820624, 56.980312, 367.3125, 618.247559], [21.400643, 57.538491, 398.792969, 628.540527]],
+            "delta_percent": [-9.7156, -0.2694, 8.5705, 1.6649]
+          },
+          "bulk_256": {
+            "samples": [[23.619481, 61.937249, 250.797852, 381.973633], [24.141442, 63.304563, 228.858398, 357.793945], [21.606637, 58.995868, 228.858398, 357.793945], [24.153015, 64.944202, 250.797852, 381.973633]],
+            "delta_percent": [4.4251, 3.7457, 9.5865, 6.758]
+          },
+          "large_2000": {
+            "samples": [[40.906371, 123.704875, 1557.183105, 2465.59375], [57.201525, 152.379034, 1370.980957, 2267.163574], [55.376818, 150.722491, 1370.980957, 2267.163574], [40.674853, 123.659041, 1557.183105, 2465.59375]],
+            "delta_percent": [-27.5338, -18.3891, 13.5817, 8.7524]
+          }
+        }
+      },
+      "trained_checkpoint_gradient_parity": {
+        "loss": "sum(E^2) + sum(F^2), CPU, checkpoint training batch",
+        "columns": ["precision", "energy_max_absolute_error", "force_max_absolute_error", "active_parameter_gradients", "parameter_gradient_max_absolute_error"],
+        "results": [["torch.float32", 2.9802322387695312e-08, 4.470348358154297e-08, 60, 2.384185791015625e-07], ["torch.float64", 5.551115123125783e-17, 8.326672684688674e-17, 60, 4.440892098500626e-16]]
+      },
+      "gpu_profile": {
+        "configuration": "One profiled periodic fp64 training iteration including energy, forces and loss backward, after three warmups.",
+        "columns": ["operator", "calls", "total_device_ms"],
+        "revisions": {
+          "b05ea1a": [["MACE_LEGACY_Contraction", 3, 2.9139], ["MACE_LEGACY_ForceLayer", 1, 23.1147], ["aten::mm", 241, 8.8654], ["aten::bmm", 90, 4.1702], ["aten::copy_", 321, 1.5096]],
+          "3e65250": [["MACE_LEGACY_Contraction", 3, 2.8744], ["MACE_LEGACY_ForceLayer", 1, 24.3928], ["aten::mm", 241, 9.6826], ["aten::bmm", 90, 4.5804], ["aten::copy_", 319, 1.5956]],
+          "baaea1b": [["MACE_LEGACY_Contraction", 3, 1.9542], ["MACE_LEGACY_ForceLayer", 1, 21.7036], ["aten::mm", 217, 5.8307], ["aten::bmm", 96, 5.2766], ["aten::copy_", 310, 1.3119]]
+        }
+      },
+      "disposition": "Rejected. GPU peak memory exceeds the 3 percent allowance, and fp64 bulk train and inference time also exceed it. The accepted implementation is 72b2738 (6317837)."
+    }
+  },
+  "spookynet_experiments": {
+    "6318034": {
+      "candidate": "c32ede3",
+      "baseline": "b05ea1a",
+      "fixture_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+      "repetitions": 17,
+      "run_order": ["main", "current", "row", "radial", "radialrow", "main", "radialrow", "radial", "row", "current", "main"],
+      "variants": {
+        "current": "unchanged candidate",
+        "main": "unchanged main",
+        "row": "index_select for source atoms",
+        "radial": "single dense radial projection",
+        "radialrow": "both local changes",
+        "projection": "scale the random-feature matrix before the projection",
+        "featuremap": "joint query/key feature maps for a single structure"
+      },
+      "samples": {
+        "mol_batch_32x20": [[21.741992, 61.076111, 122.216309, 189.966797], [19.80736, 58.229487, 103.279785, 156.904297], [19.692819, 57.567746, 102.811035, 160.671387], [19.579635, 57.219977, 103.285645, 157.813477], [22.223481, 65.228801, 102.816895, 160.672363], [23.497399, 66.873124, 122.216309, 189.966797], [22.570443, 66.657584, 102.816895, 160.672363], [20.384757, 57.874206, 103.285645, 157.813477], [19.732511, 57.887064, 102.811035, 160.671387], [19.703348, 57.847758, 103.279785, 156.904297], [23.829037, 67.915625, 122.216309, 189.966797]],
+        "bulk_256": [[20.414549, 59.219716, 79.98584, 127.27832], [19.213344, 56.910042, 65.776367, 99.993652], [19.132308, 56.278355, 65.588867, 102.614258], [18.966105, 61.35759, 64.845215, 99.062012], [21.291374, 63.630747, 64.657715, 101.682617], [22.742468, 65.438291, 79.98584, 127.27832], [21.774011, 64.462093, 64.657715, 101.682617], [19.210876, 58.489097, 64.845215, 99.062012], [19.245434, 56.435689, 65.588867, 102.614258], [19.088105, 56.597323, 65.776367, 99.993652], [21.984399, 63.262661, 79.98584, 127.27832]],
+        "large_2000": [[21.241944, 61.361274, 442.01709, 755.916992], [19.587169, 57.418473, 342.405273, 576.55957], [19.225384, 56.601326, 340.94043, 594.865234], [21.022005, 63.420586, 342.411133, 578.036133], [21.084462, 62.900231, 340.946289, 594.53125], [24.102559, 70.45902, 442.01709, 755.916992], [21.719385, 65.583755, 340.946289, 594.53125], [19.240452, 56.516578, 342.411133, 578.036133], [19.36228, 57.399784, 340.94043, 594.865234], [19.349111, 57.335718, 342.405273, 576.55957], [22.908396, 66.275187, 442.01709, 755.916992]]
+      },
+      "delta_percent": {
+        "current": {
+          "mol_batch_32x20": [-15.9254, -13.2108, -15.4943, -17.4044],
+          "bulk_256": [-12.8895, -10.2888, -17.765, -21.437],
+          "large_2000": [-15.0174, -13.426, -22.5357, -23.7271]
+        },
+        "radial": {
+          "mol_batch_32x20": [-14.96, -13.9459, -15.4895, -16.9258],
+          "bulk_256": [-13.1726, -5.2785, -18.9291, -22.169],
+          "large_2000": [-12.1229, -9.5158, -22.5344, -23.5318]
+        },
+        "radialrow": {
+          "mol_batch_32x20": [-4.6832, -1.3906, -15.873, -15.4208],
+          "bulk_256": [-2.0547, 1.2389, -19.1635, -20.11],
+          "large_2000": [-6.5761, -3.0678, -22.8658, -21.3497]
+        },
+        "row": {
+          "mol_batch_32x20": [-16.107, -13.6762, -15.8778, -15.4213],
+          "bulk_256": [-12.716, -10.9158, -17.9994, -19.3781],
+          "large_2000": [-15.7783, -13.9941, -22.8671, -21.3055]
+        }
+      }
+    },
+    "6318298": {
+      "candidate": "c32ede3",
+      "baseline": "b05ea1a",
+      "fixture_sha256": "cc8579d4b7836a53f2365ce19d70fcac3fa6c865ed48e12ff3c426e8d75d0cc5",
+      "repetitions": 17,
+      "run_order": ["main", "current", "projection", "featuremap", "main", "featuremap", "projection", "current", "main"],
+      "variants": {
+        "current": "unchanged candidate",
+        "main": "unchanged main",
+        "row": "index_select for source atoms",
+        "radial": "single dense radial projection",
+        "radialrow": "both local changes",
+        "projection": "scale the random-feature matrix before the projection",
+        "featuremap": "joint query/key feature maps for a single structure"
+      },
+      "samples": {
+        "mol_batch_32x20": [[23.532351, 66.885874, 122.216309, 189.966797], [20.879328, 62.638665, 103.279785, 156.904297], [21.838626, 64.890984, 103.287598, 156.912109], [19.713671, 58.958258, 103.279785, 156.904297], [22.052264, 62.383177, 122.216309, 189.966797], [20.97684, 61.292206, 103.279785, 156.904297], [20.934153, 62.212061, 103.287598, 156.912109], [21.069548, 63.197623, 103.279785, 156.904297], [22.902083, 64.552357, 122.216309, 189.966797]],
+        "bulk_256": [[20.842682, 60.557305, 79.98584, 127.27832], [20.655501, 61.497572, 65.776367, 99.993652], [20.546229, 62.895094, 65.78418, 100.001465], [19.028481, 56.657632, 65.842773, 100.060059], [20.968224, 59.800758, 79.98584, 127.27832], [19.132477, 56.176819, 65.842773, 100.060059], [20.284208, 61.100759, 65.78418, 100.001465], [20.524835, 61.194785, 65.776367, 99.993652], [21.49509, 62.101043, 79.98584, 127.27832]],
+        "large_2000": [[21.205239, 61.444882, 442.01709, 755.916992], [20.534959, 61.489957, 342.405273, 576.55957], [21.279071, 63.23918, 342.413086, 576.567383], [19.263078, 56.590645, 342.897461, 577.05127], [21.499203, 61.742594, 442.01709, 755.916992], [19.219569, 57.445782, 342.897461, 577.05127], [20.647979, 61.27187, 342.413086, 576.567383], [20.858976, 62.347563, 342.405273, 576.55957], [21.825743, 65.528229, 442.01709, 755.916992]]
+      },
+      "delta_percent": {
+        "current": {
+          "mol_batch_32x20": [-8.4169, -2.5316, -15.4943, -17.4044],
+          "bulk_256": [-1.803, 1.3027, -17.765, -21.437],
+          "large_2000": [-3.7315, 0.2853, -22.5357, -23.7271]
+        },
+        "featuremap": {
+          "mol_batch_32x20": [-11.1642, -6.8582, -15.4943, -17.4044],
+          "bulk_256": [-9.0029, -6.8366, -17.682, -21.3848],
+          "large_2000": [-10.5022, -7.6517, -22.4244, -23.6621]
+        },
+        "projection": {
+          "mol_batch_32x20": [-6.6181, -1.5504, -15.4879, -17.4002],
+          "bulk_256": [-2.6374, 2.3789, -17.7552, -21.4309],
+          "large_2000": [-2.4916, 0.8308, -22.534, -23.7261]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+Shared message-passing primitives
+---------------------------------
+
+Spherical operators in equivariant/ retain the source credits on their
+individual implementations. The Jd.pt table in equivariant/data/ is used
+by the e3nn 0.4.0 and fairchem eSCN Wigner-D implementation (MIT).
+https://github.com/e3nn/e3nn/tree/0.4.0
+https://github.com/FAIR-Chem/fairchem
+
+The cgmatrix.npz contraction coefficients in equivariant/data/ are shared
+with the So3krates-torch implementation (MIT).
+https://github.com/TCPUniLU/So3krates-torch
+
+The shared spherical normalization, gate and S2 grid activation implementations
+in nn/ and equivariant/ follow EquiformerV2 (MIT) and the vendored
+EquiformerV3 reference. The Cartesian gated blocks in nn/gate.py follow SchNetPack
+2.0.4 (MIT).
+https://github.com/atomicarchitects/equiformer_v2
+https://github.com/atomistic-machine-learning/schnetpack
+
+Nonlocal attention implementations
+---------------------------------
+
+nonlocal_/performer.py contains the SpookyNet random-feature attention
+implementation. nonlocal_/fragment.py follows the ViSNet-LSRM atom-fragment
+attention from LSR-MP. nonlocal_/global_attention.py adapts fairchem
+AllScAIP's projected multi-head attention (MIT).
+https://github.com/OUnke/SpookyNet
+https://github.com/liyy2/LSR-MP
+https://github.com/FAIR-Chem/fairchem
+
+Lebedev quadrature data and Euclidean Fast Attention are credited in
+nonlocal_/NOTICE.
+
+equivariant/kernels/_e2former_qk.py and _e2former_value.py adapt the sparse attention kernels from IQuestLab/UBio-MolFM under the MIT license.

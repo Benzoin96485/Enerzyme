@@ -6,8 +6,30 @@ import torch
 sys.path.extend(["..", "."])
 
 
+@pytest.mark.parametrize("correlation", [1, 2, 3])
+def test_species_indexed_mace_contraction_matches_one_hot_force_training(correlation):
+    from e3nn.o3 import Irreps
+    from enerzyme.models.mp.equivariant.e3nn.symmetric_contraction import SymmetricContraction
+
+    torch.manual_seed(42)
+    product = SymmetricContraction(Irreps("3x0e+3x1o"), Irreps("3x0e+3x1o"),
+                                   correlation, num_elements=5).double()
+    labels = torch.tensor([3, 1, 3, 0])
+    attrs = torch.nn.functional.one_hot(labels, num_classes=5).double()
+    channels = torch.randn(4, 3, 4, dtype=torch.float64, requires_grad=True)
+
+    def quantities(species):
+        result = product(channels, attrs, species)
+        force, = torch.autograd.grad(result.square().sum(), channels, create_graph=True)
+        derivatives = torch.autograd.grad(force.square().sum(), tuple(product.parameters()))
+        return (result, force, *derivatives)
+
+    for actual, expected in zip(quantities(labels), quantities(None)):
+        torch.testing.assert_close(actual, expected, atol=1e-10, rtol=1e-10)
+
+
 def test_coefficient_mapping_shapes():
-    from enerzyme.models.so3 import CoefficientMapping
+    from enerzyme.models.mp.equivariant import CoefficientMapping
 
     device = torch.device("cpu")
     mapping = CoefficientMapping([2], [2], device)
@@ -20,7 +42,7 @@ def test_coefficient_mapping_shapes():
 
 
 def test_so2_conv_output_shape():
-    from enerzyme.models.so3 import SO2Conv
+    from enerzyme.models.mp.equivariant import SO2Conv
 
     m = 1
     sphere_channels = 4
@@ -41,7 +63,7 @@ def test_so2_conv_output_shape():
 
 
 def test_rotate_inverse_roundtrip():
-    from enerzyme.models.so3 import SO3_Embedding, SO3_Rotation, init_edge_rot_mat
+    from enerzyme.models.mp.equivariant import SO3_Embedding, SO3_Rotation, init_edge_rot_mat
 
     torch.manual_seed(0)
     device = torch.device("cpu")
@@ -58,7 +80,7 @@ def test_rotate_inverse_roundtrip():
     x.embedding = torch.randn(num_edges, (lmax + 1) ** 2, num_channels, dtype=dtype)
     original = x.embedding.clone()
 
-    from enerzyme.models.so3 import CoefficientMapping
+    from enerzyme.models.mp.equivariant import CoefficientMapping
 
     mapping = CoefficientMapping([lmax], [lmax], device)
     x._rotate([so3_rot], [lmax], [lmax])
@@ -67,7 +89,7 @@ def test_rotate_inverse_roundtrip():
 
 
 def test_init_edge_rot_mat_orthonormal():
-    from enerzyme.models.so3 import init_edge_rot_mat
+    from enerzyme.models.mp.equivariant import init_edge_rot_mat
 
     torch.manual_seed(1)
     vij = torch.randn(7, 3)
@@ -79,7 +101,7 @@ def test_init_edge_rot_mat_orthonormal():
 
 
 def test_real_sh_and_l0_shapes():
-    from enerzyme.models.so3 import L0Contraction, RealSphericalHarmonics
+    from enerzyme.models.mp.equivariant import L0Contraction, RealSphericalHarmonics
 
     degrees = [1, 2, 3]
     sh = RealSphericalHarmonics(degrees)
@@ -95,7 +117,7 @@ def test_spookynet_d_layout_matches_legacy_closed_form():
     """spookynet_d must match the historical chemistry-d closed form."""
     import math
 
-    from enerzyme.models.so3 import spherical_harmonics
+    from enerzyme.models.mp.equivariant import spherical_harmonics
 
     torch.manual_seed(0)
     dtype = torch.float64
@@ -120,7 +142,7 @@ def test_spookynet_d_layout_matches_legacy_closed_form():
 
 
 def test_spherical_harmonics_so3krates_matches_module():
-    from enerzyme.models.so3 import RealSphericalHarmonics, spherical_harmonics
+    from enerzyme.models.mp.equivariant import RealSphericalHarmonics, spherical_harmonics
 
     torch.manual_seed(1)
     degrees = [1, 2, 3]
@@ -132,7 +154,7 @@ def test_spherical_harmonics_so3krates_matches_module():
 
 def test_l0_cg_rep_follows_degrees_list_order():
     """cg_rep must track caller degree order, not np.unique sorted order."""
-    from enerzyme.models.so3 import L0Contraction
+    from enerzyme.models.mp.equivariant import L0Contraction
 
     degrees = [3, 1, 2]
     l0 = L0Contraction(degrees, dtype=torch.float64)

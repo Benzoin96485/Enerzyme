@@ -1,0 +1,1479 @@
+{
+  "model": "spinconv",
+  "frozen_revision": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+  "independent_frames_revision": "29a20ac2dbe9a9e0a4b430aaafd27fb67b6d537a",
+  "compiled_polar_lookup_revision": "df32e34fecfb59d0f6d932b7e7413e436031a961",
+  "explicit_int32_map_metadata_revision": "59bd0d4ecc2696c72880ed7e58a4da0885051920",
+  "environment": {"pytorch": "2.13.0+cu126", "device": "Tesla V100-PCIE-32GB", "node": "d-7-5-1"},
+  "fixture": {"path": "test/fixtures/presnapshot/spinconv.pt", "sha256": "dc4aa813a8ca7c9f85f15bc45d5437c5bc3e2f1a1d0a545b1eaf2e158271060c"},
+  "tolerances": {
+    "float32": {"E_Fa": {"atol": 0.0003, "rtol": 0.0003}, "parameter_gradients": {"atol": 0.0007, "rtol": 0.001}},
+    "float64": {"all": {"atol": 1e-10, "rtol": 1e-08}}
+  },
+  "interpretation": [
+    "Frozen CUDA index_add_ reduction order varies independently per block. Matching the original sampling schedule preserves the distribution of charts. Independent native forwards, including two runs of the frozen source, can violate the strict FP64 tolerance.",
+    "Fixed-sum and complete-table comparisons use exactly the same ordered neighbors, the original three per-block draws and weights. The native operator control uses the original frame, projection and interpolation operations on detached inputs within the remaining compiled model.",
+    "A lookup-table disagreement in FP32 does not establish an end-to-end tolerance failure. Raw native and compiled observations, controlled table replays, and unavailable measurements have distinct meanings."
+  ],
+  "ordinary_native_cuda": {
+    "job": 6340156,
+    "device_uuid": "GPU-af0a01fe-fd4e-0ebe-1d1e-22a5448c6189",
+    "reps_per_leg": 9,
+    "order": [
+      "0:float32:baseline",
+      "1:float32:spinconv-cuda-projection",
+      "2:float64:spinconv-cuda-projection",
+      "3:float64:baseline",
+      "4:float32:spinconv-cuda-projection",
+      "5:float32:baseline",
+      "6:float64:baseline",
+      "7:float64:spinconv-cuda-projection"
+    ],
+    "method": "Independent Python process per leg. GPU synchronization, fixed fixture and batch, two warmups. Medians within each leg and medians of the two leg medians per side. Peak allocated MiB over the same timed steps.",
+    "comparison_source": {
+      "path": ".refactor/bench/spinconv-independent/v100-6340156/comparison.json",
+      "sha256": "490eb6f0620ea8e6ff55260834cc102eb82ba9dd0330fe6b45050351b171665e"
+    },
+    "rows": {
+      "float32/mol_batch_32x20/infer": {
+        "baseline": {"leg_median_ms": [393.9104489982128, 393.75880593433976], "leg_peak_mib": [5658.08837890625, 5658.08837890625]},
+        "candidate": {"leg_median_ms": [393.8532490283251, 393.93257698975503], "leg_peak_mib": [5653.802734375, 5653.802734375]},
+        "latency_percent": 0.014799496717388116,
+        "peak_percent": -0.07574368310023782,
+        "native_cross": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 4.470348358154297e-08, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 2.0486368157435209e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        },
+        "frozen_repeat": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 4.470348358154297e-08, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 1.7462298274040222e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        },
+        "candidate_repeat": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 4.470348358154297e-08, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 1.7280399333685637e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float32/mol_batch_32x20/train": {
+        "baseline": {"leg_median_ms": [1411.881691077724, 1411.5469709504396], "leg_peak_mib": [12414.3154296875, 12414.3154296875]},
+        "candidate": {"leg_median_ms": [1406.6326348111033, 1406.1587979085743], "leg_peak_mib": [12410.3310546875, 12410.3310546875]},
+        "latency_percent": -0.37674864789553064,
+        "peak_percent": -0.0320950037282941,
+        "native_cross": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 4.470348358154297e-08, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 2.319211489520967e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 4.76837158203125e-07, "outside": 0, "tensors_outside": 0}
+        },
+        "frozen_repeat": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 5.960464477539063e-08, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 1.709850039333105e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 4.76837158203125e-07, "outside": 0, "tensors_outside": 0}
+        },
+        "candidate_repeat": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 5.960464477539063e-08, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 1.348325895378366e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 4.76837158203125e-07, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float32/bulk_256/infer": {
+        "baseline": {"leg_median_ms": [420.34047096967697, 420.1619038358331], "leg_peak_mib": [6276.76904296875, 6276.76904296875]},
+        "candidate": {"leg_median_ms": [420.6446800380945, 420.35718192346394], "leg_peak_mib": [6270.22412109375, 6270.22412109375]},
+        "latency_percent": 0.05942721532035122,
+        "peak_percent": -0.10427214750448055,
+        "native_cross": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 2.384185791015625e-07, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 3.4924596548080444e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        },
+        "frozen_repeat": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 2.384185791015625e-07, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 3.5288394428789616e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        },
+        "candidate_repeat": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 3.3287506084889174e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float32/bulk_256/train": {
+        "baseline": {"leg_median_ms": [1478.6242700647563, 1478.4819860942662], "leg_peak_mib": [13212.30859375, 13212.30859375]},
+        "candidate": {"leg_median_ms": [1479.381878161803, 1479.1465541347861], "leg_peak_mib": [13206.927734375, 13206.927734375]},
+        "latency_percent": 0.04809350812486901,
+        "peak_percent": -0.04072611032976958,
+        "native_cross": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 2.384185791015625e-07, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 3.055902197957039e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0.0001220703125, "outside": 0, "tensors_outside": 0}
+        },
+        "frozen_repeat": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 3.3924152376130223e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 1.9073486328125e-06, "outside": 0, "tensors_outside": 0}
+        },
+        "candidate_repeat": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 4.1109160520136356e-10, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 3.814697265625e-06, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float32/large_2000/infer": {
+        "baseline": {"errors": ["CUDA out of memory. Tried to allocate 970.00 MiB", "CUDA out of memory. Tried to allocate 970.00 MiB"]},
+        "candidate": {"errors": ["CUDA out of memory. Tried to allocate 970.00 MiB", "CUDA out of memory. Tried to allocate 970.00 MiB"]}
+      },
+      "float32/large_2000/train": {
+        "baseline": {"errors": ["CUDA out of memory. Tried to allocate 970.00 MiB", "CUDA out of memory. Tried to allocate 970.00 MiB"]},
+        "candidate": {"errors": ["CUDA out of memory. Tried to allocate 970.00 MiB", "CUDA out of memory. Tried to allocate 970.00 MiB"]}
+      },
+      "float64/mol_batch_32x20/infer": {
+        "baseline": {"leg_median_ms": [966.7969460133463, 966.9395689852536], "leg_peak_mib": [11232.25537109375, 11232.25537109375]},
+        "candidate": {"leg_median_ms": [967.0435660518706, 966.1015160381794], "leg_peak_mib": [11229.84716796875, 11229.84716796875]},
+        "latency_percent": -0.030584979078718266,
+        "peak_percent": -0.021440067425793075,
+        "native_cross": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 2.9193441275499055e-09, "outside": 1, "tensors_outside": 1},
+          "Fa": {"max_abs": 1.7241417960963345e-10, "outside": 63, "tensors_outside": 1},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        },
+        "frozen_repeat": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 1.5441524725545719e-09, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 1.9868056429238784e-10, "outside": 40, "tensors_outside": 1},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        },
+        "candidate_repeat": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 1.7043494671131754e-09, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 1.6061862075793015e-10, "outside": 12, "tensors_outside": 1},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float64/mol_batch_32x20/train": {
+        "baseline": {"leg_median_ms": [2640.821635024622, 2640.4142770916224], "leg_peak_mib": [24789.78271484375, 24789.78271484375]},
+        "candidate": {"leg_median_ms": [2639.845160068944, 2640.835716854781], "leg_peak_mib": [24782.40380859375, 24782.40380859375]},
+        "latency_percent": -0.010509570141448155,
+        "peak_percent": -0.02976591741395973,
+        "native_cross": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 2.2178316960719258e-09, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 2.2562897878449385e-10, "outside": 60, "tensors_outside": 1},
+          "grad": {"max_abs": 1.1394871535230777e-07, "outside": 776096, "tensors_outside": 80}
+        },
+        "frozen_repeat": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 2.861627351746776e-09, "outside": 1, "tensors_outside": 1},
+          "Fa": {"max_abs": 1.6849113504559905e-10, "outside": 34, "tensors_outside": 1},
+          "grad": {"max_abs": 2.0248512555554044e-07, "outside": 697240, "tensors_outside": 80}
+        },
+        "candidate_repeat": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 1.8647674515648305e-09, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 1.4792468897744434e-10, "outside": 21, "tensors_outside": 1},
+          "grad": {"max_abs": 6.138083108453429e-08, "outside": 545374, "tensors_outside": 79}
+        }
+      },
+      "float64/bulk_256/infer": {
+        "baseline": {"leg_median_ms": [1019.2552329972386, 1015.0324162095785], "leg_peak_mib": [12438.4013671875, 12438.4013671875]},
+        "candidate": {"leg_median_ms": [1019.5843691471964, 1018.4174748137593], "leg_peak_mib": [12426.76953125, 12426.76953125]},
+        "latency_percent": 0.1825796246458511,
+        "peak_percent": -0.09351552176298794,
+        "native_cross": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 4.104554918171743e-09, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 3.380247446525982e-10, "outside": 212, "tensors_outside": 1},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        },
+        "frozen_repeat": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 1.7498891669021077e-08, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 2.8775943498019927e-10, "outside": 190, "tensors_outside": 1},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        },
+        "candidate_repeat": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 3.797079983769436e-09, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 3.7365516984775443e-10, "outside": 205, "tensors_outside": 1},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float64/bulk_256/train": {
+        "baseline": {"leg_median_ms": [2763.4476751554757, 2763.9363289345056], "leg_peak_mib": [26343.00244140625, 26343.00244140625]},
+        "candidate": {"leg_median_ms": [2761.7349890060723, 2760.9899959061295], "leg_peak_mib": [26330.07763671875, 26330.07763671875]},
+        "latency_percent": -0.08428976843896097,
+        "peak_percent": -0.04906352157939553,
+        "native_cross": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 6.758936521578107e-09, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 2.8423073337763456e-10, "outside": 219, "tensors_outside": 1},
+          "grad": {"max_abs": 3.460575499047991e-06, "outside": 3885657, "tensors_outside": 99}
+        },
+        "frozen_repeat": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 7.062226359266788e-10, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 3.354613589797768e-10, "outside": 195, "tensors_outside": 1},
+          "grad": {"max_abs": 3.781982682582452e-07, "outside": 3852309, "tensors_outside": 98}
+        },
+        "candidate_repeat": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 1.191467458028228e-08, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 3.2290829347437003e-10, "outside": 190, "tensors_outside": 1},
+          "grad": {"max_abs": 6.100313385104528e-06, "outside": 3842925, "tensors_outside": 99}
+        }
+      },
+      "float64/large_2000/infer": {
+        "baseline": {"errors": ["CUDA out of memory. Tried to allocate 734.00 MiB", "CUDA out of memory. Tried to allocate 734.00 MiB"]},
+        "candidate": {"errors": ["CUDA out of memory. Tried to allocate 734.00 MiB", "CUDA out of memory. Tried to allocate 734.00 MiB"]}
+      },
+      "float64/large_2000/train": {
+        "baseline": {"errors": ["CUDA out of memory. Tried to allocate 734.00 MiB", "CUDA out of memory. Tried to allocate 734.00 MiB"]},
+        "candidate": {"errors": ["CUDA out of memory. Tried to allocate 734.00 MiB", "CUDA out of memory. Tried to allocate 734.00 MiB"]}
+      }
+    },
+    "driver": {
+      "path": ".refactor/bench/spinconv-independent/v100-6340156/eager.py",
+      "sha256": "11a3a8e54898e340f862555a8da049ba4b0156a00e01133754825bb9ec7a291e"
+    }
+  },
+  "ordinary_native_cuda_identical_table_cross": {
+    "float32/mol_batch_32x20/infer": {
+      "raw": {
+        "path": ".refactor/bench/spinconv-independent/v100-6340156/tables-float32/spinconv-cuda-projection-mol_batch_32x20-infer.json",
+        "sha256": "804cd4efc616414877ce57c1f81fabb529d5dfd4dc5264df73559b427d879762"
+      },
+      "frozen_vs_candidate": {"E": {"max_abs": 5.960464477539063e-08, "outside": 0, "elements": 32}, "Fa": {"max_abs": 5.093170329928398e-11, "outside": 0, "elements": 1920}},
+      "candidate_within_first_forward": {
+        "0:1": {"samples": 178696, "changed_indices": 3468, "changed_indices_at_pole": 3468, "weight_max_abs": 0.9171338677406311},
+        "0:2": {"samples": 178696, "changed_indices": 3581, "changed_indices_at_pole": 3581, "weight_max_abs": 0.9171338677406311},
+        "1:2": {"samples": 178696, "changed_indices": 2211, "changed_indices_at_pole": 2211, "weight_max_abs": 0.916233241558075}
+      }
+    },
+    "float32/mol_batch_32x20/train": {
+      "raw": {
+        "path": ".refactor/bench/spinconv-independent/v100-6340156/tables-float32/spinconv-cuda-projection-mol_batch_32x20-train.json",
+        "sha256": "848166ca0ab3783c837a3e0213d0c8a4e26c023fa241de289c548cc38186abcf"
+      },
+      "frozen_vs_candidate": {
+        "E": {"max_abs": 4.470348358154297e-08, "outside": 0, "elements": 32},
+        "Fa": {"max_abs": 3.7061909097246826e-11, "outside": 0, "elements": 1920}
+      },
+      "candidate_within_first_forward": {
+        "0:1": {"samples": 178696, "changed_indices": 3711, "changed_indices_at_pole": 3711, "weight_max_abs": 0.9190914034843445},
+        "0:2": {"samples": 178696, "changed_indices": 3953, "changed_indices_at_pole": 3953, "weight_max_abs": 0.9190914034843445},
+        "1:2": {"samples": 178696, "changed_indices": 1975, "changed_indices_at_pole": 1975, "weight_max_abs": 0.9171338677406311}
+      }
+    },
+    "float32/bulk_256/infer": {
+      "raw": {
+        "path": ".refactor/bench/spinconv-independent/v100-6340156/tables-float32/spinconv-cuda-projection-bulk_256-infer.json",
+        "sha256": "c0f52d67d9c340aea762c148401e35eb45d6e3ddc068a8c284a4bfe639c81704"
+      },
+      "frozen_vs_candidate": {"E": {"max_abs": 2.384185791015625e-07, "outside": 0, "elements": 1}, "Fa": {"max_abs": 6.548361852765083e-11, "outside": 0, "elements": 768}},
+      "candidate_within_first_forward": {
+        "0:1": {"samples": 463894, "changed_indices": 7210, "changed_indices_at_pole": 7209, "weight_max_abs": 0.95344078540802},
+        "0:2": {"samples": 463894, "changed_indices": 7182, "changed_indices_at_pole": 7181, "weight_max_abs": 0.9239740967750549},
+        "1:2": {"samples": 463894, "changed_indices": 5927, "changed_indices_at_pole": 5925, "weight_max_abs": 0.9534416794776917}
+      }
+    },
+    "float32/bulk_256/train": {
+      "raw": {
+        "path": ".refactor/bench/spinconv-independent/v100-6340156/tables-float32/spinconv-cuda-projection-bulk_256-train.json",
+        "sha256": "59f7ded075eaac8fde5e59c4836ebb0e281d96475b9ea6d6001f54a7eba24e1c"
+      },
+      "frozen_vs_candidate": {"E": {"max_abs": 2.384185791015625e-07, "outside": 0, "elements": 1}, "Fa": {"max_abs": 5.093170329928398e-11, "outside": 0, "elements": 768}},
+      "candidate_within_first_forward": {
+        "0:1": {"samples": 463894, "changed_indices": 7291, "changed_indices_at_pole": 7290, "weight_max_abs": 0.9171339869499207},
+        "0:2": {"samples": 463894, "changed_indices": 7235, "changed_indices_at_pole": 7233, "weight_max_abs": 0.9534381031990051},
+        "1:2": {"samples": 463894, "changed_indices": 6172, "changed_indices_at_pole": 6169, "weight_max_abs": 0.9534389972686768}
+      }
+    },
+    "float64/mol_batch_32x20/infer": {
+      "raw": {
+        "path": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/spinconv-cuda-projection-mol_batch_32x20-infer.json",
+        "sha256": "c737eb5e594c9be2391518dbaa300521ea45438739f55ed938162e36756056d4"
+      },
+      "frozen_vs_candidate": {"E": {"max_abs": 8.326672684688674e-17, "outside": 0, "elements": 32}, "Fa": {"max_abs": 7.792703114739563e-20, "outside": 0, "elements": 1920}},
+      "candidate_within_first_forward": {
+        "0:1": {"samples": 178696, "changed_indices": 3595, "changed_indices_at_pole": 3595, "weight_max_abs": 0.9171338399890521},
+        "0:2": {"samples": 178696, "changed_indices": 3488, "changed_indices_at_pole": 3488, "weight_max_abs": 0.9171338399890521},
+        "1:2": {"samples": 178696, "changed_indices": 1555, "changed_indices_at_pole": 1555, "weight_max_abs": 0.9171338399890521}
+      }
+    },
+    "float64/mol_batch_32x20/train": {
+      "raw": {
+        "path": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/spinconv-cuda-projection-mol_batch_32x20-train.json",
+        "sha256": "395b72b028204604c8f6da6fc8854522b573840325bd7cb2e90149f5dab8652f"
+      },
+      "frozen_vs_candidate": {"E": {"max_abs": 8.326672684688674e-17, "outside": 0, "elements": 32}, "Fa": {"max_abs": 7.792703114739563e-20, "outside": 0, "elements": 1920}},
+      "candidate_within_first_forward": {
+        "0:1": {"samples": 178696, "changed_indices": 4309, "changed_indices_at_pole": 4309, "weight_max_abs": 0.919091625370474},
+        "0:2": {"samples": 178696, "changed_indices": 4290, "changed_indices_at_pole": 4290, "weight_max_abs": 0.919091625370474},
+        "1:2": {"samples": 178696, "changed_indices": 1854, "changed_indices_at_pole": 1854, "weight_max_abs": 0.9171338399890521}
+      }
+    },
+    "float64/bulk_256/infer": {
+      "raw": {
+        "path": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/spinconv-cuda-projection-bulk_256-infer.json",
+        "sha256": "951d8ec01941ee76d6214ba3fb76977f266ea18e65d6314a9226b47a4c7a8407"
+      },
+      "frozen_vs_candidate": {"E": {"max_abs": 0.0, "outside": 0, "elements": 1}, "Fa": {"max_abs": 1.0842021724855044e-19, "outside": 0, "elements": 768}},
+      "candidate_within_first_forward": {
+        "0:1": {"samples": 463894, "changed_indices": 7145, "changed_indices_at_pole": 7145, "weight_max_abs": 0.9171338399890521},
+        "0:2": {"samples": 463894, "changed_indices": 7213, "changed_indices_at_pole": 7213, "weight_max_abs": 0.9190915263947326},
+        "1:2": {"samples": 463894, "changed_indices": 5998, "changed_indices_at_pole": 5998, "weight_max_abs": 0.9190915263947326}
+      }
+    },
+    "float64/bulk_256/train": {
+      "raw": {
+        "path": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/spinconv-cuda-projection-bulk_256-train.json",
+        "sha256": "24f0604de2999d67bcf6abc63a77832bba7677a2319be5a3f093d06473eec277"
+      },
+      "frozen_vs_candidate": {"E": {"max_abs": 0.0, "outside": 0, "elements": 1}, "Fa": {"max_abs": 1.1519648082658485e-19, "outside": 0, "elements": 768}},
+      "candidate_within_first_forward": {
+        "0:1": {"samples": 463894, "changed_indices": 7199, "changed_indices_at_pole": 7199, "weight_max_abs": 0.9215494757166904},
+        "0:2": {"samples": 463894, "changed_indices": 7166, "changed_indices_at_pole": 7166, "weight_max_abs": 0.9171338399890521},
+        "1:2": {"samples": 463894, "changed_indices": 6137, "changed_indices_at_pole": 6137, "weight_max_abs": 0.9171338399890521}
+      }
+    }
+  },
+  "fixed_input_cuda": {
+    "float32": {
+      "job": 6340203,
+      "device_uuid": "GPU-af0a01fe-fd4e-0ebe-1d1e-22a5448c6189",
+      "revision": "29a20ac2dbe9a9e0a4b430aaafd27fb67b6d537a",
+      "driver": {
+        "path": ".refactor/bench/spinconv-independent/fp32-6340203/probe.py",
+        "sha256": "4818e19f381718436f9f158e75c6846e9fda58e33b63f6fa61a5e21ddcb59f5c"
+      },
+      "ordered_cases": {
+        "sums/mol_batch_32x20/infer": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/fp32-6340203/sums-mol_batch_32x20-infer.json",
+            "sha256": "997f37f54b5074f95448907a60da58943f949acc5204d57b901f3af9b681e6fb"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float32/frozen-anchor-mol_batch_32x20-infer.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 5.960464477539063e-08,
+            "force_max_abs": 6.366462912410498e-10,
+            "gradient_max_abs": 0.0
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NoneType",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "NoneType",
+            "capture": {"calls_captured": 630, "unique_graphs": 22},
+            "different_grid_samples": [7713, 7790, 7758],
+            "different_grid_samples_at_poles": [7713, 7790, 7757],
+            "maximum_weight_abs_difference": [0.9190914034843445, 0.9172362089157104, 0.9171572923660278]
+          }
+        },
+        "sums/bulk_256/infer": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/fp32-6340203/sums-bulk_256-infer.json",
+            "sha256": "495cffc7aeee7ad9fc596c9e18bde9d508667e05d469e89239140e2e8d040221"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float32/frozen-anchor-bulk_256-infer.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 7.152557373046875e-07,
+            "force_max_abs": 1.103217073250562e-09,
+            "gradient_max_abs": 0.0
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NoneType",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "NoneType",
+            "capture": {"calls_captured": 658, "unique_graphs": 25},
+            "different_grid_samples": [6937, 6972, 6958],
+            "different_grid_samples_at_poles": [6937, 6972, 6958],
+            "maximum_weight_abs_difference": [0.9192500710487366, 0.9180989861488342, 0.9180987477302551]
+          }
+        },
+        "sums/mol_batch_32x20/train": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/fp32-6340203/sums-mol_batch_32x20-train.json",
+            "sha256": "1822005ece81c20ebf0a862b9de59589d0e7515e12c006cf161a7c037dd148f8"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float32/frozen-anchor-mol_batch_32x20-train.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 113,
+            "reference_active_parameters": 113,
+            "energy_max_abs": 4.470348358154297e-08,
+            "force_max_abs": 6.45741238258779e-10,
+            "gradient_max_abs": 3.0517578125e-05
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NegBackward0",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "CompiledFunctionBackward",
+            "capture": {"calls_captured": 633, "unique_graphs": 1},
+            "different_grid_samples": [7745, 7762, 7777],
+            "different_grid_samples_at_poles": [7744, 7761, 7776],
+            "maximum_weight_abs_difference": [0.9190914034843445, 0.9190914034843445, 0.9190914034843445]
+          }
+        },
+        "sums/bulk_256/train": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/fp32-6340203/sums-bulk_256-train.json",
+            "sha256": "aacad61115f5cb8e7f25002a66c31f76d41b817acc78fec07587a81198bb104f"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float32/frozen-anchor-bulk_256-train.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 113,
+            "reference_active_parameters": 113,
+            "energy_max_abs": 4.76837158203125e-07,
+            "force_max_abs": 8.267306839115918e-10,
+            "gradient_max_abs": 0.000244140625
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NegBackward0",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "CompiledFunctionBackward",
+            "capture": {"calls_captured": 640, "unique_graphs": 1},
+            "different_grid_samples": [6544, 6535, 6582],
+            "different_grid_samples_at_poles": [6544, 6535, 6582],
+            "maximum_weight_abs_difference": [0.9244336485862732, 0.9171536564826965, 0.9171339869499207]
+          }
+        }
+      },
+      "chart_only": {
+        "mol_batch_32x20": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/fp32-6340203/chart-mol_batch_32x20-infer.json",
+            "sha256": "8bfeb7f069704072e64feb48978a434abc7605ccc4e7cd022c843d3f9f27b646"
+          },
+          "capture": {"calls_captured": 87, "unique_graphs": 1},
+          "three_blocks": [
+            {
+              "native_vs_frozen": {"samples": 178696, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 178696,
+                "index_samples": 7713,
+                "index_poles": 7713,
+                "max_abs_weight": 0.9190914034843445,
+                "max_nonpolar_weight": 4.392862319946289e-05,
+                "weight_samples_gt_1e_12": 172759
+              }
+            },
+            {
+              "native_vs_frozen": {"samples": 178696, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 178696,
+                "index_samples": 7790,
+                "index_poles": 7790,
+                "max_abs_weight": 0.9172362089157104,
+                "max_nonpolar_weight": 4.392862319946289e-05,
+                "weight_samples_gt_1e_12": 172751
+              }
+            },
+            {
+              "native_vs_frozen": {"samples": 178696, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 178696,
+                "index_samples": 7758,
+                "index_poles": 7757,
+                "max_abs_weight": 0.9171572923660278,
+                "max_nonpolar_weight": 0.7928965091705322,
+                "weight_samples_gt_1e_12": 172760
+              }
+            }
+          ]
+        },
+        "bulk_256": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/fp32-6340203/chart-bulk_256-infer.json",
+            "sha256": "008888711c95e708f7183aaffce5166e198c88b7d103ba8cacc18f1d7ca19f44"
+          },
+          "capture": {"calls_captured": 87, "unique_graphs": 1},
+          "three_blocks": [
+            {
+              "native_vs_frozen": {"samples": 463894, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 463894,
+                "index_samples": 6937,
+                "index_poles": 6937,
+                "max_abs_weight": 0.9192500710487366,
+                "max_nonpolar_weight": 0.0003507360816001892,
+                "weight_samples_gt_1e_12": 452519
+              }
+            },
+            {
+              "native_vs_frozen": {"samples": 463894, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 463894,
+                "index_samples": 6972,
+                "index_poles": 6972,
+                "max_abs_weight": 0.9180989861488342,
+                "max_nonpolar_weight": 0.00035696476697921753,
+                "weight_samples_gt_1e_12": 452570
+              }
+            },
+            {
+              "native_vs_frozen": {"samples": 463894, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 463894,
+                "index_samples": 6958,
+                "index_poles": 6958,
+                "max_abs_weight": 0.9180987477302551,
+                "max_nonpolar_weight": 0.0003488883376121521,
+                "weight_samples_gt_1e_12": 452465
+              }
+            }
+          ]
+        }
+      }
+    },
+    "float64": {
+      "job": 6340178,
+      "device_uuid": "GPU-2391d56e-6cb2-575a-6c26-d0e377950173",
+      "revision": "29a20ac2dbe9a9e0a4b430aaafd27fb67b6d537a",
+      "driver": {
+        "path": ".refactor/bench/spinconv-independent/compiled-6340178/probe.py",
+        "sha256": "02ec4a9fc5bcdf6ccf2e681da989f295443f2cc46768498b310fec637a36f9ce"
+      },
+      "ordered_cases": {
+        "sums/mol_batch_32x20/infer": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/sums-mol_batch_32x20-infer.json",
+            "sha256": "7e984914fb57aa81bdb518ef555f8bee57ac1fb81b87473ee1d3fe47d031b10b"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-mol_batch_32x20-infer.pt",
+          "compiled_vs_eager": {
+            "passed": false,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 2.089358908108352e-09,
+            "force_max_abs": 1.9506591800817416e-10,
+            "gradient_max_abs": 0.0
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NoneType",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "NoneType",
+            "capture": {"calls_captured": 630, "unique_graphs": 22},
+            "different_grid_samples": [4847, 4997, 4985],
+            "different_grid_samples_at_poles": [4847, 4997, 4985],
+            "maximum_weight_abs_difference": [0.9180991762386365, 0.9224121797782169, 0.9180991762386365]
+          }
+        },
+        "sums/bulk_256/infer": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/sums-bulk_256-infer.json",
+            "sha256": "157248a8fba52c03c21caa46bc1c11cdbc19449ce0f669c13d1d37a54703357d"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-bulk_256-infer.pt",
+          "compiled_vs_eager": {
+            "passed": false,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 8.1410096441914e-09,
+            "force_max_abs": 2.650222698928441e-10,
+            "gradient_max_abs": 0.0
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NoneType",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "NoneType",
+            "capture": {"calls_captured": 658, "unique_graphs": 25},
+            "different_grid_samples": [4317, 4192, 4316],
+            "different_grid_samples_at_poles": [4317, 4192, 4316],
+            "maximum_weight_abs_difference": [0.9212836175003242, 0.9213387354781852, 0.9239745411209588]
+          }
+        },
+        "sums/mol_batch_32x20/train": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/sums-mol_batch_32x20-train.json",
+            "sha256": "f62191e98dc193ff848a5a01d5fc11697e3bcc56544c3515a936944eebcb005e"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-mol_batch_32x20-train.pt",
+          "compiled_vs_eager": {
+            "passed": false,
+            "active_parameters": 113,
+            "reference_active_parameters": 113,
+            "energy_max_abs": 2.3150137362648593e-09,
+            "force_max_abs": 2.511732007714111e-10,
+            "gradient_max_abs": 7.093098020050093e-08
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NegBackward0",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "CompiledFunctionBackward",
+            "capture": {"calls_captured": 633, "unique_graphs": 1},
+            "different_grid_samples": [5009, 4978, 4930],
+            "different_grid_samples_at_poles": [5009, 4978, 4930],
+            "maximum_weight_abs_difference": [0.9180991762386365, 0.9224121797782169, 0.9180991762386365]
+          }
+        },
+        "sums/bulk_256/train": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/sums-bulk_256-train.json",
+            "sha256": "075a150c1f12ee7fc83ed4475a29d03c6a2c44a10db883ea79f219f1af4422fd"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-bulk_256-train.pt",
+          "compiled_vs_eager": {
+            "passed": false,
+            "active_parameters": 113,
+            "reference_active_parameters": 113,
+            "energy_max_abs": 9.384391042033258e-10,
+            "force_max_abs": 1.8393659286014736e-10,
+            "gradient_max_abs": 4.804808213521028e-07
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NegBackward0",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "CompiledFunctionBackward",
+            "capture": {"calls_captured": 640, "unique_graphs": 1},
+            "different_grid_samples": [2669, 2695, 2567],
+            "different_grid_samples_at_poles": [2669, 2695, 2567],
+            "maximum_weight_abs_difference": [0.9199291222580649, 0.9199291222580649, 0.9171338410265287]
+          }
+        },
+        "tables/mol_batch_32x20/infer": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/tables-mol_batch_32x20-infer.json",
+            "sha256": "cae70b8f248b00ab3b758bdb6ccab48d4c44c3749e3396a83de512e525ffa706"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-mol_batch_32x20-infer.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 8.326672684688674e-17,
+            "force_max_abs": 5.963111948670274e-19,
+            "gradient_max_abs": 0.0
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NoneType",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "NoneType",
+            "capture": {"calls_captured": 360, "unique_graphs": 22},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          }
+        },
+        "tables/bulk_256/infer": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/tables-bulk_256-infer.json",
+            "sha256": "5415e4b650d5c0f8d07f9f86e14b62df253a4a2512c4e4d7dccc4d6cfbbcebb9"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-bulk_256-infer.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 1.7763568394002505e-15,
+            "force_max_abs": 7.995991022080595e-19,
+            "gradient_max_abs": 0.0
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NoneType",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "NoneType",
+            "capture": {"calls_captured": 388, "unique_graphs": 25},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          }
+        },
+        "tables/mol_batch_32x20/train": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/tables-mol_batch_32x20-train.json",
+            "sha256": "46decf286a8277018015372f8a3fb3929937ca51e36540d8f7a1e824e939d091"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-mol_batch_32x20-train.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 113,
+            "reference_active_parameters": 113,
+            "energy_max_abs": 8.326672684688674e-17,
+            "force_max_abs": 5.963111948670274e-19,
+            "gradient_max_abs": 1.1368683772161603e-13
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NegBackward0",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "CompiledFunctionBackward",
+            "capture": {"calls_captured": 363, "unique_graphs": 1},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          }
+        },
+        "tables/bulk_256/train": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/tables-bulk_256-train.json",
+            "sha256": "3e4ef1302689c8bec5e5cad5f309faf24793960abb3ea2b0e0cb3e19bdd1beae"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-bulk_256-train.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 113,
+            "reference_active_parameters": 113,
+            "energy_max_abs": 8.881784197001252e-16,
+            "force_max_abs": 8.673617379884035e-19,
+            "gradient_max_abs": 4.547473508864641e-13
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NegBackward0",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "CompiledFunctionBackward",
+            "capture": {"calls_captured": 369, "unique_graphs": 1},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          }
+        },
+        "native-op/mol_batch_32x20/infer": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/native-op-mol_batch_32x20-infer.json",
+            "sha256": "ba2b743a136aa6dbf936136f918aaa60871e8187aacd92211f3b5965f4d558f2"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-mol_batch_32x20-infer.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 8.326672684688674e-17,
+            "force_max_abs": 5.72594272343907e-19,
+            "gradient_max_abs": 0.0
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NoneType",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "NoneType",
+            "capture": {"calls_captured": 378, "unique_graphs": 22},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          }
+        },
+        "native-op/bulk_256/infer": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/native-op-bulk_256-infer.json",
+            "sha256": "34cf7f9e137fbe775f88f1bca06275016eabccb7f088a21b6fdeda82327ecf68"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-bulk_256-infer.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 2.220446049250313e-15,
+            "force_max_abs": 8.402566836762659e-19,
+            "gradient_max_abs": 0.0
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NoneType",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "NoneType",
+            "capture": {"calls_captured": 406, "unique_graphs": 25},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          }
+        },
+        "native-op/mol_batch_32x20/train": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/native-op-mol_batch_32x20-train.json",
+            "sha256": "f2dda96fed974b47276f060044a8f7b165348f2eea66a1d1d9d3e078ffd975bd"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-mol_batch_32x20-train.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 113,
+            "reference_active_parameters": 113,
+            "energy_max_abs": 8.326672684688674e-17,
+            "force_max_abs": 6.098637220230962e-19,
+            "gradient_max_abs": 5.684341886080802e-14
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NegBackward0",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "CompiledFunctionBackward",
+            "capture": {"calls_captured": 381, "unique_graphs": 1},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          }
+        },
+        "native-op/bulk_256/train": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/native-op-bulk_256-train.json",
+            "sha256": "968d39cc2d810b2fbec2d404825a5afe51967d269de22c88161959c28aef2688"
+          },
+          "anchor": ".refactor/bench/spinconv-independent/v100-6340156/tables-float64/frozen-anchor-bulk_256-train.pt",
+          "compiled_vs_eager": {
+            "passed": true,
+            "active_parameters": 113,
+            "reference_active_parameters": 113,
+            "energy_max_abs": 4.440892098500626e-16,
+            "force_max_abs": 8.673617379884035e-19,
+            "gradient_max_abs": 2.2737367544323206e-13
+          },
+          "eager": {
+            "energy_grad_fn": "ScatterAddBackward0",
+            "force_grad_fn": "NegBackward0",
+            "capture": {},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          },
+          "compiled": {
+            "energy_grad_fn": "CompiledFunctionBackward",
+            "force_grad_fn": "CompiledFunctionBackward",
+            "capture": {"calls_captured": 388, "unique_graphs": 1},
+            "different_grid_samples": [0, 0, 0],
+            "different_grid_samples_at_poles": [0, 0, 0],
+            "maximum_weight_abs_difference": [0.0, 0.0, 0.0]
+          }
+        }
+      },
+      "chart_only": {
+        "mol_batch_32x20": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/chart-mol_batch_32x20-infer.json",
+            "sha256": "2977060f059014c1f1a66d624d19131a950b1903be0257e1f3976c7963b96729"
+          },
+          "capture": {"calls_captured": 87, "unique_graphs": 1},
+          "three_blocks": [
+            {
+              "native_vs_frozen": {"samples": 178696, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 178696,
+                "index_samples": 4847,
+                "index_poles": 4847,
+                "max_abs_weight": 0.9180991762386365,
+                "max_nonpolar_weight": 4.73232564246473e-14,
+                "weight_samples_gt_1e_12": 4442
+              }
+            },
+            {
+              "native_vs_frozen": {"samples": 178696, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 178696,
+                "index_samples": 4997,
+                "index_poles": 4997,
+                "max_abs_weight": 0.9224121797782169,
+                "max_nonpolar_weight": 4.73232564246473e-14,
+                "weight_samples_gt_1e_12": 4565
+              }
+            },
+            {
+              "native_vs_frozen": {"samples": 178696, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 178696,
+                "index_samples": 4985,
+                "index_poles": 4985,
+                "max_abs_weight": 0.9180991762386365,
+                "max_nonpolar_weight": 4.73232564246473e-14,
+                "weight_samples_gt_1e_12": 4572
+              }
+            }
+          ]
+        },
+        "bulk_256": {
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/compiled-6340178/chart-bulk_256-infer.json",
+            "sha256": "e9f24104e24400e1a9fbd329080489ef3515614ca3021d4c75fc412faac14cf6"
+          },
+          "capture": {"calls_captured": 87, "unique_graphs": 1},
+          "three_blocks": [
+            {
+              "native_vs_frozen": {"samples": 463894, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 463894,
+                "index_samples": 4317,
+                "index_poles": 4317,
+                "max_abs_weight": 0.9212836175003242,
+                "max_nonpolar_weight": 1.5201728764679956e-13,
+                "weight_samples_gt_1e_12": 4949
+              }
+            },
+            {
+              "native_vs_frozen": {"samples": 463894, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 463894,
+                "index_samples": 4192,
+                "index_poles": 4192,
+                "max_abs_weight": 0.9213387354781852,
+                "max_nonpolar_weight": 1.5201728764679956e-13,
+                "weight_samples_gt_1e_12": 4904
+              }
+            },
+            {
+              "native_vs_frozen": {"samples": 463894, "index_samples": 0, "index_poles": 0, "max_abs_weight": 0.0, "max_nonpolar_weight": 0.0, "weight_samples_gt_1e_12": 0},
+              "compiled_vs_frozen": {
+                "samples": 463894,
+                "index_samples": 4316,
+                "index_poles": 4316,
+                "max_abs_weight": 0.9239745411209588,
+                "max_nonpolar_weight": 1.52433621281034e-13,
+                "weight_samples_gt_1e_12": 4870
+              }
+            }
+          ]
+        }
+      }
+    },
+    "method": {
+      "chart_only": "Original block-specific sums, edge vectors, source edges and query edges were captured from the frozen CUDA forward. The three geometry calls produce local frames, rotate original directions and return four interpolation corners/weights. Compare a native call and a true fullgraph Inductor call on the same tensors, per block.",
+      "sums": "Inject those three distinct sums only. Keep the 29a20ac model and its own sphere projection under ordinary torch.compile. The detached observation operator records the actual tables consumed inside the model.",
+      "tables": "Inject all three complete frozen native interpolation tables. The following message and readout, E/F and E-squared plus F-squared training loss run normally. Active gradient names, shapes, dtypes and tolerances are checked.",
+      "native-op": "On the same fixed receiver sums, wrap only the three detached original geometry calls in a native CUDA operator during torch.compile. Feed the resulting tables through the same compiled message model. Production df32e34 dispatches the identical native geometry arithmetic within sphere_projection for CUDA float64."
+    }
+  },
+  "int32_graph_metadata": {
+    "input": "Explicit, nonempty int32 source and query maps with float64 vectors. Native interpolation produces long indices. The 59bd0d4 follow-up preserves this output type during tracing.",
+    "results": {
+      "df32e34": {
+        "raw": {
+          "path": ".refactor/bench/spinconv-independent/int32-validated-df32e34.log",
+          "sha256": "8741525d44e258ce7c7906d9e33cd23659cc78f132b0d3b8c98e58ff078eb793"
+        },
+        "computed_dtypes": "indices=torch.int32, weights=torch.float64, shape=(4, 2)"
+      },
+      "59bd0d4": {
+        "raw": {
+          "path": ".refactor/bench/spinconv-independent/int32-validated-59bd0d4.log",
+          "sha256": "283e760938624f4125931dc0c22d7c3e49224a04e88b0afb2b8bb9c0ff441f71"
+        },
+        "computed_dtypes": "indices=torch.int64, weights=torch.float64, shape=(4, 2)"
+      }
+    }
+  },
+  "cuda_regression_test": {
+    "name": "test_cuda_double_compiled_polar_tables_and_forces_with_fixed_frame_sums",
+    "old_revision": "29a20ac2dbe9a9e0a4b430aaafd27fb67b6d537a",
+    "old_job": 6340203,
+    "old_status": "failed fixed native/compiled table equality",
+    "old_log": {
+      "path": ".refactor/bench/spinconv-independent/fp32-6340203/old-regression.log",
+      "sha256": "e196dd996f0f850c1e9ece1e9442d4acb8a684c5d5addf37fa7d03b4d0423753"
+    },
+    "candidate_revision": "59bd0d4ecc2696c72880ed7e58a4da0885051920",
+    "candidate_job": 6340211,
+    "candidate_status": "passed. The GPU suite recorded 62 passes and one skip.",
+    "candidate_log": {"path": ".refactor/6340211-gpu-59bd0d4.log", "sha256": "28b24dc28b04f2cb03610857a90879b7904ce073e44062cf48cf77dad984ad08"}
+  },
+  "ordinary_native_cpu": {
+    "job": 6340167,
+    "machine": "6340167 d-18-8-1 2",
+    "torch": "2.13.0+cu126",
+    "threads": 2,
+    "sources": ["1aa0f8b", "29a20ac"],
+    "fixture": "dc4aa813a8ca7c9f85f15bc45d5437c5bc3e2f1a1d0a545b1eaf2e158271060c",
+    "raw_driver": {"path": ".refactor/bench/spinconv-independent/cpu-6340167/cpu.py", "sha256": "5be24cd92875f6c2cc4bee39234b5beeddd482af9baf5e052942e6c98b24e22f"},
+    "order": ["float32 baseline", "float32 candidate", "float64 candidate", "float64 baseline"],
+    "method": "A fresh process per source and dtype traversed the three acceptance systems in order. Each mode used one warmup and five wall-clock measurements. Inference includes the energy and coordinate gradient. Training retains the force graph and differentiates the squared energy and force loss across active weights.",
+    "memory_limit": "80 GiB address space per process, below the 100 GiB job allocation. Allocator exceptions are retained. Per-process maximum RSS is cumulative across earlier steps and is not a per-step peak.",
+    "rows": {
+      "float32/mol_batch_32x20/infer": {
+        "baseline": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 9499.034562148154,
+          "process_max_rss_mib": 6548.46875,
+          "timings_ms": [9561.083689099178, 9499.21175581403, 9499.034562148154, 9432.630230206996, 9418.71411493048]
+        },
+        "candidate": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 9361.928193131462,
+          "process_max_rss_mib": 6531.296875,
+          "timings_ms": [9414.989959914237, 9361.928193131462, 9306.469667004421, 9369.62761101313, 9322.656808886677]
+        },
+        "latency_percent": -1.4433716197121194,
+        "same_weight_frozen_cross": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float32/mol_batch_32x20/train": {
+        "baseline": {
+          "active_parameters": 113,
+          "finite": true,
+          "median_ms": 29144.05522402376,
+          "process_max_rss_mib": 13907.27734375,
+          "timings_ms": [30089.505626121536, 29746.857763035223, 28911.522117909044, 29144.05522402376, 29111.39645287767]
+        },
+        "candidate": {
+          "active_parameters": 113,
+          "finite": true,
+          "median_ms": 29562.457968946546,
+          "process_max_rss_mib": 13880.41796875,
+          "timings_ms": [29562.457968946546, 29532.503741094843, 29674.540770007297, 28977.426605997607, 29954.5413069427]
+        },
+        "latency_percent": 1.4356366734368908,
+        "same_weight_frozen_cross": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float32/bulk_256/infer": {
+        "baseline": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 8413.492979016155,
+          "process_max_rss_mib": 13907.27734375,
+          "timings_ms": [8413.492979016155, 8543.413477018476, 8470.987054985017, 8375.428800936788, 8402.188179083169]
+        },
+        "candidate": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 9769.34132212773,
+          "process_max_rss_mib": 13880.41796875,
+          "timings_ms": [9761.9143279735, 9774.087382946163, 9769.34132212773, 9765.006295172498, 9777.11011399515]
+        },
+        "latency_percent": 16.115165799664368,
+        "same_weight_frozen_cross": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 1.4551915228366852e-11, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float32/bulk_256/train": {
+        "baseline": {
+          "active_parameters": 113,
+          "finite": true,
+          "median_ms": 30102.71735396236,
+          "process_max_rss_mib": 14781.1953125,
+          "timings_ms": [30656.146401073784, 30133.75169504434, 30102.71735396236, 29540.629201801494, 29395.8414059598]
+        },
+        "candidate": {
+          "active_parameters": 113,
+          "finite": true,
+          "median_ms": 30922.573959920555,
+          "process_max_rss_mib": 14672.1953125,
+          "timings_ms": [31304.804706014693, 30922.573959920555, 30496.582506923005, 29947.09973502904, 31707.537285983562]
+        },
+        "latency_percent": 2.723530225919224,
+        "same_weight_frozen_cross": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 7.275957614183426e-12, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 1.4901161193847656e-08, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float32/large_2000/infer": {
+        "baseline": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 73279.39527318813,
+          "process_max_rss_mib": 44329.69921875,
+          "timings_ms": [73324.97237017378, 73279.39527318813, 73214.1787360888, 73265.29608294368, 73371.49255815893]
+        },
+        "candidate": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 72010.07733796723,
+          "process_max_rss_mib": 44262.44140625,
+          "timings_ms": [72297.3485190887, 72294.71431393176, 71918.46893006004, 72010.07733796723, 71870.88549300097]
+        },
+        "latency_percent": -1.7321621316453761,
+        "same_weight_frozen_cross": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float32/large_2000/train": {
+        "baseline": {
+          "error": "[enforce fail at alloc_cpu.cpp:127] err == 0. DefaultCPUAllocator: can't allocate memory: you tried to allocate 1016877056 bytes. Error code 12 (Cannot allocate memory)"
+        },
+        "candidate": {
+          "error": "[enforce fail at alloc_cpu.cpp:127] err == 0. DefaultCPUAllocator: can't allocate memory: you tried to allocate 1016877056 bytes. Error code 12 (Cannot allocate memory)"
+        }
+      },
+      "float64/mol_batch_32x20/infer": {
+        "baseline": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 39700.19148103893,
+          "process_max_rss_mib": 12159.640625,
+          "timings_ms": [39721.17817401886, 39694.341470021755, 39700.19148103893, 39637.70503993146, 39706.36702887714]
+        },
+        "candidate": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 39710.79413895495,
+          "process_max_rss_mib": 12185.3671875,
+          "timings_ms": [39710.79413895495, 39505.90721401386, 39467.03862794675, 39718.07875111699, 39712.488665943965]
+        },
+        "latency_percent": 0.026706818079413885,
+        "same_weight_frozen_cross": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float64/mol_batch_32x20/train": {
+        "baseline": {
+          "active_parameters": 113,
+          "finite": true,
+          "median_ms": 114297.49045008793,
+          "process_max_rss_mib": 27056.4453125,
+          "timings_ms": [118171.40692006797, 116081.3967299182, 114297.49045008793, 113686.88756902702, 112661.67506901547]
+        },
+        "candidate": {
+          "active_parameters": 113,
+          "finite": true,
+          "median_ms": 114491.96659517474,
+          "process_max_rss_mib": 27001.078125,
+          "timings_ms": [118068.19242914207, 116357.7365828678, 114158.25756802224, 114491.96659517474, 113674.194826046]
+        },
+        "latency_percent": 0.17014909454353688,
+        "same_weight_frozen_cross": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float64/bulk_256/infer": {
+        "baseline": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 35624.43043384701,
+          "process_max_rss_mib": 27056.4453125,
+          "timings_ms": [36664.173264056444, 36123.65094991401, 35624.43043384701, 35543.91697701067, 35596.97903483175]
+        },
+        "candidate": {
+          "active_parameters": 0,
+          "finite": true,
+          "median_ms": 35806.93059717305,
+          "process_max_rss_mib": 27001.078125,
+          "timings_ms": [35756.012907018885, 35799.97515399009, 35867.79955192469, 35846.73013491556, 35806.93059717305]
+        },
+        "latency_percent": 0.5122893506043225,
+        "same_weight_frozen_cross": {
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float64/bulk_256/train": {
+        "baseline": {
+          "active_parameters": 113,
+          "finite": true,
+          "median_ms": 115029.01359298266,
+          "process_max_rss_mib": 28644.8359375,
+          "timings_ms": [117129.20598709024, 115524.7076349333, 115029.01359298266, 114841.42655902542, 114627.87917000242]
+        },
+        "candidate": {
+          "active_parameters": 113,
+          "finite": true,
+          "median_ms": 116859.77542912588,
+          "process_max_rss_mib": 28771.4765625,
+          "timings_ms": [117153.12618901953, 115996.89122103155, 117502.58937687613, 116859.77542912588, 116079.20109806582]
+        },
+        "latency_percent": 1.5915652746716136,
+        "same_weight_frozen_cross": {
+          "active_parameters": 113,
+          "reference_active_parameters": 113,
+          "participation_changed": [],
+          "E": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "Fa": {"max_abs": 0, "outside": 0, "tensors_outside": 0},
+          "grad": {"max_abs": 0, "outside": 0, "tensors_outside": 0}
+        }
+      },
+      "float64/large_2000/infer": {
+        "baseline": {
+          "error": "[enforce fail at alloc_cpu.cpp:127] err == 0. DefaultCPUAllocator: can't allocate memory: you tried to allocate 508438528 bytes. Error code 12 (Cannot allocate memory)"
+        },
+        "candidate": {
+          "error": "[enforce fail at alloc_cpu.cpp:127] err == 0. DefaultCPUAllocator: can't allocate memory: you tried to allocate 508438528 bytes. Error code 12 (Cannot allocate memory)"
+        }
+      },
+      "float64/large_2000/train": {
+        "baseline": {
+          "error": "[enforce fail at alloc_cpu.cpp:127] err == 0. DefaultCPUAllocator: can't allocate memory: you tried to allocate 7509245952 bytes. Error code 12 (Cannot allocate memory)"
+        },
+        "candidate": {
+          "error": "[enforce fail at alloc_cpu.cpp:127] err == 0. DefaultCPUAllocator: can't allocate memory: you tried to allocate 12202524672 bytes. Error code 12 (Cannot allocate memory)"
+        }
+      }
+    },
+    "raw_comparison": {
+      "path": ".refactor/bench/spinconv-independent/cpu-6340167/comparison.json",
+      "sha256": "89b002552ecbc1814c9e93b9efb2a6a54a89d88731b36fd3da2e3fc5e0456239"
+    },
+    "isolated_fp32_periodic_inference": {
+      "job": 6340218,
+      "machine": "6340218 d-16-2-3 2",
+      "raw_driver": {
+        "path": ".refactor/bench/spinconv-independent/cpu-bulk-6340218/cpu-bulk.py",
+        "sha256": "4eda4e2d7c0e06676c1d823a4dd642c7aaced1db79878dc3f7ccaaa1b03ac4d8"
+      },
+      "method": "Fresh process per leg on a second Xeon node, with the same fixture, batch and thread count. This diagnostic runs only the periodic inference workload, without preceding molecular training. The three revisions run in mirror order.",
+      "legs": [
+        {
+          "leg": 0,
+          "source": "spinconv-cuda-projection",
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/cpu-bulk-6340218/0-spinconv-cuda-projection.json",
+            "sha256": "dfb22ad08731a26982c2ebb49798a7f8523e2bfe692243f05e4b46c9edf7a23a"
+          },
+          "median_ms": 10361.054142937064,
+          "timings_ms": [10386.081949109212, 10363.955843960866, 10353.059265995398, 10361.054142937064, 10309.491622028872]
+        },
+        {
+          "leg": 1,
+          "source": "validated-610b65f",
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/cpu-bulk-6340218/1-validated-610b65f.json",
+            "sha256": "22547f52f6c0bdb9cece4babf96a3c06e08bddb62b0cd19639918a4ef86d8ba9"
+          },
+          "median_ms": 10380.367011995986,
+          "timings_ms": [10391.059536021203, 10380.367011995986, 10332.876074826345, 10443.136943969876, 10346.997974906117]
+        },
+        {
+          "leg": 2,
+          "source": "baseline",
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/cpu-bulk-6340218/2-baseline.json",
+            "sha256": "329451960be3a573ced0031ea8255c48e40c098d1c27dd928e7bac8ef6ea6177"
+          },
+          "median_ms": 10508.103810017928,
+          "timings_ms": [10537.225905107334, 10508.103810017928, 10536.475152010098, 10476.762547856197, 10403.591718059033]
+        },
+        {
+          "leg": 3,
+          "source": "baseline",
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/cpu-bulk-6340218/3-baseline.json",
+            "sha256": "fbc0e2aa80b0788c4290daf191ee2d1c36170186c7a26c8261daad895654d90f"
+          },
+          "median_ms": 10486.477729864419,
+          "timings_ms": [10554.734285920858, 10500.564384041354, 10486.477729864419, 10407.721830066293, 10335.962669923902]
+        },
+        {
+          "leg": 4,
+          "source": "validated-610b65f",
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/cpu-bulk-6340218/4-validated-610b65f.json",
+            "sha256": "b27cb980999180dc37a96c2ed45e5654de910b0cd9e974dd35f5383c83add213"
+          },
+          "median_ms": 10443.141425028443,
+          "timings_ms": [10448.821360012516, 10402.86982501857, 10437.572547001764, 10443.141425028443, 10445.79621986486]
+        },
+        {
+          "leg": 5,
+          "source": "spinconv-cuda-projection",
+          "raw": {
+            "path": ".refactor/bench/spinconv-independent/cpu-bulk-6340218/5-spinconv-cuda-projection.json",
+            "sha256": "f6e739d694a5c79105811eae5fcceed252801786f2e8c775a723eb85711a24a5"
+          },
+          "median_ms": 10364.647926064208,
+          "timings_ms": [10376.835515955463, 10350.474279839545, 10364.647926064208, 10339.920963160694, 10364.755304995924]
+        }
+      ],
+      "median_of_leg_medians_ms": {"baseline": 10497.290769941173, "spinconv-cuda-projection": 10362.851034500636, "validated-610b65f": 10411.754218512215},
+      "candidate_vs_phase_zero_percent": -1.2807088837198166,
+      "candidate_vs_before_frame_sampling_percent": -0.4696920709540753
+    },
+    "interpretation": "The full sequential sweep measured a slower FP32 periodic inference than Phase 0. The independent mirror-order periodic-only check on a second Xeon showed no slowdown relative to either Phase 0 or the pre-sampling 610b65f source. Both workloads and their individual legs are retained."
+  },
+  "measurement_jobs": {
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": {"6340156": "00:12:05", "6340167": "01:42:46", "6340178": "00:15:57", "6340203": "00:06:04", "6340218": "00:07:52"}
+  }
+}

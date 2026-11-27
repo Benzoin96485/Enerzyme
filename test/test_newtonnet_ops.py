@@ -105,7 +105,7 @@ def test_repo_step_matches_self_contraction():
 
 
 def test_envelope_matches_paper_polynomial():
-    from enerzyme.models.cutoff import polynomial_envelope
+    from enerzyme.models.mp.basis.envelope import polynomial_envelope
 
     dist = torch.tensor([0.0, 2.5, 5.0, 6.0])
     env = polynomial_envelope(dist, 5.0, 7)

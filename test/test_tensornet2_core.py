@@ -92,7 +92,7 @@ def test_tensornet2_registration_and_yaml_build():
 
     for name in ("tensornet2", "tensornet-2"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "TensorNet2Core"
+        assert core_cls.__name__ == "tensornet2"
         assert build_params["q_dim"] == 16
         assert build_params["cutoff_sr"] == 4.5
         assert layers[-3]["name"] == "WeightedCoulombEnergy"
@@ -105,12 +105,15 @@ def test_tensornet2_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20, q_dim=2),
         verbose=0,
     )
-    assert model.__class__.__name__ == "TensorNet2Core"
+    from enerzyme.models.mp.core import ComposableCore
+
+    assert isinstance(model, ComposableCore)
     assert model.q_dim == 2
     assert model.charge_channels_dim == 6
     assert model.charge_scale == 0.0
-    assert len(model.charge_heads) == 3
-    assert model.interactions[0].__class__.__name__ == "TensorNet2Interaction"
+    assert model.embed.charge_head is not None
+    assert sum(block.charge_head is not None for block in model.blocks) == 2
+    assert model.blocks[0].interaction.__class__.__name__ == "TensorNet2Interaction"
     readout = next(layer for layer in model.post_sequence if isinstance(layer, SimpleReadout))
     coulomb = next(
         layer for layer in model.post_sequence if isinstance(layer, WeightedCoulombEnergyLayer)
@@ -120,9 +123,9 @@ def test_tensornet2_registration_and_yaml_build():
     assert coulomb.pairs == "all_to_all"
 
     try:
-        from enerzyme.models.tensornet import TensorNet2Core
+        from enerzyme.models.presets.cartesian_tensor import tensornet2
 
-        TensorNet2Core(dim_embedding=4, num_rbf=3, q_dim=0)
+        tensornet2(dim_embedding=4, num_rbf=3, q_dim=0)
     except ValueError as exc:
         assert "q_dim" in str(exc)
     else:
@@ -155,9 +158,9 @@ def test_tensornet2_registration_and_yaml_build():
 
 
 def test_per_atom_charge_must_be_constant_in_a_molecule():
-    from enerzyme.models.tensornet import TensorNet2Core
+    from enerzyme.models.presets.cartesian_tensor import tensornet2
 
-    core = TensorNet2Core(dim_embedding=4, num_rbf=2, q_dim=1, num_interactions=1)
+    core = tensornet2(dim_embedding=4, num_rbf=2, q_dim=1, num_interactions=1)
     like = torch.zeros(4)
     batch = torch.tensor([0, 0, 1, 1])
     same = core.resolve_total_charge(
@@ -174,11 +177,11 @@ def test_per_atom_charge_must_be_constant_in_a_molecule():
 
 def test_charge_conservation_equivariance_and_batch():
     from enerzyme.models.layers.rbf import ExpNormalSmearing
-    from enerzyme.models.tensornet import TensorNet2Core
+    from enerzyme.models.presets.cartesian_tensor import tensornet2
 
     torch.manual_seed(3)
     n, features, num_rbf, q_dim = 4, 5, 3, 2
-    core = TensorNet2Core(
+    core = tensornet2(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_interactions=2,
@@ -234,7 +237,7 @@ def test_charge_conservation_equivariance_and_batch():
         rtol=1e-6,
     )
 
-    so3 = TensorNet2Core(
+    so3 = tensornet2(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_interactions=2,
@@ -244,8 +247,8 @@ def test_charge_conservation_equivariance_and_batch():
         equivariance_group="SO(3)",
     ).double()
     with torch.no_grad():
-        for layer in core.interactions:
-            for linear in layer.linears_tensor:
+        for block in core.blocks:
+            for linear in block.interaction.linears_tensor:
                 linear.weight.mul_(5)
     so3.load_state_dict(core.state_dict())
     so3._radial_holder = [radial]
@@ -407,3 +410,23 @@ def test_stack_energy_force_translation_and_image():
     )
     assert torch.isfinite(isolated["E"]).all()
     assert not torch.allclose(isolated["E"], image["E"], atol=1e-6, rtol=1e-6)
+
+
+def test_prepared_coulomb_pairs_preserve_charge_and_coordinate_derivatives():
+    from enerzyme.models.layers.electrostatics import WeightedCoulombEnergyLayer, intramolecular_pair_indices
+
+    layer = WeightedCoulombEnergyLayer(layer_weights=[1.0, 2.0]).double()
+    positions = torch.randn(5, 3, dtype=torch.float64, requires_grad=True)
+    charges = torch.randn(5, 2, dtype=torch.float64, requires_grad=True)
+    membership = torch.tensor([4, 1, 4, 8, 1])
+    pairs = intramolecular_pair_indices(positions, membership)
+    assert list(zip(pairs[0].tolist(), pairs[1].tolist())) == [(0, 2), (1, 4)]
+
+    def energy_and_derivatives(indices):
+        energy = layer.get_E_coul_a(positions, charges, membership, _pair_indices=indices)
+        forces, = torch.autograd.grad(energy.sum(), positions, create_graph=True)
+        gradients = torch.autograd.grad(energy.square().sum() + forces.square().sum(), (charges, positions))
+        return energy, forces, *gradients
+
+    for actual, expected in zip(energy_and_derivatives(pairs), energy_and_derivatives(None)):
+        torch.testing.assert_close(actual, expected)

@@ -2,7 +2,7 @@
 # https://github.com/IQuestLab/UBio-MolFM
 """On-the-fly Wigner-D frames for E2Former-V2 SO2 / EAAS attention.
 
-Uses the shared e3nn/Jd backend in :mod:`enerzyme.models.so3.wigner_jd` together
+Uses the shared e3nn/Jd backend in :mod:`enerzyme.models.mp.equivariant.rotation.wigner_jd` together
 with UBio-MolFM's Euler convention (z-align absolute positions). Do **not** mix
 with eSCN ``init_edge_rot_mat`` frames unless a numerical parity test exists.
 """
@@ -14,7 +14,7 @@ from typing import List, Optional, Sequence, Tuple
 import torch
 from torch import Tensor
 
-from ..so3.wigner_jd import wigner_D
+from ..mp.equivariant.rotation.wigner_jd import wigner_D
 
 
 def init_edge_rot_euler_angles(
@@ -28,29 +28,24 @@ def init_edge_rot_euler_angles(
     deterministic inference.
     """
     edge_vec_0 = edge_distance_vec
-    edge_vec_0_distance = torch.norm(edge_vec_0, dim=1)
-    mask = edge_vec_0_distance < ts
-    if edge_vec_0_distance.numel() > 0 and bool(torch.min(edge_vec_0_distance) < ts):
-        edge_vec_0_distance = torch.where(
-            edge_vec_0_distance < ts,
-            torch.ones_like(edge_vec_0_distance),
-            edge_vec_0_distance,
-        )
-
-    xyz = edge_vec_0 / edge_vec_0_distance.view(-1, 1)
-    # Boolean OR (not +): keep mask as bool for safe advanced indexing.
+    squared_distance = edge_vec_0.square().sum(dim=1)
+    mask = squared_distance < ts * ts
+    # Mask before the square root so even the second derivative at a
+    # zero-length vector avoids dividing by its norm.
+    edge_vec_0_distance = squared_distance.masked_fill(mask, 1.0).sqrt()
+    xyz = edge_vec_0 / edge_vec_0_distance.unsqueeze(-1)
     mask = mask | xyz[:, 1].abs().isclose(xyz.new_ones(1))
 
-    # float32 normalize can leave |y| slightly outside [-1, 1]; clamp for acos.
-    y_clamped = xyz[:, 1].clamp(-1.0, 1.0)
-
-    beta = xyz.new_zeros(xyz.shape[0])
-    beta[~mask] = torch.acos(y_clamped[~mask])
-    beta[mask] = torch.acos(y_clamped[mask]).detach()
-
-    alpha = torch.zeros_like(beta)
-    alpha[~mask] = torch.atan2(xyz[~mask, 0], xyz[~mask, 2])
-    alpha[mask] = torch.atan2(xyz[mask, 0], xyz[mask, 2]).detach()
+    # Retain the frame at a pole but omit its undefined angle derivatives.
+    # Give the differentiable branch regular inputs even when its value is
+    # discarded: 0 * d(acos)/dy is NaN at |y|=1 during backpropagation.
+    y = xyz[:, 1].clamp(-1.0, 1.0)
+    beta = torch.where(mask, torch.acos(y.detach()), torch.acos(y.masked_fill(mask, 0.0)))
+    x, z = xyz[:, 0], xyz[:, 2]
+    alpha = torch.where(
+        mask, torch.atan2(x.detach(), z.detach()),
+        torch.atan2(x.masked_fill(mask, 0.0), z.masked_fill(mask, 1.0)),
+    )
 
     if training:
         gamma = torch.rand_like(alpha) * 2 * torch.pi
@@ -127,9 +122,7 @@ def build_so2_wigner_frames(
     wigner = wigner.to(dtype=out_dtype)
     wigner_inv = wigner_inv.to(dtype=out_dtype)
 
-    if exp_node_pos.data_ptr() == node_pos.data_ptr() or torch.equal(
-        exp_node_pos, node_pos
-    ):
+    if exp_node_pos is node_pos or torch.equal(exp_node_pos, node_pos):
         wigner_exp, wigner_inv_exp = wigner, wigner_inv
     else:
         wigner_exp, wigner_inv_exp = eulers_to_wigner(

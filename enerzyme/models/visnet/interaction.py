@@ -25,12 +25,13 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module
 
-from ..functional import reduce_edge
-from ..layers.rejection import vector_rejection
+from ..mp.nn.mlp import xavier_linear as _xavier_linear
+from ..mp.nn.field_norm import VECNORM_TYPES, VecLayerNorm, normalize_vecnorm_type  # noqa: F401
+from ..mp.ops import gather_sender, scatter_sum
+from ..mp.equivariant.body_order import rejection_inner
 
 
 VERTEX_TYPES = ("none", "edge", "node")
-VECNORM_TYPES = ("none", "rms", "max_min")
 
 
 def normalize_vertex_type(value: object) -> str:
@@ -51,15 +52,6 @@ def normalize_vertex_type(value: object) -> str:
     return key
 
 
-def normalize_vecnorm_type(value: object) -> str:
-    """Return ``none``, ``rms``, or ``max_min``."""
-    key = str(value).strip().lower().replace("-", "_")
-    if key not in VECNORM_TYPES:
-        choices = ", ".join(VECNORM_TYPES)
-        raise ValueError(f"vecnorm_type must be one of {choices}, got {value!r}")
-    return key
-
-
 def normalize_activation(value: object) -> str:
     """ViSNet's published runs use SiLU. ``swish`` here is that same map."""
     key = str(value).strip().lower()
@@ -68,80 +60,6 @@ def normalize_activation(value: object) -> str:
             f"activation must be 'silu' or 'swish' (exact SiLU), got {value!r}"
         )
     return "silu"
-
-
-def _xavier_linear(layer: Linear) -> None:
-    torch.nn.init.xavier_uniform_(layer.weight)
-    if layer.bias is not None:
-        layer.bias.data.fill_(0)
-
-
-class VecLayerNorm(Module):
-    """Equivariant vector norm from ``visnet.models.utils.VecLayerNorm``.
-
-    ``vec`` is ``[N, 3, F]`` or ``[N, 8, F]``. ``l = 1`` and ``l = 2`` are
-    normalized separately. ``none`` leaves the direction unchanged and still
-    applies the per-channel weight. A non-trainable weight is a buffer of ones.
-    """
-
-    def __init__(self, hidden_channels: int, trainable: bool, norm_type: str) -> None:
-        super().__init__()
-        self.hidden_channels = int(hidden_channels)
-        self.norm_type = normalize_vecnorm_type(norm_type)
-        self.trainable = bool(trainable)
-        self.eps = 1e-12
-        weight = torch.ones(self.hidden_channels)
-        if self.trainable:
-            self.weight = torch.nn.Parameter(weight)
-        else:
-            self.register_buffer("weight", weight)
-        if self.norm_type == "rms":
-            self._norm = self.rms_norm
-        elif self.norm_type == "max_min":
-            self._norm = self.max_min_norm
-        else:
-            self._norm = self.none_norm
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        self.weight.data.copy_(torch.ones(self.hidden_channels))
-
-    def none_norm(self, vec: Tensor) -> Tensor:
-        return vec
-
-    def rms_norm(self, vec: Tensor) -> Tensor:
-        dist = torch.linalg.vector_norm(vec, dim=1)
-        if bool((dist == 0).all()):
-            return torch.zeros_like(vec)
-        dist = dist.clamp(min=self.eps)
-        dist = torch.sqrt(torch.mean(dist.square(), dim=-1))
-        return vec / F.relu(dist).unsqueeze(-1).unsqueeze(-1)
-
-    def max_min_norm(self, vec: Tensor) -> Tensor:
-        dist = torch.linalg.vector_norm(vec, dim=1, keepdim=True)
-        if bool((dist == 0).all()):
-            return torch.zeros_like(vec)
-        dist = dist.clamp(min=self.eps)
-        direct = vec / dist
-        max_val, _ = torch.max(dist, dim=-1)
-        min_val, _ = torch.min(dist, dim=-1)
-        delta = (max_val - min_val).reshape(-1)
-        delta = torch.where(delta == 0, torch.ones_like(delta), delta)
-        dist = (dist - min_val.reshape(-1, 1, 1)) / delta.reshape(-1, 1, 1)
-        return F.relu(dist) * direct
-
-    def forward(self, vec: Tensor) -> Tensor:
-        if vec.shape[1] == 3:
-            normalized = self._norm(vec)
-        elif vec.shape[1] == 8:
-            vec1, vec2 = torch.split(vec, [3, 5], dim=1)
-            normalized = torch.cat((self._norm(vec1), self._norm(vec2)), dim=1)
-        else:
-            raise ValueError(
-                "VecLayerNorm expects 3 or 8 angular channels, "
-                f"got {vec.shape[1]}"
-            )
-        return normalized * self.weight.view(1, 1, -1)
 
 
 class EdgeEmbedding(Module):
@@ -166,19 +84,8 @@ class EdgeEmbedding(Module):
         rbf: Tensor,
         scalar: Tensor,
     ) -> Tensor:
-        mixed = scalar.index_select(0, idx_i) + scalar.index_select(0, idx_j)
+        mixed = scalar.index_select(0, idx_i) + gather_sender(scalar, idx_j)
         return mixed * self.edge_proj(rbf)
-
-
-def _rejection_inner(
-    left: Tensor,
-    right: Tensor,
-    direction: Tensor,
-) -> Tensor:
-    """Inner product of the two rejections. Shape ``[E, C]``."""
-    rejected_left = vector_rejection(left, direction)
-    rejected_right = vector_rejection(right, -direction)
-    return (rejected_left * rejected_right).sum(dim=1)
 
 
 class ViSInteraction(Module):
@@ -271,12 +178,12 @@ class ViSInteraction(Module):
             if isinstance(layer, Linear):
                 _xavier_linear(layer)
 
-    def _receiver_angle(self, receiver: Tensor, direction: Tensor) -> Tensor:
+    def _receiver_angle(self, vector: Tensor, idx_i: Tensor, direction: Tensor) -> Tensor:
         if self.t_src_proj is None or self.t_trg_proj is None:
             raise RuntimeError("receiver angle requested without t projections")
-        return _rejection_inner(
-            self.t_trg_proj(receiver),
-            self.t_src_proj(receiver),
+        return rejection_inner(
+            self.t_trg_proj(vector).index_select(0, idx_i),
+            self.t_src_proj(vector).index_select(0, idx_i),
             direction,
         )
 
@@ -294,15 +201,15 @@ class ViSInteraction(Module):
             or self.w_trg_proj is None
         ):
             raise RuntimeError("edge residual requested on the last layer")
-        dihedral = _rejection_inner(
-            self.w_trg_proj(vector.index_select(0, idx_i)),
-            self.w_src_proj(vector.index_select(0, idx_j)),
+        dihedral = rejection_inner(
+            self.w_trg_proj(vector).index_select(0, idx_i),
+            self.w_src_proj(vector).index_select(0, idx_j),
             direction,
         )
         filtered = F.silu(self.f_proj(edge))
         if self.vertex_type != "edge":
             return filtered * dihedral
-        angle = self._receiver_angle(vector.index_select(0, idx_i), direction)
+        angle = self._receiver_angle(vector, idx_i, direction)
         first, second = torch.split(filtered, self.hidden_channels, dim=-1)
         return first * dihedral + second * angle
 
@@ -338,6 +245,11 @@ class ViSInteraction(Module):
         """
         return vector_gate * out_scale.unsqueeze(1) + aggregated_vector
 
+    def _vector_message(self, scalar_message: Tensor, vector_n: Tensor, idx_j: Tensor, direction: Tensor) -> Tensor:
+        gate, coeff = torch.split(F.silu(self.s_proj(scalar_message)), self.hidden_channels, dim=-1)
+        vector_message = vector_n.index_select(0, idx_j) * gate.unsqueeze(1)
+        return vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
+
     def forward(
         self,
         scalar: Tensor,
@@ -348,6 +260,19 @@ class ViSInteraction(Module):
         window: Tensor,
         direction: Tensor,
     ) -> tuple[Tensor, Tensor, Optional[Tensor]]:
+        return self._update(scalar, vector, edge, idx_i, idx_j, window, direction, defer_vector=False)
+
+    def _update(
+        self,
+        scalar: Tensor,
+        vector: Tensor,
+        edge: Tensor,
+        idx_i: Tensor,
+        idx_j: Tensor,
+        window: Tensor,
+        direction: Tensor,
+        *, defer_vector: bool,
+    ):
         n_atoms = int(scalar.shape[0])
         if idx_i.shape != idx_j.shape or idx_i.ndim != 1:
             raise ValueError(
@@ -398,20 +323,15 @@ class ViSInteraction(Module):
         scalar_message = (value_j * attention.unsqueeze(-1)).reshape(
             n_edges, self.hidden_channels
         )
-        gate, coeff = torch.split(F.silu(self.s_proj(scalar_message)), self.hidden_channels, dim=-1)
-        vector_message = vector_n.index_select(0, idx_j) * gate.unsqueeze(1)
-        vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
-
-        aggregated_scalar = reduce_edge(
-            scalar_message, idx_i, (n_atoms, self.hidden_channels)
-        )
-        aggregated_vector = reduce_edge(
-            vector_message, idx_i, (n_atoms, angular, self.hidden_channels)
-        )
+        if not defer_vector:
+            vector_message = self._vector_message(scalar_message, vector_n, idx_j, direction)
+        aggregated_scalar = scatter_sum(scalar_message, idx_i, n_atoms)
+        if not defer_vector:
+            aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
         mixed = self.o_proj(aggregated_scalar)
         if self.vertex_type == "node":
-            angle = self._receiver_angle(vector_n.index_select(0, idx_i), direction)
-            aggregated_angle = reduce_edge(angle, idx_i, (n_atoms, self.hidden_channels))
+            angle = self._receiver_angle(vector_n, idx_i, direction)
+            aggregated_angle = scatter_sum(angle, idx_i, n_atoms)
             out_scale, out_dot, out_angle, out_bias = torch.split(
                 mixed, self.hidden_channels, dim=-1
             )
@@ -421,6 +341,8 @@ class ViSInteraction(Module):
                 mixed, self.hidden_channels, dim=-1
             )
             delta_scalar = vector_dot * out_dot + out_bias
+        if defer_vector:
+            return delta_scalar, (scalar_message, vector_n, vec3, out_scale)
         delta_vector = self._vector_residual(vec3, out_scale, aggregated_vector)
         delta_edge = None
         if not self.last_layer:

@@ -1,0 +1,395 @@
+"""Radial cutoffs and polynomial envelopes.
+
+Transition functions (:func:`polynomial_transition`, :func:`bump_transition`,
+…) map a distance onto ``[0, 1]`` for RBF / physics layers. Envelope modules
+(:class:`PolynomialEnvelope`, :class:`DimeNetEnvelope`,
+:class:`C3CutoffEnvelope`) are the same family of smooth radial windows used
+inside equivariant message passing (EquiformerV3, DimeNet, DPA4).
+:func:`xplor_transition` is the CHARMM / XPLOR switch used by EquFlash
+(``cuton`` / ``cutoff_on``). :func:`nequip_envelope` is the NequIP / Nequix
+polynomial cutoff (``p = 6``), the same polynomial as
+:class:`PolynomialEnvelope`. :func:`facto_polynomial_cutoff` is the separate
+degree-9 window from FACTO. :func:`powered_cosine_window` is the GRACE
+``(r/rc)^p`` cosine window. :func:`exponential_switch` is the DPA3 neighbor
+gate (Zhang et al., arXiv:2506.01686, Eq. 12). The DeePMD polynomial gate on
+``[r_cs, r_c]`` is :func:`polynomial_transition` with ``cuton=r_cs``.
+"""
+
+from __future__ import annotations
+
+import math
+from typing import Callable, Literal
+
+import torch
+from torch import Tensor
+
+
+def scale(cutoff_fn: Callable[[Tensor, Tensor, Tensor], Tensor]):
+    def scaled_transition_fn(x: Tensor, cutoff: float, cuton: float=0) -> Tensor:
+        zeros = torch.zeros_like(x)
+        ones = torch.ones_like(x)
+        x_ = (x - cuton) / (cutoff - cuton)
+        kernel = cutoff_fn(x_, zeros, ones)
+        return torch.where(x_ > 0, torch.where(x_ < 1, kernel, zeros), ones)
+    return scaled_transition_fn
+
+
+@scale
+def polynomial_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
+    """
+    Polynomial cutoff function that goes from f(x) = 1 to f(x) = 0 in the interval
+    from x = 0 to x = 1 with sufficiently many smooth derivatives [1].
+    For x >= 1, f(x) = 0.
+    For x <= 0, f(x) = 1.
+
+    Params:
+    -----
+
+    x: Only 0<=x<=1 should be used as input.
+
+    References:
+    -----
+    [1] Texturing & Modeling: A Procedural Approach; Morgan Kaufmann: 2003.
+    """
+    x3 = x_ ** 3
+    x4 = x3 * x_
+    x5 = x4 * x_
+    return 1 - 6 * x5 + 15 * x4 - 10 * x3
+
+
+@scale
+def bump_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
+    """
+    Smooth cutoff function that goes from f(x) = 1 to f(x) = 0 in the interval
+    from x = 0 to x = cutoff [1].
+    For x >= cutoff, f(x) = 0.
+
+    Params:
+    -----
+
+    x: Only 0<=x<=1 should be used as input.
+
+    References:
+    -----
+    [1] Nat. Commun., 2021, 12, 7273.
+    """
+    x_ = torch.where((0 < x_) & (x_ < 1), x_, zeros)
+    x2 = x_ ** 2
+    return torch.exp(-x2 / (1 - x2))
+
+
+def _smooth_transition(x_: Tensor, ones: Tensor) -> Tensor:
+    return torch.exp(-1 / torch.where(x_ > 0, x_, ones))
+
+
+@scale
+def smooth_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
+    fp = _smooth_transition(x_, ones)
+    fm = _smooth_transition(1 - x_, ones)
+    return fm / (fp + fm)
+
+
+@scale
+def cosine_transition(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
+    """
+    Cosine cutoff on the scaled interval ``[0, 1]`` (So3krates / Eq. 17 style).
+    For x <= 0 return 1; for x >= 1 return 0; else ``0.5 * (cos(pi * x) + 1)``.
+    """
+    return torch.where(
+        x_ <= 0,
+        ones,
+        torch.where(x_ >= 1, zeros, 0.5 * (torch.cos(torch.pi * x_) + 1.0)),
+    )
+
+
+def exponential_switch(
+    distance: Tensor, cutoff: float, cuton: float = 0.0, decay: float = 20.0
+) -> Tensor:
+    """DPA3 exponential neighbor gate.
+
+    .. math::
+
+        s(r) = \\exp\\!\\big(-\\exp(C (r - r_{cs}) / r_{cs})\\big)
+        \\quad (r < r_c), \\qquad s(r) = 0 \\quad (r \\ge r_c).
+
+    ``cuton`` is the smoothing distance :math:`r_{cs}` and must lie in
+    ``(0, cutoff)``. ``decay`` is :math:`C` (20 in the paper and in
+    DeePMD-kit). At the origin the gate is just under 1. It is not the
+    polynomial :func:`polynomial_transition`.
+    """
+    if not 0.0 < float(cuton) < float(cutoff):
+        raise ValueError(
+            f"exponential switch needs 0 < cuton < cutoff, got cuton={cuton}, cutoff={cutoff}"
+        )
+    if float(decay) <= 0.0:
+        raise ValueError(f"exponential switch decay must be positive, got {decay}")
+    width = distance.new_tensor(float(cuton))
+    gate = torch.exp(-torch.exp(float(decay) * (distance - width) / width))
+    return torch.where(distance < float(cutoff), gate, torch.zeros_like(distance))
+
+
+def xplor_transition(distance: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
+    """CHARMM / XPLOR switching function on absolute distance.
+
+    Returns 1 for ``r <= cuton``, 0 for ``r >= cutoff``, and the standard
+    cubic polynomial in ``r^2`` in between. ``cuton`` must satisfy
+    ``0 <= cuton < cutoff``. ``cuton=0`` is a valid full-range switch. This
+    window is not a linearly rescaled ``[0, 1]`` polynomial, so it does not
+    use :func:`scale`.
+    """
+    if not 0.0 <= float(cuton) < float(cutoff):
+        raise ValueError(f"cuton ({cuton}) must satisfy 0 <= cuton < cutoff ({cutoff})")
+    radius_sq = distance * distance
+    on_sq = float(cuton) ** 2
+    cut_sq = float(cutoff) ** 2
+    window = (
+        (cut_sq - radius_sq) ** 2
+        * (cut_sq + 2.0 * radius_sq - 3.0 * on_sq)
+        / (cut_sq - on_sq) ** 3
+    )
+    return torch.where(
+        distance <= cuton,
+        torch.ones_like(distance),
+        torch.where(distance >= cutoff, torch.zeros_like(distance), window),
+    )
+
+
+@scale
+def facto_polynomial_cutoff(x_: Tensor, zeros: Tensor, ones: Tensor) -> Tensor:
+    """C³ polynomial window used by FACTO (Liu et al., arXiv:2611.03276).
+
+    On the scaled coordinate ``x = r / R``::
+
+        f(x) = 1 - 84 x^6 + 216 x^7 - 189 x^8 + 56 x^9
+
+    ``f(0) = 1``, ``f(1) = 0``, and ``f', f'', f'''`` vanish at ``x = 1``.
+    The first five derivatives also vanish at ``x = 0``. On ``(0, 1)`` the
+    derivative is ``504 x^5 (x - 1)^3``, so ``f`` decreases from 1 to 0.
+    Distinct from :class:`C3CutoffEnvelope` (DeePMD / DPA4) and from
+    :class:`PolynomialEnvelope`.
+    """
+    x2 = x_ * x_
+    x3 = x2 * x_
+    x6 = x3 * x3
+    return 1.0 - 84.0 * x6 + 216.0 * x6 * x_ - 189.0 * x6 * x2 + 56.0 * x6 * x3
+
+
+def powered_cosine_window(distance: Tensor, cutoff: float, order: int) -> Tensor:
+    """``0.5 * (1 + cos(pi (r/rc)^p))`` on ``[0, rc)``, else 0.
+
+    GRACE uses ``p = 16`` for the foundation radial basis and ``p = 5`` for
+    the Finnis–Sinclair student. The derivative vanishes at ``r = rc`` because
+    ``sin(pi) = 0``, so a hard mask at the cutoff does not kink the force.
+    Distinct from :func:`cosine_transition`, which is linear in ``r/rc``.
+    """
+    if order < 1:
+        raise ValueError(f"cutoff order must be >= 1, got {order}")
+    ratio = (distance / cutoff).clamp(min=0)
+    powered = ratio if order == 1 else ratio.pow(int(order))
+    window = 0.5 * (1.0 + torch.cos(math.pi * powered))
+    return torch.where(distance < cutoff, window, torch.zeros_like(distance))
+
+
+def facto_pair_window(distance: Tensor, cutoff: float, r_short: float) -> Tensor:
+    """FACTO radial gate ``χ = f(r; Rc) * (1 - f(r; Rs))``.
+
+    ``f(·; Rc)`` is 1 at the origin and 0 at the interaction cutoff.
+    ``1 - f(·; Rs)`` suppresses learned pair terms inside the short-range
+    radius, where the ZBL repulsion carries the wall.
+    """
+    if r_short <= 0.0 or r_short >= cutoff:
+        raise ValueError(
+            f"short-range radius must lie in (0, cutoff), got Rs={r_short}, Rc={cutoff}"
+        )
+    outer = facto_polynomial_cutoff(distance, cutoff)
+    inner = facto_polynomial_cutoff(distance, r_short)
+    return outer * (1.0 - inner)
+
+
+CUTOFF_REGISTER = {
+    "polynomial": polynomial_transition,
+    # SO3LR / So3krates-torch alias for the PhysNet polynomial envelope.
+    "phys": polynomial_transition,
+    "bump": bump_transition,
+    "smooth": smooth_transition,
+    "cosine": cosine_transition,
+    "xplor": xplor_transition,
+    "exponential": exponential_switch,
+    "facto": facto_polynomial_cutoff,
+}
+CUTOFF_KEY_TYPE = Literal[
+    "polynomial", "phys", "bump", "smooth", "cosine", "xplor", "exponential",
+    "nequip", "facto",
+]
+
+
+class Envelope(torch.nn.Module):
+    """Radial window ``f(d)`` as a module, shape-preserving.
+
+    ``kind`` is a :data:`CUTOFF_REGISTER` transition evaluated on
+    ``[cuton, cutoff]`` (``"cosine"``, ``"polynomial"``, ``"bump"``, ...), or
+    ``"polynomial_p"`` for :func:`polynomial_envelope` with ``exponent``.
+    """
+
+    def __init__(self, kind: str = "cosine", cutoff: float = 5.0, cuton: float = 0.0,
+                 exponent: int = 5) -> None:
+        super().__init__()
+        aliases = {"smoothstep": "polynomial", "poly9": "facto"}
+        kind = aliases.get(kind, kind)
+        if kind not in ("c3", "polynomial_p") and kind not in CUTOFF_REGISTER:
+            choices = sorted(set(CUTOFF_REGISTER) | set(aliases) | {"c3", "polynomial_p"})
+            raise KeyError(f"unknown envelope {kind!r}; choose from {choices}")
+        if kind in ("c3", "polynomial_p") and cuton != 0.0:
+            raise ValueError(f"{kind} is defined on [0, cutoff] and requires cuton=0")
+        self.c3 = C3CutoffEnvelope(cutoff, exponent) if kind == "c3" else None
+        self.kind = kind
+        self.cutoff = float(cutoff)
+        self.cuton = float(cuton)
+        self.exponent = int(exponent)
+
+    def forward(self, distance: Tensor) -> Tensor:
+        if self.c3 is not None:
+            return self.c3(distance)
+        if self.kind == "polynomial_p":
+            return polynomial_envelope(distance, self.cutoff, self.exponent)
+        return CUTOFF_REGISTER[self.kind](distance, cutoff=self.cutoff, cuton=self.cuton)
+
+    def extra_repr(self) -> str:
+        return f"kind={self.kind}, cutoff={self.cutoff}, cuton={self.cuton}"
+
+
+def polynomial_envelope(distance: Tensor, cutoff, exponent: int) -> Tensor:
+    """``1 + a x^p + b x^{p+1} + c x^{p+2}`` on ``x = r / cutoff < 1``, else 0.
+
+    Shared by :class:`PolynomialEnvelope`, the NequIP Bessel flavor, and
+    :func:`nequip_envelope`. This is not the PhysNet
+    :func:`polynomial_transition` and not the FACTO degree-9 window.
+    ``cutoff`` may be a scalar or a per-distance tensor (Geodite's ZBL
+    envelope uses the sum of covalent radii on each edge).
+    """
+    if int(exponent) <= 0:
+        raise ValueError(f"exponent must be positive, got {exponent}")
+    p = float(exponent)
+    a = -(p + 1) * (p + 2) / 2
+    b = p * (p + 2)
+    c = -p * (p + 1) / 2
+    cutoff_t = torch.as_tensor(cutoff, dtype=distance.dtype, device=distance.device)
+    scaled = distance / cutoff_t
+    env = 1 + a * scaled**p + b * scaled ** (p + 1) + c * scaled ** (p + 2)
+    return torch.where(scaled < 1, env, torch.zeros_like(scaled))
+
+
+class PolynomialEnvelope(torch.nn.Module):
+    """Polynomial envelope that goes smoothly to zero at ``cutoff``.
+
+    Distinct from PhysNet-style :func:`polynomial_transition` (this form is
+    ``1 + a x^p + b x^{p+1} + c x^{p+2}`` on ``x = r / cutoff``, without the
+    DimeNet ``1/x``).
+
+    Reference:
+        https://github.com/facebookresearch/fairchem (eSEN radial envelope)
+        EquiformerV3 (Liao et al., 2026)
+    """
+
+    def __init__(self, cutoff: float = 6.0, exponent: int = 5) -> None:
+        super().__init__()
+        if int(exponent) <= 0:
+            raise ValueError(f"exponent must be positive, got {exponent}")
+        self.cutoff = float(cutoff)
+        self.exponent = int(exponent)
+
+    def forward(self, distance: torch.Tensor) -> torch.Tensor:
+        return polynomial_envelope(distance, self.cutoff, self.exponent).view(-1, 1)
+
+    def extra_repr(self) -> str:
+        return f"cutoff={self.cutoff}, exponent={self.exponent}"
+
+
+def nequip_envelope(distance: Tensor, cutoff: float, cuton: float = 0.0) -> Tensor:
+    """NequIP / Nequix polynomial cutoff with exponent ``p = 6``.
+
+    On ``x = r / cutoff`` this is ``PolynomialEnvelope(..., exponent=6)``:
+    ``1 + a x^6 + b x^7 + c x^8`` for ``r < cutoff`` and 0 otherwise.
+    ``cuton`` is ignored. This is not the PhysNet ``polynomial`` transition.
+    """
+    del cuton
+    return polynomial_envelope(distance, float(cutoff), 6).reshape(distance.shape)
+
+
+CUTOFF_REGISTER["nequip"] = nequip_envelope
+
+
+class DimeNetEnvelope(torch.nn.Module):
+    """DimeNet polynomial envelope divided by scaled distance (``u(x)/x``).
+
+    Official ``gasteigerjo/dimenet`` / PyG ``Envelope``: ``envelope_exponent=5``
+    sets ``p = exponent + 1 = 6`` (paper Eq. 8). On scaled ``x = d / cutoff``::
+
+        u(x)/x = 1/x + a x^{p-1} + b x^p + c x^{p+1}    (x < 1)
+        u(x)/x = 0                                       (x >= 1)
+
+    with ``a = -(p+1)(p+2)/2``, ``b = p(p+2)``, ``c = -p(p+1)/2``.
+    The ``1/x`` is absorbed into spherical Bessel ``j_0 ~ sin(x)/x`` when this
+    envelope multiplies ``sin(n π x)``.
+    """
+
+    def __init__(self, exponent: int = 5) -> None:
+        super().__init__()
+        if exponent <= 0:
+            raise ValueError("`exponent` must be positive")
+        self.exponent = int(exponent)
+        self.p = float(self.exponent + 1)
+        self.a = -(self.p + 1) * (self.p + 2) / 2
+        self.b = self.p * (self.p + 2)
+        self.c = -self.p * (self.p + 1) / 2
+
+    def forward(self, x: Tensor) -> Tensor:
+        p, a, b, c = self.p, self.a, self.b, self.c
+        x_safe = x.clamp(min=1e-12)
+        x_pow_p0 = x_safe.pow(p - 1)
+        x_pow_p1 = x_pow_p0 * x_safe
+        x_pow_p2 = x_pow_p1 * x_safe
+        env = 1.0 / x_safe + a * x_pow_p0 + b * x_pow_p1 + c * x_pow_p2
+        return env * (x < 1.0).to(dtype=x.dtype)
+
+    def extra_repr(self) -> str:
+        return f"exponent={self.exponent}, p={int(self.p)}"
+
+
+class C3CutoffEnvelope(torch.nn.Module):
+    """C³-continuous polynomial cutoff envelope ``E_p(x)``.
+
+    For scaled distance ``x = r / rcut`` and ``u = 1 - x``::
+
+        E_p(x) = u^4 * sum_{k=0}^{p-1} C(k+3, 3) x^k   (x < 1)
+        E_p(x) = 0                                        (x >= 1)
+
+    Default ``p=5`` gives ``E_5(x) = u^4 (1 + 4x + 10x^2 + 20x^3 + 35x^4)``.
+    """
+
+    def __init__(self, rcut: float, exponent: int = 5) -> None:
+        super().__init__()
+        if rcut <= 0.0:
+            raise ValueError("`rcut` must be positive")
+        if exponent <= 0:
+            raise ValueError("`exponent` must be positive")
+        self.rcut = float(rcut)
+        self.p = int(exponent)
+        coeffs = tuple(float(math.comb(k + 3, 3)) for k in range(self.p))
+        self.register_buffer(
+            "series_coefficients",
+            torch.tensor(coeffs, dtype=torch.float64),
+            persistent=False,
+        )
+
+    def forward(self, dst: Tensor) -> Tensor:
+        u = ((self.rcut - dst) / self.rcut).clamp(min=0.0, max=1.0)
+        x = 1.0 - u
+        coeffs = self.series_coefficients.to(dtype=x.dtype, device=x.device)
+        series = coeffs[-1]
+        for coefficient in coeffs[:-1].unbind()[::-1]:
+            series = coefficient + x * series
+        return (u**4) * series
+
+    def extra_repr(self) -> str:
+        return f"rcut={self.rcut}, exponent={self.p}"

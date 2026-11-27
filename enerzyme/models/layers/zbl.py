@@ -16,9 +16,9 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Parameter, init
-from torch_scatter import segment_sum_coo
+from ..mp.ops import scatter_sum
 
-from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
+from ..mp.basis.envelope import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 from ..functional import softplus_inverse
 from . import BaseFFLayer
 
@@ -35,10 +35,10 @@ class ZBLRepulsionEnergyLayer(BaseFFLayer):
         switch_off: Optional[float] = None,
     ) -> None:
         """
-        Args:
-            Bohr_in_R / Hartree_in_E: unit conversion; ``kehalf = 0.5 * Bohr * Hartree``.
-            switch_off: if set (SO3LR: 1.5), multiply by smooth switch on ``[0, switch_off]``.
-                ``None`` keeps SpookyNet behaviour (envelope only via ``cutoff_values_sr``).
+        The unit conversion uses ``kehalf = 0.5 * Bohr_in_R * Hartree_in_E``.
+        When ``switch_off`` is set (1.5 for SO3LR), multiply by a smooth switch
+        on ``[0, switch_off]``. With ``None``, the SpookyNet envelope comes
+        only from ``cutoff_values_sr``.
         """
         super().__init__(output_fields={"E_zbl_a"})
         self.a0 = Bohr_in_R
@@ -107,8 +107,4 @@ class ZBLRepulsionEnergyLayer(BaseFFLayer):
         if self.switch_off is not None:
             # SO3LR: smooth decay to ~0 by switch_off (Å), on top of NN cutoff envelope.
             f = f * self._switch(Dij_sr, self.switch_off, 0.0)
-        return segment_sum_coo(
-            self.kehalf * f * zizj / Dij_sr.clamp_min(1e-6),
-            idx_i_sr,
-            dim_size=len(Za),
-        )
+        return scatter_sum(self.kehalf * f * zizj / Dij_sr.clamp_min(1e-6), idx_i_sr, len(Za))

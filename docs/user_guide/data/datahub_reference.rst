@@ -105,10 +105,27 @@ Preprocessing flags
 -------------------
 
 :code:`neighbor_list`
-    :code:`full` precomputes all-pairs edges. Empty string computes on the fly during training (higher cost, flexible).
+    For open boundaries, :code:`full` precomputes all atom pairs and an empty
+    string builds them during batching. :code:`cutoff` uses a linked-cell
+    search with radius :code:`neighbor_list_cutoff` and supports open, partially
+    periodic, and fully periodic structures.
+
+    For periodic data, map :code:`cell` (three lattice vectors as rows) and
+    :code:`pbc` (three boolean flags) under :code:`features`. A true flag enables
+    images along the corresponding lattice vector. The cutoff list stores a
+    Cartesian :code:`offsets` vector for every edge. :code:`DistanceLayer` adds
+    it to the neighbor position before computing the displacement. Samples
+    with a periodic axis require image-aware edges and offsets.
+
+:code:`neighbor_list_cutoff`
+    Search radius for :code:`neighbor_list: cutoff`. Should be at least as large as the
+    largest cutoff used by any downstream layer (message-passing :code:`cutoff_sr`,
+    electrostatics :code:`cutoff_real`/:code:`cutoff_lr`, ...), since those layers only
+    ever narrow this precomputed pair list further, never extend it.
 
 :code:`compressed`
-    Share :code:`Za`, :code:`N`, :code:`Q`, and neighbor lists across frames with identical stoichiometry and atom order.
+    Share frame-independent data across samples where possible. Cutoff lists
+    and image offsets depend on the geometry and are stored per frame.
 
 :code:`preload`
     Load :code:`processed_dataset_<hash>/pre_transformed.hdf5` if the config hash matches.

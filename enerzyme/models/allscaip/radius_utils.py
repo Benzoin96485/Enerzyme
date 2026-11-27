@@ -7,27 +7,6 @@ from __future__ import annotations
 import torch
 
 
-def safe_norm(
-    x: torch.Tensor,
-    dim: int = -1,
-    keepdim: bool = False,
-    eps: float = 1e-12,
-) -> torch.Tensor:
-    vec_norm_sq = x.square().sum(dim=dim, keepdim=keepdim)
-    vec_norm = vec_norm_sq.clamp_min(eps).sqrt()
-    return torch.where(vec_norm_sq <= eps, torch.zeros_like(vec_norm), vec_norm)
-
-
-def safe_normalize(
-    x: torch.Tensor,
-    dim: int = -1,
-    eps: float = 1e-12,
-) -> torch.Tensor:
-    vec_norm_sq = x.square().sum(dim=dim, keepdim=True)
-    vec_norm = vec_norm_sq.clamp_min(eps).sqrt()
-    return torch.where(vec_norm_sq <= eps, torch.zeros_like(x), x / vec_norm)
-
-
 def envelope_fn(x: torch.Tensor, envelope: bool = True) -> torch.Tensor:
     if envelope:
         env = -x.pow(2) / (1 - x.pow(2))

@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import torch
+import pytest
 import yaml
 from numpy.testing import assert_allclose
 
@@ -34,7 +35,7 @@ def _random_so3(dtype=torch.float64):
 
 
 def _tiny_core(**kwargs):
-    from enerzyme.models.equiformer_v3 import EquiformerV3Core
+    from enerzyme.models.presets.so2 import equiformer_v3
 
     defaults = dict(
         dim_embedding=8,
@@ -59,7 +60,7 @@ def _tiny_core(**kwargs):
         cutoff_sr=5.0,
     )
     defaults.update(kwargs)
-    return EquiformerV3Core(**defaults)
+    return equiformer_v3(**defaults)
 
 
 def test_equiformer_v3_core_atom_feature_shape():
@@ -187,7 +188,7 @@ def test_equiformer_v3_yaml_example_builds():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "EquiformerV3Core"
+    assert model.__class__.__name__ == "ComposableCore"
 
 
 def test_equiformer_v3_force_finite_difference_conservation():
@@ -253,7 +254,7 @@ def test_equiformer_v3_force_finite_difference_conservation():
 
 def test_equiformer_v3_wigner_stays_in_autograd_graph():
     """SO3RotationFused Wigner must not be detached when use_rotation_mask=False."""
-    from enerzyme.models.so3 import SO3RotationFused, init_edge_rot_mat
+    from enerzyme.models.mp.equivariant import SO3RotationFused, init_edge_rot_mat
 
     torch.manual_seed(0)
     dtype = torch.float64
@@ -273,7 +274,7 @@ def test_equiformer_v3_drop_path_disabled_when_rate_zero():
     """drop_path_rate=0 must omit GraphDropPath (avoids empty batch_seg.max crash)."""
     core_off = _tiny_core(drop_path_rate=0.0)
     for blk in core_off.blocks:
-        assert blk.drop_path is None
+        assert blk.module.drop_path is None
     core_on = _tiny_core(drop_path_rate=0.1)
     for blk in core_on.blocks:
-        assert blk.drop_path is not None
+        assert blk.module.drop_path is not None

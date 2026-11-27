@@ -1,0 +1,388 @@
+{
+ "job": "6332515",
+ "device": "GPU-34f059c2-96ad-b500-81b4-48607e7bcca1, Tesla V100-PCIE-32GB\nGPU-985a1720-89a9-55c2-7b34-429ade146d97, Tesla V100-PCIE-32GB",
+ "baseline": "1aa0f8b",
+ "candidate": "5d53f9c",
+ "system": "mol_batch_32x20",
+ "mode": "compiled force inference",
+ "method": "Frozen pre-refactor weights and acceptance inputs; three warm-up calls, then the CUDA allocator history of one call is replayed to its peak. Live blocks are grouped by the innermost non-generated source frames of the allocation (top 40 sites).",
+ "models": {
+  "gemnet-float32": {
+   "baseline": {
+    "peak_allocated_mib": 853.0,
+    "live_blocks_at_peak": 398,
+    "top_sources": [
+     {
+      "mib": 144.3,
+      "blocks": 5,
+      "source": "layers.py:144:forward <- layers.py:285:forward"
+     },
+     {
+      "mib": 61.0,
+      "blocks": 5,
+      "source": "scatter.py:21:scatter_sum <- functional.py:15:segment_sum_coo"
+     },
+     {
+      "mib": 52.8,
+      "blocks": 5,
+      "source": "layers.py:158:forward <- layers.py:245:update"
+     },
+     {
+      "mib": 32.5,
+      "blocks": 1,
+      "source": "layers.py:145:forward <- layers.py:285:forward"
+     },
+     {
+      "mib": 24.4,
+      "blocks": 6,
+      "source": "layers.py:65:forward <- layers.py:85:forward"
+     },
+     {
+      "mib": 20.3,
+      "blocks": 3,
+      "source": "layers.py:65:forward <- layers.py:158:forward"
+     },
+     {
+      "mib": 16.3,
+      "blocks": 4,
+      "source": "layers.py:52:forward <- layers.py:67:forward"
+     },
+     {
+      "mib": 8.3,
+      "blocks": 1,
+      "source": "layers.py:158:forward <- core.py:308:torch_dynamo_resume_in_get_output_at_300"
+     }
+    ]
+   },
+   "candidate": {
+    "peak_allocated_mib": 1076.8,
+    "live_blocks_at_peak": 383,
+    "top_sources": [
+     {
+      "mib": 186.9,
+      "blocks": 8,
+      "source": "layers.py:144:forward <- layers.py:283:forward"
+     },
+     {
+      "mib": 97.5,
+      "blocks": 3,
+      "source": "layers.py:145:forward <- layers.py:283:forward"
+     },
+     {
+      "mib": 56.9,
+      "blocks": 4,
+      "source": "scatter.py:84:scatter_sum <- layers.py:142:forward"
+     },
+     {
+      "mib": 52.8,
+      "blocks": 5,
+      "source": "layers.py:158:forward <- layers.py:243:update"
+     },
+     {
+      "mib": 16.3,
+      "blocks": 4,
+      "source": "layers.py:65:forward <- layers.py:85:forward"
+     },
+     {
+      "mib": 8.3,
+      "blocks": 1,
+      "source": "layers.py:158:forward <- stages.py:111:forward"
+     },
+     {
+      "mib": 8.1,
+      "blocks": 2,
+      "source": "layers.py:65:forward <- layers.py:158:forward"
+     },
+     {
+      "mib": 8.1,
+      "blocks": 2,
+      "source": "layers.py:65:forward <- layers.py:191:forward"
+     }
+    ]
+   }
+  },
+  "alignn-float32": {
+   "baseline": {
+    "peak_allocated_mib": 781.4,
+    "live_blocks_at_peak": 185,
+    "top_sources": [
+     {
+      "mib": 236.1,
+      "blocks": 8,
+      "source": "interaction.py:118:forward <- interaction.py:169:forward"
+     },
+     {
+      "mib": 224.3,
+      "blocks": 4,
+      "source": "interaction.py:56:forward <- core.py:236:torch_dynamo_resume_in__angles_at_225"
+     },
+     {
+      "mib": 194.8,
+      "blocks": 12,
+      "source": "interaction.py:40:_apply_norm <- interaction.py:125:forward"
+     },
+     {
+      "mib": 35.0,
+      "blocks": 1,
+      "source": "core.py:233:torch_dynamo_resume_in__angles_at_225 <- core.py:225:torch_dynamo_resume_in__angles_at_225"
+     },
+     {
+      "mib": 11.8,
+      "blocks": 4,
+      "source": "interaction.py:56:forward <- core.py:212:_embed"
+     },
+     {
+      "mib": 11.8,
+      "blocks": 4,
+      "source": "scatter.py:21:scatter_sum <- functional.py:15:segment_sum_coo"
+     },
+     {
+      "mib": 7.4,
+      "blocks": 1,
+      "source": "rbf.py:113:gaussian_expansion <- rbf.py:309:_get_rbf"
+     },
+     {
+      "mib": 5.9,
+      "blocks": 2,
+      "source": "interaction.py:120:forward <- interaction.py:169:forward"
+     }
+    ]
+   },
+   "candidate": {
+    "peak_allocated_mib": 833.2,
+    "live_blocks_at_peak": 209,
+    "top_sources": [
+     {
+      "mib": 236.1,
+      "blocks": 8,
+      "source": "interaction.py:108:forward <- interaction.py:159:forward"
+     },
+     {
+      "mib": 224.3,
+      "blocks": 4,
+      "source": "interaction.py:46:forward <- stages.py:87:_angles"
+     },
+     {
+      "mib": 194.8,
+      "blocks": 12,
+      "source": "interaction.py:30:_apply_norm <- interaction.py:115:forward"
+     },
+     {
+      "mib": 56.1,
+      "blocks": 1,
+      "source": "interaction.py:30:_apply_norm <- interaction.py:46:forward"
+     },
+     {
+      "mib": 35.0,
+      "blocks": 1,
+      "source": "stages.py:86:_angles <- stages.py:120:forward"
+     },
+     {
+      "mib": 11.8,
+      "blocks": 4,
+      "source": "interaction.py:46:forward <- stages.py:77:_embed"
+     },
+     {
+      "mib": 5.9,
+      "blocks": 2,
+      "source": "scatter.py:84:scatter_sum <- interaction.py:111:forward"
+     },
+     {
+      "mib": 5.9,
+      "blocks": 2,
+      "source": "scatter.py:84:scatter_sum <- interaction.py:112:forward"
+     }
+    ]
+   }
+  },
+  "efa-float32": {
+   "baseline": {
+    "peak_allocated_mib": 595.0,
+    "live_blocks_at_peak": 167,
+    "top_sources": [
+     {
+      "mib": 365.0,
+      "blocks": 1,
+      "source": "rope.py:151:torch_dynamo_resume_in_linear_efa_aggregate_at_126 <- rope.py:126:torch_dynamo_resume_in_linear_efa_aggregate_at_126"
+     },
+     {
+      "mib": 57.6,
+      "blocks": 13,
+      "source": "interaction.py:89:forward <- interaction.py:229:forward"
+     },
+     {
+      "mib": 45.6,
+      "blocks": 2,
+      "source": "rope.py:133:torch_dynamo_resume_in_linear_efa_aggregate_at_126 <- rope.py:126:torch_dynamo_resume_in_linear_efa_aggregate_at_126"
+     },
+     {
+      "mib": 31.4,
+      "blocks": 8,
+      "source": "interaction.py:89:forward <- interaction.py:230:forward"
+     },
+     {
+      "mib": 18.2,
+      "blocks": 1,
+      "source": "rope.py:144:torch_dynamo_resume_in_linear_efa_aggregate_at_126 <- rope.py:126:torch_dynamo_resume_in_linear_efa_aggregate_at_126"
+     },
+     {
+      "mib": 11.4,
+      "blocks": 1,
+      "source": "rope.py:152:torch_dynamo_resume_in_linear_efa_aggregate_at_126"
+     },
+     {
+      "mib": 11.4,
+      "blocks": 1,
+      "source": "rope.py:141:torch_dynamo_resume_in_linear_efa_aggregate_at_126"
+     },
+     {
+      "mib": 9.1,
+      "blocks": 1,
+      "source": "rope.py:151:torch_dynamo_resume_in_linear_efa_aggregate_at_126"
+     }
+    ]
+   },
+   "candidate": {
+    "peak_allocated_mib": 621.5,
+    "live_blocks_at_peak": 223,
+    "top_sources": [
+     {
+      "mib": 383.2,
+      "blocks": 4,
+      "source": "rope.py:151:linear_efa_aggregate <- attention.py:126:forward"
+     },
+     {
+      "mib": 46.1,
+      "blocks": 14,
+      "source": "interaction.py:99:forward <- interaction.py:240:forward"
+     },
+     {
+      "mib": 45.6,
+      "blocks": 4,
+      "source": "rope.py:133:linear_efa_aggregate <- attention.py:126:forward"
+     },
+     {
+      "mib": 40.9,
+      "blocks": 12,
+      "source": "interaction.py:99:forward <- interaction.py:239:forward"
+     },
+     {
+      "mib": 17.1,
+      "blocks": 2,
+      "source": "rope.py:152:linear_efa_aggregate <- attention.py:126:forward"
+     },
+     {
+      "mib": 11.4,
+      "blocks": 1,
+      "source": "rope.py:141:linear_efa_aggregate <- attention.py:126:forward"
+     },
+     {
+      "mib": 9.1,
+      "blocks": 1,
+      "source": "rope.py:144:linear_efa_aggregate <- attention.py:126:forward"
+     },
+     {
+      "mib": 8.4,
+      "blocks": 2,
+      "source": "interaction.py:209:_get_qkv <- interaction.py:247:forward"
+     }
+    ]
+   }
+  },
+  "grace-float64": {
+   "baseline": {
+    "peak_allocated_mib": 301.1,
+    "live_blocks_at_peak": 227,
+    "top_sources": [
+     {
+      "mib": 119.5,
+      "blocks": 29,
+      "source": "coupling.py:203:forward <- coupling.py:271:forward"
+     },
+     {
+      "mib": 33.6,
+      "blocks": 5,
+      "source": "radial.py:127:forward <- core.py:128:forward"
+     },
+     {
+      "mib": 10.3,
+      "blocks": 1,
+      "source": "basis.py:97:forward <- core.py:129:forward"
+     },
+     {
+      "mib": 8.1,
+      "blocks": 1,
+      "source": "coupling.py:89:forward <- coupling.py:364:forward"
+     },
+     {
+      "mib": 2.6,
+      "blocks": 1,
+      "source": "basis.py:67:_scalar_edges <- basis.py:97:forward"
+     },
+     {
+      "mib": 2.0,
+      "blocks": 1,
+      "source": "_spherical_harmonics.py:284:_spherical_harmonics <- _spherical_harmonics.py:99:forward"
+     },
+     {
+      "mib": 1.4,
+      "blocks": 1,
+      "source": "functional.py:70:reduce_edge <- features.py:49:scatter_blocks"
+     },
+     {
+      "mib": 1.4,
+      "blocks": 1,
+      "source": "coupling.py:128:forward <- coupling.py:270:forward"
+     }
+    ]
+   },
+   "candidate": {
+    "peak_allocated_mib": 315.0,
+    "live_blocks_at_peak": 278,
+    "top_sources": [
+     {
+      "mib": 53.3,
+      "blocks": 13,
+      "source": "product_ladder.py:110:_couple_channels <- product_ladder.py:176:forward"
+     },
+     {
+      "mib": 33.6,
+      "blocks": 5,
+      "source": "radial.py:122:forward <- blocks.py:117:forward"
+     },
+     {
+      "mib": 29.2,
+      "blocks": 9,
+      "source": "product_ladder.py:112:_couple_channels <- product_ladder.py:176:forward"
+     },
+     {
+      "mib": 18.1,
+      "blocks": 4,
+      "source": "product_ladder.py:108:_couple_channels <- product_ladder.py:176:forward"
+     },
+     {
+      "mib": 8.1,
+      "blocks": 1,
+      "source": "coupling.py:60:forward <- coupling.py:146:forward"
+     },
+     {
+      "mib": 4.2,
+      "blocks": 3,
+      "source": "product_ladder.py:111:_couple_channels <- product_ladder.py:176:forward"
+     },
+     {
+      "mib": 3.9,
+      "blocks": 1,
+      "source": "product_ladder.py:107:_couple_channels <- product_ladder.py:176:forward"
+     },
+     {
+      "mib": 2.0,
+      "blocks": 1,
+      "source": "_spherical_harmonics.py:284:_spherical_harmonics <- angular.py:270:spherical_harmonics"
+     }
+    ]
+   }
+  }
+ },
+ "finding": "Saved-for-backward activations are unchanged (GemNet fp32 on CPU Inductor: 697.0 MiB against 699.6 MiB). The refactored stages compile with fewer graph breaks (GemNet 26 against 31 graphs, ALIGNN angle stage in one graph), so one fused force backward keeps additional transient buffers alive at its peak: one 56 MiB normalized angle activation in ALIGNN, three extra 32.5 MiB dense-layer buffers and smaller ones in GemNet, about 24 MiB in EFA and 14 MiB in GRACE. Inductor peak-memory reordering is already enabled. The same cells run faster than the pre-refactor compile, and every larger cell fails to compile before the refactor."
+}

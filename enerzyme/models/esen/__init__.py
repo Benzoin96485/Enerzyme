@@ -5,7 +5,7 @@
 a UMA / eSCN-MD checkpoint. They are not the 2023 paper eSCN and they are
 not the native eSEN network.
 
-``eSENCore`` (architecture ``esen``) is Fu et al., 2025
+``esen`` (architecture ``esen``) is Fu et al., 2025
 (arXiv:2502.12147). It is implemented in :mod:`enerzyme.models.esen.native`
 on the shared SO(2) / SO(3) modules and does not import fairchem.
 """
@@ -16,7 +16,6 @@ from .native import (
     PUBLISHED_30M_CORE_PARAMS,
     PUBLISHED_MP_3M_CORE_PARAMS,
     PUBLISHED_SPICE_6M_CORE_PARAMS,
-    eSENCore,
 )
 
 _UMA_EXPORTS = {
@@ -46,7 +45,6 @@ __all__ = [
     "PUBLISHED_30M_CORE_PARAMS",
     "PUBLISHED_MP_3M_CORE_PARAMS",
     "PUBLISHED_SPICE_6M_CORE_PARAMS",
-    "eSENCore",
     "UMAWrapperQS",
     "UMAFlowWrapperQS",
     "ESCNMDBackboneFlow",

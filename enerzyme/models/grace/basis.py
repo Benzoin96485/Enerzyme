@@ -62,9 +62,8 @@ class AtomicBasis(Module):
             )
 
     def _scalar_edges(
-        self, radial: Tensor, harmonics: Sequence[Tensor], neighbor_embedding: Tensor
+        self, radial: Tensor, harmonics: Sequence[Tensor], weights: Tensor
     ) -> List[Tensor]:
-        weights = self.embed(neighbor_embedding)
         edges: List[Tensor] = []
         for degree, block in enumerate(harmonics):
             edges.append(
@@ -94,7 +93,7 @@ class AtomicBasis(Module):
         if radial.shape[0] == 0:
             return zeros_like_degrees(neighbor_scale, n_atoms, self.n_rad, self.lmax)
         scalar = scatter_blocks(
-            self._scalar_edges(radial, harmonics, embedding[senders]),
+            self._scalar_edges(radial, harmonics, self.embed(embedding)[senders]),
             receivers,
             n_atoms,
         )

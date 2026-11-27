@@ -35,7 +35,7 @@ def _pairs(n: int):
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.equireann import EquiREANNCore
+    from enerzyme.models.presets.cartesian_tensor import equireann
 
     params = dict(
         dim_embedding=4,
@@ -52,7 +52,7 @@ def _tiny(**kwargs):
         coeff_init=0.1,
     )
     params.update(kwargs)
-    return EquiREANNCore(**params).double()
+    return equireann(**params).double()
 
 
 def _run(core, pos, embedding, species):
@@ -82,7 +82,7 @@ def test_registration_presets_and_example_yaml():
 
     for name in ("equireann", "EquiREANN", "equi-reann", "equi_reann"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "EquiREANNCore"
+        assert core_cls.__name__ == "equireann"
         assert build_params["cutoff_sr"] == 6.0
         assert layers[2]["params"]["nwave"] == 20
         assert layers[2]["params"]["num_iterations"] == 2
@@ -108,9 +108,9 @@ def test_registration_presets_and_example_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "EquiREANNCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.n_orbit == 630
-    assert model.hyper.shape == (3, 3, 20, 630)
+    assert model.embed.hyper.shape == (3, 3, 20, 630)
     assert model.dim_feature_out == 630
     assert model.feature_irreps == "630x0e"
     readout = next(layer for layer in model.post_sequence if isinstance(layer, SimpleReadout))
@@ -150,10 +150,10 @@ def test_the_orbital_message_moves_the_density_before_the_coefficient_network():
     updated = _tiny(num_iterations=1)
     plain = _tiny(num_iterations=0)
     with torch.no_grad():
-        plain.rs.copy_(updated.rs)
-        plain.inta.copy_(updated.inta)
-        plain.hyper.copy_(updated.hyper[:1])
-        plain.coeff.load_state_dict(updated.coeff.state_dict())
+        plain.embed.rs.copy_(updated.embed.rs)
+        plain.embed.inta.copy_(updated.embed.inta)
+        plain.embed.hyper.copy_(updated.embed.hyper[:1])
+        plain.embed.coeff.load_state_dict(updated.embed.coeff.state_dict())
     pos = torch.tensor(
         [[0.0, 0.0, 0.0], [0.8, 0.1, 0.0], [0.2, 0.9, 0.3]],
         dtype=torch.float64,
@@ -163,16 +163,16 @@ def test_the_orbital_message_moves_the_density_before_the_coefficient_network():
     before = _run(updated, pos, embedding, species)
     # The released output linear is zero, so the coefficient is unchanged.
     # The passed orbital still changes the density.
-    assert float(updated.updates[0].shared.out.weight.detach().abs().sum()) == 0.0
+    assert float(updated.blocks[0].shared.out.weight.detach().abs().sum()) == 0.0
     assert not torch.allclose(before, _run(plain, pos, embedding, species))
     twice = _tiny(num_iterations=2)
     with torch.no_grad():
-        twice.rs.copy_(updated.rs)
-        twice.inta.copy_(updated.inta)
-        twice.hyper.copy_(updated.hyper[0].unsqueeze(0).repeat(twice.num_iterations + 1, 1, 1, 1))
-        twice.coeff.load_state_dict(updated.coeff.state_dict())
+        twice.embed.rs.copy_(updated.embed.rs)
+        twice.embed.inta.copy_(updated.embed.inta)
+        twice.embed.hyper.copy_(updated.embed.hyper[0].unsqueeze(0).repeat(twice.num_iterations + 1, 1, 1, 1))
+        twice.embed.coeff.load_state_dict(updated.embed.coeff.state_dict())
         for step in range(2):
-            twice.updates[step].load_state_dict(updated.updates[0].state_dict())
+            twice.blocks[step].load_state_dict(updated.blocks[0].state_dict())
     assert not torch.allclose(before, _run(twice, pos, embedding, species))
 
 
@@ -180,27 +180,27 @@ def test_later_contraction_is_unused_until_that_iteration():
     core0 = _tiny(num_iterations=0)
     core1 = _tiny(num_iterations=1)
     with torch.no_grad():
-        core1.rs.copy_(core0.rs)
-        core1.inta.copy_(core0.inta)
-        core1.hyper.zero_()
-        core1.hyper[0].copy_(core0.hyper[0])
-        core1.coeff.load_state_dict(core0.coeff.state_dict())
+        core1.embed.rs.copy_(core0.embed.rs)
+        core1.embed.inta.copy_(core0.embed.inta)
+        core1.embed.hyper.zero_()
+        core1.embed.hyper[0].copy_(core0.embed.hyper[0])
+        core1.embed.coeff.load_state_dict(core0.embed.coeff.state_dict())
     pos = torch.tensor([[0.0, 0.0, 0.0], [0.6, 0.2, 0.1], [-0.2, 0.7, 0.3]], dtype=torch.float64)
     embedding = torch.randn(3, 4, dtype=torch.float64)
     species = torch.tensor([1, 8, 6])
     base = _run(core1, pos, embedding, species).detach()
     with torch.no_grad():
-        core1.hyper[1].add_(0.7)
+        core1.embed.hyper[1].add_(0.7)
     moved = _run(core1, pos, embedding, species)
     assert not torch.allclose(base, moved.detach())
     with torch.no_grad():
-        core1.hyper[1].zero_()
+        core1.embed.hyper[1].zero_()
     restored = _run(core1, pos, embedding, species)
     assert_allclose(base.numpy(), restored.detach().numpy(), atol=1e-10)
     # A zero-iteration model reads only the first slice, which matches REANN's hyper.
-    from enerzyme.models.reann import REANNCore
+    from enerzyme.models.presets.cartesian_tensor import reann
 
-    plain = REANNCore(
+    plain = reann(
         dim_embedding=4,
         max_Za=10,
         cutoff_sr=4.0,
@@ -213,10 +213,10 @@ def test_later_contraction_is_unused_until_that_iteration():
         layer_norm=False,
     ).double()
     with torch.no_grad():
-        plain.rs.copy_(core0.rs)
-        plain.inta.copy_(core0.inta)
-        plain.hyper.copy_(core0.hyper[0])
-        plain.coeff.load_state_dict(core0.coeff.state_dict())
+        plain.embed.rs.copy_(core0.embed.rs)
+        plain.embed.inta.copy_(core0.embed.inta)
+        plain.embed.hyper.copy_(core0.embed.hyper[0])
+        plain.embed.coeff.load_state_dict(core0.embed.coeff.state_dict())
     assert_allclose(
         _run(core0, pos, embedding, species).detach().numpy(),
         _run(plain, pos, embedding, species).detach().numpy(),
@@ -235,15 +235,15 @@ def test_elemental_update_follows_the_receiver_and_trains_the_contraction():
     species = torch.tensor([1, 6, 8])
     base = _run(core, pos, embedding, species).detach()
     with torch.no_grad():
-        core.updates[0].by_species["1"].out.weight.fill_(0.05)
-        core.updates[0].by_species["1"].out.bias.fill_(0.5)
+        core.blocks[0].by_species["1"].out.weight.fill_(0.05)
+        core.blocks[0].by_species["1"].out.bias.fill_(0.5)
     changed = _run(core, pos, embedding, species)
     assert not torch.allclose(base, changed.detach())
     changed.sum().backward()
-    assert core.hyper.grad is not None
-    assert float(core.hyper.grad[0].abs().sum()) > 0.0
-    assert float(core.hyper.grad[1].abs().sum()) > 0.0
-    assert core.updates[0].by_species["1"].out.bias.grad is not None
+    assert core.embed.hyper.grad is not None
+    assert float(core.embed.hyper.grad[0].abs().sum()) > 0.0
+    assert float(core.embed.hyper.grad[1].abs().sum()) > 0.0
+    assert core.blocks[0].by_species["1"].out.bias.grad is not None
     try:
         _run(core, pos, embedding, torch.tensor([1, 6, 7]))
     except ValueError as exc:
@@ -385,9 +385,9 @@ def test_layer_stack_forces_offsets_and_isolated_atom():
     pos2 = pos.detach().requires_grad_(True)
     loss = model({**batch, "Ra": pos2})["E"].sum()
     loss.backward()
-    assert model.rs.grad is not None
-    assert float(model.rs.grad.abs().sum()) > 0.0
-    assert float(model.hyper.grad.abs().sum()) > 0.0
+    assert model.embed.rs.grad is not None
+    assert float(model.embed.rs.grad.abs().sum()) > 0.0
+    assert float(model.embed.hyper.grad.abs().sum()) > 0.0
 
 
 def test_response_stack_rotates_the_dipole():

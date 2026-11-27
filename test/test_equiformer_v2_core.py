@@ -35,7 +35,7 @@ def _random_so3(dtype=torch.float64):
 
 
 def _tiny_core(**kwargs):
-    from enerzyme.models.equiformer_v2 import EquiformerV2Core
+    from enerzyme.models.presets.so2 import equiformer_v2
 
     defaults = dict(
         dim_embedding=8,
@@ -52,11 +52,11 @@ def _tiny_core(**kwargs):
         edge_channels=8,
     )
     defaults.update(kwargs)
-    return EquiformerV2Core(**defaults)
+    return equiformer_v2(**defaults)
 
 
 def test_equiformer_v2_core_atom_feature_shape():
-    from enerzyme.models.equiformer_v2 import EquiformerV2Core
+    from enerzyme.models.presets.so2 import equiformer_v2
 
     torch.manual_seed(0)
     N = 6
@@ -64,7 +64,7 @@ def test_equiformer_v2_core_atom_feature_shape():
     dim_embedding = 16
     num_rbf = 8
     lmax = 2
-    core = EquiformerV2Core(
+    core = equiformer_v2(
         dim_embedding=dim_embedding,
         num_rbf=num_rbf,
         sphere_channels=sphere_channels,

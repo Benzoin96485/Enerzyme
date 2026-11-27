@@ -33,7 +33,7 @@ def _random_so3(dtype=torch.float64):
 
 
 def _tiny_core(**kwargs):
-    from enerzyme.models.e2former import E2FormerCore
+    from enerzyme.models.presets.so2 import e2former
 
     defaults = dict(
         dim_embedding=16,
@@ -51,7 +51,7 @@ def _tiny_core(**kwargs):
         alpha_drop=0.0,
     )
     defaults.update(kwargs)
-    return E2FormerCore(**defaults)
+    return e2former(**defaults)
 
 
 def test_e2former_core_atom_feature_shape():

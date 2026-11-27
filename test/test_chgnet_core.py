@@ -44,7 +44,7 @@ def _basis(dist: torch.Tensor, num_rbf: int, cutoff: float):
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.chgnet import CHGNetCore
+    from enerzyme.models.presets.triplet_graphs import chgnet
 
     params = dict(
         dim_embedding=8,
@@ -60,7 +60,7 @@ def _tiny(**kwargs):
         readout_norm="layer",
     )
     params.update(kwargs)
-    return CHGNetCore(**params)
+    return chgnet(**params)
 
 
 def _inputs(n=4, seed=0, num_rbf=3):
@@ -97,7 +97,7 @@ def test_registration_and_example_yaml():
     from enerzyme.models.ff import build_model, get_ff_core
 
     core_cls, defaults, layers = get_ff_core("chgnet")
-    assert core_cls.__name__ == "CHGNetCore"
+    assert core_cls.__name__ == "chgnet"
     assert defaults["cutoff_sr"] == 5.0
     assert defaults["bond_cutoff"] == 3.0
     assert defaults["num_rbf"] == 9
@@ -112,7 +112,7 @@ def test_registration_and_example_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "CHGNetCore"
+    assert model.architecture == "chgnet"
     assert model.num_blocks == 4
     assert model.bond_cutoff == 3.0
     assert model.dim_feature_out == 64
@@ -120,7 +120,7 @@ def test_registration_and_example_yaml():
     assert model.bond_basis._name_mapping["rbf"] == "rbf_bg"
     assert model.atom_basis.basis_cutoff == 5.0
     assert model.bond_basis.basis_cutoff == 3.0
-    assert model.fourier.learnable is True
+    assert model.embed.fourier.learnable is True
 
 
 def test_feature_shapes_and_isolated_atom():
@@ -147,7 +147,7 @@ def test_feature_shapes_and_isolated_atom():
     )
     assert_allclose(
         alone["atom_feature"].detach().numpy(),
-        core.readout_norm(emb).detach().numpy(),
+        core.head.norm(emb).detach().numpy(),
         atol=1e-6,
     )
 
@@ -408,3 +408,105 @@ def test_layer_stack_energy_forces_magmom_and_wrong_basis():
         assert "basis_cutoff" in str(exc)
     else:
         raise AssertionError("a bond basis at the wrong cutoff must be rejected")
+
+
+def test_compiled_energy_force_and_moment_parameter_participation():
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    torch.manual_seed(21)
+    model = build("chgnet").double()
+    batch = make_batch(random_molecules(107, [5, 4]), torch.float64)
+    compiled = torch.compile(model, backend="aot_eager")
+
+    def gradients(runner, include_moment):
+        out = forward(runner, batch, torch.float64, train=True)
+        loss = out["E"].square().sum() + out["Fa"].square().sum()
+        if include_moment:
+            loss = loss + out["Ma"].square().sum()
+        derivatives = torch.autograd.grad(loss, (*model.parameters(), out["Ra"]), allow_unused=True)
+        return out, derivatives
+
+    for include_moment in (False, True):
+        expected, expected_gradients = gradients(model, include_moment)
+        observed, actual_gradients = gradients(compiled, include_moment)
+        assert expected.keys() == observed.keys()
+        for key, value in expected.items():
+            torch.testing.assert_close(observed[key], value)
+        for actual, reference in zip(actual_gradients, expected_gradients):
+            torch.testing.assert_close(actual, reference)
+
+    # A hook can consume magnetic predictions before computing the energy.
+    # Register after tracing to exercise ordinary calls on an existing runner.
+    def add_moment_to_features(module, args):
+        fields, = args
+        return ({**fields, "atom_feature": fields["atom_feature"] + fields["Ma"][:, None]},)
+
+    handle = model.post_sequence[1].register_forward_pre_hook(add_moment_to_features)
+    try:
+        expected, expected_gradients = gradients(model, False)
+        observed, actual_gradients = gradients(compiled, False)
+        torch.testing.assert_close(observed["Fa"], expected["Fa"])
+        for actual, reference in zip(actual_gradients, expected_gradients):
+            torch.testing.assert_close(actual, reference)
+    finally:
+        handle.remove()
+    expected, expected_gradients = gradients(model, False)
+    observed, actual_gradients = gradients(compiled, False)
+    torch.testing.assert_close(observed["Fa"], expected["Fa"])
+    for actual, reference in zip(actual_gradients, expected_gradients):
+        torch.testing.assert_close(actual, reference)
+
+
+def test_compiled_magnetic_readout_preserves_pyg_output():
+    from torch_geometric.data import Data
+    from scripts.core_harness import build, make_batch, random_molecules
+
+    fields = make_batch(random_molecules(107, [5, 4]), torch.float64)
+    fields["batch"] = fields.pop("batch_seg")
+    fields["Ra"].requires_grad_()
+    model = build("chgnet").double()
+    compiled = torch.compile(model, backend="aot_eager")
+    expected = model(Data(**fields))
+    graph = Data(**fields)
+    actual = compiled(graph)
+    assert actual is graph
+    assert set(actual.keys()) == set(expected.keys())
+    for key in ("Ma", "E", "Fa", "atom_feature_charge"):
+        torch.testing.assert_close(actual[key], expected[key])
+    params = tuple(model.post_sequence[0].parameters())
+    assert all(value is None for value in torch.autograd.grad(actual.Fa.square().sum(), params, allow_unused=True))
+
+
+def test_independent_magnetic_readout_checks_custom_fields_and_modes():
+    from enerzyme.models.chgnet.stages import independent_magnetic_readout
+    from scripts.core_harness import build
+
+    core = build("chgnet")
+    moment, energy, _, _ = core.post_sequence
+    assert independent_magnetic_readout(core) is moment
+    moment.test_only = True
+    assert independent_magnetic_readout(core) is None
+    moment.test_only = False
+    energy.reset_field_name(atom_feature="Ma")
+    assert independent_magnetic_readout(core) is None
+
+
+
+def test_compiled_moment_and_radial_gradients_without_angles():
+    from scripts.core_harness import build
+
+    model = build("chgnet").double()
+    runner = torch.compile(model, backend="aot_eager")
+
+    def step(target, distance, keys):
+        coordinates = torch.tensor([[0., 0., 0.], [distance, 0., 0.]], dtype=torch.float64, requires_grad=True)
+        fields = dict(Ra=coordinates, Za=torch.tensor([1, 8]), idx_i=torch.tensor([1, 0]),
+                      idx_j=torch.tensor([0, 1]), batch_seg=torch.tensor([0, 0]))
+        out = target(fields)
+        loss = sum(out[key].square().sum() for key in keys)
+        grads = torch.autograd.grad(loss, (*model.parameters(), coordinates), allow_unused=True)
+        return (out["E"], out["Fa"], out["Ma"]), grads
+
+    for distance in (2., 20.):
+        for keys in (("E", "Fa"), ("E", "Fa", "Ma"), ("Ma",)):
+            torch.testing.assert_close(step(runner, distance, keys), step(model, distance, keys))

@@ -58,7 +58,7 @@ Modelhub:
         params:
           num_residual: 1
           attribute: spin
-      - name: Core
+      - name: Core  # Configure the mace message-passing blocks here.
         params: 
           max_ell: 3
           additional_hidden_irreps: 128x1o

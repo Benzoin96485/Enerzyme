@@ -18,8 +18,8 @@ import torch
 from torch import Tensor
 from torch.nn import Parameter
 
-from ..cutoff import polynomial_envelope
-from ..functional import segment_sum_coo
+from ..mp.basis.envelope import polynomial_envelope
+from ..mp.ops import scatter_sum
 from . import BaseFFLayer
 from .covalent import covalent_radii_table
 
@@ -90,7 +90,7 @@ class ScreenedZBLRepulsionEnergyLayer(BaseFFLayer):
             * phi
             * envelope
         )
-        return segment_sum_coo(pair, idx_i_sr, dim_size=Za.shape[0])
+        return scatter_sum(pair, idx_i_sr, Za.shape[0])
 
 
 class StandardZBLRepulsionEnergyLayer(BaseFFLayer):
@@ -179,4 +179,4 @@ class StandardZBLRepulsionEnergyLayer(BaseFFLayer):
             * phi
             * envelope
         )
-        return segment_sum_coo(pair, idx_i_sr, dim_size=Za.shape[0])
+        return scatter_sum(pair, idx_i_sr, Za.shape[0])

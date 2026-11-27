@@ -10,7 +10,7 @@ from __future__ import annotations
 import torch
 from torch.nn import Module
 
-from enerzyme.models.blocks.mlp import DenseLayer
+from enerzyme.models.mp.nn.mlp import DenseLayer
 from enerzyme.models.layers.denormalize import AtomicAffineLayer
 from enerzyme.models.layers.electrostatics import ChargeConservationLayer
 from enerzyme.models.layers.readout import HierachicalReadout, SimpleReadout

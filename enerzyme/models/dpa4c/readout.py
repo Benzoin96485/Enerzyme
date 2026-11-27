@@ -13,13 +13,13 @@ from typing import List, Sequence, Tuple
 import torch
 from torch import Tensor, nn
 
+from ..mp.equivariant.cg import gaunt
+from ..mp.equivariant.body_order import bispectrum_contraction, vector_tensor_invariants
 from .geometry import (
-    cached_couplings,
     degree_offsets,
     derive_bispectrum_ranks,
     derive_degree_channels,
     enumerate_degree_triples,
-    packed_l2_to_stf,
     probe_entries,
 )
 
@@ -81,10 +81,10 @@ class InvariantReadout(nn.Module):
         probe_offsets = [0]
         coupling_parts = []
         coupling_offsets = [0]
-        couplings = cached_couplings(lmax)
-        for degrees, coupling in zip(self.triples, couplings):
-            coupling_parts.append(torch.as_tensor(coupling.reshape(-1), dtype=torch.float64))
-            coupling_offsets.append(coupling_offsets[-1] + int(coupling.size))
+        for degrees in self.triples:
+            coupling = gaunt(*degrees, dtype=torch.float64, convention="dpa4c")
+            coupling_parts.append(coupling.flatten())
+            coupling_offsets.append(coupling_offsets[-1] + coupling.numel())
             index, scale = probe_entries(degrees, self.ranks)
             probe_index_parts.append(torch.as_tensor(index, dtype=torch.long))
             probe_scale_parts.append(torch.as_tensor(scale, dtype=torch.float64))
@@ -133,18 +133,17 @@ class InvariantReadout(nn.Module):
     def _grams(self, blocks: Sequence[Tensor]) -> List[Tensor]:
         index = self.gram_index.to(device=blocks[0].device)
         offdiag = self.gram_offdiag.to(device=blocks[0].device)
+        scale = torch.ones_like(offdiag, dtype=blocks[0].dtype).masked_fill_(offdiag, math.sqrt(2.0))
         parts = []
         for degree, block in enumerate(blocks[1:], start=1):
             gram = torch.matmul(block.transpose(-1, -2), block)
             flat = gram.reshape(block.shape[0], self.degree_channels[degree] ** 2)
             start, stop = self.gram_offsets[degree - 1 : degree + 1]
-            scale = torch.ones(stop - start, dtype=block.dtype, device=block.device)
-            scale[offdiag[start:stop]] = math.sqrt(2.0)
-            parts.append(flat.index_select(1, index[start:stop]) * scale)
+            parts.append(flat.index_select(1, index[start:stop]) * scale[start:stop])
         return parts
 
     def _bispectrum(self, projected: Sequence[Tensor]) -> Tuple[List[Tensor], Tensor]:
-        cubic_112, quartic = self._vector_tensor(projected[0], projected[1])
+        cubic_112, quartic = vector_tensor_invariants(projected[0], projected[1])
         index = self.probe_index.to(device=projected[0].device)
         scale = self.probe_scale.to(dtype=projected[0].dtype, device=projected[0].device)
         coupling = self.coupling.to(dtype=projected[0].dtype, device=projected[0].device)
@@ -160,7 +159,7 @@ class InvariantReadout(nn.Module):
                     2 * degree_2 + 1,
                     2 * degree_3 + 1,
                 )
-                full = self._contract(
+                full = bispectrum_contraction(
                     tensor,
                     projected[degree_1 - 1],
                     projected[degree_2 - 1],
@@ -172,29 +171,3 @@ class InvariantReadout(nn.Module):
                 * scale[probe_start:probe_stop]
             )
         return parts, quartic
-
-    def _vector_tensor(self, vector: Tensor, packed: Tensor) -> Tuple[Tensor, Tensor]:
-        nodes, _, rank_vector = vector.shape
-        rank_tensor = packed.shape[-1]
-        vectors = vector.transpose(1, 2)
-        matrices = packed_l2_to_stf(packed.transpose(1, 2))
-        contracted = torch.einsum("neij,nbi->nebj", matrices, vectors)
-        cubic = torch.einsum("nai,nebi->nabe", vectors, contracted)
-        cubic = cubic.reshape(nodes, rank_vector * rank_vector * rank_tensor)
-        cubic = cubic * (-1.0 / math.sqrt(5.0))
-        quartic = torch.sum(contracted * contracted, dim=-1).reshape(nodes, rank_tensor * rank_vector)
-        return cubic, quartic
-
-    @staticmethod
-    def _contract(
-        coupling: Tensor,
-        value_1: Tensor,
-        value_2: Tensor,
-        value_3: Tensor,
-    ) -> Tensor:
-        nodes = value_1.shape[0]
-        rank_1 = value_1.shape[-1]
-        rank_2 = value_2.shape[-1]
-        rank_3 = value_3.shape[-1]
-        full = torch.einsum("abc,naA,nbB,ncC->nABC", coupling, value_1, value_2, value_3)
-        return full.reshape(nodes, rank_1 * rank_2 * rank_3)

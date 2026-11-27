@@ -15,8 +15,9 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Module, ModuleList, init
+from torch.utils.checkpoint import checkpoint
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 
 
 _INV_SQRT_2 = 1.0 / math.sqrt(2.0)
@@ -109,12 +110,19 @@ class BasisDownProjection(Module):
         return torch.einsum("eln,lni->eil", radial, self.weight)
 
 
+def _contract_edge_features(radial: Tensor, angular_sum: Tensor, weight: Tensor) -> Tensor:
+    mixed = torch.einsum("eil,els->eis", radial, angular_sum)
+    return torch.einsum("eis,sio->eo", mixed, weight)
+
+
 class BilinearAggregate(Module):
     """Sum ``Y · m`` over neighbor edges, then a bilinear map with the radial factor.
 
     ``radial_w`` has shape ``(E, interm, n_sph)`` and lives on the destination
     edge. ``weight`` has shape ``(emb_in, interm, units_out)``.
     """
+
+    recompute_force_inference = False
 
     def __init__(self, emb_in: int, emb_interm: int, units_out: int) -> None:
         super().__init__()
@@ -139,10 +147,17 @@ class BilinearAggregate(Module):
         gathered = msg[idx_src]
         contrib = angular.unsqueeze(-1) * gathered.unsqueeze(1)
         flat = contrib.reshape(contrib.shape[0], -1)
-        summed = segment_sum_coo(flat, idx_dst, dim_size=num_edges)
+        summed = scatter_sum(flat, idx_dst, num_edges)
         sum_k = summed.view(num_edges, angular.shape[-1], self.emb_in)
-        mixed = torch.einsum("eil,els->eis", radial_w, sum_k)
-        return torch.einsum("eis,sio->eo", mixed, self.weight)
+        if (torch.compiler.is_compiling() and self.recompute_force_inference and msg.is_cuda
+                and not self.training and not torch._C._are_functorch_transforms_active()):
+            # Keep the neighbor sum for the force backward. Rebuilding only the
+            # two contractions saves the edge-channel intermediate and a scatter.
+            return checkpoint(
+                _contract_edge_features, radial_w, sum_k, self.weight,
+                use_reentrant=False, preserve_rng_state=False,
+            )
+        return _contract_edge_features(radial_w, sum_k, self.weight)
 
 
 class EdgeEmbedding(Module):
@@ -188,9 +203,7 @@ class AtomUpdate(Module):
         if messages.numel() == 0:
             scattered = messages.new_zeros(num_nodes, self.emb_edge)
         else:
-            scattered = segment_sum_coo(
-                messages * self.dense_rbf(rbf), idx_i, dim_size=num_nodes
-            )
+            scattered = scatter_sum(messages * self.dense_rbf(rbf), idx_i, num_nodes)
         hidden = self.dense(self.scale(scattered))
         for layer in self.residuals:
             hidden = layer(hidden)
@@ -371,6 +384,7 @@ class GemNetInteraction(Module):
         self.trip = TripletInteraction(
             emb_edge, emb_trip, emb_bil_trip, emb_rbf, emb_cbf
         )
+        self.trip.bilinear.recompute_force_inference = triplets_only
         self.quad: Optional[QuadrupletInteraction]
         if triplets_only:
             self.quad = None

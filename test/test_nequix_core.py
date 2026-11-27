@@ -45,7 +45,7 @@ def test_mptrj_vocabulary_matches_published_list():
 
 
 def test_nequip_envelope_is_polynomial_p6():
-    from enerzyme.models.cutoff import PolynomialEnvelope, nequip_envelope
+    from enerzyme.models.mp.basis.envelope import PolynomialEnvelope, nequip_envelope
 
     distance = torch.tensor([0.0, 1.0, 3.0, 6.0, 6.5])
     got = nequip_envelope(distance, cutoff=6.0, cuton=0.0)
@@ -57,7 +57,7 @@ def test_nequip_envelope_is_polynomial_p6():
 
 
 def test_bessel_times_nequip_envelope_matches_nequix_basis():
-    from enerzyme.models.cutoff import nequip_envelope
+    from enerzyme.models.mp.basis.envelope import nequip_envelope
     from enerzyme.models.layers.rbf import BesselRBFLayer
 
     cutoff = 6.0
@@ -111,7 +111,7 @@ def _reference_rms(irreps: o3.Irreps, features: torch.Tensor, centering: bool) -
 
 
 def test_rms_layer_norm_matches_reference_formula():
-    from enerzyme.models.e3nn_nn import RMSLayerNorm
+    from enerzyme.models.mp.equivariant.e3nn import RMSLayerNorm
 
     irreps = o3.Irreps("8x0e + 4x1o + 2x2e")
     features = torch.randn(5, irreps.dim)
@@ -151,6 +151,12 @@ def test_one_hot_vocabulary_and_unknown_species():
     with pytest.raises(ValueError, match="outside the one-hot"):
         layer.get_embedding(torch.tensor([7]))
 
+    encode = torch.compile(layer.get_embedding, backend="eager", fullgraph=True)
+    torch.testing.assert_close(encode(torch.tensor([8, 1, 6])), encoded)
+    assert encode(torch.empty(0, dtype=torch.long)).shape == (0, 3)
+    with pytest.raises(RuntimeError, match="outside the one-hot"):
+        encode(torch.tensor([7]))
+
 
 def test_nequix_registration_and_yaml_build():
     from enerzyme.models.ff import build_model, get_ff_core
@@ -158,7 +164,7 @@ def test_nequix_registration_and_yaml_build():
     from enerzyme.models.layers.readout import SimpleReadout
 
     core_cls, build_params, layers = get_ff_core("nequix")
-    assert core_cls.__name__ == "NequixCore"
+    assert core_cls.__name__ == "nequix"
     assert build_params["cutoff_fn"] == "nequip"
     assert build_params["dim_embedding"] == 89
     assert layers[1]["params"]["flavor"] == "equflash"
@@ -176,7 +182,7 @@ def test_nequix_registration_and_yaml_build():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "NequixCore"
+    assert model.__class__.__name__ == "ComposableCore"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.num_layers == 2
@@ -275,10 +281,10 @@ def conv_sh(conv, vij: torch.Tensor) -> torch.Tensor:
 
 
 def test_core_scalar_output_is_rotation_invariant_and_isolated_atom_is_finite():
-    from enerzyme.models.nequix import NequixCore
+    from enerzyme.models.presets.irreps import nequix
 
     torch.manual_seed(2)
-    core = NequixCore(
+    core = nequix(
         dim_embedding=3,
         num_rbf=4,
         num_layers=2,

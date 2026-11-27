@@ -12,19 +12,17 @@ shape; this package does not change QuinNet's forward.
 """
 
 from .cg import GroupSparseCG, shuffle_offset
-from .core import (
+from .defaults import (
     DEFAULT_BUILD_PARAMS,
     DEFAULT_LAYER_PARAMS,
     PUBLISHED_MD17_BUILD_PARAMS,
     PUBLISHED_MD17_CORE_PARAMS,
     PUBLISHED_QM9_BUILD_PARAMS,
     PUBLISHED_QM9_CORE_PARAMS,
-    FreeCGCore,
 )
 from .interaction import ATTENTION_ENHANCERS, FreeCGInteraction, normalize_attention_enhancer
 
 __all__ = [
-    "FreeCGCore",
     "FreeCGInteraction",
     "GroupSparseCG",
     "ATTENTION_ENHANCERS",

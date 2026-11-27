@@ -3,7 +3,7 @@
 The convolution is the NequIP / SevenNet message: a radial network produces
 weights for a Clebsch–Gordan product of neighbor features with spherical
 harmonics, and the messages are summed onto the receiver. Instructions come
-from the shared :func:`enerzyme.models.e3nn_nn.tp_out_irreps_with_instructions`.
+from the shared :func:`enerzyme.models.mp.equivariant.e3nn.tp_out_irreps_with_instructions`.
 The gate is :class:`e3nn.nn.Gate` (second-moment-normalized activations), which
 is the nonlinearity used by the reference EquFlash stack.
 
@@ -17,17 +17,18 @@ from __future__ import annotations
 from typing import List, Sequence
 
 import torch
+from ..mp.message.irreps import irreps_convolution
 from e3nn import o3
-from e3nn.nn import FullyConnectedNet, Gate
+from ..mp.nn.radial_mlp import e3nn_radial_mlp
+from e3nn.nn import Gate
 from torch import Tensor, nn
 
-from ..activation import resolve_scalar_activation
-from ..e3nn_nn import tp_out_irreps_with_instructions
-from ..functional import segment_sum_coo
+from ..mp.nn.activation import resolve_scalar_activation
+from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions
 
 
 def resolve_activation(name: str):
-    """EquFlash name for :func:`enerzyme.models.activation.resolve_scalar_activation`."""
+    """EquFlash name for :func:`enerzyme.models.mp.nn.activation.resolve_scalar_activation`."""
     return resolve_scalar_activation(name)
 
 
@@ -122,7 +123,7 @@ class EquFlashConvolution(nn.Module):
         hidden = [int(width) for width in radial_hidden]
         if any(width < 1 for width in hidden):
             raise ValueError(f"radial hidden widths must be positive, got {hidden}")
-        self.weight_nn = FullyConnectedNet(
+        self.weight_nn = e3nn_radial_mlp(
             [num_rbf, *hidden, self.tp.weight_numel],
             act=resolve_activation(act_radial),
         )
@@ -138,13 +139,9 @@ class EquFlashConvolution(nn.Module):
         idx_sender: Tensor,
         idx_receiver: Tensor,
     ) -> Tensor:
-        n_atoms = features.shape[0]
-        if idx_sender.numel() == 0:
-            return features.new_zeros(n_atoms, self.irreps_out.dim)
-        weights = self.weight_nn(rbf)
-        messages = self.tp(features[idx_sender], sph, weights)
-        aggregated = segment_sum_coo(messages, idx_receiver, dim_size=n_atoms)
-        return aggregated / self.denominator
+        return irreps_convolution(
+            self.tp, self.weight_nn, features, idx_sender, idx_receiver, sph, rbf, denominator=self.denominator
+        )
 
 
 class EquFlashInteraction(nn.Module):

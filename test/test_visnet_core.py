@@ -119,7 +119,7 @@ def test_registration_and_yaml_build():
 
     for name in ("visnet", "ViSNet", "vis-net", "vis_net"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "ViSNetCore"
+        assert core_cls.__name__ == "visnet"
         assert build_params["num_rbf"] == 32
         assert build_params["dim_embedding"] == 256
         assert build_params["cutoff_sr"] == 5.0
@@ -140,14 +140,14 @@ def test_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "ViSNetCore"
+    assert model.architecture == "visnet"
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.vector_feature_layout == "cartesian_n3f"
     assert model.lmax == 2
     assert model.angular_dim == 8
     assert "atom_l2_feature" in model._output_fields
-    assert model._radial_holder[0].__class__.__name__ == "ExpNormalSmearing"
+    assert model.embed._radial_holder[0].__class__.__name__ == "ExpNormalSmearing"
     readout = next(layer for layer in model.post_sequence if isinstance(layer, SimpleReadout))
     assert readout.head_type == "two_layer"
     assert readout.head[0].dim_feature_out == 4
@@ -155,16 +155,16 @@ def test_registration_and_yaml_build():
 
 def test_unknown_width_lmax_and_cutoff_raise():
     from enerzyme.models.ff import build_model
-    from enerzyme.models.visnet import ViSNetCore
+    from enerzyme.models.presets.cartesian_vector import visnet
 
     try:
-        ViSNetCore(dim_embedding=6, num_rbf=3, num_heads=4)
+        visnet(dim_embedding=6, num_rbf=3, num_heads=4)
     except ValueError as exc:
         assert "divisible" in str(exc)
     else:
         raise AssertionError("expected a bad head count to fail")
     try:
-        ViSNetCore(dim_embedding=4, num_rbf=3, num_heads=2, lmax=3)
+        visnet(dim_embedding=4, num_rbf=3, num_heads=2, lmax=3)
     except ValueError as exc:
         assert "lmax" in str(exc)
     else:
@@ -194,18 +194,18 @@ def _attach(core, num_rbf: int):
     from enerzyme.models.layers.rbf import ExpNormalSmearing
 
     radial = ExpNormalSmearing(num_rbf=num_rbf, cutoff_sr=5.0, trainable=False)
-    core._radial_holder = [radial]
+    core.embed._radial_holder = [radial]
     core.eval()
     return core
 
 
 def test_features_rotation_parity_translation_and_batch():
-    from enerzyme.models.visnet import ViSNetCore
+    from enerzyme.models.presets.cartesian_vector import visnet
 
     torch.manual_seed(3)
     n, features, num_rbf = 4, 8, 4
     core = _attach(
-        ViSNetCore(
+        visnet(
             dim_embedding=features,
             num_rbf=num_rbf,
             num_layers=2,
@@ -280,13 +280,13 @@ def test_features_rotation_parity_translation_and_batch():
 
 
 def test_neighbor_embedding_self_pairs_and_isolated_atom():
-    from enerzyme.models.visnet import ViSNetCore
+    from enerzyme.models.presets.cartesian_vector import visnet
 
     torch.manual_seed(6)
     n, features, num_rbf = 3, 8, 4
     graph = _graph(n, features, num_rbf, seed=6)
     with_neighbors = _attach(
-        ViSNetCore(
+        visnet(
             dim_embedding=features,
             num_rbf=num_rbf,
             num_layers=2,
@@ -297,7 +297,7 @@ def test_neighbor_embedding_self_pairs_and_isolated_atom():
         num_rbf,
     )
     without = _attach(
-        ViSNetCore(
+        visnet(
             dim_embedding=features,
             num_rbf=num_rbf,
             num_layers=2,
@@ -322,7 +322,7 @@ def test_neighbor_embedding_self_pairs_and_isolated_atom():
     )
     assert "atom_l2_feature" not in with_neighbors.get_output(**graph)
 
-    no_self = ViSNetCore(
+    no_self = visnet(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_layers=2,
@@ -453,3 +453,215 @@ def test_stack_energy_force_dipole_and_image():
         edges=(torch.zeros(0, dtype=torch.long), torch.zeros(0, dtype=torch.long)),
     )
     assert torch.allclose(alone["Fa"], torch.zeros_like(alone["Fa"]), atol=1e-8)
+
+
+def _force_fixture(dipole=False, lmax=1):
+    from enerzyme.models.ff import build_model
+
+    torch.manual_seed(53)
+    layers = _tiny_layers(dipole=dipole, lmax=lmax)
+    layers[3]["params"].update(vertex_type="none", vecnorm_type="none")
+    model = build_model(
+        "visnet", layer_params=layers,
+        build_params={"dim_embedding": 8, "num_rbf": 6, "cutoff_sr": 3.0, "max_Za": 8},
+        verbose=0,
+    ).train()
+    receiver, sender = _edges(3)
+    batch = dict(Ra=torch.tensor([[0., 0., 0.], [1.2, 0., 0.], [0., 0.9, 0.]], requires_grad=True),
+                 Za=torch.tensor([1, 6, 8]), N=[3], batch_seg=torch.zeros(3, dtype=torch.long),
+                 idx_i=receiver, idx_j=sender)
+    return model, batch
+
+
+def test_fullgraph_energy_force_loss_keeps_unused_vector_weights_out_of_adamw():
+    from torch._dynamo import config
+
+    model, batch = _force_fixture()
+    weights = model.blocks[-1].module.s_proj.weight
+    before = weights.detach().clone()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.01, weight_decay=0.1)
+
+    def energy_forces(inputs):
+        out = model(inputs)
+        return out["E"], out["Fa"]
+
+    with config.patch(capture_dynamic_output_shape_ops=True, capture_scalar_outputs=True):
+        energy, forces = torch.compile(energy_forces, fullgraph=True, backend="aot_eager")(batch)
+        (energy.square().sum() + forces.square().sum()).backward()
+    assert model.blocks[0].module.s_proj.weight.grad is not None
+    assert weights.grad is None
+    optimizer.step()
+    torch.testing.assert_close(weights, before, atol=0, rtol=0)
+
+def test_compiled_vector_partition_respects_custom_layers_hooks_modes_and_fields():
+    from torch_geometric.data import Data
+    from enerzyme.models.layers._base_layer import BaseFFLayer
+    from enerzyme.models.presets.compiled_vector import _deferred_layers, has_training_hooks
+
+    class VectorEnergy(BaseFFLayer):
+        def __init__(self, **flags):
+            super().__init__(input_fields={"atom_vector_feature", "Ea"}, output_fields={"Ea"}, **flags)
+
+        def get_Ea(self, atom_vector_feature, Ea):
+            return Ea + atom_vector_feature.square().sum(dim=(1, 2))
+
+    model, batch = _force_fixture()
+    assert _deferred_layers(model, batch) == ()
+    collision = torch.tensor(17)
+    assert _deferred_layers(model, {**batch, "_visnet_idx_j": collision}) is None
+    data = Data(**batch)
+    data["_visnet_idx_j"] = collision
+    assert _deferred_layers(model, data) is None
+    runner = torch.compile(model, backend="eager")
+    assert runner({**batch, "_visnet_idx_j": collision})["_visnet_idx_j"] is collision
+    data["batch"] = data["batch_seg"]
+    assert runner(data)["_visnet_idx_j"] is collision
+    with model.blocks[-1].module.s_proj.register_forward_hook(lambda module, inputs, out: out):
+        assert has_training_hooks(model)
+    assert not has_training_hooks(model)
+    class RandomVectorProbe(BaseFFLayer):
+        def __init__(self):
+            super().__init__(input_fields={"atom_vector_feature"}, output_fields={"probe"})
+
+        def get_probe(self, atom_vector_feature):
+            return torch.rand_like(atom_vector_feature)
+
+    model.post_sequence.insert(0, RandomVectorProbe())
+    assert _deferred_layers(model, batch) is None
+    del model.post_sequence[0]
+    flags = ("eval_only", "test_only", "train_only", "test_exclude")
+    class ModeProbe(BaseFFLayer):
+        def __init__(self, flag):
+            super().__init__(input_fields={"Ea"}, output_fields={flag}, **{flag: True})
+            self.flag = flag
+
+        def get_output(self, Ea):
+            return {self.flag: Ea}
+
+    for flag in flags:
+        model.post_sequence.append(ModeProbe(flag))
+    assert _deferred_layers(model, batch) == (3, 4, 5, 6)
+    assert set(runner(batch)).intersection(flags) == {"train_only", "test_exclude"}
+    model.test_mode = True
+    assert set(runner(batch)).intersection(flags) == {"train_only", "test_only"}
+
+    model, batch = _force_fixture()
+    model.post_sequence.insert(1, VectorEnergy())
+    assert _deferred_layers(model, batch) is None
+    compiled = torch.compile(model, backend="aot_eager")
+    for runner in (model, compiled):
+        out = runner(batch)
+        params = tuple(model.blocks[-1].module.s_proj.parameters())
+        gradients = torch.autograd.grad(out["E"].sum() + out["Fa"].square().sum(), params)
+        assert all(torch.count_nonzero(g) for g in gradients)
+        if runner is model:
+            reference = gradients
+        else:
+            for actual, expected in zip(gradients, reference):
+                torch.testing.assert_close(actual, expected)
+
+
+def test_compiled_training_runs_energy_hooks_installed_after_warmup():
+    model, batch = _force_fixture()
+    model.double()
+    batch["Ra"] = batch["Ra"].detach().double().requires_grad_()
+    simple = model.post_sequence[0]
+    runner = torch.compile(model, backend="aot_eager")
+    params = (batch["Ra"], simple.head[0].weight, model.blocks[0].module.s_proj.weight)
+
+    def values(net):
+        out = net(batch)
+        loss = out["E"].square().sum() + out["Fa"].square().sum()
+        return (out["E"], out["Fa"], *torch.autograd.grad(loss, params))
+
+    def compare():
+        expected = values(model)
+        torch.testing.assert_close(values(runner), expected, atol=1e-10, rtol=1e-8)
+        return expected
+
+    def scale_input(module, args):
+        return ({**args[0], "atom_feature": args[0]["atom_feature"] * 2},)
+
+    def scale_energy(module, args, result):
+        return {**result, "Ea": result["Ea"] * 1.5}
+
+    original = compare()
+    with simple.register_forward_pre_hook(scale_input):
+        pre = compare()
+        with simple.register_forward_hook(scale_energy):
+            both = compare()
+            torch.testing.assert_close(both[1], 1.5 * pre[1])
+
+    def shift_hidden(module, args, output):
+        return output * 1.25
+
+    with simple.head[0].register_forward_hook(shift_hidden):
+        changed = compare()
+        assert not torch.allclose(changed[1], original[1])
+
+    torch.testing.assert_close(compare(), original)
+
+def test_compiled_force_training_without_messages_keeps_disconnected_weights_unused():
+    model, _ = _force_fixture()
+    model.embed.include_self = False
+    batch = dict(Ra=torch.zeros(1, 3, requires_grad=True), Za=torch.tensor([1]), N=[1],
+                 batch_seg=torch.tensor([0]), idx_i=torch.empty(0, dtype=torch.long),
+                 idx_j=torch.empty(0, dtype=torch.long))
+    params = tuple(model.parameters())
+
+    def gradients(runner):
+        output = runner(batch)
+        loss = output["E"].square().sum() + output["Fa"].square().sum()
+        return torch.autograd.grad(loss, params, allow_unused=True)
+
+    reference = gradients(model)
+    observed = gradients(torch.compile(model, backend="aot_eager"))
+    assert any(grad is None for grad in reference)
+    torch.testing.assert_close(observed, reference)
+
+
+def test_compiled_vector_training_honors_internal_backward_hooks_and_wrapped_final_updates(monkeypatch):
+    model, batch = _force_fixture()
+    model.double()
+    batch["Ra"] = batch["Ra"].detach().double().requires_grad_()
+    query = model.blocks[0].module.q_proj
+    last = model.blocks[-1].module
+    weights = (batch["Ra"], query.weight)
+
+    def evaluate(runner):
+        out = runner(batch)
+        loss = out["E"].square().sum() + out["Fa"].square().sum()
+        return out["E"], out["Fa"], *torch.autograd.grad(loss, weights)
+
+    torch.compiler.reset()
+    try:
+        compiled = torch.compile(model, backend="aot_eager")
+
+        def compare():
+            reference = evaluate(model)
+            torch.testing.assert_close(evaluate(compiled), reference, atol=1e-10, rtol=1e-8)
+            return reference
+
+        baseline = compare()
+
+        def amplify(_layer, grad_output):
+            return (2 * grad_output[0],)
+
+        with query.register_full_backward_pre_hook(amplify):
+            hooked = compare()
+            assert not torch.allclose(hooked[-1], baseline[-1])
+        torch.testing.assert_close(compare(), baseline)
+
+        forward = last.forward
+
+        def amplify_update(*args, **kwargs):
+            scalar, vector, edge = forward(*args, **kwargs)
+            return 3 * scalar, vector, edge
+
+        with monkeypatch.context() as patched:
+            patched.setattr(last, "forward", amplify_update)
+            changed = compare()
+            assert not torch.allclose(changed[0], baseline[0])
+        torch.testing.assert_close(compare(), baseline)
+    finally:
+        torch.compiler.reset()

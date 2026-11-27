@@ -40,8 +40,9 @@ from torch import Tensor
 from torch.nn import LayerNorm, Linear, Module, Parameter
 
 from ..et.interaction import normalize_distance_influence
-from ..functional import reduce_edge
-from ..layers.rejection import vector_rejection
+from ..mp.ops import gather_sender, scatter_sum
+from ..mp.ops.rejection import vector_rejection
+from ..mp.equivariant.body_order import angular_inner, angular_norm_squared, rejection_inner
 from ..visnet.interaction import normalize_activation
 
 
@@ -171,22 +172,31 @@ class QuinNetInteraction(Module):
         reference names ``edge_index[0]`` ``dst`` and ``edge_index[1]``
         ``src``, so ``dst`` is the sender and ``src`` is the receiver.
         """
-        sender = vector.index_select(0, idx_j)
+        sender = gather_sender(vector, idx_j)
         receiver = vector.index_select(0, idx_i)
         normal_sender = normal_i.index_select(0, idx_j)
         normal_receiver = normal_i.index_select(0, idx_i)
-        five_iii = F.silu(self.f_proj2(edge)) * (
-            self.dst_proj1(normal_sender) * self.src_proj1(normal_receiver)
-        ).sum(dim=1)
-        five_ii = F.silu(self.f_proj3(edge)) * self.src_proj2(
-            normal_receiver
-        ).square().sum(dim=1)
-        rejected_receiver = vector_rejection(self.trg_proj(receiver), direction)
-        rejected_sender = vector_rejection(self.src_proj(sender), -direction)
-        torsion = F.silu(self.f_proj1(edge)) * (
-            rejected_receiver * rejected_sender
-        ).sum(dim=1)
+        five_iii = F.silu(self.f_proj2(edge)) * angular_inner(
+            self.dst_proj1(normal_sender), self.src_proj1(normal_receiver)
+        )
+        five_ii = F.silu(self.f_proj3(edge)) * angular_norm_squared(self.src_proj2(normal_receiver))
+        # A contiguous edge projection lowers to one matrix multiply when the
+        # fullgraph compiler does not know the number of selected edges.
+        torsion = F.silu(self.f_proj1(edge)) * rejection_inner(
+            self.trg_proj(receiver), self.src_proj(sender.contiguous()), direction
+        )
         return five_iii, five_ii, torsion
+
+    def _vector_message(self, scalar_message: Tensor, vector: Tensor, idx_j: Tensor, direction: Tensor) -> Tensor:
+        gate, coeff = torch.split(
+            F.silu(self.s_proj(scalar_message)), self.hidden_channels, dim=-1
+        )
+        vector_message = gather_sender(vector, idx_j) * gate.unsqueeze(1)
+        return vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
+
+    @staticmethod
+    def _vector_residual(vec3: Tensor, out_scale: Tensor, aggregated: Tensor) -> Tensor:
+        return vec3 * out_scale.unsqueeze(1) + aggregated
 
     def forward(
         self,
@@ -198,6 +208,19 @@ class QuinNetInteraction(Module):
         window: Tensor,
         direction: Tensor,
     ) -> tuple[Tensor, Tensor, Optional[Tensor]]:
+        return self._update(scalar, vector, edge, idx_i, idx_j, window, direction, defer_vector=False)
+
+    def _update(
+        self,
+        scalar: Tensor,
+        vector: Tensor,
+        edge: Tensor,
+        idx_i: Tensor,
+        idx_j: Tensor,
+        window: Tensor,
+        direction: Tensor,
+        *, defer_vector: bool,
+    ):
         n_atoms = int(scalar.shape[0])
         if idx_i.shape != idx_j.shape or idx_i.ndim != 1:
             raise ValueError(
@@ -229,22 +252,22 @@ class QuinNetInteraction(Module):
         vec1, vec2, vec3 = torch.split(
             self.vec_proj(vector), self.hidden_channels, dim=-1
         )
-        three_body = (vec1 * vec2).sum(dim=1)
+        three_body = angular_inner(vec1, vec2)
         normal_i = vector_rejection(
             self.vec_proj_improper1(vector), self.vec_proj_improper2(vector)
         )
-        five_i = normal_i.square().sum(dim=1)
+        five_i = angular_norm_squared(normal_i)
         normal_improper = vector_rejection(
             self.vec_proj_improper3(vector), self.vec_proj_improper4(vector)
         )
-        improper = (normal_improper * self.vec_proj_improper5(vector)).sum(dim=1)
+        improper = angular_inner(normal_improper, self.vec_proj_improper5(vector))
         five_iii_edge, five_ii_edge, torsion_edge = self._edge_invariants(
             vector, normal_i, edge, idx_i, idx_j, direction
         )
         node_shape = (n_atoms, self.hidden_channels)
-        five_iii = reduce_edge(five_iii_edge, idx_j, node_shape)
-        five_ii = reduce_edge(five_ii_edge, idx_j, node_shape)
-        torsion = reduce_edge(torsion_edge, idx_j, node_shape)
+        five_iii = scatter_sum(five_iii_edge, idx_j, node_shape[0])
+        five_ii = scatter_sum(five_ii_edge, idx_j, node_shape[0])
+        torsion = scatter_sum(torsion_edge, idx_j, node_shape[0])
 
         filter_key = None
         if self.dk_proj is not None:
@@ -269,15 +292,11 @@ class QuinNetInteraction(Module):
         scalar_message = (value_j * attention.unsqueeze(-1)).reshape(
             n_edges, self.hidden_channels
         )
-        gate, coeff = torch.split(
-            F.silu(self.s_proj(scalar_message)), self.hidden_channels, dim=-1
-        )
-        vector_message = vector.index_select(0, idx_j) * gate.unsqueeze(1)
-        vector_message = vector_message + coeff.unsqueeze(1) * direction.unsqueeze(-1)
-        aggregated_scalar = reduce_edge(scalar_message, idx_i, node_shape)
-        aggregated_vector = reduce_edge(
-            vector_message, idx_i, (n_atoms, angular, self.hidden_channels)
-        )
+        if not defer_vector:
+            vector_message = self._vector_message(scalar_message, vector, idx_j, direction)
+        aggregated_scalar = scatter_sum(scalar_message, idx_i, node_shape[0])
+        if not defer_vector:
+            aggregated_vector = scatter_sum(vector_message, idx_i, n_atoms)
         out_scale, out_gate, out_bias = torch.split(
             self.o_proj(aggregated_scalar), self.hidden_channels, dim=-1
         )
@@ -286,7 +305,9 @@ class QuinNetInteraction(Module):
         )
         mixed = (terms * self.ratio.to(dtype=terms.dtype).view(-1, 1, 1)).sum(dim=0)
         delta_scalar = mixed * out_gate + out_bias
-        delta_vector = vec3 * out_scale.unsqueeze(1) + aggregated_vector
+        if defer_vector:
+            return delta_scalar, (scalar_message, vector, vec3, out_scale)
+        delta_vector = self._vector_residual(vec3, out_scale, aggregated_vector)
         delta_edge = None
         if not self.last_layer:
             delta_edge = torsion_edge + five_iii_edge + five_ii_edge

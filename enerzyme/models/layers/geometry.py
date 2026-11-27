@@ -2,7 +2,7 @@ from typing import Optional, Dict, Literal
 from torch import Tensor
 import torch.nn.functional as F
 from . import BaseFFLayer
-from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
+from ..mp.basis.envelope import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
 class DistanceLayer(BaseFFLayer):
@@ -21,8 +21,8 @@ class DistanceLayer(BaseFFLayer):
         '''
         Compute the distance with atom pair indices
 
-        Params:
-        -----
+        .. rubric:: Parameters
+
         Ra: Float tensor of atom positions, shape [N * batch_size]
 
         idx_i: Long tensor of the first pair indices, shape [N_pair * batch_size]
@@ -31,8 +31,8 @@ class DistanceLayer(BaseFFLayer):
 
         offsets: Float tensor of distance offsets, shape [N_pair * batch_size]
 
-        Returns:
-        -----
+        .. rubric:: Returns
+
         Dij: Float tensor of distances, shape [N_pair * batch_size]
         '''
         relevant_output = dict()
@@ -72,18 +72,23 @@ class RangeSeparationLayer(BaseFFLayer):
     def get_output(self, Dij_lr: Tensor, idx_i_lr: Tensor, idx_j_lr: Tensor, vij_lr: Optional[Tensor]=None) -> Dict[
         Literal["Dij_sr", "idx_i_sr", "idx_j_sr", "vij_sr", "cutoff_values_sr"], Tensor
     ]:
-        cutmask = Dij_lr < self.cutoff_sr
+        # Boolean indexing would repeat the same nonzero search and device
+        # synchronization for distances, both endpoint arrays and vectors.
+        edges = (Dij_lr < self.cutoff_sr).nonzero(as_tuple=True)[0]
+        return self._select_edges(edges, Dij_lr, idx_i_lr, idx_j_lr, vij_lr)
+
+    def _select_edges(self, edges, Dij_lr, idx_i_lr, idx_j_lr, vij_lr):
         relevant_output = {
-            "Dij_sr": Dij_lr[cutmask],
-            "idx_i_sr": idx_i_lr[cutmask],
-            "idx_j_sr": idx_j_lr[cutmask],
+            "Dij_sr": Dij_lr.index_select(0, edges),
+            "idx_i_sr": idx_i_lr.index_select(0, edges),
+            "idx_j_sr": idx_j_lr.index_select(0, edges),
         }
         if self.cutoff_fn is not None:
             relevant_output["cutoff_values_sr"] = self.cutoff_fn(
                 relevant_output["Dij_sr"], self.cutoff_sr, self.cuton
             )
         if vij_lr is not None:
-            relevant_output["vij_sr"] = vij_lr[cutmask]
+            relevant_output["vij_sr"] = vij_lr.index_select(0, edges)
         return relevant_output
 
 

@@ -29,14 +29,14 @@ def _random_so3(dtype=torch.float64):
 
 
 def test_so3krates_core_atom_feature_shape():
-    from enerzyme.models.so3krates import So3kratesCore
+    from enerzyme.models.presets.hybrid import so3krates
 
     torch.manual_seed(0)
     N = 6
     F = 12
     degrees = [1, 2, 3]
     m_tot = sum(2 * l + 1 for l in degrees)
-    core = So3kratesCore(
+    core = so3krates(
         dim_embedding=F,
         num_rbf=8,
         degrees=degrees,
@@ -62,11 +62,11 @@ def test_so3krates_core_atom_feature_shape():
 
 
 def test_so3krates_simple_readout_resolves_feature_irreps():
-    from enerzyme.models.so3krates import So3kratesCore
+    from enerzyme.models.presets.hybrid import so3krates
     from enerzyme.models.layers import SimpleReadout
 
     F = 12
-    core = So3kratesCore(
+    core = so3krates(
         dim_embedding=F,
         num_rbf=8,
         degrees=[1, 2, 3],
@@ -88,7 +88,7 @@ def test_so3krates_simple_readout_resolves_feature_irreps():
 
 def test_so3krates_build_model_energy_force_finite():
     from enerzyme.models.ff import build_model
-    from enerzyme.models.so3krates.core import DEFAULT_LAYER_PARAMS
+    from enerzyme.models.so3krates import DEFAULT_LAYER_PARAMS
 
     torch.manual_seed(0)
     # Smaller stack for speed
@@ -140,7 +140,7 @@ def test_so3krates_build_model_energy_force_finite():
 
 def test_so3krates_energy_so3_invariant_forces_equivariant():
     from enerzyme.models.ff import build_model
-    from enerzyme.models.so3krates.core import DEFAULT_LAYER_PARAMS
+    from enerzyme.models.so3krates import DEFAULT_LAYER_PARAMS
 
     torch.manual_seed(1)
     layers = []

@@ -13,9 +13,10 @@ import torch
 from e3nn import o3
 from torch import Tensor, nn
 
-from ..activation import SmoothLeakyReLU
-from ..blocks.radial_mlp import RadialFunction
-from ..so3.linear import SO3Linear
+from ..mp.basis.angular import spherical_harmonic_degree
+from ..mp.nn.activation import SmoothLeakyReLU
+from ..mp.nn.radial_mlp import RadialFunction
+from ..mp.equivariant.sph.linear import SO3Linear
 from .so3_ops import SO3Linear2Scalar
 from .so2_tensor_product import E2TensorProductSO2_FirstOrder
 from .triton_sparse import (
@@ -133,7 +134,7 @@ class DotAlphaModule(nn.Module):
         node_dot = self.dot_linear(node_irreps_input)
         extras = []
         for lval in range(self.lmax + 1):
-            rij_l = e3nn.o3.spherical_harmonics(
+            rij_l = spherical_harmonic_degree(
                 lval, edge_vec, normalize=True
             ).unsqueeze(-1)
             node_l = node_dot[:, lval**2 : (lval + 1) ** 2]
@@ -682,7 +683,7 @@ class E2AttentionClusterSparse(nn.Module):
             key_dot = self.alpha_module.dot_linear(cluster_irreps_input)
             extras = []
             for lval in range(self.lmax + 1):
-                rij_l = e3nn.o3.spherical_harmonics(
+                rij_l = spherical_harmonic_degree(
                     lval, edge_vec, normalize=True
                 ).unsqueeze(-1)
                 node_l = node_dot[:, lval**2 : (lval + 1) ** 2]

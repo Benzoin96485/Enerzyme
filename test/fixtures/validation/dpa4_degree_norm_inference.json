@@ -1,0 +1,1273 @@
+{
+ "torch": "2.13.0+cu126",
+ "device": "CPU",
+ "model": "dpa4",
+ "source_parent": "8279050",
+ "corrected_source": "3a4dd07",
+ "method": "Run check_compiled_forces.py on the published DPA4 preset, built with the default weights (seed 142). Inputs have five and four atoms (seed 107). Inference measures energy, force and the first and repeated energy-coordinate gradients. FP32 atol/rtol are 7e-4/1e-3 and FP64 atol/rtol are 1e-10/1e-8.",
+ "initial_fp64_inference": {
+  "revision": "2354ed0",
+  "job": 6318417,
+  "outside_tolerance": [
+   "E",
+   "Fa",
+   "energy_coordinate_gradient",
+   "repeated_energy_coordinate_gradient"
+  ],
+  "checked": {
+   "E": {
+    "max_abs": 8.92751508274614e-08,
+    "relative_l2": 1.25905376600011e-08
+   },
+   "Fa": {
+    "max_abs": 6.381202510841177e-10,
+    "relative_l2": 5.233169603962016e-09
+   },
+   "energy_coordinate_gradient": {
+    "max_abs": 6.381202510841177e-10,
+    "relative_l2": 5.233169603962016e-09
+   },
+   "repeated_energy_coordinate_gradient": {
+    "max_abs": 6.381202510841177e-10,
+    "relative_l2": 5.233169603962016e-09
+   }
+  },
+  "graphs": 9,
+  "operations": 1097,
+  "learned_operators": [
+   "bmm",
+   "einsum",
+   "embedding",
+   "index_add_",
+   "linear",
+   "matmul",
+   "scatter_add_"
+  ]
+ },
+ "controls": {
+  "job": 6318568,
+  "statistics": "Compute the upstream FP32 centering and two degree-balanced variance reductions with native CPU operations. The rescaling, affine map and their derivatives still use Inductor.",
+  "whole_norm": "Compute the full published FP32 degree normalization and its derivatives with native CPU operations. Embeddings, attention, contractions and readout retain compiled kernels.",
+  "statistics_only_fp64": {
+   "outside_tolerance": [
+    "Fa",
+    "energy_coordinate_gradient",
+    "repeated_energy_coordinate_gradient"
+   ],
+   "checked": {
+    "E": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "Fa": {
+     "max_abs": 5.797907015603343e-09,
+     "relative_l2": 4.092140203607374e-08
+    },
+    "energy_coordinate_gradient": {
+     "max_abs": 5.797907015603343e-09,
+     "relative_l2": 4.092140203607374e-08
+    },
+    "repeated_energy_coordinate_gradient": {
+     "max_abs": 5.797907015603343e-09,
+     "relative_l2": 4.092140203607374e-08
+    }
+   },
+   "graphs": 15,
+   "operations": 721,
+   "learned_operators": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ]
+  },
+  "whole_norm_fp64": {
+   "outside_tolerance": [],
+   "checked": {
+    "E": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "Fa": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    },
+    "energy_coordinate_gradient": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    },
+    "repeated_energy_coordinate_gradient": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    }
+   },
+   "graphs": 13,
+   "operations": 702,
+   "learned_operators": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ]
+  }
+ },
+ "corrected_inference": {
+  "float32": {
+   "outside_tolerance": [],
+   "checked": {
+    "E": {
+     "max_abs": 1.9073486328125e-06,
+     "relative_l2": 1.966393192241092e-07
+    },
+    "Fa": {
+     "max_abs": 4.470348358154297e-08,
+     "relative_l2": 2.956803715183602e-07
+    },
+    "energy_coordinate_gradient": {
+     "max_abs": 4.470348358154297e-08,
+     "relative_l2": 2.956803715183602e-07
+    },
+    "repeated_energy_coordinate_gradient": {
+     "max_abs": 4.470348358154297e-08,
+     "relative_l2": 2.956803715183602e-07
+    }
+   },
+   "graphs": 9,
+   "operations": 1097,
+   "learned_operators": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ],
+   "job": 6318588
+  },
+  "float64": {
+   "outside_tolerance": [],
+   "checked": {
+    "E": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "Fa": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    },
+    "energy_coordinate_gradient": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    },
+    "repeated_energy_coordinate_gradient": {
+     "max_abs": 8.326672684688674e-17,
+     "relative_l2": 5.198453871140874e-16
+    }
+   },
+   "graphs": 13,
+   "operations": 702,
+   "learned_operators": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ],
+   "job": 6318588
+  }
+ },
+ "training_controls": {
+  "job": 6318588,
+  "prior_data": "compiled_forces_cpu.json / cases / dpa4",
+  "cases": {
+   "float32": {
+    "gradients_compared": 60,
+    "energy": {
+     "max_abs": 1.9073486328125e-06,
+     "relative_l2": 1.966393192241092e-07
+    },
+    "forces": {
+     "max_abs": 2.9802322387695312e-08,
+     "relative_l2": 2.3465660482246005e-07
+    },
+    "outside_tolerance": [],
+    "same_failing_fields_as_previous_training": true,
+    "changed_gradient_participation": {}
+   },
+   "float64": {
+    "gradients_compared": 60,
+    "energy": {
+     "max_abs": 8.92751508274614e-08,
+     "relative_l2": 1.25905376600011e-08
+    },
+    "forces": {
+     "max_abs": 6.381205251704269e-10,
+     "relative_l2": 5.2331708935515914e-09
+    },
+    "outside_tolerance": [
+     "E",
+     "Fa",
+     "blocks.0.module.ffns.0.so3_linear_2.weight",
+     "blocks.0.module.post_so2_norm.bias",
+     "blocks.0.module.so2_conv.post_mix.weight",
+     "blocks.1.module.ffns.0.so3_linear_2.weight",
+     "blocks.1.module.post_so2_norm.bias",
+     "blocks.1.module.so2_conv.post_mix.weight",
+     "embed.env_embed.output_proj.weight",
+     "embed.radial_basis.freqs",
+     "embed.radial_feat_mlp.net.0.weight",
+     "embed.radial_feat_mlp.net.2.weight",
+     "embed.sphere_proj.bias",
+     "embed.sphere_proj.weight",
+     "head.norm.bias",
+     "head.norm.scale",
+     "post_sequence.0.head.bias",
+     "post_sequence.0.head.weight",
+     "pre_sequence.2.embedding.weight"
+    ],
+    "same_failing_fields_as_previous_training": true,
+    "changed_gradient_participation": {}
+   }
+  }
+ },
+ "additional_training_controls": {
+  "job": 6318833,
+  "precision": "float64",
+  "reference": "Identical model parameters, FP32 degree statistics and two-molecule force-loss check as the original training controls.",
+  "controls": {
+   "native_degree_norm": {
+    "method": "Use the original degree normalization outside Dynamo while tracing the CPU force VJP.",
+    "energy": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "forces": {
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "gradient_count": 60,
+    "largest_gradient_error": {
+     "name": "pre_sequence.2.embedding.weight",
+     "max_abs": 0.0,
+     "relative_l2": 0.0
+    },
+    "outside_tolerance": [],
+    "changed_gradient_participation": {},
+    "graphs": 2,
+    "captured_operations": 2,
+    "learned_operations": []
+   },
+   "scalar_cpu": {
+    "method": "Set CPU cpp.simdlen=1 while lowering both forward and backward.",
+    "energy": {
+     "max_abs": 6.615955072675206e-08,
+     "relative_l2": 8.140551107270262e-09
+    },
+    "forces": {
+     "max_abs": 5.088858029411725e-09,
+     "relative_l2": 3.8130508607447436e-08
+    },
+    "gradient_count": 60,
+    "largest_gradient_error": {
+     "name": "embed.sphere_proj.weight",
+     "max_abs": 8.083585811391458e-06,
+     "relative_l2": 5.3073203423174004e-08
+    },
+    "outside_tolerance": [
+     "Fa",
+     "pre_sequence.2.embedding.weight",
+     "post_sequence.0.head.weight",
+     "embed.radial_basis.freqs",
+     "embed.sphere_proj.weight",
+     "embed.sphere_proj.bias",
+     "embed.radial_feat_mlp.net.0.weight",
+     "embed.radial_feat_mlp.net.2.weight",
+     "embed.env_embed.output_proj.weight",
+     "blocks.0.module.post_so2_norm.bias",
+     "blocks.0.module.so2_conv.post_mix.weight",
+     "blocks.0.module.ffns.0.so3_linear_2.weight",
+     "blocks.1.module.post_so2_norm.bias",
+     "blocks.1.module.so2_conv.post_mix.weight",
+     "blocks.1.module.ffns.0.so3_linear_2.weight",
+     "head.norm.scale",
+     "head.norm.bias"
+    ],
+    "changed_gradient_participation": {},
+    "graphs": 1,
+    "captured_operations": 1171,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "unroll_short_reductions": {
+    "method": "Expand static reductions with fewer than 64 elements.",
+    "energy": {
+     "max_abs": 6.615955072675206e-08,
+     "relative_l2": 8.140551107270262e-09
+    },
+    "forces": {
+     "max_abs": 6.381205286398739e-10,
+     "relative_l2": 5.2331708619832906e-09
+    },
+    "gradient_count": 60,
+    "largest_gradient_error": {
+     "name": "blocks.0.module.post_so2_norm.bias",
+     "max_abs": 1.52587890625e-05,
+     "relative_l2": 6.007544555014459e-08
+    },
+    "outside_tolerance": [
+     "Fa",
+     "pre_sequence.2.embedding.weight",
+     "post_sequence.0.head.weight",
+     "embed.radial_basis.freqs",
+     "embed.sphere_proj.weight",
+     "embed.sphere_proj.bias",
+     "embed.radial_feat_mlp.net.0.weight",
+     "embed.radial_feat_mlp.net.2.weight",
+     "embed.env_embed.output_proj.weight",
+     "blocks.0.module.post_so2_norm.bias",
+     "blocks.0.module.so2_conv.post_mix.weight",
+     "blocks.0.module.ffns.0.so3_linear_2.weight",
+     "blocks.1.module.post_so2_norm.bias",
+     "blocks.1.module.so2_conv.post_mix.weight",
+     "blocks.1.module.ffns.0.so3_linear_2.weight",
+     "head.norm.scale",
+     "head.norm.bias"
+    ],
+    "changed_gradient_participation": {},
+    "graphs": 1,
+    "captured_operations": 1171,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "scalar_cpu_single_operation_fusion": {
+    "method": "Set cpp.simdlen=1 and max_fusion_size=1.",
+    "energy": {
+     "max_abs": 6.615955072675206e-08,
+     "relative_l2": 8.140551107270262e-09
+    },
+    "forces": {
+     "max_abs": 5.088858029411725e-09,
+     "relative_l2": 3.8130508607447436e-08
+    },
+    "gradient_count": 60,
+    "largest_gradient_error": {
+     "name": "embed.sphere_proj.weight",
+     "max_abs": 8.083585811391458e-06,
+     "relative_l2": 5.3073203423174004e-08
+    },
+    "outside_tolerance": [
+     "Fa",
+     "pre_sequence.2.embedding.weight",
+     "post_sequence.0.head.weight",
+     "embed.radial_basis.freqs",
+     "embed.sphere_proj.weight",
+     "embed.sphere_proj.bias",
+     "embed.radial_feat_mlp.net.0.weight",
+     "embed.radial_feat_mlp.net.2.weight",
+     "embed.env_embed.output_proj.weight",
+     "blocks.0.module.post_so2_norm.bias",
+     "blocks.0.module.so2_conv.post_mix.weight",
+     "blocks.0.module.ffns.0.so3_linear_2.weight",
+     "blocks.1.module.post_so2_norm.bias",
+     "blocks.1.module.so2_conv.post_mix.weight",
+     "blocks.1.module.ffns.0.so3_linear_2.weight",
+     "head.norm.scale",
+     "head.norm.bias"
+    ],
+    "changed_gradient_participation": {},
+    "graphs": 1,
+    "captured_operations": 1171,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   }
+  },
+  "segmented_forward": {
+   "method": "Apply the same native degree normalization, compile the ordinary forward in segments, and ask the energy for a differentiable force (create_graph=True).",
+   "outcome": "PyTorch AOTAutograd fails while computing the first force. Its backward tries to restride a leaf tensor via copy_ while higher derivatives are enabled.",
+   "error": "RuntimeError: a leaf Variable that requires grad is being used in an in-place operation."
+  },
+  "production_training": "Before the dtype-specific native force dispatch, the published FP32 accumulations remain in the compiled VJP. Native degree normalization matches all 60 parameter gradients, but the VJP loses all learned operators. The CPU code-generation controls retain learned contractions and reductions, with errors above the stated FP64 tolerances."
+ },
+ "opaque_operator_training_controls": {
+  "source": "9ee12e4",
+  "device": "CPU",
+  "torch": "2.13.0+cu126",
+  "minimum": {
+   "seed": 410,
+   "dtype": "float64 for coordinates and dense weights, float32 for normalization",
+   "shapes": {
+    "X": [
+     3,
+     7
+    ],
+    "W": [
+     7,
+     32
+    ],
+    "V": [
+     32,
+     1
+    ]
+   },
+   "energy": "h = (X @ W).float(); c = h - sum(h)/32; E = ((c * rsqrt(sum(c*c)/32 + 1e-4)).double() @ V).sum(). Each sum in the normalization reduces the last axis and keeps that axis.",
+   "derivatives": "energy, pullback = torch.func.vjp(E, X); F = -pullback(ones_like(energy))[0]. Differentiate energy**2 + sum(F**2) jointly with respect to W and V. Use fullgraph=True for both the FX and Inductor checks.",
+   "error_fields": [
+    "energy",
+    "force",
+    "weight_gradient_W",
+    "weight_gradient_V"
+   ],
+   "implementations": {
+    "regular": "Use ordinary Tensor.sum.",
+    "op": "torch.library.custom_op with a CPU sum, fake shape rule, registered autograd (backward expands the incoming gradient), setup_context, and registered vmap.",
+    "wrapped": "Call the opaque op on detached input from a new-style autograd.Function with setup_context, generate_vmap_rule and the same expand backward.",
+    "allow": "Wrap the call to that Function with torch.compiler.allow_in_graph.",
+    "detach_analytic": "Let r = x.sum(-1, keepdim=True); return opaque_sum(x.detach()) + (r-r.detach()). This finite-input diagnostic applies the native rounded value and uses the standard derivative of the linear sum."
+   },
+   "registered_op_smoke": {
+    "data_shape": [
+     6,
+     3,
+     32
+    ],
+    "native_forward_max_error": 0.0,
+    "native_backward_max_error": 0.0,
+    "vmap_forward_max_error": 0.0,
+    "vmap_backward_max_error": 0.0
+   },
+   "results": {
+    "regular": {
+     "eager": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [],
+      "learned_matrix_multiplications": 0,
+      "opaque_sum_nodes": 0
+     },
+     "fx": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [
+       27
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     },
+     "inductor": {
+      "maximum_absolute_errors": [
+       4.1062929057034125e-08,
+       8.797434114526936e-07,
+       7.455561739533323e-06,
+       5.972065579840091e-06
+      ],
+      "graph_sizes": [
+       27
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     }
+    },
+    "op": {
+     "eager": {
+      "error": "RuntimeError",
+      "cause": "GeneratedBackwardFor_dpa4_scratch_sum_last_default lacks a functorch-compatible setup_context method."
+     },
+     "fx": {
+      "error": "TorchRuntimeError",
+      "cause": "GeneratedBackwardFor_dpa4_scratch_sum_last_default lacks a functorch-compatible setup_context method."
+     },
+     "inductor": {
+      "error": "TorchRuntimeError",
+      "cause": "GeneratedBackwardFor_dpa4_scratch_sum_last_default lacks a functorch-compatible setup_context method."
+     }
+    },
+    "wrapped": {
+     "eager": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [],
+      "learned_matrix_multiplications": 0,
+      "opaque_sum_nodes": 0
+     },
+     "fx": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       1.9589476505072625,
+       5.448240637779236
+      ],
+      "graph_sizes": [
+       29
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     },
+     "inductor": {
+      "maximum_absolute_errors": [
+       0.0,
+       7.357734221891121e-08,
+       1.9589508152915691,
+       5.448240756988525
+      ],
+      "graph_sizes": [
+       29
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     }
+    },
+    "allow": {
+     "eager": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [],
+      "learned_matrix_multiplications": 0,
+      "opaque_sum_nodes": 0
+     },
+     "fx": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [
+       27
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     },
+     "inductor": {
+      "maximum_absolute_errors": [
+       0.0,
+       7.357734221891121e-08,
+       1.7755231027649643e-06,
+       5.960464477539062e-07
+      ],
+      "graph_sizes": [
+       27
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 0
+     }
+    },
+    "detach_analytic": {
+     "eager": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [],
+      "learned_matrix_multiplications": 0,
+      "opaque_sum_nodes": 0
+     },
+     "fx": {
+      "maximum_absolute_errors": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "graph_sizes": [
+       37
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 2
+     },
+     "inductor": {
+      "maximum_absolute_errors": [
+       0.0,
+       7.357734221891121e-08,
+       1.7755231027649643e-06,
+       5.960464477539062e-07
+      ],
+      "graph_sizes": [
+       37
+      ],
+      "learned_matrix_multiplications": 2,
+      "opaque_sum_nodes": 2
+     }
+    }
+   }
+  },
+  "full_dpa4": {
+   "job": 6319030,
+   "variant": "Replace the scalar centering mean and both degree variance sums with opaque native reductions of detached inputs, with the ordinary differentiable reduction providing their linear derivatives. Keep the published FP32 casts, affine transform and VJP.",
+   "energy": {
+    "max_abs": 0.0,
+    "relative_l2": 0.0
+   },
+   "forces": {
+    "max_abs": 5.797906932336616e-09,
+    "relative_l2": 4.092140147775604e-08
+   },
+   "parameter_gradients_compared": 60,
+   "largest_gradient_error": {
+    "name": "blocks.0.module.post_so2_norm.bias",
+    "max_abs": 3.814697265625e-06,
+    "relative_l2": 2.413965382666459e-08
+   },
+   "graphs": 1,
+   "captured_operations": 1246,
+   "learned_operations": [
+    "bmm",
+    "einsum",
+    "embedding",
+    "index_add_",
+    "linear",
+    "matmul",
+    "scatter_add_"
+   ],
+   "outside_tolerance": [
+    "Fa",
+    "pre_sequence.2.embedding.weight",
+    "embed.radial_basis.freqs",
+    "embed.sphere_proj.weight",
+    "embed.sphere_proj.bias",
+    "embed.radial_feat_mlp.net.0.weight",
+    "embed.radial_feat_mlp.net.2.weight",
+    "embed.env_embed.output_proj.weight",
+    "blocks.0.module.post_so2_norm.bias",
+    "blocks.0.module.so2_conv.post_mix.weight",
+    "blocks.0.module.ffns.0.so3_linear_2.weight",
+    "blocks.1.module.post_so2_norm.bias",
+    "blocks.1.module.so2_conv.post_mix.weight",
+    "blocks.1.module.ffns.0.so3_linear_2.weight"
+   ],
+   "changed_gradient_participation": {},
+   "opaque_reduction_calls_per_generated_forward": 15,
+   "note": "The five degree RMS normalization sites each call the native centering mean and two native sums. All parameter gradients participate; force and thirteen weight gradients are outside tolerance."
+  },
+  "whole_norm_native_derivatives": {
+   "seed": 125,
+   "shapes": {
+    "X": [
+     4,
+     3
+    ],
+    "W": [
+     3,
+     32
+    ],
+    "V": [
+     32,
+     1
+    ]
+   },
+   "method": "Use one opaque op for the full single-input FP32-centered RMS norm, another for its torch.func.vjp, and a third for the VJP of the pullback. Wrap the ops in new-style autograd Functions. Allow the forward wrapper in the Dynamo graph. The test uses a 1e-5 variance floor and the same scalar energy + force-loss procedure.",
+   "isolated_ops": {
+    "first_vjp_maximum_absolute_error": 0.0,
+    "second_vjp_x_maximum_absolute_error": 0.0,
+    "second_vjp_cotangent_maximum_absolute_error": 0.0
+   },
+   "eager_and_fullgraph_fx": {
+    "energy_maximum_absolute_error": 0.0,
+    "force_maximum_absolute_error": 0.0,
+    "weight_W_maximum_absolute_error": 3.861223692780413e-06,
+    "weight_V_maximum_absolute_error": 0.0
+   },
+   "inductor": "The compiled call reaches the opaque native VJP, which fails inside torch.func.vjp with NotImplementedError: Cannot access storage of TensorWrapper.",
+   "ordinary_autograd_replay": "Calling torch.autograd.grad under torch.enable_grad() inside an opaque CPU kernel fails even in isolation: element 0 of tensors does not require grad and does not have a grad_fn."
+  }
+ },
+ "native_force_dispatch": {
+  "source": "61a9976",
+  "original_revision": "11e93d4",
+  "device": "CPU",
+  "default_job": 6319123,
+  "ordinary": {
+   "training": {
+    "float64": {
+     "dtype": "float64",
+     "mode": "training",
+     "fields": {
+      "E": 0.0,
+      "Fa": 0.0
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "pre_sequence.2.embedding.weight",
+      "max_abs": 0.0
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": {},
+     "graphs": 0,
+     "captured_operations": 0,
+     "learned_operations": []
+    },
+    "float32": {
+     "dtype": "float32",
+     "mode": "training",
+     "fields": {
+      "E": 1.9073486328125e-06,
+      "Fa": 2.9802322387695312e-08
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "post_sequence.0.head.weight",
+      "max_abs": 9.1552734375e-05
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": {},
+     "graphs": 1,
+     "captured_operations": 1171,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    }
+   },
+   "inference": {
+    "float64": {
+     "dtype": "float64",
+     "mode": "inference",
+     "fields": {
+      "E": 0.0,
+      "Fa": 8.326672684688674e-17,
+      "energy_coordinate_gradient": 8.326672684688674e-17,
+      "repeated_energy_coordinate_gradient": 8.326672684688674e-17
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": {},
+     "graphs": 13,
+     "captured_operations": 702,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    },
+    "float32": {
+     "dtype": "float32",
+     "mode": "inference",
+     "fields": {
+      "E": 1.9073486328125e-06,
+      "Fa": 4.470348358154297e-08,
+      "energy_coordinate_gradient": 4.470348358154297e-08,
+      "repeated_energy_coordinate_gradient": 4.470348358154297e-08
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": {},
+     "graphs": 9,
+     "captured_operations": 1097,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    }
+   }
+  },
+  "fullgraph": {
+   "original_default_job": 6319106,
+   "original_default": "With data-dependent neighbor counts, strict tracing reaches segment_softmax and fails on Eq(u0,0) before lowering.",
+   "fixed_neighbor_method": "For the static-neighbor control, compute the actual cutoff indices for the same positions before the compiled call, keep them in the range layer and run its original index selection. Model weights and differentiable geometry remain identical.",
+   "original_fixed_neighbor_job": 6319142,
+   "original_inductor": {
+    "inference": {
+     "dtype": "float64",
+     "mode": "inference",
+     "fields": {
+      "E": 8.92751508274614e-08,
+      "Fa": 6.381202510841177e-10,
+      "energy_coordinate_gradient": 6.381202510841177e-10,
+      "repeated_energy_coordinate_gradient": 6.381202510841177e-10
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [
+      "E",
+      "Fa",
+      "energy_coordinate_gradient",
+      "repeated_energy_coordinate_gradient"
+     ],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1126,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    },
+    "training": {
+     "dtype": "float64",
+     "mode": "training",
+     "fields": {
+      "E": 8.92751508274614e-08,
+      "Fa": 6.381205251704269e-10
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "blocks.0.module.post_so2_norm.bias",
+      "max_abs": 1.52587890625e-05
+     },
+     "outside_tolerance": [
+      "E",
+      "Fa",
+      "pre_sequence.2.embedding.weight",
+      "post_sequence.0.head.weight",
+      "post_sequence.0.head.bias",
+      "embed.radial_basis.freqs",
+      "embed.sphere_proj.weight",
+      "embed.sphere_proj.bias",
+      "embed.radial_feat_mlp.net.0.weight",
+      "embed.radial_feat_mlp.net.2.weight",
+      "embed.env_embed.output_proj.weight",
+      "blocks.0.module.post_so2_norm.bias",
+      "blocks.0.module.so2_conv.post_mix.weight",
+      "blocks.0.module.ffns.0.so3_linear_2.weight",
+      "blocks.1.module.post_so2_norm.bias",
+      "blocks.1.module.so2_conv.post_mix.weight",
+      "blocks.1.module.ffns.0.so3_linear_2.weight",
+      "head.norm.scale",
+      "head.norm.bias"
+     ],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1171,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    }
+   },
+   "guarded_inductor_job": 6319128,
+   "guarded_inductor": {
+    "training": {
+     "exception": "AssertionError",
+     "message": "Fullgraph torch.float64 CPU forces for dpa4 require native derivatives. Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'."
+    },
+    "inference": {
+     "exception": "AssertionError",
+     "message": "Fullgraph torch.float64 CPU forces for dpa4 require native derivatives. Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'."
+    }
+   },
+   "float32_inductor_job": 6319142,
+   "float32_inductor": {
+    "training": {
+     "dtype": "float32",
+     "mode": "training",
+     "fields": {
+      "E": 1.9073486328125e-06,
+      "Fa": 2.9802322387695312e-08
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "post_sequence.0.head.weight",
+      "max_abs": 9.1552734375e-05
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1171,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    },
+    "inference": {
+     "dtype": "float32",
+     "mode": "inference",
+     "fields": {
+      "E": 1.9073486328125e-06,
+      "Fa": 4.470348358154297e-08,
+      "energy_coordinate_gradient": 4.470348358154297e-08,
+      "repeated_energy_coordinate_gradient": 4.470348358154297e-08
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1126,
+     "learned_operations": [
+      "bmm",
+      "einsum",
+      "embedding",
+      "index_add_",
+      "linear",
+      "matmul",
+      "scatter_add_"
+     ]
+    }
+   },
+   "float64_eager_backend_job": 6319153,
+   "float64_eager_backends": {
+    "eager/training": {
+     "dtype": "float64",
+     "mode": "training",
+     "fields": {
+      "E": 0.0,
+      "Fa": 0.0
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "pre_sequence.2.embedding.weight",
+      "max_abs": 0.0
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1171
+    },
+    "aot_eager/training": {
+     "dtype": "float64",
+     "mode": "training",
+     "fields": {
+      "E": 0.0,
+      "Fa": 0.0
+     },
+     "gradients_compared": 60,
+     "largest_weight_error": {
+      "name": "pre_sequence.2.embedding.weight",
+      "max_abs": 0.0
+     },
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1171
+    },
+    "eager/inference": {
+     "dtype": "float64",
+     "mode": "inference",
+     "fields": {
+      "E": 0.0,
+      "Fa": 2.6020852139652106e-18,
+      "energy_coordinate_gradient": 0.0,
+      "repeated_energy_coordinate_gradient": 0.0
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1126
+    },
+    "aot_eager/inference": {
+     "dtype": "float64",
+     "mode": "inference",
+     "fields": {
+      "E": 0.0,
+      "Fa": 2.6020852139652106e-18,
+      "energy_coordinate_gradient": 0.0,
+      "repeated_energy_coordinate_gradient": 0.0
+     },
+     "gradients_compared": 0,
+     "outside_tolerance": [],
+     "changed_gradient_participation": [],
+     "graphs": 1,
+     "captured_operations": 1126
+    }
+   },
+   "guarded_fixed_neighbors": {
+    "inference": "Fullgraph torch.float64 CPU forces for dpa4 require native derivatives. Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'.",
+    "training": "Fullgraph torch.float64 CPU forces for dpa4 require native derivatives. Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'."
+   }
+  },
+  "force_activation_and_device": {
+   "tests": "test_dpa4_core.py exercises the mapped coordinate key on CPU and CUDA FakeTensors in both dtypes, and the evaluation-only and missing ForceLayer cases. No CUDA hardware was allocated for this dispatch check.",
+   "none": {
+    "dtype": "float64",
+    "mode": "training",
+    "fields": {
+     "E": 8.92751508274614e-08,
+     "Fa_present": 0.0
+    },
+    "gradients_compared": 0,
+    "outside_tolerance": [
+     "E"
+    ],
+    "changed_gradient_participation": [],
+    "graphs": 1,
+    "captured_operations": 1140,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "inactive": {
+    "dtype": "float64",
+    "mode": "inference",
+    "fields": {
+     "E": 0.0,
+     "Fa_present": 0.0
+    },
+    "gradients_compared": 0,
+    "outside_tolerance": [],
+    "changed_gradient_participation": [],
+    "graphs": 7,
+    "captured_operations": 710,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "ordinary_job": 6319134
+  },
+  "pytest_with_force_hooks": {
+   "passed": 22,
+   "scope": "DPA4 core, normalization, frozen snapshots and shared ForceLayer hook regression."
+  }
+ },
+ "energy_only_training_controls": {
+  "source": "61a9976",
+  "original_revision": "11e93d4",
+  "method": "Remove the ForceLayer from the same published model and fit only sum(E**2). Compare energy and all 60 weight gradients with the uncompiled model. All controls keep the original parameters, including the two zero-initialized SO2 output matrices, and the published FP32 norm.",
+  "production": "The CPU float64 force dispatch only applies if the corresponding ForceLayer is active. Energy-only training keeps its preexisting compiled path.",
+  "cases": {
+   "existing_energy_only_training": {
+    "job": 6319196,
+    "task": 0,
+    "method": "Original full compiled energy graph.",
+    "energy_max_abs": 8.92751508274614e-08,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.0.module.post_so2_norm.bias",
+     "max_abs": 7.62939453125e-06
+    },
+    "failed_fields": {
+     "E": 8.92751508274614e-08,
+     "pre_sequence.2.embedding.weight": 1.2860058760111315e-06,
+     "post_sequence.0.head.weight": 6.909750837280626e-06,
+     "post_sequence.0.head.bias": 1.6027523059847226e-06,
+     "embed.radial_basis.freqs": 1.433658597393972e-08,
+     "embed.sphere_proj.weight": 6.987114034018305e-06,
+     "embed.sphere_proj.bias": 6.67572021484375e-06,
+     "embed.radial_feat_mlp.net.0.weight": 1.1197807514573554e-08,
+     "embed.radial_feat_mlp.net.2.weight": 1.7022071946426465e-08,
+     "embed.env_embed.output_proj.weight": 1.5439382064497131e-09,
+     "blocks.0.module.post_so2_norm.bias": 7.62939453125e-06,
+     "blocks.0.module.so2_conv.post_mix.weight": 1.9186966682127604e-06,
+     "blocks.0.module.ffns.0.so3_linear_2.weight": 1.236947761995566e-07,
+     "blocks.1.module.post_so2_norm.bias": 7.62939453125e-06,
+     "blocks.1.module.so2_conv.post_mix.weight": 3.4612073633866203e-06,
+     "blocks.1.module.ffns.0.so3_linear_2.weight": 1.138694530888884e-07,
+     "head.norm.scale": 1.9073486328125e-06,
+     "head.norm.bias": 9.5367431640625e-07
+    },
+    "changed_gradient_participation": [],
+    "graphs": 1,
+    "captured_operations": 1140,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_normalization": {
+    "job": 6319196,
+    "task": 1,
+    "method": "Move only the published degree normalization into native CPU execution.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.1.module.so2_conv.post_mix.weight",
+     "max_abs": 9.690878499668543e-07
+    },
+    "failed_fields": {
+     "blocks.0.module.so2_conv.post_mix.weight": 9.398247513559e-08,
+     "blocks.1.module.so2_conv.post_mix.weight": 9.690878499668543e-07
+    },
+    "changed_gradient_participation": [],
+    "graphs": 10,
+    "captured_operations": 745,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_norm_and_output_linears": {
+    "job": 6319210,
+    "task": 0,
+    "method": "Also run the two SO2 post_mix output linear layers natively.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.1.module.so2_conv.post_mix.weight",
+     "max_abs": 9.690878499668543e-07
+    },
+    "failed_fields": {
+     "blocks.0.module.so2_conv.post_mix.weight": 9.398247513559e-08,
+     "blocks.1.module.so2_conv.post_mix.weight": 9.690878499668543e-07
+    },
+    "changed_gradient_participation": [],
+    "graphs": 12,
+    "captured_operations": 744,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_norm_and_convolutions": {
+    "job": 6319210,
+    "task": 1,
+    "method": "Run both complete SO2Convolution modules natively in addition to the degree normalizations.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.0.module.so2_conv.post_mix.weight",
+     "max_abs": 8.526512829121202e-14
+    },
+    "failed_fields": {},
+    "changed_gradient_participation": [],
+    "graphs": 11,
+    "captured_operations": 541,
+    "learned_operations": [
+     "bmm",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_norm_with_scalar_codegen": {
+    "job": 6319210,
+    "task": 2,
+    "method": "Use native degree norms and cpp.simdlen=1 for the remaining compiled model.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.0.module.so2_conv.post_mix.weight",
+     "max_abs": 7.194245199571014e-14
+    },
+    "failed_fields": {},
+    "changed_gradient_participation": [],
+    "graphs": 10,
+    "captured_operations": 745,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   },
+   "native_degree_norm_and_output_linears_with_scalar_codegen": {
+    "job": 6319210,
+    "task": 3,
+    "method": "Use native degree norms and output linear layers, and cpp.simdlen=1 for the remaining compiled model.",
+    "energy_max_abs": 0.0,
+    "parameters_compared": 60,
+    "largest_weight_error": {
+     "name": "blocks.0.module.so2_conv.post_mix.weight",
+     "max_abs": 7.194245199571014e-14
+    },
+    "failed_fields": {},
+    "changed_gradient_participation": [],
+    "graphs": 12,
+    "captured_operations": 744,
+    "learned_operations": [
+     "bmm",
+     "einsum",
+     "embedding",
+     "index_add_",
+     "linear",
+     "matmul",
+     "scatter_add_"
+    ]
+   }
+  }
+ }
+}

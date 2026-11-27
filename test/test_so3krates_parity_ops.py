@@ -17,7 +17,7 @@ from so3krates_parity_utils import (  # noqa: E402
 
 
 def test_real_spherical_harmonics_matches_upstream():
-    from enerzyme.models.so3 import RealSphericalHarmonics as EZSH
+    from enerzyme.models.mp.equivariant import RealSphericalHarmonics as EZSH
     from spherical_harmonics import RealSphericalHarmonics as OffSH
 
     torch.manual_seed(0)
@@ -29,7 +29,7 @@ def test_real_spherical_harmonics_matches_upstream():
 
 
 def test_l0_contraction_matches_upstream():
-    from enerzyme.models.so3 import L0Contraction as EZL0
+    from enerzyme.models.mp.equivariant import L0Contraction as EZL0
     from so3_conv_invariants import L0Contraction as OffL0
 
     torch.manual_seed(1)

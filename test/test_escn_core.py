@@ -1,6 +1,7 @@
 import sys
 
 import torch
+import pytest
 from numpy.testing import assert_allclose
 
 sys.path.extend(["..", "."])
@@ -25,7 +26,7 @@ def _random_so3(dtype=torch.float64):
 
 
 def test_escn_core_atom_feature_shape():
-    from enerzyme.models.escn import eSCNCore
+    from enerzyme.models.presets.so2 import escn
 
     torch.manual_seed(0)
     N = 6
@@ -33,7 +34,7 @@ def test_escn_core_atom_feature_shape():
     dim_embedding = 16
     num_rbf = 8
     lmax = 2
-    core = eSCNCore(
+    core = escn(
         dim_embedding=dim_embedding,
         num_rbf=num_rbf,
         sphere_channels=sphere_channels,
@@ -65,10 +66,10 @@ def test_escn_core_atom_feature_shape():
 
 
 def test_escn_simple_readout_resolves_feature_irreps():
-    from enerzyme.models.escn import eSCNCore
+    from enerzyme.models.presets.so2 import escn
     from enerzyme.models.layers import SimpleReadout
 
-    core = eSCNCore(
+    core = escn(
         dim_embedding=16,
         num_rbf=8,
         sphere_channels=16,
@@ -90,7 +91,7 @@ def test_escn_simple_readout_resolves_feature_irreps():
 
 
 def test_init_edge_rot_mat_keeps_grad():
-    from enerzyme.models.so3 import init_edge_rot_mat
+    from enerzyme.models.mp.equivariant import init_edge_rot_mat
 
     vij = torch.randn(5, 3, requires_grad=True)
     rot = init_edge_rot_mat(vij)
@@ -100,16 +101,16 @@ def test_init_edge_rot_mat_keeps_grad():
     assert torch.isfinite(vij.grad).all()
 
 
-def test_escn_build_model_energy_force_finite():
+@pytest.mark.parametrize("num_atoms", [1, 5])
+def test_escn_build_model_energy_force_finite(num_atoms):
     from enerzyme.models.ff import build_model
 
     torch.manual_seed(0)
     model = build_model("escn", verbose=0)
-    N = 5
-    Ra = torch.randn(N, 3, requires_grad=True)
-    Za = torch.tensor([1, 6, 8, 1, 6])
-    batch_seg = torch.zeros(N, dtype=torch.long)
-    idx_i, idx_j = _complete_graph_edges(N)
+    Ra = torch.randn(num_atoms, 3, requires_grad=True)
+    Za = torch.tensor([1, 6, 8, 1, 6])[:num_atoms]
+    batch_seg = torch.zeros(num_atoms, dtype=torch.long)
+    idx_i, idx_j = _complete_graph_edges(num_atoms)
     out = model(
         {
             "Ra": Ra,
@@ -119,10 +120,13 @@ def test_escn_build_model_energy_force_finite():
             "idx_j": idx_j,
         }
     )
-    assert out["atom_feature"].shape == (N, model.dim_feature_out)
+    assert out["atom_feature"].shape == (num_atoms, model.dim_feature_out)
     assert torch.isfinite(out["E"]).all()
-    assert out["Fa"].shape == (N, 3)
+    assert out["Fa"].shape == (num_atoms, 3)
     assert torch.isfinite(out["Fa"]).all()
+    if num_atoms == 1:
+        torch.testing.assert_close(out["Fa"], torch.zeros_like(Ra))
+        (out["E"].square().sum() + out["Fa"].square().sum()).backward()
 
 
 def test_escn_force_finite_difference_conservation():

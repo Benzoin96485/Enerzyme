@@ -17,11 +17,16 @@ from typing import Callable, List, Optional, Sequence, Union
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Identity, LayerNorm, Linear, Module, ModuleList, Parameter, Sequential
+from torch.nn import Identity, LayerNorm, Linear, Module, ModuleList, Sequential
 
-from ..functional import reduce_edge
-from ..layers.rejection import vector_rejection
-from .geometry import degree_widths, split_degrees
+from ..mp.block import Block, BlockState
+from ..mp.core import Embed
+from ..mp.head import Head
+from ..mp.nn.field_norm import TensorLayerNorm
+from ..mp.aggregate import Aggregate
+from .geometry import angular_dim, geodite_spherical_harmonics
+from ..mp.ops.rejection import vector_rejection
+from .geometry import split_degrees
 
 
 _EDGE_PARTS = {
@@ -145,43 +150,6 @@ def _mlp(
     return Sequential(*layers)
 
 
-class TensorLayerNorm(Module):
-    """One RMS over every degree, with a per-degree affine gain.
-
-    The degree weight ``1 / (2l + 1)`` gives each ``l`` the same vote. The
-    statistic is then averaged over channels, so a symmetric geometry where
-    one degree is zero does not make its own norm singular.
-    """
-
-    def __init__(self, lmax: int, num_channels: int, eps: float = 1e-6) -> None:
-        super().__init__()
-        self.lmax = int(lmax)
-        self.eps = float(eps)
-        self.channels = int(num_channels)
-        self.split_sizes = [1, *degree_widths(self.lmax)]
-        degree_index: List[int] = []
-        balance: List[float] = []
-        for degree, size in enumerate(self.split_sizes):
-            degree_index.extend([degree] * size)
-            balance.extend([1.0 / size] * size)
-        self.register_buffer(
-            "degree_index", torch.tensor(degree_index, dtype=torch.long), persistent=False
-        )
-        self.register_buffer(
-            "balance", torch.tensor(balance).view(1, -1, 1), persistent=False
-        )
-        self.affine = Parameter(torch.ones(self.lmax + 1, self.channels))
-
-    def forward(self, scalars: Tensor, steerable: Tensor) -> tuple[Tensor, Tensor]:
-        packed = torch.cat([scalars.unsqueeze(1), steerable], dim=1)
-        # [N, 1, C] then a scalar per atom.
-        squared = (packed.square() * self.balance).sum(dim=1, keepdim=True)
-        inverse_rms = (squared.mean(dim=2, keepdim=True) + self.eps).pow(-0.5)
-        gain = self.affine.index_select(0, self.degree_index).unsqueeze(0)
-        normalized = packed * inverse_rms * gain
-        return normalized[:, 0, :], normalized[:, 1:, :]
-
-
 class NodeInit(Module):
     """Environment-conditioned scalar state from the species embedding.
 
@@ -194,6 +162,7 @@ class NodeInit(Module):
         self.channels = int(channels)
         self.neighbor_embedding = torch.nn.Embedding(int(max_Za) + 1, self.channels)
         self.radial_proj = Dense(int(num_rbf), self.channels)
+        self.aggregate = Aggregate(mode="density")
         self.density = Dense(int(num_rbf), 1, activation=F.silu)
         self.update = _mlp(
             (2 * self.channels, self.channels, self.channels),
@@ -216,11 +185,7 @@ class NodeInit(Module):
             neighbor = self.neighbor_embedding(atomic_numbers.long())
             radial = self.radial_proj(rbf)
             density = torch.tanh(self.density(rbf).square())
-            pooled = reduce_edge(
-                neighbor[idx_j] * radial, idx_i, (number, channels)
-            )
-            norm = reduce_edge(density, idx_i, (number, 1))
-            message = pooled / (norm + 1)
+            message = self.aggregate.reduce(neighbor[idx_j] * radial, idx_i, number, density)
         return self.update(torch.cat([atom_embedding, message], dim=-1))
 
 
@@ -305,6 +270,9 @@ class InteractionBlock(Module):
         self.lmax = int(lmax)
         self.num_heads = int(num_heads)
         self.head_dim = self.channels // self.num_heads
+        self.register_buffer(
+            "_value_head", torch.arange(3 * self.channels) // (3 * self.head_dim), persistent=False
+        )
         self.dropout = float(dropout)
         self.update_edges = bool(update_edges)
         self.edge_spec = edge_spec
@@ -326,6 +294,7 @@ class InteractionBlock(Module):
         self.key = Dense(self.channels, self.channels)
         self.edge_attention = Dense(self.channels, self.channels, activation=F.silu)
         self.edge_filter = Dense(self.channels, multiplier)
+        self.aggregate = Aggregate(mode="density")
         self.density = Dense(self.num_rbf, 1, activation=F.silu)
 
         if self.update_edges:
@@ -402,11 +371,21 @@ class InteractionBlock(Module):
         attended = self.edge_attention(edges).reshape(-1, self.num_heads, self.head_dim)
         logits = (query[idx_i] * key[idx_j] * attended).sum(dim=-1, keepdim=True)
         attention = F.silu(logits) / math.sqrt(self.channels)
-        attention = F.dropout(attention, p=self.dropout, training=self.training)
-        value_heads = values[idx_j].reshape(
-            -1, self.num_heads, (3 * self.channels) // self.num_heads
-        )
-        mixed = (attention * value_heads).reshape(-1, 3 * self.channels)
+        if torch.compiler.is_compiling() and self.training and 0.0 < self.dropout < 1.0:
+            # The composite dropout checks numel() under the coordinate VJP.
+            # The native operator accepts a symbolic edge count.
+            attention = torch.ops.aten.native_dropout.default(attention, self.dropout, True)[0]
+        else:
+            attention = F.dropout(attention, p=self.dropout, training=self.training)
+        neighbor_values = values[idx_j]
+        if torch.compiler.is_compiling() and values.device.type == "cpu":
+            # A scalar/vector split can cut through a head. CPU Inductor drops
+            # the partial head when fusing the flattened broadcast into a scatter.
+            channel_weights = attention.squeeze(-1).index_select(1, self._value_head)
+            mixed = channel_weights * neighbor_values
+        else:
+            value_heads = neighbor_values.reshape(-1, self.num_heads, 3 * self.head_dim)
+            mixed = (attention * value_heads).reshape(-1, 3 * self.channels)
         mixed = mixed + self.edge_filter(edges) * filtered[idx_j]
         scalar_message, direction_gate, feature_gate = mixed.split(self.channels, dim=-1)
         steerable_message = (
@@ -414,14 +393,9 @@ class InteractionBlock(Module):
             + feature_gate.unsqueeze(1) * steerable[idx_j]
         )
         density = torch.tanh(self.density(rbf / self.num_rbf).square())
-        scalar_sum = reduce_edge(scalar_message, idx_i, (number, self.channels))
-        steerable_sum = reduce_edge(
-            steerable_message, idx_i, (number, steerable.shape[1], self.channels)
-        )
-        density_sum = reduce_edge(density, idx_i, (number, 1))
-        scale = density_sum + 1
-        scalars = scalars + scalar_sum / scale
-        steerable = steerable + steerable_sum / scale.unsqueeze(-1)
+        norm = self.aggregate.normalizer(idx_i, number, scalar_message, density)
+        scalars = scalars + self.aggregate.reduce_with_normalizer(scalar_message, idx_i, number, norm)
+        steerable = steerable + self.aggregate.reduce_with_normalizer(steerable_message, idx_i, number, norm)
         if self.update_edges:
             edges = edges + self._edge_update(steerable, harmonics, edges, idx_i, idx_j)
         return scalars, steerable, edges
@@ -452,3 +426,68 @@ class InteractionBlock(Module):
                 sender = vector_rejection(sender, -axis)
             weight = weight + (receiver * sender).sum(dim=1)
         return self.edge_mlp(edges) * self.edge_gate(weight)
+
+
+class GeoditeEmbed(Embed):
+    input_fields = ("atom_embedding", "Za")
+
+    def __init__(self, width, num_rbf, max_Za, lmax):
+        super().__init__()
+        self.width = width
+        self.num_rbf = num_rbf
+        self.lmax = lmax
+        self.angular_dim = angular_dim(lmax)
+        self.node_init = NodeInit(width, num_rbf, max_Za)
+        self.edge_init = EdgeInit(width, num_rbf)
+
+    def forward(self, inputs, ctx):
+        x = inputs["atom_embedding"]
+        z = inputs["Za"].long()
+        if x.shape[-1] != self.width:
+            raise ValueError(f"atom_embedding width {x.shape[-1]} != dim_embedding {self.width}")
+        if ctx.rbf.ndim != 2 or ctx.rbf.shape[-1] != self.num_rbf:
+            raise ValueError(f"rbf must have shape [E, {self.num_rbf}], got {tuple(ctx.rbf.shape)}")
+        if x.shape[0] != z.shape[0]:
+            raise ValueError(f"atom_embedding has {x.shape[0]} atoms but Za has {z.shape[0]}")
+        scalar = self.node_init(x, z, ctx.rbf, ctx.receiver, ctx.sender)
+        edges = self.edge_init(scalar, ctx.rbf, ctx.receiver, ctx.sender)
+        vector = scalar.new_zeros((ctx.num_nodes, self.angular_dim, self.width))
+        harmonics = (geodite_spherical_harmonics(ctx.unit(), self.lmax) if ctx.num_edges else
+                     ctx.vec.new_zeros((0, self.angular_dim)))
+        ctx.cache["geodite_harmonics"] = harmonics
+
+        # Evaluate the isolated-atom reference once per species using the same learned updates.
+        unique, inverse = torch.unique(z, sorted=True, return_inverse=True)
+        choice = torch.empty_like(unique)
+        choice.scatter_(0, inverse, torch.arange(ctx.num_nodes, device=z.device))
+        empty = z.new_empty(0)
+        isolated = self.node_init(x.index_select(0, choice), unique, ctx.rbf[:0], empty, empty)
+        isolated_vector = isolated.new_zeros(unique.shape[0], self.angular_dim, self.width)
+        ctx.cache["isolated_species"] = inverse
+        return BlockState(scalar, vector, edges, {"isolated": isolated, "isolated_vector": isolated_vector})
+
+
+class GeoditeBlock(Block):
+    def __init__(self, message, coupling):
+        super().__init__()
+        self.message = message
+        self.coupling = coupling
+
+    def forward(self, state, ctx):
+        x, v, edges = self.message(state.scalar, state.equi, state.edge,
+                                   ctx.cache["geodite_harmonics"], ctx.rbf, ctx.receiver, ctx.sender)
+        x, v = self.coupling(x, v)
+        x0, v0 = self.message.norm(state.aux["isolated"], state.aux["isolated_vector"])
+        x0, v0 = self.coupling(x0, v0)
+        return BlockState(x, v, edges, {"isolated": x0, "isolated_vector": v0})
+
+
+class GeoditeHead(Head):
+    needs_taps = True
+    output_fields = ("atom_feature", "isolated_atom_feature", "atom_steerable_feature")
+
+    def forward(self, state, ctx, taps, inputs):
+        scalars = torch.stack([tap.scalar for tap in taps[1:]], dim=-1)
+        isolated = torch.stack([tap.aux["isolated"] for tap in taps[1:]], dim=-1)
+        return {"atom_feature": scalars, "isolated_atom_feature": isolated.index_select(0, ctx.cache["isolated_species"]),
+                "atom_steerable_feature": state.equi}

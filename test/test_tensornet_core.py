@@ -118,7 +118,7 @@ def test_tensornet_registration_and_yaml_build():
 
     for name in ("tensornet", "TensorNet"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "TensorNetCore"
+        assert core_cls.__name__ == "tensornet"
         assert build_params["num_rbf"] == 32
         assert build_params["cutoff_sr"] == 4.5
         assert build_params["cutoff_fn"] == "cosine"
@@ -133,7 +133,9 @@ def test_tensornet_registration_and_yaml_build():
         build_params=dict(ff["build_params"], dim_embedding=8, num_rbf=4, max_Za=20),
         verbose=0,
     )
-    assert model.__class__.__name__ == "TensorNetCore"
+    from enerzyme.models.mp.core import ComposableCore
+
+    assert isinstance(model, ComposableCore)
     assert model.dim_feature_out == 8
     assert model.feature_irreps == "8x0e"
     assert model.vector_feature_layout == "cartesian_n3f"
@@ -146,10 +148,10 @@ def test_tensornet_registration_and_yaml_build():
 
 def test_unknown_group_and_cutoff_mismatch_raise():
     from enerzyme.models.ff import build_model
-    from enerzyme.models.tensornet import TensorNetCore
+    from enerzyme.models.presets.cartesian_tensor import tensornet
 
     try:
-        TensorNetCore(dim_embedding=4, num_rbf=3, equivariance_group="SU(2)")
+        tensornet(dim_embedding=4, num_rbf=3, equivariance_group="SU(2)")
     except ValueError as exc:
         assert "O(3)" in str(exc)
     else:
@@ -172,7 +174,7 @@ def test_unknown_group_and_cutoff_mismatch_raise():
 
 
 def test_embedding_and_interaction_match_reference_wiring():
-    from enerzyme.models.functional import reduce_edge
+    from enerzyme.models.mp.ops import scatter_sum
     from enerzyme.models.tensornet.interaction import TensorNetEmbedding, TensorNetInteraction
     from enerzyme.models.tensornet.ops import (
         compose_tensor,
@@ -218,18 +220,10 @@ def test_embedding_and_interaction_match_reference_wiring():
         dim=1,
     )
     processed = window[:, None, None] * pair[:, None, :] * radial
-    iso = reduce_edge(processed[:, 0], graph["idx_i_sr"], (n, features))
-    vector = reduce_edge(
-        processed[:, 1, None, :] * hat[:, :, None],
-        graph["idx_i_sr"],
-        (n, 3, features),
-    )
+    iso = scatter_sum(processed[:, 0], graph["idx_i_sr"], n)
+    vector = scatter_sum(processed[:, 1, None, :] * hat[:, :, None], graph["idx_i_sr"], n)
     outer = hat[:, :, None] * hat[:, None, :]
-    symmetric = reduce_edge(
-        processed[:, 2, None, None, :] * outer[:, :, :, None],
-        graph["idx_i_sr"],
-        (n, 3, 3, features),
-    )
+    symmetric = scatter_sum(processed[:, 2, None, None, :] * outer[:, :, :, None], graph["idx_i_sr"], n)
     skew = vector_to_skew_tensor(vector)
     traceless = symmetric_traceless(symmetric)
     features_t = compose_tensor(iso, skew, traceless)
@@ -264,19 +258,9 @@ def test_embedding_and_interaction_match_reference_wiring():
     traceless_n = interaction.linears_tensor[2](traceless_n)
     node = compose_tensor(iso_n, skew_n, traceless_n)
     vec = skew_tensor_to_vector(skew_n)
-    iso_m = reduce_edge(
-        edge[:, 0] * iso_n[graph["idx_j_sr"]], graph["idx_i_sr"], (n, features)
-    )
-    vec_m = reduce_edge(
-        edge[:, 1, None, :] * vec[graph["idx_j_sr"]],
-        graph["idx_i_sr"],
-        (n, 3, features),
-    )
-    traceless_m = reduce_edge(
-        edge[:, 2, None, None, :] * traceless_n[graph["idx_j_sr"]],
-        graph["idx_i_sr"],
-        (n, 3, 3, features),
-    )
+    iso_m = scatter_sum(edge[:, 0] * iso_n[graph["idx_j_sr"]], graph["idx_i_sr"], n)
+    vec_m = scatter_sum(edge[:, 1, None, :] * vec[graph["idx_j_sr"]], graph["idx_i_sr"], n)
+    traceless_m = scatter_sum(edge[:, 2, None, None, :] * traceless_n[graph["idx_j_sr"]], graph["idx_i_sr"], n)
     message = compose_tensor(iso_m, vector_to_skew_tensor(vec_m), traceless_m)
     scale = (1 + 0.1 * charge)[:, None, None, None]
     mixed = scale * tensor_anticommutator(node, message)
@@ -293,11 +277,11 @@ def test_embedding_and_interaction_match_reference_wiring():
 
 def test_geometry_self_pairs_charge_and_batch():
     from enerzyme.models.layers.rbf import ExpNormalSmearing
-    from enerzyme.models.tensornet import TensorNetCore
+    from enerzyme.models.presets.cartesian_tensor import tensornet
 
     torch.manual_seed(5)
     n, features, num_rbf = 4, 6, 4
-    core = TensorNetCore(
+    core = tensornet(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_interactions=2,
@@ -344,7 +328,7 @@ def test_geometry_self_pairs_charge_and_batch():
         rtol=1e-6,
     )
 
-    so3 = TensorNetCore(
+    so3 = tensornet(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_interactions=2,
@@ -355,8 +339,8 @@ def test_geometry_self_pairs_charge_and_batch():
     # Default init keeps the skew part small, so YM+MY and 2YM are close.
     # Larger tensor maps make the parity-breaking product visible.
     with torch.no_grad():
-        for layer in core.interactions:
-            for linear in layer.linears_tensor:
+        for block in core.blocks:
+            for linear in block.interaction.linears_tensor:
                 linear.weight.mul_(5)
     so3.load_state_dict(core.state_dict())
     plain = core.get_output(**graph)
@@ -398,7 +382,7 @@ def test_geometry_self_pairs_charge_and_batch():
         rtol=1e-6,
     )
     core.include_self = True
-    without_self = TensorNetCore(
+    without_self = tensornet(
         dim_embedding=features,
         num_rbf=num_rbf,
         num_interactions=2,

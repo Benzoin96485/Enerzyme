@@ -1,0 +1,159 @@
+{
+  "model": "spinconv",
+  "precision": "float64",
+  "baseline": "1aa0f8b",
+  "candidate": "81620f7",
+  "fixture_sha256": "dc4aa813a8ca7c9f85f15bc45d5437c5bc3e2f1a1d0a545b1eaf2e158271060c",
+  "acceptance_driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+  "native_cpu_job": "6338815",
+  "paired_cuda_job": "6326320",
+  "cuda_uuid": "GPU-34f059c2-96ad-b500-81b4-48607e7bcca1",
+  "systems": {
+    "mol_batch_32x20": {
+      "cpu_fields": {
+        "indices": {
+          "shape": [
+            4,
+            178696
+          ],
+          "dtype": "torch.int64",
+          "identical": true
+        },
+        "weights": {
+          "shape": [
+            4,
+            178696
+          ],
+          "dtype": "torch.float64",
+          "identical": true
+        },
+        "near": {
+          "shape": [
+            178696
+          ],
+          "dtype": "torch.bool",
+          "identical": true
+        },
+        "E": {
+          "shape": [
+            32
+          ],
+          "dtype": "torch.float64",
+          "identical": true
+        },
+        "Fa": {
+          "shape": [
+            640,
+            3
+          ],
+          "dtype": "torch.float64",
+          "identical": true
+        }
+      },
+      "first_block_pole_sensitivity": {
+        "samples": 178696,
+        "pole_count": 10590,
+        "pole_with_shifted_grid_cell": 8972,
+        "largest_pole_weight_change": 0.9239737828652954
+      },
+      "sensitivity_identical_across_checkouts": true,
+      "baseline_subsequent_blocks": [
+        {
+          "indices_equal": true,
+          "weights_equal": true
+        },
+        {
+          "indices_equal": true,
+          "weights_equal": true
+        }
+      ],
+      "candidate_projections": 1,
+      "cross_cuda_native": {
+        "infer": {
+          "passed": false,
+          "E_max_abs": 1.8847268468125122e-09,
+          "Fa_max_abs": 1.7232791691708773e-10
+        },
+        "train": {
+          "passed": false,
+          "E_max_abs": 1.1114327791439393e-09,
+          "Fa_max_abs": 1.7321158907068648e-10
+        }
+      }
+    },
+    "bulk_256": {
+      "cpu_fields": {
+        "indices": {
+          "shape": [
+            4,
+            463894
+          ],
+          "dtype": "torch.int64",
+          "identical": true
+        },
+        "weights": {
+          "shape": [
+            4,
+            463894
+          ],
+          "dtype": "torch.float64",
+          "identical": true
+        },
+        "near": {
+          "shape": [
+            463894
+          ],
+          "dtype": "torch.bool",
+          "identical": true
+        },
+        "E": {
+          "shape": [
+            1
+          ],
+          "dtype": "torch.float64",
+          "identical": true
+        },
+        "Fa": {
+          "shape": [
+            256,
+            3
+          ],
+          "dtype": "torch.float64",
+          "identical": true
+        }
+      },
+      "first_block_pole_sensitivity": {
+        "samples": 463894,
+        "pole_count": 10890,
+        "pole_with_shifted_grid_cell": 8765,
+        "largest_pole_weight_change": 0.9232747858332753
+      },
+      "sensitivity_identical_across_checkouts": true,
+      "baseline_subsequent_blocks": [
+        {
+          "indices_equal": true,
+          "weights_equal": true
+        },
+        {
+          "indices_equal": true,
+          "weights_equal": true
+        }
+      ],
+      "candidate_projections": 1,
+      "cross_cuda_native": {
+        "infer": {
+          "passed": false,
+          "E_max_abs": 1.537788829608644e-08,
+          "Fa_max_abs": 3.0605972427657016e-10
+        },
+        "train": {
+          "passed": false,
+          "E_max_abs": 2.5537545411680185e-08,
+          "Fa_max_abs": 3.526144507725969e-10
+        }
+      }
+    }
+  },
+  "method": "Both native CPU checkouts load the same frozen weights and run the full force forward. Their spherical interpolation indices and weights are captured from the first block. Subsequent baseline blocks are also compared to the first. The sensitivity probe shifts only y at points within 8 machine epsilons of the polar axis by half a float64 epsilon, without passing that perturbation to the model.",
+  "interpretation": "All saved CPU arrays, energies and forces are bitwise equal across the two checkouts. The old checkout computes the same projection three times on CPU. The pole index is ill-conditioned in float64. This CPU experiment does not attribute the prior GPU mismatches to a particular kernel or change their numerical acceptance status."
+}

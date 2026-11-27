@@ -25,9 +25,9 @@ import torch
 from torch import Tensor
 from torch.nn import Module
 
-from ..functional import segment_sum_coo
+from ..mp.ops import scatter_sum
 from . import BaseFFLayer
-from .gated_equivariant import build_gated_equivariant_mlp
+from ..mp.nn.gate import build_gated_equivariant_mlp
 
 
 def resolve_cartesian_feature_dim(
@@ -67,8 +67,8 @@ def correct_partial_charges(
 ) -> Tensor:
     """Shift latent charges so each molecule sums to ``total_charge`` (or 0)."""
     ones = torch.ones_like(charges)
-    n_per = segment_sum_coo(ones, batch_seg).clamp_min(1)
-    sum_q = segment_sum_coo(charges, batch_seg)
+    n_per = scatter_sum(ones, batch_seg).clamp_min(1)
+    sum_q = scatter_sum(charges, batch_seg)
     if total_charge is None:
         target = torch.zeros_like(sum_q)
     else:
@@ -159,7 +159,7 @@ class EquivariantDipoleLayer(BaseFFLayer):
         if self.correct_charges:
             charges = correct_partial_charges(charges, batch_seg, Q)
         moment = Ra.to(dtype=charges.dtype) * charges.unsqueeze(-1) + atomic_dipoles
-        dipole = segment_sum_coo(moment, batch_seg)
+        dipole = scatter_sum(moment, batch_seg)
         out: Dict[str, Tensor] = {"M2": dipole}
         if self.return_charges:
             out["Qa"] = charges
@@ -214,4 +214,4 @@ class EquivariantPolarizabilityLayer(BaseFFLayer):
         outer = nu.unsqueeze(-1) * positions.unsqueeze(-2)
         alpha = alpha + outer + outer.transpose(-1, -2)
         batch_seg = _as_batch_index(batch_seg, alpha.shape[0], alpha.device)
-        return {"polarizability": segment_sum_coo(alpha, batch_seg)}
+        return {"polarizability": scatter_sum(alpha, batch_seg)}

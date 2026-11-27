@@ -1,7 +1,5 @@
 """Rotational invariance of AllScAIP core atomic outputs Ea and Qa w.r.t. positions R.
 
-Graph preprocessing uses float32 internally; the core must match that dtype on inputs.
-
 The default AllScAIP steerable path (full spherical-harmonic edge channels and frequency
 masks) is not guaranteed to yield exactly rotation-invariant per-atom scalars for arbitrary
 weights. This regression test uses the **scalar angular limit** (only l=0 harmonics, no
@@ -22,7 +20,8 @@ from numpy.testing import assert_allclose
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from enerzyme.models.allscaip.core import AllScAIPCore
+from enerzyme.models.mp.core import ComposableCore
+from enerzyme.models.presets.hybrid import allscaip
 
 
 def _random_so3(device: torch.device, dtype: torch.dtype) -> torch.Tensor:
@@ -34,7 +33,7 @@ def _random_so3(device: torch.device, dtype: torch.dtype) -> torch.Tensor:
     return q
 
 
-def _make_invariant_limit_core(**kwargs) -> AllScAIPCore:
+def _make_invariant_limit_core(**kwargs) -> ComposableCore:
     """Small core with rotation-invariant angular features (l=0 only, no freq mask)."""
     defaults = dict(
         dim_embedding=64,
@@ -51,7 +50,7 @@ def _make_invariant_limit_core(**kwargs) -> AllScAIPCore:
         attn_num_freq=16,
     )
     defaults.update(kwargs)
-    return AllScAIPCore(**defaults)
+    return allscaip(**defaults)
 
 
 def _make_higher_l_core(
@@ -60,7 +59,7 @@ def _make_higher_l_core(
     node_direction_expansion_size: int = 3,
     use_freq_mask: bool = True,
     **kwargs: object,
-) -> AllScAIPCore:
+) -> ComposableCore:
     """Core with l>0 spherical-harmonic edge/node channels (lmax = size - 1)."""
     defaults = dict(
         dim_embedding=64,
@@ -77,7 +76,7 @@ def _make_higher_l_core(
         attn_num_freq=16,
     )
     defaults.update(kwargs)
-    return AllScAIPCore(**defaults)
+    return allscaip(**defaults)
 
 
 def _print_rotation_invariance_deviation(
@@ -286,7 +285,7 @@ def test_allscaip_equivariant_mode_l_gt_0_rotation_invariant():
     N = 20
     hidden = 64
 
-    core = AllScAIPCore(
+    core = allscaip(
         dim_embedding=hidden,
         num_layers=2,
         atten_num_heads=4,
@@ -304,7 +303,7 @@ def test_allscaip_equivariant_mode_l_gt_0_rotation_invariant():
         attn_num_freq=16,
     ).to(device=device, dtype=dtype)
     core.eval()
-    assert core._use_freq_mask_resolved is False
+    assert core.embed.graph_params.use_freq_mask is False
 
     Ra = torch.randn(N, 3, device=device, dtype=dtype) * 2.0
     Za = torch.randint(1, 10, (N,), device=device)
@@ -332,3 +331,50 @@ def test_allscaip_equivariant_mode_l_gt_0_rotation_invariant():
         atol=atol,
         err_msg="atom_feature not rotation-invariant with equivariant_mode",
     )
+
+def test_allscaip_double_precision_periodic_graph_uses_cell():
+    core = allscaip(dim_embedding=16, num_layers=1, atten_num_heads=2,
+                    knn_k=3, cutoff_sr=2.0, pbc=True, equivariant_mode=True).double()
+    positions = torch.tensor([[0.1, 0.0, 0.0], [3.9, 0.1, 0.0], [0.2, 0.4, 0.1]],
+                             dtype=torch.float64, requires_grad=True)
+    inputs = dict(Ra=positions, Za=torch.tensor([1, 6, 8]), batch_seg=torch.zeros(3, dtype=torch.long),
+                  atom_embedding=torch.rand(3, 16, dtype=positions.dtype),
+                  cell=(4 * torch.eye(3, dtype=positions.dtype)).unsqueeze(0))
+    first = core.get_output(**inputs)["atom_feature"]
+    moved = positions.detach().clone()
+    moved[1, 0] -= 4.0
+    second = core.get_output(**dict(inputs, Ra=moved))["atom_feature"]
+    torch.testing.assert_close(first, second)
+    assert torch.isfinite(torch.autograd.grad(first.square().sum(), positions)[0]).all()
+
+
+def test_prepared_biknn_preserves_periodic_cell_and_coordinate_derivatives():
+    from enerzyme.models.allscaip.graph_preprocess import AllScAIPGraphHParams
+    from enerzyme.models.allscaip.radius_graph import biknn_radius_graph_from_batch, prepare_biknn
+
+    pos = torch.tensor([[.2, .1, .0], [2.8, .3, .1], [.4, .6, .2], [2.6, .3, .2]],
+                       dtype=torch.float64, requires_grad=True)
+    cells = (3 * torch.eye(3, dtype=torch.float64)).repeat(2, 1, 1).requires_grad_()
+    batch = torch.tensor([0, 0, 1, 1])
+    for soft, padding in ((False, None), (True, 2)):
+        hp = AllScAIPGraphHParams(max_radius=1.8, knn_k=3, knn_pad_size=padding, knn_soft=soft, pbc=True)
+        with torch.no_grad():
+            topology = prepare_biknn(pos, batch, cells, hp)
+        for first, second in zip(topology.images, topology.slots):
+            assert first.dtype == torch.int64
+            assert all(table.dtype == torch.int64 for table in second)
+
+        def evaluate(prepared):
+            fields = biknn_radius_graph_from_batch(
+                pos, batch, hp.max_radius, hp.knn_k, knn_soft=soft, knn_pad_size=padding,
+                cell=cells, pbc=True, prepared=prepared,
+            )
+            distances, vectors, src_env, dst_env = fields[:4]
+            loss = distances.square().sum() + vectors.square().sum()
+            loss = loss + src_env[src_env.isfinite()].square().sum() + dst_env[dst_env.isfinite()].square().sum()
+            dpos, dcell = torch.autograd.grad(loss, (pos, cells), create_graph=True)
+            second = torch.autograd.grad(dpos.square().sum() + dcell.square().sum(), (pos, cells))
+            return *fields, dpos, dcell, *second
+
+        for result, reference in zip(evaluate(topology), evaluate(None)):
+            torch.testing.assert_close(result, reference)

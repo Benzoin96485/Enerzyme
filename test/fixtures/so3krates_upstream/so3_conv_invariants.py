@@ -45,7 +45,7 @@ class L0Contraction(Module):
         cg_diag = np.diagonal(cg_matrix, axis1=1, axis2=2)[0]
 
         # Match Enerzyme: concatenate CG blocks in caller ``degrees`` order
-        # (not np.unique sorted). See enerzyme.models.so3.l0_contraction.
+        # (not np.unique sorted). See enerzyme.models.mp.equivariant.sph.l0_contraction.
         cg_blocks = [
             cg_diag[indx_fn(d - 1) : indx_fn(d)] for d in degrees
         ]

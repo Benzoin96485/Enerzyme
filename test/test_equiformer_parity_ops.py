@@ -37,7 +37,7 @@ def test_exp_normal_smearing_parity():
 
 def test_linear_rs_parity():
     from nets.tensor_product_rescale import LinearRS as OfficialLinearRS
-    from enerzyme.models.e3nn_nn import LinearRS
+    from enerzyme.models.mp.equivariant.e3nn import LinearRS
 
     dtype = torch.float64
     torch.manual_seed(1)
@@ -52,7 +52,7 @@ def test_linear_rs_parity():
 
 def test_layer_norm_v2_parity():
     from nets.layer_norm import EquivariantLayerNormV2 as OfficialNorm
-    from enerzyme.models.e3nn_nn import EquivariantLayerNormV2
+    from enerzyme.models.mp.equivariant.e3nn import EquivariantLayerNormV2
 
     dtype = torch.float64
     torch.manual_seed(2)

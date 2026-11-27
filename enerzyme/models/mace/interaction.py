@@ -3,232 +3,19 @@ from typing import Optional, List, Tuple, Dict, Union, Callable
 import numpy as np
 import torch
 from torch import nn, Tensor
-from torch.nn import Module, ModuleList, Parameter, ParameterList
+from torch.nn import Module, Parameter
 import torch.nn.functional as F
-from opt_einsum_fx import optimize_einsums_full
 from e3nn import o3
-from e3nn.nn import FullyConnectedNet, Activation
+from ..mp.nn.radial_mlp import e3nn_radial_mlp
+from e3nn.nn import Activation
 from e3nn.o3 import Irreps, TensorProduct, FullyConnectedTensorProduct
 from e3nn.util.jit import compile_mode
-from torch_scatter import scatter_sum
-from ..e3nn_nn import tp_out_irreps_with_instructions, reshape_irreps, U_matrix_real, linear_out_irreps
-
-
-BATCH_EXAMPLE = 10
-ALPHABET = ["w", "x", "v", "n", "z", "r", "t", "y", "u", "o", "p", "s"]
-
-
-@compile_mode("script")
-class Contraction(Module):
-    def __init__(
-        self,
-        irreps_in: Irreps,
-        irrep_out: Irreps,
-        correlation: int,
-        internal_weights: bool = True,
-        num_elements: Optional[int] = None,
-        weights: Optional[Tensor] = None,
-    ) -> None:
-        super().__init__()
-
-        self.num_features = irreps_in.count((0, 1))
-        self.coupling_irreps = Irreps([irrep.ir for irrep in irreps_in])
-        self.correlation = correlation
-        dtype = torch.get_default_dtype()
-        for nu in range(1, correlation + 1):
-            U_matrix = U_matrix_real(
-                irreps_in=self.coupling_irreps,
-                irreps_out=irrep_out,
-                correlation=nu,
-                dtype=dtype,
-            )[-1]
-            self.register_buffer(f"U_matrix_{nu}", U_matrix)
-
-        # Tensor contraction equations
-        self.contractions_weighting = ModuleList()
-        self.contractions_features = ModuleList()
-
-        # Create weight for product basis
-        self.weights = ParameterList([])
-
-        for i in range(correlation, 0, -1):
-            # Shapes definying
-            num_params = self.U_tensors(i).size()[-1]
-            num_equivariance = 2 * irrep_out.lmax + 1
-            num_ell = self.U_tensors(i).size()[-2]
-
-            if i == correlation:
-                parse_subscript_main = (
-                    [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1) - 1)]
-                    + ["ik,ekc,bci,be -> bc"]
-                    + [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1) - 1)]
-                )
-                graph_module_main = torch.fx.symbolic_trace(
-                    lambda x, y, w, z: torch.einsum(
-                        "".join(parse_subscript_main), x, y, w, z
-                    )
-                )
-
-                # Optimizing the contractions
-                self.graph_opt_main = optimize_einsums_full(
-                    model=graph_module_main,
-                    example_inputs=(
-                        torch.randn(
-                            [num_equivariance] + [num_ell] * i + [num_params]
-                        ).squeeze(0),
-                        torch.randn((num_elements, num_params, self.num_features)),
-                        torch.randn((BATCH_EXAMPLE, self.num_features, num_ell)),
-                        torch.randn((BATCH_EXAMPLE, num_elements)),
-                    ),
-                )
-                # Parameters for the product basis
-                w = Parameter(
-                    torch.randn((num_elements, num_params, self.num_features))
-                    / num_params
-                )
-                self.weights_max = w
-            else:
-                # Generate optimized contractions equations
-                parse_subscript_weighting = (
-                    [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1))]
-                    + ["k,ekc,be->bc"]
-                    + [ALPHABET[j] for j in range(i + min(irrep_out.lmax, 1))]
-                )
-                parse_subscript_features = (
-                    ["bc"]
-                    + [ALPHABET[j] for j in range(i - 1 + min(irrep_out.lmax, 1))]
-                    + ["i,bci->bc"]
-                    + [ALPHABET[j] for j in range(i - 1 + min(irrep_out.lmax, 1))]
-                )
-
-                # Symbolic tracing of contractions
-                graph_module_weighting = torch.fx.symbolic_trace(
-                    lambda x, y, z: torch.einsum(
-                        "".join(parse_subscript_weighting), x, y, z
-                    )
-                )
-                graph_module_features = torch.fx.symbolic_trace(
-                    lambda x, y: torch.einsum("".join(parse_subscript_features), x, y)
-                )
-
-                # Optimizing the contractions
-                graph_opt_weighting = optimize_einsums_full(
-                    model=graph_module_weighting,
-                    example_inputs=(
-                        torch.randn(
-                            [num_equivariance] + [num_ell] * i + [num_params]
-                        ).squeeze(0),
-                        torch.randn((num_elements, num_params, self.num_features)),
-                        torch.randn((BATCH_EXAMPLE, num_elements)),
-                    ),
-                )
-                graph_opt_features = optimize_einsums_full(
-                    model=graph_module_features,
-                    example_inputs=(
-                        torch.randn(
-                            [BATCH_EXAMPLE, self.num_features, num_equivariance]
-                            + [num_ell] * i
-                        ).squeeze(2),
-                        torch.randn((BATCH_EXAMPLE, self.num_features, num_ell)),
-                    ),
-                )
-                self.contractions_weighting.append(graph_opt_weighting)
-                self.contractions_features.append(graph_opt_features)
-                # Parameters for the product basis
-                w = Parameter(
-                    torch.randn((num_elements, num_params, self.num_features))
-                    / num_params
-                )
-                self.weights.append(w)
-        if not internal_weights:
-            self.weights = weights[:-1]
-            self.weights_max = weights[-1]
-
-    def forward(self, x: Tensor, y: Tensor):
-        out = self.graph_opt_main(
-            self.U_tensors(self.correlation),
-            self.weights_max,
-            x,
-            y,
-        )
-        for i, (weight, contract_weights, contract_features) in enumerate(
-            zip(self.weights, self.contractions_weighting, self.contractions_features)
-        ):
-            c_tensor = contract_weights(
-                self.U_tensors(self.correlation - i - 1),
-                weight,
-                y,
-            )
-            c_tensor = c_tensor + out
-            out = contract_features(c_tensor, x)
-
-        return out.view(out.shape[0], -1)
-
-    def U_tensors(self, nu: int):
-        return dict(self.named_buffers())[f"U_matrix_{nu}"]
-
-
-@compile_mode("script")
-class SymmetricContraction(nn.Module):
-    def __init__(
-        self,
-        irreps_in: Irreps,
-        irreps_out: Irreps,
-        correlation: Union[int, Dict[str, int]],
-        irrep_normalization: Optional[str] = "component",
-        path_normalization: Optional[str] = "element",
-        internal_weights: Optional[bool] = None,
-        shared_weights: Optional[bool] = None,
-        num_elements: Optional[int] = None,
-    ) -> None:
-        super().__init__()
-
-        if irrep_normalization is None:
-            irrep_normalization = "component"
-
-        if path_normalization is None:
-            path_normalization = "element"
-
-        assert irrep_normalization in ["component", "norm", "none"]
-        assert path_normalization in ["element", "path", "none"]
-
-        self.irreps_in = Irreps(irreps_in)
-        self.irreps_out = Irreps(irreps_out)
-
-        del irreps_in, irreps_out
-
-        if not isinstance(correlation, tuple):
-            corr = correlation
-            correlation = {}
-            for irrep_out in self.irreps_out:
-                correlation[irrep_out] = corr
-
-        assert shared_weights or not internal_weights
-
-        if internal_weights is None:
-            internal_weights = True
-
-        self.internal_weights = internal_weights
-        self.shared_weights = shared_weights
-
-        del internal_weights, shared_weights
-
-        self.contractions = ModuleList()
-        for irrep_out in self.irreps_out:
-            self.contractions.append(
-                Contraction(
-                    irreps_in=self.irreps_in,
-                    irrep_out=Irreps(str(irrep_out.ir)),
-                    correlation=correlation[irrep_out],
-                    internal_weights=self.internal_weights,
-                    num_elements=num_elements,
-                    weights=self.shared_weights,
-                )
-            )
-
-    def forward(self, x: Tensor, y: Tensor):
-        outs = [contraction(x, y) for contraction in self.contractions]
-        return torch.cat(outs, dim=-1)
+from ..mp.equivariant.body_order import SymmetricContraction
+from ..mp.block import BlockState
+from ..mp.graph import GraphContext
+from ..layers.atom_embedding import one_hot_species
+from ..mp.ops import scatter_sum
+from ..mp.equivariant.e3nn import tp_out_irreps_with_instructions, reshape_irreps, linear_out_irreps
 
 
 @compile_mode("script")
@@ -263,8 +50,9 @@ class EquivariantProductBasisBlock(nn.Module):
         node_feats: Tensor,
         sc: Optional[Tensor],
         node_attrs: Tensor,
+        species: Optional[Tensor] = None,
     ) -> Tensor:
-        node_feats = self.symmetric_contractions(node_feats, node_attrs)
+        node_feats = self.symmetric_contractions(node_feats, node_attrs, species)
         if self.use_sc and sc is not None:
             return self.linear(node_feats) + sc
         return self.linear(node_feats)
@@ -336,8 +124,8 @@ class InteractionBlock(ABC, Module):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tuple[Tensor, Tensor]:
         ...
 
@@ -391,11 +179,9 @@ class ResidualElementDependentInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tensor:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         sc = self.skip_tp(node_feats, node_attrs)
         node_feats = self.linear_up(node_feats)
@@ -406,7 +192,9 @@ class ResidualElementDependentInteractionBlock(InteractionBlock):
         message = scatter_sum(
             src=mji, index=receiver, dim=0, dim_size=num_nodes
         )  # [n_nodes, irreps]
-        message = self.linear(message) / self.avg_num_neighbors
+        message = self.linear(message)
+        if self.avg_num_neighbors != 1.0:
+            message = message / self.avg_num_neighbors
         return message + sc  # [n_nodes, irreps]
 
 
@@ -437,7 +225,7 @@ class AgnosticNonlinearInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
             F.silu,
         )
@@ -461,11 +249,9 @@ class AgnosticNonlinearInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tensor:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         tp_weights = self.conv_tp_weights(edge_feats)
         node_feats = self.linear_up(node_feats)
@@ -475,7 +261,9 @@ class AgnosticNonlinearInteractionBlock(InteractionBlock):
         message = scatter_sum(
             src=mji, index=receiver, dim=0, dim_size=num_nodes
         )  # [n_nodes, irreps]
-        message = self.linear(message) / self.avg_num_neighbors
+        message = self.linear(message)
+        if self.avg_num_neighbors != 1.0:
+            message = message / self.avg_num_neighbors
         message = self.skip_tp(message, node_attrs)
         return message  # [n_nodes, irreps]
 
@@ -505,7 +293,7 @@ class AgnosticResidualNonlinearInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
             F.silu,
         )
@@ -529,11 +317,9 @@ class AgnosticResidualNonlinearInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tensor:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         sc = self.skip_tp(node_feats, node_attrs)
         node_feats = self.linear_up(node_feats)
@@ -544,7 +330,9 @@ class AgnosticResidualNonlinearInteractionBlock(InteractionBlock):
         message = scatter_sum(
             src=mji, index=receiver, dim=0, dim_size=num_nodes
         )  # [n_nodes, irreps]
-        message = self.linear(message) / self.avg_num_neighbors
+        message = self.linear(message)
+        if self.avg_num_neighbors != 1.0:
+            message = message / self.avg_num_neighbors
         message = message + sc
         return message  # [n_nodes, irreps]
 
@@ -579,7 +367,7 @@ class RealAgnosticInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
             F.silu,
         )
@@ -603,11 +391,9 @@ class RealAgnosticInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         node_feats = self.linear_up(node_feats)
         tp_weights = self.conv_tp_weights(edge_feats)
@@ -655,7 +441,7 @@ class RealAgnosticResidualInteractionBlock(InteractionBlock):
 
         # Convolution weights
         input_dim = self.edge_feats_irreps.num_irreps
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + self.radial_MLP + [self.conv_tp.weight_numel],
             F.silu,
         )
@@ -679,11 +465,9 @@ class RealAgnosticResidualInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         sc = self.skip_tp(node_feats, node_attrs)
         node_feats = self.linear_up(node_feats) # Linear map of node features
@@ -742,7 +526,7 @@ class RealAgnosticAttResidualInteractionBlock(InteractionBlock):
             self.edge_feats_irreps.num_irreps
             + 2 * self.node_feats_down_irreps.num_irreps
         )
-        self.conv_tp_weights = FullyConnectedNet(
+        self.conv_tp_weights = e3nn_radial_mlp(
             [input_dim] + 3 * [256] + [self.conv_tp.weight_numel],
             F.silu,
         )
@@ -768,11 +552,9 @@ class RealAgnosticAttResidualInteractionBlock(InteractionBlock):
         node_feats: Tensor,
         edge_attrs: Tensor,
         edge_feats: Tensor,
-        idx_i_sr: Tensor,
-        idx_j_sr: Tensor,
+        sender: Tensor,
+        receiver: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        sender = idx_i_sr
-        receiver = idx_j_sr
         num_nodes = node_feats.shape[0]
         sc = self.skip_linear(node_feats)
         node_feats_up = self.linear_up(node_feats)
@@ -835,3 +617,37 @@ INTERACTION_CLASSES = {
     "RealAgnosticResidualInteractionBlock": RealAgnosticResidualInteractionBlock,
     "RealAgnosticAttResidualInteractionBlock": RealAgnosticAttResidualInteractionBlock,
 }
+
+def element_one_hot(ctx: GraphContext, num_elements: int, dtype: torch.dtype) -> Tensor:
+    """One-hot species ``(N, num_elements)`` from ``Za``, cached per forward."""
+    def encode():
+        return one_hot_species(ctx.inputs["Za"], num_elements, dtype)
+
+    return ctx.cached(("element_one_hot", int(num_elements), dtype), encode)
+
+
+class MACEBlock(Module):
+    """One MACE layer: equivariant convolution, then the symmetric-contraction product.
+
+    Node features live in ``state.equi`` (e3nn flat irreps). Edge attributes are
+    the component-normalized e3nn harmonics of ``R_receiver - R_sender``.
+    """
+
+    def __init__(self, interaction: InteractionBlock, product: EquivariantProductBasisBlock,
+                 num_elements: int, max_ell: int) -> None:
+        super().__init__()
+        self.interaction = interaction
+        self.product = product
+        self.num_elements = int(num_elements)
+        self.max_ell = int(max_ell)
+
+    def forward(self, state: BlockState, ctx: GraphContext) -> BlockState:
+        node_feats = state.equi
+        node_attrs = element_one_hot(ctx, self.num_elements, node_feats.dtype)
+        edge_attrs = ctx.spherical_harmonics(self.max_ell, "component", True, layout="e3nn", edge_sign=-1.0)
+        node_feats, sc = self.interaction(
+            node_attrs=node_attrs, node_feats=node_feats, edge_attrs=edge_attrs,
+            edge_feats=ctx.rbf, sender=ctx.sender, receiver=ctx.receiver,
+        )
+        species = None if torch.compiler.is_compiling() else ctx.inputs["Za"]
+        return state._replace(equi=self.product(node_feats=node_feats, sc=sc, node_attrs=node_attrs, species=species))

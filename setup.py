@@ -14,6 +14,9 @@ setup(
         # Optional Q/S prior backends for Datahub transforms (runtime-checked in deps.py)
         "xtb": ["tblite>=0.5"],
         "pyscf_nao": ["pyscf"],
+        # Optional fast (C-optimized) backend for Datahub neighbor_list='cutoff';
+        # falls back to ase.neighborlist.primitive_neighbor_list when absent.
+        "pbc": ["matscipy"],
     },
     entry_points={'console_scripts': ['enerzyme=enerzyme.cli:main']},
     packages=find_packages(include=["enerzyme", "enerzyme.*"]),
@@ -21,10 +24,11 @@ setup(
         "data/periodic-table.csv", 
         "models/layers/dispersion/grimme_d3_tables/*.npy", 
         "models/layers/dispersion/grimme_d4_tables/*.pth",
-        "models/so3/Jd.pt",
-        "models/so3/cgmatrix.npz",
-        "models/so3/data/lebedev_grids.npz",
-        "models/efa/NOTICE",
+        "models/mp/equivariant/data/Jd.pt",
+        "models/mp/equivariant/data/cgmatrix.npz",
+        "models/mp/equivariant/data/lebedev_grids.npz",
+        "models/mp/NOTICE",
+        "models/mp/nonlocal_/NOTICE",
         "qm/xtb_population/xtbml.toml",
     ]},
     auth='Benzoin96485',

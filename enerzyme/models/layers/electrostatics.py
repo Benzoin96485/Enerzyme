@@ -3,8 +3,8 @@ import math
 import torch
 from torch import Tensor
 from . import BaseFFLayer
-from ..functional import segment_sum_coo
-from ..cutoff import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
+from ..mp.ops import batch_size_from_counts, scatter_sum
+from ..mp.basis.envelope import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
 
 
 class ChargeConservationLayer(BaseFFLayer):
@@ -12,23 +12,26 @@ class ChargeConservationLayer(BaseFFLayer):
         r"""
         Correct the atomic charges to make their summation equal to the total charge by [1]
 
-        q^{corrected}_i = q_i - 1 / N (\sum_{j=1}^N q_j - Q)
+        .. math::
 
-        References:
-        -----
+            q_i^{\mathrm{corrected}} = q_i -
+            \frac{1}{N}\left(\sum_{j=1}^N q_j - Q\right).
+
+        .. rubric:: References
+
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         """
         super().__init__()
 
     def get_output(
         self, Za: Tensor, Qa: Tensor, 
-        Q: Optional[Tensor]=None, batch_seg: Optional[Tensor]=None
+        Q: Optional[Tensor]=None, batch_seg: Optional[Tensor]=None, N=None,
     ) -> Dict[Literal["Qa", "Q"], Tensor]:
         '''
         Correct the atomic charge
 
-        Params:
-        -----
+        .. rubric:: Parameters
+
         Za: Long tensor of atomic numbers, shape [N * batch_size]
 
         Qa: Float tensor of atomic charges, shape [N * batch_size]
@@ -37,8 +40,8 @@ class ChargeConservationLayer(BaseFFLayer):
 
         batch_seg: Long tensor of batch indices, shape [N * batch_size]
 
-        Returns:
-        -----
+        .. rubric:: Returns
+
         Qa_corrected: Float tensor of corrected atomic charge, shape [N * batch_size]
 
         raw_Q: Float tensor of total atomic charge before correction, shape [batch_size]
@@ -46,16 +49,18 @@ class ChargeConservationLayer(BaseFFLayer):
         if batch_seg is None:
             batch_seg = torch.zeros_like(Za, dtype=torch.long)
         #number of atoms per batch (needed for charge scaling)
-        N_per_batch = segment_sum_coo(torch.ones_like(batch_seg), batch_seg)
+        size = batch_size_from_counts(N)
+        N_per_batch = scatter_sum(torch.ones_like(batch_seg), batch_seg, size)
         view_shape = (-1, ) if Qa.dim() == 1 else (-1, 1)
-        raw_Q = segment_sum_coo(Qa, batch_seg)
+        raw_Q = scatter_sum(Qa, batch_seg, size)
         if Q is None: #assume desired total charge zero if not given
             Q = torch.zeros_like(N_per_batch)
-        #return scaled charges (such that they have the desired total charge)
-        return {
-            "Qa": Qa + ((Q.view(view_shape) - raw_Q) / N_per_batch.view(view_shape))[batch_seg], 
-            "Q": raw_Q
-        }
+        correction = (Q.view(view_shape) - raw_Q) / N_per_batch.view(view_shape).clamp_min(1)
+        # One structure has one correction for every atom. Broadcast directly so
+        # its backward is a sum rather than an indexed atomic add to a scalar.
+        if size != 1:
+            correction = correction[batch_seg]
+        return {"Qa": Qa + correction, "Q": raw_Q}
 
 
 class VelocityConservationLayer(BaseFFLayer):
@@ -71,9 +76,9 @@ class VelocityConservationLayer(BaseFFLayer):
         self, batch_seg: Tensor, Q_vel_a: Tensor, S_vel_a: Tensor
     ) -> Dict[str, Tensor]:
         ones = torch.ones(batch_seg.shape[0], dtype=Q_vel_a.dtype, device=Q_vel_a.device)
-        N_per = segment_sum_coo(ones, batch_seg)
-        mean_q = segment_sum_coo(Q_vel_a, batch_seg) / N_per
-        mean_s = segment_sum_coo(S_vel_a, batch_seg) / N_per
+        N_per = scatter_sum(ones, batch_seg)
+        mean_q = scatter_sum(Q_vel_a, batch_seg) / N_per
+        mean_s = scatter_sum(S_vel_a, batch_seg) / N_per
         return {
             "Q_vel_a": Q_vel_a - mean_q[batch_seg],
             "S_vel_a": S_vel_a - mean_s[batch_seg],
@@ -97,23 +102,23 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
         Pairwise electrostatic energy.
 
         Flavors:
+
         - ``PhysNet`` / ``SpookyNet``: shielded Coulomb with smooth SR blend [1].
         - ``SO3LR``: erf-damped Coulomb ``erf(r/σ)/r`` (Kabylda et al., JACS 2025);
           ``electrostatic_energy_scale`` is σ (pretrained SO3LR: 4.0). With
           ``cutoff_lr``, blends energy- and force-shifted forms on
           ``[0.45·Rc, Rc]``.
 
-        Params:
-        -----
-        Bohr_in_R / Hartree_in_E: unit conversion
-            (``kehalf = 0.5 * Bohr * Hartree``).
+        .. rubric:: Parameters
+
+        Bohr_in_R / Hartree_in_E: unit conversion (``kehalf = 0.5 * Bohr * Hartree``).
 
         cutoff_sr: short-range blend cutoff (required for PhysNet/SpookyNet).
 
         cutoff_lr: long-range cutoff; ignored interactions beyond this distance.
 
-        References:
-        -----
+        .. rubric:: References
+
         [1] J. Chem. Theory Comput. 2019, 15, 3678−3693.
         """
         super().__init__(input_fields={"Dij_lr", "Qa", "idx_i", "idx_j"}, output_fields={"E_ele_a"})
@@ -224,14 +229,14 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             blended = f * energy_shifted + (1.0 - f) * force_shifted
             edge = self.pair_kehalf * qi * qj * blended / self.dielectric_constant
             edge = torch.where(r < cutoff, edge, torch.zeros_like(edge))
-        return segment_sum_coo(edge, idx_i, dim_size=len(Qa))
+        return scatter_sum(edge, idx_i, len(Qa))
 
     def get_E_ele_a(self, Dij_lr: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor) -> Tensor:
         '''
         Compute the atomic electrostatic energy
 
-        Params:
-        -----
+        .. rubric:: Parameters
+
         Dij: Float tensor of pair distances, shape [N_pair * batch_size]
 
         Qa: Float tensor of atomic charges, shape [N * batch_size]
@@ -240,8 +245,8 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
 
         idx_j: Long tensor of the second indices of pairs, shape [N_pair * batch_size]
 
-        Returns:
-        -----
+        .. rubric:: Returns
+
         Ea: Float tensor of atomic electrostatic energy, shape [N * batch_size]
         '''
         if self.flavor == "SO3LR":
@@ -263,7 +268,7 @@ class ElectrostaticEnergyLayer(BaseFFLayer):
             # combine shielded and ordinary interactions and apply prefactors
             Eele = fac * (switch * Eele_shielded + cswitch * Eele_ordinary).view(view_shape)
             Eele = torch.where(condition, Eele, zeros)
-        return segment_sum_coo(Eele, idx_i, dim_size=len(Qa))
+        return scatter_sum(Eele, idx_i, len(Qa))
 
 
 def require_uniform_molecular_charge(values: Tensor, batch_seg: Optional[Tensor]) -> None:
@@ -284,21 +289,26 @@ def require_uniform_molecular_charge(values: Tensor, batch_seg: Optional[Tensor]
             raise ValueError(
                 f"batch_seg length {index.numel()} != number of charge values {n_atoms}"
             )
-    if not torch.isfinite(flat).all():
-        raise ValueError("Q must be finite")
-    n_mol = int(index.max()) + 1
-    src = flat.detach().to(dtype=torch.float64)
-    lowest = torch.full((n_mol,), float("inf"), dtype=torch.float64, device=flat.device)
-    highest = torch.full((n_mol,), float("-inf"), dtype=torch.float64, device=flat.device)
-    lowest.scatter_reduce_(0, index, src, reduce="amin", include_self=True)
-    highest.scatter_reduce_(0, index, src, reduce="amax", include_self=True)
-    present = torch.zeros(n_mol, dtype=torch.bool, device=flat.device)
-    present.scatter_(0, index, torch.ones(n_atoms, dtype=torch.bool, device=flat.device))
-    if bool(((highest - lowest)[present] > 0).any()):
-        raise ValueError(
-            "Q must be one molecular total per molecule. A length-N Q has to "
-            "repeat that total on every atom of the molecule."
-        )
+    # Adjacent atoms in molecule order suffice, including sparse or
+    # interleaved molecule IDs. All intermediate shapes depend only on N.
+    labels, order = torch.sort(index)
+    ordered = flat.detach()[order]
+    finite = torch.isfinite(flat).all()
+    nonnegative = labels[0] >= 0
+    uniform = ((labels[1:] != labels[:-1]) | (ordered[1:] == ordered[:-1])).all()
+    message = ("Q must be one molecular total per molecule. A length-N Q has to "
+               "repeat that total on every atom of the molecule.")
+    if torch.compiler.is_compiling():
+        torch._assert_async(finite, "Q must be finite")
+        torch._assert_async(nonnegative, "batch_seg must be non-negative")
+        torch._assert_async(uniform, message)
+    else:
+        if not finite:
+            raise ValueError("Q must be finite")
+        if not nonnegative:
+            raise ValueError("batch_seg must be non-negative")
+        if not uniform:
+            raise ValueError(message)
 
 
 def neutral_charge_equilibration(
@@ -343,21 +353,18 @@ def neutral_charge_equilibration(
             f"total_charge must have 1 or {n_atoms} values, got {target.numel()}"
         )
     require_uniform_molecular_charge(target, batch_seg)
-    counts = segment_sum_coo(
-        torch.ones(n_atoms, 1, dtype=charges.dtype, device=charges.device),
-        batch_seg,
-    )
-    raw_sum = segment_sum_coo(weights, batch_seg)
+    counts = scatter_sum(torch.ones(n_atoms, 1, dtype=charges.dtype, device=charges.device), batch_seg)
+    raw_sum = scatter_sum(weights, batch_seg)
     dead = raw_sum <= 0
     uniform = torch.ones_like(weights) / counts[batch_seg].clamp_min(1)
     effective = torch.where(dead[batch_seg], uniform, weights)
-    summed_weights = segment_sum_coo(effective, batch_seg)
+    summed_weights = scatter_sum(effective, batch_seg)
     summed_weights = summed_weights + torch.where(
         dead,
         torch.zeros_like(summed_weights),
         summed_weights.new_full((), float(eps)),
     )
-    summed_charges = segment_sum_coo(charges, batch_seg)
+    summed_charges = scatter_sum(charges, batch_seg)
     delta = target.unsqueeze(-1) - summed_charges[batch_seg]
     updated = charges + effective / summed_weights[batch_seg] * delta
     return updated.squeeze(-1) if squeezed else updated
@@ -425,27 +432,30 @@ def expand_coulomb_weights(
         stage = like.new_tensor(values)
         weights = stage.repeat_interleave(n_channels // len(values))
     total = weights.sum()
-    if total == 0:
+    if torch.compiler.is_compiling():
+        torch._assert_async(total != 0, "layer_weights must not sum to zero")
+    elif total == 0:
         raise ValueError("layer_weights must not sum to zero")
     return weights / total
 
 
+def intramolecular_pair_indices(positions: Tensor, batch_seg: Optional[Tensor]) -> Tuple[Tensor, Tensor]:
+    """Distinct atom pairs in the same molecule, in upper-triangle order."""
+    n_atoms = positions.shape[0]
+    left, right = torch.triu_indices(n_atoms, n_atoms, offset=1, device=positions.device)
+    if batch_seg is not None:
+        same_molecule = torch.where(batch_seg[left] == batch_seg[right])[0]
+        left, right = left[same_molecule], right[same_molecule]
+    return left, right
+
+
 def intramolecular_upper_pairs(
-    positions: Tensor,
-    batch_seg: Optional[Tensor] = None,
+    positions: Tensor, batch_seg: Optional[Tensor] = None,
 ) -> Tuple[Tensor, Tensor, Tensor]:
     """Upper-triangle pairs that stay inside one molecule. No periodic images."""
-    n_atoms = int(positions.shape[0])
-    empty_index = torch.zeros(0, dtype=torch.long, device=positions.device)
-    empty_distance = positions.new_zeros(0)
-    if n_atoms <= 1:
-        return empty_index, empty_index, empty_distance
-    if batch_seg is None:
-        batch_seg = torch.zeros(n_atoms, dtype=torch.long, device=positions.device)
-    left, right = torch.triu_indices(n_atoms, n_atoms, offset=1, device=positions.device)
-    same_molecule = batch_seg[left] == batch_seg[right]
-    left = left[same_molecule]
-    right = right[same_molecule]
+    left, right = intramolecular_pair_indices(positions, batch_seg)
+    if positions.shape[0] <= 1:
+        return left, right, positions.new_zeros(0)
     distance = torch.linalg.vector_norm(positions[left] - positions[right], dim=-1)
     return left, right, distance
 
@@ -465,6 +475,13 @@ class WeightedCoulombEnergyLayer(BaseFFLayer):
     ``1/r`` with the OpenMM reaction-field kernel and needs that cutoff.
     ``EnergyReduce`` adds the atomic term because the field is ``E_coul_a``.
     """
+
+    _force_pair_fields = ("Ra", "batch_seg")
+
+    def _prepare_force_pairs(self, Ra, batch_seg):
+        if self.pairs == "all_to_all" and self.cutoff is None:
+            return intramolecular_pair_indices(Ra, batch_seg)
+        return None
 
     def __init__(
         self,
@@ -507,6 +524,7 @@ class WeightedCoulombEnergyLayer(BaseFFLayer):
         idx_i: Optional[Tensor] = None,
         idx_j: Optional[Tensor] = None,
         Dij_lr: Optional[Tensor] = None,
+        _pair_indices: Optional[Tuple[Tensor, Tensor]] = None,
     ) -> Tensor:
         if charge_channels.ndim == 1:
             charge_channels = charge_channels.unsqueeze(-1)
@@ -523,7 +541,11 @@ class WeightedCoulombEnergyLayer(BaseFFLayer):
             self.layer_weights, int(charge_channels.shape[-1]), Ra
         )
         if self.pairs == "all_to_all":
-            left, right, distance = intramolecular_upper_pairs(Ra, batch_seg)
+            if _pair_indices is None:
+                left, right, distance = intramolecular_upper_pairs(Ra, batch_seg)
+            else:
+                left, right = _pair_indices
+                distance = torch.linalg.vector_norm(Ra[left] - Ra[right], dim=-1)
             add_both = True
         else:
             if idx_i is None or idx_j is None or Dij_lr is None:
@@ -550,12 +572,146 @@ class WeightedCoulombEnergyLayer(BaseFFLayer):
         return energy
 
 
+class EwaldElectrostaticEnergyLayer(BaseFFLayer):
+    r"""Three-dimensional, tin-foil Ewald energy for point charges in periodic cells.
+
+    The directed real-space neighbor list must cover ``cutoff_real``, including
+    periodic images of the same atom. ``k_cutoff`` is a spherical reciprocal
+    cutoff in inverse position units. ``alpha`` splits the sum between real and
+    reciprocal space and defaults to ``4 / cutoff_real + 1e-3``. Each row of
+    ``cell`` is a direct lattice vector. Supplying a cell without ``pbc`` implies
+    periodicity along all three axes.
+
+    A charged cell includes a uniform neutralizing background. In Coulomb
+    units its energy contribution is :math:`-\pi Q^2/(2 V \alpha^2)`.
+    The reciprocal and background energies are distributed over atoms in
+    proportion to their squared charge, with the same small offset as
+    SpookyNet. Each charge channel of an ensemble is summed independently.
+
+    .. rubric:: References
+
+    * P. P. Ewald, Ann. Phys. 369, 253–287 (1921).
+    * O. T. Unke et al., Nat. Commun. 12, 7273 (2021).
+    * B. Cheng, `Latent Ewald Summation <https://github.com/ChengUCB/les>`_,
+      for the reciprocal-lattice convention.
+    * T. J. Giese et al., J. Chem. Theory Comput. 11, 436–450 (2015),
+      `uniform-background correction <https://doi.org/10.1021/ct5007983>`_.
+    """
+
+    _force_pair_fields = ("Ra", "cell", "batch_seg", "pbc")
+
+    def __init__(
+        self, cutoff_real: float, k_cutoff: float, alpha: Optional[float] = None,
+        Bohr_in_R: float = 0.5291772108, Hartree_in_E: float = 1,
+        dielectric_constant: float = 1,
+    ) -> None:
+        super().__init__(input_fields={"Ra", "Qa", "idx_i", "idx_j", "Dij_lr", "cell", "pbc", "batch_seg"},
+                         output_fields={"E_ele_a"})
+        self.cutoff_real = float(cutoff_real)
+        self.k_cutoff = float(k_cutoff)
+        self.dielectric_constant = dielectric_constant
+        if not all(math.isfinite(x) and x > 0 for x in (self.cutoff_real, dielectric_constant)):
+            raise ValueError("Ewald cutoff_real and dielectric_constant must be positive and finite")
+        if not math.isfinite(self.k_cutoff) or self.k_cutoff < 0:
+            raise ValueError("Ewald k_cutoff must be nonnegative and finite")
+        self.alpha = 4.0 / self.cutoff_real + 1e-3 if alpha is None else float(alpha)
+        if not math.isfinite(self.alpha) or self.alpha <= 0:
+            raise ValueError("Ewald alpha must be positive and finite")
+        self.alpha2 = self.alpha ** 2
+        self.ke = Bohr_in_R * Hartree_in_E
+        if self.alpha * self.cutoff_real < 4.0:
+            import warnings
+            warnings.warn("Ewald alpha * cutoff_real < 4 can give an inaccurate truncated real-space sum",
+                          stacklevel=2)
+
+    def _lattices(self, Ra, cell):
+        if cell is None:
+            raise ValueError("EwaldElectrostaticEnergy requires a periodic cell")
+        if cell.ndim == 2:
+            cell = cell.unsqueeze(0)
+        if cell.ndim != 3 or cell.shape[1:] != (3, 3):
+            raise ValueError("Ewald cell must have shape (3, 3) or (graphs, 3, 3)")
+        cell = cell.to(Ra)
+        volume = torch.linalg.det(cell).abs()
+        reciprocal = (2 * math.pi) * torch.linalg.inv_ex(cell).inverse.transpose(-1, -2)
+        return cell, volume, reciprocal
+
+    def _sites_and_modes(self, Ra, batch_seg, pbc, cell, volume, reciprocal):
+        if not (torch.isfinite(volume) & (volume > 0)).all():
+            raise ValueError("Ewald requires a finite, nonsingular cell for each periodic structure")
+        if pbc is not None and (pbc.numel() != 3 * len(cell) or not pbc.all()):
+            raise ValueError("Ewald requires periodicity along all three axes of every structure")
+        if batch_seg is None:
+            if len(cell) != 1:
+                raise ValueError("Ewald requires batch_seg to assign atoms to multiple cells")
+            batch_seg = torch.zeros(Ra.shape[0], device=Ra.device, dtype=torch.long)
+        if batch_seg.shape != (Ra.shape[0],):
+            raise ValueError("Ewald requires one batch_seg index per atom")
+        if batch_seg.numel() and ((batch_seg < 0) | (batch_seg >= len(cell))).any():
+            raise ValueError("Ewald batch_seg must reference a cell for every structure")
+        # For k = n @ reciprocal, n_i = k · cell[i] / (2 pi). This bound
+        # includes cancelling reciprocal vectors even for a skewed lattice.
+        bounds = (self.k_cutoff / (2 * math.pi) * cell.norm(dim=-1)).ceil().long()
+        result = []
+        for graph, row in enumerate(bounds.unbind()):
+            extents = [int(n.item()) for n in row.unbind()]
+            atoms = (batch_seg == graph).nonzero(as_tuple=True)[0]
+            axes = [torch.arange(-n, n + 1, device=cell.device) for n in extents]
+            modes = torch.cartesian_prod(*axes)
+            k2 = (modes.to(Ra.dtype) @ reciprocal[graph]).square().sum(dim=1)
+            result.append((atoms, modes[(k2 > 0) & (k2 <= self.k_cutoff ** 2)]))
+        return tuple(result)
+
+    @torch.no_grad()
+    def _prepare_force_pairs(self, Ra, cell, batch_seg, pbc):
+        # Prepare only discrete membership before the coordinate VJP. Lattice
+        # vectors, volumes, structure factors and charges remain differentiable.
+        return self._sites_and_modes(Ra, batch_seg, pbc, *self._lattices(Ra, cell))
+
+    def _reciprocal_graph(self, positions, charges, volume, k):
+        k2 = k.square().sum(dim=1)
+        phase = positions @ k.T
+        real = torch.cos(phase).T.to(charges.dtype) @ charges
+        imag = torch.sin(phase).T.to(charges.dtype) @ charges
+        kernel = torch.exp(-k2 / (4 * self.alpha2)) / k2
+        reciprocal = (2 * math.pi / volume) * (kernel[:, None] * (real.square() + imag.square())).sum(0)
+        background = -math.pi * charges.sum(0).square() / (2 * volume * self.alpha2)
+        weights = charges.square() + 1e-8
+        return weights / weights.sum(0).clamp_min(1e-8) * (reciprocal + background)
+
+    def get_E_ele_a(self, Ra: Tensor, Qa: Tensor, idx_i: Tensor, idx_j: Tensor, Dij_lr: Tensor,
+                    cell: Optional[Tensor] = None, batch_seg: Optional[Tensor] = None,
+                    pbc: Optional[Tensor] = None, _pair_indices=None) -> Tensor:
+        """Return the real, reciprocal, self and background energies per atom."""
+        if Qa.ndim not in (1, 2) or Qa.shape[0] != Ra.shape[0]:
+            raise ValueError("Ewald charges must have shape (atoms,) or (atoms, channels)")
+        cell, volumes, lattices = self._lattices(Ra, cell)
+        if _pair_indices is None:
+            with torch.no_grad():
+                _pair_indices = self._sites_and_modes(Ra, batch_seg, pbc, cell, volumes, lattices)
+        charges = Qa[:, None] if Qa.ndim == 1 else Qa
+        charges = charges.to(torch.promote_types(Ra.dtype, Qa.dtype))
+        r = Dij_lr.clamp_min(1e-12)
+        kernel = torch.where(Dij_lr < self.cutoff_real, torch.erfc(self.alpha * r) / r, 0.0)
+        pairs = 0.5 * kernel[:, None] * charges[idx_i] * charges[idx_j]
+        real = scatter_sum(pairs, idx_i, Ra.shape[0])
+        reciprocal = torch.zeros_like(charges)
+        for graph, (atoms, modes) in enumerate(_pair_indices):
+            k = modes.to(Ra.dtype) @ lattices[graph]
+            atomic = self._reciprocal_graph(Ra[atoms], charges[atoms], volumes[graph], k)
+            reciprocal.index_copy_(0, atoms, atomic)
+        energy = (self.ke / self.dielectric_constant) * (
+            real + reciprocal - self.alpha / math.sqrt(math.pi) * charges.square()
+        )
+        return energy[:, 0] if Qa.ndim == 1 else energy
+
+
 class AtomicCharge2DipoleLayer(BaseFFLayer):
     def __init__(self) -> None:
-        super().__init__(input_fields={"Qa", "Ra", "batch_seg"}, output_fields={"M2"})
+        super().__init__(input_fields={"Qa", "Ra", "batch_seg", "N"}, output_fields={"M2"})
 
-    def get_M2(self, Qa: Tensor, Ra: Tensor, batch_seg: Optional[Tensor]=None) -> Tensor:
+    def get_M2(self, Qa: Tensor, Ra: Tensor, batch_seg: Optional[Tensor]=None, N=None) -> Tensor:
         if batch_seg is None:
-            batch_seg = torch.zeros_like(Qa, dtype=torch.long)
+            batch_seg = torch.zeros(Qa.shape[0], dtype=torch.long, device=Qa.device)
         Pa = Qa.unsqueeze(1) * Ra.view((-1, 3, 1) if Qa.dim() > 1 else (-1, 3))
-        return segment_sum_coo(Pa, batch_seg)
+        return scatter_sum(Pa, batch_seg, batch_size_from_counts(N))

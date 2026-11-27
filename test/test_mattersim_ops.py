@@ -7,22 +7,22 @@ from numpy.testing import assert_allclose
 
 
 def test_segment_softmax_is_one_per_receiver():
-    from enerzyme.models.mattersim.attention import segment_softmax
+    from enerzyme.models.mp.ops import segment_softmax
 
     logits = torch.tensor(
         [[0.0, 0.0], [0.0, 0.0], [1.0, 2.0]],
         dtype=torch.float64,
     )
     index = torch.tensor([0, 0, 1])
-    weights = segment_softmax(logits, index, dim_size=3)
+    weights = segment_softmax(logits, index, 3, clamp_min=1e-12)
     assert_allclose(weights[0].numpy(), [0.5, 0.5], atol=1e-6)
     assert_allclose(weights[1].numpy(), [0.5, 0.5], atol=1e-6)
     assert_allclose(weights[2].numpy(), [1.0, 1.0], atol=1e-6)
-    assert segment_softmax(logits[:0], index[:0], dim_size=0).shape == (0, 2)
+    assert segment_softmax(logits[:0], index[:0], 0, clamp_min=1e-12).shape == (0, 2)
 
 
 def test_centrality_matches_the_per_edge_affine_sum():
-    from enerzyme.models.cutoff import polynomial_envelope
+    from enerzyme.models.mp.basis.envelope import polynomial_envelope
     from enerzyme.models.mattersim.attention import CentralityEncoding
 
     torch.manual_seed(0)
@@ -46,8 +46,9 @@ def test_centrality_matches_the_per_edge_affine_sum():
 
 
 def test_attention_mask_is_applied_after_softmax():
-    from enerzyme.models.functional import segment_sum_coo
-    from enerzyme.models.mattersim.attention import GraphormerBlock, segment_softmax
+    from enerzyme.models.mp.ops import scatter_sum
+    from enerzyme.models.mattersim.attention import GraphormerBlock
+    from enerzyme.models.mp.ops import segment_softmax
 
     torch.manual_seed(0)
     block = GraphormerBlock(dim=8, num_heads=2, num_basis=4, ffn_dim=8, dropout=0.0)
@@ -65,9 +66,9 @@ def test_attention_mask_is_applied_after_softmax():
     query, key, value = qkv.unbind(dim=1)
     logits = (query[idx_i] * key[idx_j]).sum(dim=-1) * block.scale
     logits = logits + block.distance_bias(basis)
-    weights = segment_softmax(logits, idx_i, 3) * mask.unsqueeze(-1)
+    weights = segment_softmax(logits, idx_i, 3, clamp_min=1e-12) * mask.unsqueeze(-1)
     message = (weights.unsqueeze(-1) * value[idx_j]).reshape(2, 8)
-    expected = block.out(segment_sum_coo(message, idx_i, dim_size=3))
+    expected = block.out(scatter_sum(message, idx_i, 3))
     got = block.attend(node, basis, mask, idx_i, idx_j)
     assert_allclose(got.detach().numpy(), expected.detach().numpy(), atol=1e-6)
 

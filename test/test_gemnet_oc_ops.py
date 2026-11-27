@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from numpy.testing import assert_allclose
 
-from enerzyme.models.cutoff import polynomial_envelope
+from enerzyme.models.mp.basis.envelope import polynomial_envelope
 from enerzyme.models.gemnet.basis import legendre_outer, y_lm0
 from enerzyme.models.gemnet.geometry import (
     cap_incoming_mask,

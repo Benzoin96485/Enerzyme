@@ -25,7 +25,7 @@ def _complete_edges(n: int):
 
 
 def _tiny(**kwargs):
-    from enerzyme.models.gemnet import GemNetOCCore
+    from enerzyme.models.presets.triplet_graphs import gemnet_oc
     from enerzyme.models.layers.rbf import GaussianRBFLayer
 
     params = dict(
@@ -61,8 +61,8 @@ def _tiny(**kwargs):
         envelope_exponent=5,
     )
     params.update(kwargs)
-    core = GemNetOCCore(**params)
-    core.radial_basis = GaussianRBFLayer(
+    core = gemnet_oc(**params)
+    core.embed.radial_basis = GaussianRBFLayer(
         params["num_rbf"],
         params["cutoff_sr"],
         apply_cutoff_fn=False,
@@ -209,11 +209,11 @@ def _molecule(model, pos, za=None):
 
 def test_registration_and_example_yaml():
     from enerzyme.models.ff import get_ff_core
-    from enerzyme.models.gemnet import GemNetOCCore
+    from enerzyme.models.presets.triplet_graphs import gemnet_oc
 
     for name in ("gemnet-oc", "gemnetoc", "gemnet_oc"):
         core_cls, build, layers = get_ff_core(name)
-        assert core_cls is GemNetOCCore
+        assert core_cls is gemnet_oc
         assert build["cutoff_sr"] == 12.0
         assert build["dim_embedding"] == 256
         assert build["num_rbf"] == 128
@@ -357,7 +357,7 @@ def test_neighbor_cap_and_optional_interactions():
         edge_atom_interaction=False,
         atom_interaction=False,
     )
-    assert bare.interactions[0].quad is None
+    assert bare.blocks[0].interaction.quad is None
     feat = _forward(bare, inp)
     assert feat.shape == (4, 4, 2) and torch.isfinite(feat).all()
 

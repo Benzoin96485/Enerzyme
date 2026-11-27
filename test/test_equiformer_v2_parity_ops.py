@@ -17,8 +17,8 @@ from equiformer_v2_parity_utils import (  # noqa: E402
 
 
 def test_so3_linear_v2_matches_upstream():
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
-    from enerzyme.models.so3 import SO3_LinearV2 as EZLin
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_LinearV2 as EZLin
     from eqv2_so3 import SO3_Embedding as OffEmb
     from eqv2_so3 import SO3_LinearV2 as OffLin
 
@@ -46,7 +46,7 @@ def test_so3_linear_v2_matches_upstream():
 
 
 def test_so2_convolution_matches_upstream():
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
     from eqv2_so3 import SO3_Embedding as OffEmb
 
     torch.manual_seed(1)
@@ -79,7 +79,7 @@ def test_so2_convolution_matches_upstream():
 
 
 def test_so2_convolution_extra_m0_matches_upstream():
-    from enerzyme.models.so3 import SO3_Embedding as EZEmb
+    from enerzyme.models.mp.equivariant import SO3_Embedding as EZEmb
     from eqv2_so3 import SO3_Embedding as OffEmb
 
     torch.manual_seed(2)
@@ -111,7 +111,7 @@ def test_so2_convolution_extra_m0_matches_upstream():
 
 
 def test_rms_norm_sh_matches_upstream():
-    from enerzyme.models.so3 import get_normalization_layer as ez_norm
+    from enerzyme.models.mp.equivariant import get_normalization_layer as ez_norm
     from layer_norm import get_normalization_layer as off_norm
 
     torch.manual_seed(3)
@@ -127,7 +127,7 @@ def test_rms_norm_sh_matches_upstream():
 
 def test_rotate_inv_rescale_when_mmax_lt_lmax():
     """Shared so3 rotate_inv applies EquiformerV2 rescale for mmax < lmax."""
-    from enerzyme.models.so3 import CoefficientMapping, SO3_Embedding, SO3_Rotation
+    from enerzyme.models.mp.equivariant import CoefficientMapping, SO3_Embedding, SO3_Rotation
 
     torch.manual_seed(4)
     device = torch.device("cpu")

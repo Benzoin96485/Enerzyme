@@ -12,7 +12,7 @@ are the parity-allowed couplings of ``1o`` and ``2e``:
 
 That is fewer paths than an SO(3) product of the same two degrees, and each
 output degree still sees both input degrees. Features use the polynomial
-spherical-harmonic order from :func:`enerzyme.models.layers.polynomial_harmonics.polynomial_spherical_harmonics`
+spherical-harmonic order from :func:`enerzyme.models.mp.basis.angular.polynomial_spherical_harmonics`
 (``l = 1`` then ``l = 2``, Cartesian ``(x, y, z)``). That order matches the
 e3nn real harmonics, up to one scale per degree, so
 :class:`e3nn.o3.FullyConnectedTensorProduct` is equivariant on these tensors.
@@ -31,7 +31,9 @@ from e3nn import o3
 from torch import Tensor
 from torch.nn import Module, Parameter, init
 
-from ..layers.polynomial_harmonics import angular_dim
+from ..mp.basis.angular import angular_dim
+from ..mp.equivariant.cg import coupling_paths
+from ..mp.equivariant.e3nn.tools import traceable_e3nn_kernels
 
 
 ANGULAR_DIM = angular_dim(2)
@@ -84,6 +86,18 @@ def _unpack_groups(packed: Tensor, num_groups: int, width: int) -> Tensor:
     return angular.permute(0, 3, 1, 2).reshape(n_atoms, ANGULAR_DIM, num_groups * width)
 
 
+class _GroupedTensorProduct(o3.TensorProduct):
+    """Apply one weight vector per channel group to every atom in that group."""
+
+    def forward(self, left: Tensor, right: Tensor, group_weights: Tensor) -> Tensor:
+        # The e3nn kernel shares weights across its atom dimension. Batching
+        # over groups keeps the trainable weights at [groups, path weights].
+        def one_group(left, right, weights):
+            return o3.TensorProduct.forward(self, left, right, weights)
+
+        return torch.vmap(one_group, in_dims=(1, 1, 0), out_dims=1)(left, right, group_weights)
+
+
 class GroupSparseCG(Module):
     """One grouped sparse tensor product, then the abstract-edge roll.
 
@@ -107,14 +121,18 @@ class GroupSparseCG(Module):
         self.shuffle_scale = float(shuffle_scale)
         self.offset = shuffle_offset(channels, num_groups, self.shuffle_scale)
         self.width = channels // num_groups
-        irreps = f"{self.width}x1o + {self.width}x2e"
-        self.tp = o3.FullyConnectedTensorProduct(
-            irreps,
-            irreps,
-            irreps,
-            shared_weights=False,
-            internal_weights=False,
-        )
+        irreps = o3.Irreps(f"{self.width}x1o + {self.width}x2e")
+        degrees = tuple(ir for _, ir in irreps)
+        paths = coupling_paths(degrees, degrees, degrees)
+        with traceable_e3nn_kernels():
+            self.tp = _GroupedTensorProduct(
+                irreps,
+                irreps,
+                irreps,
+                [(i, j, k, "uvw", True, 1.0) for i, j, k in paths],
+                shared_weights=True,
+                internal_weights=False,
+            )
         self.n_paths = len(self.tp.instructions)
         if self.n_paths != 4:
             raise RuntimeError(

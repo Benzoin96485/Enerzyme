@@ -89,7 +89,7 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | DimeNet++      | Faster directional messages              | Hadamard bottleneck       |
 +----------------+------------------------------------------+---------------------------+
-| M3GNet         | Three-body bonds + gated convolution     | Cutoffs 5 Å and 4 Å      |
+| M3GNet         | Three-body bonds + gated convolution     | Cutoffs 5 Å and 4 Å       |
 +----------------+------------------------------------------+---------------------------+
 | CHGNet         | Atom, bond, and angle graphs + magmom    | Cutoffs 5 Å and 3 Å, eV   |
 +----------------+------------------------------------------+---------------------------+
@@ -120,7 +120,7 @@ Choosing an architecture
 +----------------+------------------------------------------+---------------------------+
 | XPaiNN         | External XPaiNN via XequiNet             | Extra pip packages        |
 +----------------+------------------------------------------+---------------------------+
-| AllScAIP       | Research only (do not use as primary)   | Experimental 魔改 port;   |
+| AllScAIP       | Research only (do not use as primary)    | Experimental 魔改 port;   |
 |                |                                          | see architecture catalog  |
 +----------------+------------------------------------------+---------------------------+
 

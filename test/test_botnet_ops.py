@@ -45,10 +45,10 @@ def test_mace_bessel_matches_botnet_polynomial():
 
 
 def test_message_is_written_on_idx_j_and_matches_the_interaction_block():
-    from enerzyme.models.botnet import BOTNetCore
+    from enerzyme.models.presets.irreps import botnet
 
     torch.manual_seed(0)
-    core = BOTNetCore(
+    core = botnet(
         max_Za=8,
         dim_embedding=4,
         num_rbf=3,
@@ -78,23 +78,24 @@ def test_message_is_written_on_idx_j_and_matches_the_interaction_block():
     assert torch.count_nonzero(out[1]) > 0
 
     node_attrs = torch.nn.functional.one_hot(atomic_numbers, num_classes=9).to(embedding.dtype)
-    block = core.interactions[0](
+    block = core.blocks[0].module(
         node_attrs=node_attrs,
         node_feats=embedding,
-        edge_attrs=core.spherical_harmonics(vij),
+        edge_attrs=core.embed.sph(vij),
         edge_feats=rbf,
-        idx_i_sr=idx_i,
-        idx_j_sr=idx_j,
+        sender=idx_i,
+        receiver=idx_j,
     )
     assert torch.allclose(block, out[:, :, 0])
 
 
 def test_natural_parity_layers_share_one_layout():
-    from enerzyme.models.botnet import BOTNetCore, natural_hidden_irreps
+    from enerzyme.models.botnet import natural_hidden_irreps
+    from enerzyme.models.presets.irreps import botnet
 
     hidden = natural_hidden_irreps(4, 1)
     assert hidden == str(Irreps("4x0e+4x1o"))
-    core = BOTNetCore(
+    core = botnet(
         max_Za=8,
         dim_embedding=4,
         num_rbf=3,
@@ -110,10 +111,10 @@ def test_natural_parity_layers_share_one_layout():
 
 
 def test_later_layers_may_grow_unnatural_parity_and_early_channels_stay_zero():
-    from enerzyme.models.botnet import BOTNetCore
+    from enerzyme.models.presets.irreps import botnet
 
     torch.manual_seed(1)
-    core = BOTNetCore(
+    core = botnet(
         max_Za=8,
         dim_embedding=4,
         num_rbf=3,
@@ -124,7 +125,7 @@ def test_later_layers_may_grow_unnatural_parity_and_early_channels_stay_zero():
         avg_num_neighbors=2.0,
     )
     assert core.uniform_irreps is False
-    assert core.placement_1.numel() > core.placement_0.numel()
+    assert core.head.placement_1.numel() > core.head.placement_0.numel()
     n = 4
     idx_i, idx_j = [], []
     for i in range(n):
@@ -143,7 +144,7 @@ def test_later_layers_may_grow_unnatural_parity_and_early_channels_stay_zero():
         rbf=torch.randn(idx_i.numel(), 3),
         atom_embedding=torch.randn(n, 4),
     )["atom_feature"]
-    present = set(core.placement_0.tolist())
+    present = set(core.head.placement_0.tolist())
     missing = [column for column in range(out.shape[1]) if column not in present]
     assert missing
     assert torch.count_nonzero(out[:, missing, 0]) == 0
@@ -151,10 +152,10 @@ def test_later_layers_may_grow_unnatural_parity_and_early_channels_stay_zero():
 
 
 def test_hidden_width_and_variant_are_checked():
-    from enerzyme.models.botnet import BOTNetCore
+    from enerzyme.models.presets.irreps import botnet
 
     try:
-        BOTNetCore(
+        botnet(
             max_Za=8,
             dim_embedding=4,
             num_rbf=3,
@@ -167,14 +168,14 @@ def test_hidden_width_and_variant_are_checked():
         raise AssertionError("mismatched 0e multiplicity should be rejected")
 
     try:
-        BOTNetCore(max_Za=8, dim_embedding=4, num_rbf=3, max_ell=1, variant="mace")
+        botnet(max_Za=8, dim_embedding=4, num_rbf=3, max_ell=1, variant="mace")
     except ValueError as exc:
         assert "variant" in str(exc)
     else:
         raise AssertionError("unknown variant should be rejected")
 
     try:
-        BOTNetCore(
+        botnet(
             max_Za=8,
             dim_embedding=4,
             num_rbf=3,
@@ -188,10 +189,10 @@ def test_hidden_width_and_variant_are_checked():
 
 
 def test_features_are_rotation_and_inversion_equivariant():
-    from enerzyme.models.botnet import BOTNetCore
+    from enerzyme.models.presets.irreps import botnet
 
     torch.manual_seed(2)
-    core = BOTNetCore(
+    core = botnet(
         max_Za=8,
         dim_embedding=4,
         num_rbf=3,
@@ -242,7 +243,7 @@ def test_features_are_rotation_and_inversion_equivariant():
 
 
 def test_isolated_atom_is_zero_until_the_first_layer_is_residual():
-    from enerzyme.models.botnet import BOTNetCore
+    from enerzyme.models.presets.irreps import botnet
 
     torch.manual_seed(5)
     kwargs = dict(
@@ -253,7 +254,7 @@ def test_isolated_atom_is_zero_until_the_first_layer_is_residual():
         num_interactions=2,
         radial_MLP=[8],
     )
-    agnostic = BOTNetCore(**kwargs)
+    agnostic = botnet(**kwargs)
     agnostic.eval()
     empty = dict(
         Za=torch.tensor([8]),
@@ -266,7 +267,7 @@ def test_isolated_atom_is_zero_until_the_first_layer_is_residual():
     alone = agnostic.get_output(**empty)["atom_feature"]
     assert torch.count_nonzero(alone) == 0
 
-    residual = BOTNetCore(**kwargs, variant="residual_element")
+    residual = botnet(**kwargs, variant="residual_element")
     residual.eval()
     kept = residual.get_output(**empty)["atom_feature"]
     assert torch.isfinite(kept).all()

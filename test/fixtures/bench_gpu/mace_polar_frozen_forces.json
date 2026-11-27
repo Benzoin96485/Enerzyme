@@ -1,0 +1,193 @@
+{
+  "model": "MACE-Polar",
+  "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+  "historical_candidate": "c32ede3e3c1e58127ce5c3d308d452e59f742530",
+  "later_candidate": "d173ef1096a0dcf53d737593df49d8d85653ef6e",
+  "scope": "Four frozen cross-eager FP32 failures in native force evaluation. All four energies pass. Both sides use the default displaced-charge electrostatics evaluated with open boundaries, including for the geometry labeled bulk_256.",
+  "torch": "2.13.0+cu126",
+  "fixture": "test/fixtures/presnapshot/mace_polar.pt",
+  "fixture_sha256": "58332bb156643e6fd6d8c2f877b2ef717a9a1c09f48b81759c7898c3f92c4fa3",
+  "gate": "FP32 E/F elementwise abs(actual-reference) <= 3e-4 + 3e-4*abs(reference). The FP64 gate uses 1e-10 + 1e-8*abs(reference).",
+  "archived_v100": {
+    "jobs": {
+      "FP32": [
+        "6319793",
+        "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65"
+      ],
+      "FP64": [
+        "6317171",
+        "GPU-dd4e9ff4-134a-9fad-fc2f-3be31367859c"
+      ]
+    },
+    "order": [
+      "baseline",
+      "historical_candidate"
+    ],
+    "files": {
+      "base_float32": {
+        "file": ".refactor/bench/raw-frozen-c32ede3/pair_46-mace_polar-float32_6319793_1795537731/0-base.eager.pt",
+        "sha256": "f206fbf104b51cf79f1eeb7fe131465bd8ccbd36632d13d282d01f8d35453857"
+      },
+      "new_float32": {
+        "file": ".refactor/bench/raw-frozen-c32ede3/pair_46-mace_polar-float32_6319793_1795537731/1-new.eager.pt",
+        "sha256": "d797d9f52528b4d03b6399e266ca6629d7d9218d2772f5c1380bb12c40ed38a9"
+      },
+      "base_float64": {
+        "file": ".refactor/bench/raw-frozen-c32ede3/pair_47-mace_polar-float64_6317171_1795555905/0-base.eager.pt",
+        "sha256": "e2831ff36beacbcf874a5c900bbfa01b33e28b1155e2d2d638c38cd34b018cee"
+      },
+      "new_float64": {
+        "file": ".refactor/bench/raw-frozen-c32ede3/pair_47-mace_polar-float64_6317171_1795555905/1-new.eager.pt",
+        "sha256": "466c71c20ec744d7e4d3ef33a882fb273357ddc7669cb852e7d72fc1d46e634f"
+      }
+    },
+    "columns": [
+      "system",
+      "mode",
+      "failing_force_components",
+      "worst_tolerance_ratio",
+      "worst_atom_xyz",
+      "old_FP32",
+      "candidate_FP32",
+      "old_FP64_at_same_index"
+    ],
+    "rows": [
+      ["mol_batch_32x20", "infer", 1, 1.0316774080382023, [560, 0], -0.24691811203956604, -0.24653218686580658, -0.24687345787371634],
+      ["mol_batch_32x20", "train", 4, 1.197364634292117, [295, 1], 0.18849417567253113, 0.1880672574043274, 0.18810353567548882],
+      ["bulk_256", "infer", 1, 1.429855934053455, [225, 2], 0.13239392638206482, 0.13190817832946777, 0.1322310682281958],
+      ["bulk_256", "train", 3, 1.1093072938437238, [115, 1], -0.01926245540380478, -0.01960165798664093, -0.019450929153566054]
+    ]
+  },
+  "matched_native_cpu": {
+    "method": "Run both frozen sources independently with the same loaded state, one CPU thread, default dtype fixed to the run precision, PYTHONHASHSEED=0, identical EnergyReduce term order, and eval mode. Parameter and batch tensors are FP32. The later candidate uses the same single-thread input and weights.",
+    "bitwise_equal_on_both_systems": [
+      "atom_feature",
+      "spin_multipole",
+      "E",
+      "E_nonlocal_a",
+      "E_coulomb_a",
+      "Qa",
+      "Sa",
+      "dipole",
+      "source density, mixer, Fukui, all six potential calls, first field update, nonlocal readout"
+    ],
+    "columns": [
+      "system",
+      "max_abs_force_difference_old_vs_historical_candidate",
+      "max_force_tolerance_ratio_old_vs_historical_candidate",
+      "max_force_tolerance_ratio_old_vs_later_candidate"
+    ],
+    "rows": [
+      ["mol_batch_32x20", 6.103515625e-05, 0.00216210699921602, 0.00216210699921602],
+      ["bulk_256", 5.960464477539063e-08, 0.00012560207353951166, 0.00012560207353951166]
+    ],
+    "identical_AST_sha256_in_all_three_revisions": {
+      "_pair_node_energy": "3bab5df82ef2f090d500e4a1f0075d105adb8b2a6d3fc52f1dddb5998d5733cd",
+      "_scalar_projection": "43c49bdf43e543163f4dce3d682a0c4dde2492b70f13eb9e38f92decdf1cc83b",
+      "_displaced_positions": "591b8e2fee39e95bc2d2c8cf81243d1512a8cce22c03c746bd9f4dda6fcb318d"
+    }
+  },
+  "mode_control": {
+    "method": "The frozen CPU model has no Dropout, BatchNorm, recurrent, or MultiheadAttention modules. Its intermediate features, scalar energies and source densities agree bitwise between train and eval. Switching only ForceLayer.create_graph reproduces all training-mode fields bitwise. Different autograd paths can change the evaluated forces.",
+    "v100_scope": "The saved V100 train and infer are different modes. No second same-mode native V100 tensor set was available for this fixture. This comparison measures the variation across modes.",
+    "columns": [
+      "system",
+      "frozen_CPU_train_vs_eval_max_abs_force_difference",
+      "CPU_max_force_tolerance_ratio",
+      "archived_frozen_V100_train_vs_infer_components_outside",
+      "V100_max_force_tolerance_ratio"
+    ],
+    "rows": [
+      ["mol_batch_32x20", 0.00146484375, 0.08674110529945706, 1, 1.0237312433601613],
+      ["bulk_256", 9.5367431640625e-07, 0.0022343901955989474, 2, 1.3824140735778163]
+    ]
+  },
+  "same_mode_frozen_order_controls": {
+    "method": "The baseline alone runs in eager eval with a single CPU thread. Each control preserves positions, weights, pair terms and their mathematical sum. by_charge sorts the unchanged pair list stably by signed source charge before reduction in both _pair_node_energy and _scalar_projection. This tests numerical conditioning. The original V100 thread schedule was not recorded.",
+    "controls": {
+      "reverse_projection": "reverse pair enumeration only for the scalar potential",
+      "reverse_energy": "reverse pair enumeration only for the Coulomb energy",
+      "reverse_neighbors": "reverse the local supplied neighbor list and matching offsets",
+      "permute_atoms": "reverse atoms within each structure and remap neighbor indices, then invert the output permutation",
+      "by_charge": "accumulate both Gaussian pair sums in increasing source-charge order"
+    },
+    "columns": [
+      "system",
+      "control",
+      "failing_force_components",
+      "total_force_max_tolerance_ratio",
+      "Coulomb_force_max_tolerance_ratio",
+      "nonlocal_force_max_tolerance_ratio"
+    ],
+    "rows": [
+      ["mol_batch_32x20", "reverse_projection", 0, 0.5454531835305647, 0.5553977771082425, 0.0016097905778858412],
+      ["mol_batch_32x20", "reverse_energy", 0, 0.44059623137871223, 0.4536402152875653, 0.0],
+      ["mol_batch_32x20", "reverse_neighbors", 0, 0.5454589365381999, 0.5896685617375977, 0.009658743467315049],
+      ["mol_batch_32x20", "permute_atoms", 0, 0.40117854301315414, 0.39424009844262037, 0.013662581571287524],
+      ["mol_batch_32x20", "by_charge", 175, 4.281807870059064, 4.528450051035329, 0.1390198632389619],
+      ["bulk_256", "reverse_projection", 0, 0.36845788850688194, 0.3676192920806508, 0.0005741190513117458],
+      ["bulk_256", "reverse_energy", 0, 0.5474916140123659, 0.5529942244349384, 0.0],
+      ["bulk_256", "reverse_neighbors", 0, 0.7179778351797614, 0.7359010273730547, 0.000451755477594483],
+      ["bulk_256", "permute_atoms", 0, 0.7052927144168681, 0.721212755224881, 0.0007287412866766002],
+      ["bulk_256", "by_charge", 671, 39.07618831181067, 39.278017973418514, 0.006461009943643184]
+    ],
+    "double_columns": [
+      "system",
+      "by_charge_FP64_components_outside_FP64_gate",
+      "FP64_max_abs_force_change",
+      "FP64_max_tolerance_ratio"
+    ],
+    "double_rows": [
+      ["mol_batch_32x20", 0, 4.234607331454754e-09, 0.008921730541814778],
+      ["bulk_256", 0, 2.7893187759531202e-11, 0.0789408200837135]
+    ]
+  },
+  "rounded_geometry_reference": {
+    "method": "Construct the original FP32 batch, including coordinates and offsets, then upcast it to FP64. Use the original model weights and source in FP64 eager eval and compare with native V100 FP32 values. This removes input-coordinate rounding as an explanation for the discrepancies.",
+    "columns": [
+      "system",
+      "archived_mode",
+      "old_GPU_FP32_components_outside",
+      "worst_tolerance_ratio",
+      "atom_xyz",
+      "old_archived_FP32_force",
+      "CPU_FP64_force_rounded_inputs"
+    ],
+    "rows": [
+      ["mol_batch_32x20", "infer", 2, 1.1722354207048433, [333, 0], -0.0049764132127165794, -0.0046229925281543235],
+      ["mol_batch_32x20", "train", 5, 1.4056885191557842, [561, 1], 0.09942750632762909, 0.09989114211461574],
+      ["bulk_256", "infer", 3, 1.2171244396717629, [139, 1], -0.11292460560798645, -0.11333097592908571],
+      ["bulk_256", "train", 3, 1.2390830873993308, [120, 1], -0.07260993868112564, -0.0730086545314445]
+    ]
+  },
+  "local_precision_probe": {
+    "method": "Evaluate just the two pair kernels (_pair_node_energy and _scalar_projection) on FP64 inputs and cast each result back to FP32. All public outputs remain FP32. Compare both ordinary and experimental CPU forces with the FP64 frozen reference on rounded inputs.",
+    "columns": [
+      "system",
+      "unmodified_CPU_force_max_tolerance_ratio",
+      "FP64_pair_kernels_CPU_force_max_tolerance_ratio"
+    ],
+    "rows": [
+      ["mol_batch_32x20", 0.6451937048637066, 0.3113977603832799],
+      ["bulk_256", 0.7708836266107097, 0.017024410974334284]
+    ],
+    "frozen_V100_columns": [
+      "system",
+      "mode",
+      "high_precision_CPU_probe_components_outside_archived_old_FP32",
+      "max_tolerance_ratio"
+    ],
+    "frozen_V100_rows": [
+      ["mol_batch_32x20", "infer", 2, 1.1740994363694706],
+      ["mol_batch_32x20", "train", 5, 1.4057756697287016],
+      ["bulk_256", "infer", 3, 1.2203355868860863],
+      ["bulk_256", "train", 3, 1.2461048889722928]
+    ],
+    "decision": "This changes the old FP32 arithmetic while improving agreement with the double reference. The experimental forces still fail the four archived native FP32 comparisons. Production arithmetic and gates are retained."
+  },
+  "interpretation": "The original same-mode FP32 model can exceed its own force gate when only the order of cancelling pair terms changes. The two unchanged pair kernels sum offset image charges with opposing signs. The matched-order comparison found no failing CPU force component from the refactor. The V100 job lacks per-operation tensors for exact attribution of its individual failures. The four historical statuses remain failed.",
+  "raw_archive": ".refactor/bench/mace-polar-fp32-attribution",
+  "raw_comparison_sha256": "574b456a8f62a86d72b51e415e48ec51011d545ca3e7f8984907596dea9c4247",
+  "cpu_driver": ".refactor/tools/mace-polar-fp32-attribution.py",
+  "cpu_driver_final_sha256": "e0305cabc8a294acb63170f951a43a01919761eb1b0c1f4fba5a259d9c167fea"
+}

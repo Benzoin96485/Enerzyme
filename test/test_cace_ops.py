@@ -119,3 +119,28 @@ def test_radial_mix_is_independent_per_shell():
     assert mixed.shape == (1, 1, 4, 1)
     assert torch.allclose(mixed[0, 0, 0, 0], torch.tensor(1.0))
     assert torch.allclose(mixed[0, 0, 1:, 0], torch.full((3,), 6.0))
+
+
+def test_compiled_radial_shell_mix_with_force_loss():
+    from enerzyme.models.cace.interaction import RadialChannelMix
+
+    torch.manual_seed(14)
+    model = RadialChannelMix(2, 3, 4, torch.tensor([[0, 1], [1, 4], [4, 10]])).double()
+    raw = torch.randn(5, 2, 10, 4, dtype=torch.float64, requires_grad=True)
+
+    def objective(x):
+        mixed = model(x)
+        return mixed.square().sum(), mixed
+
+    def derivatives(x):
+        _, pullback, mixed = torch.func.vjp(objective, x, has_aux=True)
+        return mixed, pullback(x.new_ones(()))[0]
+
+    eager = derivatives(raw)
+    actual = torch.compile(derivatives, fullgraph=True, backend="aot_eager")(raw)
+    for values in zip(actual, eager):
+        torch.testing.assert_close(*values)
+    actual_grad = torch.autograd.grad(actual[1].square().sum(), (raw, model.weight))
+    expected_grad = torch.autograd.grad(eager[1].square().sum(), (raw, model.weight))
+    for value, target in zip(actual_grad, expected_grad):
+        torch.testing.assert_close(value, target)

@@ -15,9 +15,19 @@ import torch
 from torch import Tensor
 from torch.nn import Identity, Module, Sequential, SiLU
 from torch.nn import Linear, LayerNorm
-from torch_scatter import scatter_sum
+from ..mp.ops import scatter_sum
 
-from ..so3 import L0Contraction
+from ..mp.equivariant import L0Contraction
+
+
+def _repeat_degree_weights(value: Tensor, degrees, repeats: Tensor, width: int) -> Tensor:
+    if torch.compiler.is_compiling() and value.device.type == "cpu":
+        # Keep the backward reduction for each angular degree explicit.
+        return torch.cat([
+            value[..., i:i + 1].expand(*value.shape[:-1], 2 * degree + 1)
+            for i, degree in enumerate(degrees)
+        ], dim=-1)
+    return torch.repeat_interleave(value, repeats, dim=-1, output_size=width)
 
 
 def _lecun_normal_(tensor: Tensor) -> None:
@@ -255,11 +265,8 @@ class EuclideanAttentionBlock(Module):
         )
         d_att_inv_features = d_h_att_inv_features.view(-1, self.inv_features_dim)
 
-        alpha_ev_full = torch.repeat_interleave(
-            alpha_ev,
-            self.degree_repeats,
-            dim=-1,
-            output_size=self.ev_features_dim,
+        alpha_ev_full = _repeat_degree_weights(
+            alpha_ev, self.degrees, self.degree_repeats, self.ev_features_dim
         )
         scaled_neighbors_ev = cutoffs[:, None] * alpha_ev_full * sh_vectors
         d_att_ev_features = scatter_sum(
@@ -316,11 +323,8 @@ class InteractionBlock(Module):
             [inv_features.shape[-1], ev_invariants.shape[-1]],
             dim=-1,
         )
-        b_ev_features = torch.repeat_interleave(
-            b_ev_features,
-            self.degree_repeats,
-            dim=-1,
-            output_size=ev_features.shape[-1],
+        b_ev_features = _repeat_degree_weights(
+            b_ev_features, self.so3_conv_invariants.degrees, self.degree_repeats, ev_features.shape[-1]
         )
         d_ev_features = b_ev_features * ev_features
         return d_inv_features, d_ev_features

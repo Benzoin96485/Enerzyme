@@ -1,0 +1,338 @@
+{
+  "architecture": "gemnet",
+  "job": "6338668",
+  "device": "Tesla V100-PCIE-32GB",
+  "gpu_uuid": "GPU-e7d358e7-783a-3a6f-9e59-ddd2825dcbd8",
+  "baseline": "1aa0f8b",
+  "experimental_base": "2a3b024",
+  "production_candidate": "f53ec5e",
+  "snapshot_sha256": "39566781242ab4a660c1a90d96906a36420d0e85e44da5b44e1bc93b93d7ee2e",
+  "frozen_driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+  "system": "mol_batch_32x20",
+  "mode": "ordinary CUDA Inductor force inference",
+  "repetitions": 11,
+  "torch": "2.13.0+cu126",
+  "experiments": {
+    "original": "Default bilinear contractions.",
+    "full": "Recompute the full bilinear aggregate in the force backward, retaining the original einsum order.",
+    "bmm": "Reorder the two contractions to flatten the shared weights without an edge-sized transpose.",
+    "bmm-remat": "Apply the reordered contractions and recompute only the contractions after scatter."
+  },
+  "results": {
+    "float32": {
+      "baseline": {
+        "infer_ms": 25.432939874008298,
+        "infer_peak_mb": 852.4326171875,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 5.7220458984375e-06,
+          "force_max_abs": 6.9141387939453125e-06,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 31,
+          "new_calls": 1001
+        }
+      },
+      "full": {
+        "infer_ms": 25.040513137355447,
+        "infer_peak_mb": 736.33837890625,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 3.814697265625e-06,
+          "force_max_abs": 5.9604644775390625e-06,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 941
+        }
+      },
+      "full_relative_to_baseline_percent": {
+        "infer_ms": -1.5429861376501708,
+        "infer_peak_mb": -13.619168945492621
+      },
+      "original": {
+        "infer_ms": 22.64757500961423,
+        "infer_peak_mb": 1075.73779296875,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 4.76837158203125e-06,
+          "force_max_abs": 6.4373016357421875e-06,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 985
+        }
+      },
+      "bmm": {
+        "infer_ms": 23.792726919054985,
+        "infer_peak_mb": 1075.306640625,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 7.033348083496094e-06,
+          "force_max_abs": 9.5367431640625e-06,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 1001
+        }
+      },
+      "bmm-remat": {
+        "infer_ms": 23.948172107338905,
+        "infer_peak_mb": 750.6953125,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 5.602836608886719e-06,
+          "force_max_abs": 1.1444091796875e-05,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 985
+        }
+      }
+    },
+    "float64": {
+      "baseline": {
+        "infer_ms": 63.5533828753978,
+        "infer_peak_mb": 1674.068359375,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 8.881784197001252e-15,
+          "force_max_abs": 1.5987211554602254e-14,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 31,
+          "new_calls": 1001
+        }
+      },
+      "full": {
+        "infer_ms": 63.52825206704438,
+        "infer_peak_mb": 1440.7119140625,
+        "numerical": {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 8.881784197001252e-15,
+          "force_max_abs": 1.7763568394002505e-14,
+          "gradient_max_abs": 0.0
+        },
+        "capture": {
+          "new_graphs": 25,
+          "new_calls": 1838
+        }
+      },
+      "full_relative_to_baseline_percent": {
+        "infer_ms": -0.03954283346756515,
+        "infer_peak_mb": -13.9394812646493
+      }
+    }
+  },
+  "scope": "All runs used the frozen baseline weights, geometry and driver on the same physical device. Each run checked its E/F directly against its own unchanged eager implementation. The exploratory variants were applied only during compilation. These small-system results do not replace the separate formal full-system pairs for the production commit.",
+  "raw_directory": ".refactor/bench/gemnet-bilinear-6338668",
+  "contraction_scope_rechecks": {
+    "job": "6338973",
+    "system": "mol_batch_32x20",
+    "repetitions_per_process": 21,
+    "baseline": "1aa0f8b",
+    "full_recompute_candidate": "f53ec5e",
+    "contraction_only_candidate": "4428e68",
+    "method": "Four source-matched fresh processes ran in baseline, full recomputation, full recomputation, baseline order. Each additional experiment used one fresh process with the migrated model at 882b187 and changed only the CUDA compilation path for its bilinear aggregation. The baseline reference below is the median of its two process medians. Each source and variant had its own compilation cache. The production implementation at 4428e68 is assessed separately through source-matched frozen full-system runs.",
+    "physical_gpu": "GPU-9a19f472-727c-1aec-eb16-7d4406811551",
+    "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+    "fixture_sha256": "39566781242ab4a660c1a90d96906a36420d0e85e44da5b44e1bc93b93d7ee2e",
+    "variants": {
+      "C": "Recompute the two contractions in every triplet layer and preserve the neighbor sum.",
+      "D": "Recompute only those contractions, in the first three of four triplet layers.",
+      "E": "Recompute the complete aggregate in the first three of four triplet layers."
+    },
+    "results": {
+      "float32": {
+        "A1": {
+          "revision": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+          "median_ms": 24.02913896366954,
+          "peak_MiB": 852.4326171875,
+          "native_EF_passed": true,
+          "energy_max_abs": 4.291534423828125e-06,
+          "force_max_abs": 9.5367431640625e-06,
+          "receipt_sha256": "f44324617e58d183ab11ccfcc81aa88eefe7413bebe617131ebcdee5ec714552",
+          "median_ms_relative_percent": -0.43477099827708976,
+          "peak_MiB_relative_percent": 0.0
+        },
+        "B1": {
+          "revision": "f53ec5e88e34048050872e5c27625869d6901dbd",
+          "median_ms": 25.64307302236557,
+          "peak_MiB": 736.33837890625,
+          "native_EF_passed": true,
+          "energy_max_abs": 4.291534423828125e-06,
+          "force_max_abs": 9.5367431640625e-06,
+          "receipt_sha256": "4a79557981ae9a4093558cc3ac24310ea9d0302a94ae7f4e1660d0e51175ad06",
+          "median_ms_relative_percent": 6.252597799693804,
+          "peak_MiB_relative_percent": -13.619168945492621
+        },
+        "B2": {
+          "revision": "f53ec5e88e34048050872e5c27625869d6901dbd",
+          "median_ms": 24.807131849229336,
+          "peak_MiB": 736.33837890625,
+          "native_EF_passed": true,
+          "energy_max_abs": 4.76837158203125e-06,
+          "force_max_abs": 7.62939453125e-06,
+          "receipt_sha256": "9ad9f0668a0ca6becad4a111c3ff217fa53c074fedf7cb69d6b4df16a67f5355",
+          "median_ms_relative_percent": 2.788858443027009,
+          "peak_MiB_relative_percent": -13.619168945492621
+        },
+        "A2": {
+          "revision": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+          "median_ms": 24.23899481073022,
+          "peak_MiB": 852.4326171875,
+          "native_EF_passed": true,
+          "energy_max_abs": 6.67572021484375e-06,
+          "force_max_abs": 8.58306884765625e-06,
+          "receipt_sha256": "86606e916b4d1caa473f234e1c20a47f0fef9093a5af58730d25c6fd8d834b61",
+          "median_ms_relative_percent": 0.43477099827708976,
+          "peak_MiB_relative_percent": 0.0
+        },
+        "C": {
+          "revision": "882b187acd561b57af232279dd67700532e50c97",
+          "median_ms": 23.520502960309386,
+          "peak_MiB": 750.9453125,
+          "native_EF_passed": true,
+          "energy_max_abs": 6.9141387939453125e-06,
+          "force_max_abs": 5.125999450683594e-06,
+          "receipt_sha256": "afb9a9ab51275d6307fd3c59d25f78dc22e5a5cc804b9cc38dd51b0808fadcdd",
+          "median_ms_relative_percent": -2.5423146863652435,
+          "peak_MiB_relative_percent": -11.905610207918283
+        },
+        "D": {
+          "revision": "882b187acd561b57af232279dd67700532e50c97",
+          "median_ms": 23.315113969147205,
+          "peak_MiB": 977.71435546875,
+          "native_EF_passed": true,
+          "energy_max_abs": 3.814697265625e-06,
+          "force_max_abs": 7.3909759521484375e-06,
+          "receipt_sha256": "44dfb682d898515bee101cd5d11bc4a76776ef4ae11c66ae261ad14068acbb19",
+          "median_ms_relative_percent": -3.3933481740991867,
+          "peak_MiB_relative_percent": 14.696966746134388
+        },
+        "E": {
+          "revision": "882b187acd561b57af232279dd67700532e50c97",
+          "median_ms": 24.55415390431881,
+          "peak_MiB": 949.27001953125,
+          "native_EF_passed": true,
+          "energy_max_abs": 4.76837158203125e-06,
+          "force_max_abs": 7.271766662597656e-06,
+          "receipt_sha256": "109d338d7d2ea54e00f089113403a2a14f7da6966095c314d7a6c54fc7004741",
+          "median_ms_relative_percent": 1.7406391516290087,
+          "peak_MiB_relative_percent": 11.36012400173676
+        }
+      },
+      "float64": {
+        "A1": {
+          "revision": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+          "median_ms": 64.12517605349422,
+          "peak_MiB": 1674.068359375,
+          "native_EF_passed": true,
+          "energy_max_abs": 8.881784197001252e-15,
+          "force_max_abs": 9.769962616701378e-15,
+          "receipt_sha256": "cc1d49a431cecf01f5e2f659e99bc7be8bbc10c6f1f9d9b76a160fb27d478b30",
+          "median_ms_relative_percent": 0.16856483907468078,
+          "peak_MiB_relative_percent": 0.0
+        },
+        "B1": {
+          "revision": "f53ec5e88e34048050872e5c27625869d6901dbd",
+          "median_ms": 62.86450708284974,
+          "peak_MiB": 1440.7119140625,
+          "native_EF_passed": true,
+          "energy_max_abs": 7.993605777301127e-15,
+          "force_max_abs": 1.2212453270876722e-14,
+          "receipt_sha256": "17838e5c20ce08ae234a3430e09744283a2e6807de1a78ee53938324d9d9e86e",
+          "median_ms_relative_percent": -1.8006991738812594,
+          "peak_MiB_relative_percent": -13.9394812646493
+        },
+        "B2": {
+          "revision": "f53ec5e88e34048050872e5c27625869d6901dbd",
+          "median_ms": 63.90101392753422,
+          "peak_MiB": 1440.7119140625,
+          "native_EF_passed": true,
+          "energy_max_abs": 7.105427357601002e-15,
+          "force_max_abs": 1.509903313490213e-14,
+          "receipt_sha256": "06ae4b5f8f791d99548098b934b5b8a77ff57c26bf022e6786772d55e5ca4c8d",
+          "median_ms_relative_percent": -0.1815940194360044,
+          "peak_MiB_relative_percent": -13.9394812646493
+        },
+        "A2": {
+          "revision": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+          "median_ms": 63.90935485251248,
+          "peak_MiB": 1674.068359375,
+          "native_EF_passed": true,
+          "energy_max_abs": 1.0658141036401503e-14,
+          "force_max_abs": 9.992007221626409e-15,
+          "receipt_sha256": "963438b9483313adf0a3098c03c0cf53c45a59c0bf727113dfbed60f6a0fee4d",
+          "median_ms_relative_percent": -0.16856483907468078,
+          "peak_MiB_relative_percent": 0.0
+        },
+        "C": {
+          "revision": "882b187acd561b57af232279dd67700532e50c97",
+          "median_ms": 59.23830717802048,
+          "peak_MiB": 1467.5927734375,
+          "native_EF_passed": true,
+          "energy_max_abs": 2.4868995751603507e-14,
+          "force_max_abs": 1.1546319456101628e-14,
+          "receipt_sha256": "e1acb9ad360abfac652d64001acba6cb736b8b4fc8caff30909a6f0079fbe7c7",
+          "median_ms_relative_percent": -7.4651084221821655,
+          "peak_MiB_relative_percent": -12.333760732123622
+        },
+        "D": {
+          "revision": "882b187acd561b57af232279dd67700532e50c97",
+          "median_ms": 60.55542011745274,
+          "peak_MiB": 1938.48486328125,
+          "native_EF_passed": true,
+          "energy_max_abs": 1.4210854715202004e-14,
+          "force_max_abs": 1.5987211554602254e-14,
+          "receipt_sha256": "39d58b74ab2f17e4f4e880a8e18c4a9e0397c03d718fc9d7fa1f8812c1e0ea74",
+          "median_ms_relative_percent": -5.407674493831715,
+          "peak_MiB_relative_percent": 15.79484508057769
+        },
+        "E": {
+          "revision": "882b187acd561b57af232279dd67700532e50c97",
+          "median_ms": 63.32777696661651,
+          "peak_MiB": 1882.353515625,
+          "native_EF_passed": true,
+          "energy_max_abs": 8.881784197001252e-15,
+          "force_max_abs": 1.1546319456101628e-14,
+          "receipt_sha256": "2abf05f63bed2cec52b81a4b7b538b2d99c236cef20f333aa988f43528b3595a",
+          "median_ms_relative_percent": -1.0770352052806853,
+          "peak_MiB_relative_percent": 12.441854902971915
+        }
+      }
+    },
+    "production_cuda_retained_gradient_test": {
+      "revision": "4428e68",
+      "job": "6339555",
+      "test": "test/test_gemnet_ops.py::test_compiled_bilinear_force_inference_retains_gradients",
+      "precisions": [
+        "float32",
+        "float64"
+      ],
+      "passed": 2,
+      "method": "Independently compare two cotangents through retained compiled outputs with the native input and weight derivatives at each precision.",
+      "receipt_sha256": "3060be746eece71ce14494b575918d06a36ab526ffe4bf03a47ad59ed0a03359"
+    }
+  }
+}

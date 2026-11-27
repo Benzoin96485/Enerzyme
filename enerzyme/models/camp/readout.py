@@ -54,4 +54,4 @@ def _find_camp_core(built_layers: List[nn.Module]) -> nn.Module:
     for layer in reversed(built_layers):
         if getattr(layer, "is_camp_core", False):
             return layer
-    raise TypeError("CAMPEnergyReadout must follow a CAMPCore in the layer list")
+    raise TypeError("CAMPEnergyReadout must follow the CAMP preset in the layer list")

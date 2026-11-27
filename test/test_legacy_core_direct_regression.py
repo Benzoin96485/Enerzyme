@@ -38,13 +38,13 @@ def _smoke_features(n_atoms: int = 8, seed: int = 0, with_charge_spin: bool = Fa
 
 
 def test_physnet_core_direct_default_matches_explicit():
-    from enerzyme.models.physnet.core import PhysNetCore
+    from enerzyme.models.presets.scalar import physnet
 
     dim_embedding = 16
     num_rbf = 8
     num_blocks = 3
-    c_default = PhysNetCore(dim_embedding=dim_embedding, num_rbf=num_rbf, num_blocks=num_blocks).float()
-    c_direct = PhysNetCore(
+    c_default = physnet(dim_embedding=dim_embedding, num_rbf=num_rbf, num_blocks=num_blocks).float()
+    c_direct = physnet(
         dim_embedding=dim_embedding,
         num_rbf=num_rbf,
         num_blocks=num_blocks,
@@ -71,12 +71,12 @@ def test_physnet_core_direct_default_matches_explicit():
 
 
 def test_schnet_core_direct_default():
-    from enerzyme.models.schnet.core import SchNetCore
+    from enerzyme.models.presets.scalar import schnet
 
     hidden_channels = 32
     dim_embedding = 32
     num_rbf = 12
-    core = SchNetCore(
+    core = schnet(
         hidden_channels=hidden_channels,
         dim_embedding=dim_embedding,
         num_interactions=2,
@@ -104,11 +104,11 @@ def test_schnet_core_direct_default():
 
 
 def test_spookynet_core_direct_default():
-    from enerzyme.models.spookynet.core import SpookyNetCore
+    from enerzyme.models.presets.scalar import spookynet
 
     dim_embedding = 32
     num_rbf = 16
-    core = SpookyNetCore(
+    core = spookynet(
         dim_embedding=dim_embedding,
         num_rbf=num_rbf,
         num_modules=2,
@@ -152,10 +152,7 @@ def test_spookynet_core_direct_default():
 
 
 def test_mace_core_direct_default():
-    try:
-        from enerzyme.models.mace.core import MACECore
-    except Exception as e:
-        pytest.skip(f"MACECore not importable: {e}")
+    from enerzyme.models.presets.irreps import mace
 
     N = 8
     num_edges = 20
@@ -169,7 +166,7 @@ def test_mace_core_direct_default():
     Za = torch.randint(1, max_Za + 1, (N,), dtype=torch.long)
     atom_embedding = torch.randn(N, dim_embedding, dtype=torch.float32)
 
-    core = MACECore(
+    core = mace(
         max_Za=max_Za,
         max_ell=max_ell,
         dim_embedding=dim_embedding,
@@ -268,9 +265,9 @@ def test_spookynet_build_default_layers_forward_backward():
 
 def test_alphanet_core_emits_features_without_an_internal_head():
     """Energy and charge heads live in the layer stack, not on the Core."""
-    from enerzyme.models.alphanet.core import AlphaNetCore
+    from enerzyme.models.presets.cartesian_vector import alphanet
 
-    core = AlphaNetCore(
+    core = alphanet(
         dim_embedding=8,
         num_rbf=4,
         num_layers=1,

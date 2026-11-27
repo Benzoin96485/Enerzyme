@@ -7,7 +7,7 @@ from numpy.testing import assert_allclose
 
 
 def test_polynomial_switch_matches_deepmd_gate():
-    from enerzyme.models.cutoff import polynomial_transition
+    from enerzyme.models.mp.basis.envelope import polynomial_transition
 
     distance = torch.tensor([0.0, 4.0, 5.5, 6.0, 7.0])
     got = polynomial_transition(distance, 6.0, 5.0)
@@ -19,7 +19,7 @@ def test_polynomial_switch_matches_deepmd_gate():
 
 
 def test_exponential_switch_limits_and_gradient():
-    from enerzyme.models.cutoff import exponential_switch
+    from enerzyme.models.mp.basis.envelope import exponential_switch
 
     distance = torch.tensor([0.0, 5.3, 6.0], requires_grad=True)
     gate = exponential_switch(distance, 6.0, 5.3, decay=20.0)
@@ -31,7 +31,7 @@ def test_exponential_switch_limits_and_gradient():
 
 
 def test_silut_matches_value_and_first_derivative():
-    from enerzyme.models.activation import silut, silut_constants
+    from enerzyme.models.mp.nn.activation import silut, silut_constants
 
     threshold = 3.0
     slope, const = silut_constants(threshold)
@@ -97,7 +97,7 @@ def test_residual_combiners():
 
 
 def test_repflow_smooth_and_compression_shapes():
-    from enerzyme.models.activation import resolve_scalar_activation
+    from enerzyme.models.mp.nn.activation import resolve_scalar_activation
     from enerzyme.models.dpa3.interaction import RepFlowBlock
 
     torch.manual_seed(0)

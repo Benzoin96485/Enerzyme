@@ -15,6 +15,7 @@ import torch
 from torch import nn
 
 from enerzyme.models.ff import build_model
+from enerzyme.models.presets import available_architectures, default_params, get_architecture
 from enerzyme.models.spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 from enerzyme.tasks.trainer import _load_state_dict
 
@@ -287,3 +288,18 @@ def test_task_entrypoints_do_not_chain_module_type_dtype(relpath: str):
     # Module chain: .to(...).type(self.dtype) or .type(dtype)
     assert not re.search(r"\)\.type\(\s*self\.dtype\s*\)", text)
     assert not re.search(r"\)\.type\(\s*dtype\s*\)", text)
+
+
+
+@pytest.mark.parametrize("name", [n for n in available_architectures() if get_architecture(n).family != "wrapper"])
+def test_composable_preset_to_preserves_buffer_types(name):
+    if name == "xpainn":
+        pytest.importorskip("xequinet.nn.model")
+    params, layers = default_params(name)
+    model = build_model(name, layers, params, verbose=0)
+    original = {k: v.dtype for k, v in model.named_buffers()}
+    for precision in (torch.float64, torch.float32):
+        model.to(dtype=precision)
+        for key, value in model.named_buffers():
+            assert value.dtype == (precision if original[key].is_floating_point else original[key]), key
+        assert all(p.dtype == precision for p in model.parameters() if p.is_floating_point())

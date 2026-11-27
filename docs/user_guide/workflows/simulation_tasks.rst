@@ -71,3 +71,9 @@ Calculator integration
 ----------------------
 
 The trained model is wrapped as :code:`ASECalculator` (:code:`enerzyme/tasks/calculator.py`). Hybrid and UDD setups use :code:`external_calculator` and :code:`uncertainty_calculator` — see :doc:`/user_guide/workflows/enhanced_sampling_plumed`.
+
+For periodic simulations, store the cell and its three periodicity flags in the
+input structure (for example, extended XYZ). Under :code:`Simulation`, set
+:code:`neighbor_list: cutoff` and :code:`neighbor_list_cutoff` to the search
+radius used for training. The calculator rebuilds the periodic images from the
+current positions and cell at each evaluation.

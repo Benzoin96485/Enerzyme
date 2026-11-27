@@ -8,9 +8,12 @@ sys.path.extend(["..", "."])
 import numpy as np
 from numpy.testing import assert_allclose
 import torch
-from torch.nn import Sequential
-from enerzyme.models.spookynet import SpookyNetCore
+from enerzyme.models.layers import ChargeConservationLayer
+from enerzyme.models.mp.block import BlockState
+from enerzyme.models.mp.core import ComposableCore
+from enerzyme.models.mp.graph import GraphContext, GraphRequires
 from enerzyme.models.spookynet import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
+from enerzyme.models.spookynet.interaction import edge_orbitals
 
 
 dim_feature = DEFAULT_BUILD_PARAMS["dim_embedding"]
@@ -90,7 +93,7 @@ def initialize():
     })
     from enerzyme.models.ff import build_model
     from spookynet.spookynet import SpookyNet as F2
-    f1: SpookyNetCore = build_model(
+    f1: ComposableCore = build_model(
         "SpookyNet", 
         DEFAULT_LAYER_PARAMS, 
         DEFAULT_BUILD_PARAMS
@@ -104,13 +107,13 @@ def test_initialize():
 
 
 def test_cutoff_function():
-    from enerzyme.models.cutoff import bump_transition
+    from enerzyme.models.mp.basis.envelope import bump_transition
     from spookynet.functional import cutoff_function
     assert_tensor_allclose(bump_transition(D, 5), cutoff_function(D, 5))
 
 
 def test_shifted_softplus():
-    from enerzyme.models.activation import ShiftedSoftplus as F1
+    from enerzyme.models.mp.nn.activation import ShiftedSoftplus as F1
     from spookynet.modules.shifted_softplus import ShiftedSoftplus as F2
     f1 = F1(dim_feature, initial_alpha, initial_beta).type(dtype)
     f2 = F2(dim_feature, initial_alpha, initial_beta).type(dtype)
@@ -118,7 +121,7 @@ def test_shifted_softplus():
 
 
 def test_swish():
-    from enerzyme.models.activation import Swish as F1
+    from enerzyme.models.mp.nn.activation import Swish as F1
     from spookynet.modules.swish import Swish as F2
     f1 = F1(dim_feature, initial_alpha, initial_beta).type(dtype)
     f2 = F2(dim_feature, initial_alpha, initial_beta).type(dtype)
@@ -126,7 +129,7 @@ def test_swish():
 
 
 def test_residual_layer():
-    from enerzyme.models.blocks.mlp import ResidualLayer as F1
+    from enerzyme.models.mp.nn.mlp import ResidualLayer as F1
     from spookynet.modules.residual import Residual as F2
     f1 = F1(
         dim_feature_in=dim_feature, dim_feature_out=dim_feature, 
@@ -141,7 +144,7 @@ def test_residual_layer():
 
 
 def test_residual_stack():
-    from enerzyme.models.blocks.mlp import ResidualStack as F1
+    from enerzyme.models.mp.nn.mlp import ResidualStack as F1
     from spookynet.modules.residual_stack import ResidualStack as F2
     f1 = F1(
         dim_feature=dim_feature, num_residual=3, 
@@ -156,7 +159,7 @@ def test_residual_stack():
 
 
 def test_residual_mlp():
-    from enerzyme.models.blocks.mlp import ResidualMLP as F1
+    from enerzyme.models.mp.nn.mlp import ResidualMLP as F1
     from spookynet.modules.residual_mlp import ResidualMLP as F2
     f2 = F2(dim_feature, 3).type(dtype)
     f1 = F1(
@@ -287,7 +290,7 @@ def test_local_interaction():
 
 
 def test_attention():
-    from enerzyme.models.blocks.attention import Attention as F1
+    from enerzyme.models.mp.nn.attention import Attention as F1
     from spookynet.modules.attention import Attention as F2
     f2 = F2(dim_feature, dim_feature, dim_feature).type(dtype)
     f1 = F1(dim_feature, dim_feature).type(dtype)
@@ -339,10 +342,13 @@ def test_interaction_module():
     with torch.no_grad():
         f1.resblock.output.weight.copy_(f2.resblock.linear.weight)
         f1.resblock.output.bias.copy_(f2.resblock.linear.bias)
-    x1, y1 = f1(atom_embedding, rbf, pij, dij, idx_i, idx_j, 1, None)
-    x2, y2 = f2(atom_embedding, rbf, pij, dij, idx_i, idx_j, 1, None)
-    assert_tensor_allclose(x1, x2)
-    assert_tensor_allclose(y1, y2)
+    inputs = {"vij_sr": vij.type(dtype), "Dij_sr": D, "idx_i_sr": idx_i, "idx_j_sr": idx_j, "rbf": rbf}
+    ctx = GraphContext.from_inputs(inputs, GraphRequires(optional_cutoff_values=False), num_nodes=N, dtype=dtype)
+    state = f1(BlockState(scalar=atom_embedding), ctx)
+    pij_e, dij_e = edge_orbitals(ctx, use_irreps=True)
+    x2, y2 = f2(atom_embedding, rbf, pij_e, dij_e, idx_i, idx_j, 1, None)
+    assert_tensor_allclose(state.scalar, x2)
+    assert_tensor_allclose(state.aux["y"], y2)
 
 
 def test_zbl_repulsion_energy():
@@ -359,7 +365,7 @@ def test_zbl_repulsion_energy():
 
 
 def test_switch_function():
-    from enerzyme.models.cutoff import smooth_transition
+    from enerzyme.models.mp.basis.envelope import smooth_transition
     from spookynet.functional import switch_function
     assert_tensor_allclose(
         smooth_transition(D, 10, 1),
@@ -406,15 +412,24 @@ def test_calculate_distances():
     assert_tensor_allclose(vij1, vij2)
 
 
+def _pre_sequence_output(f1):
+    return f1.pre_sequence({"Ra": R, "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S})
+
+
+def _atomic_properties(f1):
+    output = _pre_sequence_output(f1)
+    out = f1.get_output(**output)
+    conservation = next(layer for layer in f1.post_sequence if isinstance(layer, ChargeConservationLayer))
+    return out["Ea"], conservation.get_output(Za, out["Qa"], Q)["Qa"]
+
+
 def test_atomic_properties_static():
     f1, f2 = initialize()
-    net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j}
-    output = f1.range_separation(f1.calculate_distance(net_input))
-    pij1, dij1, _, _ = f1._atomic_properties_static(output["Dij_sr"], output["vij_sr"])
+    pij1, dij1 = edge_orbitals(f1.context(_pre_sequence_output(f1)), f1.use_irreps)
     _, _, _, _, pij2, dij2, _, _, _ = f2._atomic_properties_static(Za, R, idx_i, idx_j)
     assert_tensor_allclose(pij1, pij2)
     assert_tensor_allclose(dij1, dij2)
-    
+
 
 def test_atomic_properties_dynamic():
     f1, f2 = initialize()
@@ -422,46 +437,15 @@ def test_atomic_properties_dynamic():
     _, ea2, qa2, _, _, _, _, _ = f2._atomic_properties_dynamic(
         N_, Q, S, Za, R, cutoff_values_, Dij_lr, idx_i, idx_j, Dij_sr, pij, dij, idx_i_sr, idx_j_sr
     )
-    net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S}
-    pre_layers = Sequential(
-        f1.calculate_distance, f1.range_separation, f1.atom_embedding, 
-        f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function,
-        f1.gather_embedding
-    )
-    output = pre_layers(net_input)
-    ea1, qa1 = f1._atomic_properties_dynamic(
-        output["atom_embedding"],
-        1,
-        output["rbf"],
-        pij, dij, output["idx_i_sr"], output["idx_j_sr"], None
-    )
-    qa1 = f1.charge_conservation.get_output(Za, qa1, Q)["Qa"]
+    ea1, qa1 = _atomic_properties(f1)
     assert_tensor_allclose(ea1, ea2)
     assert_tensor_allclose(qa1, qa2)
-    pass
 
 
 def test_atomic_properties():
     f1, f2 = initialize()
     _, ea2, qa2, _, _, _, _, _ = f2.atomic_properties(Za, Q, S, R, idx_i, idx_j)
-    net_input = {"Ra": R, "idx_i": idx_i, "idx_j": idx_j, "Za": Za, "Q": Q, "S": S}
-    pre_layers = Sequential(
-        f1.calculate_distance, f1.range_separation, f1.atom_embedding, 
-        f1.charge_embedding, f1.spin_embedding, f1.radial_basis_function,
-        f1.gather_embedding
-    )
-    output = pre_layers(net_input)
-    pij1, dij1, _, _ = f1._atomic_properties_static(
-        output["Dij_sr"],
-        output["vij_sr"],
-    )
-    ea1, qa1 = f1._atomic_properties_dynamic(
-        output["atom_embedding"],
-        1,
-        output["rbf"],
-        pij1, dij1, output["idx_i_sr"], output["idx_j_sr"], None
-    )
-    qa1 = f1.charge_conservation.get_output(Za, qa1, Q)["Qa"]
+    ea1, qa1 = _atomic_properties(f1)
     assert_tensor_allclose(ea1, ea2)
     assert_tensor_allclose(qa1, qa2)
 

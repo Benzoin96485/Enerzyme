@@ -1,6 +1,7 @@
 from typing import Dict, Set, List, Optional, Union
 from inspect import signature
 from abc import ABC, abstractmethod
+import torch
 from torch import Tensor
 from torch.nn import Module, Sequential
 from torch_geometric.data import Data
@@ -62,26 +63,41 @@ class BaseFFModule(ABC, Module):
     def get_relevant_input_fields(self, net_input_fields: Optional[Set[str]]=None) -> Set[str]:
         return self._input_fields
 
+    @torch.compiler.assume_constant_result
+    def _compiled_input_fields(self, keys, _layer_id):
+        # Freeze the first schema on the actual layer, outside Dynamo's guards
+        # on the initialization flag. id(self) guards this trace against reuse
+        # on another, still uninitialized instance of the same layer type.
+        if not self.adapted_relevant_fields:
+            self._get_relevant_input_fields(dict.fromkeys(keys).keys())
+        return tuple(self._input_fields)
+
     @abstractmethod
     def get_output(self, **relevant_input: Dict[str, Tensor]) -> Dict[str, Tensor]:
         ...
 
-    def _forward(self, net_input: Union[Dict[str, Tensor], Data]) -> Dict[str, Tensor]:
+    def _forward(self, net_input: Union[Dict[str, Tensor], Data], extra_inputs=None) -> Dict[str, Tensor]:
         relevant_input = dict()
-        if not self.adapted_relevant_fields:
-            self._get_relevant_input_fields(net_input.keys())
         relevant_input_fields = self._input_fields
+        if torch.compiler.is_compiling():
+            if type(self).get_relevant_input_fields is not BaseFFModule.get_relevant_input_fields:
+                relevant_input_fields = self._compiled_input_fields(tuple(net_input.keys()), id(self))
+        elif not self.adapted_relevant_fields:
+            self._get_relevant_input_fields(net_input.keys())
+            relevant_input_fields = self._input_fields
         if isinstance(net_input, Data):
             net_output = net_input
             for k in relevant_input_fields:
                 if k == "batch_seg":
                     relevant_input[k] = net_input["batch"]
                 else:
-                    relevant_input[k] = net_input.get(self._name_mapping[k], None)
+                    relevant_input[k] = net_input.get(self._name_mapping.get(k, k), None)
         else:
             net_output = net_input.copy()
             for k in relevant_input_fields:
-                relevant_input[k] = net_input.get(self._name_mapping[k], None)
+                relevant_input[k] = net_input.get(self._name_mapping.get(k, k), None)
+        if extra_inputs is not None:
+            relevant_input.update(extra_inputs)
         relevant_output = self.get_output(**relevant_input)
         for k in self._output_fields:
             new_k = self._name_mapping[k]
@@ -135,6 +151,64 @@ class BaseFFCore(BaseFFModule):
         self.test_mode = False
 
     def forward(self, net_input):
+        if torch.compiler.is_compiling():
+            from .compiled_grad import (
+                compiled_coordinate_vjp, compiling_fullgraph, forward_with_coordinate_gradients, retained_inference,
+                inductor_force_device, uses_cpu_inductor_forces, native_forces,
+                compiled_cpu_forces_with_options, cpu_inductor_options,
+            )
+
+            # A graph break inside a VJP discards the whole energy trace. In
+            # normal inference the ordinary stack can compile on both sides
+            # of a break and autograd can differentiate the compiled pieces.
+            native = (getattr(self, "_native_cpu_inductor_forces", False) if self.training else
+                      getattr(self, "_native_cpu_inductor_force_inference", False))
+            partitioned = getattr(self, "_partitioned_cpu_inductor_force_inference", None)
+            if not self.training and partitioned is not None and compiling_fullgraph():
+                native = partitioned
+            devices = ("cpu",)
+            norm_dtype = getattr(self, "_partitioned_norm_force_dtype", None)
+            if norm_dtype is not None and (self.training or compiling_fullgraph()):
+                # This model's norm uses FP32 even in a double-precision stack.
+                # Ordinary inference partitions the norm, training needs its
+                # native double backward through the full coordinate graph.
+                native, devices = norm_dtype, ("cpu", "cuda")
+            dtype = native if isinstance(native, torch.dtype) else None
+            device = (inductor_force_device(self, net_input, devices=devices, include_eval=not self.training, dtype=dtype)
+                      if native is True or dtype is not None else None)
+            if device is not None:
+                if dtype is not None:
+                    name = getattr(self, "architecture", type(self).__name__)
+                    message = (f"Fullgraph {dtype} {device.upper()} forces for {name} require native derivatives. "
+                               "Use ordinary torch.compile or fullgraph with backend='eager' or 'aot_eager'.")
+                else:
+                    message = ("Fullgraph CPU force training requires an eager backend for this model"
+                               if self.training else "Fullgraph CPU force inference requires an eager backend "
+                               "for reusable energy derivatives in this model")
+                torch._assert(not compiling_fullgraph(), message)
+                return native_forces(self, net_input)
+            option = getattr(self, "_cpu_force_training_option" if self.training
+                             else "_cpu_force_inference_option", None)
+            if option and uses_cpu_inductor_forces(self, net_input, include_eval=not self.training):
+                required = (option,) if isinstance(option, str) else option
+                overrides = cpu_inductor_options(required)
+                if compiling_fullgraph():
+                    for name, value in zip(required, overrides):
+                        torch._assert(value == 1, f"Fullgraph CPU forces for this preset require {name}=1")
+                elif all(value is None or value == 1 for value in overrides):
+                    return compiled_cpu_forces_with_options(self, net_input, required)
+                else:
+                    return native_forces(self, net_input)
+            if compiling_fullgraph():
+                return forward_with_coordinate_gradients(self, net_input)
+            if self.training:
+                return compiled_coordinate_vjp(self, net_input)
+            joint = (getattr(self, "_joint_cpu_force_inference", False)
+                     and uses_cpu_inductor_forces(self, net_input, include_eval=True))
+            return retained_inference(self, net_input, joint=joint)
+        return self._run_layers(net_input)
+
+    def _run_layers(self, net_input, *, prepared_topology=None):
         for layer in self.pre_sequence:
             if layer.test_only and not self.test_mode:
                 continue
@@ -142,7 +216,10 @@ class BaseFFCore(BaseFFModule):
                 continue
             else:
                 net_input = layer(net_input)
-        net_output = self._forward(net_input)
+        if prepared_topology is None:
+            net_output = self._forward(net_input)
+        else:
+            net_output = self._forward(net_input, extra_inputs={"_prepared_topology": prepared_topology})
         for layer in self.post_sequence:
             if layer.test_only and not self.test_mode:
                 continue
@@ -152,7 +229,7 @@ class BaseFFCore(BaseFFModule):
                 net_output = layer(net_output)
         return net_output
     
-    def adopt_radius_stack(self, built_layers: List[Module]) -> None:
+    def adopt_radius_stack(self, built_layers: List[Module], *, vectors: bool = True) -> None:
         """Place radius geometry, embeddings, and post-core heads around this Core.
 
         The Core inserts its own :class:`DistanceLayer` (``vij_lr``). A
@@ -165,7 +242,8 @@ class BaseFFCore(BaseFFModule):
         from .geometry import DistanceLayer, RangeSeparationLayer
 
         self.calculate_distance = DistanceLayer()
-        self.calculate_distance.with_vector_on("vij_lr")
+        if vectors:
+            self.calculate_distance.with_vector_on("vij_lr")
         self.calculate_distance.reset_field_name(Dij="Dij_lr")
         self.pre_sequence.append(self.calculate_distance)
         pre_core = True

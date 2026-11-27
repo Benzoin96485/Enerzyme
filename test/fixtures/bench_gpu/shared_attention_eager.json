@@ -1,0 +1,3603 @@
+{
+ "_meta": {
+  "job": "6317350",
+  "baseline_revision": "1aa0f8b",
+  "candidate_revision": "cb0bbb099d5358e533632c753034de2940c3d8aa",
+  "gpu": "Tesla V100-PCIE-32GB",
+  "gpu_uuid": "2c6a0c04-8630-be10-f0e0-b467c595f452",
+  "torch": "2.13.0+cu126",
+  "python": "3.13.5",
+  "initial_reps": 5,
+  "confirm_reps": 11,
+  "threads": 2,
+  "coordinate_seed": 11,
+  "system_set": "acceptance"
+ },
+ "method": {
+  "initial_baseline": "baseline_eager_float32.json and baseline_eager_float64.json",
+  "confirmation": "For each model and precision with a regression or incomplete cell against the historical baseline, measured baseline, candidate, candidate, baseline on the same physical GPU. Each recorded sample is a median of 11 repetitions. Each side's estimate is the median of its two samples.",
+  "gate": "Each of the two time and two peak-allocated-memory measurements per system passes at <=3% regression. Unavailable cells retain their execution status.",
+  "cpu": "Same pre-refactor checkpoint in candidate and pre-extraction revision 46c9fc4. Compared energy, force, coordinate derivative and all trainable parameters for the energy-plus-force squared loss. DPA4 additionally used a fixed nonzero output projection to exercise nonzero attention gradients."
+ },
+ "cuda_scatter": {
+  "passed": 5,
+  "failures": 1,
+  "errors": 0,
+  "skipped": 0
+ },
+ "cpu_attention_gradients": {
+  "et/float32": {
+   "parameter_gradients_compared": 102,
+   "max_abs_diff": 0.0,
+   "nonzero_attention_parameter_gradients": 36
+  },
+  "et/float64": {
+   "parameter_gradients_compared": 102,
+   "max_abs_diff": 0.0,
+   "nonzero_attention_parameter_gradients": 36
+  },
+  "mattersim/float32": {
+   "parameter_gradients_compared": 131,
+   "max_abs_diff": 0.0,
+   "nonzero_attention_parameter_gradients": 6
+  },
+  "mattersim/float64": {
+   "parameter_gradients_compared": 131,
+   "max_abs_diff": 0.0,
+   "nonzero_attention_parameter_gradients": 6
+  },
+  "dpa4/float32": {
+   "parameter_gradients_compared": 60,
+   "max_abs_diff": 0.0,
+   "nonzero_attention_parameter_gradients": 2
+  },
+  "dpa4/float64": {
+   "parameter_gradients_compared": 60,
+   "max_abs_diff": 0.0,
+   "nonzero_attention_parameter_gradients": 2
+  }
+ },
+ "measurements": {
+  "et/float32": {
+   "mol_batch_32x20/infer_ms": {
+    "initial": {
+     "baseline": 16.566064907237887,
+     "candidate": 16.44301787018776,
+     "percent": -0.742765634078657,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 16.27338444814086,
+     "candidate": 16.414182959124446,
+     "percent": 0.8652073048005082,
+     "status": "pass",
+     "baseline_samples": [
+      16.274225898087025,
+      16.272542998194695
+     ],
+     "candidate_samples": [
+      16.406487906351686,
+      16.421878011897206
+     ]
+    }
+   },
+   "mol_batch_32x20/train_ms": {
+    "initial": {
+     "baseline": 51.58486682921648,
+     "candidate": 51.09305400401354,
+     "percent": -0.9534052435013596,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 51.12035304773599,
+     "candidate": 51.473023486323655,
+     "percent": 0.6898826349230003,
+     "status": "pass",
+     "baseline_samples": [
+      51.14153795875609,
+      51.09916813671589
+     ],
+     "candidate_samples": [
+      51.432932959869504,
+      51.513114012777805
+     ]
+    }
+   },
+   "mol_batch_32x20/infer_peak_mb": {
+    "initial": {
+     "baseline": 907.71728515625,
+     "candidate": 782.68505859375,
+     "percent": -13.774357788171631,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 907.71728515625,
+     "candidate": 782.68505859375,
+     "percent": -13.774357788171631,
+     "status": "pass",
+     "baseline_samples": [
+      907.71728515625,
+      907.71728515625
+     ],
+     "candidate_samples": [
+      782.68505859375,
+      782.68505859375
+     ]
+    }
+   },
+   "mol_batch_32x20/train_peak_mb": {
+    "initial": {
+     "baseline": 2054.265625,
+     "candidate": 1935.2216796875,
+     "percent": -5.7949636046945034,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 2054.265625,
+     "candidate": 1935.2216796875,
+     "percent": -5.7949636046945034,
+     "status": "pass",
+     "baseline_samples": [
+      2054.265625,
+      2054.265625
+     ],
+     "candidate_samples": [
+      1935.2216796875,
+      1935.2216796875
+     ]
+    }
+   },
+   "bulk_256/infer_ms": {
+    "initial": {
+     "baseline": 14.81622108258307,
+     "candidate": 15.26161190122366,
+     "percent": 3.006102677316025,
+     "status": "regression"
+    },
+    "abba": {
+     "baseline": 15.883374959230423,
+     "candidate": 16.836744616739452,
+     "percent": 6.00231159911635,
+     "status": "regression",
+     "baseline_samples": [
+      15.817433828487992,
+      15.949316089972854
+     ],
+     "candidate_samples": [
+      16.826212173327804,
+      16.8472770601511
+     ]
+    }
+   },
+   "bulk_256/train_ms": {
+    "initial": {
+     "baseline": 44.27193198353052,
+     "candidate": 43.89974707737565,
+     "percent": -0.8406791605420016,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 43.722190079279244,
+     "candidate": 44.90983043797314,
+     "percent": 2.71633318582718,
+     "status": "pass",
+     "baseline_samples": [
+      43.68241713382304,
+      43.76196302473545
+     ],
+     "candidate_samples": [
+      44.859967892989516,
+      44.95969298295677
+     ]
+    }
+   },
+   "bulk_256/infer_peak_mb": {
+    "initial": {
+     "baseline": 681.87353515625,
+     "candidate": 594.35302734375,
+     "percent": -12.835299113411825,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 681.87353515625,
+     "candidate": 594.35302734375,
+     "percent": -12.835299113411825,
+     "status": "pass",
+     "baseline_samples": [
+      681.87353515625,
+      681.87353515625
+     ],
+     "candidate_samples": [
+      594.35302734375,
+      594.35302734375
+     ]
+    }
+   },
+   "bulk_256/train_peak_mb": {
+    "initial": {
+     "baseline": 1543.7900390625,
+     "candidate": 1457.26953125,
+     "percent": -5.6044219500885895,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 1543.7900390625,
+     "candidate": 1457.26953125,
+     "percent": -5.6044219500885895,
+     "status": "pass",
+     "baseline_samples": [
+      1543.7900390625,
+      1543.7900390625
+     ],
+     "candidate_samples": [
+      1457.26953125,
+      1457.26953125
+     ]
+    }
+   },
+   "large_2000/infer_ms": {
+    "initial": {
+     "baseline": 55.89073896408081,
+     "candidate": 55.12157012708485,
+     "percent": -1.3762008720090146,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 55.23732991423458,
+     "candidate": 55.18101796042174,
+     "percent": -0.10194546677088079,
+     "status": "pass",
+     "baseline_samples": [
+      55.1927899941802,
+      55.281869834288955
+     ],
+     "candidate_samples": [
+      55.169295985251665,
+      55.19273993559182
+     ]
+    }
+   },
+   "large_2000/train_ms": {
+    "initial": {
+     "baseline": 183.92359698191285,
+     "candidate": 183.75712097622454,
+     "percent": -0.09051367438441815,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 183.79137804731727,
+     "candidate": 184.432752430439,
+     "percent": 0.3489687002382613,
+     "status": "pass",
+     "baseline_samples": [
+      183.76940302550793,
+      183.8133530691266
+     ],
+     "candidate_samples": [
+      184.60676702670753,
+      184.25873783417046
+     ]
+    }
+   },
+   "large_2000/infer_peak_mb": {
+    "initial": {
+     "baseline": 4373.447265625,
+     "candidate": 3798.3369140625,
+     "percent": -13.150046556702044,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 4373.447265625,
+     "candidate": 3798.3369140625,
+     "percent": -13.150046556702044,
+     "status": "pass",
+     "baseline_samples": [
+      4373.447265625,
+      4373.447265625
+     ],
+     "candidate_samples": [
+      3798.3369140625,
+      3798.3369140625
+     ]
+    }
+   },
+   "large_2000/train_peak_mb": {
+    "initial": {
+     "baseline": 10046.5712890625,
+     "candidate": 9482.0751953125,
+     "percent": -5.618793491910578,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 10046.5712890625,
+     "candidate": 9482.0751953125,
+     "percent": -5.618793491910578,
+     "status": "pass",
+     "baseline_samples": [
+      10046.5712890625,
+      10046.5712890625
+     ],
+     "candidate_samples": [
+      9482.0751953125,
+      9482.0751953125
+     ]
+    }
+   }
+  },
+  "et/float64": {
+   "mol_batch_32x20/infer_ms": {
+    "initial": {
+     "baseline": 25.0206938944757,
+     "candidate": 23.8070220220834,
+     "percent": -4.850672317526183,
+     "status": "pass"
+    }
+   },
+   "mol_batch_32x20/train_ms": {
+    "initial": {
+     "baseline": 89.65764497406781,
+     "candidate": 89.15170608088374,
+     "percent": -0.5643008951778716,
+     "status": "pass"
+    }
+   },
+   "mol_batch_32x20/infer_peak_mb": {
+    "initial": {
+     "baseline": 1719.845703125,
+     "candidate": 1499.33984375,
+     "percent": -12.821258266037216,
+     "status": "pass"
+    }
+   },
+   "mol_batch_32x20/train_peak_mb": {
+    "initial": {
+     "baseline": 3920.1142578125,
+     "candidate": 3702.7373046875,
+     "percent": -5.545168809602519,
+     "status": "pass"
+    }
+   },
+   "bulk_256/infer_ms": {
+    "initial": {
+     "baseline": 20.562230842188,
+     "candidate": 19.87176900729537,
+     "percent": -3.357913060075146,
+     "status": "pass"
+    }
+   },
+   "bulk_256/train_ms": {
+    "initial": {
+     "baseline": 74.18603589758277,
+     "candidate": 73.23278998956084,
+     "percent": -1.2849398090739483,
+     "status": "pass"
+    }
+   },
+   "bulk_256/infer_peak_mb": {
+    "initial": {
+     "baseline": 1345.4990234375,
+     "candidate": 1170.51318359375,
+     "percent": -13.005274384866794,
+     "status": "pass"
+    }
+   },
+   "bulk_256/train_peak_mb": {
+    "initial": {
+     "baseline": 3069.9921875,
+     "candidate": 2896.69384765625,
+     "percent": -5.644911428418742,
+     "status": "pass"
+    }
+   },
+   "large_2000/infer_ms": {
+    "initial": {
+     "baseline": 93.04827591404319,
+     "candidate": 91.7331650853157,
+     "percent": -1.4133639939146958,
+     "status": "pass"
+    }
+   },
+   "large_2000/train_ms": {
+    "initial": {
+     "baseline": 335.3202461730689,
+     "candidate": 333.05404405109584,
+     "percent": -0.6758321776977883,
+     "status": "pass"
+    }
+   },
+   "large_2000/infer_peak_mb": {
+    "initial": {
+     "baseline": 8733.681640625,
+     "candidate": 7584.70751953125,
+     "percent": -13.155667545165151,
+     "status": "pass"
+    }
+   },
+   "large_2000/train_peak_mb": {
+    "initial": {
+     "baseline": 20099.57177734375,
+     "candidate": 18964.716796875,
+     "percent": -5.646164968290313,
+     "status": "pass"
+    }
+   }
+  },
+  "mattersim/float32": {
+   "mol_batch_32x20/infer_ms": {
+    "initial": {
+     "baseline": 19.268854055553675,
+     "candidate": 19.50576505623758,
+     "percent": 1.2295022838455738,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 18.649973557330668,
+     "candidate": 19.260023022070527,
+     "percent": 3.271047344193523,
+     "status": "regression",
+     "baseline_samples": [
+      18.803277052938938,
+      18.496670061722398
+     ],
+     "candidate_samples": [
+      19.135782029479742,
+      19.384264014661312
+     ]
+    }
+   },
+   "mol_batch_32x20/train_ms": {
+    "initial": {
+     "baseline": 58.95505100488663,
+     "candidate": 59.57197188399732,
+     "percent": 1.0464258254302194,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 56.49371258914471,
+     "candidate": 58.837848948314786,
+     "percent": 4.149375659231325,
+     "status": "regression",
+     "baseline_samples": [
+      57.18205706216395,
+      55.805368116125464
+     ],
+     "candidate_samples": [
+      57.99745791591704,
+      59.67823998071253
+     ]
+    }
+   },
+   "mol_batch_32x20/infer_peak_mb": {
+    "initial": {
+     "baseline": 306.3984375,
+     "candidate": 306.3984375,
+     "percent": 0.0,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 306.3984375,
+     "candidate": 306.3984375,
+     "percent": 0.0,
+     "status": "pass",
+     "baseline_samples": [
+      306.3984375,
+      306.3984375
+     ],
+     "candidate_samples": [
+      306.3984375,
+      306.3984375
+     ]
+    }
+   },
+   "mol_batch_32x20/train_peak_mb": {
+    "initial": {
+     "baseline": 820.8447265625,
+     "candidate": 821.123046875,
+     "percent": 0.03390657252140272,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 820.8447265625,
+     "candidate": 821.123046875,
+     "percent": 0.03390657252140272,
+     "status": "pass",
+     "baseline_samples": [
+      820.8447265625,
+      820.8447265625
+     ],
+     "candidate_samples": [
+      821.123046875,
+      821.123046875
+     ]
+    }
+   },
+   "bulk_256/infer_ms": {
+    "initial": {
+     "baseline": 19.337577046826482,
+     "candidate": 21.720523945987225,
+     "percent": 12.322882506895105,
+     "status": "regression"
+    },
+    "abba": {
+     "baseline": 18.91050150152296,
+     "candidate": 19.538439577445388,
+     "percent": 3.3205786524056924,
+     "status": "regression",
+     "baseline_samples": [
+      19.08457209356129,
+      18.736430909484625
+     ],
+     "candidate_samples": [
+      19.43592308089137,
+      19.640956073999405
+     ]
+    }
+   },
+   "bulk_256/train_ms": {
+    "initial": {
+     "baseline": 59.04884496703744,
+     "candidate": 57.63679789379239,
+     "percent": -2.391320395908314,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 55.69494888186455,
+     "candidate": 58.90558264218271,
+     "percent": 5.764676734201313,
+     "status": "regression",
+     "baseline_samples": [
+      56.23606685549021,
+      55.15383090823889
+     ],
+     "candidate_samples": [
+      59.048883151263,
+      58.76228213310242
+     ]
+    }
+   },
+   "bulk_256/infer_peak_mb": {
+    "initial": {
+     "baseline": 270.6875,
+     "candidate": 270.6875,
+     "percent": 0.0,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 270.6875,
+     "candidate": 270.6875,
+     "percent": 0.0,
+     "status": "pass",
+     "baseline_samples": [
+      270.6875,
+      270.6875
+     ],
+     "candidate_samples": [
+      270.6875,
+      270.6875
+     ]
+    }
+   },
+   "bulk_256/train_peak_mb": {
+    "initial": {
+     "baseline": 711.8017578125,
+     "candidate": 711.8017578125,
+     "percent": 0.0,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 711.8017578125,
+     "candidate": 711.8017578125,
+     "percent": 0.0,
+     "status": "pass",
+     "baseline_samples": [
+      711.8017578125,
+      711.8017578125
+     ],
+     "candidate_samples": [
+      711.8017578125,
+      711.8017578125
+     ]
+    }
+   },
+   "large_2000/infer_ms": {
+    "initial": {
+     "baseline": 40.460434975102544,
+     "candidate": 39.606727892532945,
+     "percent": -2.109979991799227,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 40.221862494945526,
+     "candidate": 39.43208954297006,
+     "percent": -1.9635414746761448,
+     "status": "pass",
+     "baseline_samples": [
+      40.49393115565181,
+      39.949793834239244
+     ],
+     "candidate_samples": [
+      39.41492713056505,
+      39.449251955375075
+     ]
+    }
+   },
+   "large_2000/train_ms": {
+    "initial": {
+     "baseline": 117.66757094301283,
+     "candidate": 116.31866497918963,
+     "percent": -1.1463701961490158,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 116.62536964286119,
+     "candidate": 116.089022369124,
+     "percent": -0.45988902361435713,
+     "status": "pass",
+     "baseline_samples": [
+      116.77624215371907,
+      116.47449713200331
+     ],
+     "candidate_samples": [
+      116.01535184308887,
+      116.16269289515913
+     ]
+    }
+   },
+   "large_2000/infer_peak_mb": {
+    "initial": {
+     "baseline": 1639.30615234375,
+     "candidate": 1639.30615234375,
+     "percent": 0.0,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 1639.30615234375,
+     "candidate": 1639.30615234375,
+     "percent": 0.0,
+     "status": "pass",
+     "baseline_samples": [
+      1639.30615234375,
+      1639.30615234375
+     ],
+     "candidate_samples": [
+      1639.30615234375,
+      1639.30615234375
+     ]
+    }
+   },
+   "large_2000/train_peak_mb": {
+    "initial": {
+     "baseline": 4468.24169921875,
+     "candidate": 4467.99755859375,
+     "percent": -0.005463908208969137,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 4468.24169921875,
+     "candidate": 4467.99755859375,
+     "percent": -0.005463908208969137,
+     "status": "pass",
+     "baseline_samples": [
+      4468.24169921875,
+      4468.24169921875
+     ],
+     "candidate_samples": [
+      4467.99755859375,
+      4467.99755859375
+     ]
+    }
+   }
+  },
+  "mattersim/float64": {
+   "mol_batch_32x20/infer_ms": {
+    "initial": {
+     "baseline": 19.683366874232888,
+     "candidate": 18.872419139370322,
+     "percent": -4.11996453677933,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 19.948306609876454,
+     "candidate": 19.351436523720622,
+     "percent": -2.9920839789996045,
+     "status": "pass",
+     "baseline_samples": [
+      19.96685820631683,
+      19.92975501343608
+     ],
+     "candidate_samples": [
+      19.015782047063112,
+      19.687091000378132
+     ]
+    }
+   },
+   "mol_batch_32x20/train_ms": {
+    "initial": {
+     "baseline": 60.86632702499628,
+     "candidate": 60.07373007014394,
+     "percent": -1.302192843880401,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 61.46572204306722,
+     "candidate": 59.887937968596816,
+     "percent": -2.566933279275385,
+     "status": "pass",
+     "baseline_samples": [
+      61.34354812093079,
+      61.58789596520364
+     ],
+     "candidate_samples": [
+      59.68394596129656,
+      60.091929975897074
+     ]
+    }
+   },
+   "mol_batch_32x20/infer_peak_mb": {
+    "initial": {
+     "baseline": 593.04345703125,
+     "candidate": 593.04345703125,
+     "percent": 0.0,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 593.04345703125,
+     "candidate": 593.04345703125,
+     "percent": 0.0,
+     "status": "pass",
+     "baseline_samples": [
+      593.04345703125,
+      593.04345703125
+     ],
+     "candidate_samples": [
+      593.04345703125,
+      593.04345703125
+     ]
+    }
+   },
+   "mol_batch_32x20/train_peak_mb": {
+    "initial": {
+     "baseline": 1627.69091796875,
+     "candidate": 1627.69091796875,
+     "percent": 0.0,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 1627.69091796875,
+     "candidate": 1627.69091796875,
+     "percent": 0.0,
+     "status": "pass",
+     "baseline_samples": [
+      1627.69091796875,
+      1627.69091796875
+     ],
+     "candidate_samples": [
+      1627.69091796875,
+      1627.69091796875
+     ]
+    }
+   },
+   "bulk_256/infer_ms": {
+    "initial": {
+     "baseline": 19.045721041038632,
+     "candidate": 21.639157785102725,
+     "percent": 13.616899767018031,
+     "status": "regression"
+    },
+    "abba": {
+     "baseline": 20.63850301783532,
+     "candidate": 20.25517704896629,
+     "percent": -1.857334170689462,
+     "status": "pass",
+     "baseline_samples": [
+      19.685704028233886,
+      21.591302007436752
+     ],
+     "candidate_samples": [
+      19.149736035615206,
+      21.36061806231737
+     ]
+    }
+   },
+   "bulk_256/train_ms": {
+    "initial": {
+     "baseline": 57.643254986032844,
+     "candidate": 58.016769122332335,
+     "percent": 0.6479754420356532,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 58.56910045258701,
+     "candidate": 57.27169499732554,
+     "percent": -2.215170534011779,
+     "status": "pass",
+     "baseline_samples": [
+      58.006936917081475,
+      59.13126398809254
+     ],
+     "candidate_samples": [
+      56.44577299244702,
+      58.09761700220406
+     ]
+    }
+   },
+   "bulk_256/infer_peak_mb": {
+    "initial": {
+     "baseline": 528.90576171875,
+     "candidate": 529.40185546875,
+     "percent": 0.09379624611913773,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 528.90576171875,
+     "candidate": 529.40185546875,
+     "percent": 0.09379624611913773,
+     "status": "pass",
+     "baseline_samples": [
+      528.90576171875,
+      528.90576171875
+     ],
+     "candidate_samples": [
+      529.40185546875,
+      529.40185546875
+     ]
+    }
+   },
+   "bulk_256/train_peak_mb": {
+    "initial": {
+     "baseline": 1400.59326171875,
+     "candidate": 1401.57763671875,
+     "percent": 0.07028271711031486,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 1400.59326171875,
+     "candidate": 1401.57763671875,
+     "percent": 0.07028271711031486,
+     "status": "pass",
+     "baseline_samples": [
+      1400.59326171875,
+      1400.59326171875
+     ],
+     "candidate_samples": [
+      1401.57763671875,
+      1401.57763671875
+     ]
+    }
+   },
+   "large_2000/infer_ms": {
+    "initial": {
+     "baseline": 56.60877004265785,
+     "candidate": 55.7601610198617,
+     "percent": -1.4990769489545142,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 56.66143901180476,
+     "candidate": 55.710808490403,
+     "percent": -1.6777380489819693,
+     "status": "pass",
+     "baseline_samples": [
+      56.28433986566961,
+      57.03853815793991
+     ],
+     "candidate_samples": [
+      55.62861100770533,
+      55.79300597310066
+     ]
+    }
+   },
+   "large_2000/train_ms": {
+    "initial": {
+     "baseline": 253.26339015737176,
+     "candidate": 253.14511614851654,
+     "percent": -0.0467000022315589,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 252.72726744879037,
+     "candidate": 251.84224802069366,
+     "percent": -0.3501875508055474,
+     "status": "pass",
+     "baseline_samples": [
+      252.56059598177671,
+      252.89393891580403
+     ],
+     "candidate_samples": [
+      251.76843907684088,
+      251.91605696454644
+     ]
+    }
+   },
+   "large_2000/infer_peak_mb": {
+    "initial": {
+     "baseline": 3247.46044921875,
+     "candidate": 3247.3759765625,
+     "percent": -0.002601191225293231,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 3247.46044921875,
+     "candidate": 3247.3759765625,
+     "percent": -0.002601191225293231,
+     "status": "pass",
+     "baseline_samples": [
+      3247.46044921875,
+      3247.46044921875
+     ],
+     "candidate_samples": [
+      3247.3759765625,
+      3247.3759765625
+     ]
+    }
+   },
+   "large_2000/train_peak_mb": {
+    "initial": {
+     "baseline": 8907.595703125,
+     "candidate": 8907.5234375,
+     "percent": -0.0008112809270710564,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 8907.595703125,
+     "candidate": 8907.5234375,
+     "percent": -0.0008112809270710564,
+     "status": "pass",
+     "baseline_samples": [
+      8907.595703125,
+      8907.595703125
+     ],
+     "candidate_samples": [
+      8907.5234375,
+      8907.5234375
+     ]
+    }
+   }
+  },
+  "dpa4/float32": {
+   "mol_batch_32x20/infer_ms": {
+    "initial": {
+     "baseline": 34.72342691384256,
+     "candidate": 35.717166028916836,
+     "percent": 2.861869358516911,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 34.599085920490324,
+     "candidate": 34.092789865098894,
+     "percent": -1.4633220558338267,
+     "status": "pass",
+     "baseline_samples": [
+      34.34482286684215,
+      34.8533489741385
+     ],
+     "candidate_samples": [
+      34.04810791835189,
+      34.1374718118459
+     ]
+    }
+   },
+   "mol_batch_32x20/train_ms": {
+    "initial": {
+     "baseline": 98.58512599021196,
+     "candidate": 102.00663702562451,
+     "percent": 3.4706158774420626,
+     "status": "regression"
+    },
+    "abba": {
+     "baseline": 97.13660005945712,
+     "candidate": 97.53875387832522,
+     "percent": 0.41400853913142743,
+     "status": "pass",
+     "baseline_samples": [
+      96.59149800427258,
+      97.68170211464167
+     ],
+     "candidate_samples": [
+      97.62075496837497,
+      97.45675278827548
+     ]
+    }
+   },
+   "mol_batch_32x20/infer_peak_mb": {
+    "initial": {
+     "baseline": 1038.9775390625,
+     "candidate": 1009.75439453125,
+     "percent": -2.812682991936366,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 1038.9775390625,
+     "candidate": 1009.75439453125,
+     "percent": -2.812682991936366,
+     "status": "pass",
+     "baseline_samples": [
+      1038.9775390625,
+      1038.9775390625
+     ],
+     "candidate_samples": [
+      1009.75439453125,
+      1009.75439453125
+     ]
+    }
+   },
+   "mol_batch_32x20/train_peak_mb": {
+    "initial": {
+     "baseline": 1791.16845703125,
+     "candidate": 1763.58837890625,
+     "percent": -1.5397813654396408,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 1791.16845703125,
+     "candidate": 1763.58837890625,
+     "percent": -1.5397813654396408,
+     "status": "pass",
+     "baseline_samples": [
+      1791.16845703125,
+      1791.16845703125
+     ],
+     "candidate_samples": [
+      1763.58837890625,
+      1763.58837890625
+     ]
+    }
+   },
+   "bulk_256/infer_ms": {
+    "initial": {
+     "baseline": 34.64528499171138,
+     "candidate": 38.512240862473845,
+     "percent": 11.161564616044028,
+     "status": "regression"
+    },
+    "abba": {
+     "baseline": 34.50622851960361,
+     "candidate": 34.308728063479066,
+     "percent": -0.5723617578557993,
+     "status": "pass",
+     "baseline_samples": [
+      34.211534075438976,
+      34.800922963768244
+     ],
+     "candidate_samples": [
+      34.37415207736194,
+      34.24330404959619
+     ]
+    }
+   },
+   "bulk_256/train_ms": {
+    "initial": {
+     "baseline": 97.81688312068582,
+     "candidate": 100.35046422854066,
+     "percent": 2.5901265988294897,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 96.76138253416866,
+     "candidate": 95.87257646489888,
+     "percent": -0.9185545369361781,
+     "status": "pass",
+     "baseline_samples": [
+      96.26902895979583,
+      97.25373610854149
+     ],
+     "candidate_samples": [
+      96.42813308164477,
+      95.317019848153
+     ]
+    }
+   },
+   "bulk_256/infer_peak_mb": {
+    "initial": {
+     "baseline": 900.3447265625,
+     "candidate": 871.82275390625,
+     "percent": -3.1678946757589643,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 900.3447265625,
+     "candidate": 871.82275390625,
+     "percent": -3.1678946757589643,
+     "status": "pass",
+     "baseline_samples": [
+      900.3447265625,
+      900.3447265625
+     ],
+     "candidate_samples": [
+      871.82275390625,
+      871.82275390625
+     ]
+    }
+   },
+   "bulk_256/train_peak_mb": {
+    "initial": {
+     "baseline": 1623.60546875,
+     "candidate": 1592.32666015625,
+     "percent": -1.9265030326506172,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 1623.60546875,
+     "candidate": 1592.32666015625,
+     "percent": -1.9265030326506172,
+     "status": "pass",
+     "baseline_samples": [
+      1623.60546875,
+      1623.60546875
+     ],
+     "candidate_samples": [
+      1592.32666015625,
+      1592.32666015625
+     ]
+    }
+   },
+   "large_2000/infer_ms": {
+    "initial": {
+     "baseline": 124.43105317652225,
+     "candidate": 122.8698322083801,
+     "percent": -1.2546875786121903,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 124.79939649347216,
+     "candidate": 122.87607905454934,
+     "percent": -1.5411271952933125,
+     "status": "pass",
+     "baseline_samples": [
+      124.39477606676519,
+      125.20401692017913
+     ],
+     "candidate_samples": [
+      122.72712402045727,
+      123.0250340886414
+     ]
+    }
+   },
+   "large_2000/train_ms": {
+    "initial": {
+     "baseline": 389.14665300399065,
+     "candidate": 388.1864030845463,
+     "percent": -0.24675785132205474,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 389.6812974708155,
+     "candidate": 387.7119910903275,
+     "percent": -0.5053633297952831,
+     "status": "pass",
+     "baseline_samples": [
+      389.64391802437603,
+      389.7186769172549
+     ],
+     "candidate_samples": [
+      387.9466431681067,
+      387.4773390125483
+     ]
+    }
+   },
+   "large_2000/infer_peak_mb": {
+    "initial": {
+     "baseline": 5765.1416015625,
+     "candidate": 5580.314453125,
+     "percent": -3.20594291018641,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 5765.1416015625,
+     "candidate": 5580.314453125,
+     "percent": -3.20594291018641,
+     "status": "pass",
+     "baseline_samples": [
+      5765.1416015625,
+      5765.1416015625
+     ],
+     "candidate_samples": [
+      5580.314453125,
+      5580.314453125
+     ]
+    }
+   },
+   "large_2000/train_peak_mb": {
+    "initial": {
+     "baseline": 10279.4951171875,
+     "candidate": 10099.67138671875,
+     "percent": -1.7493439942208977,
+     "status": "pass"
+    },
+    "abba": {
+     "baseline": 10279.4951171875,
+     "candidate": 10099.67138671875,
+     "percent": -1.7493439942208977,
+     "status": "pass",
+     "baseline_samples": [
+      10279.4951171875,
+      10279.4951171875
+     ],
+     "candidate_samples": [
+      10099.67138671875,
+      10099.67138671875
+     ]
+    }
+   }
+  },
+  "dpa4/float64": {
+   "mol_batch_32x20/infer_ms": {
+    "initial": {
+     "baseline": 45.33776082098484,
+     "candidate": 41.74907482229173,
+     "percent": -7.915446051389607,
+     "status": "pass"
+    }
+   },
+   "mol_batch_32x20/train_ms": {
+    "initial": {
+     "baseline": 137.41642306558788,
+     "candidate": 134.73923597484827,
+     "percent": -1.948229353533537,
+     "status": "pass"
+    }
+   },
+   "mol_batch_32x20/infer_peak_mb": {
+    "initial": {
+     "baseline": 2033.44970703125,
+     "candidate": 1983.9384765625,
+     "percent": -2.4348391945741454,
+     "status": "pass"
+    }
+   },
+   "mol_batch_32x20/train_peak_mb": {
+    "initial": {
+     "baseline": 3509.525390625,
+     "candidate": 3456.18701171875,
+     "percent": -1.519817438811899,
+     "status": "pass"
+    }
+   },
+   "bulk_256/infer_ms": {
+    "initial": {
+     "baseline": 47.656364971771836,
+     "candidate": 44.69911893829703,
+     "percent": -6.2053537554248255,
+     "status": "pass"
+    }
+   },
+   "bulk_256/train_ms": {
+    "initial": {
+     "baseline": 141.556812915951,
+     "candidate": 137.55760993808508,
+     "percent": -2.825157543099288,
+     "status": "pass"
+    }
+   },
+   "bulk_256/infer_peak_mb": {
+    "initial": {
+     "baseline": 1756.73193359375,
+     "candidate": 1700.74658203125,
+     "percent": -3.186903504848948,
+     "status": "pass"
+    }
+   },
+   "bulk_256/train_peak_mb": {
+    "initial": {
+     "baseline": 3175.7919921875,
+     "candidate": 3120.08544921875,
+     "percent": -1.7540992327516713,
+     "status": "pass"
+    }
+   },
+   "large_2000/infer_ms": {
+    "initial": {
+     "baseline": 222.91830484755337,
+     "candidate": 220.3543351497501,
+     "percent": -1.1501835614426859,
+     "status": "pass"
+    }
+   },
+   "large_2000/train_ms": {
+    "initial": {
+     "baseline": 703.2099331263453,
+     "candidate": 699.1171170957386,
+     "percent": -0.5820190867342756,
+     "status": "pass"
+    }
+   },
+   "large_2000/infer_peak_mb": {
+    "initial": {
+     "baseline": 11447.27490234375,
+     "candidate": 11072.642578125,
+     "percent": -3.2726769245495,
+     "status": "pass"
+    }
+   },
+   "large_2000/train_peak_mb": {
+    "initial": {
+     "baseline": 20390.0693359375,
+     "candidate": 20030.4638671875,
+     "percent": -1.7636304360976074,
+     "status": "pass"
+    }
+   }
+  }
+ },
+ "followup": {
+  "metadata": {
+   "job": "6317603",
+   "baseline_revision": "1aa0f8b",
+   "candidate_revision": "ca4e60484d548215ef655411bdd9e3c9d2d43f2e",
+   "gpu": "Tesla V100-PCIE-32GB",
+   "gpu_uuid": "590cd023-ff31-c1a2-8267-e0afba042725",
+   "torch": "2.13.0+cu126",
+   "confirm_reps": 11,
+   "threads": 2,
+   "coordinate_seed": 11
+  },
+  "cuda_scatter": {
+   "counts": {
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+   },
+   "passed": 6,
+   "method": "The original bitwise CUDA reference failed on duplicate-destination floating-point atomics. Compare production and torch_scatter against a float64 reference with the per-destination floating-point addition error bound."
+  },
+  "confirmation": {
+   "et/float32": {
+    "mol_batch_32x20/infer_ms": {
+     "baseline": 16.813178081065416,
+     "candidate": 16.31199347320944,
+     "status": "pass",
+     "percent": -2.980903464172535,
+     "raw": [
+      [
+       17.090464010834694,
+       16.53589215129614
+      ],
+      [
+       16.392051009461284,
+       16.231935936957598
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_ms": {
+     "baseline": 52.203785511665046,
+     "candidate": 51.4417290687561,
+     "status": "pass",
+     "percent": -1.4597723813317365,
+     "raw": [
+      [
+       52.2411810234189,
+       52.16638999991119
+      ],
+      [
+       51.61308916285634,
+       51.27036897465587
+      ]
+     ]
+    },
+    "mol_batch_32x20/infer_peak_mb": {
+     "baseline": 907.71728515625,
+     "candidate": 782.68505859375,
+     "status": "pass",
+     "percent": -13.774357788171631,
+     "raw": [
+      [
+       907.71728515625,
+       907.71728515625
+      ],
+      [
+       782.68505859375,
+       782.68505859375
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_peak_mb": {
+     "baseline": 2054.265625,
+     "candidate": 1935.2216796875,
+     "status": "pass",
+     "percent": -5.7949636046945034,
+     "raw": [
+      [
+       2054.265625,
+       2054.265625
+      ],
+      [
+       1935.2216796875,
+       1935.2216796875
+      ]
+     ]
+    },
+    "bulk_256/infer_ms": {
+     "baseline": 15.560270519927144,
+     "candidate": 16.457170015200973,
+     "status": "regression",
+     "percent": 5.764035362529341,
+     "raw": [
+      [
+       16.516969073563814,
+       14.603571966290474
+      ],
+      [
+       16.56046905554831,
+       16.353870974853635
+      ]
+     ]
+    },
+    "bulk_256/train_ms": {
+     "baseline": 44.984875014051795,
+     "candidate": 44.91197143215686,
+     "status": "pass",
+     "percent": -0.16206243069956106,
+     "raw": [
+      [
+       45.56363797746599,
+       44.4061120506376
+      ],
+      [
+       45.17181101255119,
+       44.65213185176253
+      ]
+     ]
+    },
+    "bulk_256/infer_peak_mb": {
+     "baseline": 681.87353515625,
+     "candidate": 594.35302734375,
+     "status": "pass",
+     "percent": -12.835299113411825,
+     "raw": [
+      [
+       681.87353515625,
+       681.87353515625
+      ],
+      [
+       594.35302734375,
+       594.35302734375
+      ]
+     ]
+    },
+    "bulk_256/train_peak_mb": {
+     "baseline": 1543.7900390625,
+     "candidate": 1457.26953125,
+     "status": "pass",
+     "percent": -5.6044219500885895,
+     "raw": [
+      [
+       1543.7900390625,
+       1543.7900390625
+      ],
+      [
+       1457.26953125,
+       1457.26953125
+      ]
+     ]
+    },
+    "large_2000/infer_ms": {
+     "baseline": 56.03200208861381,
+     "candidate": 55.600666091777384,
+     "status": "pass",
+     "percent": -0.7698029353908731,
+     "raw": [
+      [
+       56.461055064573884,
+       55.60294911265373
+      ],
+      [
+       55.72048504836857,
+       55.480847135186195
+      ]
+     ]
+    },
+    "large_2000/train_ms": {
+     "baseline": 185.4671979090199,
+     "candidate": 185.88610459119081,
+     "status": "pass",
+     "percent": 0.22586564464968095,
+     "raw": [
+      [
+       186.2563609611243,
+       184.67803485691547
+      ],
+      [
+       185.6091250665486,
+       186.16308411583304
+      ]
+     ]
+    },
+    "large_2000/infer_peak_mb": {
+     "baseline": 4373.447265625,
+     "candidate": 3798.3369140625,
+     "status": "pass",
+     "percent": -13.150046556702044,
+     "raw": [
+      [
+       4373.447265625,
+       4373.447265625
+      ],
+      [
+       3798.3369140625,
+       3798.3369140625
+      ]
+     ]
+    },
+    "large_2000/train_peak_mb": {
+     "baseline": 10046.5712890625,
+     "candidate": 9482.0751953125,
+     "status": "pass",
+     "percent": -5.618793491910578,
+     "raw": [
+      [
+       10046.5712890625,
+       10046.5712890625
+      ],
+      [
+       9482.0751953125,
+       9482.0751953125
+      ]
+     ]
+    }
+   },
+   "mattersim/float32": {
+    "mol_batch_32x20/infer_ms": {
+     "baseline": 19.76738206576556,
+     "candidate": 18.573314999230206,
+     "status": "pass",
+     "percent": -6.040592844124348,
+     "raw": [
+      [
+       18.713842146098614,
+       20.820921985432506
+      ],
+      [
+       18.476472003385425,
+       18.670157995074987
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_ms": {
+     "baseline": 60.53303845692426,
+     "candidate": 56.27711000852287,
+     "status": "pass",
+     "percent": -7.0307530513769585,
+     "raw": [
+      [
+       56.3653118442744,
+       64.70076506957412
+      ],
+      [
+       56.21521617285907,
+       56.339003844186664
+      ]
+     ]
+    },
+    "mol_batch_32x20/infer_peak_mb": {
+     "baseline": 306.3984375,
+     "candidate": 306.3984375,
+     "status": "pass",
+     "percent": 0.0,
+     "raw": [
+      [
+       306.3984375,
+       306.3984375
+      ],
+      [
+       306.3984375,
+       306.3984375
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_peak_mb": {
+     "baseline": 820.8447265625,
+     "candidate": 821.123046875,
+     "status": "pass",
+     "percent": 0.03390657252140272,
+     "raw": [
+      [
+       820.8447265625,
+       820.8447265625
+      ],
+      [
+       821.123046875,
+       821.123046875
+      ]
+     ]
+    },
+    "bulk_256/infer_ms": {
+     "baseline": 21.272306446917355,
+     "candidate": 20.192741067148745,
+     "status": "pass",
+     "percent": -5.074980385707317,
+     "raw": [
+      [
+       20.724450005218387,
+       21.820162888616323
+      ],
+      [
+       21.255006082355976,
+       19.130476051941514
+      ]
+     ]
+    },
+    "bulk_256/train_ms": {
+     "baseline": 59.96573157608509,
+     "candidate": 56.12050951458514,
+     "status": "pass",
+     "percent": -6.412365796990405,
+     "raw": [
+      [
+       56.234673131257296,
+       63.696790020912886
+      ],
+      [
+       56.285884929820895,
+       55.95513409934938
+      ]
+     ]
+    },
+    "bulk_256/infer_peak_mb": {
+     "baseline": 270.6875,
+     "candidate": 270.6875,
+     "status": "pass",
+     "percent": 0.0,
+     "raw": [
+      [
+       270.6875,
+       270.6875
+      ],
+      [
+       270.6875,
+       270.6875
+      ]
+     ]
+    },
+    "bulk_256/train_peak_mb": {
+     "baseline": 711.8017578125,
+     "candidate": 711.8017578125,
+     "status": "pass",
+     "percent": 0.0,
+     "raw": [
+      [
+       711.8017578125,
+       711.8017578125
+      ],
+      [
+       711.8017578125,
+       711.8017578125
+      ]
+     ]
+    },
+    "large_2000/infer_ms": {
+     "baseline": 40.70543544366956,
+     "candidate": 39.379306486807764,
+     "status": "pass",
+     "percent": -3.257867020479277,
+     "raw": [
+      [
+       40.23596807383001,
+       41.17490281350911
+      ],
+      [
+       39.31641788221896,
+       39.44219509139657
+      ]
+     ]
+    },
+    "large_2000/train_ms": {
+     "baseline": 118.19369799923152,
+     "candidate": 117.14544252026826,
+     "status": "pass",
+     "percent": -0.8868962531065505,
+     "raw": [
+      [
+       116.86537903733552,
+       119.52201696112752
+      ],
+      [
+       115.908098872751,
+       118.38278616778553
+      ]
+     ]
+    },
+    "large_2000/infer_peak_mb": {
+     "baseline": 1639.30615234375,
+     "candidate": 1639.30615234375,
+     "status": "pass",
+     "percent": 0.0,
+     "raw": [
+      [
+       1639.30615234375,
+       1639.30615234375
+      ],
+      [
+       1639.30615234375,
+       1639.30615234375
+      ]
+     ]
+    },
+    "large_2000/train_peak_mb": {
+     "baseline": 4468.24169921875,
+     "candidate": 4467.99755859375,
+     "status": "pass",
+     "percent": -0.005463908208969137,
+     "raw": [
+      [
+       4468.24169921875,
+       4468.24169921875
+      ],
+      [
+       4467.99755859375,
+       4467.99755859375
+      ]
+     ]
+    }
+   }
+  },
+  "geometry_3e65250": {
+   "et/float32": {
+    "mol_batch_32x20/infer_ms": {
+     "baseline": 16.95365854538977,
+     "candidate": 15.96348499879241,
+     "status": "pass",
+     "percent": -5.840471211251453,
+     "raw": [
+      [
+       16.573139000684023,
+       17.33417809009552
+      ],
+      [
+       16.016815090551972,
+       15.910154907032847
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_ms": {
+     "baseline": 52.13870760053396,
+     "candidate": 50.71726383175701,
+     "status": "pass",
+     "percent": -2.7262735004240812,
+     "raw": [
+      [
+       51.70200299471617,
+       52.57541220635176
+      ],
+      [
+       50.76022585853934,
+       50.674301804974675
+      ]
+     ]
+    },
+    "mol_batch_32x20/infer_peak_mb": {
+     "baseline": 907.71728515625,
+     "candidate": 782.7373046875,
+     "status": "pass",
+     "percent": -13.768602020973585,
+     "raw": [
+      [
+       907.71728515625,
+       907.71728515625
+      ],
+      [
+       782.7373046875,
+       782.7373046875
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_peak_mb": {
+     "baseline": 2054.265625,
+     "candidate": 1935.27392578125,
+     "status": "pass",
+     "percent": -5.792420306831058,
+     "raw": [
+      [
+       2054.265625,
+       2054.265625
+      ],
+      [
+       1935.27392578125,
+       1935.27392578125
+      ]
+     ]
+    },
+    "bulk_256/infer_ms": {
+     "baseline": 16.792951966635883,
+     "candidate": 15.082663157954812,
+     "status": "pass",
+     "percent": -10.184563214847875,
+     "raw": [
+      [
+       16.73695887438953,
+       16.848945058882236
+      ],
+      [
+       15.108222141861916,
+       15.057104174047709
+      ]
+     ]
+    },
+    "bulk_256/train_ms": {
+     "baseline": 45.81109154969454,
+     "candidate": 43.686505989171565,
+     "status": "pass",
+     "percent": -4.637709970779202,
+     "raw": [
+      [
+       45.795782934874296,
+       45.82640016451478
+      ],
+      [
+       43.742778012529016,
+       43.630233965814114
+      ]
+     ]
+    },
+    "bulk_256/infer_peak_mb": {
+     "baseline": 681.87353515625,
+     "candidate": 594.39306640625,
+     "status": "pass",
+     "percent": -12.829427194289632,
+     "raw": [
+      [
+       681.87353515625,
+       681.87353515625
+      ],
+      [
+       594.39306640625,
+       594.39306640625
+      ]
+     ]
+    },
+    "bulk_256/train_peak_mb": {
+     "baseline": 1543.7900390625,
+     "candidate": 1457.3095703125,
+     "status": "pass",
+     "percent": -5.601828393873898,
+     "raw": [
+      [
+       1543.7900390625,
+       1543.7900390625
+      ],
+      [
+       1457.3095703125,
+       1457.3095703125
+      ]
+     ]
+    },
+    "large_2000/infer_ms": {
+     "baseline": 55.80594856292009,
+     "candidate": 54.78850146755576,
+     "status": "pass",
+     "percent": -1.8231875302991751,
+     "raw": [
+      [
+       55.39108905941248,
+       56.22080806642771
+      ],
+      [
+       54.67562098056078,
+       54.90138195455074
+      ]
+     ]
+    },
+    "large_2000/train_ms": {
+     "baseline": 186.2182569457218,
+     "candidate": 183.8511434616521,
+     "status": "pass",
+     "percent": -1.2711500595560143,
+     "raw": [
+      [
+       185.99555687978864,
+       186.44095701165497
+      ],
+      [
+       183.36607399396598,
+       184.33621292933822
+      ]
+     ]
+    },
+    "large_2000/infer_peak_mb": {
+     "baseline": 4373.447265625,
+     "candidate": 3798.6005859375,
+     "status": "pass",
+     "percent": -13.14401763125752,
+     "raw": [
+      [
+       4373.447265625,
+       4373.447265625
+      ],
+      [
+       3798.6005859375,
+       3798.6005859375
+      ]
+     ]
+    },
+    "large_2000/train_peak_mb": {
+     "baseline": 10046.5712890625,
+     "candidate": 9482.3388671875,
+     "status": "pass",
+     "percent": -5.616168995777382,
+     "raw": [
+      [
+       10046.5712890625,
+       10046.5712890625
+      ],
+      [
+       9482.3388671875,
+       9482.3388671875
+      ]
+     ]
+    }
+   },
+   "mattersim/float32": {
+    "mol_batch_32x20/infer_ms": {
+     "baseline": 19.771302468143404,
+     "candidate": 19.67893645633012,
+     "status": "pass",
+     "percent": -0.46717211454383456,
+     "raw": [
+      [
+       20.093770930543542,
+       19.448834005743265
+      ],
+      [
+       19.041449995711446,
+       20.316422916948795
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_ms": {
+     "baseline": 59.07442595344037,
+     "candidate": 60.48204703256488,
+     "status": "pass",
+     "percent": 2.3827926491133855,
+     "raw": [
+      [
+       58.98262397386134,
+       59.1662279330194
+      ],
+      [
+       58.037535985931754,
+       62.926558079198
+      ]
+     ]
+    },
+    "mol_batch_32x20/infer_peak_mb": {
+     "baseline": 306.3984375,
+     "candidate": 306.45068359375,
+     "status": "pass",
+     "percent": 0.017051684132685097,
+     "raw": [
+      [
+       306.3984375,
+       306.3984375
+      ],
+      [
+       306.45068359375,
+       306.45068359375
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_peak_mb": {
+     "baseline": 820.8447265625,
+     "candidate": 821.17529296875,
+     "status": "pass",
+     "percent": 0.040271490521037734,
+     "raw": [
+      [
+       820.8447265625,
+       820.8447265625
+      ],
+      [
+       821.17529296875,
+       821.17529296875
+      ]
+     ]
+    },
+    "bulk_256/infer_ms": {
+     "baseline": 20.228669978678226,
+     "candidate": 21.805242053233087,
+     "status": "regression",
+     "percent": 7.7937505343486535,
+     "raw": [
+      [
+       19.019010942429304,
+       21.43832901492715
+      ],
+      [
+       20.926065044477582,
+       22.684419061988592
+      ]
+     ]
+    },
+    "bulk_256/train_ms": {
+     "baseline": 58.641922543756664,
+     "candidate": 60.410971054807305,
+     "status": "regression",
+     "percent": 3.0166959647863534,
+     "raw": [
+      [
+       58.492067037150264,
+       58.791778050363064
+      ],
+      [
+       58.54136100970209,
+       62.280581099912524
+      ]
+     ]
+    },
+    "bulk_256/infer_peak_mb": {
+     "baseline": 270.6875,
+     "candidate": 270.7275390625,
+     "status": "pass",
+     "percent": 0.014791618563836373,
+     "raw": [
+      [
+       270.6875,
+       270.6875
+      ],
+      [
+       270.7275390625,
+       270.7275390625
+      ]
+     ]
+    },
+    "bulk_256/train_peak_mb": {
+     "baseline": 711.8017578125,
+     "candidate": 711.841796875,
+     "status": "pass",
+     "percent": 0.0056250300116023055,
+     "raw": [
+      [
+       711.8017578125,
+       711.8017578125
+      ],
+      [
+       711.841796875,
+       711.841796875
+      ]
+     ]
+    },
+    "large_2000/infer_ms": {
+     "baseline": 40.66288145259023,
+     "candidate": 39.24055304378271,
+     "status": "pass",
+     "percent": -3.497854451032545,
+     "raw": [
+      [
+       40.25521292351186,
+       41.07054998166859
+      ],
+      [
+       39.19535409659147,
+       39.28575199097395
+      ]
+     ]
+    },
+    "large_2000/train_ms": {
+     "baseline": 118.36734996177256,
+     "candidate": 111.98616039473563,
+     "status": "pass",
+     "percent": -5.391004841366954,
+     "raw": [
+      [
+       118.13154094852507,
+       118.60315897502005
+      ],
+      [
+       111.85990390367806,
+       112.11241688579321
+      ]
+     ]
+    },
+    "large_2000/infer_peak_mb": {
+     "baseline": 1639.30615234375,
+     "candidate": 1639.56982421875,
+     "status": "pass",
+     "percent": 0.016084358289214506,
+     "raw": [
+      [
+       1639.30615234375,
+       1639.30615234375
+      ],
+      [
+       1639.56982421875,
+       1639.56982421875
+      ]
+     ]
+    },
+    "large_2000/train_peak_mb": {
+     "baseline": 4468.24169921875,
+     "candidate": 4468.26123046875,
+     "status": "pass",
+     "percent": 0.00043711265671486643,
+     "raw": [
+      [
+       4468.24169921875,
+       4468.24169921875
+      ],
+      [
+       4468.26123046875,
+       4468.26123046875
+      ]
+     ]
+    }
+   }
+  },
+  "layout_controls": {
+   "et/float32": {
+    "flatten": {
+     "stage": "abba",
+     "flagged": [],
+     "abba": {
+      "mol_batch_32x20/infer_ms": {
+       "baseline": 16.59625058528036,
+       "candidate": 16.642787028104067,
+       "status": "pass",
+       "percent": 0.2804033512544324,
+       "raw": [
+        [
+         16.789081040769815,
+         16.403420129790902
+        ],
+        [
+         16.531568951904774,
+         16.75400510430336
+        ]
+       ]
+      },
+      "mol_batch_32x20/train_ms": {
+       "baseline": 51.71317653730512,
+       "candidate": 51.96762306150049,
+       "status": "pass",
+       "percent": 0.4920342188065252,
+       "raw": [
+        [
+         52.05212812870741,
+         51.374224945902824
+        ],
+        [
+         51.98761890642345,
+         51.94762721657753
+        ]
+       ]
+      },
+      "mol_batch_32x20/infer_peak_mb": {
+       "baseline": 907.71728515625,
+       "candidate": 782.68505859375,
+       "status": "pass",
+       "percent": -13.774357788171631,
+       "raw": [
+        [
+         907.71728515625,
+         907.71728515625
+        ],
+        [
+         782.68505859375,
+         782.68505859375
+        ]
+       ]
+      },
+      "mol_batch_32x20/train_peak_mb": {
+       "baseline": 2054.265625,
+       "candidate": 1935.2216796875,
+       "status": "pass",
+       "percent": -5.7949636046945034,
+       "raw": [
+        [
+         2054.265625,
+         2054.265625
+        ],
+        [
+         1935.2216796875,
+         1935.2216796875
+        ]
+       ]
+      },
+      "bulk_256/infer_ms": {
+       "baseline": 15.696767484769225,
+       "candidate": 15.285563888028264,
+       "status": "pass",
+       "percent": -2.619670560451104,
+       "raw": [
+        [
+         15.139713883399963,
+         16.253821086138487
+        ],
+        [
+         15.295154880732298,
+         15.27597289532423
+        ]
+       ]
+      },
+      "bulk_256/train_ms": {
+       "baseline": 44.436425901949406,
+       "candidate": 45.067740022204816,
+       "status": "pass",
+       "percent": 1.4207130916613853,
+       "raw": [
+        [
+         45.10084888897836,
+         43.77200291492045
+        ],
+        [
+         44.672504998743534,
+         45.4629750456661
+        ]
+       ]
+      },
+      "bulk_256/infer_peak_mb": {
+       "baseline": 681.87353515625,
+       "candidate": 594.35302734375,
+       "status": "pass",
+       "percent": -12.835299113411825,
+       "raw": [
+        [
+         681.87353515625,
+         681.87353515625
+        ],
+        [
+         594.35302734375,
+         594.35302734375
+        ]
+       ]
+      },
+      "bulk_256/train_peak_mb": {
+       "baseline": 1543.7900390625,
+       "candidate": 1457.26953125,
+       "status": "pass",
+       "percent": -5.6044219500885895,
+       "raw": [
+        [
+         1543.7900390625,
+         1543.7900390625
+        ],
+        [
+         1457.26953125,
+         1457.26953125
+        ]
+       ]
+      },
+      "large_2000/infer_ms": {
+       "baseline": 55.56931043975055,
+       "candidate": 55.68572808988392,
+       "status": "pass",
+       "percent": 0.20949990059637713,
+       "raw": [
+        [
+         56.06368905864656,
+         55.074931820854545
+        ],
+        [
+         55.45843718573451,
+         55.91301899403334
+        ]
+       ]
+      },
+      "large_2000/train_ms": {
+       "baseline": 184.92730148136616,
+       "candidate": 185.91662251856178,
+       "status": "pass",
+       "percent": 0.5349783559650989,
+       "raw": [
+        [
+         186.28494394943118,
+         183.56965901330113
+        ],
+        [
+         185.65400107763708,
+         186.17924395948648
+        ]
+       ]
+      },
+      "large_2000/infer_peak_mb": {
+       "baseline": 4373.447265625,
+       "candidate": 3798.3369140625,
+       "status": "pass",
+       "percent": -13.150046556702044,
+       "raw": [
+        [
+         4373.447265625,
+         4373.447265625
+        ],
+        [
+         3798.3369140625,
+         3798.3369140625
+        ]
+       ]
+      },
+      "large_2000/train_peak_mb": {
+       "baseline": 10046.5712890625,
+       "candidate": 9482.0751953125,
+       "status": "pass",
+       "percent": -5.618793491910578,
+       "raw": [
+        [
+         10046.5712890625,
+         10046.5712890625
+        ],
+        [
+         9482.0751953125,
+         9482.0751953125
+        ]
+       ]
+      }
+     }
+    },
+    "index": {
+     "stage": "abba",
+     "flagged": [],
+     "abba": {
+      "mol_batch_32x20/infer_ms": {
+       "baseline": 16.739781945943832,
+       "candidate": 15.982780489139259,
+       "status": "pass",
+       "percent": -4.5221703559167326,
+       "raw": [
+        [
+         16.442623920738697,
+         17.036939971148968
+        ],
+        [
+         15.847830101847649,
+         16.11773087643087
+        ]
+       ]
+      },
+      "mol_batch_32x20/train_ms": {
+       "baseline": 52.14332335162908,
+       "candidate": 51.62350495811552,
+       "status": "pass",
+       "percent": -0.9969030742596918,
+       "raw": [
+        [
+         51.46891181357205,
+         52.81773488968611
+        ],
+        [
+         52.062080008909106,
+         51.18492990732193
+        ]
+       ]
+      },
+      "mol_batch_32x20/infer_peak_mb": {
+       "baseline": 907.71728515625,
+       "candidate": 907.71728515625,
+       "status": "pass",
+       "percent": 0.0,
+       "raw": [
+        [
+         907.71728515625,
+         907.71728515625
+        ],
+        [
+         907.71728515625,
+         907.71728515625
+        ]
+       ]
+      },
+      "mol_batch_32x20/train_peak_mb": {
+       "baseline": 2054.265625,
+       "candidate": 2054.265625,
+       "status": "pass",
+       "percent": 0.0,
+       "raw": [
+        [
+         2054.265625,
+         2054.265625
+        ],
+        [
+         2054.265625,
+         2054.265625
+        ]
+       ]
+      },
+      "bulk_256/infer_ms": {
+       "baseline": 16.027907957322896,
+       "candidate": 15.031021903268993,
+       "status": "pass",
+       "percent": -6.219689161606656,
+       "raw": [
+        [
+         14.88982792943716,
+         17.16598798520863
+        ],
+        [
+         14.855614863336086,
+         15.2064289432019
+        ]
+       ]
+      },
+      "bulk_256/train_ms": {
+       "baseline": 45.734848361462355,
+       "candidate": 44.09734799992293,
+       "status": "pass",
+       "percent": -3.580421538948919,
+       "raw": [
+        [
+         43.96014986559749,
+         47.50954685732722
+        ],
+        [
+         43.98135305382311,
+         44.21334294602275
+        ]
+       ]
+      },
+      "bulk_256/infer_peak_mb": {
+       "baseline": 681.87353515625,
+       "candidate": 681.87353515625,
+       "status": "pass",
+       "percent": 0.0,
+       "raw": [
+        [
+         681.87353515625,
+         681.87353515625
+        ],
+        [
+         681.87353515625,
+         681.87353515625
+        ]
+       ]
+      },
+      "bulk_256/train_peak_mb": {
+       "baseline": 1543.7900390625,
+       "candidate": 1543.7900390625,
+       "status": "pass",
+       "percent": 0.0,
+       "raw": [
+        [
+         1543.7900390625,
+         1543.7900390625
+        ],
+        [
+         1543.7900390625,
+         1543.7900390625
+        ]
+       ]
+      },
+      "large_2000/infer_ms": {
+       "baseline": 55.54867803584784,
+       "candidate": 54.629712481983006,
+       "status": "pass",
+       "percent": -1.6543427969101132,
+       "raw": [
+        [
+         55.11783016845584,
+         55.979525903239846
+        ],
+        [
+         54.555274080485106,
+         54.70415088348091
+        ]
+       ]
+      },
+      "large_2000/train_ms": {
+       "baseline": 185.2394404122606,
+       "candidate": 184.19646203983575,
+       "status": "pass",
+       "percent": -0.5630433616640396,
+       "raw": [
+        [
+         184.01592993177474,
+         186.46295089274645
+        ],
+        [
+         182.88346310146153,
+         185.50946097820997
+        ]
+       ]
+      },
+      "large_2000/infer_peak_mb": {
+       "baseline": 4373.447265625,
+       "candidate": 4371.75390625,
+       "status": "pass",
+       "percent": -0.038719098965922516,
+       "raw": [
+        [
+         4373.447265625,
+         4373.447265625
+        ],
+        [
+         4371.75390625,
+         4371.75390625
+        ]
+       ]
+      },
+      "large_2000/train_peak_mb": {
+       "baseline": 10046.5712890625,
+       "candidate": 10046.5712890625,
+       "status": "pass",
+       "percent": 0.0,
+       "raw": [
+        [
+         10046.5712890625,
+         10046.5712890625
+        ],
+        [
+         10046.5712890625,
+         10046.5712890625
+        ]
+       ]
+      }
+     }
+    },
+    "neighbor-3e65250": {
+     "stage": "screen",
+     "flagged": [
+      {
+       "system": "bulk_256",
+       "metric": "infer_ms",
+       "percent": 7.397824175609435,
+       "status": "regression"
+      }
+     ]
+    }
+   },
+   "mattersim/float32": {
+    "flatten": {
+     "stage": "abba",
+     "flagged": [
+      {
+       "system": "bulk_256",
+       "metric": "infer_ms",
+       "percent": 10.904614258969003,
+       "status": "regression"
+      }
+     ],
+     "abba": {
+      "mol_batch_32x20/infer_ms": {
+       "baseline": 19.17170744854957,
+       "candidate": 18.817100673913956,
+       "status": "pass",
+       "percent": -1.8496358531823964,
+       "raw": [
+        [
+         19.233542028814554,
+         19.109872868284583
+        ],
+        [
+         19.31274915114045,
+         18.32145219668746
+        ]
+       ]
+      },
+      "mol_batch_32x20/train_ms": {
+       "baseline": 58.39294346515089,
+       "candidate": 56.86407897155732,
+       "status": "pass",
+       "percent": -2.6182350175685265,
+       "raw": [
+        [
+         58.12292010523379,
+         58.662966825068
+        ],
+        [
+         58.596341870725155,
+         55.13181607238948
+        ]
+       ]
+      },
+      "mol_batch_32x20/infer_peak_mb": {
+       "baseline": 306.3984375,
+       "candidate": 306.3984375,
+       "status": "pass",
+       "percent": 0.0,
+       "raw": [
+        [
+         306.3984375,
+         306.3984375
+        ],
+        [
+         306.3984375,
+         306.3984375
+        ]
+       ]
+      },
+      "mol_batch_32x20/train_peak_mb": {
+       "baseline": 820.8447265625,
+       "candidate": 821.123046875,
+       "status": "pass",
+       "percent": 0.03390657252140272,
+       "raw": [
+        [
+         820.8447265625,
+         820.8447265625
+        ],
+        [
+         821.123046875,
+         821.123046875
+        ]
+       ]
+      },
+      "bulk_256/infer_ms": {
+       "baseline": 19.25982895772904,
+       "candidate": 21.360039012506604,
+       "status": "regression",
+       "percent": 10.904614258969003,
+       "raw": [
+        [
+         19.23205191269517,
+         19.287606002762914
+        ],
+        [
+         21.864796988666058,
+         20.85528103634715
+        ]
+       ]
+      },
+      "bulk_256/train_ms": {
+       "baseline": 57.20105755608529,
+       "candidate": 57.1573069319129,
+       "status": "pass",
+       "percent": -0.07648569107221448,
+       "raw": [
+        [
+         57.369199115782976,
+         57.0329159963876
+        ],
+        [
+         59.16915298439562,
+         55.145460879430175
+        ]
+       ]
+      },
+      "bulk_256/infer_peak_mb": {
+       "baseline": 270.6875,
+       "candidate": 270.6875,
+       "status": "pass",
+       "percent": 0.0,
+       "raw": [
+        [
+         270.6875,
+         270.6875
+        ],
+        [
+         270.6875,
+         270.6875
+        ]
+       ]
+      },
+      "bulk_256/train_peak_mb": {
+       "baseline": 711.8017578125,
+       "candidate": 711.8017578125,
+       "status": "pass",
+       "percent": 0.0,
+       "raw": [
+        [
+         711.8017578125,
+         711.8017578125
+        ],
+        [
+         711.8017578125,
+         711.8017578125
+        ]
+       ]
+      },
+      "large_2000/infer_ms": {
+       "baseline": 40.26471055112779,
+       "candidate": 39.554782561026514,
+       "status": "pass",
+       "percent": -1.763151852786371,
+       "raw": [
+        [
+         40.25829792954028,
+         40.271123172715306
+        ],
+        [
+         39.64562900364399,
+         39.46393611840904
+        ]
+       ]
+      },
+      "large_2000/train_ms": {
+       "baseline": 116.84864899143577,
+       "candidate": 116.38254998251796,
+       "status": "pass",
+       "percent": -0.3988912263349964,
+       "raw": [
+        [
+         116.72750511206686,
+         116.96979287080467
+        ],
+        [
+         116.79122899658978,
+         115.97387096844614
+        ]
+       ]
+      },
+      "large_2000/infer_peak_mb": {
+       "baseline": 1639.30615234375,
+       "candidate": 1639.30615234375,
+       "status": "pass",
+       "percent": 0.0,
+       "raw": [
+        [
+         1639.30615234375,
+         1639.30615234375
+        ],
+        [
+         1639.30615234375,
+         1639.30615234375
+        ]
+       ]
+      },
+      "large_2000/train_peak_mb": {
+       "baseline": 4468.24169921875,
+       "candidate": 4467.99755859375,
+       "status": "pass",
+       "percent": -0.005463908208969137,
+       "raw": [
+        [
+         4468.24169921875,
+         4468.24169921875
+        ],
+        [
+         4467.99755859375,
+         4467.99755859375
+        ]
+       ]
+      }
+     }
+    },
+    "index": {
+     "stage": "abba",
+     "flagged": [
+      {
+       "system": "mol_batch_32x20",
+       "metric": "infer_peak_mb",
+       "percent": 5.870719549198089,
+       "status": "regression"
+      },
+      {
+       "system": "bulk_256",
+       "metric": "infer_peak_mb",
+       "percent": 6.536632706072498,
+       "status": "regression"
+      },
+      {
+       "system": "large_2000",
+       "metric": "infer_peak_mb",
+       "percent": 6.821286992907094,
+       "status": "regression"
+      }
+     ],
+     "abba": {
+      "mol_batch_32x20/infer_ms": {
+       "baseline": 19.413429545238614,
+       "candidate": 19.01096000801772,
+       "status": "pass",
+       "percent": -2.0731501164337307,
+       "raw": [
+        [
+         18.83103116415441,
+         19.995827926322818
+        ],
+        [
+         18.18607305176556,
+         19.835846964269876
+        ]
+       ]
+      },
+      "mol_batch_32x20/train_ms": {
+       "baseline": 59.270479483529925,
+       "candidate": 57.8340491047129,
+       "status": "pass",
+       "percent": -2.423517392357488,
+       "raw": [
+        [
+         57.295433012768626,
+         61.245525954291224
+        ],
+        [
+         55.34633505158126,
+         60.32176315784454
+        ]
+       ]
+      },
+      "mol_batch_32x20/infer_peak_mb": {
+       "baseline": 306.3984375,
+       "candidate": 324.38623046875,
+       "status": "regression",
+       "percent": 5.870719549198089,
+       "raw": [
+        [
+         306.3984375,
+         306.3984375
+        ],
+        [
+         324.38623046875,
+         324.38623046875
+        ]
+       ]
+      },
+      "mol_batch_32x20/train_peak_mb": {
+       "baseline": 820.8447265625,
+       "candidate": 837.08935546875,
+       "status": "pass",
+       "percent": 1.9790136161657035,
+       "raw": [
+        [
+         820.8447265625,
+         820.8447265625
+        ],
+        [
+         837.08935546875,
+         837.08935546875
+        ]
+       ]
+      },
+      "bulk_256/infer_ms": {
+       "baseline": 20.45177051331848,
+       "candidate": 19.139245036058128,
+       "status": "pass",
+       "percent": -6.417661866514768,
+       "raw": [
+        [
+         19.25404299981892,
+         21.649498026818037
+        ],
+        [
+         18.58484302647412,
+         19.693647045642138
+        ]
+       ]
+      },
+      "bulk_256/train_ms": {
+       "baseline": 59.05372556298971,
+       "candidate": 57.570335105992854,
+       "status": "pass",
+       "percent": -2.511933739751271,
+       "raw": [
+        [
+         56.9069089833647,
+         61.20054214261472
+        ],
+        [
+         54.92957402020693,
+         60.21109619177878
+        ]
+       ]
+      },
+      "bulk_256/infer_peak_mb": {
+       "baseline": 270.6875,
+       "candidate": 288.38134765625,
+       "status": "regression",
+       "percent": 6.536632706072498,
+       "raw": [
+        [
+         270.6875,
+         270.6875
+        ],
+        [
+         288.38134765625,
+         288.38134765625
+        ]
+       ]
+      },
+      "bulk_256/train_peak_mb": {
+       "baseline": 711.8017578125,
+       "candidate": 726.96728515625,
+       "status": "pass",
+       "percent": 2.1305830137813286,
+       "raw": [
+        [
+         711.8017578125,
+         711.8017578125
+        ],
+        [
+         726.96728515625,
+         726.96728515625
+        ]
+       ]
+      },
+      "large_2000/infer_ms": {
+       "baseline": 40.58579192496836,
+       "candidate": 39.426713017746806,
+       "status": "pass",
+       "percent": -2.855873576064172,
+       "raw": [
+        [
+         40.131046902388334,
+         41.04053694754839
+        ],
+        [
+         39.26938190124929,
+         39.58404413424432
+        ]
+       ]
+      },
+      "large_2000/train_ms": {
+       "baseline": 117.96357913408428,
+       "candidate": 116.63054104428738,
+       "status": "pass",
+       "percent": -1.1300420855166582,
+       "raw": [
+        [
+         116.7451802175492,
+         119.18197805061936
+        ],
+        [
+         115.91491010040045,
+         117.34617198817432
+        ]
+       ]
+      },
+      "large_2000/infer_peak_mb": {
+       "baseline": 1639.30615234375,
+       "candidate": 1751.1279296875,
+       "status": "regression",
+       "percent": 6.821286992907094,
+       "raw": [
+        [
+         1639.30615234375,
+         1639.30615234375
+        ],
+        [
+         1751.1279296875,
+         1751.1279296875
+        ]
+       ]
+      },
+      "large_2000/train_peak_mb": {
+       "baseline": 4468.24169921875,
+       "candidate": 4570.82080078125,
+       "status": "pass",
+       "percent": 2.295737528711461,
+       "raw": [
+        [
+         4468.24169921875,
+         4468.24169921875
+        ],
+        [
+         4570.82080078125,
+         4570.82080078125
+        ]
+       ]
+      }
+     }
+    }
+   }
+  },
+  "mattersim_geometry_followup": {
+   "fresh-3e65250": {
+    "mol_batch_32x20/infer_ms": {
+     "baseline": 19.15202208328992,
+     "candidate": 19.429571460932493,
+     "status": "pass",
+     "percent": 1.4491909858684426,
+     "raw": [
+      [
+       19.201920134946704,
+       19.10212403163314
+      ],
+      [
+       19.654728937894106,
+       19.20441398397088
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_ms": {
+     "baseline": 58.99958801455796,
+     "candidate": 59.343255939893425,
+     "status": "pass",
+     "percent": 0.5824920764712305,
+     "raw": [
+      [
+       58.59447899274528,
+       59.404697036370635
+      ],
+      [
+       60.363177908584476,
+       58.32333397120237
+      ]
+     ]
+    },
+    "mol_batch_32x20/infer_peak_mb": {
+     "baseline": 306.3984375,
+     "candidate": 306.45068359375,
+     "status": "pass",
+     "percent": 0.017051684132685097,
+     "raw": [
+      [
+       306.3984375,
+       306.3984375
+      ],
+      [
+       306.45068359375,
+       306.45068359375
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_peak_mb": {
+     "baseline": 820.8447265625,
+     "candidate": 821.17529296875,
+     "status": "pass",
+     "percent": 0.040271490521037734,
+     "raw": [
+      [
+       820.8447265625,
+       820.8447265625
+      ],
+      [
+       821.17529296875,
+       821.17529296875
+      ]
+     ]
+    },
+    "bulk_256/infer_ms": {
+     "baseline": 22.141744499094784,
+     "candidate": 20.28079447336495,
+     "status": "pass",
+     "percent": -8.404712762383815,
+     "raw": [
+      [
+       22.52720296382904,
+       21.756286034360528
+      ],
+      [
+       21.510011050850153,
+       19.051577895879745
+      ]
+     ]
+    },
+    "bulk_256/train_ms": {
+     "baseline": 62.93801742140204,
+     "candidate": 60.1339841959998,
+     "status": "pass",
+     "percent": -4.455229669259852,
+     "raw": [
+      [
+       65.00272499397397,
+       60.873309848830104
+      ],
+      [
+       60.40488020516932,
+       59.86308818683028
+      ]
+     ]
+    },
+    "bulk_256/infer_peak_mb": {
+     "baseline": 270.6875,
+     "candidate": 270.7275390625,
+     "status": "pass",
+     "percent": 0.014791618563836373,
+     "raw": [
+      [
+       270.6875,
+       270.6875
+      ],
+      [
+       270.7275390625,
+       270.7275390625
+      ]
+     ]
+    },
+    "bulk_256/train_peak_mb": {
+     "baseline": 711.8017578125,
+     "candidate": 711.841796875,
+     "status": "pass",
+     "percent": 0.0056250300116023055,
+     "raw": [
+      [
+       711.8017578125,
+       711.8017578125
+      ],
+      [
+       711.841796875,
+       711.841796875
+      ]
+     ]
+    },
+    "large_2000/infer_ms": {
+     "baseline": 41.16647911723703,
+     "candidate": 39.26157497335225,
+     "status": "pass",
+     "percent": -4.627318596909502,
+     "raw": [
+      [
+       41.32130811922252,
+       41.01165011525154
+      ],
+      [
+       39.278381038457155,
+       39.24476890824735
+      ]
+     ]
+    },
+    "large_2000/train_ms": {
+     "baseline": 119.07501588575542,
+     "candidate": 112.37893754150718,
+     "status": "pass",
+     "percent": -5.623411674093481,
+     "raw": [
+      [
+       118.92639892175794,
+       119.2236328497529
+      ],
+      [
+       112.54297196865082,
+       112.21490311436355
+      ]
+     ]
+    },
+    "large_2000/infer_peak_mb": {
+     "baseline": 1639.30615234375,
+     "candidate": 1639.56982421875,
+     "status": "pass",
+     "percent": 0.016084358289214506,
+     "raw": [
+      [
+       1639.30615234375,
+       1639.30615234375
+      ],
+      [
+       1639.56982421875,
+       1639.56982421875
+      ]
+     ]
+    },
+    "large_2000/train_peak_mb": {
+     "baseline": 4468.24169921875,
+     "candidate": 4468.26123046875,
+     "status": "pass",
+     "percent": 0.00043711265671486643,
+     "raw": [
+      [
+       4468.24169921875,
+       4468.24169921875
+      ],
+      [
+       4468.26123046875,
+       4468.26123046875
+      ]
+     ]
+    }
+   },
+   "kv-3e65250": {
+    "mol_batch_32x20/infer_ms": {
+     "baseline": 18.947868491522968,
+     "candidate": 18.426660913974047,
+     "status": "pass",
+     "percent": -2.7507451710576447,
+     "raw": [
+      [
+       19.317219965159893,
+       18.578517017886043
+      ],
+      [
+       18.146691843867302,
+       18.70662998408079
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_ms": {
+     "baseline": 58.62239107955247,
+     "candidate": 55.008868454024196,
+     "status": "pass",
+     "percent": -6.164065571164789,
+     "raw": [
+      [
+       60.37287809886038,
+       56.87190406024456
+      ],
+      [
+       55.17535284161568,
+       54.842384066432714
+      ]
+     ]
+    },
+    "mol_batch_32x20/infer_peak_mb": {
+     "baseline": 306.3984375,
+     "candidate": 306.52490234375,
+     "status": "pass",
+     "percent": 0.04127463729315384,
+     "raw": [
+      [
+       306.3984375,
+       306.3984375
+      ],
+      [
+       306.52490234375,
+       306.52490234375
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_peak_mb": {
+     "baseline": 820.8447265625,
+     "candidate": 833.53369140625,
+     "status": "pass",
+     "percent": 1.5458422809010886,
+     "raw": [
+      [
+       820.8447265625,
+       820.8447265625
+      ],
+      [
+       833.53369140625,
+       833.53369140625
+      ]
+     ]
+    },
+    "bulk_256/infer_ms": {
+     "baseline": 20.136854029260576,
+     "candidate": 19.238306442275643,
+     "status": "pass",
+     "percent": -4.4622044023324925,
+     "raw": [
+      [
+       21.16466499865055,
+       19.1090430598706
+      ],
+      [
+       18.389344913884997,
+       20.08726797066629
+      ]
+     ]
+    },
+    "bulk_256/train_ms": {
+     "baseline": 56.861188961192966,
+     "candidate": 54.754368495196104,
+     "status": "pass",
+     "percent": -3.705199459397057,
+     "raw": [
+      [
+       55.93630392104387,
+       57.78607400134206
+      ],
+      [
+       54.43546106107533,
+       55.07327592931688
+      ]
+     ]
+    },
+    "bulk_256/infer_peak_mb": {
+     "baseline": 270.6875,
+     "candidate": 270.9833984375,
+     "status": "pass",
+     "percent": 0.10931366889863625,
+     "raw": [
+      [
+       270.6875,
+       270.6875
+      ],
+      [
+       270.9833984375,
+       270.9833984375
+      ]
+     ]
+    },
+    "bulk_256/train_peak_mb": {
+     "baseline": 711.8017578125,
+     "candidate": 723.08837890625,
+     "status": "pass",
+     "percent": 1.5856410819265143,
+     "raw": [
+      [
+       711.8017578125,
+       711.8017578125
+      ],
+      [
+       723.08837890625,
+       723.08837890625
+      ]
+     ]
+    },
+    "large_2000/infer_ms": {
+     "baseline": 40.25927057955414,
+     "candidate": 38.573748082853854,
+     "status": "pass",
+     "percent": -4.186669237758833,
+     "raw": [
+      [
+       40.330523159354925,
+       40.188017999753356
+      ],
+      [
+       38.52700209245086,
+       38.62049407325685
+      ]
+     ]
+    },
+    "large_2000/train_ms": {
+     "baseline": 117.91324452497065,
+     "candidate": 111.10009101685137,
+     "status": "pass",
+     "percent": -5.7781070613118874,
+     "raw": [
+      [
+       117.37545416690409,
+       118.45103488303721
+      ],
+      [
+       111.05026304721832,
+       111.14991898648441
+      ]
+     ]
+    },
+    "large_2000/infer_peak_mb": {
+     "baseline": 1639.30615234375,
+     "candidate": 1639.15771484375,
+     "status": "pass",
+     "percent": -0.009054897999849487,
+     "raw": [
+      [
+       1639.30615234375,
+       1639.30615234375
+      ],
+      [
+       1639.15771484375,
+       1639.15771484375
+      ]
+     ]
+    },
+    "large_2000/train_peak_mb": {
+     "baseline": 4468.24169921875,
+     "candidate": 4533.51025390625,
+     "status": "pass",
+     "percent": 1.4607212205846487,
+     "raw": [
+      [
+       4468.24169921875,
+       4468.24169921875
+      ],
+      [
+       4533.51025390625,
+       4533.51025390625
+      ]
+     ]
+    }
+   }
+  },
+  "mattersim_geometry_pooled": {
+   "method": "Median of the four samples per side pooled across both same-card baseline/candidate/candidate/baseline rounds. Each sample is an eleven-step median.",
+   "cells": {
+    "mol_batch_32x20/infer_ms": {
+     "baseline": 19.325377070344985,
+     "candidate": 19.429571460932493,
+     "status": "pass",
+     "percent": 0.5391583833435076,
+     "raw": [
+      [
+       20.093770930543542,
+       19.448834005743265,
+       19.201920134946704,
+       19.10212403163314
+      ],
+      [
+       19.041449995711446,
+       20.316422916948795,
+       19.654728937894106,
+       19.20441398397088
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_ms": {
+     "baseline": 59.07442595344037,
+     "candidate": 59.343255939893425,
+     "status": "pass",
+     "percent": 0.45506999368041257,
+     "raw": [
+      [
+       58.98262397386134,
+       59.1662279330194,
+       58.59447899274528,
+       59.404697036370635
+      ],
+      [
+       58.037535985931754,
+       62.926558079198,
+       60.363177908584476,
+       58.32333397120237
+      ]
+     ]
+    },
+    "mol_batch_32x20/infer_peak_mb": {
+     "baseline": 306.3984375,
+     "candidate": 306.45068359375,
+     "status": "pass",
+     "percent": 0.017051684132685097,
+     "raw": [
+      [
+       306.3984375,
+       306.3984375,
+       306.3984375,
+       306.3984375
+      ],
+      [
+       306.45068359375,
+       306.45068359375,
+       306.45068359375,
+       306.45068359375
+      ]
+     ]
+    },
+    "mol_batch_32x20/train_peak_mb": {
+     "baseline": 820.8447265625,
+     "candidate": 821.17529296875,
+     "status": "pass",
+     "percent": 0.040271490521037734,
+     "raw": [
+      [
+       820.8447265625,
+       820.8447265625,
+       820.8447265625,
+       820.8447265625
+      ],
+      [
+       821.17529296875,
+       821.17529296875,
+       821.17529296875,
+       821.17529296875
+      ]
+     ]
+    },
+    "bulk_256/infer_ms": {
+     "baseline": 21.59730752464384,
+     "candidate": 21.218038047663867,
+     "status": "pass",
+     "percent": -1.7560961084950089,
+     "raw": [
+      [
+       19.019010942429304,
+       21.43832901492715,
+       22.52720296382904,
+       21.756286034360528
+      ],
+      [
+       20.926065044477582,
+       22.684419061988592,
+       21.510011050850153,
+       19.051577895879745
+      ]
+     ]
+    },
+    "bulk_256/train_ms": {
+     "baseline": 59.832543949596584,
+     "candidate": 60.1339841959998,
+     "status": "pass",
+     "percent": 0.5038065014537185,
+     "raw": [
+      [
+       58.492067037150264,
+       58.791778050363064,
+       65.00272499397397,
+       60.873309848830104
+      ],
+      [
+       58.54136100970209,
+       62.280581099912524,
+       60.40488020516932,
+       59.86308818683028
+      ]
+     ]
+    },
+    "bulk_256/infer_peak_mb": {
+     "baseline": 270.6875,
+     "candidate": 270.7275390625,
+     "status": "pass",
+     "percent": 0.014791618563836373,
+     "raw": [
+      [
+       270.6875,
+       270.6875,
+       270.6875,
+       270.6875
+      ],
+      [
+       270.7275390625,
+       270.7275390625,
+       270.7275390625,
+       270.7275390625
+      ]
+     ]
+    },
+    "bulk_256/train_peak_mb": {
+     "baseline": 711.8017578125,
+     "candidate": 711.841796875,
+     "status": "pass",
+     "percent": 0.0056250300116023055,
+     "raw": [
+      [
+       711.8017578125,
+       711.8017578125,
+       711.8017578125,
+       711.8017578125
+      ],
+      [
+       711.841796875,
+       711.841796875,
+       711.841796875,
+       711.841796875
+      ]
+     ]
+    },
+    "large_2000/infer_ms": {
+     "baseline": 41.041100048460066,
+     "candidate": 39.26157497335225,
+     "status": "pass",
+     "percent": -4.335958522082994,
+     "raw": [
+      [
+       40.25521292351186,
+       41.07054998166859,
+       41.32130811922252,
+       41.01165011525154
+      ],
+      [
+       39.19535409659147,
+       39.28575199097395,
+       39.278381038457155,
+       39.24476890824735
+      ]
+     ]
+    },
+    "large_2000/train_ms": {
+     "baseline": 118.764778948389,
+     "candidate": 112.16366000007838,
+     "status": "pass",
+     "percent": -5.558145274011938,
+     "raw": [
+      [
+       118.13154094852507,
+       118.60315897502005,
+       118.92639892175794,
+       119.2236328497529
+      ],
+      [
+       111.85990390367806,
+       112.11241688579321,
+       112.54297196865082,
+       112.21490311436355
+      ]
+     ]
+    },
+    "large_2000/infer_peak_mb": {
+     "baseline": 1639.30615234375,
+     "candidate": 1639.56982421875,
+     "status": "pass",
+     "percent": 0.016084358289214506,
+     "raw": [
+      [
+       1639.30615234375,
+       1639.30615234375,
+       1639.30615234375,
+       1639.30615234375
+      ],
+      [
+       1639.56982421875,
+       1639.56982421875,
+       1639.56982421875,
+       1639.56982421875
+      ]
+     ]
+    },
+    "large_2000/train_peak_mb": {
+     "baseline": 4468.24169921875,
+     "candidate": 4468.26123046875,
+     "status": "pass",
+     "percent": 0.00043711265671486643,
+     "raw": [
+      [
+       4468.24169921875,
+       4468.24169921875,
+       4468.24169921875,
+       4468.24169921875
+      ],
+      [
+       4468.26123046875,
+       4468.26123046875,
+       4468.26123046875,
+       4468.26123046875
+      ]
+     ]
+    }
+   }
+  },
+  "profiled": {
+   "profile-et-float32-bulk_256-infer-base.json": 1,
+   "profile-et-float32-bulk_256-infer-candidate.json": 1,
+   "profile-mattersim-float32-bulk_256-train-base.json": 0,
+   "profile-mattersim-float32-bulk_256-train-candidate.json": 0,
+   "profile-et-float32-bulk_256-infer-base-retry.json": 0,
+   "profile-et-float32-bulk_256-infer-candidate-retry.json": 0
+  }
+ }
+}

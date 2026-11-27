@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import torch
 import torch.nn.functional as F
 from numpy.testing import assert_allclose
@@ -180,6 +181,54 @@ def test_edge_gated_conv_matches_per_channel_reference():
     assert alone.shape == (1, 4)
     assert alone_edge.shape == (0, 4)
     assert torch.isfinite(alone).all()
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA Inductor")
+def test_compiled_gate_preserves_live_hooks_and_force_gradients():
+    from enerzyme.models.alignn.interaction import EdgeGatedGraphConv
+
+    torch.manual_seed(31)
+    conv = EdgeGatedGraphConv(4, "layer").cuda().double().eval()
+    node = torch.randn(3, 4, device="cuda", dtype=torch.double, requires_grad=True)
+    src = torch.tensor([0, 1, 2, 1], device="cuda")
+    dst = torch.tensor([1, 2, 1, 0], device="cuda")
+    edge = torch.randn(4, 4, device="cuda", dtype=torch.double, requires_grad=True)
+    calls = torch.zeros((), device="cuda")
+    compiled = torch.compile(conv)
+
+    def result(run):
+        atom, bond = run(node, edge, src, dst)
+        loss = atom.square().sum() + bond.square().sum()
+        grads = torch.autograd.grad(loss, (node, edge, conv.edge_gate.weight))
+        return (atom, bond, *grads)
+
+    def modify_gate(_, inputs, output):
+        calls.add_(1)
+        return 0.5 * output
+
+    def check():
+        expected = result(conv)
+        calls.zero_()
+        actual = result(compiled)
+        for a, b in zip(actual, expected):
+            torch.testing.assert_close(a, b, atol=1e-10, rtol=1e-8)
+
+    check()
+    hook = conv.edge_gate.register_forward_hook(modify_gate)
+    check()
+    assert calls.item() == 1
+    hook.remove()
+
+    def shift_gate(_, inputs, output):
+        calls.add_(1)
+        return output + 0.25
+
+    hook = conv.edge_gate.register_forward_hook(shift_gate)
+    check()
+    assert calls.item() == 1
+    hook.remove()
+    check()
+    assert calls.item() == 0
 
 
 def test_alignn_layer_orders_disagree_on_which_state_sees_the_angle():

@@ -46,7 +46,7 @@ def test_registration_defaults_and_yaml():
 
     for name in ("geodite", "Geodite"):
         core_cls, build_params, layers = get_ff_core(name)
-        assert core_cls.__name__ == "GeoditeCore"
+        assert core_cls.__name__ == "geodite"
         assert build_params["dim_embedding"] == 192
         assert build_params["num_rbf"] == 12
         assert build_params["cutoff_sr"] == 6.0
@@ -72,13 +72,13 @@ def test_registration_defaults_and_yaml():
         build_params=ff["build_params"],
         verbose=0,
     )
-    assert model.__class__.__name__ == "GeoditeCore"
+    assert model.architecture == "geodite"
     assert model.dim_embedding == 16
     assert model.num_layers == 2
     assert model.lmax == 2
     assert model.feature_irreps == "16x0e"
-    assert model.interactions[0].update_edges is True
-    assert model.interactions[-1].update_edges is False
+    assert model.blocks[0].message.update_edges is True
+    assert model.blocks[-1].message.update_edges is False
     names = [type(layer).__name__ for layer in list(model.pre_sequence) + list(model.post_sequence)]
     assert "RadialWindowLayer" in names
     assert "IsolatedAtomResidualLayer" in names
@@ -96,9 +96,9 @@ def test_registration_defaults_and_yaml():
     assert zbl.envelope_p == 5
 
     try:
-        from enerzyme.models.geodite import GeoditeCore
+        from enerzyme.models.presets.cartesian_vector import geodite
 
-        GeoditeCore(dim_embedding=16, num_heads=5)
+        geodite(dim_embedding=16, num_heads=5)
     except ValueError as exc:
         assert "divisible" in str(exc)
     else:
@@ -106,10 +106,10 @@ def test_registration_defaults_and_yaml():
 
 
 def test_published_width_forward():
-    from enerzyme.models.geodite import GeoditeCore
+    from enerzyme.models.presets.cartesian_vector import geodite
 
     torch.manual_seed(1)
-    core = GeoditeCore().eval()
+    core = geodite().eval()
     assert core.dim_embedding == 192
     assert core.num_layers == 4
     assert core.lmax == 2
@@ -134,10 +134,10 @@ def test_published_width_forward():
 
 
 def test_molecules_do_not_exchange_messages():
-    from enerzyme.models.geodite import GeoditeCore
+    from enerzyme.models.presets.cartesian_vector import geodite
 
     torch.manual_seed(2)
-    core = GeoditeCore(
+    core = geodite(
         dim_embedding=16, num_rbf=4, max_Za=10, num_layers=2, num_heads=4, attn_dropout=0.0
     ).eval()
     table = torch.randn(11, 16)
@@ -354,3 +354,59 @@ def test_two_molecules_keep_separate_total_energies():
     assert torch.allclose(both["E"][1], right["E"][0], atol=1e-8, rtol=1e-8)
     assert torch.allclose(both["Ea"][:3], left["Ea"], atol=1e-8, rtol=1e-8)
     assert torch.allclose(both["Ea"][3:], right["Ea"], atol=1e-8, rtol=1e-8)
+
+
+def test_compiled_attention_preserves_channels_split_across_heads():
+    from enerzyme.models.presets.cartesian_vector import geodite
+
+    torch.manual_seed(19)
+    width, heads = 24, 8
+    block = geodite(dim_embedding=width, num_heads=heads, num_layers=1, num_rbf=4,
+                    attn_dropout=0).blocks[0].message.double()
+    idx_i = torch.tensor([0, 0, 1, 1, 2, 2])
+    idx_j = torch.tensor([1, 2, 2, 0, 0, 1])
+    data = [torch.randn(*shape, dtype=torch.float64, requires_grad=True) for shape in
+            [(3, width), (3, 8, width), (6, width), (6, 8), (6, 4)]]
+
+    def gradients(run):
+        out = run(*data, idx_i, idx_j)
+        loss = sum(field.square().sum() for field in out)
+        return (*out, *torch.autograd.grad(loss, (*data, block.value[0].linear.weight)))
+
+    expected = gradients(block)
+    compiled = torch.compile(block, backend="eager", fullgraph=True)
+    for actual, reference in zip(gradients(compiled), expected):
+        torch.testing.assert_close(actual, reference, rtol=2e-12, atol=2e-12)
+
+
+def test_compiled_force_training_with_dropout_accepts_new_edge_counts():
+    # A second batch with a different edge count retraces with a symbolic
+    # number of edges. The composite dropout called numel() on it inside the
+    # coordinate VJP; the native operator accepts the symbolic size.
+    from scripts.core_harness import build, forward, make_batch, random_molecules
+
+    from enerzyme.models.ff import get_ff_core
+
+    torch.manual_seed(5)
+    _, params, _ = get_ff_core("geodite")
+    params = {**params, "dim_embedding": 16, "num_layers": 1, "num_heads": 4, "num_rbf": 4}
+    model = build("geodite", build_params=params).double().train()
+    compiled = torch.compile(model, backend="aot_eager")
+    for sizes in ([5, 4], [8, 6]):
+        batch = make_batch(random_molecules(107, sizes, density=0.12), torch.float64)
+
+        def run(fn):
+            model.zero_grad(set_to_none=True)
+            torch.manual_seed(7)
+            out = forward(fn, batch, torch.float64, train=True)
+            (out["E"].square().sum() + out["Fa"].square().sum()).backward()
+            return out["E"].detach(), out["Fa"].detach(), {
+                name: p.grad.clone() for name, p in model.named_parameters() if p.grad is not None}
+
+        energy, forces, grads = run(model)
+        c_energy, c_forces, c_grads = run(compiled)
+        torch.testing.assert_close(c_energy, energy, rtol=1e-10, atol=1e-10)
+        torch.testing.assert_close(c_forces, forces, rtol=1e-10, atol=1e-10)
+        assert c_grads.keys() == grads.keys()
+        for name in grads:
+            torch.testing.assert_close(c_grads[name], grads[name], rtol=1e-8, atol=1e-10)

@@ -12,7 +12,7 @@ from enerzyme.models.camp.moment import (
 )
 from enerzyme.models.camp.radial import SpeciesPairChebyshev, chebyshev_first
 from enerzyme.models.camp.rules import atomic_paths, hyper_moment_rules
-from enerzyme.models.cutoff import polynomial_envelope
+from enerzyme.models.mp.basis.envelope import polynomial_envelope
 
 
 def test_chebyshev_recurrence_uses_the_unit_interval_argument():

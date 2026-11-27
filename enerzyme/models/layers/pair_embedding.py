@@ -15,7 +15,7 @@ import torch
 from torch import Tensor
 from torch.nn import Embedding
 
-from ..blocks.mlp import VariancePreservingMLP
+from ..mp.nn.mlp import VariancePreservingMLP
 from . import BaseFFLayer
 
 
@@ -71,7 +71,9 @@ class PairChemicalRadialLayer(BaseFFLayer):
                 "rbf and the neighbor index must describe the same edges"
             )
         species = Za.long()
-        if species.numel() and int(species.max()) > self.max_Za:
+        if torch.compiler.is_compiling():
+            torch._assert_async((species <= self.max_Za).all(), "atomic number exceeds max_Za")
+        elif species.numel() and int(species.max()) > self.max_Za:
             raise ValueError(
                 f"atomic number {int(species.max())} exceeds max_Za {self.max_Za}"
             )

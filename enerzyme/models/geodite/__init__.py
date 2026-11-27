@@ -6,10 +6,9 @@ stack. Radial window, isolated-atom residual, readout, and screened ZBL
 stay outside it.
 """
 
-from .core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS, GeoditeCore
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 
 __all__ = [
-    "GeoditeCore",
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
 ]

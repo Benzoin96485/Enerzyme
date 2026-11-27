@@ -9,7 +9,8 @@ import torch
 from e3nn import o3
 from torch import Tensor, nn
 
-from ..blocks.radial_mlp import RadialProfile
+from ..mp.basis.angular import spherical_harmonics
+from ..mp.nn.radial_mlp import RadialProfile
 
 
 class EdgeDegreeEmbeddingHigherOrder(nn.Module):
@@ -30,6 +31,7 @@ class EdgeDegreeEmbeddingHigherOrder(nn.Module):
     ) -> None:
         super().__init__()
         self.irreps_node_embedding = o3.Irreps(irreps_node_embedding)
+        self.degrees = tuple(ir.l for _, ir in self.irreps_node_embedding)
         if self.irreps_node_embedding[0][1].l != 0:
             raise ValueError("node embedding must include a 0e irrep first")
         self.number_of_basis = number_of_basis
@@ -83,14 +85,10 @@ class EdgeDegreeEmbeddingHigherOrder(nn.Module):
         else:
             edge_dis_embed = edge_scalars
 
+        harmonics = spherical_harmonics(edge_vec, lmax=max(self.degrees), layout="e3nn", normalization="norm")
         node_features = []
-        for idx, (_mul, ir) in enumerate(self.irreps_node_embedding):
-            lx = o3.spherical_harmonics(
-                l=ir.l,
-                x=edge_vec,
-                normalize=True,
-                normalization="norm",
-            )
+        for idx, degree in enumerate(self.degrees):
+            lx = harmonics[..., degree**2 : (degree + 1)**2]
             edge_fea = self.gbf_projs[idx](edge_dis_embed)
             edge_fea = torch.where(attn_mask, 0, edge_fea)
             lx_embed = torch.einsum("mnd,mnh->mdh", lx, edge_fea)

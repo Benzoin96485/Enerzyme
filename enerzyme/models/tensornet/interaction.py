@@ -19,12 +19,11 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, LayerNorm, Module, ModuleList
 
-from ..functional import reduce_edge
-from .ops import (
+from ..mp.ops import scatter_sum
+from ..mp.equivariant.cartesian import (
     compose_tensor,
     decompose_tensor,
     frobenius_squared,
-    skew_tensor_to_vector,
     symmetric_traceless,
     tensor_anticommutator,
     tensor_matmul,
@@ -45,18 +44,10 @@ def aggregate_edge_tensors(
     product is symmetrized and made traceless after the sum.
     """
     width = int(processed.shape[-1])
-    iso = reduce_edge(processed[:, 0, :], idx_i, (n_atoms, width))
-    vector = reduce_edge(
-        processed[:, 1, None, :] * hat.unsqueeze(-1),
-        idx_i,
-        (n_atoms, 3, width),
-    )
+    iso = scatter_sum(processed[:, 0, :], idx_i, n_atoms)
+    vector = scatter_sum(processed[:, 1, None, :] * hat.unsqueeze(-1), idx_i, n_atoms)
     outer = hat.unsqueeze(-1) * hat.unsqueeze(-2)
-    symmetric = reduce_edge(
-        processed[:, 2, None, None, :] * outer.unsqueeze(-1),
-        idx_i,
-        (n_atoms, 3, 3, width),
-    )
+    symmetric = scatter_sum(processed[:, 2, None, None, :] * outer.unsqueeze(-1), idx_i, n_atoms)
     return iso, vector_to_skew_tensor(vector), symmetric_traceless(symmetric)
 
 
@@ -97,13 +88,12 @@ class TensorNetEmbedding(Module):
     ) -> Tensor:
         n_atoms = atom_embedding.shape[0]
         width = self.dim_embedding
-        if idx_i.numel() == 0:
-            pair_input = atom_embedding.new_zeros((0, 2 * width))
-        else:
-            pair_input = torch.cat(
-                (atom_embedding[idx_i], atom_embedding[idx_j]), dim=-1
-            )
-        pair = self.pair_mix(pair_input)
+        # The two halves of the affine pair map act independently on the
+        # receiver and sender embeddings, which are shared by incident edges.
+        weights = self.pair_mix.weight.reshape(2 * width, width)
+        projected = F.linear(atom_embedding, weights).reshape(n_atoms, width, 2)
+        receiver = projected[..., 0] + self.pair_mix.bias
+        pair = receiver[idx_i] + projected[..., 1][idx_j]
         radial = torch.stack(
             (
                 self.distance_proj1(rbf),
@@ -160,17 +150,12 @@ def tensor_message_update(
     skew = linears_tensor[1](skew)
     traceless = linears_tensor[2](traceless)
     node = compose_tensor(iso, skew, traceless)
+    # The channel map preserves the antisymmetry produced by decomposition.
+    vector = torch.stack((skew[:, 2, 1], skew[:, 0, 2], skew[:, 1, 0]), dim=1)
 
-    vector = skew_tensor_to_vector(skew)
-    iso_m = reduce_edge(edge[:, 0, :] * iso[idx_j], idx_i, (n_atoms, width))
-    vector_m = reduce_edge(
-        edge[:, 1, None, :] * vector[idx_j], idx_i, (n_atoms, 3, width)
-    )
-    traceless_m = reduce_edge(
-        edge[:, 2, None, None, :] * traceless[idx_j],
-        idx_i,
-        (n_atoms, 3, 3, width),
-    )
+    iso_m = scatter_sum(edge[:, 0, :] * iso[idx_j], idx_i, n_atoms)
+    vector_m = scatter_sum(edge[:, 1, None, :] * vector[idx_j], idx_i, n_atoms)
+    traceless_m = scatter_sum(edge[:, 2, None, None, :] * traceless[idx_j], idx_i, n_atoms)
     message = compose_tensor(iso_m, vector_to_skew_tensor(vector_m), traceless_m)
     scale = charge_scale[:, None, None, None]
     if equivariance_group == "O(3)":

@@ -7,11 +7,10 @@ Adapted from https://github.com/liyy2/E2Former and
 https://github.com/IQuestLab/UBio-MolFM (MIT).
 """
 
-from .core import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS, E2FormerCore
+from .defaults import DEFAULT_BUILD_PARAMS, DEFAULT_LAYER_PARAMS
 from .lsr import (
     DEFAULT_BUILD_PARAMS as LSR_DEFAULT_BUILD_PARAMS,
     DEFAULT_LAYER_PARAMS as LSR_DEFAULT_LAYER_PARAMS,
-    E2FormerLSRCore,
 )
 from .v2 import (
     DEFAULT_BUILD_PARAMS as V2_DEFAULT_BUILD_PARAMS,
@@ -21,8 +20,6 @@ from .v2 import (
 __all__ = [
     "DEFAULT_BUILD_PARAMS",
     "DEFAULT_LAYER_PARAMS",
-    "E2FormerCore",
-    "E2FormerLSRCore",
     "LSR_DEFAULT_BUILD_PARAMS",
     "LSR_DEFAULT_LAYER_PARAMS",
     "V2_DEFAULT_BUILD_PARAMS",
