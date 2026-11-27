@@ -113,6 +113,20 @@
         ["equireann", "float64", "large_2000", [29.051452, 90.067442, 2589.142578, 4668.648926], [22.850769, 74.097025, 1651.625, 3270.644531], [28.825639, 90.079343, 2589.142578, 4668.648926], [22.874675, 75.0555, 1651.625, 3270.644531], [-20.994244, -17.205038, -36.209577, -29.944517]],
         ["equireann", "float64", "mol_batch_32x20", [8.350394, 24.95544, 498.47998, 901.990723], [7.837271, 23.050972, 341.570801, 652.908691], [8.548115, 25.000404, 498.47998, 901.990723], [7.841977, 23.054486, 341.570801, 652.908691], [-7.202819, -7.70751, -31.477529, -27.6147]]
       ]
+    },
+    "6340156": {
+      "candidate_revision": "29a20ac",
+      "baseline_revision": "1aa0f8b",
+      "fixture_sha256": "dc4aa813a8ca7c9f85f15bc45d5437c5bc3e2f1a1d0a545b1eaf2e158271060c",
+      "device_uuid": "GPU-af0a01fe-fd4e-0ebe-1d1e-22a5448c6189",
+      "timing_method": "Two warmups, nine timed iterations per run, one process per leg. FP32 ran baseline/candidate then candidate/baseline. FP64 ran candidate/baseline then baseline/candidate. Percent uses the median of the two paired ratios.",
+      "unavailable": "Both frozen and candidate sources exhausted 32 GiB V100 memory on 2000-atom inference and training in both precisions and both rounds.",
+      "paired_systems": [
+        ["spinconv", "float32", "mol_batch_32x20", [393.910449, 1411.881691, 5658.088379, 12414.31543], [393.853249, 1406.632635, 5653.802734, 12410.331055], [393.758806, 1411.546971, 5658.088379, 12414.31543], [393.932577, 1406.158798, 5653.802734, 12410.331055], [0.014805, -0.376749, -0.075744, -0.032095]],
+        ["spinconv", "float32", "bulk_256", [420.340471, 1478.62427, 6276.769043, 13212.308594], [420.64468, 1479.381878, 6270.224121, 13206.927734], [420.161904, 1478.481986, 6276.769043, 13212.308594], [420.357182, 1479.146554, 6270.224121, 13206.927734], [0.059424, 0.048093, -0.104272, -0.040726]],
+        ["spinconv", "float64", "mol_batch_32x20", [966.796946, 2640.821635, 11232.255371, 24789.782715], [967.043566, 2639.84516, 11229.847168, 24782.403809], [966.939569, 2640.414277, 11232.255371, 24789.782715], [966.101516, 2640.835717, 11229.847168, 24782.403809], [-0.030581, -0.010508, -0.02144, -0.029766]],
+        ["spinconv", "float64", "bulk_256", [1019.255233, 2763.447675, 12438.401367, 26343.002441], [1019.584369, 2761.734989, 12426.769531, 26330.077637], [1015.032416, 2763.936329, 12438.401367, 26343.002441], [1018.417475, 2760.989996, 12426.769531, 26330.077637], [0.182892, -0.084288, -0.093516, -0.049064]]
+      ]
     }
   },
   "regression_history_columns": ["architecture", "dtype", "system", "metric", "initial_delta_percent", "subsequent_job_and_delta_percent", "latest_status"],
@@ -163,8 +177,8 @@
     ["visnet_lsrm", "float64", "bulk_256", "train_ms", 3.07004, [["6316956", -3.71611]], "within_limit"]
   ],
   "summary": {
-    "paired_metric_records": 256,
-    "latest_distinct_comparable_metrics": 192,
+    "paired_metric_records": 272,
+    "latest_distinct_comparable_metrics": 208,
     "latest_over_limit": 0
   },
   "e2former_v2_cuda": {
