@@ -34,6 +34,7 @@ This guide is the in-depth reference for Enerzyme. It explains configuration sch
    :maxdepth: 2
    :caption: Workflows
 
+   user_guide/workflows/distributed_training
    user_guide/workflows/prediction
    user_guide/workflows/simulation_tasks
    user_guide/workflows/enhanced_sampling_plumed

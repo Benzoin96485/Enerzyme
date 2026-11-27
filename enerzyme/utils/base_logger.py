@@ -1,6 +1,7 @@
 import logging, os, datetime, pathlib
 from logging.handlers import TimedRotatingFileHandler
 import enerzyme
+from enerzyme.tasks.distributed import is_global_zero
 
 
 BASE_NAME = "Enerzyme"
@@ -36,17 +37,19 @@ class Logger(object):
 
     def get_logger(self):
         if not self.logger.handlers:
+            rank0 = is_global_zero()
             console_handler = logging.StreamHandler()
             console_handler.setFormatter(self.formatter)
-            console_handler.setLevel(self.console_output_level)
+            console_handler.setLevel(self.console_output_level if rank0 else logging.WARNING)
             console_handler.addFilter(PackagePathFilter())
             self.logger.addHandler(console_handler)
 
-            file_handler = TimedRotatingFileHandler(filename=os.path.join(self.log_path, self.log_file_name), when='D',
-                        interval=1, backupCount=self.backup_count, delay=True, encoding='utf-8')
-            file_handler.setFormatter(self.formatter)
-            file_handler.setLevel(self.file_output_level)
-            self.logger.addHandler(file_handler)
+            if rank0:
+                file_handler = TimedRotatingFileHandler(filename=os.path.join(self.log_path, self.log_file_name), when='D',
+                            interval=1, backupCount=self.backup_count, delay=True, encoding='utf-8')
+                file_handler.setFormatter(self.formatter)
+                file_handler.setLevel(self.file_output_level)
+                self.logger.addHandler(file_handler)
             # Avoid duplicate lines on stdout when root (e.g. Lightning) also has a StreamHandler.
             self.logger.propagate = False
         return self.logger

@@ -34,7 +34,8 @@ Training
     Faster epochs if memory allows; otherwise on-the-fly lists.
 
 :code:`lightning: true`
-    Multi-GPU training when single-process :code:`cuda` is insufficient.
+    Select the Lightning trainer. Native multi-GPU training uses PyTorch DDP.
+    See :doc:`../workflows/distributed_training` for launch and batch-size settings.
 
 Simulation
 ----------

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Iterable, Tuple, Dict, Any, List, Union, Optional
 import torch
 from torch import Tensor
@@ -288,7 +289,7 @@ def _decorate_batch_input(
         features, targets, data_keys = zip(*batch)
     else:
         features, targets = zip(*batch)
-        data_keys = None
+        data_keys = [None] * len(features)
     features = _batch_geometry(features)
     batch_features = dict()
     batch_targets = dict()
@@ -348,6 +349,23 @@ def _decorate_batch_input(
     return batch_features, batch_targets
 
 
+@dataclass
+class CollateBatch:
+    """Picklable collator that keeps the Trainer out of worker processes."""
+
+    pyg: bool
+    dtype: torch.dtype
+    device: Optional[torch.device]
+    otf_graph: bool
+    generator_config: Optional[Dict[str, Any]]
+    generator_training: bool
+
+    def __call__(self, batch):
+        collate = _decorate_pyg_batch_input if self.pyg else _decorate_batch_input
+        return collate(batch, self.dtype, self.device, self.otf_graph,
+                       self.generator_config, self.generator_training)
+
+
 def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], targets: Optional[Dict[str, Any]], non_target_features: List[str]=[]) -> Tuple[Dict[str, Union[np.ndarray, List]], Optional[Dict[str, Union[np.ndarray, List]]]]:
     y_pred = dict()
     y_truth = dict()
@@ -384,8 +402,9 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
                     y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
                 else:
                     y_truth[k] = v.detach().cpu().numpy()
-        y_pred["data_key"] = targets["data_key"]
-        y_truth["data_key"] = targets["data_key"]
+        data_keys = targets.get("data_key", [None] * len(features["N"]))
+        y_pred["data_key"] = data_keys
+        y_truth["data_key"] = data_keys
     y_truth["Za"] = y_pred["Za"]
 
     # Delta-learning inverse: priors must sit next to residual Qa / Sa on the metric dict

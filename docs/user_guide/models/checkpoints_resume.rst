@@ -78,10 +78,12 @@ layout cannot be mapped and continues with fresh optimizer state.
 New checkpoints carry the :code:`enerzyme_format` field. The conversion runs
 in memory when loading older files. The next save writes the current format.
 
-Lightning multi-GPU
--------------------
+Multi-GPU training
+------------------
 
-:code:`Trainer.lightning: true` enables PyTorch Lightning training (:code:`lightning_utils.py`). Use for multi-GPU scaling; verify batch size and learning rate relative to single-GPU runs.
+The native trainer supports single-process and distributed training. Set
+:code:`Trainer.lightning: true` to select Lightning. Launch examples and the
+native resume contract are in :doc:`../workflows/distributed_training`.
 
 Logs and config snapshot
 ------------------------
