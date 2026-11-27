@@ -25814,6 +25814,9 @@
         "float64/train/fail": 2,
         "float64/train/pass": 8
       },
+      "candidate_failed": 54,
+      "baseline_failed_candidate_passed": 1,
+      "baseline_and_candidate_failed": 2,
       "matching_same_source_and_shape_float32_training_controls": {
         "equflashv2/bulk_256/cuda": {
           "candidate": "c32ede3",
