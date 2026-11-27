@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Literal
-from torch import Tensor, linalg
+import torch
+from torch import Tensor
 import torch.nn.functional as F
 from . import BaseFFLayer
 from ..mp.basis.envelope import CUTOFF_KEY_TYPE, CUTOFF_REGISTER
@@ -35,7 +36,6 @@ class DistanceLayer(BaseFFLayer):
 
         Dij: Float tensor of distances, shape [N_pair * batch_size]
         '''
-        relevant_output = dict()
         if Ra.device.type == "cpu":  # indexing is faster on CPUs
             Ri = Ra[idx_i]
             Rj = Ra[idx_j]
@@ -48,12 +48,14 @@ class DistanceLayer(BaseFFLayer):
             Rj_ = Rj
         if self._with_vector:
             vij = Rj_ - Ri
-            relevant_output["vij"] = vij
-            # pairwise_distance(Ri, Rj_) adds epsilon to Ri - Rj_.
-            relevant_output["Dij"] = linalg.vector_norm(vij - 1e-15, dim=-1)
-        else:
-            relevant_output["Dij"] = F.pairwise_distance(Ri, Rj_, eps=1e-15)
-        return relevant_output
+            if Ra.dtype in (torch.float32, torch.float64):
+                # pairwise_distance(Ri, Rj_) adds epsilon to Ri - Rj_.
+                distance = torch.linalg.vector_norm(vij - 1e-15, dim=-1)
+            else:
+                # Preserve pairwise_distance's autocast promotion before subtraction.
+                distance = F.pairwise_distance(Ri, Rj_, eps=1e-15)
+            return {"Dij": distance, "vij": vij}
+        return {"Dij": F.pairwise_distance(Ri, Rj_, eps=1e-15)}
 
 
 class RangeSeparationLayer(BaseFFLayer):

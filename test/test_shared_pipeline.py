@@ -78,3 +78,22 @@ def test_vector_distance_keeps_directed_epsilon_and_mixed_derivatives(dtype):
     actual = derivatives(out["Dij"], out["vij"])
     reference = derivatives(expected, right - coords[i])
     torch.testing.assert_close(actual, reference)
+
+
+@pytest.mark.parametrize("device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else []))
+def test_vector_distance_preserves_autocast_for_low_precision_coordinates(device):
+    from enerzyme.models.layers.geometry import DistanceLayer
+
+    dtype = torch.float16 if device == "cuda" else torch.bfloat16
+    coords = torch.tensor([[0, 0, 0], [1.25, 0.5, 1.]], device=device, dtype=dtype,
+                          requires_grad=True)
+    i = torch.tensor([0, 0, 1], device=device)
+    j = torch.tensor([0, 1, 0], device=device)
+    layer = DistanceLayer()
+    layer.with_vector_on()
+    with torch.autocast(device_type=device, dtype=dtype):
+        actual = layer.get_output(coords, i, j)
+        expected = torch.nn.functional.pairwise_distance(coords[i], coords[j], eps=1e-15)
+    assert list(actual) == ["Dij", "vij"]
+    torch.testing.assert_close(actual["Dij"], expected, rtol=0, atol=0)
+    torch.testing.assert_close(actual["vij"], coords[j] - coords[i], rtol=0, atol=0)
