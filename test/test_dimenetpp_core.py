@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+import pytest
 import torch
 import yaml
 from numpy.testing import assert_allclose
@@ -124,20 +126,22 @@ def test_dimenetpp_feature_shape_hierarchical_and_last():
     assert out_last["atom_feature"].shape == (n, 6)
 
 
-def test_dimenetpp_rotation_invariance():
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_dimenetpp_rotation_invariance(dtype):
     torch.manual_seed(1)
+    # These weights exposed the error from generating the rotation in float32.
+    np.random.seed(96)
     n = 5
-    core = _tiny_core()
+    core = _tiny_core().to(dtype)
     core.eval()
     idx_i, idx_j = _complete_graph_edges(n)
-    pos = torch.randn(n, 3)
-    q, _ = torch.linalg.qr(torch.randn(3, 3))
+    pos = torch.randn(n, 3).to(dtype)
+    q, _ = torch.linalg.qr(torch.randn(3, 3).double())
     if torch.det(q) < 0:
-        q = q.clone()
         q[:, 0] *= -1
-    pos_r = pos @ q
-    atom_embedding = torch.randn(n, 8)
-    rbf = torch.randn(idx_i.numel(), 4)
+    pos_r = (pos.double() @ q).to(dtype)
+    atom_embedding = torch.randn(n, 8).to(dtype)
+    rbf = torch.randn(idx_i.numel(), 4).to(dtype)
 
     def _feat(p):
         vij = p[idx_j] - p[idx_i]
@@ -153,7 +157,8 @@ def test_dimenetpp_rotation_invariance():
 
     f0 = _feat(pos)
     f1 = _feat(pos_r)
-    assert torch.allclose(f0, f1, atol=1e-5, rtol=1e-5)
+    tolerance = 1e-10 if dtype == torch.float64 else 1e-5
+    torch.testing.assert_close(f0, f1, atol=tolerance, rtol=tolerance)
 
 
 def test_dimenetpp_layer_stack_energy_and_force():
