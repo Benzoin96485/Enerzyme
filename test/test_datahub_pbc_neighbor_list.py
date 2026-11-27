@@ -196,3 +196,109 @@ def test_otf_fallback_rejects_periodic_sample_without_cached_edges(tmp_path):
     batch = [(feature, None, "a")]
     with pytest.raises(ValueError):
         _decorate_batch_input(batch, dtype=torch.float64, device="cpu", otf_graph=True)
+
+
+@pytest.mark.parametrize("pyg", [False, True])
+@pytest.mark.parametrize("periodic_first", [False, True])
+def test_mixed_open_and_periodic_collation_uses_global_indices(pyg, periodic_first):
+    closed = {"N": 2, "Ra": np.array([[0.1, 0., 0.], [1.9, 0., 0.]]), "Za": [1, 1],
+              "cell": 2*np.eye(3), "pbc": [1, 0, 0], "idx_i": [0, 1, -1], "idx_j": [1, 0, -1],
+              "offsets": [[-2., 0., 0.], [2., 0., 0.], [0., 0., 0.]], "N_pair": 2}
+    opened = {"N": 2, "Ra": np.array([[0., 0., 0.], [0.5, 0., 0.]]), "Za": [1, 1]}
+    frames = [closed, opened] if periodic_first else [opened, closed]
+    collate = _decorate_pyg_batch_input if pyg else _decorate_batch_input
+    batch, _ = collate([(f, {}, "sample") for f in frames], torch.float64, "cpu")
+    assert batch["cell"].shape == (2, 3, 3) and batch["pbc"].shape == (2, 3)
+    assert batch["idx_i"].tolist() == [0, 1, 2, 3]
+    assert batch["idx_j"].tolist() == [1, 0, 3, 2]
+    if pyg:
+        assert torch.equal(batch.edge_index, torch.stack((batch.idx_i, batch.idx_j)))
+        for graph in batch.to_data_list():
+            assert graph.idx_i.tolist() == [0, 1] and graph.idx_j.tolist() == [1, 0]
+    distances = (batch["Ra"][batch["idx_j"]] + batch["offsets"] - batch["Ra"][batch["idx_i"]]).norm(dim=-1)
+    values = [0.2, 0.2, 0.5, 0.5] if periodic_first else [0.5, 0.5, 0.2, 0.2]
+    torch.testing.assert_close(distances, torch.tensor(values, dtype=torch.float64))
+
+
+@pytest.mark.parametrize("pyg", [False, True])
+def test_open_metadata_can_use_on_the_fly_and_periodic_edges_require_shifts(pyg):
+    collate = _decorate_pyg_batch_input if pyg else _decorate_batch_input
+    frame = {"N": 2, "Ra": [[0., 0., 0.], [0.5, 0., 0.]], "Za": [1, 1],
+             "cell": np.zeros((3,3)), "pbc": [False]*3}
+    batch, _ = collate([(frame, {}, "sample")], torch.float64, "cpu")
+    assert batch["idx_i"].tolist() == [0, 1]
+    periodic = dict(frame, cell=np.eye(3), pbc=[True, False, False], idx_i=[0, 1], idx_j=[1, 0])
+    with pytest.raises(ValueError, match="offsets"):
+        collate([(periodic, {}, "sample")], torch.float64, "cpu")
+
+
+def test_cutoff_cache_distinguishes_boundary_conditions_and_geometry_alias(tmp_path):
+    path = tmp_path / "geometry.pkl"
+    fields = {"N": 2, "Za": [1, 1], "Ra": [[0.1, 0., 0.], [1.9, 0., 0.]],
+              "alternative": [[0.1, 0., 0.], [1., 0., 0.]], "cell": 2*np.eye(3), "pbc": [1,0,0]}
+    _write_pickle(path, [fields, fields])
+
+    def cache(features):
+        h = SingleDataHub(dump_dir=str(tmp_path), data_path=str(path), data_format="pickle",
+                          features=features, targets={}, neighbor_list="cutoff",
+                          neighbor_list_cutoff=0.5, preload=True)
+        n = np.asarray(h.data["N_pair"]).tolist()
+        h.file.close()
+        return h.preload_path, n
+
+    common = {"N": None, "Ra": None, "Za": None}
+    periodic = {**common, "cell": None, "pbc": None}
+    a = cache(common)
+    b = cache(periodic)
+    c = cache({**periodic, "Ra": "alternative"})
+    assert [a[1], b[1], c[1]] == [[0, 0], [2, 2], [0, 0]]
+    assert len({a[0], b[0], c[0]}) == 3
+    assert cache(periodic) == b
+
+
+@pytest.mark.parametrize("data_format", ["hdf5", "aselmdb"])
+def test_periodic_training_geometry_from_database_and_preloaded_cache(tmp_path, data_format):
+    cell = np.diag([2., 3., 4.])
+    positions = np.array([[0.1, 0., 0.], [1.9, 0., 0.]])
+    path = tmp_path / f"frames.{data_format}"
+    if data_format == "hdf5":
+        import h5py
+
+        with h5py.File(path, "w") as store:
+            raw = store.create_group("data")
+            raw["Ra"] = [positions, positions]
+            raw["N"] = [2, 2]
+            raw["Za"] = [[1, 1], [1, 1]]
+            raw["cell"] = [cell]  # One shared lattice, two configurations.
+            raw["pbc"] = [[True, False, False], [False, False, False]]
+    else:
+        from ase import Atoms
+        from ase.db import connect
+
+        with connect(str(path)) as db:
+            for pbc in ([True, False, False], [False, False, False]):
+                db.write(Atoms("H2", positions=positions, cell=cell, pbc=pbc))
+
+    options = dict(dump_dir=str(tmp_path), data_path=str(path), data_format=data_format,
+                   features=["N", "Za", "Ra", "cell", "pbc"], targets={},
+                   neighbor_list="cutoff", neighbor_list_cutoff=0.4, preload=True)
+    for _ in range(2):
+        hub = SingleDataHub(**options)
+        try:
+            assert hub.n_datapoint == 2 and hub.max_N == 2
+            assert np.asarray(hub.data["N_pair"]).tolist() == [2, 0]
+            assert np.asarray(hub.data["idx_i"][1]).tolist() == [-1, -1]
+            assert not np.any(hub.data["offsets"][1])
+            np.testing.assert_allclose(hub.features.loc(0)["cell"], cell)
+        finally:
+            hub.file.close()
+
+
+def test_full_neighbor_list_rejects_a_periodic_dataset(tmp_path):
+    path = tmp_path / "periodic.pkl"
+    frame = {"N": 2, "Za": [1, 1], "Ra": [[0.1, 0., 0.], [1.9, 0., 0.]],
+             "cell": 2*np.eye(3), "pbc": [True, False, False]}
+    _write_pickle(path, [frame, frame])
+    with pytest.raises(ValueError, match="Periodic.*cutoff"):
+        SingleDataHub(dump_dir=str(tmp_path), data_path=str(path), data_format="pickle",
+                      features=["N", "Ra", "Za", "pbc", "cell"], targets={}, neighbor_list="full")

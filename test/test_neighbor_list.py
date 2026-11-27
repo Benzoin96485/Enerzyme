@@ -136,3 +136,42 @@ def test_empty_system():
     idx_i, idx_j, offsets = cutoff_neighbor_list(pos, cutoff=1.0)
     assert len(idx_i) == 0 and len(idx_j) == 0
     assert offsets.shape == (0, 3)
+
+
+@pytest.mark.parametrize("pbc,cell", [
+    ((True, False, False), [[0., 2., 0.], [0., 0., 0.], [0., 0., 0.]]),
+    ((True, False, True), [[0., 2., 0.], [0., 0., 0.], [0., 0.5, -2.]]),
+])
+def test_rotated_partial_cell_is_translation_invariant(pbc, cell):
+    cell = np.asarray(cell)
+    positions = np.array([[0., 0., 0.], [0.3, 1.8, 0.1]]) + [300., -400., 30.]
+    cutoff = 2.05
+    expected = _brute_force_periodic_pairs(positions, cutoff, cell, pbc)
+    assert _pairs_with_shift(*cutoff_neighbor_list(positions, cutoff, cell, pbc)) == expected
+
+
+@pytest.mark.parametrize("use_ase", [True, False])
+def test_self_images_and_inclusive_cutoff(monkeypatch, use_ase):
+    if use_ase:
+        import sys
+        monkeypatch.setitem(sys.modules, "matscipy.neighbours", None)
+    else:
+        pytest.importorskip("matscipy")
+    pos = np.zeros((1, 3))
+    expected = _brute_force_periodic_pairs(pos, 2., np.eye(3)*2, (True, True, True))
+    assert len(expected) == 6
+    for include_origin in (True, False):
+        i, j, shifts = cutoff_neighbor_list(pos, 2., np.eye(3)*2, True, self_interaction=include_origin)
+        wanted = expected | {(0, 0, (0., 0., 0.))} if include_origin else expected
+        assert len(i) == len(wanted)
+        assert _pairs_with_shift(i, j, shifts) == wanted
+
+
+@pytest.mark.parametrize("cutoff,cell,pbc", [
+    (0., None, False), (-1., None, False), (float("nan"), None, False),
+    (1., None, True), (1., np.zeros((3, 3)), [True, False, False]),
+    (1., np.eye(3), [True, False]), (1., np.eye(3), [True, True, True, True]),
+])
+def test_invalid_neighbor_geometry_is_rejected(cutoff, cell, pbc):
+    with pytest.raises(ValueError):
+        cutoff_neighbor_list(np.zeros((2, 3)), cutoff, cell, pbc)

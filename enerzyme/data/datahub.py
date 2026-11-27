@@ -92,8 +92,7 @@ ASELMDB_METADATA_PROPERTIES_KEY = "enerzyme_properties"
 _ASE_INFO_STANDARD_KEYS = frozenset({"charge", "spin"})
 
 # Always available geometry / charge fields (no calculator required).
-# cell/pbc come straight from ase.Atoms and default to a non-periodic identity
-# cell / all-False pbc, same as an isolated-molecule Atoms object.
+# ASE provides the cell and the three periodicity flags even for isolated structures.
 _ASELMDB_GEOMETRY_KEYS = frozenset({"Ra", "Za", "N", "Q", "S", "cell", "pbc"})
 
 # ASELMDBDataset exposes these under standard Enerzyme names only (not pickle aliases
@@ -508,12 +507,12 @@ class SingleDataHub:
         preprocessings: Optional[Dict[str, Union[str, bool]]]=None,
         global_transforms: Optional[Dict[str, Union[str, bool]]]=None,
         neighbor_list: Optional[str]=None,
-        neighbor_list_cutoff: Optional[float]=None,
         hash_length: int=16,
         compressed: bool=True,
         max_memory: int=10,
         connect_args: Dict[str, Any]=dict(),
         select_args: Dict[str, Any]=dict(),
+        neighbor_list_cutoff: Optional[float]=None,
         **params
     ):
         self.data_path = os.path.abspath(data_path)
@@ -557,10 +556,12 @@ class SingleDataHub:
         datahub_str = data_path + str(neighbor_list) + \
             str(sorted(preprocessings.items()) if preprocessings is not None else '') + \
             str(sorted(global_transforms.items()) if global_transforms is not None else '')
-        # Only fold neighbor_list_cutoff into the cache key when set, so existing
-        # "full"/unset configs (neighbor_list_cutoff always None) keep their hash.
-        if neighbor_list_cutoff is not None:
-            datahub_str += str(neighbor_list_cutoff)
+        if neighbor_list == "cutoff":
+            if neighbor_list_cutoff is None or not np.isfinite(neighbor_list_cutoff) or neighbor_list_cutoff <= 0:
+                raise ValueError("Datahub neighbor_list='cutoff' requires a finite, positive neighbor_list_cutoff")
+            # Boundaries and mapped coordinates determine which edges are cached.
+            # Older open-boundary/all-pairs datasets retain their existing keys.
+            datahub_str += repr((float(neighbor_list_cutoff), sorted(self.data_types.items())))
         if data_format:
             datahub_str += str(data_format)
         if self.connect_args:
@@ -636,9 +637,15 @@ class SingleDataHub:
             handler = YamlHandler(config_path)
             datahub_config = handler.read_yaml()
             preload_data_types = _collect_types(datahub_config.feature) | _collect_types(datahub_config.target)
-            if preload_data_types.keys() <= self.data_types.keys():
-                # all kinds of features and targets are contained in the processed dataset
+            if self.data_types.items() <= preload_data_types.items():
                 self.get_handle()
+                if self.neighbor_list_type == "full":
+                    self._check_full_boundaries()
+                if self.neighbor_list_type == "cutoff" and not self.data.attrs.get("cutoff_neighbor_list_complete", False):
+                    self.file.close()
+                    return False
+                self.n_datapoint = len(self.data["Ra"])
+                self.max_N = self.data["Ra"].shape[1]
                 logger.info(f"Data matched and preloaded from {self.preload_path}")
                 return True
         return False
@@ -881,27 +888,18 @@ class SingleDataHub:
             else:
                 self._load_molecular_data(k, raw_data)
         
-        if self.data_format in ["hdf5", "npz"]:
+        if self.data_format == "hdf5":
+            raw_data.file.close()
+        elif self.data_format == "npz":
             raw_data.close()
 
-    def _neighbor_list_frame_N(self, i: int) -> int:
-        # "N" may be compressed to a single shared value (see _expand/_compress).
-        return int(self.data["N"][0 if len(self.data["N"]) == 1 else i])
-
-    def _neighbor_list_frame_cell(self, i: int) -> Optional[np.ndarray]:
-        if "cell" not in self.data:
-            return None
-        cell = self.data["cell"]
-        return np.asarray(cell[0 if len(cell) == 1 else i])
-
-    def _neighbor_list_frame_pbc(self, i: int) -> Optional[np.ndarray]:
-        if "pbc" not in self.data:
-            return None
-        pbc = self.data["pbc"]
-        return np.asarray(pbc[0 if len(pbc) == 1 else i])
+    def _check_full_boundaries(self):
+        if "pbc" in self.data_types and "pbc" in self.data and np.asarray(self.data["pbc"]).any():
+            raise ValueError("Periodic samples need neighbor_list='cutoff' with Cartesian offsets")
 
     def _init_neighbor_list(self) -> None:
         if self.neighbor_list_type == "full":
+            self._check_full_boundaries()
             from .neighbor_list import full_neighbor_list
             logger.info("producing neighbor list")
             if self.compressed and len(self.data["N"]) == 1:
@@ -921,41 +919,30 @@ class SingleDataHub:
                     self.data["idx_j"][i] = array_padding([idx_j], max_N_pairs, pad_value=-1)
         elif self.neighbor_list_type == "cutoff":
             from .neighbor_list import cutoff_neighbor_list
-            if self.neighbor_list_cutoff is None:
-                raise ValueError(
-                    "Datahub neighbor_list='cutoff' requires neighbor_list_cutoff "
-                    "(the short-range search radius) to be set."
-                )
-            logger.info(
-                f"producing cutoff neighbor list (O(N) cell list, cutoff="
-                f"{self.neighbor_list_cutoff}); cell/pbc are read per-datapoint when present, "
-                "else this is an open-boundary cutoff radius graph"
-            )
-            # Cutoff-limited pairs are geometry-dependent (unlike the fixed
-            # all-pairs topology "full" reuses via compression), so every frame
-            # is enumerated individually; the max pair count is only known after
-            # building every frame's list once.
-            per_frame = []
+            logger.info(f"Producing cutoff neighbor list (cutoff={self.neighbor_list_cutoff})")
+            # Resize on demand. Padding belongs to the HDF5 dataset; holding
+            # every frame's image vectors in memory scales with the trajectory.
+            shape = (self.n_datapoint, 1)
+            maxshape = (self.n_datapoint, None)
+            idx_i = self.data.create_dataset("idx_i", shape=shape, maxshape=maxshape, dtype=int, fillvalue=-1)
+            idx_j = self.data.create_dataset("idx_j", shape=shape, maxshape=maxshape, dtype=int, fillvalue=-1)
+            offsets = self.data.create_dataset("offsets", shape=(*shape, 3), maxshape=(*maxshape, 3), dtype=float)
+            counts = self.data.create_dataset("N_pair", shape=self.n_datapoint, dtype=int)
+            frames = FieldDataset({k: self.data[k] for k in ("Ra", "N", "cell", "pbc") if k in self.data})
             for i in tqdm(range(self.n_datapoint)):
-                N_i = self._neighbor_list_frame_N(i)
-                Ra_i = np.asarray(self.data["Ra"][i])[:N_i]
-                idx_i, idx_j, offsets = cutoff_neighbor_list(
-                    Ra_i,
-                    self.neighbor_list_cutoff,
-                    cell=self._neighbor_list_frame_cell(i),
-                    pbc=self._neighbor_list_frame_pbc(i),
+                frame = frames.loc(i)
+                receivers, senders, shifts = cutoff_neighbor_list(
+                    frame["Ra"][:int(frame["N"])], self.neighbor_list_cutoff,
+                    cell=frame.get("cell"), pbc=frame.get("pbc"),
                 )
-                per_frame.append((idx_i, idx_j, offsets))
-            max_N_pairs = max((len(idx_i) for idx_i, _, _ in per_frame), default=0) or 1
-            self.data.create_dataset("idx_i", shape=(self.n_datapoint, max_N_pairs), dtype=int)
-            self.data.create_dataset("idx_j", shape=(self.n_datapoint, max_N_pairs), dtype=int)
-            self.data.create_dataset("offsets", shape=(self.n_datapoint, max_N_pairs, 3), dtype=float)
-            self.data.create_dataset("N_pair", shape=self.n_datapoint, dtype=int)
-            for i, (idx_i, idx_j, offsets) in enumerate(per_frame):
-                self.data["N_pair"][i] = len(idx_i)
-                self.data["idx_i"][i] = array_padding([idx_i], max_N_pairs, pad_value=-1)
-                self.data["idx_j"][i] = array_padding([idx_j], max_N_pairs, pad_value=-1)
-                self.data["offsets"][i] = array_padding([offsets], max_N_pairs, pad_value=0.0)
+                n_pair = len(receivers)
+                counts[i] = n_pair
+                if n_pair > idx_i.shape[1]:
+                    for field in (idx_i, idx_j, offsets):
+                        field.resize(n_pair, axis=1)
+                idx_i[i, :n_pair] = receivers
+                idx_j[i, :n_pair] = senders
+                offsets[i, :n_pair] = shifts
 
     def get_handle(self, mode: Literal["r", "w"]="r") -> None:
         if mode == "w" and os.path.exists(self.preload_path):
@@ -984,6 +971,8 @@ class SingleDataHub:
             "neighbor_list_cutoff": self.neighbor_list_cutoff,
         })
         handler.write_yaml(datahub_config)
+        if self.neighbor_list_type == "cutoff":
+            self.data.attrs["cutoff_neighbor_list_complete"] = True
         logger.info(f"Save preloaded dataset at {self.preload_path}")
 
     @property
