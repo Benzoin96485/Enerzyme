@@ -399,7 +399,8 @@ the interaction hierarchy reuses the GemNet blocks. Also :code:`So3krates` under
 :code:`atom_sphere_feature` with :code:`feature_irreps`; shared :code:`SimpleReadout`
 or optional :code:`EquiformerV2FeedForwardReadout` / physics layers after the Core),
 :code:`EquiformerV3` under :code:`enerzyme/models/equiformer_v3/`
-(same latent contract; merged LN + SwiGLU-S² + envelope attention via extended :code:`so3/`),
+(same latent contract, with merged layer norm and SwiGLU-S² in
+:code:`mp/equivariant/` and envelope attention in :code:`mp/ops/`),
 :code:`EquFlash` and :code:`EquFlashV2` under :code:`enerzyme/models/equflash/`
 (shared irreps, Bessel flavor, and XPLOR window; each Core emits flat
 :code:`atom_feature`),
@@ -1028,7 +1029,7 @@ Paper eSCN (Passaro & Zitnick, 2023) lives under :code:`enerzyme/models/escn/` w
 EquiformerV2 (:code:`equiformer_v2`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Liao et al. (ICLR 2024) lives under :code:`enerzyme/models/equiformer_v2/` and extends shared :code:`so3/` (rotate-inv rescale, component grids, :code:`SO3_LinearV2`). The Core emits the same :code:`atom_feature` / :code:`atom_sphere_feature` contract as eSCN; compose :code:`SimpleReadout` or :code:`EquiformerV2FeedForwardReadout` plus :code:`EnergyReduce` / :code:`Force` outside the Core. Offline parity vs vendored :code:`atomicarchitects/equiformer_v2` nets is in :code:`test/test_equiformer_v2_parity_*.py`. Enerzymette only needs :code:`architecture: equiformer_v2` plus a resolved :code:`config.yaml`.
+Liao et al. (ICLR 2024) lives under :code:`enerzyme/models/equiformer_v2/` and uses rotation, component grids and :code:`SO3_LinearV2` from :code:`mp/equivariant/`. The Core emits the same :code:`atom_feature` / :code:`atom_sphere_feature` contract as eSCN; compose :code:`SimpleReadout` or :code:`EquiformerV2FeedForwardReadout` plus :code:`EnergyReduce` / :code:`Force` outside the Core. Offline parity vs vendored :code:`atomicarchitects/equiformer_v2` nets is in :code:`test/test_equiformer_v2_parity_*.py`. Enerzymette only needs :code:`architecture: equiformer_v2` plus a resolved :code:`config.yaml`.
 
 EquFlashV2 (:code:`equflashv2`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1069,7 +1070,7 @@ plus a resolved :code:`config.yaml`.
 EquiformerV3 (:code:`equiformer_v3`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Liao et al. (2026, arXiv:2604.09130) lives under :code:`enerzyme/models/equiformer_v3/` and further extends shared :code:`so3/` (merged LN, SwiGLU-S², :code:`SO2Linear`, :code:`PolynomialEnvelope` / :code:`GraphSoftmax`, fused :code:`SO3RotationFused`, flat lat–long :code:`SO3Grid`). The Core emits the same :code:`atom_feature` / :code:`atom_sphere_feature` contract as eSCN/V2; compose :code:`SimpleReadout` plus :code:`EnergyReduce` / :code:`Force` outside the Core. Offline parity vs vendored :code:`atomicarchitects/equiformer_v3` experimental nets is in :code:`test/test_equiformer_v3_parity_*.py`. Enerzymette only needs :code:`architecture: equiformer_v3` plus a resolved :code:`config.yaml`.
+Liao et al. (2026, arXiv:2604.09130) lives under :code:`enerzyme/models/equiformer_v3/` and uses merged layer norm, SwiGLU-S², :code:`SO2Linear`, :code:`SO3RotationFused` and :code:`SO3Grid` from :code:`mp/equivariant/`. Its attention uses :code:`PolynomialEnvelope` from :code:`mp/basis/` and :code:`GraphSoftmax` from :code:`mp/ops/`. The Core emits the same :code:`atom_feature` / :code:`atom_sphere_feature` contract as eSCN/V2; compose :code:`SimpleReadout` plus :code:`EnergyReduce` / :code:`Force` outside the Core. Offline parity vs vendored :code:`atomicarchitects/equiformer_v3` experimental nets is in :code:`test/test_equiformer_v3_parity_*.py`. Enerzymette only needs :code:`architecture: equiformer_v3` plus a resolved :code:`config.yaml`.
 
 E2Former (:code:`e2former`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
