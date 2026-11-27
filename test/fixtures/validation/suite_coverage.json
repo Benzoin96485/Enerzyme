@@ -1,21 +1,24 @@
 {
   "cpu": {
-    "revision": "67ccb68",
-    "job": "6340317",
-    "test_files_and_shards": 171,
+    "revision": "c5e5454",
+    "job": "6341026",
+    "test_files_and_shards": 177,
     "results": {
-      "passed": 1676,
-      "skipped": 68,
+      "passed": 1726,
+      "skipped": 74,
       "errors": 0,
       "failures": 0
     },
     "skip_reasons": {
       "preset does not declare inversion symmetry": 42,
+      "CUDA device required": 2,
       "CUDA + Triton required": 2,
       "CUDA and Triton required": 2,
+      "two visible CUDA devices and Triton required": 1,
       "CUDA-only local-frame fusion": 1,
       "requires CUDA Inductor": 4,
       "set UMA_CHECKPOINT to a local uma-*.pt for live train smoke": 1,
+      "requires a CUDA device": 3,
       "compiled single-precision CUDA training": 1,
       "CUDA receiver reductions": 1,
       "CUDA not available": 6,
@@ -24,8 +27,8 @@
     }
   },
   "cuda": {
-    "revision": "59bd0d4",
-    "job": "6340211",
+    "revision": "c5e5454",
+    "job": "6341025",
     "device": "Tesla V100-PCIE-32GB (sm70)",
     "pytest_files": [
       "test/test_e2former_triton_parity.py",
@@ -36,25 +39,34 @@
       "test/test_alignn_ops.py::test_compiled_gate_preserves_live_hooks_and_force_gradients",
       "test/test_gemnet_ops.py::test_compiled_bilinear_force_inference_retains_gradients",
       "test/test_spinconv_core.py",
-      "test/test_spinconv_ops.py"
+      "test/test_spinconv_ops.py",
+      "test/test_ewald_electrostatics.py",
+      "test/test_pbc_ewald_end_to_end_smoke.py",
+      "test/test_cuda_periodic_forces.py"
     ],
     "results": {
-      "passed": 62,
+      "passed": 81,
       "skipped": 1,
       "errors": 0,
       "failures": 0
     },
     "cpu_skips_passed_on_cuda": [
       "test.test_alignn_ops::test_compiled_gate_preserves_live_hooks_and_force_gradients",
+      "test.test_cuda_periodic_forces::test_schnet_force_training_across_cell_boundary[dtype0-cuda]",
+      "test.test_cuda_periodic_forces::test_schnet_force_training_across_cell_boundary[dtype1-cuda]",
       "test.test_dpa4_core::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles",
       "test.test_e2former_triton_parity::test_attention_triton_qk_matches_qk_alpha_module_on_cuda",
       "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype0]",
       "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype1]",
       "test.test_e2former_triton_parity::test_triton_sparse_qk_v_match_pytorch_on_cuda",
+      "test.test_e2former_triton_parity::test_triton_uses_input_device_and_restores_current_device",
+      "test.test_ewald_electrostatics::test_skewed_and_left_handed_representations_of_the_same_lattice[cuda]",
       "test.test_gemnet_ops::test_compiled_bilinear_force_inference_retains_gradients[dtype0]",
       "test.test_gemnet_ops::test_compiled_bilinear_force_inference_retains_gradients[dtype1]",
       "test.test_local_frame_ops::test_compiled_local_frame_projection_honors_nested_hook",
       "test.test_mp_aggregate::test_double_cuda_envelope_training_uses_the_ordered_fp32_denominator",
+      "test.test_pbc_ewald_end_to_end_smoke::test_pbc_physnet_ewald_forward_finite[dtype0-cuda]",
+      "test.test_pbc_ewald_end_to_end_smoke::test_pbc_physnet_ewald_forward_finite[dtype1-cuda]",
       "test.test_scatter::test_scatter_sum_basic_equivalence[cuda]",
       "test.test_scatter::test_scatter_sum_empty_input_equivalence[cuda]",
       "test.test_scatter::test_scatter_sum_grad_equivalence[cuda]",
@@ -67,12 +79,12 @@
       "test.test_e2former_triton_parity::test_want_triton_cpu_fallback_matches_pytorch_sparse_ops": "CUDA Triton available; CPU fallback path not exercised here"
     }
   },
-  "notes": "The CPU suite includes the DimeNet++ rotation test fix. The installed package sources, documentation and CUDA test files are identical to their measured revision. Every CUDA-only test skipped on the CPU passed on the V100. The GPU suite skipped one CPU fallback test that passed on the CPU.",
+  "notes": "The CPU suite, two-GPU CUDA regression suite, installed wheel and strict documentation build use the same product revision. Every CUDA-only test skipped on the CPU passed on the available Tesla V100 GPUs. The CUDA suite's CPU-only fallback case passed on the CPU.",
   "wheel": {
-    "revision": "59bd0d4",
-    "job": "6340213",
+    "revision": "c5e5454",
+    "job": "6341023",
     "filename": "enerzyme-0.6.0-py3-none-any.whl",
-    "sha256": "8319aeec97a694aba617aa1ab3ecf5cc2aebf810389e1e864329b5c99421e40f",
+    "sha256": "2644ee15b09e675727997ccb3eff2d21a7cfc4229352b50daa028b2103a627d1",
     "results": {
       "passed": 58,
       "skipped": 0,
@@ -82,7 +94,7 @@
     "method": "Build from git archive with no index, install into a fresh target directory, load the registry and bundled Jd, CG and Lebedev data, and run the 58 frozen-weight checks outside the source checkout. The isolated test directory contains only the test harness and the frozen-weight symlink."
   },
   "documentation": {
-    "revision": "59bd0d4",
+    "revision": "c5e5454",
     "sphinx": "8.2.3",
     "builder": "html",
     "options": [
@@ -92,8 +104,8 @@
       "-E",
       "-a"
     ],
-    "source_documents": 997,
-    "generated_api_documents": 956,
+    "source_documents": 999,
+    "generated_api_documents": 958,
     "warnings": 0,
     "exit_code": 0,
     "method": "Copy docs to a fresh source directory and build into an empty output directory with the repository source available for autodoc. Count the source documents reported by Sphinx. The two autosummary templates are excluded."
@@ -219,5 +231,31 @@
     },
     "test_revision": "67ccb68",
     "new_test": "Use the reproducing weight seed 96, construct the same proper rotation in double precision for both model dtypes and also check float64 features. Absolute and relative tolerances are both 1e-5 for float32 and 1e-10 for float64."
+  },
+  "periodic_force_training": {
+    "revision": "c5e5454",
+    "job": "6341031",
+    "device": "Tesla V100-PCIE-32GB (sm70)",
+    "method": "Default CUDA Inductor versus eager PhysNet with three-dimensional Ewald summation. Compare energies and forces and differentiate a loss using both through every participating parameter.",
+    "results": {
+      "float32": {
+        "energy_force_max_abs": 2.9802322387695312e-08,
+        "weight_max_abs": 1.1920928955078125e-07,
+        "parameters": 44,
+        "graphs": {
+          "calls_captured": 360,
+          "unique_graphs": 1
+        }
+      },
+      "float64": {
+        "energy_force_max_abs": 1.1102230246251565e-16,
+        "weight_max_abs": 8.881784197001252e-16,
+        "parameters": 44,
+        "graphs": {
+          "calls_captured": 360,
+          "unique_graphs": 1
+        }
+      }
+    }
   }
 }
