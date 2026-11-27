@@ -6,7 +6,7 @@
     "original": "1aa0f8b",
     "candidate": "4428e68",
     "closure_jobs": {"formal": "6339555", "matched_V100": "6340048", "CPU_native": "6340069", "CPU_row_derivatives": "6340084"},
-    "formal_GPU_uuid": "GPU-e7d358e7-783a-3a6f-9e59-ddd2825dcbd8",
+    "formal_GPU_uuid": "GPU-9a19f472-727c-1aec-eb16-7d4406811551",
     "matching_GPU_uuid": "GPU-4081123a-eb84-086b-44c7-05b874d413ce",
     "torch": "2.13.0+cu126",
     "fixture_sha256": "39566781242ab4a660c1a90d96906a36420d0e85e44da5b44e1bc93b93d7ee2e",
