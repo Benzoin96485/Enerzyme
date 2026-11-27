@@ -70,11 +70,40 @@ def test_double_cuda_envelope_training_uses_the_ordered_fp32_denominator():
         torch.use_deterministic_algorithms(True)
         reference = segment_envelope_gated_softmax(logits, envelope, index, nodes, bias)
         torch.use_deterministic_algorithms(False)
-        result = EnvelopeGated()(values, logits, envelope, index, nodes, bias)
+        result = EnvelopeGated(ordered_sum=True)(values, logits, envelope, index, nodes, bias)
         weights, = torch.autograd.grad(result.sum(), values)
     finally:
         torch.use_deterministic_algorithms(deterministic, warn_only=warn_only)
     torch.testing.assert_close(weights.flatten(), reference.flatten(), rtol=0, atol=0)
+
+
+def test_dpa4_opts_in_to_ordered_sum_only_for_double_cuda_training(monkeypatch):
+    from torch._subclasses.fake_tensor import FakeTensorMode
+    from enerzyme.models.dpa4.so2 import SO2Convolution
+    from enerzyme.models.mp import aggregate
+
+    selected = []
+
+    def record(logits, *args, ordered_sum):
+        selected.append(ordered_sum)
+        return logits
+
+    monkeypatch.setattr(aggregate, "segment_envelope_gated_softmax", record)
+    monkeypatch.setattr(aggregate, "scatter_sum", lambda values, *_: values)
+    default = EnvelopeGated()
+    legacy = EnvelopeGated()
+    del legacy.ordered_sum
+    dpa4 = SO2Convolution(lmax=1, mmax=1, channels=2).aggregate
+    with FakeTensorMode():
+        for module, training, device, dtype in (
+            (default, True, "cuda", torch.float64), (legacy, True, "cuda", torch.float64),
+            (dpa4, True, "cuda", torch.float64), (dpa4, False, "cuda", torch.float64),
+            (dpa4, True, "cuda", torch.float32), (dpa4, True, "cpu", torch.float64),
+        ):
+            logits = torch.empty(3, 1, 1, dtype=dtype, device=device)
+            module.train(training)(logits.unsqueeze(-1), logits, logits[:, 0, 0],
+                                   torch.zeros(3, dtype=torch.long, device=device), 1, logits[0])
+    assert selected == [False, False, True, False, False, False]
 
 
 def test_gated_softmax_value_and_score_gradients():

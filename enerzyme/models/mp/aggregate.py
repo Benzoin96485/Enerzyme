@@ -89,9 +89,14 @@ class SoftmaxAttention(nn.Module):
 class EnvelopeGated(nn.Module):
     """DPA4 receiver aggregation of [edge, coefficient, focus, channel] values."""
 
+    def __init__(self, *, ordered_sum: bool = False) -> None:
+        super().__init__()
+        self.ordered_sum = ordered_sum
+
     def forward(self, values: Tensor, logits: Tensor, envelope: Tensor, index: Tensor,
                 num_nodes: int, null_bias: Tensor, eps: float = 1e-6) -> Tensor:
-        ordered_sum = self.training and logits.is_cuda and logits.dtype == torch.float64
+        ordered_sum = (getattr(self, "ordered_sum", False) and self.training
+                       and logits.is_cuda and logits.dtype == torch.float64)
         weights = segment_envelope_gated_softmax(
             logits, envelope, index, num_nodes, null_bias, eps, ordered_sum=ordered_sum
         )

@@ -318,7 +318,7 @@ class SO2Convolution(nn.Module):
         self.mixing_layers = mixing_layers
         self.n_atten_head = n_atten_head
         self.eps = eps
-        self.aggregate = EnvelopeGated()
+        self.aggregate = EnvelopeGated(ordered_sum=True)
         self.message_node_so3 = message_node_so3
         # n_radial kept for API compatibility with interaction/core builders.
         del n_radial

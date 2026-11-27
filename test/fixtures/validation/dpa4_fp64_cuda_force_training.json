@@ -180,13 +180,13 @@
   "commit": "cd00fc0",
   "card_job": "6339517",
   "gpu": "e7d358e7-783a-3a6f-9e59-ddd2825dcbd8",
-  "implementation": "EnvelopeGated enables ordered_sum only for CUDA double training. The softmax retains its published FP32 exponential and scalar operations. Its indexed denominator sum uses index_put_(accumulate=True). The same-model CUDA comparisons use the strict FP64 tolerances throughout.",
+  "implementation": "DPA4 opts into ordered_sum when constructing its SO2 convolution. EnvelopeGated applies it only during CUDA double training. Public and previously serialized unconfigured aggregators keep their original default. The softmax retains its published FP32 exponential and scalar operations. Its indexed denominator sum uses index_put_(accumulate=True). The same-model CUDA comparisons use the strict FP64 tolerances throughout.",
   "verification": "The frozen driver ran on 882b187 with this denominator in the training-only DPA4 aggregation and its existing inference path. The isolated source implementation also passed the V100 per-edge weight regression. The timing alternated production/candidate/candidate/production followed by candidate/production/production/candidate. Each section contained one warmup and three measured ordinary training steps. The reported percent change compares medians of section medians.",
   "localization": "With the same saved FP32 exponentials and receiver indices, the default CUDA sum changes on replay. Indexed accumulation matches the deterministic PyTorch sum bitwise in all six block/system pairs. Promoting the degree normalization to FP64 leaves the two unstable SO2 weight gradients and changes the published energy, forces and derivatives.",
   "remaining": "FP64 ordinary force training continues to execute the native force graph. Comparing two separately constructed frozen instances on the small molecules can change ten weight tensors despite identical energy and force. Both the untouched original and the candidate reproduce this before compilation, including with deterministic algorithms enabled.",
   "cpu_and_gpu_regressions": {
    "cuda": "test_double_cuda_envelope_training_uses_the_ordered_fp32_denominator passed in job 6339517.",
-   "cpu": "test_mp_aggregate.py, test_dpa4_core.py and the dpa4 presnapshot selection on the integrated source: 17 passed and 2 CUDA-only cases skipped."
+   "cpu": "The aggregate, DPA4 core and DPA4 presnapshot selections include the default and legacy aggregator, the DPA4 opt-in, training and evaluation, both dtypes and both devices. The final CPU suite passed 18 cases and skipped two CUDA-only cases."
   },
   "scenarios": {
    "mol_batch_32x20": {
