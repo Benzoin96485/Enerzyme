@@ -1,0 +1,365 @@
+{
+ "architecture": "dpa4",
+ "precision": "float64",
+ "original": "1aa0f8b",
+ "production_candidate": "882b187",
+ "torch": "2.13.0+cu126",
+ "snapshot_sha256": "fd841694be0ee71e5c9e04c0952db634be767a48e7e3a2bf654d22019b1f5897",
+ "tolerance": {"all_fields_and_parameters": {"atol": 1e-10, "rtol": 1e-08}},
+ "method": "The original and candidate load the same frozen DPA4 checkpoint and train on scripts/bench_cores.py acceptance inputs at cutoff 6. Every evaluation resets seed 7, reloads the weights, clears gradients, clones the input coordinates and differentiates sum(E\u00b2) + sum(Fa\u00b2). Each ordinary compile result is compared with its own native model. New and old native repeats use unchanged atom and edge order.",
+ "source": {
+  "route": "enerzyme/models/layers/_base_layer.py::BaseFFCore.forward and enerzyme/models/layers/compiled_grad.py::native_forces",
+  "norm": "enerzyme/models/mp/equivariant/sph/layer_norm.py::EquivariantDegreeRMSNorm._normalize",
+  "route_probe": "A Python monitoring callback on the native_forces code object records each actual entry without replacing any model function.",
+  "controls": "Deterministic CUDA uses torch.use_deterministic_algorithms(True) and CUBLAS_WORKSPACE_CONFIG=:4096:8. The counterfactual FP64 norm evaluates only the published degree-normalization arithmetic in model precision. Local replay fixes each norm input, output cotangent and directional seed and compares twice-differentiated output, scale and bias on two identical native calls.",
+  "order_controls": "workspace_only sets CUBLAS_WORKSPACE_CONFIG with the default algorithms. forward uses deterministic algorithms during the forward and coordinate VJP. backward sets them only while differentiating the combined loss. indexed enables them for indexed ATen operations during both phases."
+ },
+ "reproduce_official": "python scripts/bench_frozen_compile.py --model-tree <checkout> --snapshot test/fixtures/presnapshot/dpa4.pt --precision float64 --device cuda --threads 2 --reps 2 --out dpa4.json",
+ "metric_columns": [
+  "weight tensors exceeding tolerance",
+  "weight elements exceeding tolerance",
+  "maximum absolute weight-gradient difference",
+  "maximum ratio to elementwise tolerance"
+ ],
+ "cpu": {
+  "job": "6339440",
+  "scenarios": {
+   "mol_batch_32x20": {
+    "old_candidate_and_ordinary_native_all_exact": true,
+    "old_and_new_native_repeat_failures": [0, 0, 0, 0],
+    "native_calls": ["native_forces"],
+    "captured_graphs_and_calls": [0, 0]
+   },
+   "bulk_256": {
+    "old_candidate_and_ordinary_native_all_exact": true,
+    "old_and_new_native_repeat_failures": [0, 0, 0, 0],
+    "native_calls": ["native_forces"],
+    "captured_graphs_and_calls": [0, 0]
+   },
+   "large_2000": {
+    "old_candidate_and_ordinary_native_all_exact": true,
+    "old_and_new_native_repeat_failures": [0, 0, 0, 0],
+    "native_calls": ["native_forces"],
+    "captured_graphs_and_calls": [0, 0]
+   }
+  }
+ },
+ "cuda": {
+  "official_job": "6338787",
+  "official_gpu": "GPU-d27cd600-162e-ffdb-c1ad-0ddb9d50e7e1",
+  "repeat_job": "6339429",
+  "repeat_gpu": "e7d358e7-783a-3a6f-9e59-ddd2825dcbd8",
+  "scenarios": {
+   "mol_batch_32x20": {
+    "official_inference_passed": true,
+    "official_training": {
+     "passed": false,
+     "E_max_abs": 3.552713678800501e-15,
+     "Fa_max_abs": 3.122502256758253e-17,
+     "weight_max_abs": 4.7120711315074004e-05,
+     "active": 60,
+     "reference_active": 60,
+     "new_graphs_and_calls": [0, 0]
+    },
+    "old_native_repeats": [[2, 1682, 4.924041763842979e-05, 716.943783533456], [2, 1701, 3.520538044199384e-05, 1254.8400894278784]],
+    "new_native_repeats": [[2, 956, 1.859096960288298e-05, 266.7054282331566], [2, 1242, 2.7043934466064457e-05, 781.6554495765185]],
+    "candidate_vs_old_native": [2, 1404, 5.1604610746380786e-05, 4708.705590024896],
+    "ordinary_vs_native": [10, 27759, 0.0001450114100407518, 4904.0333584981145],
+    "ordinary_failing_parameters_and_counts": {
+     "blocks.0.module.ffns.0.so3_linear_2.weight": 2229,
+     "blocks.0.module.post_so2_norm.bias": 23,
+     "blocks.0.module.so2_conv.post_mix.weight": 788,
+     "blocks.1.module.ffns.0.so3_linear_2.weight": 2290,
+     "blocks.1.module.post_so2_norm.bias": 23,
+     "blocks.1.module.so2_conv.post_mix.weight": 938,
+     "embed.env_embed.output_proj.weight": 20571,
+     "embed.sphere_proj.bias": 29,
+     "embed.sphere_proj.weight": 767,
+     "pre_sequence.2.embedding.weight": 101
+    },
+    "ordinary_E_F_max_abs": [3.552713678800501e-15, 4.163336342344337e-17],
+    "ordinary_actual_native_calls": ["native_forces"],
+    "ordinary_new_graphs_and_calls": [0, 0],
+    "matching_rng_after_every_native_and_ordinary_call": "7a984a1014e51d543166124ca5437c403fdcbeadd5c9c772f2ea2f72dd33b3c5",
+    "promoted_norm_native_repeat": [[2, 680, 1.4552133961842628e-05, 271.57231243024904], [2, 869, 1.8968960830534343e-05, 188.73089416039718]],
+    "promoted_norm_vs_published": {"weights": [17, 56090, 0.0008283666311399429, 38504.1844042667], "E_F_max_abs": [1.1890607662934372e-06, 4.482390467130948e-08]},
+    "deterministic_native_repeats": {"original": [[0, 0, 0.0, 0.0], [0, 0, 0.0, 0.0]], "candidate": [[0, 0, 0.0, 0.0], [0, 0, 0.0, 0.0]]},
+    "deterministic_ordinary_vs_native": [10, 27780, 0.0001450114100407518, 4421.069669715313],
+    "deterministic_cross_tree": {"tensors": 62, "max_abs": 0.0, "different_tensors": [], "max_tolerance_ratio": 0.0},
+    "degree_norm_boundaries": {"tensors_observed": 30, "values_changed_after_cast_to_fp32": 0, "isolated_double_backward_max_abs": 0.0},
+    "separate_native_losses": {"E_only_repeat": [2, 1236, 2.564721603448561e-05, 4033.042502182291], "Fa_only_repeat": [2, 176, 1.4565318728898546e-07, 71.38417961802749]},
+    "order_controls": {
+     "workspace_only": [2, 1469, 2.5755080741873826e-05, 248.54127732505987],
+     "forward": [10, 27780, 0.0001450114100407518, 4421.726215311306],
+     "backward": [2, 494, 1.624285619072907e-05, 116.47061380716147],
+     "indexed": [0, 0, 0.0, 0.0]
+    }
+   },
+   "bulk_256": {
+    "official_inference_passed": true,
+    "official_training": {
+     "passed": false,
+     "E_max_abs": 0.0,
+     "Fa_max_abs": 2.7755575615628914e-17,
+     "weight_max_abs": 5.8149020333075896e-05,
+     "active": 60,
+     "reference_active": 60,
+     "new_graphs_and_calls": [0, 0]
+    },
+    "old_native_repeats": [[2, 919, 0.00016245923688984476, 573.1517887229143], [2, 799, 0.00010950275827781297, 602.5183555960087]],
+    "new_native_repeats": [[2, 217, 2.4402557755820453e-05, 128.03367082856323], [2, 374, 4.1925752157112584e-05, 103.31304050409672]],
+    "candidate_vs_old_native": [2, 874, 9.801206351767178e-05, 613.6971203321415],
+    "ordinary_vs_native": [2, 293, 4.763991091749631e-05, 103.15821414279068],
+    "ordinary_failing_parameters_and_counts": {"blocks.0.module.so2_conv.post_mix.weight": 169, "blocks.1.module.so2_conv.post_mix.weight": 124},
+    "ordinary_E_F_max_abs": [0.0, 2.7755575615628914e-17],
+    "ordinary_actual_native_calls": ["native_forces"],
+    "ordinary_new_graphs_and_calls": [0, 0],
+    "matching_rng_after_every_native_and_ordinary_call": "7a984a1014e51d543166124ca5437c403fdcbeadd5c9c772f2ea2f72dd33b3c5",
+    "promoted_norm_native_repeat": [[2, 266, 2.8638180992857087e-05, 167.49993296423744], [2, 239, 3.3619282476138324e-05, 82.88728857710541]],
+    "promoted_norm_vs_published": {"weights": [17, 59145, 0.008678146896272665, 15065.08017096037], "E_F_max_abs": [7.469929101944217e-06, 1.708629548957674e-08]},
+    "deterministic_native_repeats": {"original": [[0, 0, 0.0, 0.0], [0, 0, 0.0, 0.0]], "candidate": [[0, 0, 0.0, 0.0], [0, 0, 0.0, 0.0]]},
+    "deterministic_ordinary_vs_native": [0, 0, 0.0, 0.0],
+    "deterministic_cross_tree": {
+     "tensors": 62,
+     "max_abs": 3.637978807091713e-12,
+     "different_tensors": ["blocks.0.module.so2_conv.post_mix.weight", "blocks.1.module.so2_conv.post_mix.weight"],
+     "max_tolerance_ratio": 5.357220951573871e-07
+    },
+    "degree_norm_boundaries": {"tensors_observed": 30, "values_changed_after_cast_to_fp32": 0, "isolated_double_backward_max_abs": 0.0},
+    "separate_native_losses": {"E_only_repeat": [2, 493, 7.951743828016333e-05, 423.5586418307595], "Fa_only_repeat": [2, 1467, 1.8265124923644294e-07, 428.96688252831854]},
+    "order_controls": {
+     "workspace_only": [2, 264, 4.9777292588260025e-05, 162.56932489172513],
+     "forward": [0, 0, 2.9103830456733704e-08, 0.03369727096744483],
+     "backward": [2, 354, 3.06159199681133e-05, 113.69500696462676],
+     "indexed": [0, 0, 0.0, 0.0]
+    }
+   },
+   "large_2000": {
+    "official_inference_passed": true,
+    "official_training": {
+     "passed": false,
+     "E_max_abs": 1.1368683772161603e-13,
+     "Fa_max_abs": 3.469446951953614e-17,
+     "weight_max_abs": 0.0005558428820222616,
+     "active": 60,
+     "reference_active": 60,
+     "new_graphs_and_calls": [0, 0]
+    },
+    "old_native_repeats": [[2, 446, 0.0017212496604770422, 290.4679168798322], [2, 377, 0.0016358973225578666, 3318.214047960735]],
+    "new_native_repeats": [[2, 190, 0.0010665685404092073, 2054.263810747076], [2, 232, 0.0009843134321272373, 1019.6632795378525]],
+    "candidate_vs_old_native": [2, 219, 0.0013089955318719149, 524.2196174494272],
+    "ordinary_vs_native": [2, 138, 0.00040736176015343517, 631.9026409815203],
+    "ordinary_failing_parameters_and_counts": {"blocks.0.module.so2_conv.post_mix.weight": 65, "blocks.1.module.so2_conv.post_mix.weight": 73},
+    "ordinary_E_F_max_abs": [5.684341886080802e-14, 3.469446951953614e-17],
+    "ordinary_actual_native_calls": ["native_forces"],
+    "ordinary_new_graphs_and_calls": [0, 0],
+    "matching_rng_after_every_native_and_ordinary_call": "7a984a1014e51d543166124ca5437c403fdcbeadd5c9c772f2ea2f72dd33b3c5",
+    "promoted_norm_native_repeat": [[2, 221, 0.0006309744749160018, 3342.1244475600415], [2, 177, 0.0009295338531956077, 1466.0726083673926]],
+    "promoted_norm_vs_published": {"weights": [17, 59686, 0.5940828113816679, 194341.731588244], "E_F_max_abs": [6.500486823313167e-05, 1.4998560962653507e-08]},
+    "deterministic_native_repeats": {"original": [[0, 0, 0.0, 0.0], [0, 0, 0.0, 0.0]], "candidate": [[0, 0, 0.0, 0.0], [0, 0, 0.0, 0.0]]},
+    "deterministic_ordinary_vs_native": [0, 0, 0.0, 0.0],
+    "deterministic_cross_tree": {
+     "tensors": 62,
+     "max_abs": 1.1641532182693481e-10,
+     "different_tensors": ["blocks.0.module.so2_conv.post_mix.weight", "blocks.1.module.so2_conv.post_mix.weight"],
+     "max_tolerance_ratio": 4.3058912041217606e-06
+    },
+    "degree_norm_boundaries": {"tensors_observed": 30, "values_changed_after_cast_to_fp32": 0, "isolated_double_backward_max_abs": 0.0},
+    "separate_native_losses": {"E_only_repeat": [2, 178, 0.0006889010546728969, 387.98307329148736], "Fa_only_repeat": [2, 695, 6.899353834910471e-07, 150.13436446114662]},
+    "order_controls": {
+     "workspace_only": [2, 243, 0.0007220384432002902, 1911.5559594088304],
+     "forward": [0, 0, 2.4389009922742844e-07, 0.32550884284035364],
+     "backward": [2, 169, 0.000729933031834662, 749.0130914618233],
+     "indexed": [0, 0, 0.0, 0.0]
+    }
+   }
+  }
+ },
+ "repeated_native_outside_parameters": ["blocks.0.module.so2_conv.post_mix.weight", "blocks.1.module.so2_conv.post_mix.weight"],
+ "fix": {
+  "commit": "cd00fc0",
+  "card_job": "6339517",
+  "gpu": "e7d358e7-783a-3a6f-9e59-ddd2825dcbd8",
+  "implementation": "EnvelopeGated enables ordered_sum only for CUDA double training. The softmax retains its published FP32 exponential and scalar operations. Its indexed denominator sum uses index_put_(accumulate=True). The same-model CUDA comparisons use the strict FP64 tolerances throughout.",
+  "verification": "The frozen driver ran on 882b187 with this denominator in the training-only DPA4 aggregation and its existing inference path. The isolated source implementation also passed the V100 per-edge weight regression. The timing alternated production/candidate/candidate/production followed by candidate/production/production/candidate. Each section contained one warmup and three measured ordinary training steps. The reported percent change compares medians of section medians.",
+  "localization": "With the same saved FP32 exponentials and receiver indices, the default CUDA sum changes on replay. Indexed accumulation matches the deterministic PyTorch sum bitwise in all six block/system pairs. Promoting the degree normalization to FP64 leaves the two unstable SO2 weight gradients and changes the published energy, forces and derivatives.",
+  "remaining": "FP64 ordinary force training continues to execute the native force graph. Comparing two separately constructed frozen instances on the small molecules can change ten weight tensors despite identical energy and force. Both the untouched original and the candidate reproduce this before compilation, including with deterministic algorithms enabled.",
+  "cpu_and_gpu_regressions": {
+   "cuda": "test_double_cuda_envelope_training_uses_the_ordered_fp32_denominator passed in job 6339517.",
+   "cpu": "test_mp_aggregate.py, test_dpa4_core.py and the dpa4 presnapshot selection on the integrated source: 17 passed and 2 CUDA-only cases skipped."
+  },
+  "scenarios": {
+   "mol_batch_32x20": {
+    "candidate_same_instance_native_repeat": [0, 0, 1.3642420526593924e-12, 1.0357392438510246e-05],
+    "candidate_ordinary_vs_same_instance_native": [0, 0, 4.547473508864641e-13, 6.92889390456554e-06],
+    "candidate_vs_unmodified_deterministic_original": [0, 0, 1.3642420526593924e-12, 7.84150654764828e-06],
+    "candidate_vs_unmodified_default_original": [2, 1641, 4.2873052450431715e-05, 6218.398554828955],
+    "original_second_instance_vs_first_native_with_deterministic_algorithms": [10, 27780, 0.0001450114100407518, 4421.069669715313],
+    "candidate_second_instance_vs_first_native": [10, 27780, 0.0001450114100407518, 4421.069671873008],
+    "candidate_second_instance_ordinary_vs_first_native": [10, 27780, 0.0001450114100407518, 4421.069657200035],
+    "unmodified_candidate_second_instance_vs_first_native_with_deterministic_algorithms": [10, 27780, 0.0001450114100407518, 4421.069669715313],
+    "native_float32_denominator_replay": [
+     {
+      "dtype": "torch.float32",
+      "edges": 10590,
+      "receivers": 640,
+      "default_repeat": {"changed": 80, "max_abs": 9.5367431640625e-07},
+      "candidate_repeat": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_deterministic_atten_sum": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_default": {"changed": 149, "max_abs": 1.430511474609375e-06}
+     },
+     {
+      "dtype": "torch.float32",
+      "edges": 10590,
+      "receivers": 640,
+      "default_repeat": {"changed": 59, "max_abs": 9.5367431640625e-07},
+      "candidate_repeat": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_deterministic_atten_sum": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_default": {"changed": 133, "max_abs": 1.430511474609375e-06}
+     }
+    ],
+    "formal": {
+     "infer": {
+      "passed": true,
+      "active_parameters": 0,
+      "reference_active_parameters": 0,
+      "energy_max_abs": 3.552713678800501e-15,
+      "force_max_abs": 4.85722573273506e-16,
+      "gradient_max_abs": 0.0
+     },
+     "train": {
+      "passed": true,
+      "active_parameters": 60,
+      "reference_active_parameters": 60,
+      "energy_max_abs": 3.552713678800501e-15,
+      "force_max_abs": 3.469446951953614e-17,
+      "gradient_max_abs": 9.094947017729282e-13
+     }
+    },
+    "dynamo_new_graphs_and_calls": {"infer": {"new_graphs": 13, "new_calls": 713}, "train": {"new_graphs": 0, "new_calls": 0}},
+    "timing_ms": {
+     "production": [130.35719096660614, 136.72693609260023, 135.8445012010634, 137.0826638303697],
+     "candidate": [129.8934652004391, 135.7345401775092, 137.40448793396354, 133.68509081192315]
+    },
+    "peak_MiB": {"production": 3459.2890625, "candidate": 3457.8759765625},
+    "timing_change_percent": -1.156323030587969,
+    "peak_change_percent": 0.0,
+    "alternative_sum_vs_deterministic_original": {"double_sum": [2, 1782, 3.5944685123467934e-05, 3778.233577523085], "sorted_sum": [1, 4, 6.240895800146973e-08, 3.4002149853400354]}
+   },
+   "bulk_256": {
+    "candidate_same_instance_native_repeat": [0, 0, 3.637978807091713e-12, 1.8631174628396183e-06],
+    "candidate_ordinary_vs_same_instance_native": [0, 0, 3.637978807091713e-12, 9.273999870831136e-07],
+    "candidate_vs_unmodified_deterministic_original": [0, 0, 1.8189894035458565e-11, 1.9754035599303595e-06],
+    "candidate_vs_unmodified_default_original": [2, 576, 4.349155142335803e-05, 360.0793842462369],
+    "original_second_instance_vs_first_native_with_deterministic_algorithms": [0, 0, 0.0, 0.0],
+    "candidate_second_instance_vs_first_native": [0, 0, 7.275957614183426e-12, 2.4578179029870855e-06],
+    "candidate_second_instance_ordinary_vs_first_native": [0, 0, 3.637978807091713e-12, 1.1585833665419849e-06],
+    "unmodified_candidate_second_instance_vs_first_native_with_deterministic_algorithms": [0, 0, 0.0, 0.0],
+    "native_float32_denominator_replay": [
+     {
+      "dtype": "torch.float32",
+      "edges": 13360,
+      "receivers": 256,
+      "default_repeat": {"changed": 117, "max_abs": 1.9073486328125e-06},
+      "candidate_repeat": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_deterministic_atten_sum": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_default": {"changed": 181, "max_abs": 1.9073486328125e-06}
+     },
+     {
+      "dtype": "torch.float32",
+      "edges": 13360,
+      "receivers": 256,
+      "default_repeat": {"changed": 102, "max_abs": 1.9073486328125e-06},
+      "candidate_repeat": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_deterministic_atten_sum": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_default": {"changed": 181, "max_abs": 1.9073486328125e-06}
+     }
+    ],
+    "formal": {
+     "infer": {
+      "passed": true,
+      "active_parameters": 0,
+      "reference_active_parameters": 0,
+      "energy_max_abs": 4.973799150320701e-14,
+      "force_max_abs": 8.049116928532385e-16,
+      "gradient_max_abs": 0.0
+     },
+     "train": {
+      "passed": true,
+      "active_parameters": 60,
+      "reference_active_parameters": 60,
+      "energy_max_abs": 0.0,
+      "force_max_abs": 2.7755575615628914e-17,
+      "gradient_max_abs": 1.8189894035458565e-12
+     }
+    },
+    "dynamo_new_graphs_and_calls": {"infer": {"new_graphs": 8, "new_calls": 704}, "train": {"new_graphs": 0, "new_calls": 0}},
+    "timing_ms": {
+     "production": [134.2539379838854, 136.5245480556041, 135.44157287105918, 134.1384551487863],
+     "candidate": [133.89698206447065, 137.24131882190704, 135.6208899524063, 134.0125489514321]
+    },
+    "peak_MiB": {"production": 3121.99169921875, "candidate": 3121.99169921875},
+    "timing_change_percent": -0.023015567040551854,
+    "peak_change_percent": 0.0,
+    "alternative_sum_vs_deterministic_original": {"double_sum": [2, 1005, 0.00023034361583995633, 598.9487458000159], "sorted_sum": [2, 584, 5.29767753505439e-05, 757.2448730920149]}
+   },
+   "large_2000": {
+    "candidate_same_instance_native_repeat": [0, 0, 1.0477378964424133e-09, 9.842037037993388e-06],
+    "candidate_ordinary_vs_same_instance_native": [0, 0, 1.7462298274040222e-09, 1.034182798132899e-05],
+    "candidate_vs_unmodified_deterministic_original": [0, 0, 1.1641532182693481e-09, 8.035100550548643e-06],
+    "candidate_vs_unmodified_default_original": [2, 424, 0.0035524959675967693, 1564.6291079241962],
+    "original_second_instance_vs_first_native_with_deterministic_algorithms": [0, 0, 0.0, 0.0],
+    "candidate_second_instance_vs_first_native": [0, 0, 1.0477378964424133e-09, 9.501082443216568e-06],
+    "candidate_second_instance_ordinary_vs_first_native": [0, 0, 1.0477378964424133e-09, 1.8338483074698617e-05],
+    "unmodified_candidate_second_instance_vs_first_native_with_deterministic_algorithms": [0, 0, 0.0, 0.0],
+    "native_float32_denominator_replay": [
+     {
+      "dtype": "torch.float32",
+      "edges": 83828,
+      "receivers": 2000,
+      "default_repeat": {"changed": 1106, "max_abs": 1.9073486328125e-06},
+      "candidate_repeat": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_deterministic_atten_sum": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_default": {"changed": 1388, "max_abs": 2.86102294921875e-06}
+     },
+     {
+      "dtype": "torch.float32",
+      "edges": 83828,
+      "receivers": 2000,
+      "default_repeat": {"changed": 1127, "max_abs": 1.9073486328125e-06},
+      "candidate_repeat": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_deterministic_atten_sum": {"changed": 0, "max_abs": 0.0},
+      "candidate_vs_default": {"changed": 1404, "max_abs": 2.86102294921875e-06}
+     }
+    ],
+    "formal": {
+     "infer": {
+      "passed": true,
+      "active_parameters": 0,
+      "reference_active_parameters": 0,
+      "energy_max_abs": 4.263256414560601e-14,
+      "force_max_abs": 1.9572017617708326e-15,
+      "gradient_max_abs": 0.0
+     },
+     "train": {
+      "passed": true,
+      "active_parameters": 60,
+      "reference_active_parameters": 60,
+      "energy_max_abs": 4.263256414560601e-14,
+      "force_max_abs": 2.7755575615628914e-17,
+      "gradient_max_abs": 4.656612873077393e-10
+     }
+    },
+    "dynamo_new_graphs_and_calls": {"infer": {"new_graphs": 0, "new_calls": 0}, "train": {"new_graphs": 0, "new_calls": 0}},
+    "timing_ms": {
+     "production": [695.4838240053505, 695.7931870128959, 695.6740231253207, 695.606429129839],
+     "candidate": [696.2632110808045, 696.2859958875924, 695.8120078779757, 696.3159327860922]
+    },
+    "peak_MiB": {"production": 20038.3896484375, "candidate": 20038.3896484375},
+    "timing_change_percent": 0.09119331125373442,
+    "peak_change_percent": 0.0,
+    "alternative_sum_vs_deterministic_original": {"double_sum": [2, 507, 0.0030186529038473964, 1980.3314361870475], "sorted_sum": [2, 284, 0.0025652582990005612, 2015.19912279061]}
+   }
+  }
+ }
+}
