@@ -9,7 +9,7 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.data.distributed import DistributedSampler
 from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
+from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 from torch.nn import Module
 from torch.nn.utils import clip_grad_norm_
 from torch_ema import ExponentialMovingAverage
@@ -18,7 +18,6 @@ try:
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 except:
     pass
-from transformers.optimization import get_scheduler
 import numpy as np
 from .splitter import Splitter
 from .batch import (
@@ -53,6 +52,21 @@ DTYPE_MAPPING = {
     "double": torch.float64,
     "single": torch.float32
 }
+
+def _linear_lr_scale(step, warmup_steps, training_steps):
+    if step < warmup_steps:
+        return step / max(1, warmup_steps)
+    return max(0.0, (training_steps - step) / max(1, training_steps - warmup_steps))
+
+
+def _training_scheduler(name, optimizer, warmup_steps, training_steps):
+    if name == "linear":
+        # Preserve the LambdaLR state and step numbering of the historical default.
+        scale = partial(_linear_lr_scale, warmup_steps=warmup_steps, training_steps=training_steps)
+        return LambdaLR(optimizer, scale)
+    from transformers.optimization import get_scheduler
+    return get_scheduler(name, optimizer, warmup_steps, training_steps)
+
 
 def _unwrap_ddp(model: Module) -> Module:
     return model.module if isinstance(model, DistributedDataParallel) else model
@@ -385,8 +399,6 @@ class Trainer:
             )
         else:
             self.device = native_device_for_launch(self._launch, self.cuda)
-            if self.device.type == "cuda":
-                torch.cuda.set_device(self.device)
             logger.info(f"Training device {self.device}, rank={self._launch.global_rank}/{self._launch.world_size}, "
                         f"batch_size={self.batch_size} per process, global_batch_size={self.batch_size * self._launch.world_size}")
 
@@ -596,7 +608,7 @@ class Trainer:
                         parameter.requires_grad_(False)
             del loaded
         optimizer = get_optimizer(self.optimizer_name, model, self.optimizer_hyper_params)
-        scheduler = get_scheduler(self.schedule, optimizer, int(num_steps * self.warmup_ratio), num_steps)
+        scheduler = _training_scheduler(self.schedule, optimizer, int(num_steps * self.warmup_ratio), num_steps)
         logger.info("Using Lightning Trainer")
         from .lightning_utils import LightningModel, evaluation_loader
         lightning_model = LightningModel(
@@ -777,7 +789,7 @@ class Trainer:
 
             model = model.to(device=self.device, dtype=self.dtype)
             optimizer = get_optimizer(self.optimizer_name, model, self.optimizer_hyper_params)
-            scheduler = get_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
+            scheduler = _training_scheduler(self.schedule, optimizer, num_warmup_steps, num_training_steps)
 
             if self.reset_parameters:
                 for m in model.modules():
@@ -817,10 +829,10 @@ class Trainer:
                     output_device=self.device.index if self.device.type == "cuda" else None,
                     find_unused_parameters=self.find_unused_parameters,
                 )
-                if ema is not None:
-                    # DDP synchronizes model parameters on construction. Match its initial EMA on every rank.
-                    for shadow in ema.shadow_params:
-                        dist.broadcast(shadow, src=0)
+                if ema is not None and (pretrain_path is None or self.resume == 0):
+                    # DDP synchronized the initial parameters; derive each rank's fresh
+                    # EMA from them. A restored EMA already came from the same checkpoint.
+                    ema = ExponentialMovingAverage(model.parameters(), self.ema_decay, self.ema_use_num_updates)
 
             if self.resume > 1 and "best_epoch" in other_info and "epoch" in other_info:
                 wait = other_info.get("wait", other_info["epoch"] - other_info["best_epoch"])

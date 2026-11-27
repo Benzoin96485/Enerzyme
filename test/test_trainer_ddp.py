@@ -194,3 +194,20 @@ def test_lightning_warm_start_and_explicit_cpu(tmp_path, monkeypatch, resume, ex
 
     monkeypatch.setattr(trainer.lightning_trainer, "fit", inspect_fit)
     trainer.fit_predict(model, checkpoint, [None], None, {}, str(tmp_path), None)
+
+
+@pytest.mark.parametrize("warmup, expected", [(2, [0, .5, 1, .5, 0, 0]), (0, [1, .75, .5, .25, 0, 0])])
+def test_default_scheduler_matches_linear_warmup_and_decay(warmup, expected):
+    from enerzyme.tasks.trainer import _training_scheduler
+
+    model = nn.Linear(1, 1)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1.0)
+    scheduler = _training_scheduler("linear", optimizer, warmup, 4)
+    actual = []
+    for _ in expected:
+        actual.append(scheduler.get_last_lr()[0])
+        optimizer.step()
+        scheduler.step()
+    assert actual == expected
+    # The previous Transformers default stored a functools.partial in LambdaLR as well.
+    assert scheduler.state_dict()["lr_lambdas"] == [{}]
