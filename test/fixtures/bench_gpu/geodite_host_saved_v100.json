@@ -333,5 +333,126 @@
     }
   },
   "complete": true,
-  "passes_all_controls": false
+  "passes_all_controls": false,
+  "small_native_and_host_saved_repeats": {
+    "job": "6339555",
+    "gpu_uuid": "9a19f472-727c-1aec-eb16-7d4406811551",
+    "order": [
+      "native",
+      "host_saved",
+      "host_saved",
+      "native"
+    ],
+    "system": "mol_batch_32x20",
+    "roles": {
+      "old-native": {
+        "source": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+        "receipt_sha256": "5c14fc8591119490840293e813dec7ab89182651d4260fbb1683c776c9323411",
+        "checks": {
+          "native_repeat": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 12,
+            "missing_weights": [],
+            "weight_elements_outside": 497
+          },
+          "host_saved_repeat": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 13,
+            "missing_weights": [],
+            "weight_elements_outside": 416
+          },
+          "native1_saved1": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 11,
+            "missing_weights": [],
+            "weight_elements_outside": 373
+          },
+          "native1_saved2": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 12,
+            "missing_weights": [],
+            "weight_elements_outside": 442
+          },
+          "native2_saved1": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 12,
+            "missing_weights": [],
+            "weight_elements_outside": 500
+          },
+          "native2_saved2": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 11,
+            "missing_weights": [],
+            "weight_elements_outside": 450
+          }
+        }
+      },
+      "new-native": {
+        "source": "882b187acd561b57af232279dd67700532e50c97",
+        "receipt_sha256": "c1b3a09279efcbe1cd4a192a12e4c34195a04ca4305ae997d2bf4436e9b8b247",
+        "checks": {
+          "native_repeat": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 13,
+            "missing_weights": [],
+            "weight_elements_outside": 408
+          },
+          "host_saved_repeat": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 13,
+            "missing_weights": [],
+            "weight_elements_outside": 461
+          },
+          "native1_saved1": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 12,
+            "missing_weights": [],
+            "weight_elements_outside": 531
+          },
+          "native1_saved2": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 12,
+            "missing_weights": [],
+            "weight_elements_outside": 563
+          },
+          "native2_saved1": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 12,
+            "missing_weights": [],
+            "weight_elements_outside": 453
+          },
+          "native2_saved2": {
+            "energy_and_forces_passed": true,
+            "unused_match": true,
+            "compared_weights": 93,
+            "failed_weight_tensors": 11,
+            "missing_weights": [],
+            "weight_elements_outside": 460
+          }
+        }
+      }
+    }
+  }
 }
