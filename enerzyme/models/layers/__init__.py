@@ -17,6 +17,7 @@ from ..equiformer.embedding import EquiformerNodeEmbedding
 from .electron_embedding import BaseElectronEmbedding, ElectronicEmbedding
 from .electrostatics import (
     ElectrostaticEnergyLayer,
+    EwaldElectrostaticEnergyLayer,
     ChargeConservationLayer,
     AtomicCharge2DipoleLayer,
     VelocityConservationLayer,
