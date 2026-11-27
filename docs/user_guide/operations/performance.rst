@@ -36,6 +36,24 @@ Training
 :code:`lightning: true`
     Multi-GPU training when single-process :code:`cuda` is insufficient.
 
+Single-device Muon
+~~~~~~~~~~~~~~~~~~
+
+For models with Muon parameter groups, enable batched updates in the training YAML:
+
+.. code-block:: yaml
+
+   Trainer:
+     Optimizer:
+       name: Muon
+       batched: true
+
+The optimizer groups equal-shaped hidden matrices on the same device and uses
+foreach updates for the auxiliary Adam parameters. It reads and writes the same
+optimizer state as the single-device Muon implementation. Batched bfloat16
+matrix products may round differently. The default is ``batched: false``.
+Distributed training keeps its distributed Muon optimizer.
+
 Simulation
 ----------
 
@@ -47,6 +65,31 @@ Simulation
 
 :code:`log_interval`
     Reduce trajectory I/O frequency for long MD.
+
+For repeated ASE evaluations with ``neighbor_list: full``, the calculator keeps
+the molecular pair indices and other static inputs on the model device. Each
+step uses new coordinates and a fresh force graph. The calculation rebuilds
+the inputs when the species, charge, spin, device or precision changes.
+This reuse applies to non-periodic full graphs.
+
+Measuring training and prediction
+---------------------------------
+
+To compare the shared batch and geometry paths against a baseline checkout,
+run the following from the candidate checkout:
+
+.. code-block:: bash
+
+   PYTHONPATH=. python scripts/bench_shared_pipeline.py \
+     --reference-tree /path/to/baseline --device cuda --dtype float32 \
+     --output model-pipeline.json
+
+The benchmark uses identical weights and a fixed batch of 16 molecules for
+SchNet and PaiNN. It alternates baseline and candidate paths on one device,
+checks energies, forces and participating parameter gradients, and reports
+wall time for batch prediction and force-loss backward. Prediction includes
+host result collection. Training includes collation, transfer, forward and
+backward. The optimizer step is measured separately when evaluating Muon.
 
 Neighbor list memory
 --------------------
