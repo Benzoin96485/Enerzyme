@@ -317,4 +317,5 @@ class SparseQK_N_Tiled_Fn(torch.autograd.Function):
 
 
 def sparse_qk_triton_n_tiled(query, key, idx, gate, scale=0.1):
-    return SparseQK_N_Tiled_Fn.apply(query, key, idx, gate, scale)
+    with torch.cuda.device(query.device):
+        return SparseQK_N_Tiled_Fn.apply(query, key, idx, gate, scale)

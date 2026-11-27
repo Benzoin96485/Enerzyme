@@ -267,5 +267,6 @@ def sparse_v_agg_triton_n_tiled_test(value, alpha, idx):
 
 def sparse_v_agg_triton_n_tiled(value, alpha, idx):
     value = value.permute(0,2,1)
-    return SparseVAgg_N_Tiled_Fn.apply(value, alpha, idx).permute(0,2,1)
+    with torch.cuda.device(value.device):
+        return SparseVAgg_N_Tiled_Fn.apply(value, alpha, idx).permute(0,2,1)
 

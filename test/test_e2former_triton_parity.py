@@ -282,3 +282,41 @@ def test_sparse_dispatch_values_and_double_gradients(device, dtype):
         torch.testing.assert_close(got, want, rtol=2e-4 if dtype == torch.float32 else 1e-12,
                                    atol=2e-4 if dtype == torch.float32 else 1e-12)
     assert callable(sparse.sparse_qk) and callable(sparse.sparse_v_agg)
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 2 or not _cuda_triton_ready(),
+                    reason="two visible CUDA devices and Triton required")
+def test_triton_uses_input_device_and_restores_current_device(monkeypatch):
+    from enerzyme.models.mp.equivariant import kernels
+    from enerzyme.models.mp.equivariant.kernels import _e2former_qk, _e2former_value
+
+    first = torch.cuda.current_device()
+    target = (first + 1) % torch.cuda.device_count()
+    # Record the selected device inside each real kernel's forward and backward.
+    calls = []
+    for cls in (_e2former_qk.SparseQK_N_Tiled_Fn, _e2former_value.SparseVAgg_N_Tiled_Fn):
+        for method in ("forward", "backward"):
+            implementation = getattr(cls, method)
+
+            def checked(*args, fn=implementation):
+                assert torch.cuda.current_device() == target
+                calls.append(fn.__name__)
+                return fn(*args)
+
+            monkeypatch.setattr(cls, method, staticmethod(checked))
+
+    options = {"device": torch.device("cuda", target), "requires_grad": True}
+    q, k = (torch.randn(7, 2, 8, **options) for _ in range(2))
+    idx = torch.tensor([[0, 2], [5, 4], [6, 6], [3, 2], [3, 4], [2, 1], [0, 5]], device=q.device)
+    gate, value = torch.randn(7, 2, 2, **options), torch.randn(7, 4, 2, **options)
+
+    def outputs(use_triton):
+        scores = kernels.sparse_qk(q, k, idx, gate, 0.125, use_triton=use_triton)
+        out = kernels.sparse_v_agg(value, scores, idx, use_triton=use_triton)
+        return (out, *torch.autograd.grad(out.square().sum(), (q, k, gate, value)))
+
+    expected, actual = outputs(False), outputs(True)
+    assert torch.cuda.current_device() == first
+    assert calls == ["forward", "forward", "backward", "backward"]
+    for a, b in zip(actual, expected):
+        torch.testing.assert_close(a, b, atol=2e-4, rtol=2e-4)
