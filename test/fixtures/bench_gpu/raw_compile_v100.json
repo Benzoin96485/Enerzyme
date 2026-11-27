@@ -732,6 +732,60 @@
     "grace/float64": "cda3884"
   },
   "frozen_method": "Rechecks load the pre-refactor state dict strictly and use the same deterministic inputs on each checkout. Each timed step includes energy and force inference. Training differentiates squared energies and forces through the weights. Numerical fields compare the first compiled result with that checkout\u2019s eager result, including every training gradient and its presence. cross_eager compares original and candidate eager E and Fa on the allocated GPU. A separately attributed native CPU oracle may validate values if the pre-port GPU kernel failed. fp64 tolerances are atol 1e-10, rtol 1e-8. fp32 tolerances are 3e-4 for both, and atol 7e-4, rtol 1e-3 for parameter derivatives. Each leg uses a fresh process, two warmups, then the median of its repetitions. ABBA compares medians of the two per-side medians. A cell with passing numerical evidence and no baseline timing is additional candidate capability. It contributes no speed or memory comparison. When both native GPU references run out of memory, a separately recorded direct CUDA inference replay against pre-port CPU outputs can prove candidate-only support. For a measured pair missing both native GPU references, same-card replays of both compiled outputs must pass against an identical pre-port CPU reference and each other before its original paired timing is counted. A zero graph delta may indicate reuse of prior graphs or execution in eager mode.",
+  "frozen_acceptance_protocol": {
+    "pre_port_revision": "1aa0f8b",
+    "architectures": 58,
+    "precisions": ["float32", "float64"],
+    "systems": {
+      "mol_batch_32x20": {
+        "molecules": 32,
+        "atoms_per_molecule": 20,
+        "periodic": false
+      },
+      "bulk_256": {
+        "structures": 1,
+        "atoms": 256,
+        "periodic": true
+      },
+      "large_2000": {
+        "structures": 1,
+        "atoms": 2000,
+        "periodic": false
+      }
+    },
+    "modes": {
+      "infer": "Energy and forces",
+      "train": "Backward of sum(E squared) + sum(Fa squared) into every active weight"
+    },
+    "warmups_per_process_and_cell": 2,
+    "first_warmup": "Check each compiled output against its same-source native result, including the active parameter gradient names.",
+    "native_cross_source_outputs": ["E", "Fa"],
+    "finite_elementwise_tolerances": {
+      "float64": {
+        "E_Fa_and_weights": {
+          "atol": 1e-10,
+          "rtol": 1e-08
+        }
+      },
+      "float32": {
+        "E_Fa": {
+          "atol": 0.0003,
+          "rtol": 0.0003
+        },
+        "weights": {
+          "atol": 0.0007,
+          "rtol": 0.001
+        }
+      }
+    },
+    "metrics": {
+      "median_ms": "Median measured wall time after device synchronization",
+      "peak_allocated_MiB": "Median per-step maximum allocated GPU bytes, divided by 2**20"
+    },
+    "maximum_increase_percent_per_metric": 3,
+    "balanced_estimator": "Median of the per-process medians on each side; percentage changes use the frozen original as the denominator.",
+    "current_process_doses": [{"measurement": "abba", "process_order": ["base", "new", "new", "base"], "timed_calls_per_process_per_supported_cell": [11, 11, 11, 11], "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391", "architecture_precision_records": 1}, {"measurement": "abba", "process_order": ["base", "new", "new", "base"], "timed_calls_per_process_per_supported_cell": [21, 21, 21, 21], "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c", "architecture_precision_records": 1}, {"measurement": "abba", "process_order": ["new", "base", "base", "new"], "timed_calls_per_process_per_supported_cell": [11, 11, 11, 11], "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391", "architecture_precision_records": 1}, {"measurement": "abba", "process_order": ["new", "base", "base", "new"], "timed_calls_per_process_per_supported_cell": [17, 17, 17, 17], "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c", "architecture_precision_records": 2}, {"measurement": "abba-full", "process_order": ["new", "base", "base", "new"], "timed_calls_per_process_per_supported_cell": [17, 17, 17, 17], "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c", "architecture_precision_records": 1}, {"measurement": "pair", "process_order": ["base", "new"], "timed_calls_per_process_per_supported_cell": [5, 5], "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c", "architecture_precision_records": 115}]
+  },
   "frozen_rechecks": {
     "dimenet++/float64/2a3b024/abba": {
       "job": "6333965",
