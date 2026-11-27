@@ -3,9 +3,12 @@ from collections import defaultdict, OrderedDict
 from typing import Union, List, Dict, Optional, Literal
 from hashlib import md5
 import addict
-import sklearn as skl
+from uuid import uuid4
+from zipfile import BadZipFile, ZipFile
 import numpy as np
 from ..utils import logger, YamlHandler
+from ..utils.util import atomic_output
+from .distributed import is_global_zero, run_rank0_exclusive
 from ..data.datahub import FieldDataset
 
 SIMPLE_PART_INFO_TYPE = Dict[Literal["name", "dataset", "ratio"], Union[str, float, int]]
@@ -52,7 +55,7 @@ class RandomSplit:
             )
 
 
-    def split(self, data: Dict[str, FieldDataset]) -> None:
+    def split(self, data: Dict[str, FieldDataset], rng=None):
         canonical_partition = defaultdict(dict)
         part_keys = []
         sorted_data_keys = defaultdict(list)
@@ -76,7 +79,7 @@ class RandomSplit:
                             raise KeyError("Dataset should be provided for each source")
                         canonical_partition[part_info["name"]][source_info["dataset"]] = source_info.get("ratio", -1)
                         sorted_data_keys[part_info["name"]].append(source_info["dataset"])
-                elif "dataset" in part_info:
+                else:
                     data_key = part_info.get("dataset", list(data.keys())[0])
                     canonical_partition[part_info["name"]][data_key] = part_info.get("ratio", -1)
                     sorted_data_keys[part_info["name"]].append(data_key)
@@ -89,24 +92,25 @@ class RandomSplit:
 
         for part_key, part_info in canonical_partition.items():
             for data_key, ratio in part_info.items():
-                if isinstance(ratio, str) and ratio[-1] == "%":
+                if isinstance(ratio, str) and ratio.endswith("%"):
                     ratio = float(ratio[:-1]) / 100
-                    if ratio > 1:
-                        raise ValueError("Percentage shouldn't be greater than 100%")
-                elif ratio is None or ratio < 0:
+                    if not 0 <= ratio <= 1:
+                        raise ValueError("Percentage must be between 0% and 100%")
+                if ratio is None or ratio < 0:
                     if rest[data_key] is None:
                         rest[data_key] = part_key
                     else:
                         raise ValueError(f"Only one part can be used as the remaining part of the dataset {data_key}")
-                elif ratio < 1:
-                    count = min(round(ratio * l[data_key]), l[data_key] - allocated_count[data_key])
-                    final_partition[part_key][data_key] = count
-                    allocated_count[data_key] += count
+                    continue
+                if isinstance(ratio, float) and ratio <= 1:
+                    requested = round(ratio * l[data_key])
                 elif isinstance(ratio, int):
-                    final_partition[part_key][data_key] = min(ratio, l[data_key] - allocated_count[data_key])
-                    allocated_count[data_key] += ratio
+                    requested = ratio
                 else:
                     raise ValueError(f"Ratio or count {ratio} not valid")
+                count = min(requested, l[data_key] - allocated_count[data_key])
+                final_partition[part_key][data_key] = count
+                allocated_count[data_key] += count
 
         for data_key, part_key in rest.items():
             if part_key is not None:
@@ -121,11 +125,10 @@ class RandomSplit:
                 allocation[data_key].append(allocation[data_key][-1])
 
         full_indices = {k: list(range(l[k])) for k in data.keys()}
+        rng = np.random if rng is None else rng
         for indices in full_indices.values():
-            np.random.shuffle(indices)
-        # print(part_keys, allocation, {k: len(v) for k, v in full_indices.items()})
-        # print(sorted_data_keys)
-        self.split = OrderedDict(
+            rng.shuffle(indices)
+        return OrderedDict(
             (
                 part_key, 
                 OrderedDict([
@@ -134,7 +137,6 @@ class RandomSplit:
                 ])
             ) for i, part_key in enumerate(part_keys)
         )
-        return self.split
 
 
 class Splitter:
@@ -153,10 +155,6 @@ class Splitter:
         self.save = save
         self.split = defaultdict(list)
 
-    def _set_seed(self):
-        skl.random.seed(self.seed)
-        np.random.seed(self.seed)
-
     def _init_split(self, method: Literal["random"], **split_params):
         if method == "random":
             return RandomSplit(**split_params)
@@ -164,25 +162,31 @@ class Splitter:
             raise NotImplementedError
 
     def preload_split(self, preload_path: Optional[Dict[str, str]]) -> bool:
-        if preload_path is not None:
-            for data_key, path in preload_path.items():
-                if os.path.isdir(path):
-                    split_path = os.path.join(path, "split_" + self.splitter.hash)
-                    split_file = os.path.join(split_path, "split.npz")
-                    if os.path.isfile(split_file):
-                        logger.info(f"Split matched and preloaded from {split_path} for dataset {data_key}")
-                        for part_key, indices in np.load(split_file).items():
-                            self.split[part_key][data_key] = indices.tolist()
-                    else:
-                        logger.warning(f"Split file {split_file} for dataset {data_key} not found")
+        if not preload_path:
+            return False
+        loaded = {}
+        generations = set()
+        for data_key, path in preload_path.items():
+            split_file = os.path.join(path, "split_" + self.splitter.hash, "split.npz")
+            expected = {part for part, sources in self.split.items() if data_key in sources}
+            try:
+                with np.load(split_file) as parts:
+                    generations.add(parts.zip.comment)
+                    if set(parts.files) != expected:
                         return False
-                else:
-                    logger.warning(f"Split path {path} for dataset {data_key} not found")
-                    return False
-            return True
-        return False
-    
+                    loaded[data_key] = {part: parts[part].tolist() for part in expected}
+            except (OSError, ValueError, EOFError, BadZipFile):
+                return False
+        if len(generations) != 1:
+            # Retry an interrupted multi-dataset publication.
+            return False
+        for data_key, parts in loaded.items():
+            for part, indices in parts.items():
+                self.split[part][data_key] = indices
+        return True
+
     def _save(self, preload_path: Dict[str, str]) -> None:
+        generation = uuid4().hex
         for data_key, path in preload_path.items():
             if os.path.isdir(path):
                 split_path = os.path.join(path, "split_" + self.splitter.hash)
@@ -194,26 +198,40 @@ class Splitter:
                 for part_key, part_info in self.split.items():
                     for k, indices in part_info.items():
                         if k == data_key:
-                            split_dict[part_key] = np.array(indices)
-                np.savez(split_file, **split_dict)
+                            split_dict[part_key] = np.array(indices, dtype=np.int64)
                 handler = YamlHandler(os.path.join(split_path, "splitter.yaml"))
                 splitter_config = addict.Dict({
                     "method": self.method,
                     "seed": self.seed,
                     **self.params
                 })
-                handler.write_yaml(splitter_config)
+                with atomic_output(handler.file_path) as path:
+                    handler.write_yaml(splitter_config, path)
+                with atomic_output(split_file) as path:
+                    np.savez(path, **split_dict)
+                    # Leave the arrays compatible with consumers iterating over every key.
+                    with ZipFile(path, "a") as archive:
+                        archive.comment = generation.encode("ascii")
                 logger.info(f"Save split for dataset {data_key} at {split_path}")
             else:
                 raise FileNotFoundError(f"Preload path {path} for dataset {data_key} not found")
 
     def get_split(self, data: Dict[str, FieldDataset], preload_path: Optional[Dict[str, str]]=None) -> Dict[str, Dict[str, List[int]]]: 
-        self._set_seed()
         self.split = self.splitter._get_empty_split(data)
-        if self.preload and self.preload_split(preload_path):
-            return self.split
-        else:
-            self.split = self.splitter.split(data)
-            if self.save:
+
+        def prepare():
+            if self.preload and self.preload_split(preload_path):
+                return
+            self.split = self.splitter.split(data, np.random.RandomState(self.seed))
+            if self.save and preload_path:
                 self._save(preload_path)
-            return self.split
+
+        if self.save and preload_path:
+            sync_dir = next(iter(preload_path.values()))
+            run_rank0_exclusive(prepare, sync_dir=sync_dir, name=f"split_{self.splitter.hash}")
+            if not is_global_zero() and not self.preload_split(preload_path):
+                raise RuntimeError(f"Published split is unavailable in {sync_dir}")
+        else:
+            # Each rank obtains the same partition without writing an ephemeral split.
+            prepare()
+        return self.split

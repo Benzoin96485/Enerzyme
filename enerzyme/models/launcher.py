@@ -16,7 +16,9 @@ from torch.utils.data import Dataset, Subset
 
 from ..data.datahub import DataHub, FieldDataset
 from ..tasks.trainer import Trainer
+from ..tasks.distributed import is_global_zero, run_rank0_exclusive
 from ..utils import logger
+from ..utils.util import atomic_output
 from .loss import LOSS_REGISTER
 from .pipeline import build_model
 
@@ -33,7 +35,6 @@ class FFDataset(Dataset):
             indices = {data_key: np.arange(0, len(data["Ra"])) for data_key, data in features.items()}
         elif isinstance(indices, list):
             indices = {list(features.keys())[0]: indices}
-        self.key_order = {k: i for i, k in enumerate(features.keys())}
         self.data_in_memory = data_in_memory
         self.full_features = features
         self.full_targets = targets
@@ -53,8 +54,10 @@ class FFDataset(Dataset):
         self._update_indices_map()
 
     def _update_indices_map(self) -> None:
-        self.prefix_sum = np.cumsum([len(data_indices) for data_indices in self.indices.values()])
-        self.indices_map = np.concatenate([[i] * len(data_indices) for i, data_indices in enumerate(self.indices.values())])
+        lengths = np.array([len(indices) for indices in self.indices.values()], dtype=np.int64)
+        self.key_order = {key: i for i, key in enumerate(self.indices)}
+        self.prefix_sum = np.cumsum(lengths)
+        self.indices_map = np.repeat(np.arange(len(lengths)), lengths)
 
     def _bisect_search(self, idx: int) -> int:
         return bisect.bisect_right(self.prefix_sum, idx)
@@ -69,9 +72,10 @@ class FFDataset(Dataset):
         return data_key, residue_idx
 
     def _indices_to_key_indices(self, indices: Iterable[int]) -> Dict[str, np.ndarray[int]]:
-        _indices = np.array(indices)
+        _indices = np.asarray(indices, dtype=np.int64)
         data_key_indices = self.indices_map[_indices]
-        return {k: _indices[data_key_indices == self.key_order[k]] - self.prefix_sum[self.key_order[k]] for k in self.indices.keys()}
+        starts = np.concatenate([[0], self.prefix_sum])
+        return {k: _indices[data_key_indices == i] - starts[i] for k, i in self.key_order.items()}
 
     def _key_indices_to_indices(self, key_indices: Dict[str, Iterable[int]]) -> np.ndarray[int]:
         if not key_indices:
@@ -86,7 +90,8 @@ class FFDataset(Dataset):
         if len(self) == 0:
             raise IndexError("Cannot index into empty FFDataset")
         data_key, residue_idx = self._index_to_key_index(idx)
-        return self.features[data_key].loc(residue_idx), self.targets[data_key].loc(residue_idx), data_key
+        frame = self.indices[data_key][residue_idx]
+        return self.features[data_key].loc(frame), self.targets[data_key].loc(frame), data_key
 
     def expand_with_indices(self, new_raw_indices: Dict[str, Iterable[int]]) -> None:
         for k in new_raw_indices.keys():
@@ -114,10 +119,11 @@ class MetaStateDict(dict):
 
     def load(self) -> None:
         if os.path.exists(self.dump_path):
-            self.update(joblib.load(self.dump_path))
+            super().update(joblib.load(self.dump_path))
 
     def dump(self) -> None:
-        joblib.dump({k: v for k, v in self.items()}, self.dump_path)
+        with atomic_output(self.dump_path) as path:
+            joblib.dump(dict(self), path)
 
     def update(self, d: Dict) -> None:
         super().update(d)
@@ -153,7 +159,7 @@ class BaseFFLauncher(ABC):
     def _init_model(self, verbose=1) -> Module:
         model = build_model(self.architecture, self.layer_params, self.build_params, verbose)
         self.loss_terms = {k: LOSS_REGISTER[k](**v) for k, v in self.loss_params.items()}
-        if verbose:
+        if verbose and is_global_zero():
             print(model.__str__())
         return model
 
@@ -211,10 +217,11 @@ class BaseFFLauncher(ABC):
         return self._evaluate(test_dataset)
 
     def dump(self, data: Any, dump_dir: str, name: str) -> None:
-        path = os.path.join(dump_dir, name)
-        if not os.path.exists(dump_dir):
-            os.makedirs(dump_dir)
-        joblib.dump(data, path)
+        def write():
+            with atomic_output(os.path.join(dump_dir, name)) as path:
+                joblib.dump(data, path)
+
+        run_rank0_exclusive(write, sync_dir=dump_dir, name=name)
 
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
@@ -332,15 +339,14 @@ class BaseFFLauncher(ABC):
                 masked_relative_indices = masked_relative_indices[:sample_size]
                 masked_relative_key_indices = withheld_set._indices_to_key_indices(masked_relative_indices)
                 expand_absolute_key_indices = {k: withheld_set.raw_indices[k][v] for k, v in masked_relative_key_indices.items()}
-                expand_absolute_indices = withheld_set._key_indices_to_indices(expand_absolute_key_indices)
-                len_expanded = len(expand_absolute_indices)
+                len_expanded = len(masked_relative_indices)
                 if extend_validation_set:
                     len_expanded_training = int(len_expanded * ratio_training + 0.5)
-                    expand_absolute_key_indices_training = withheld_set._indices_to_key_indices(expand_absolute_indices[:len_expanded_training])
-                    training_set.expand_with_indices(expand_absolute_key_indices_training)
+                    training_picks = withheld_set._indices_to_key_indices(masked_relative_indices[:len_expanded_training])
+                    training_set.expand_with_indices({k: withheld_set.raw_indices[k][v] for k, v in training_picks.items()})
                     if validation_set is not None:
-                        expand_absolute_key_indices_validation = withheld_set._indices_to_key_indices(expand_absolute_indices[len_expanded_training:])
-                        validation_set.expand_with_indices(expand_absolute_key_indices_validation)
+                        validation_picks = withheld_set._indices_to_key_indices(masked_relative_indices[len_expanded_training:])
+                        validation_set.expand_with_indices({k: withheld_set.raw_indices[k][v] for k, v in validation_picks.items()})
                 else:
                     training_set.expand_with_indices(expand_absolute_key_indices)
                 for k, v in masked_relative_key_indices.items():
@@ -382,6 +388,8 @@ class FF_single(BaseFFLauncher):
                 try:
                     self.pretrain_path = get_pretrain_path(self.dump_dir, "last", None)
                 except FileNotFoundError:
+                    self.pretrain_path = None
+                if self.pretrain_path is None:
                     self.pretrain_path = get_pretrain_path(self.base_pretrain_path, "best", None)
             else:
                 self.pretrain_path = get_pretrain_path(base_pretrain_path, "last", None)
@@ -440,7 +448,6 @@ class FF_single(BaseFFLauncher):
         metric_score = predict_result["metric_score"]
         logger.info("{} FF metrics score: \n{}".format(self.model_str, metric_score))
         logger.info("{} FF done!".format(self.model_str))
-        print(metric_score)
         return {"y_pred": y_pred, "y_truth": y_truth, "metric_score": pd.DataFrame(metric_score, index=[self.model_str])}
 
 
@@ -467,22 +474,20 @@ class FF_committee(BaseFFLauncher):
 
     def _init_pretrain_path(self, base_pretrain_path: Optional[str]=None) -> None:
         from .modelhub import get_pretrain_path
-        if self.trainer.resume:
-            if base_pretrain_path is None:
+        self.pretrain_path = []
+        for i in range(self.size):
+            path = None
+            if self.trainer.resume:
+                resume_dir = self.dump_dir if base_pretrain_path is None else base_pretrain_path
                 try:
-                    self.pretrain_path = [get_pretrain_path(self.dump_dir, "last", i) for i in range(self.size)]
+                    path = get_pretrain_path(resume_dir, "last", i)
                 except FileNotFoundError:
-                    self.pretrain_path = None
-            else:
-                self.pretrain_path = [
-                    get_pretrain_path(base_pretrain_path, "last", i)
-                    for i in range(self.size)
-                ]
-        else:
-            self.pretrain_path = [
-                get_pretrain_path(self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path, "best", i)
-                for i in range(self.size)
-            ]
+                    if base_pretrain_path is not None:
+                        raise
+            if path is None:
+                directory = self.base_pretrain_path if base_pretrain_path is None else base_pretrain_path
+                path = get_pretrain_path(directory, "best", i)
+            self.pretrain_path.append(path)
 
     def _train(self,
         train_dataset: FFDataset,

@@ -1,7 +1,11 @@
 import os
+from copy import copy
 from typing import Dict, Optional, List, Literal, Any
 import pandas as pd
 from .utils import YamlHandler, logger
+from .utils.util import atomic_output
+from .tasks.distributed import run_rank0_exclusive
+from .train import validate_parallel_config
 from .data.datahub import DataHub
 from .tasks.trainer import Trainer
 from .models import ModelHub
@@ -16,8 +20,8 @@ class FFPredict:
 
         model_config_path = os.path.join(model_dir, 'config.yaml') if model_config_path is None else model_config_path
         config = YamlHandler(model_config_path).read_yaml()
-        new_config = YamlHandler(config_path).read_yaml()
         if config_path is not None:
+            new_config = YamlHandler(config_path).read_yaml()
             new_datahub_config = new_config.get("Datahub", dict())
             if new_datahub_config:
                 if "datasets" in config.Datahub and "datasets" not in new_datahub_config:
@@ -26,7 +30,7 @@ class FFPredict:
                     if k not in ["transforms", "neighbor_list", "global_transforms"]:
                         config.Datahub[k] = v
                 if "targets" not in new_datahub_config:
-                    config.Datahub.pop("targets")
+                    config.Datahub.pop("targets", None)
             else:
                 self.new_data = False
             new_metric_config = new_config.get("Metric", dict())
@@ -39,8 +43,9 @@ class FFPredict:
                 if k in ["non_target_features", "inference_batch_size", "dtype", "device"]:
                     config.Trainer[k] = v
         else:
-            config = new_config
+            self.new_data = False
 
+        validate_parallel_config(config, training=False)
         logger.info('Config: {}'.format(config))
         
         ### load from ckp will initialize the datahub and the modelhub
@@ -67,53 +72,74 @@ class FFPredict:
         FFs: Dict[str, BaseFFLauncher] = self.modelhub.models.get('FF', dict())
         metrics = []
         for ff_name, ff in FFs.items():
-            result = dict()
             if self.new_data:
                 predict_result = ff.evaluate()
             else:
-                partition = ff._init_partition()
+                # The original training run owns the saved test indices, even
+                # when prediction writes to a different output directory.
+                splitter = copy(ff.splitter)
+                splitter.preload, splitter.save = True, False
+                paths = {key: os.path.join(self.model_dir, os.path.basename(path))
+                         for key, path in self.datahub.preload_path.items()}
+                split = splitter.get_split(self.datahub.features, paths)
+                partition = ff._init_partition(split)
                 predict_result = ff._evaluate(partition["test"])
-            y_pred = predict_result["y_pred"]
-            y_truth = predict_result["y_truth"]
-            metric_score = predict_result["metric_score"]
-            result = pd.DataFrame({"data_key": y_pred["data_key"]})
-            all_target_keys = set()
-            for data_key, target in self.datahub.targets.items():
-                all_target_keys.update(target.data.keys())
-            for k in all_target_keys:
-                if hasattr(ff, "size") and ff.size > 1:
-                    for i, y_pred_single in enumerate(y_pred):
-                        result[f"predict{i}_{k}"] = list(y_pred_single[k])
-                else:
-                    result[f"predict_{k}"] = list(y_pred[k])
-                result[k] = list(y_truth[k])
-            for k in self.trainer.non_target_features:
-                if hasattr(ff, "size") and ff.size > 1:
-                    for i, y_pred_single in enumerate(y_pred):
-                        result[f"{k}{i}"] = list(y_pred_single[k])
-                else:
-                    result[k] = list(y_pred[k])
-            os.makedirs(self.output_dir, exist_ok=True)
-            for data_key, datahub in self.datahub.datahubs.items():
-                result[result["data_key"] == data_key].to_pickle(os.path.join(datahub.preload_path, f"{ff_name}-prediction.pkl"))
-            metrics.append(metric_score)
-        metrics_df = pd.concat(metrics)
-        metrics_df.to_csv(os.path.join(self.output_dir, 'metric.csv'))
-        logger.info(f"final predict metrics score: \n{metrics_df.T}")
-        logger.info("pipeline finish!")
+            def save_prediction():
+                predictions = predict_result["y_pred"]
+                committee = isinstance(predictions, list)
+                members = predictions if committee else [predictions]
+                result = pd.DataFrame({"data_key": members[0]["data_key"]})
+                targets = {key for fields in self.datahub.targets.values() for key in fields.keys()}
+                for key in targets:
+                    for i, member in enumerate(members):
+                        column = f"predict{i}_{key}" if committee else f"predict_{key}"
+                        result[column] = list(member[key])
+                    result[key] = list(predict_result["y_truth"][key])
+                for key in ff.trainer.non_target_features:
+                    for i, member in enumerate(members):
+                        result[f"{key}{i}" if committee else key] = list(member[key])
+                self._write_predictions(ff_name, result)
+                metrics.append(predict_result["metric_score"])
+
+            run_rank0_exclusive(save_prediction, sync_dir=self.output_dir, name=f"prediction_{ff_name}")
+
+        def save_metrics():
+            if metrics:
+                scores = pd.concat(metrics)
+                with atomic_output(os.path.join(self.output_dir, "metric.csv")) as path:
+                    scores.to_csv(path)
+                logger.info(f"Final prediction metrics:\n{scores.T}")
+
+        run_rank0_exclusive(save_metrics, sync_dir=self.output_dir, name="prediction_metrics")
+
+    def _write_predictions(self, ff_name, frame):
+        for data_key, hub in self.datahub.datahubs.items():
+            with atomic_output(os.path.join(hub.preload_path, f"{ff_name}-prediction.pkl")) as path:
+                frame[frame["data_key"] == data_key].to_pickle(path)
 
     def _simple_predict(self, non_target_features: List[str], save: bool=True) -> Dict[str, Dict[Literal["y_pred", "y_truth", "metric_score"], Any]]:
         FFs: Dict[str, BaseFFLauncher] = self.modelhub.models.get('FF', dict())
         predict_results = dict()
         for ff_name, ff in FFs.items():
-            ff.trainer.non_target_features.extend(non_target_features)
+            for key in non_target_features:
+                if key not in ff.trainer.non_target_features:
+                    ff.trainer.non_target_features.append(key)
             predict_results[ff_name] = ff.evaluate()
             if save:
-                os.makedirs(self.output_dir, exist_ok=True)
-                y_pred = predict_results[ff_name]["y_pred"]
-                result = pd.DataFrame({k: list(v) for k, v in y_pred.items()})
-                for data_key, datahub in self.datahub.datahubs.items():
-                    result[result["data_key"] == data_key].to_pickle(os.path.join(datahub.preload_path, f"{ff_name}-prediction.pkl"))
+                def save_prediction():
+                    predictions = predict_results[ff_name]["y_pred"]
+                    if isinstance(predictions, list):
+                        # Keep member zero's ordinary columns for existing simple-prediction readers.
+                        result = pd.DataFrame({k: list(v) for k, v in predictions[0].items()})
+                        for i, member in enumerate(predictions[1:], 1):
+                            for key, values in member.items():
+                                if key != "data_key":
+                                    result[f"{key}{i}"] = list(values)
+                    else:
+                        result = pd.DataFrame({k: list(v) for k, v in predictions.items()})
+                    self._write_predictions(ff_name, result)
+
+                run_rank0_exclusive(save_prediction, sync_dir=self.output_dir, name=f"simple_prediction_{ff_name}")
         return predict_results
 
     def _simple_load_prediction(self):
