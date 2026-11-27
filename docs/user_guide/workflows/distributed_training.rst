@@ -90,8 +90,9 @@ checkpoints can supply the fields recorded by their original trainer.
 See :doc:`../models/checkpoints_resume` for checkpoint selection and pretraining.
 
 Lightning supports supervised multi-GPU configurations through the same CLI.
-For Slurm installations that expose all allocated GPUs on each node, one
-task per GPU and ``--gpu-bind=none`` give Lightning its local device list.
+The Slurm example also works with Lightning when the scheduler exposes just
+one GPU to each task. On installations that expose all allocated GPUs per
+node, use one task per GPU and the local rank selects its device.
 Active learning and committee workflows run in a single process.
 
 Comparing training throughput

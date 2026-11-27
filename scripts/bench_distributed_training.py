@@ -16,10 +16,10 @@ import sys
 import time
 
 
-def compare_runs(directory):
+def compare_runs(directory, systems=("molecules", "crystals")):
     """Summarize complete ABBA runs, checking that their workloads and GPUs match."""
     report = {}
-    for system in ("molecules", "crystals"):
+    for system in systems:
         legs = {}
         identity = None
         revisions = {}
@@ -69,7 +69,8 @@ def main():
     parser.add_argument("--steps", type=int, default=50)
     args = parser.parse_args()
     if args.compare:
-        print(json.dumps(compare_runs(args.compare), indent=2))
+        systems = [args.system] if args.system else ["molecules", "crystals"]
+        print(json.dumps(compare_runs(args.compare, systems), indent=2))
         return
     if not (args.source_tree and args.output and args.system):
         parser.error("measurement requires --source-tree, --output and --system")
