@@ -348,5 +348,23 @@
   "docs": {
     "strict_html_build": "passed",
     "html_files": 1206
+  },
+  "full_cpu_suite": {
+    "job": 6343693,
+    "product_revision": "44e9895",
+    "files_and_shards": 182,
+    "rerun": {
+      "job": 6343796,
+      "module": "test_distributed_env",
+      "reason": "Isolate the simulated Slurm allocation from the real test job environment.",
+      "tests_passed": 41
+    },
+    "results": {
+      "tests": 1869,
+      "skipped": 74,
+      "failures": 0,
+      "errors": 0,
+      "passed": 1795
+    }
   }
 }
