@@ -91,6 +91,8 @@ checks energies, forces and participating parameter gradients, and reports
 wall time for batch prediction and force-loss backward. Prediction includes
 host result collection. Training includes collation, transfer, forward and
 backward. The optimizer step is measured separately when evaluating Muon.
+The CPU and CUDA measurements, hardware details and per-preset comparisons
+are recorded in ``test/fixtures/validation/shared_performance.json``.
 
 Neighbor list memory
 --------------------
