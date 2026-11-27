@@ -714,7 +714,7 @@
     "gemnet/float64": "4428e68",
     "gemnet-q/float32": "81620f7",
     "gemnet-q/float64": "5d53f9c",
-    "gemnet-oc/float32": "81620f7",
+    "gemnet-oc/float32": "610b65f",
     "gemnet-oc/float64": "610b65f",
     "m3gnet/float32": "81620f7",
     "m3gnet/float64": "2a3b024",
@@ -2904,6 +2904,23 @@
       },
       "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "aeac206136e39c5b034c36798a8125853909b95c1e52f96c40bdd06841c249a5", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": ["err3", "err3"], "bulk_256": [[29.9705620855093, 131.10009765625, 10, 302], "err1"], "large_2000": ["err2", "err2"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.440892098500626e-16, "force_max_abs": 4.618701254788249e-17, "gradient_max_abs": 0.0}}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "f22c89371a84915898a1a6652ff714addb73aa84e2c756586336b6c6200f95f1", "cache_had_prior_completed_process": false, "reps": 5, "timings": {"mol_batch_32x20": [[27.862761169672012, 213.0625, 15, 1134], [29.0052960626781, 589.93603515625, 1, 1333]], "bulk_256": [[27.869192184880376, 126.3759765625, 1, 422], [29.70528812147677, 347.095703125, 1, 1260]], "large_2000": [[34.4444380607456, 737.12744140625, 1, 422], [50.1534529030323, 2249.39453125, 1, 1257]]}, "numerical": {"mol_batch_32x20": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 4.440892098500626e-16, "force_max_abs": 1.3322676295501878e-15, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 435, "reference_active_parameters": 435, "energy_max_abs": 8.881784197001252e-16, "force_max_abs": 1.3322676295501878e-15, "gradient_max_abs": 4.547473508864641e-13}}, "bulk_256": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 0.0, "force_max_abs": 1.3877787807814457e-17, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 435, "reference_active_parameters": 435, "energy_max_abs": 2.220446049250313e-15, "force_max_abs": 5.551115123125783e-17, "gradient_max_abs": 1.7053025658242404e-13}}, "large_2000": {"infer": {"passed": true, "active_parameters": 0, "reference_active_parameters": 0, "energy_max_abs": 7.105427357601002e-15, "force_max_abs": 1.734723475976807e-17, "gradient_max_abs": 0.0}, "train": {"passed": true, "active_parameters": 435, "reference_active_parameters": 435, "energy_max_abs": 4.263256414560601e-14, "force_max_abs": 5.551115123125783e-17, "gradient_max_abs": 2.1827872842550278e-11}}}}]
     },
+    "gemnet-oc/float32/610b65f/pair": {
+      "job": "6340153",
+      "host": "d-8-15-2",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "fixture_sha256": "92f37cfecf8115ba78620718c3a3d3a9ac431881dfb047398e71aab4a4e04ae7",
+      "node_gpu_inventory": ["GPU-4163ef98-d563-542a-eccc-2939797f3efc, Tesla V100-PCIE-32GB", "GPU-d1eda129-fd3c-30d1-726d-5fdcd4a8fc65, Tesla V100-PCIE-32GB"],
+      "allocated_gpu_index": "0",
+      "cuda_visible_devices": "GPU-4163ef98-d563-542a-eccc-2939797f3efc",
+      "allocated_gpu_uuid": "GPU-4163ef98-d563-542a-eccc-2939797f3efc",
+      "selected_candidate": true,
+      "matches_current_source": true,
+      "attempt_started_unix": 1795743368,
+      "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
+      "modes": ["infer", "train"],
+      "cross_eager": {},
+      "legs": [{"side": "base", "exit": 0, "cache_configuration_sha256": "22fefb2ccec733d22671f8b0dfbece8f7b43f9aefae2c688e79af23ec8746ce7", "cache_had_prior_completed_process": true, "process_started_unix": 1795743368.8067858, "process_finished_unix": 1795743491.0972939, "cuda_visible_devices": "GPU-4163ef98-d563-542a-eccc-2939797f3efc", "reps": 5, "timings": {"mol_batch_32x20": ["err2", "err4"], "bulk_256": ["err2", "err2"], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {}, "bulk_256": {}, "large_2000": {}}}, {"side": "new", "exit": 0, "cache_configuration_sha256": "56ea2fad513ad08a0205538af3b23992cf7751cb1f4a77ffac674c378b42186a", "cache_had_prior_completed_process": false, "process_started_unix": 1795743491.1352391, "process_finished_unix": 1795744652.1876469, "cuda_visible_devices": "GPU-4163ef98-d563-542a-eccc-2939797f3efc", "reps": 5, "timings": {"mol_batch_32x20": [[685.7081369962543, 21449.55029296875, 33, 2372], "err7"], "bulk_256": [[694.1513461060822, 20746.5341796875, 27, 2322], "err7"], "large_2000": ["err7", "err7"]}, "numerical": {"mol_batch_32x20": {"infer": {"reference_error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 9.15 GiB. GPU 0 has a total capacity of 31.73 GiB of which 1.79 GiB is free. Including non-PyTorch memory, this process has 29.94 GiB memory in use. Of the allocated memory 27.90 GiB is allocated by PyTorch, and 1.66 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)"}}, "bulk_256": {"infer": {"reference_error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 9.88 GiB. GPU 0 has a total capacity of 31.73 GiB of which 1.92 GiB is free. Including non-PyTorch memory, this process has 29.81 GiB memory in use. Of the allocated memory 27.10 GiB is allocated by PyTorch, and 2.33 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)"}}, "large_2000": {}}}]
+    },
     "gemnet-oc/float64/610b65f/pair": {
       "job": "6340154",
       "host": "d-8-8-1",
@@ -4687,7 +4704,7 @@
       "cuda_visible_devices": "GPU-34f059c2-96ad-b500-81b4-48607e7bcca1",
       "allocated_gpu_uuid": "GPU-34f059c2-96ad-b500-81b4-48607e7bcca1",
       "selected_candidate": true,
-      "matches_current_source": true,
+      "matches_current_source": false,
       "attempt_started_unix": 1795616899,
       "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
       "modes": ["infer", "train"],
@@ -12424,7 +12441,7 @@
       "cuda_visible_devices": "GPU-34f059c2-96ad-b500-81b4-48607e7bcca1",
       "allocated_gpu_uuid": "GPU-34f059c2-96ad-b500-81b4-48607e7bcca1",
       "selected_candidate": true,
-      "matches_current_source": true,
+      "matches_current_source": false,
       "attempt_started_unix": 1795603070,
       "systems": ["mol_batch_32x20", "bulk_256", "large_2000"],
       "modes": ["infer", "train"],
@@ -25298,6 +25315,128 @@
       "captured_calls": 3634,
       "finished": true
     },
+    "gemnet-oc/float32/610b65f/bulk_256/infer": {
+      "architecture": "gemnet-oc",
+      "precision": "float32",
+      "system": "bulk_256",
+      "mode": "infer",
+      "candidate": "610b65f92cad35139e6374d87b5e55ce26ac6412",
+      "gpu_job": "6340153",
+      "side": "new",
+      "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
+      "fixture_sha256": "92f37cfecf8115ba78620718c3a3d3a9ac431881dfb047398e71aab4a4e04ae7",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "measured_job": "6340153",
+      "cpu_reference": {
+        "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+        "torch": "2.13.0+cu126",
+        "device": "cpu",
+        "job": "6338743",
+        "fixture_sha256": "92f37cfecf8115ba78620718c3a3d3a9ac431881dfb047398e71aab4a4e04ae7",
+        "errors": {},
+        "systems": {
+          "mol_batch_32x20": {
+            "atoms": 640,
+            "edges": 12160
+          },
+          "bulk_256": {
+            "atoms": 256,
+            "edges": 108234
+          }
+        },
+        "requested_systems": ["bulk_256", "mol_batch_32x20"],
+        "requested_modes": ["infer"],
+        "complete": true
+      },
+      "original_gpu_reference_error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 9.88 GiB. GPU 0 has a total capacity of 31.73 GiB of which 1.92 GiB is free. Including non-PyTorch memory, this process has 29.81 GiB memory in use. Of the allocated memory 27.10 GiB is allocated by PyTorch, and 2.33 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "reused_verified_inductor_cache": true,
+      "replayed_prior_modes": ["mol_batch_32x20/infer", "mol_batch_32x20/train"],
+      "fields": {
+        "E": {
+          "shape": [1],
+          "native_shape": [1],
+          "dtype": "torch.float32",
+          "native_dtype": "torch.float32",
+          "passed": true,
+          "max_abs": 0.0001068115234375,
+          "elements_outside": 0
+        },
+        "Fa": {
+          "shape": [256, 3],
+          "native_shape": [256, 3],
+          "dtype": "torch.float32",
+          "native_dtype": "torch.float32",
+          "passed": true,
+          "max_abs": 6.532669067382812e-05,
+          "elements_outside": 0
+        }
+      },
+      "passed": true,
+      "graphs": 61,
+      "captured_calls": 6994,
+      "finished": true
+    },
+    "gemnet-oc/float32/610b65f/mol_batch_32x20/infer": {
+      "architecture": "gemnet-oc",
+      "precision": "float32",
+      "system": "mol_batch_32x20",
+      "mode": "infer",
+      "candidate": "610b65f92cad35139e6374d87b5e55ce26ac6412",
+      "gpu_job": "6340153",
+      "side": "new",
+      "gpu_uuid": "4163ef98-d563-542a-eccc-2939797f3efc",
+      "fixture_sha256": "92f37cfecf8115ba78620718c3a3d3a9ac431881dfb047398e71aab4a4e04ae7",
+      "driver_sha256": "42cc9b1da0f3331c6dc018d3291b6cf93ec1f0d5dd87952656e783300c30922c",
+      "measured_job": "6340153",
+      "cpu_reference": {
+        "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+        "torch": "2.13.0+cu126",
+        "device": "cpu",
+        "job": "6338743",
+        "fixture_sha256": "92f37cfecf8115ba78620718c3a3d3a9ac431881dfb047398e71aab4a4e04ae7",
+        "errors": {},
+        "systems": {
+          "mol_batch_32x20": {
+            "atoms": 640,
+            "edges": 12160
+          },
+          "bulk_256": {
+            "atoms": 256,
+            "edges": 108234
+          }
+        },
+        "requested_systems": ["bulk_256", "mol_batch_32x20"],
+        "requested_modes": ["infer"],
+        "complete": true
+      },
+      "original_gpu_reference_error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 9.15 GiB. GPU 0 has a total capacity of 31.73 GiB of which 1.79 GiB is free. Including non-PyTorch memory, this process has 29.94 GiB memory in use. Of the allocated memory 27.90 GiB is allocated by PyTorch, and 1.66 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "reused_verified_inductor_cache": true,
+      "replayed_prior_modes": [],
+      "fields": {
+        "E": {
+          "shape": [32],
+          "native_shape": [32],
+          "dtype": "torch.float32",
+          "native_dtype": "torch.float32",
+          "passed": true,
+          "max_abs": 5.7220458984375e-06,
+          "elements_outside": 0
+        },
+        "Fa": {
+          "shape": [640, 3],
+          "native_shape": [640, 3],
+          "dtype": "torch.float32",
+          "native_dtype": "torch.float32",
+          "passed": true,
+          "max_abs": 1.4781951904296875e-05,
+          "elements_outside": 0
+        }
+      },
+      "passed": true,
+      "graphs": 33,
+      "captured_calls": 2372,
+      "finished": true
+    },
     "gemnet-oc/float32/81620f7/bulk_256/infer": {
       "architecture": "gemnet-oc",
       "precision": "float32",
@@ -27114,7 +27253,7 @@
     "terminal_partial_frozen_attempts": 50,
     "selected_partial_cells": 0,
     "historical_architecture_precision_pairs": 46,
-    "completed_frozen_attempts": 260,
+    "completed_frozen_attempts": 261,
     "comparable_mode_system_cells": 81,
     "comparable_metrics": 162,
     "above_3_percent": 0,
