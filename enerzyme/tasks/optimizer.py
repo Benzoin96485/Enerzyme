@@ -131,8 +131,8 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
             batched: bool, default False
                 Batch same-shaped hidden weights and auxiliary Adam updates on a single
                 device. Batched bfloat16 matrix products can differ in rounding. Both
-                paths use the same checkpoint format. Distributed runs use the
-                distributed Muon implementation.
+                paths use the same checkpoint format. An initialized process group
+                selects distributed Muon.
 
             muon_learning_rate: float, default 1e-2
                 Learning rate of Muon optimizer. If not provided but with `learning_rate` provided, use the `learning rate`.

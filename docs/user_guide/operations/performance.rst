@@ -52,7 +52,8 @@ The optimizer groups equal-shaped hidden matrices on the same device and uses
 foreach updates for the auxiliary Adam parameters. It reads and writes the same
 optimizer state as the single-device Muon implementation. Batched bfloat16
 matrix products may round differently. The default is ``batched: false``.
-Distributed training keeps its distributed Muon optimizer.
+If a process group is initialized when Enerzyme builds the optimizer, the trainer
+uses distributed Muon.
 
 Simulation
 ----------
