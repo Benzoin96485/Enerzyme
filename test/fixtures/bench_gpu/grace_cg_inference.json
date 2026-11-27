@@ -1,0 +1,256 @@
+{
+  "model": "grace",
+  "system": "mol_batch_32x20",
+  "mode": "compiled CUDA inference with forces",
+  "job": "6339530",
+  "node": "d-7-1-1",
+  "device_uuid": "9a19f472-727c-1aec-eb16-7d4406811551",
+  "sources": {
+    "einsum": "cda3884bce2df5fd837f3ea398844c042a6597b0",
+    "baseline": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c"
+  },
+  "snapshot_sha256": "d95c4611ebd308a9ed7167eb437db345836047be365b25c91f65327bfee18253",
+  "driver_sha256": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
+  "experiment_sha256": "07422a01f6a1c9a7562c2d255cfc3a0e0324be5a0e415f7390cd8bd1539592b0",
+  "method": "Four independent processes per precision share one V100. Source-specific compiler caches start empty. Each process records the median of eleven evaluations after warmup. The summary uses the median of the two process medians for each source. All four cross-source native E/F comparisons use the frozen benchmark tolerances.",
+  "results": {
+    "float64": {
+      "processes": [
+        {
+          "version": "einsum",
+          "infer_ms": 10.326827876269817,
+          "infer_peak_mb": 286.138671875,
+          "numerical": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 1.6653345369377348e-16,
+            "force_max_abs": 2.3592239273284576e-16,
+            "gradient_max_abs": 0.0
+          },
+          "capture": {
+            "new_graphs": 9,
+            "new_calls": 784
+          }
+        },
+        {
+          "version": "baseline",
+          "infer_ms": 11.351949069648981,
+          "infer_peak_mb": 298.26416015625,
+          "numerical": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 2.7755575615628914e-16,
+            "force_max_abs": 2.220446049250313e-16,
+            "gradient_max_abs": 0.0
+          },
+          "capture": {
+            "new_graphs": 16,
+            "new_calls": 771
+          }
+        },
+        {
+          "version": "baseline",
+          "infer_ms": 11.535831959918141,
+          "infer_peak_mb": 300.42041015625,
+          "numerical": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 2.220446049250313e-16,
+            "force_max_abs": 2.5587171270657905e-16,
+            "gradient_max_abs": 0.0
+          },
+          "capture": {
+            "new_graphs": 16,
+            "new_calls": 771
+          }
+        },
+        {
+          "version": "einsum",
+          "infer_ms": 10.638085193932056,
+          "infer_peak_mb": 288.357421875,
+          "numerical": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 2.220446049250313e-16,
+            "force_max_abs": 2.3592239273284576e-16,
+            "gradient_max_abs": 0.0
+          },
+          "capture": {
+            "new_graphs": 9,
+            "new_calls": 784
+          }
+        }
+      ],
+      "metrics": {
+        "infer_ms": {
+          "baseline": 11.443890514783561,
+          "einsum": 10.482456535100937,
+          "relative_percent": -8.40128606998306
+        },
+        "infer_peak_mb": {
+          "baseline": 299.34228515625,
+          "einsum": 287.248046875,
+          "relative_percent": -4.040270580194538
+        }
+      },
+      "cross_native": [
+        {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 2.220446049250313e-16,
+          "force_max_abs": 9.020562075079397e-17,
+          "gradient_max_abs": 0.0
+        },
+        {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 2.220446049250313e-16,
+          "force_max_abs": 7.632783294297951e-17,
+          "gradient_max_abs": 0.0
+        },
+        {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 2.7755575615628914e-16,
+          "force_max_abs": 9.71445146547012e-17,
+          "gradient_max_abs": 0.0
+        },
+        {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 2.220446049250313e-16,
+          "force_max_abs": 9.020562075079397e-17,
+          "gradient_max_abs": 0.0
+        }
+      ],
+      "passed_numerical": true
+    },
+    "float32": {
+      "processes": [
+        {
+          "version": "baseline",
+          "infer_ms": 9.210533928126097,
+          "infer_peak_mb": 158.2705078125,
+          "numerical": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 1.341104507446289e-07,
+            "force_max_abs": 2.0302832126617432e-07,
+            "gradient_max_abs": 0.0
+          },
+          "capture": {
+            "new_graphs": 16,
+            "new_calls": 771
+          }
+        },
+        {
+          "version": "einsum",
+          "infer_ms": 8.461426012217999,
+          "infer_peak_mb": 152.06982421875,
+          "numerical": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 1.7881393432617188e-07,
+            "force_max_abs": 2.1886080503463745e-07,
+            "gradient_max_abs": 0.0
+          },
+          "capture": {
+            "new_graphs": 9,
+            "new_calls": 784
+          }
+        },
+        {
+          "version": "einsum",
+          "infer_ms": 8.9593140874058,
+          "infer_peak_mb": 152.06982421875,
+          "numerical": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 1.341104507446289e-07,
+            "force_max_abs": 1.9185245037078857e-07,
+            "gradient_max_abs": 0.0
+          },
+          "capture": {
+            "new_graphs": 9,
+            "new_calls": 784
+          }
+        },
+        {
+          "version": "baseline",
+          "infer_ms": 9.042669087648392,
+          "infer_peak_mb": 158.2705078125,
+          "numerical": {
+            "passed": true,
+            "active_parameters": 0,
+            "reference_active_parameters": 0,
+            "energy_max_abs": 1.7881393432617188e-07,
+            "force_max_abs": 2.086162567138672e-07,
+            "gradient_max_abs": 0.0
+          },
+          "capture": {
+            "new_graphs": 16,
+            "new_calls": 771
+          }
+        }
+      ],
+      "metrics": {
+        "infer_ms": {
+          "baseline": 9.126601507887244,
+          "einsum": 8.7103700498119,
+          "relative_percent": -4.560640208906197
+        },
+        "infer_peak_mb": {
+          "baseline": 158.2705078125,
+          "einsum": 152.06982421875,
+          "relative_percent": -3.9177757621753684
+        }
+      },
+      "cross_native": [
+        {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 2.682209014892578e-07,
+          "force_max_abs": 6.984919309616089e-08,
+          "gradient_max_abs": 0.0
+        },
+        {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 2.8312206268310547e-07,
+          "force_max_abs": 8.381903171539307e-08,
+          "gradient_max_abs": 0.0
+        },
+        {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 2.5331974029541016e-07,
+          "force_max_abs": 7.916241884231567e-08,
+          "gradient_max_abs": 0.0
+        },
+        {
+          "passed": true,
+          "active_parameters": 0,
+          "reference_active_parameters": 0,
+          "energy_max_abs": 2.980232238769531e-07,
+          "force_max_abs": 8.940696716308594e-08,
+          "gradient_max_abs": 0.0
+        }
+      ],
+      "passed_numerical": true
+    }
+  }
+}
