@@ -25,7 +25,7 @@ From :code:`enerzyme/models/layers/`:
     Architecture-specific message passing (:code:`Core` with :code:`architecture` in Modelhub)
 
 **Physics / post-processing**
-    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy` (flavors: SpookyNet / PhysNet / SO3LR), :code:`EwaldElectrostaticEnergy` (periodic / PBC datasets: real-space erfc-damped Coulomb + reciprocal-space Ewald sum + self-energy, drop-in for :code:`ElectrostaticEnergy` given :code:`cell`/:code:`pbc` -- see :doc:`../data/datahub_reference`), :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`TSQDODispersionEnergy` (SO3LR; not Grimme), :code:`ZBLRepulsionEnergy` (optional :code:`switch_off` for SO3LR)
+    :code:`AtomicAffine`, :code:`ChargeConservation`, :code:`ElectrostaticEnergy` (flavors: SpookyNet / PhysNet / SO3LR), :code:`EwaldElectrostaticEnergy`, :code:`AtomicCharge2Dipole`, :code:`GrimmeD3Energy`, :code:`GrimmeD4Energy`, :code:`TSQDODispersionEnergy` (SO3LR; not Grimme), :code:`ZBLRepulsionEnergy` (optional :code:`switch_off` for SO3LR)
 
 **Output**
     :code:`EnergyReduce`, :code:`Force`, :code:`ShallowEnsembleReduce`
@@ -48,6 +48,20 @@ From :code:`enerzyme/models/layers/`:
     Equiformer-series external readouts (including LinearRS / GraphAttention /
     :code:`EquiformerV2FeedForwardReadout`) accept :code:`shallow_ensemble_size`
     by widening the last linear layer.
+
+Periodic electrostatics
+-----------------------
+
+Use ``EwaldElectrostaticEnergy`` for a cell that is periodic in all three
+directions. It uses conducting boundary conditions and includes a uniform
+neutralizing background when the cell carries net charge. Provide the three
+lattice vectors as rows of ``cell`` and set all three ``pbc`` flags to true.
+
+Set the neighbor search radius to cover both the model's short-range cutoff
+and the Ewald real-space cutoff (``cutoff_real``). The directed neighbor list
+must include periodic images, including images of the same atom.
+``k_cutoff`` sets the reciprocal-space radius in inverse position units.
+See :doc:`../data/datahub_reference` for the cutoff neighbor list settings.
 
 Compiling energy and force predictions
 --------------------------------------

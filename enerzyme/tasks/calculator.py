@@ -7,7 +7,7 @@ import torch
 from ase.calculators.calculator import Calculator, all_changes
 from ase.units import Hartree
 from ..data.transform import Transform
-from ..data.neighbor_list import full_neighbor_list
+from ..data.neighbor_list import cutoff_neighbor_list, full_neighbor_list
 from .trainer import _decorate_batch_output, _decorate_batch_input, _to_device
 
 
@@ -46,6 +46,7 @@ class ASECalculator(Calculator):
         uncertainty_calculator_config: Optional[Dict[str, Any]]=None,
         external_calculator: Optional[Calculator]=None,
         external_calculator_config: Optional[Dict[str, Any]]=None,
+        neighbor_list_cutoff: Optional[float]=None,
         **params: Dict[str, Any]
     ) -> None:
         Calculator.__init__(
@@ -59,6 +60,7 @@ class ASECalculator(Calculator):
         self.cell_offsets = None
         self.dtype = dtype
         self.neighbor_list_type = neighbor_list_type
+        self.neighbor_list_cutoff = neighbor_list_cutoff
         self.transform = transform
         self.Hartree_in_E = Hartree_in_E
         self.E_conversion_factor = Hartree / self.Hartree_in_E
@@ -79,6 +81,9 @@ class ASECalculator(Calculator):
                 "Internal calculator is required (non-zero internal_calculator_weight "
                 "or uncertainty_calculator) but model is None"
             )
+        if self.use_internal_calculator and neighbor_list_type == "cutoff":
+            if neighbor_list_cutoff is None or not np.isfinite(neighbor_list_cutoff) or neighbor_list_cutoff <= 0:
+                raise ValueError("neighbor_list='cutoff' requires a finite positive neighbor_list_cutoff")
         if not self.use_internal_calculator and not self.use_external_calculator:
             raise ValueError(
                 "No calculator is active: set a non-zero internal_calculator_weight "
@@ -134,7 +139,20 @@ class ASECalculator(Calculator):
             "Za": atoms.numbers,
             "N": len(atoms)
         }
-        if self.neighbor_list_type == "full":
+        if self.neighbor_list_type == "cutoff":
+            idx_i, idx_j, offsets = cutoff_neighbor_list(
+                atoms.positions, self.neighbor_list_cutoff, cell=atoms.cell.array, pbc=atoms.pbc
+            )
+            features.update(
+                idx_i=idx_i, idx_j=idx_j, N_pair=len(idx_i), offsets=offsets,
+                cell=atoms.cell.array, pbc=atoms.pbc,
+            )
+        elif atoms.pbc.any():
+            raise ValueError(
+                "Periodic atoms require neighbor_list='cutoff' and neighbor_list_cutoff "
+                "to build the internal model's periodic images"
+            )
+        elif self.neighbor_list_type == "full":
             idx_i, idx_j = full_neighbor_list(features["N"])
             features["idx_i"] = idx_i
             features["idx_j"] = idx_j
@@ -151,7 +169,8 @@ class ASECalculator(Calculator):
             features=net_input,
             targets=None
         )
-        self.transform.inverse_transform(output)
+        if self.transform is not None:
+            self.transform.inverse_transform(output)
         if self.uncertainty_calculator_config is None:
             results["energy"] = output["E"][0] * self.E_conversion_factor
             results["forces"] = output["Fa"][0] * self.E_conversion_factor
@@ -220,7 +239,7 @@ def get_patched_calculator(calculator_patch_module: object, external_calculator_
     return external_calculator
 
 
-def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", model_config_path: Optional[str] = None, calculator_patch: Optional[str] = None, neighbor_list_type: Optional[str]="full", Hartree_in_E: float=1, internal_calculator_weight: float=1.0, uncertainty_calculator_config: Optional[Dict[str, Any]]=None, external_calculator: Optional[Calculator]=None, external_calculator_config: Optional[Dict[str, Any]]=None):
+def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", model_config_path: Optional[str] = None, calculator_patch: Optional[str] = None, neighbor_list_type: Optional[str]="full", Hartree_in_E: float=1, internal_calculator_weight: float=1.0, uncertainty_calculator_config: Optional[Dict[str, Any]]=None, external_calculator: Optional[Calculator]=None, external_calculator_config: Optional[Dict[str, Any]]=None, neighbor_list_cutoff: Optional[float]=None):
     from ..models import get_model_str, build_model, get_pretrain_path
     from ..utils import YamlHandler, logger
     from .trainer import DTYPE_MAPPING, _load_state_dict
@@ -256,6 +275,7 @@ def get_calculator(model_dir: str, device: str="cuda", dtype: str="float64", mod
                 dtype=dtype,
                 transform=transform,
                 neighbor_list_type=neighbor_list_type,
+                neighbor_list_cutoff=neighbor_list_cutoff,
                 Hartree_in_E=Hartree_in_E,
                 internal_calculator_weight=internal_calculator_weight,
                 uncertainty_calculator_config=uncertainty_calculator_config,

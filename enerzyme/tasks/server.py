@@ -58,6 +58,7 @@ class Server:
             dtype=self.dtype,
             transform=self.transform,
             neighbor_list_type=self.neighbor_list_type,
+            neighbor_list_cutoff=config.Server.get("neighbor_list_cutoff"),
             Hartree_in_E=self.Hartree_in_E,
             internal_calculator_weight=self.internal_calculator_weight,
             uncertainty_calculator_config=self.uncertainty_calculator_config,
@@ -75,6 +76,8 @@ class Server:
         atoms = Atoms(
             numbers=np.asarray(features["Za"]),
             positions=np.asarray(features["Ra"]),
+            cell=features.get("cell"),
+            pbc=features.get("pbc"),
         )
         atoms.info["charge"] = features.get("Q", 0)
         atoms.info["spin"] = features.get("S", 0) + 1

@@ -59,6 +59,11 @@ JSON body (conceptual):
 
 Exact schema follows what :code:`Server.calculate` expects for your model's active features.
 
+For a periodic request, include :code:`features.cell` (three lattice vectors
+as rows) and :code:`features.pbc` (three booleans). For an internal model,
+configure :code:`Server.neighbor_list: cutoff` and
+:code:`Server.neighbor_list_cutoff` with the training search radius.
+
 Response
 --------
 
