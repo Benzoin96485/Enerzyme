@@ -1,0 +1,177 @@
+{
+  "model": "GRACE 1L",
+  "system": "mol_batch_32x20",
+  "atoms": 640,
+  "short_range_edges": 10590,
+  "mode": "ordinary torch.compile inference returning energy and coordinate-gradient forces",
+  "job": 6339511,
+  "job_state": "COMPLETED",
+  "elapsed_seconds": 553,
+  "node": "d-7-1-1",
+  "gpu_index": 0,
+  "gpu_uuid": "GPU-e7d358e7-783a-3a6f-9e59-ddd2825dcbd8",
+  "device": "Tesla V100-PCIE-32GB",
+  "torch": "2.13.0+cu126",
+  "model_revision": "455e150edc3fedc03646df3b12cd65377ed91bad",
+  "snapshot_revision": "1aa0f8b3afbc2bed7e7c5fabf42d54034854d49c",
+  "raw_run_directory": ".refactor/bench/grace-radial-atomic/v100-6339511",
+  "sha256": {
+    "experiment.py": "ebc88611dd8acb01ee9a88e9ce2058eb9964ebc4e2f487c931753ec2d5045bd3",
+    "bench_frozen_compile.py": "7cea2501a1df47211fd2242f44cb4118d28fc64e242588ff186a4bc6748c4391",
+    "bench_cores.py": "7d5ce78dbeb6e66664a1b449a60aaa051f28f78c4c7831f384e2a1fe3b7cdbcc",
+    "grace.pt": "d95c4611ebd308a9ed7167eb437db345836047be365b25c91f65327bfee18253"
+  },
+  "candidate": "Only the radial variant wraps the original RadialEmbedding.forward(module, distance) with torch.utils.checkpoint.checkpoint(use_reentrant=False, preserve_rng_state=False) during compiled CUDA evaluation outside torch.func transforms. All order products use the same model revision.",
+  "aggregation": "Each process uses two warmups followed by 17 measured evaluations. Values per precision and scope are the medians of the two process medians. Each scope has a separate persistent compiler cache.",
+  "summary": {
+    "float32": {
+      "default": {
+        "ms": 8.386369096115232,
+        "peak_allocated_mib": 166.50390625
+      },
+      "radial": {
+        "ms": 8.727614535018802,
+        "peak_allocated_mib": 155.701171875
+      },
+      "radial_vs_default_percent": {
+        "ms": 4.069,
+        "peak_allocated_mib": -6.488
+      }
+    },
+    "float64": {
+      "default": {
+        "ms": 10.795581969432533,
+        "peak_allocated_mib": 316.095703125
+      },
+      "radial": {
+        "ms": 10.697540477849543,
+        "peak_allocated_mib": 296.4345703125
+      },
+      "radial_vs_default_percent": {
+        "ms": -0.9082,
+        "peak_allocated_mib": -6.22
+      }
+    }
+  },
+  "legs": [
+    {
+      "order": 0,
+      "dtype": "float32",
+      "scope": "default",
+      "ms": 8.083599153906107,
+      "peak_allocated_mib": 166.50390625,
+      "compiled_graphs": 9,
+      "captured_calls": 987,
+      "passed": true,
+      "energy_max_abs": 1.4901161193847656e-07,
+      "force_max_abs": 1.9837170839309692e-07
+    },
+    {
+      "order": 1,
+      "dtype": "float32",
+      "scope": "radial",
+      "ms": 8.71957209892571,
+      "peak_allocated_mib": 155.701171875,
+      "compiled_graphs": 9,
+      "captured_calls": 948,
+      "passed": true,
+      "energy_max_abs": 1.341104507446289e-07,
+      "force_max_abs": 1.9371509552001953e-07
+    },
+    {
+      "order": 2,
+      "dtype": "float64",
+      "scope": "radial",
+      "ms": 10.197788942605257,
+      "peak_allocated_mib": 297.3251953125,
+      "compiled_graphs": 9,
+      "captured_calls": 948,
+      "passed": true,
+      "energy_max_abs": 2.7755575615628914e-16,
+      "force_max_abs": 2.498001805406602e-16
+    },
+    {
+      "order": 3,
+      "dtype": "float64",
+      "scope": "default",
+      "ms": 10.448699817061424,
+      "peak_allocated_mib": 316.53955078125,
+      "compiled_graphs": 9,
+      "captured_calls": 987,
+      "passed": true,
+      "energy_max_abs": 2.7755575615628914e-16,
+      "force_max_abs": 2.714842239903703e-16
+    },
+    {
+      "order": 4,
+      "dtype": "float32",
+      "scope": "radial",
+      "ms": 8.735656971111894,
+      "peak_allocated_mib": 155.701171875,
+      "compiled_graphs": 9,
+      "captured_calls": 948,
+      "passed": true,
+      "energy_max_abs": 1.043081283569336e-07,
+      "force_max_abs": 1.9744038581848145e-07
+    },
+    {
+      "order": 5,
+      "dtype": "float32",
+      "scope": "default",
+      "ms": 8.689139038324356,
+      "peak_allocated_mib": 166.50390625,
+      "compiled_graphs": 9,
+      "captured_calls": 987,
+      "passed": true,
+      "energy_max_abs": 1.1920928955078125e-07,
+      "force_max_abs": 1.9744038581848145e-07
+    },
+    {
+      "order": 6,
+      "dtype": "float64",
+      "scope": "default",
+      "ms": 11.142464121803641,
+      "peak_allocated_mib": 315.65185546875,
+      "compiled_graphs": 9,
+      "captured_calls": 987,
+      "passed": true,
+      "energy_max_abs": 3.3306690738754696e-16,
+      "force_max_abs": 2.0816681711721685e-16
+    },
+    {
+      "order": 7,
+      "dtype": "float64",
+      "scope": "radial",
+      "ms": 11.19729201309383,
+      "peak_allocated_mib": 295.5439453125,
+      "compiled_graphs": 9,
+      "captured_calls": 948,
+      "passed": true,
+      "energy_max_abs": 2.7755575615628914e-16,
+      "force_max_abs": 3.469446951953614e-16
+    }
+  ],
+  "saved_tensors": {
+    "v100_default_job": 6339213,
+    "default_cuda_code_sha256": "f284438d39e1bbc0a90f8e244b718e906621b573e7f91bfeecfd6a84c344c878",
+    "default_cuda_radial_fp32_buffers": "Four [10590, 64] and one [10590, 160] float32 buffers retained by the energy forward for backward.",
+    "default_cuda_five_buffers_mib": 16.805419921875,
+    "cpu_compiled_fp32_exclusive_mib": {
+      "default": 17.20672607421875,
+      "atomic": 17.12860107421875,
+      "radial": 0.078125,
+      "radial_atomic": 0.0
+    },
+    "cpu_scope": "Isolated radial and atomic basis on frozen model inputs, counting distinct saved storage excluding inputs, weights and outputs. CPU Inductor used cpp.simdlen=1 and ahead-of-time backward lowering for this diagnostic."
+  },
+  "cpu_frozen_parity": {
+    "dtypes": [
+      "float32",
+      "float64"
+    ],
+    "threads": 1,
+    "active_parameters": 38,
+    "result": "In both precisions the original model and the explicit radial rematerialization agreed bitwise on E and Fa, on two gradients of the returned energy for coordinates and every active weight, and on the 38 active gradients of the training E/F loss."
+  },
+  "interpretation": "Both precisions use less peak V100 memory with radial rematerialization. Its FP32 timing median is 4.07% above the same-revision default and its FP64 median is 0.91% below. These are supplemental measurements on one system."
+}
