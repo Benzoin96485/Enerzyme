@@ -22,6 +22,7 @@ def compare_runs(directory):
     for system in ("molecules", "crystals"):
         legs = {}
         identity = None
+        revisions = {}
         for leg in ("A1", "B1", "B2", "A2"):
             ranks = sorted((directory / f"{system}-{leg}").glob("rank-*.json"))
             if not ranks:
@@ -32,6 +33,15 @@ def compare_runs(directory):
             fields = ("fixture_sha256", "config_sha256", "system", "atoms", "edges",
                       "world_size", "global_batch", "warmup", "steps", "torch", "cuda")
             hardware = sorted((r["host"], r["device"], r["device_uuid"]) for r in rows)
+            if len(set(hardware)) != len(rows):
+                raise ValueError(f"Ranks share a GPU in {system}-{leg}")
+            source = {(row["revision"], row.get("package_tree"), row["lightning"]) for row in rows}
+            if len(source) != 1:
+                raise ValueError(f"Ranks disagree about the trainer or checkout in {system}-{leg}")
+            sha, package, trainer = source.pop()
+            prior_sha, prior_package, prior_trainer = revisions.setdefault(leg[0], (sha, package, trainer))
+            if prior_trainer != trainer or (prior_sha != sha and (not package or prior_package != package)):
+                raise ValueError(f"Trainer or package changed in {system}-{leg}")
             trial = (tuple(rows[0][k] for k in fields), hardware)
             if any(tuple(row[k] for k in fields) != trial[0] for row in rows):
                 raise ValueError(f"Ranks disagree about the workload in {system}-{leg}")
@@ -66,6 +76,9 @@ def main():
     if min(args.warmup, args.steps) < 1:
         parser.error("warmup and measured steps must both be positive")
     tree = args.source_tree.resolve()
+    revision = subprocess.check_output(["git", "-C", str(tree), "rev-parse", "HEAD"], text=True).strip()
+    package_tree = subprocess.check_output(["git", "-C", str(tree), "rev-parse", revision + ":enerzyme"],
+                                           text=True).strip()
     sys.path[:0] = [str(tree), str(tree / "scripts")]
 
     import numpy as np
@@ -103,13 +116,14 @@ def main():
                       Splitter={"parts": ["training", "validation"], "ratios": [0.8, 0.2]},
                       metric_config={"E": {"rmse": 1}, "Fa": {"rmse": 1}})
     steps = 0
-    start = elapsed = peak = None
+    start = elapsed = peak = gpu = None
 
     def record_step(optimizer, _args, _kwargs):
-        nonlocal steps, start, elapsed, peak
+        nonlocal steps, start, elapsed, peak, gpu
         steps += 1
         if steps == args.warmup:
             torch.cuda.synchronize()
+            gpu = torch.cuda.get_device_properties(torch.cuda.current_device())
             torch.cuda.reset_peak_memory_stats()
             start = time.perf_counter()
         if steps == args.warmup + args.steps:
@@ -123,9 +137,7 @@ def main():
                             {"mse": MSELoss(E=1., Fa=1.)}, str(out), None)
     if steps != args.warmup + args.steps:
         raise RuntimeError(f"Observed {steps} updates, expected {args.warmup + args.steps}")
-    revision = subprocess.check_output(["git", "-C", str(tree), "rev-parse", "HEAD"], text=True).strip()
-    gpu = torch.cuda.get_device_properties(torch.cuda.current_device())
-    record = dict(revision=revision, rank=rank, world_size=world, host=socket.gethostname(),
+    record = dict(revision=revision, package_tree=package_tree, rank=rank, world_size=world, host=socket.gethostname(),
                   device=gpu.name, device_uuid=str(gpu.uuid), capability=[gpu.major, gpu.minor],
                   torch=str(torch.__version__), cuda=torch.version.cuda,
                   lightning=args.lightning, fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),
