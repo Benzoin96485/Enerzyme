@@ -10,7 +10,7 @@ HYPER_PARAM_KEYS = {
     "Muon": {
         "learning_rate", "weight_decay", 
         "muon_learning_rate", "momentum", "muon_weight_decay", 
-        "aux_learning_rate", "betas", "eps", "aux_weight_decay"
+        "aux_learning_rate", "betas", "eps", "aux_weight_decay", "batched"
     },
 }
 MODEL_HEAD_NAMES = {
@@ -128,6 +128,12 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
         Muon:
             The usage and hyperparameters are from https://github.com/KellerJordan/Muon?tab=readme-ov-file#usage
 
+            batched: bool, default False
+                Batch same-shaped hidden weights and auxiliary Adam updates on a single
+                device. Batched bfloat16 matrix products can differ in rounding. Both
+                paths use the same checkpoint format. An initialized process group
+                selects distributed Muon.
+
             muon_learning_rate: float, default 1e-2
                 Learning rate of Muon optimizer. If not provided but with `learning_rate` provided, use the `learning rate`.
 
@@ -242,6 +248,8 @@ def get_optimizer(name: Literal["Adam", "AdamW", "CoRe", "Muon"], model: torch.n
         try:
             if dist.is_initialized():
                 from muon import MuonWithAuxAdam as Muon
+            elif hyper_params.get("batched", False):
+                from .muon_batched import BatchedSingleDeviceMuonWithAuxAdam as Muon
             else:
                 from muon import SingleDeviceMuonWithAuxAdam as Muon
         except ImportError:

@@ -6,6 +6,7 @@ and related nonlinearities from Liao et al. (2026).
 
 import torch
 import copy
+from ..activation import SmoothLeakyReLU
 from .grid import SO3Grid
 
 
@@ -106,22 +107,6 @@ def prepare_activation_forward_param(act_name, inputs, scalars):
     if has_scalars(act_name):
         output_dict['scalars'] = scalars
     return output_dict
-
-
-class SmoothLeakyReLU(torch.nn.Module):
-    def __init__(self, negative_slope=0.2):
-        super().__init__()
-        self.alpha = negative_slope
-
-
-    def forward(self, x):
-        x1 = ((1 + self.alpha) / 2) * x
-        x2 = ((1 - self.alpha) / 2) * x * (2 * torch.sigmoid(x) - 1)
-        return x1 + x2
-
-
-    def extra_repr(self):
-        return 'negative_slope={}'.format(self.alpha)
 
 
 class GateActivation(torch.nn.Module):

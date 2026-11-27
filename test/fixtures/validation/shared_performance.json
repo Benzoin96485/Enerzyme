@@ -1,0 +1,1556 @@
+{
+  "reference_performance_branch": "cb97888b357310dcff47e4295ccf6560179e3709",
+  "devel_baseline": "8305896ab8fa583894d6ec9b4f00d0f068d7ec56",
+  "unified_baseline": "7484d8e41a66b3354fcf6968f98854ae4c70f11a",
+  "devel_performance_measurements": "896a2412f0a680bb156e2fe398b6029fc3cb4311",
+  "devel_code_after_autocast_fix": "07463b73710cc5b509d88390076a532fefb86b5b",
+  "unified_code_after_autocast_fix": "a2dfca9ba0db44732c9b97c46115ae747827683c",
+  "unified_performance_measurements": "b984d1b3bf35d8ad1aed0616545a389df4059033",
+  "tests": {
+    "devel_cpu": {
+      "tests": 65,
+      "skipped": 14,
+      "errors": 0,
+      "failures": 0
+    },
+    "unified_cpu": {
+      "tests": 173,
+      "skipped": 7,
+      "errors": 0,
+      "failures": 0
+    },
+    "final_devel_cpu_and_cuda": {
+      "tests": 52,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0
+    },
+    "final_unified_cpu_and_cuda": {
+      "tests": 52,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0
+    }
+  },
+  "batch_pipeline": {
+    "method": "16 molecules of 16\u201331 atoms, fixed weights, 2 interactions, 32 features, 16 radial functions. ABBA with 3 warmups and 41 measured iterations per round. Prediction includes host collection. Force training includes forward and backward, without optimizer.step().",
+    "devel_cpu": [
+      {
+        "device": "cpu",
+        "torch": "2.13.0+cu126",
+        "dtype": "float32",
+        "iterations_per_round": 41,
+        "milliseconds": {
+          "SchNet/predict": {
+            "baseline": 8.6552,
+            "candidate": 7.5114,
+            "compared_tensors": 2
+          },
+          "SchNet/force_backward": {
+            "baseline": 28.5057,
+            "candidate": 28.5369,
+            "compared_tensors": 27
+          },
+          "PaiNN/predict": {
+            "baseline": 29.086,
+            "candidate": 28.7853,
+            "compared_tensors": 2
+          },
+          "PaiNN/force_backward": {
+            "baseline": 66.8705,
+            "candidate": 66.28,
+            "compared_tensors": 27
+          }
+        }
+      },
+      {
+        "device": "cpu",
+        "torch": "2.13.0+cu126",
+        "dtype": "float64",
+        "iterations_per_round": 41,
+        "milliseconds": {
+          "SchNet/predict": {
+            "baseline": 11.8309,
+            "candidate": 10.6353,
+            "compared_tensors": 2
+          },
+          "SchNet/force_backward": {
+            "baseline": 43.2938,
+            "candidate": 40.5221,
+            "compared_tensors": 27
+          },
+          "PaiNN/predict": {
+            "baseline": 48.2537,
+            "candidate": 46.7506,
+            "compared_tensors": 2
+          },
+          "PaiNN/force_backward": {
+            "baseline": 119.6054,
+            "candidate": 118.2341,
+            "compared_tensors": 27
+          }
+        }
+      }
+    ],
+    "unified_cpu": [
+      {
+        "device": "cpu",
+        "torch": "2.13.0+cu126",
+        "dtype": "float32",
+        "iterations_per_round": 41,
+        "milliseconds": {
+          "SchNet/predict": {
+            "baseline": 11.1805,
+            "candidate": 12.615,
+            "compared_tensors": 2
+          },
+          "SchNet/force_backward": {
+            "baseline": 32.9136,
+            "candidate": 33.0097,
+            "compared_tensors": 27
+          },
+          "PaiNN/predict": {
+            "baseline": 31.5299,
+            "candidate": 31.0446,
+            "compared_tensors": 2
+          },
+          "PaiNN/force_backward": {
+            "baseline": 68.2703,
+            "candidate": 67.9794,
+            "compared_tensors": 27
+          }
+        }
+      },
+      {
+        "device": "cpu",
+        "torch": "2.13.0+cu126",
+        "dtype": "float64",
+        "iterations_per_round": 41,
+        "milliseconds": {
+          "SchNet/predict": {
+            "baseline": 12.529,
+            "candidate": 11.1981,
+            "compared_tensors": 2
+          },
+          "SchNet/force_backward": {
+            "baseline": 45.3466,
+            "candidate": 44.6687,
+            "compared_tensors": 27
+          },
+          "PaiNN/predict": {
+            "baseline": 51.8198,
+            "candidate": 49.9374,
+            "compared_tensors": 2
+          },
+          "PaiNN/force_backward": {
+            "baseline": 121.6871,
+            "candidate": 121.6618,
+            "compared_tensors": 27
+          }
+        }
+      }
+    ],
+    "devel_cuda": [
+      {
+        "device": "Tesla V100-PCIE-32GB",
+        "device_uuid": "05918bf1-e6dd-b588-c1fe-8ee5220f9dc2",
+        "torch": "2.13.0+cu126",
+        "cuda": "12.6",
+        "dtype": "float32",
+        "iterations_per_round": 41,
+        "milliseconds": {
+          "SchNet/predict": {
+            "baseline": 6.0549,
+            "candidate": 4.1678,
+            "compared_tensors": 2,
+            "peak_allocated_bytes": {
+              "baseline": 28027904,
+              "candidate": 28061184
+            }
+          },
+          "SchNet/force_backward": {
+            "baseline": 9.8716,
+            "candidate": 8.6727,
+            "compared_tensors": 27,
+            "peak_allocated_bytes": {
+              "baseline": 40340992,
+              "candidate": 40374272
+            }
+          },
+          "PaiNN/predict": {
+            "baseline": 7.2909,
+            "candidate": 5.4941,
+            "compared_tensors": 2,
+            "peak_allocated_bytes": {
+              "baseline": 54441984,
+              "candidate": 54475264
+            }
+          },
+          "PaiNN/force_backward": {
+            "baseline": 14.698,
+            "candidate": 13.0256,
+            "compared_tensors": 27,
+            "peak_allocated_bytes": {
+              "baseline": 71407104,
+              "candidate": 71440384
+            }
+          }
+        }
+      },
+      {
+        "device": "Tesla V100-PCIE-32GB",
+        "device_uuid": "05918bf1-e6dd-b588-c1fe-8ee5220f9dc2",
+        "torch": "2.13.0+cu126",
+        "cuda": "12.6",
+        "dtype": "float64",
+        "iterations_per_round": 41,
+        "milliseconds": {
+          "SchNet/predict": {
+            "baseline": 5.9733,
+            "candidate": 4.14,
+            "compared_tensors": 2,
+            "peak_allocated_bytes": {
+              "baseline": 38623744,
+              "candidate": 38657024
+            }
+          },
+          "SchNet/force_backward": {
+            "baseline": 9.8888,
+            "candidate": 8.6785,
+            "compared_tensors": 27,
+            "peak_allocated_bytes": {
+              "baseline": 63849984,
+              "candidate": 63883264
+            }
+          },
+          "PaiNN/predict": {
+            "baseline": 7.2182,
+            "candidate": 5.3859,
+            "compared_tensors": 2,
+            "peak_allocated_bytes": {
+              "baseline": 91558912,
+              "candidate": 91592192
+            }
+          },
+          "PaiNN/force_backward": {
+            "baseline": 14.6685,
+            "candidate": 13.0448,
+            "compared_tensors": 27,
+            "peak_allocated_bytes": {
+              "baseline": 126260736,
+              "candidate": 126294016
+            }
+          }
+        }
+      }
+    ],
+    "unified_cuda": [
+      {
+        "device": "Tesla V100-PCIE-32GB",
+        "device_uuid": "05918bf1-e6dd-b588-c1fe-8ee5220f9dc2",
+        "torch": "2.13.0+cu126",
+        "cuda": "12.6",
+        "dtype": "float32",
+        "iterations_per_round": 41,
+        "milliseconds": {
+          "SchNet/predict": {
+            "baseline": 5.4104,
+            "candidate": 3.7123,
+            "compared_tensors": 2,
+            "peak_allocated_bytes": {
+              "baseline": 27911168,
+              "candidate": 27911168
+            }
+          },
+          "SchNet/force_backward": {
+            "baseline": 8.484,
+            "candidate": 7.6473,
+            "compared_tensors": 27,
+            "peak_allocated_bytes": {
+              "baseline": 40159744,
+              "candidate": 40159744
+            }
+          },
+          "PaiNN/predict": {
+            "baseline": 6.9351,
+            "candidate": 5.4233,
+            "compared_tensors": 2,
+            "peak_allocated_bytes": {
+              "baseline": 54475264,
+              "candidate": 54475264
+            }
+          },
+          "PaiNN/force_backward": {
+            "baseline": 13.8885,
+            "candidate": 12.9033,
+            "compared_tensors": 27,
+            "peak_allocated_bytes": {
+              "baseline": 71440384,
+              "candidate": 71440384
+            }
+          }
+        }
+      },
+      {
+        "device": "Tesla V100-PCIE-32GB",
+        "device_uuid": "05918bf1-e6dd-b588-c1fe-8ee5220f9dc2",
+        "torch": "2.13.0+cu126",
+        "cuda": "12.6",
+        "dtype": "float64",
+        "iterations_per_round": 41,
+        "milliseconds": {
+          "SchNet/predict": {
+            "baseline": 5.2989,
+            "candidate": 3.6823,
+            "compared_tensors": 2,
+            "peak_allocated_bytes": {
+              "baseline": 38465024,
+              "candidate": 38465024
+            }
+          },
+          "SchNet/force_backward": {
+            "baseline": 8.4861,
+            "candidate": 7.694,
+            "compared_tensors": 27,
+            "peak_allocated_bytes": {
+              "baseline": 63563776,
+              "candidate": 63563776
+            }
+          },
+          "PaiNN/predict": {
+            "baseline": 6.9113,
+            "candidate": 5.467,
+            "compared_tensors": 2,
+            "peak_allocated_bytes": {
+              "baseline": 91592192,
+              "candidate": 91592192
+            }
+          },
+          "PaiNN/force_backward": {
+            "baseline": 13.9807,
+            "candidate": 13.0406,
+            "compared_tensors": 27,
+            "peak_allocated_bytes": {
+              "baseline": 126294016,
+              "candidate": 126294016
+            }
+          }
+        }
+      }
+    ],
+    "unified_schnet_cpu_fp32_repeat": {
+      "method": "Pinned to one logical CPU, two energy/force tensors checked, eight interleaved rounds per implementation and 41 timed iterations per round.",
+      "round_medians_ms": {
+        "baseline": [
+          12.965047033503652,
+          12.444661930203438,
+          12.848853133618832,
+          12.865151977166533,
+          12.897486099973321,
+          12.972007971256971,
+          12.983839027583599,
+          13.047263026237488
+        ],
+        "candidate": [
+          11.61335688084364,
+          11.61652896553278,
+          11.171062011271715,
+          11.577984085306525,
+          11.376635869964957,
+          11.612023925408721,
+          11.713974177837372,
+          11.493721976876259
+        ]
+      },
+      "speedup": 1.115244683034471
+    }
+  },
+  "molecular_ase": {
+    "method": "FP64 SchNet and PaiNN on moving coordinates. Each of six alternating timing rounds evaluates 15 frames. Energies and forces are checked.",
+    "devel_cpu": {
+      "device": "cpu",
+      "dtype": "torch.float64",
+      "milliseconds_per_frame": [
+        {
+          "model": "SchNet",
+          "atoms": 32,
+          "baseline": 7.4533,
+          "candidate": 7.2666,
+          "energy_force_parity": true
+        },
+        {
+          "model": "PaiNN",
+          "atoms": 32,
+          "baseline": 8.3527,
+          "candidate": 8.3551,
+          "energy_force_parity": true
+        },
+        {
+          "model": "SchNet",
+          "atoms": 128,
+          "baseline": 75.7653,
+          "candidate": 75.2259,
+          "energy_force_parity": true
+        },
+        {
+          "model": "PaiNN",
+          "atoms": 128,
+          "baseline": 58.914,
+          "candidate": 54.0689,
+          "energy_force_parity": true
+        }
+      ]
+    },
+    "unified_cpu": {
+      "device": "cpu",
+      "dtype": "torch.float64",
+      "milliseconds_per_frame": [
+        {
+          "model": "SchNet",
+          "atoms": 32,
+          "baseline": 7.6754,
+          "candidate": 7.457,
+          "energy_force_parity": true
+        },
+        {
+          "model": "PaiNN",
+          "atoms": 32,
+          "baseline": 9.1157,
+          "candidate": 8.4855,
+          "energy_force_parity": true
+        },
+        {
+          "model": "SchNet",
+          "atoms": 128,
+          "baseline": 77.1756,
+          "candidate": 73.7414,
+          "energy_force_parity": true
+        },
+        {
+          "model": "PaiNN",
+          "atoms": 128,
+          "baseline": 81.7421,
+          "candidate": 80.5209,
+          "energy_force_parity": true
+        }
+      ]
+    },
+    "devel_cuda": {
+      "device": "Tesla V100-PCIE-32GB",
+      "dtype": "torch.float64",
+      "milliseconds_per_frame": [
+        {
+          "model": "SchNet",
+          "atoms": 32,
+          "baseline": 8.0415,
+          "candidate": 7.8861,
+          "energy_force_parity": true
+        },
+        {
+          "model": "PaiNN",
+          "atoms": 32,
+          "baseline": 5.2282,
+          "candidate": 4.9345,
+          "energy_force_parity": true
+        },
+        {
+          "model": "SchNet",
+          "atoms": 128,
+          "baseline": 13.4097,
+          "candidate": 12.86,
+          "energy_force_parity": true
+        },
+        {
+          "model": "PaiNN",
+          "atoms": 128,
+          "baseline": 5.6506,
+          "candidate": 5.0644,
+          "energy_force_parity": true
+        }
+      ]
+    }
+  },
+  "muon_step": {
+    "method": "Optimizer step only. Original parameter groups and optimizer state of four trained checkpoints, with fixed gradients. Times are round medians.",
+    "cpu": {
+      "schnet_ff07": {
+        "max_abs_parameter_difference_after_3_steps": [
+          0.0,
+          0.0
+        ],
+        "serial_ms": [
+          5.7407,
+          4.4106
+        ],
+        "batched_ms": [
+          2.7446,
+          2.7395
+        ]
+      },
+      "physnet_mtase": {
+        "max_abs_parameter_difference_after_3_steps": [
+          0.0,
+          0.0
+        ],
+        "serial_ms": [
+          10.6383,
+          10.6602
+        ],
+        "batched_ms": [
+          4.0141,
+          4.0234
+        ]
+      },
+      "spookynet_mtase": {
+        "max_abs_parameter_difference_after_3_steps": [
+          0.0,
+          0.0
+        ],
+        "serial_ms": [
+          36.7141,
+          37.2599
+        ],
+        "batched_ms": [
+          10.0333,
+          10.0207
+        ]
+      },
+      "mace_l1_c12": {
+        "max_abs_parameter_difference_after_3_steps": [
+          0.0,
+          0.0
+        ],
+        "serial_ms": [
+          8.6386,
+          8.7313
+        ],
+        "batched_ms": [
+          8.0229,
+          8.0381
+        ]
+      }
+    },
+    "cuda": {
+      "schnet_ff07": {
+        "max_abs_parameter_difference_after_3_steps": [
+          0.0,
+          0.0
+        ],
+        "serial_ms": [
+          9.3161,
+          9.2588
+        ],
+        "peak_incremental_workspace_MiB": {
+          "serial": 0.02392578125,
+          "batched": 0.03125
+        },
+        "batched_ms": [
+          2.796,
+          2.7905
+        ]
+      },
+      "physnet_mtase": {
+        "max_abs_parameter_difference_after_3_steps": [
+          0.0,
+          0.0
+        ],
+        "serial_ms": [
+          22.8778,
+          22.924
+        ],
+        "peak_incremental_workspace_MiB": {
+          "serial": 0.00634765625,
+          "batched": 0.08203125
+        },
+        "batched_ms": [
+          4.1338,
+          4.169
+        ]
+      },
+      "spookynet_mtase": {
+        "max_abs_parameter_difference_after_3_steps": [
+          0.0,
+          0.0
+        ],
+        "serial_ms": [
+          77.3227,
+          77.3604
+        ],
+        "peak_incremental_workspace_MiB": {
+          "serial": 0.02197265625,
+          "batched": 0.2421875
+        },
+        "batched_ms": [
+          6.2623,
+          6.2574
+        ]
+      },
+      "mace_l1_c12": {
+        "max_abs_parameter_difference_after_3_steps": [
+          0.0,
+          0.0
+        ],
+        "serial_ms": [
+          17.3282,
+          17.1353
+        ],
+        "peak_incremental_workspace_MiB": {
+          "serial": 0.34375,
+          "batched": 0.4169921875
+        },
+        "batched_ms": [
+          7.5237,
+          7.4556
+        ]
+      }
+    }
+  },
+  "attention": {
+    "method": "For the QK and Dot attention heads, modes 0, 1 and 2 time the forward, first and second derivative paths. See the longer paired repeat for full-model EquiformerV2 training and inference.",
+    "cpu": [
+      {
+        "model": "QK",
+        "mode": 0,
+        "baseline_us": 2479.203,
+        "candidate_us": 2421.398
+      },
+      {
+        "model": "QK",
+        "mode": 1,
+        "baseline_us": 3152.76,
+        "candidate_us": 3079.5
+      },
+      {
+        "model": "QK",
+        "mode": 2,
+        "baseline_us": 8833.127,
+        "candidate_us": 8740.387
+      },
+      {
+        "model": "Dot",
+        "mode": 0,
+        "baseline_us": 7324.971,
+        "candidate_us": 7092.588
+      },
+      {
+        "model": "Dot",
+        "mode": 1,
+        "baseline_us": 10060.4,
+        "candidate_us": 9814.738
+      },
+      {
+        "model": "Dot",
+        "mode": 2,
+        "baseline_us": 28408.483,
+        "candidate_us": 28195.53
+      },
+      {
+        "model": "EquiformerV2",
+        "mode": 1,
+        "baseline_us": 138200.932,
+        "candidate_us": 138242.761
+      },
+      {
+        "model": "EquiformerV2",
+        "mode": 2,
+        "baseline_us": 384020.254,
+        "candidate_us": 385398.121
+      }
+    ],
+    "cuda": [
+      {
+        "model": "QK",
+        "mode": 0,
+        "baseline_us": 1504.182,
+        "candidate_us": 1458.54
+      },
+      {
+        "model": "QK",
+        "mode": 1,
+        "baseline_us": 2244.081,
+        "candidate_us": 2176.575
+      },
+      {
+        "model": "QK",
+        "mode": 2,
+        "baseline_us": 5763.717,
+        "candidate_us": 5612.282
+      },
+      {
+        "model": "Dot",
+        "mode": 0,
+        "baseline_us": 1881.374,
+        "candidate_us": 1821.138
+      },
+      {
+        "model": "Dot",
+        "mode": 1,
+        "baseline_us": 2553.276,
+        "candidate_us": 2488.869
+      },
+      {
+        "model": "Dot",
+        "mode": 2,
+        "baseline_us": 6216.914,
+        "candidate_us": 6107.516
+      },
+      {
+        "model": "EquiformerV2",
+        "mode": 1,
+        "baseline_us": 40957.652,
+        "candidate_us": 40081.502
+      },
+      {
+        "model": "EquiformerV2",
+        "mode": 2,
+        "baseline_us": 88658.549,
+        "candidate_us": 99232.47
+      }
+    ],
+    "equiformer_v2_cuda_repeat": {
+      "method": "24 atoms, FP32, two fixed seeds. For each implementation and seed, eight alternating blocks with two warmups and eight samples bracketed by device synchronizations per block. Times are median block means. The initial short training sample was 11.9% slower.",
+      "results": [
+        {
+          "seed": 76,
+          "mode": "train",
+          "a_ms": 88.50840569357388,
+          "b_ms": 88.1980293779634,
+          "percent": -0.3506743943451407,
+          "parity": {
+            "seed": 76,
+            "mode": "train",
+            "num_tensors": 91,
+            "E_abs": 3.814697265625e-06,
+            "F_abs": 5.960464477539062e-07,
+            "max_grad_abs": 0.001953125
+          },
+          "peak_bytes": {
+            "baseline": 205997568,
+            "candidate": 206560768
+          }
+        },
+        {
+          "seed": 76,
+          "mode": "infer",
+          "a_ms": 38.14687936392147,
+          "b_ms": 38.04800924262963,
+          "percent": -0.2591827246171796,
+          "parity": {
+            "seed": 76,
+            "mode": "infer",
+            "num_tensors": 2,
+            "E_abs": 7.62939453125e-06,
+            "F_abs": 7.152557373046875e-07,
+            "max_grad_abs": 0.0
+          },
+          "peak_bytes": {
+            "baseline": 97735680,
+            "candidate": 97172480
+          }
+        },
+        {
+          "seed": 2893,
+          "mode": "train",
+          "a_ms": 88.39361451100558,
+          "b_ms": 87.92992850067094,
+          "percent": -0.5245695776779358,
+          "parity": {
+            "seed": 2893,
+            "mode": "train",
+            "num_tensors": 91,
+            "E_abs": 0.0,
+            "F_abs": 4.544854164123535e-07,
+            "max_grad_abs": 0.0009765625
+          },
+          "peak_bytes": {
+            "baseline": 208442880,
+            "candidate": 209004032
+          }
+        },
+        {
+          "seed": 2893,
+          "mode": "infer",
+          "a_ms": 38.158902068971656,
+          "b_ms": 38.078715253504924,
+          "percent": -0.21013921029958693,
+          "parity": {
+            "seed": 2893,
+            "mode": "infer",
+            "num_tensors": 2,
+            "E_abs": 1.52587890625e-05,
+            "F_abs": 6.258487701416016e-07,
+            "max_grad_abs": 0.0
+          },
+          "peak_bytes": {
+            "baseline": 97558528,
+            "candidate": 96997376
+          }
+        }
+      ]
+    }
+  },
+  "fixed_graph_unified_presets": {
+    "method": "58 frozen fixtures on one CPU thread per worker. Each mode uses ABBA with 9 timed iterations per round. Warnings above 3% slower trigger 51-iteration repeats. Timings use a prebuilt graph, excluding batch assembly, result collection and optimizer.step(). Compared tensors include E, Fa and every active parameter gradient in training.",
+    "rows": {
+      "alignn": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 28.5267,
+          "candidate_ms": 25.6052,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 89.0943,
+          "candidate_ms": 88.6898,
+          "compared_tensors": 105
+        }
+      },
+      "allegro": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 12.3388,
+          "candidate_ms": 12.2344,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 32.5906,
+          "candidate_ms": 32.6278,
+          "compared_tensors": 19
+        }
+      },
+      "allscaip": {
+        "dtype": "torch.float32",
+        "infer": {
+          "baseline_ms": 94.8939,
+          "candidate_ms": 94.3304,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 262.3094,
+          "candidate_ms": 262.3061,
+          "compared_tensors": 246
+        }
+      },
+      "alphanet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 87.4358,
+          "candidate_ms": 87.4578,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 300.1713,
+          "candidate_ms": 295.9769,
+          "compared_tensors": 123
+        }
+      },
+      "botnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 20.0263,
+          "candidate_ms": 19.9755,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 53.8145,
+          "candidate_ms": 52.9931,
+          "compared_tensors": 22
+        }
+      },
+      "cace": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 29.402,
+          "candidate_ms": 27.8983,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 69.8566,
+          "candidate_ms": 70.5398,
+          "compared_tensors": 16
+        }
+      },
+      "camp": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 39.8462,
+          "candidate_ms": 39.8365,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 117.0131,
+          "candidate_ms": 118.4256,
+          "compared_tensors": 142
+        }
+      },
+      "chgnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 26.6111,
+          "candidate_ms": 26.5873,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 81.4402,
+          "candidate_ms": 81.427,
+          "compared_tensors": 129
+        }
+      },
+      "dimenet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 236.2327,
+          "candidate_ms": 231.0441,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 714.1994,
+          "candidate_ms": 712.2734,
+          "compared_tensors": 190
+        }
+      },
+      "dimenet++": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 59.7494,
+          "candidate_ms": 58.6127,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 162.0536,
+          "candidate_ms": 163.5921,
+          "compared_tensors": 149
+        }
+      },
+      "dpa3": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 10.5247,
+          "candidate_ms": 10.6077,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 24.9022,
+          "candidate_ms": 24.7828,
+          "compared_tensors": 34
+        }
+      },
+      "dpa4": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 66.3909,
+          "candidate_ms": 66.4311,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 214.2661,
+          "candidate_ms": 214.7505,
+          "compared_tensors": 62
+        }
+      },
+      "dpa4c": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 7.1728,
+          "candidate_ms": 7.1601,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 17.0212,
+          "candidate_ms": 17.0085,
+          "compared_tensors": 19
+        }
+      },
+      "e2former": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 109.593,
+          "candidate_ms": 108.9689,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 321.8223,
+          "candidate_ms": 320.4335,
+          "compared_tensors": 147
+        }
+      },
+      "e2former_lsr": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 356.6099,
+          "candidate_ms": 358.9374,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 1041.5922,
+          "candidate_ms": 1046.6206,
+          "compared_tensors": 361
+        }
+      },
+      "e2former_v2": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 82.9618,
+          "candidate_ms": 83.314,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 265.6062,
+          "candidate_ms": 264.071,
+          "compared_tensors": 155
+        }
+      },
+      "efa": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 87.0314,
+          "candidate_ms": 87.7575,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 287.0429,
+          "candidate_ms": 287.2276,
+          "compared_tensors": 92
+        }
+      },
+      "eqnorm": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 14.4917,
+          "candidate_ms": 14.459,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 36.5036,
+          "candidate_ms": 35.5902,
+          "compared_tensors": 37
+        }
+      },
+      "equflash": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 3098.0061,
+          "candidate_ms": 3048.8672,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 10852.1854,
+          "candidate_ms": 10875.7183,
+          "compared_tensors": 68
+        }
+      },
+      "equflashv2": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 24.6147,
+          "candidate_ms": 24.5768,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 62.6513,
+          "candidate_ms": 62.9248,
+          "compared_tensors": 36
+        }
+      },
+      "equiformer": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 92.6452,
+          "candidate_ms": 90.7245,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 245.3889,
+          "candidate_ms": 249.1054,
+          "compared_tensors": 92
+        }
+      },
+      "equiformer_v2": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 96.248,
+          "candidate_ms": 95.7795,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 299.4685,
+          "candidate_ms": 301.3911,
+          "compared_tensors": 91
+        }
+      },
+      "equiformer_v3": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 186.5021,
+          "candidate_ms": 185.9799,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 524.9031,
+          "candidate_ms": 524.6773,
+          "compared_tensors": 99
+        }
+      },
+      "equireann": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 10.9855,
+          "candidate_ms": 10.9007,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 33.9128,
+          "candidate_ms": 33.9353,
+          "compared_tensors": 41
+        }
+      },
+      "escn": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 95.0037,
+          "candidate_ms": 95.6664,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 289.9646,
+          "candidate_ms": 297.6818,
+          "compared_tensors": 89
+        }
+      },
+      "esen": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 39.1233,
+          "candidate_ms": 39.5378,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 94.9444,
+          "candidate_ms": 95.3002,
+          "compared_tensors": 85
+        }
+      },
+      "et": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 40.402,
+          "candidate_ms": 40.3731,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 129.3461,
+          "candidate_ms": 129.1581,
+          "compared_tensors": 104
+        }
+      },
+      "facto": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 61.3203,
+          "candidate_ms": 61.8712,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 193.8183,
+          "candidate_ms": 196.5032,
+          "compared_tensors": 190
+        }
+      },
+      "freecg": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 753.7257,
+          "candidate_ms": 760.8966,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 2313.0893,
+          "candidate_ms": 2315.8563,
+          "compared_tensors": 225
+        }
+      },
+      "gemnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 90.7997,
+          "candidate_ms": 91.7193,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 282.3884,
+          "candidate_ms": 278.3338,
+          "compared_tensors": 124
+        }
+      },
+      "gemnet-oc": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 1486.5545,
+          "candidate_ms": 1502.9695,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 4520.5149,
+          "candidate_ms": 4527.6338,
+          "compared_tensors": 295
+        }
+      },
+      "gemnet-q": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 831.0114,
+          "candidate_ms": 831.0784,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 2442.5857,
+          "candidate_ms": 2441.1623,
+          "compared_tensors": 155
+        }
+      },
+      "geodite": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 129.0675,
+          "candidate_ms": 132.8856,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 387.4529,
+          "candidate_ms": 388.6018,
+          "compared_tensors": 95
+        }
+      },
+      "grace": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 43.0563,
+          "candidate_ms": 42.3599,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 114.1643,
+          "candidate_ms": 115.0742,
+          "compared_tensors": 40
+        }
+      },
+      "leftnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 66.434,
+          "candidate_ms": 66.3756,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 223.6063,
+          "candidate_ms": 223.4096,
+          "compared_tensors": 75
+        }
+      },
+      "m3gnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 21.0808,
+          "candidate_ms": 21.9594,
+          "compared_tensors": 2,
+          "repeat_51": {
+            "baseline_ms": 17.9095,
+            "candidate_ms": 17.7823
+          }
+        },
+        "train": {
+          "baseline_ms": 63.8989,
+          "candidate_ms": 63.2205,
+          "compared_tensors": 107
+        }
+      },
+      "mace": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 26.7194,
+          "candidate_ms": 26.9399,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 73.214,
+          "candidate_ms": 72.1438,
+          "compared_tensors": 35
+        }
+      },
+      "mace_polar": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 72.5594,
+          "candidate_ms": 71.3792,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 187.8243,
+          "candidate_ms": 190.0661,
+          "compared_tensors": 88
+        }
+      },
+      "mattersim": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 22.7399,
+          "candidate_ms": 22.661,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 70.993,
+          "candidate_ms": 71.0456,
+          "compared_tensors": 133
+        }
+      },
+      "nequip": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 33.0718,
+          "candidate_ms": 33.5119,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 95.0135,
+          "candidate_ms": 94.2928,
+          "compared_tensors": 25
+        }
+      },
+      "nequix": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 12.9428,
+          "candidate_ms": 13.1527,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 30.9786,
+          "candidate_ms": 30.5417,
+          "compared_tensors": 20
+        }
+      },
+      "newtonnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 17.2438,
+          "candidate_ms": 17.2704,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 51.3066,
+          "candidate_ms": 50.5464,
+          "compared_tensors": 65
+        }
+      },
+      "painn": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 14.9504,
+          "candidate_ms": 14.9003,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 41.7854,
+          "candidate_ms": 41.7518,
+          "compared_tensors": 36
+        }
+      },
+      "physnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 26.4496,
+          "candidate_ms": 26.5717,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 66.7039,
+          "candidate_ms": 66.5556,
+          "compared_tensors": 178
+        }
+      },
+      "quinnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 440.4746,
+          "candidate_ms": 449.4388,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 1368.9337,
+          "candidate_ms": 1360.2948,
+          "compared_tensors": 184
+        }
+      },
+      "reann": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 6.8908,
+          "candidate_ms": 5.3613,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 14.4557,
+          "candidate_ms": 14.5971,
+          "compared_tensors": 31
+        }
+      },
+      "schnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 13.7712,
+          "candidate_ms": 13.7049,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 50.3727,
+          "candidate_ms": 50.5432,
+          "compared_tensors": 50
+        }
+      },
+      "so3krates": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 21.6355,
+          "candidate_ms": 21.6107,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 57.0447,
+          "candidate_ms": 56.4254,
+          "compared_tensors": 74
+        }
+      },
+      "so3lr": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 25.1102,
+          "candidate_ms": 25.0921,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 68.9013,
+          "candidate_ms": 68.8084,
+          "compared_tensors": 123
+        }
+      },
+      "so3lr_efa": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 99.1883,
+          "candidate_ms": 99.012,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 283.22,
+          "candidate_ms": 283.6747,
+          "compared_tensors": 141
+        }
+      },
+      "spinconv": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 830.6208,
+          "candidate_ms": 831.0341,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 2636.1398,
+          "candidate_ms": 2636.432,
+          "compared_tensors": 115
+        }
+      },
+      "spookynet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 38.1431,
+          "candidate_ms": 38.1361,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 95.9417,
+          "candidate_ms": 96.0289,
+          "compared_tensors": 437
+        }
+      },
+      "tace": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 104.6795,
+          "candidate_ms": 104.7918,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 311.39,
+          "candidate_ms": 310.8118,
+          "compared_tensors": 45
+        }
+      },
+      "tece": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 155.9152,
+          "candidate_ms": 157.1523,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 452.8713,
+          "candidate_ms": 453.0904,
+          "compared_tensors": 107
+        }
+      },
+      "tensornet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 49.0484,
+          "candidate_ms": 49.0094,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 147.5601,
+          "candidate_ms": 147.6596,
+          "compared_tensors": 52
+        }
+      },
+      "tensornet2": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 62.1615,
+          "candidate_ms": 62.8168,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 179.7607,
+          "candidate_ms": 180.7127,
+          "compared_tensors": 76
+        }
+      },
+      "visnet": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 325.1317,
+          "candidate_ms": 327.527,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 1002.0414,
+          "candidate_ms": 992.8682,
+          "compared_tensors": 199
+        }
+      },
+      "visnet_lsrm": {
+        "dtype": "torch.float64",
+        "infer": {
+          "baseline_ms": 91.2913,
+          "candidate_ms": 92.141,
+          "compared_tensors": 2
+        },
+        "train": {
+          "baseline_ms": 222.3014,
+          "candidate_ms": 222.326,
+          "compared_tensors": 184
+        }
+      }
+    }
+  },
+  "tested_cuda_hardware": "Tesla V100-PCIE-32GB"
+}

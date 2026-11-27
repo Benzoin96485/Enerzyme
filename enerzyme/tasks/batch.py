@@ -227,13 +227,12 @@ def _decorate_batch_input(
     
     for k in features[0]:
         if is_atomic(k):
-            batch_features[k] = torch.tensor(
+            batch_features[k] = torch.as_tensor(
                 np.concatenate([feature[k][:feature["N"]] for feature in features]), 
                 dtype=torch.long if is_int(k) else dtype,
-                requires_grad=requires_grad(k)
-            )
-        elif not is_idx(k):
-            batch_features[k] = torch.tensor(
+            ).requires_grad_(requires_grad(k))
+        elif k != "N" and not is_idx(k):
+            batch_features[k] = torch.as_tensor(
                 np.array([feature[k] for feature in features]), 
                 dtype=torch.long if is_int(k) else dtype,
             )
@@ -260,11 +259,11 @@ def _decorate_batch_input(
         batch_seg.append(np.full(feature["N"], i, dtype=int))
         count += feature["N"]
     batch_features["N"] = [feature["N"] for feature in features]
-    batch_features["batch_seg"] = torch.tensor(np.concatenate(batch_seg), dtype=torch.long)
+    batch_features["batch_seg"] = torch.as_tensor(np.concatenate(batch_seg), dtype=torch.long)
     n_structures = len(features)
     if n_with_edges == n_structures:
-        batch_features["idx_i"] = torch.tensor(np.concatenate(batch_idx_i), dtype=torch.long)
-        batch_features["idx_j"] = torch.tensor(np.concatenate(batch_idx_j), dtype=torch.long)
+        batch_features["idx_i"] = torch.as_tensor(np.concatenate(batch_idx_i), dtype=torch.long)
+        batch_features["idx_j"] = torch.as_tensor(np.concatenate(batch_idx_j), dtype=torch.long)
     elif n_with_edges > 0:
         raise ValueError(
             f"Incomplete neighbor lists in batch: {n_with_edges}/{n_structures} "
@@ -275,12 +274,12 @@ def _decorate_batch_input(
     if targets[0] is not None:
         for k in targets[0]:
             if is_atomic(k): 
-                batch_targets[k] = torch.tensor(
+                batch_targets[k] = torch.as_tensor(
                     np.concatenate([target[k][:features[i]["N"]] for i, target in enumerate(targets)]), 
                     dtype=torch.long if is_int(k) else dtype
                 )
             else:
-                batch_targets[k] = torch.tensor(
+                batch_targets[k] = torch.as_tensor(
                     np.array([target[k] for target in targets]), 
                     dtype=torch.long if is_int(k) else dtype,
                 )
@@ -292,40 +291,45 @@ def _decorate_batch_input(
     return batch_features, batch_targets
 
 
+def _atomic_numpy_parts(tensor: Tensor, counts) -> List[np.ndarray]:
+    # Copy the entire field to the host once, even when a batch contains many molecules.
+    return [part.numpy() for part in tensor.detach().cpu().split(counts)]
+
+
 def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], targets: Optional[Dict[str, Any]], non_target_features: List[str]=[]) -> Tuple[Dict[str, Union[np.ndarray, List]], Optional[Dict[str, Union[np.ndarray, List]]]]:
     y_pred = dict()
     y_truth = dict()
     for k, v in output.items():
         if is_target(k):
             if is_atomic(k):
-                y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
+                y_pred[k] = _atomic_numpy_parts(v, features["N"])
             else:
                 y_pred[k] = v.detach().cpu().numpy()
         elif is_target_uq(k):
             target = k[:-4]
             if is_atomic(target):
-                y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
+                y_pred[k] = _atomic_numpy_parts(v, features["N"])
             else:
                 y_pred[k] = v.detach().cpu().numpy()
         elif is_grad(k):
-            y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
+            y_pred[k] = _atomic_numpy_parts(v, features["N"])
     for k in non_target_features:
         if k in y_pred:
             continue
         if len(output[k]) == len(features["Za"]):
-            y_pred[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(output[k], features["N"])))
+            y_pred[k] = _atomic_numpy_parts(output[k], features["N"])
         elif len(output[k]) == len(features["N"]):
             y_pred[k] = output[k].detach().cpu().numpy()
         else:
             raise ValueError(f"non-target feature {k} has invalid length {len(output[k])}")
     
-    y_pred["Za"] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(features["Za"], features["N"])))
+    y_pred["Za"] = _atomic_numpy_parts(features["Za"], features["N"])
     
     if targets is not None:
         for k, v in targets.items():
             if is_target(k):
                 if is_atomic(k):
-                    y_truth[k] = list(map(lambda x: x.detach().cpu().numpy(), torch.split(v, features["N"])))
+                    y_truth[k] = _atomic_numpy_parts(v, features["N"])
                 else:
                     y_truth[k] = v.detach().cpu().numpy()
         y_pred["data_key"] = targets["data_key"]
@@ -335,12 +339,7 @@ def _decorate_batch_output(output: Dict[str, Any], features: Dict[str, Any], tar
     # Delta-learning inverse: priors must sit next to residual Qa / Sa on the metric dict
     for _prior_key in ("Q_init_a", "S_init_a"):
         if _prior_key in features and is_atomic(_prior_key):
-            split_prior = list(
-                map(
-                    lambda x: x.detach().cpu().numpy(),
-                    torch.split(features[_prior_key], features["N"]),
-                )
-            )
+            split_prior = _atomic_numpy_parts(features[_prior_key], features["N"])
             y_pred[_prior_key] = split_prior
             if targets is not None:
                 y_truth[_prior_key] = split_prior
