@@ -11,6 +11,7 @@ from typing import Dict
 
 import torch
 from torch import Tensor
+from ..loss import LossComponent
 
 
 def latent_force_cosine(pred: Tensor, ref: Tensor, eps: float = 1e-8) -> Tensor:
@@ -42,14 +43,18 @@ class LatentForceCosineLoss:
         self.weight = float(weight)
         self.eps = float(eps)
 
-    def __call__(self, output: Dict[str, Tensor], target: Dict[str, Tensor]) -> Tensor:
+    def components(self, output, target):
         if "latent_force" not in output:
             raise KeyError("latent_force_cosine expects output['latent_force'] from the NewtonNet preset")
         if "Fa" not in target:
             raise KeyError("latent_force_cosine expects reference forces target['Fa']")
-        return self.weight * latent_force_cosine(
-            output["latent_force"], target["Fa"], eps=self.eps
-        )
+        pred, ref = output["latent_force"], target["Fa"]
+        mean = latent_force_cosine(pred, ref, self.eps) if len(ref) else pred.sum()
+        yield LossComponent(mean, len(ref), self.weight)
+
+    def __call__(self, output: Dict[str, Tensor], target: Dict[str, Tensor]) -> Tensor:
+        component, = self.components(output, target)
+        return self.weight * component.mean
 
 
 LOSS_REGISTER = {
