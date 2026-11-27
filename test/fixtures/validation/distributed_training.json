@@ -1,0 +1,37 @@
+{
+  "pr": 150,
+  "baseline_revision": "7484d8e",
+  "candidate_package_tree": "8c46e4bd88097b48e3786ae5df8b21f202f03057",
+  "focused_checks": {
+    "launch_and_synchronization": {"tests_passed": 41},
+    "cache_pbc_split_active_learning_and_prediction_io": {"tests_passed": 65},
+    "trainer_and_resume": {"tests_passed": 16},
+    "loss_and_lightning": {"tests_passed": 9, "job": 6343577},
+    "loss_compatibility_subset": {"tests_passed": 5}
+  },
+  "legacy_lightning_checkpoint": {
+    "job": 6343658,
+    "model": "SchNet",
+    "checkpoint_epoch": 0,
+    "checkpoint_global_step": 8,
+    "next_batch_loss": 1.5230813099654352,
+    "equal_at_zero_tolerance": ["energy", "forces", "loss", "parameter_gradients", "updated_parameters", "optimizer_moments", "learning_rate"]
+  },
+  "cpu_ddp": {
+    "continuation": {
+      "world_size": 2,
+      "checked": ["model", "ema", "optimizer", "scheduler", "per_rank_rng", "best_last_epoch_checkpoints", "empty_validation_shard", "prediction_order"]
+    },
+    "cross_node_prediction": {
+      "job": 6343611,
+      "nodes": 2,
+      "world_size": 4,
+      "matched_input_rows_and_recomputed_metrics": 24,
+      "epoch_zero_based": 1,
+      "global_step": 4,
+      "checkpoint_rank_states": 4,
+      "energy_rmse": 49.63571031622513,
+      "force_component_rmse": 0.0271908194406747
+    }
+  }
+}

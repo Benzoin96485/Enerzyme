@@ -270,26 +270,16 @@ def test_resolve_world_size_yaml_fills_missing():
     assert resolve_world_size("auto", env) == 1
 
 
-def test_export_torchrun_env_from_slurm(monkeypatch):
-    for key in ("RANK", "WORLD_SIZE", "LOCAL_WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT"):
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("SLURM_JOB_ID", "42")
-    monkeypatch.setenv("SLURM_NODELIST", "gpu[01-04]")
-
-    launch = LaunchEnv(
-        mode="slurm_srun",
-        global_rank=3,
-        local_rank=3,
-        world_size=4,
-        local_world_size=4,
-        num_nodes=1,
-    )
-    export_torchrun_env(launch)
-    assert os.environ["RANK"] == "3"
-    assert os.environ["WORLD_SIZE"] == "4"
-    assert os.environ["LOCAL_WORLD_SIZE"] == "4"
-    assert os.environ["MASTER_ADDR"] == "gpu01"
-    assert os.environ["MASTER_PORT"] == str(42 + 15000)
+def test_export_torchrun_env_from_slurm():
+    step = {"SLURM_JOB_ID": "42", "SLURM_STEP_NODELIST": "gpu[01-02]", "SLURM_STEP_NUM_NODES": "2"}
+    launch = LaunchEnv(mode="slurm_srun", global_rank=3, local_rank=1,
+                       world_size=4, local_world_size=2, num_nodes=2)
+    export_torchrun_env(launch, environ=step)
+    assert step["RANK"] == "3"
+    assert step["WORLD_SIZE"] == "4"
+    assert step["LOCAL_WORLD_SIZE"] == "2"
+    assert step["MASTER_ADDR"] == "gpu01"
+    assert step["MASTER_PORT"] == "15042"
 
 
 def test_export_torchrun_env_does_not_overwrite_existing(monkeypatch):
