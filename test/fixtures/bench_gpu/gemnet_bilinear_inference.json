@@ -321,6 +321,18 @@
           "peak_MiB_relative_percent": 12.441854902971915
         }
       }
+    },
+    "production_cuda_retained_gradient_test": {
+      "revision": "4428e68",
+      "job": "6339555",
+      "test": "test/test_gemnet_ops.py::test_compiled_bilinear_force_inference_retains_gradients",
+      "precisions": [
+        "float32",
+        "float64"
+      ],
+      "passed": 2,
+      "method": "Independently compare two cotangents through retained compiled outputs with the native input and weight derivatives at each precision.",
+      "receipt_sha256": "3060be746eece71ce14494b575918d06a36ab526ffe4bf03a47ad59ed0a03359"
     }
   }
 }
