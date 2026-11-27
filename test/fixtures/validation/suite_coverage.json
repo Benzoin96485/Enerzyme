@@ -1,11 +1,11 @@
 {
   "cpu": {
-    "revision": "610b65f",
-    "job": "6339659",
+    "revision": "d2329fd",
+    "job": "6339860",
     "test_files_and_shards": 171,
     "results": {
-      "passed": 1671,
-      "skipped": 65,
+      "passed": 1673,
+      "skipped": 67,
       "errors": 0,
       "failures": 0
     },
@@ -14,28 +14,30 @@
       "CUDA + Triton required": 2,
       "CUDA and Triton required": 2,
       "CUDA-only local-frame fusion": 1,
-      "requires CUDA Inductor": 2,
+      "requires CUDA Inductor": 3,
       "set UMA_CHECKPOINT to a local uma-*.pt for live train smoke": 1,
       "compiled single-precision CUDA training": 1,
+      "CUDA receiver reductions": 1,
       "CUDA not available": 6,
       "set UMA_CHECKPOINT to a local uma-*.pt for live flow train smoke": 1,
       "fixture has no Muon trajectory": 7
     }
   },
   "cuda": {
-    "revision": "da1e5ec",
-    "job": "6339171",
+    "revision": "d2329fd",
+    "job": "6339868",
     "device": "Tesla V100-PCIE-32GB (sm70)",
     "pytest_files": [
       "test/test_e2former_triton_parity.py",
       "test/test_scatter.py",
+      "test/test_mp_aggregate.py",
       "test/test_local_frame_ops.py",
       "test/test_dpa4_core.py::test_dpa4_compiled_wigner_coordinate_hessian_at_euler_poles",
       "test/test_alignn_ops.py::test_compiled_gate_preserves_live_hooks_and_force_gradients",
       "test/test_gemnet_ops.py::test_compiled_bilinear_force_inference_retains_gradients"
     ],
     "results": {
-      "passed": 36,
+      "passed": 45,
       "skipped": 1,
       "errors": 0,
       "failures": 0
@@ -47,8 +49,10 @@
       "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype0]",
       "test.test_e2former_triton_parity::test_sparse_dispatch_values_and_double_gradients[cuda-dtype1]",
       "test.test_e2former_triton_parity::test_triton_sparse_qk_v_match_pytorch_on_cuda",
-      "test.test_gemnet_ops::test_compiled_bilinear_force_inference_retains_gradients",
+      "test.test_gemnet_ops::test_compiled_bilinear_force_inference_retains_gradients[dtype0]",
+      "test.test_gemnet_ops::test_compiled_bilinear_force_inference_retains_gradients[dtype1]",
       "test.test_local_frame_ops::test_compiled_local_frame_projection_honors_nested_hook",
+      "test.test_mp_aggregate::test_double_cuda_envelope_training_uses_the_ordered_fp32_denominator",
       "test.test_scatter::test_scatter_sum_basic_equivalence[cuda]",
       "test.test_scatter::test_scatter_sum_empty_input_equivalence[cuda]",
       "test.test_scatter::test_scatter_sum_grad_equivalence[cuda]",
@@ -62,10 +66,10 @@
   },
   "notes": "The runs use the recorded revisions. Each CUDA-only case skipped on the CPU passed in the GPU run, and the CUDA run skipped a CPU-only fallback case covered in the CPU run.",
   "wheel": {
-    "revision": "610b65f",
-    "job": "6339660",
+    "revision": "d2329fd",
+    "job": "6339867",
     "filename": "enerzyme-0.6.0-py3-none-any.whl",
-    "sha256": "cae2df3a42b07fac7786c0761cbebbbf2cfefdfae76a2a13c6a0527cbd4a76b4",
+    "sha256": "88decf092a5fec57ece0bfca4a8d56f9d7664a4fb2c1229d8c27744280e6930b",
     "results": {
       "passed": 58,
       "skipped": 0,
@@ -75,7 +79,7 @@
     "method": "Build from git archive with no index, install into a fresh target directory, load the registry and bundled Jd, CG and Lebedev data, and run the 58 frozen-weight checks outside the source checkout. The isolated test directory contains only the test harness and the frozen-weight symlink."
   },
   "documentation": {
-    "revision": "b0d6961",
+    "revision": "d2329fd",
     "sphinx": "8.2.3",
     "builder": "html",
     "options": [
